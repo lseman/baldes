@@ -139,6 +139,10 @@ struct Label {
     double                          real_cost      = 0.0;
     std::array<double, R_SIZE>      resources      = {};
     std::array<uint64_t, bitmap_words> visited_bitmap = {0};
+    // 64-bit summary of visited_bitmap used by dominance; see
+    // visited_signature(). Zero is always safe (it never causes a wrong
+    // dominance, at most a missed one).
+    uint64_t visited_sig = 0;
 #ifdef UNREACHABLE_DOMINANCE
     std::array<uint64_t, bitmap_words> unreachable_bitmap = {0};
 #endif
@@ -244,15 +248,32 @@ struct Label {
     bool visits(int node_id) const noexcept { return visited_bitmap[node_id / 64] & (1ULL << (node_id % 64)); }
 
     /**
-     * Conservative 64-bit summary used to reject impossible visited-set
-     * subset tests before reading the complete bitmap. If A is a subset of B,
-     * signature(A) is necessarily a subset of signature(B); collisions only
-     * cause a full check, never an incorrect dominance result.
+     * Visited-set signature used by dominance. Two encodings, told apart by
+     * kExactNgBit:
+     *  - exact: the ng-memory in the label vertex's local coordinates (bit p
+     *    set iff the p-th node of N(v), in increasing node id, is memorised),
+     *    plus kExactNgBit. For two labels at the same vertex the subset test
+     *    on this word is exactly the subset test on visited_bitmap, so the
+     *    bitmap need not be read.
+     *  - conservative: OR-fold of visited_bitmap with kExactNgBit cleared.
+     *    If A is a subset of B then sig(A) is a subset of sig(B); a passing
+     *    test still requires the full bitmap check.
+     * Set by BucketGraph::finalize_visited_signature().
      */
-    [[nodiscard]] uint64_t visited_signature() const noexcept {
+    static constexpr uint64_t kExactNgBit = 1ULL << 63;
+
+    [[nodiscard]] uint64_t visited_signature() const noexcept { return visited_sig; }
+
+    [[nodiscard]] uint64_t conservative_visited_signature() const noexcept {
         uint64_t signature = 0;
         for (uint64_t word : visited_bitmap) signature |= word;
-        return signature;
+        return signature & ~kExactNgBit;
+    }
+
+    // True when both signatures are exact local ng words, i.e. the
+    // signature subset test is the complete visited-set subset test.
+    [[nodiscard]] static constexpr bool exact_visited_pair(uint64_t lhs, uint64_t rhs) noexcept {
+        return ((lhs & rhs) & kExactNgBit) != 0;
     }
 
     /**
@@ -279,6 +300,7 @@ struct Label {
 
         // Zero out the bitmaps efficiently.
         std::memset(visited_bitmap.data(), 0, visited_bitmap.size() * sizeof(uint64_t));
+        visited_sig = 0;
 #ifdef UNREACHABLE_DOMINANCE
         std::memset(unreachable_bitmap.data(), 0, unreachable_bitmap.size() * sizeof(uint64_t));
 #endif

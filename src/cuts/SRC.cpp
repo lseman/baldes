@@ -78,12 +78,19 @@ bool CutStorage::addCut(Cut &cut) {
         cut.id                    = it->second;
         auto        old_cut       = cuts[cut.id];
         const auto &old_neighbors = old_cut.neighbors;
-        for (size_t i = 0; i < num_words; ++i) { cut.neighbors[i] |= old_neighbors[i]; }
-        // Preserve 'added' flag if the existing cut has been marked as added.
+        bool        memory_grew   = false;
+        for (size_t i = 0; i < num_words; ++i) {
+            const uint64_t merged = cut.neighbors[i] | old_neighbors[i];
+            memory_grew           = memory_grew || merged != old_neighbors[i];
+            cut.neighbors[i]      = merged;
+        }
+        // Preserve 'added'; the master row needs refreshing only when the
+        // memory actually grew (or an earlier update is still pending).
         if (old_cut.added) {
             cut.added   = true;
-            cut.updated = true;
+            cut.updated = old_cut.updated || memory_grew;
         }
+        cut.inactive_rounds = 0;
         cut.separation_count        = old_cut.separation_count;
         cut.inclusion_count         = old_cut.inclusion_count;
         cut.active_count            = old_cut.active_count;
@@ -201,50 +208,38 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
                         return customer == i || customer == j || customer == k;
                     };
 
-                    // Update AM based on the positions of nodes in each
-                    // consumer path.
+                    // Memory from the support routes (x > 0): every segment
+                    // that ends in a state overflow, not only the first.
                     for (int path_idx : candidate_paths) {
-                        const auto &consumers = allPaths[path_idx].route;
-                        int         first = -1, second = -1;
-                        // Identify first and second occurrences of elements
-                        // from C_set.
-                        for (size_t pos = 1; pos < consumers.size() - 1; ++pos) {
-                            if (is_base_node(consumers[pos])) {
-                                if (first == -1) {
-                                    first = pos;
-                                } else {
-                                    second = pos;
-                                    for (int pos_inner = first + 1; pos_inner < second; ++pos_inner) {
-                                        AM[consumers[pos_inner] / 64] |= (1ULL << (consumers[pos_inner] % 64));
-                                    }
-                                    break;
-                                }
-                            }
-                        }
+                        if (static_cast<size_t>(path_idx) >= x.size() || numericutils::isZero(x[path_idx])) continue;
+                        rank1::forEachRequiredMemoryNode(
+                            allPaths[path_idx].route, p.den, is_base_node, [&](int) { return 1; },
+                            [&](int node) { AM[node / 64] |= (1ULL << (node % 64)); });
                     }
                     // set all AM vector to 1
                     // for (int node_idx = 0; node_idx < N_SIZE; ++node_idx) {
                     // AM[node_idx / 64] |= (1ULL << (node_idx % 64));
                     // }
 
+                    // The memory comes from the support routes above, but the
+                    // sparse row must hold the coefficient of every column
+                    // touching the base set: it becomes the master row, and a
+                    // route visiting one base node twice (ng-route) also has
+                    // coefficient floor(2/2) = 1.
                     double exact_lhs = 0.0;
                     candidate_coefficients.clear();
-                    candidate_coefficients.reserve(candidate_paths.size());
-                    for (int path_idx : candidate_paths) {
-                        if (static_cast<size_t>(path_idx) >= x.size()) {
-                            candidate_coefficients.push_back(0.0);
-                            continue;
-                        }
+                    candidate_coefficients.reserve(touched_paths.size());
+                    for (int path_idx : touched_paths) {
                         const auto  &clients = allPaths[path_idx].route;
                         const double coeff   = computeLimitedMemoryCoefficient(C, AM, p, clients, order);
                         candidate_coefficients.push_back(coeff);
-                        exact_lhs += coeff * x[path_idx];
+                        if (static_cast<size_t>(path_idx) < x.size()) exact_lhs += coeff * x[path_idx];
                     }
 
                     if (exact_lhs > rhs + SRC_SEPARATION_TOL) {
                         Cut cut(C, AM, {}, p);
                         cut.baseSetOrder = order;
-                        set_sparse_coefficients(cut, candidate_paths, candidate_coefficients);
+                        set_sparse_coefficients(cut, touched_paths, candidate_coefficients);
                         local_cuts.emplace_back(exact_lhs - rhs, cut);
                     }
                 }
@@ -283,6 +278,9 @@ void LimitedMemoryRank1Cuts::separate(const SparseMatrix &A, const std::vector<d
         auto &cut = candidate.second;
         cut.key   = cutStorage.compute_cut_key(cut.baseSet, cut.p.num, cut.p.den);
         if (cutStorage.cutExists(cut.key).first >= 0) {
+            // Violated again: its stored memory is too small for the current
+            // support routes. Merge the new memory so the row is refreshed.
+            cutStorage.addCut(cut);
             cutStorage.markCutSeparated(cut, candidate.first);
             continue;
         }
@@ -332,14 +330,11 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     // fmt::print("Separating Rank-1 cuts...\n");
     separateR1C1(matrix.A_sparse, solution);
     // fmt::print("Separation Rank-3 cuts...\n");
-    const size_t initial_cut_count = cuts->size();
     separate(matrix.A_sparse, solution);
     // Adjacency-based rank-3 separation (RouteOpt generateR1C3 style):
     // focuses on triples where nodes are structurally adjacent in routes.
     separateR1C3Adjacency(matrix.A_sparse, solution);
 
-    // Record the cut count after the first separation phase.
-    int rank3_cuts_size = static_cast<int>(cuts->size() - initial_cut_count);
 
     ////////////////////////////////////////////////////
     // High-Rank Cuts Separation
@@ -349,8 +344,10 @@ std::pair<bool, bool> LimitedMemoryRank1Cuts::runSeparation(BNBNode *node, std::
     high_rank_cuts.allPaths         = allPaths;
     high_rank_cuts.nodes            = nodes;
     high_rank_cuts.arc_duals        = arc_duals;
-    // fmt::print("Separating High-Rank cuts...\n");
-    high_rank_cuts.separate(matrix.A_sparse, solution);
+    // Escalate to higher ranks
+    // only while the lower ranks left room in this round's budget: with the
+    // budget spent, high-rank search could only refresh existing cuts.
+    if (cuts->remainingRoundCutBudget() > 0) { high_rank_cuts.separate(matrix.A_sparse, solution); }
 
     const size_t cuts_after_separation = cuts->size();
 
@@ -554,37 +551,27 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
             order[node] = ordering++;
         }
 
-        // Grow AM: add intermediate nodes between the first two cut-vertex
-        // visits in every route with x > 0.
+        // Grow AM from every route with x > 0: each segment that ends in a
+        // state overflow.
         const auto is_base_node = [&](int n) noexcept { return n == i || n == j || n == k; };
         for (int r : exact_candidate_paths) {
-            const auto &route = allPaths[r].route;
-            int         first = -1, second = -1;
-            for (int pos = 1; pos + 1 < static_cast<int>(route.size()); ++pos) {
-                if (is_base_node(route[pos])) {
-                    if (first < 0)
-                        first = pos;
-                    else {
-                        second = pos;
-                        break;
-                    }
-                }
-            }
-            if (second < 0) continue;
-            for (int inner = first + 1; inner < second; ++inner) {
-                const int node = route[inner];
-                AM[node / 64] |= (1ULL << (node % 64));
-            }
+            rank1::forEachRequiredMemoryNode(
+                allPaths[r].route, p.den, is_base_node, [](int) { return 1; },
+                [&](int node) { AM[node / 64] |= (1ULL << (node % 64)); });
         }
 
-        // Compute exact violation with the limited-memory coefficient
+        // Compute exact violation with the limited-memory coefficient. The
+        // memory above comes from the support routes; coefficients are
+        // needed for every column touching the base set because the sparse
+        // row becomes the master row (columns at x = 0 included).
         double              exact_vio = -rhs;
         std::vector<int>    cand_paths;
         std::vector<double> cand_coeffs;
-        for (int r : exact_candidate_paths) {
+        for (int r : exact_touched_routes) {
+            if (exact_visit_count[r] < 2) continue; // floor(visits / 2) = 0
             const double coeff = computeLimitedMemoryCoefficient(C, AM, p, allPaths[r].route, order);
             if (!numericutils::isZero(coeff)) {
-                exact_vio += coeff * x[r];
+                if (static_cast<size_t>(r) < x.size()) exact_vio += coeff * x[r];
                 cand_paths.push_back(r);
                 cand_coeffs.push_back(coeff);
             }
@@ -604,6 +591,8 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
 
         cut.key = cutStorage.compute_cut_key(cut.baseSet, cut.p.num, cut.p.den);
         if (cutStorage.cutExists(cut.key).first >= 0) {
+            // Violated again: merge the larger memory (see separate()).
+            cutStorage.addCut(cut);
             cutStorage.markCutSeparated(cut, exact_vio);
             --max_trials;
             continue;
@@ -632,7 +621,8 @@ void LimitedMemoryRank1Cuts::separateR1C3Adjacency(const SparseMatrix &A, const 
     }
 }
 
-bool LimitedMemoryRank1Cuts::cutCleaner(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints) {
+bool LimitedMemoryRank1Cuts::cutCleaner(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints,
+                                        size_t required_slots) {
     // Pointer to the cut storage.
     auto               *cuts = &cutStorage;
     std::vector<double> solution;
@@ -655,7 +645,23 @@ bool LimitedMemoryRank1Cuts::cutCleaner(BNBNode *node, std::vector<baldesCtrPtr>
         // threshold removed binding cuts each iteration and made the bound
         // oscillate as they were re-separated.
         constexpr double kInactiveSlack = 1e-2;
-        if (numericutils::gt(slack, 0.0, kInactiveSlack)) {
+        // Removing a cut the moment it goes slack lets it become violated
+        // again once the LP moves, so it is re-separated and re-added every
+        // round (cut churn that also starves higher-rank separation). Drop a
+        // cut only after it stayed slack for several consecutive rounds.
+        constexpr int kInactiveRounds = 3;
+        const int     row_position    = static_cast<int>(std::distance(SRCconstraints.begin(), it.base()) - 1);
+        Cut          &stored_cut      = cuts->getCut(row_position);
+        if (!numericutils::gt(slack, 0.0, kInactiveSlack)) {
+            stored_cut.inactive_rounds = 0;
+            ++it;
+            continue;
+        }
+        if (++stored_cut.inactive_rounds < kInactiveRounds) {
+            ++it;
+            continue;
+        }
+        {
             cleaned = true;
             node->remove(constr);
 
@@ -671,8 +677,32 @@ bool LimitedMemoryRank1Cuts::cutCleaner(BNBNode *node, std::vector<baldesCtrPtr>
 
             // Erase the element and update the reverse iterator.
             it = std::make_reverse_iterator(SRCconstraints.erase(normal_it));
-        } else {
-            ++it;
+        }
+    }
+
+    // Make room for pending cuts when the master is at its SRC capacity
+    // (SRCMap holds MAX_SRC_CUTS residues): evict non-binding rows, largest
+    // slack first. Removing a non-binding row does not change the LP optimum.
+    // Without this, separated cuts were dropped every round while the round
+    // still counted as "cuts found", looping column generation.
+    const size_t free_slots = SRCconstraints.size() < MAX_SRC_CUTS ? MAX_SRC_CUTS - SRCconstraints.size() : 0;
+    if (required_slots > free_slots) {
+        size_t to_evict = required_slots - free_slots;
+        std::vector<std::pair<double, int>> slack_rows;
+        for (int pos = 0; pos < static_cast<int>(SRCconstraints.size()); ++pos) {
+            const double slack = node->getSlack(SRCconstraints[pos]->index(), solution);
+            if (numericutils::gt(slack, 0.0, 1e-6)) slack_rows.emplace_back(slack, pos);
+        }
+        std::sort(slack_rows.begin(), slack_rows.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+        if (slack_rows.size() > to_evict) slack_rows.resize(to_evict);
+        // Remove from the highest position down so earlier positions stay valid.
+        std::sort(slack_rows.begin(), slack_rows.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
+        for (const auto &[slack, pos] : slack_rows) {
+            (void)slack;
+            node->remove(SRCconstraints[pos]);
+            cuts->removeCut(cuts->getID(pos));
+            SRCconstraints.erase(SRCconstraints.begin() + pos);
+            cleaned = true;
         }
     }
     return cleaned;

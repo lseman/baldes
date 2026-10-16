@@ -10,6 +10,7 @@
 
 #include "pricing/bucket_graph/model/Bucket.h"
 #include "pricing/bucket_graph/ArcElimination.h"
+#include "pricing/bucket_graph/Resources.h"
 #include "core/Definitions.h"
 #include "utils/MST.h"
 #include "cuts/rank1/Rank1Cuts.h"
@@ -62,93 +63,46 @@ void BucketGraph::add_arc(int from_bucket, int to_bucket, const std::array<doubl
 
 template <Direction D>
 inline int BucketGraph::get_bucket_number(int node, std::span<double> resource_values_vec) {
-    const size_t num_resources = options.main_resources.size();
+    // Table lookup prepared by define_buckets<D>(); see BucketIndexTable.
+    const auto  &table = assign_buckets<D>(fw_bucket_index_table, bw_bucket_index_table);
+    const size_t dims  = table.dims;
+    const size_t base  = static_cast<size_t>(node) * dims;
 
-    const auto &buckets = assign_buckets<D>(fw_buckets, bw_buckets);
-
-    // Optionally adjust resource values (uncomment if you need epsilon
-    // adjustments)
-    for (size_t r = 0; r < num_resources; ++r) {
-        if constexpr (D == Direction::Forward) {
-            // resource_values_vec[r] += numericutils::eps;
-        } else { // Direction::Backward
-            // resource_values_vec[r] -= numericutils::eps;
-        }
-    }
-    auto &num_buckets_index = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw);
-    // Start with the offset for this node’s buckets.
-    int bucket_number = num_buckets_index[node];
-    int multiplier    = 1;
-
-    for (size_t r = 0; r < num_resources; ++r) {
-        // Node-specific resource bounds.
-        double node_lb = nodes[node].lb[r];
-        double node_ub = nodes[node].ub[r];
-
-        // Global bounds (if needed for computing splits).
-        double global_lb  = R_min[r];
-        double global_ub  = R_max[r];
-        double full_range = global_ub - global_lb;
-        double node_range = node_ub - node_lb;
-
-        // Determine the number of splits (i.e. intervals) for resource r.
-        // Keep this identical to define_buckets, including the degenerate
-        // global-range case.
-        int splits = 1;
-        if (std::fabs(full_range) > std::numeric_limits<double>::epsilon()) {
-            splits =
-                std::max(1, static_cast<int>(std::round((node_range / full_range) * intervals[r].interval)));
-        }
-        double interval_width =
-            (splits == 0 || std::fabs(node_range) < std::numeric_limits<double>::epsilon()) ? 1.0 : node_range / splits;
-
-        int pos = 0;
-        if constexpr (D == Direction::Forward) {
-            if (std::fabs(interval_width) < std::numeric_limits<double>::epsilon()) {
-                pos = 0;
-            } else {
-                pos = std::clamp(static_cast<int>(std::floor((resource_values_vec[r] - node_lb) / interval_width)), 0,
-                                 splits - 1);
-            }
-        } else {
-            if (std::fabs(interval_width) < std::numeric_limits<double>::epsilon()) {
-                pos = 0;
-            } else {
-                pos = std::clamp(static_cast<int>(std::floor((node_ub - resource_values_vec[r]) / interval_width)), 0,
-                                 splits - 1);
-            }
-        }
-
-        bucket_number += pos * multiplier;
-        multiplier *= splits;
+    int bucket_number = assign_buckets<D>(num_buckets_index_fw, num_buckets_index_bw)[node];
+    for (size_t r = 0; r < dims; ++r) {
+        const double width = table.width[base + r];
+        if (width == 0.0) continue;
+        const double offset = (D == Direction::Forward) ? resource_values_vec[r] - table.lb[base + r]
+                                                        : table.ub[base + r] - resource_values_vec[r];
+        const int    pos    = std::clamp(static_cast<int>(std::floor(offset / width)), 0, table.splits[base + r] - 1);
+        bucket_number += pos * table.stride[base + r];
     }
 
+#ifdef BALDES_CHECK_BUCKET_LOOKUP
     // Buckets contain only the bucketed (main) dimensions, whereas labels may
     // carry additional resources. Validate only the dimensions represented by
     // the bucket to avoid indexing past its compact bounds.
-    bool bucket_contains_values = bucket_number >= 0 && bucket_number < static_cast<int>(buckets.size());
+    const auto &buckets                = assign_buckets<D>(fw_buckets, bw_buckets);
+    bool        bucket_contains_values = bucket_number >= 0 && bucket_number < static_cast<int>(buckets.size());
     if (bucket_contains_values) {
         const auto &bucket = buckets[bucket_number];
         bucket_contains_values =
-            bucket.lb.size() == num_resources && bucket.ub.size() == num_resources &&
-            resource_values_vec.size() >= num_resources;
-        for (size_t r = 0; r < num_resources && bucket_contains_values; ++r) {
+            bucket.lb.size() == dims && bucket.ub.size() == dims && resource_values_vec.size() >= dims;
+        for (size_t r = 0; r < dims && bucket_contains_values; ++r) {
             bucket_contains_values = !numericutils::lt(resource_values_vec[r], bucket.lb[r]) &&
                                      !numericutils::gt(resource_values_vec[r], bucket.ub[r]);
         }
     }
     if (unlikely(!bucket_contains_values)) {
-        // print resource_values_vec
         for (auto val : resource_values_vec) { fmt::print("{}\n", val); }
-        // Print bucket bounds only when the computed index itself is valid.
         if (bucket_number >= 0 && bucket_number < static_cast<int>(buckets.size()) &&
             !buckets[bucket_number].lb.empty() && !buckets[bucket_number].ub.empty()) {
             fmt::print("{}\n", buckets[bucket_number].lb[0]);
             fmt::print("{}\n", buckets[bucket_number].ub[0]);
         }
-
         std::throw_with_nested(std::runtime_error("Resource values not contained in bucket"));
     }
+#endif
 
     return bucket_number;
 }
@@ -237,6 +191,14 @@ void BucketGraph::define_buckets() {
     num_buckets.resize(num_nodes);
     num_buckets_index.resize(num_nodes);
 
+    auto &index_table = assign_buckets<D>(fw_bucket_index_table, bw_bucket_index_table);
+    index_table.dims  = static_cast<size_t>(num_intervals);
+    index_table.lb.assign(num_nodes * index_table.dims, 0.0);
+    index_table.ub.assign(num_nodes * index_table.dims, 0.0);
+    index_table.width.assign(num_nodes * index_table.dims, 0.0);
+    index_table.splits.assign(num_nodes * index_table.dims, 1);
+    index_table.stride.assign(num_nodes * index_table.dims, 1);
+
     // Lambda to calculate an interval for one dimension. Backward buckets are
     // deliberately emitted in the paper's kappa order:
     //   kappa = 0 -> interval ending at u_v,
@@ -282,6 +244,25 @@ void BucketGraph::define_buckets() {
         }
         // Optionally store node-specific split counts.
         bucket_splits[vrp_node.id] = node_split_counts;
+
+        // Cache the lookup parameters used by get_bucket_number<D>().
+        {
+            const size_t base   = static_cast<size_t>(vrp_node.id) * index_table.dims;
+            int          stride = 1;
+            for (int r = 0; r < num_intervals; ++r) {
+                const double node_range = vrp_node.ub[r] - vrp_node.lb[r];
+                double       width      = (std::fabs(node_range) < std::numeric_limits<double>::epsilon())
+                                              ? 1.0
+                                              : node_range / node_split_counts[r];
+                if (std::fabs(width) < std::numeric_limits<double>::epsilon()) width = 0.0;
+                index_table.lb[base + r]     = vrp_node.lb[r];
+                index_table.ub[base + r]     = vrp_node.ub[r];
+                index_table.width[base + r]  = width;
+                index_table.splits[base + r] = node_split_counts[r];
+                index_table.stride[base + r] = stride;
+                stride *= node_split_counts[r];
+            }
+        }
 
         int n_buckets = 0;
         if (num_intervals == 1) {
@@ -336,7 +317,46 @@ void BucketGraph::define_buckets() {
         if constexpr (D == Direction::Forward) { n_segments = (n_buckets + 63) >> 6; }
     }
 
-    // 5. Precompute RC2 bucket metadata for whole-bucket prune.
+    // 5. Resources that are not monotone in this direction cannot use the
+    // one-sided dominance test (forward <=, backward >=) applied by the
+    // dominance scans; they must match within eps, i.e. non-disposable
+    // resources are compared for equality. Combined with the one-sided
+    // prefilter, a reversed-sense resource (battery) also ends up requiring
+    // equality, which is conservative.
+    {
+        auto &eq_resources = assign_buckets<D>(fw_eq_dominance_resources, bw_eq_dominance_resources);
+        eq_resources.clear();
+        const size_t n_res = std::min(options.resources.size(), static_cast<size_t>(R_SIZE));
+        for (size_t r = 0; r < n_res && r < options.resource_type.size(); ++r) {
+            bool needs_equality = false;
+            switch (static_cast<ResourceType>(options.resource_type[r])) {
+            case ResourceType::Disposable:
+            case ResourceType::MTW: break;
+            case ResourceType::NonDisposable:
+                // No waiting: a cheaper consumption can miss a later lower
+                // bound (forward) or exceed a later upper bound (backward).
+                for (const auto &vrp_node : nodes) {
+                    if constexpr (D == Direction::Forward) {
+                        needs_equality = needs_equality || numericutils::gt(vrp_node.lb[r], R_min[r]);
+                    } else {
+                        needs_equality = needs_equality || numericutils::lt(vrp_node.ub[r], R_max[r]);
+                    }
+                }
+                break;
+            case ResourceType::Binary:
+            case ResourceType::Battery: needs_equality = true; break;
+            case ResourceType::RechargeCount:
+            case ResourceType::RechargeTime:
+                // Both grow towards their limit in either direction, so the
+                // backward ">=" sense is the wrong one.
+                needs_equality = (D == Direction::Backward);
+                break;
+            }
+            if (needs_equality) eq_resources.push_back(static_cast<int>(r));
+        }
+    }
+
+    // 6. Precompute RC2 bucket metadata for whole-bucket prune.
     // Forward dominance needs candidate rc2 <= label rc2, so keep a prefix
     // minimum of bucket lower bounds. Backward buckets are reversed, so
     // candidate rc2 >= label rc2 also lives in the prefix.
@@ -433,7 +453,11 @@ int BucketGraph::get_opposite_bucket_number(int current_bucket_index, std::span<
     // Optionally, add an assertion or check that inc has the expected size.
     assert(inc.size() == num_resources && theNode.lb.size() == num_resources && theNode.ub.size() == num_resources);
 
-    std::vector<double> reference_point(num_resources);
+    // Main resources are a subset of the R_SIZE label resources; keep the
+    // reference point on the stack (this runs once per forward extension in
+    // completion-bound pricing).
+    std::array<double, R_SIZE> reference_storage{};
+    const std::span<double>    reference_point(reference_storage.data(), num_resources);
 
     if constexpr (D == Direction::Forward) {
         // For Forward direction:
@@ -516,6 +540,15 @@ void BucketGraph::bucket_fixing() {
 
         // Print info about bucket arc elimination.
         print_info("performing bucket arc elimination with theta = {}\n", gap);
+
+        // Sum of positive active SRC duals (prepared by the Stage Four run
+        // above): an upper bound on the discount a forward/backward join can
+        // collect from SRC overflows, used by UpdateBucketsSet. Set before the
+        // two directions run in parallel.
+        elimination_src_discount = 0.0;
+#ifdef SRC
+        for (double dual : src_dense_duals) elimination_src_discount += std::max(0.0, dual);
+#endif
 
         // Run forward and backward sections in parallel.
         PARALLEL_SECTIONS(
@@ -910,6 +943,7 @@ void BucketGraph::common_initialization() {
     depot_label->is_extended = false;
     depot_label->addNode(depot_id);
     set_node_visited(depot_label->visited_bitmap, depot_id);
+    finalize_visited_signature<Full::Full>(depot_label, depot_id);
     SRC_MODE_BLOCK(depot_label->SRCmap.assign(cut_storage->activeSize(), 0);)
     buckets[initial_bucket].add_label(depot_label);
     buckets[initial_bucket].node_id = depot_id;

@@ -47,9 +47,9 @@ void BucketGraph::generate_arcs() {
         bucket.clear();
         bucket.clear_arcs(D == Direction::Forward);
     }
-
+    int physical_arc_id_counter = 0;
     auto try_add_arc = [&](int from_bucket, const VRPNode &next_node, const std::array<double, R_SIZE> &res_inc,
-                           double cost_inc) -> bool {
+                           double cost_inc, int arc_id) -> bool {
         bool                valid = true;
         std::vector<double> head_resource(num_resources, 0.0);
         for (int r = 0; r < num_resources && valid; ++r) {
@@ -70,10 +70,11 @@ void BucketGraph::generate_arcs() {
         }
         if (valid) {
             const int to_bucket = get_bucket_number<D>(next_node.id, head_resource);
-            buckets[from_bucket].template add_bucket_arc<D>(from_bucket, to_bucket, res_inc, cost_inc, false);
+            buckets[from_bucket].template add_bucket_arc<D>(from_bucket, to_bucket, res_inc, cost_inc, false, -1, arc_id);
         }
         return valid;
     };
+
 
     auto process_node = [&](int node_id) {
         const auto         &node = nodes[node_id];
@@ -93,7 +94,9 @@ void BucketGraph::generate_arcs() {
                     if (options.resources[r] == "time") { res_inc[r] += travel_cost; }
                 }
 
-                try_add_arc(from_bucket, next_node, res_inc, cost_inc);
+                // Assign physical arc ID and pass to try_add_arc
+                int phys_id = physical_arc_id_counter++;
+                try_add_arc(from_bucket, next_node, res_inc, cost_inc, phys_id);
             }
         }
     };
@@ -139,6 +142,9 @@ void BucketGraph::generate_arcs() {
             global_arcs.push_back(arc);
         }
     }
+    // Build physical-arc NG memories after arcs are generated.
+    //: grouped set-distance initialization for elementarity.
+    build_arc_ng_memory();
 }
 
 template <Direction D>

@@ -84,12 +84,23 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
         // Mark the current bucket as visited.
         Bvisited[segment] |= (1ULL << bit_pos);
 
-        // Get the opposite bucket’s label and node id.
+        // Get the opposite bucket’s label and node id. The joining arc runs
+        // from the forward side to the backward side of the route: (u, w)
+        // when eliminating forward, (w, u) when eliminating backward.
         const int bucketLprimenode = buckets_opposite[curr_bucket].node_id;
-        double    cost             = getcij(bucketLnode, bucketLprimenode);
+        const int arc_from         = forward ? bucketLnode : bucketLprimenode;
+        const int arc_to           = forward ? bucketLprimenode : bucketLnode;
+        const double travel        = getcij(arc_from, arc_to);
 
-        // Optionally adjust cost with arc duals if RCC mode is enabled.
-        RCC_MODE_BLOCK(auto arc_dual = arc_duals.getDual(bucketLnode, bucketLprimenode); cost -= arc_dual;)
+        // Reduced cost of the joining arc, as in concatenation: travel minus
+        // RCC and branching arc duals. Resource checks use the travel time.
+        double cost = travel;
+        RCC_MODE_BLOCK(cost -= arc_duals.getDual(arc_from, arc_to);)
+        if (!branching_duals->empty()) { cost -= branching_duals->getDual(arc_from, arc_to); }
+        // Joining can also trigger SRC overflows; positive SRC duals may lower
+        // the route cost, so allow for them (elimination_src_discount = sum of
+        // positive active SRC duals, 0 when all duals are non-positive).
+        cost -= elimination_src_discount;
 
         // Skip if the accumulated cost plus lower bound exceeds theta.
         if (numericutils::gt(label_cost + cost + c_bar_opposite[curr_bucket], theta)) continue;
@@ -107,30 +118,22 @@ void BucketGraph::UpdateBucketsSet(const double theta, const Label *label, anker
                 if (overlapsVisited(L_opposite, label)) continue;
             }
 
-            // Determine the reference node for resource checks.
-            const VRPNode &ref_node = forward ? nodes[bucketLnode] : nodes[L_opposite->node_id];
+            // Same increments as Extend / check_feasibility: consumption of
+            // the arc's tail plus travel time on the time resource.
+            const Label   *fw_label = forward ? label : L_opposite;
+            const Label   *bw_label = forward ? L_opposite : label;
+            const VRPNode &ref_node = nodes[arc_from];
 
-            const int time_idx  = options.time_resource_index;
-            bool      violated  = false;
-            const size_t num_resources = options.resources.size();
+            const int    time_idx      = options.time_resource_index;
+            bool         violated      = false;
+            const size_t num_resources = std::min(options.resources.size(), static_cast<size_t>(R_SIZE));
             for (size_t r = 0; r < num_resources; ++r) {
-                if (static_cast<int>(r) == time_idx) {
-                    const double time_constraint = forward
-                                                       ? label->resources[time_idx] + cost + ref_node.duration
-                                                       : L_opposite->resources[time_idx] + cost + ref_node.duration;
-                    if (numericutils::gt(time_constraint,
-                                         forward ? L_opposite->resources[time_idx] : label->resources[time_idx])) {
-                        violated = true;
-                        break;
-                    }
-                } else {
-                    const double resource_constraint = forward ? label->resources[r] + ref_node.consumption[r]
-                                                               : L_opposite->resources[r] + ref_node.consumption[r];
-                    if (numericutils::gt(resource_constraint,
-                                         forward ? L_opposite->resources[r] : label->resources[r])) {
-                        violated = true;
-                        break;
-                    }
+                double reached = fw_label->resources[r];
+                if (r < ref_node.consumption.size()) reached += ref_node.consumption[r];
+                if (static_cast<int>(r) == time_idx) reached += travel;
+                if (numericutils::gt(reached, bw_label->resources[r])) {
+                    violated = true;
+                    break;
                 }
             }
 
@@ -358,10 +361,14 @@ void BucketGraph::BucketArcElimination(double theta) {
         process_jump_arcs(b);
         process_bucket_arcs(b);
 
-        // iterate over fixed buckets and remove them
-        for (int b_prime = 0; b_prime < buckets_size; ++b_prime) {
-            if (is_bucket_fixed<D>(b, b_prime)) { buckets[b].template remove_bucket_arc<D>(b, b_prime); }
+        // Remove the fixed arcs of b. Only b's own arcs can be fixed here, so
+        // scan them instead of every possible target bucket.
+        static thread_local std::vector<int> fixed_targets;
+        fixed_targets.clear();
+        for (const auto &arc : buckets[b].template get_bucket_arcs<D>()) {
+            if (!arc.jump && is_bucket_fixed<D>(b, arc.to_bucket)) fixed_targets.push_back(arc.to_bucket);
         }
+        for (int b_prime : fixed_targets) { buckets[b].template remove_bucket_arc<D>(b, b_prime); }
     }
 
     // Print the total number of removed arcs.

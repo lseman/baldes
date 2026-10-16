@@ -98,6 +98,9 @@ struct Cut {
     int  srcMultiplier(int node) const { return p.num[baseSetOrder[node]]; }
 
     double rhs = 1;
+    // Consecutive separation rounds with the master row slack (see
+    // LimitedMemoryRank1Cuts::cutCleaner).
+    int inactive_rounds = 0;
     int    id  = -1;
 
     // Cut pool management metadata
@@ -642,15 +645,16 @@ private:
 
             for (const auto &active_cut : active_cuts) {
                 const auto &cut = *active_cut.cut_ptr;
-                if (!(cut.neighbors[segment] & bit)) {
-                    clears.push_back(static_cast<uint16_t>(active_cut.index));
-                    continue;
-                }
+                // The base set always belongs to the memory (C is a subset of M),
+                // so test it first: a base-set node missing from `neighbors`
+                // must still advance the state rather than reset it.
                 if (cut.baseSet[segment] & bit) {
                     updates.push_back({static_cast<uint16_t>(active_cut.index),
                                        static_cast<uint16_t>(cut.p.num[cut.baseSetOrder[node_id]]),
                                        static_cast<uint16_t>(cut.p.den), active_cut.dual_value});
+                    continue;
                 }
+                if (!(cut.neighbors[segment] & bit)) { clears.push_back(static_cast<uint16_t>(active_cut.index)); }
             }
         }
     }
@@ -823,7 +827,6 @@ public:
         stored.max_violation         = std::max(stored.max_violation, stored.last_violation);
         stored.last_separation_epoch = current_epoch_;
         if (stored.creation_epoch == 0) { stored.creation_epoch = current_epoch_; }
-        if (stored.added) { stored.updated = true; }
     }
 
     void markCutSeparated(Cut &cut, double violation) {
@@ -844,7 +847,10 @@ public:
             stored.max_violation         = std::max(stored.max_violation, cut.last_violation);
             stored.last_separation_epoch = current_epoch_;
             if (stored.creation_epoch == 0) { stored.creation_epoch = current_epoch_; }
-            if (stored.added) { stored.updated = true; }
+            // Statistics only: re-separating an existing cut does not change
+            // its master row (addCut merges a larger memory and flags the
+            // update when there is one). Flagging it here made every round
+            // look like a cut change and looped column generation.
         }
     }
 

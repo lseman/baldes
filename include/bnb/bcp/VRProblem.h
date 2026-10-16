@@ -218,6 +218,80 @@ public:
         return rc;
     }
 
+    // Master column of a route over every row (customer visits, vehicle row,
+    // SRC, RCC and branching rows), dense by row index. Mirrors
+    // routeReducedCost.
+    std::vector<double> routeMasterColumn(BNBNode *node, const std::vector<int> &route, size_t n_rows) {
+        std::vector<double> column(n_rows, 0.0);
+        auto add = [&](int row, double coeff) {
+            if (row >= 0 && static_cast<size_t>(row) < n_rows) column[static_cast<size_t>(row)] += coeff;
+        };
+        for (int node_id : route) {
+            if (node_id > 0 && node_id < N_SIZE - 1) add(node_id - 1, 1.0);
+        }
+        add(N_SIZE - 2, 1.0);
+
+        Path path(route, 0.0);
+        SRC_MODE_BLOCK({
+            auto        &cuts           = node->r1c->cutStorage;
+            auto        &SRCconstraints = node->SRCconstraints;
+            auto         coeffs         = cuts.computeLimitedMemoryCoefficients(path.route);
+            const size_t n_terms        = std::min(coeffs.size(), SRCconstraints.size());
+            for (size_t i = 0; i < n_terms; ++i) add(SRCconstraints[i]->index(), coeffs[i]);
+        });
+        RCC_MODE_BLOCK({
+            auto        &rccManager = node->rccManager;
+            auto         coeffs     = rccManager->computeRCCCoefficients(path.route);
+            const auto  &cuts       = rccManager->getCuts();
+            const size_t n_terms    = std::min(coeffs.size(), cuts.size());
+            for (size_t i = 0; i < n_terms; ++i) add(cuts[i].ctr->index(), coeffs[i]);
+        });
+        auto        &branching = node->branchingDuals;
+        auto         coeffs    = branching->computeCoefficients(path.route);
+        const auto  &ctrs      = branching->getBranchingbaldesCtrs();
+        const size_t n_terms   = std::min(coeffs.size(), ctrs.size());
+        for (size_t i = 0; i < n_terms; ++i) add(ctrs[i]->index(), coeffs[i]);
+        return column;
+    }
+
+    /**
+     * Subgradient of the pricing Lagrangian L(v) = b·v + U·min(0, rc_min(v))
+     * at the separation point: the
+     * Lagrangian solution takes the best column U times when its reduced cost
+     * is negative and nothing otherwise, so g = b - U·a(best) or g = b. The
+     * vehicle row is not part of the pricing Lagrangian (pricing reads its
+     * dual as 0), so its component is 0.
+     */
+    std::vector<double> pricingSubgradient(BNBNode *node, const ModelData &matrix, const std::vector<Label *> &columns,
+                                           const std::vector<double> &sep_duals, int fleet_bound) {
+        constexpr int kVehicleRow = N_SIZE - 2;
+        const size_t  n_rows      = matrix.b.size();
+        std::vector<double> g(matrix.b.begin(), matrix.b.end());
+
+        const double vehicle_dual =
+            kVehicleRow < static_cast<int>(sep_duals.size()) ? sep_duals[static_cast<size_t>(kVehicleRow)] : 0.0;
+        std::vector<int> route;
+        std::vector<int> best_route;
+        double           best_rc = 0.0;
+        for (const Label *label : columns) {
+            if (label == nullptr) continue;
+            const auto &stored = label->getRoute();
+            if (stored.size() < 3) continue;
+            route.assign(stored.begin(), stored.end());
+            const double rc = routeReducedCost(node, route, label->real_cost, sep_duals) + vehicle_dual;
+            if (rc < best_rc) {
+                best_rc = rc;
+                best_route.swap(route);
+            }
+        }
+        if (!best_route.empty() && fleet_bound > 0) {
+            const auto column = routeMasterColumn(node, best_route, n_rows);
+            for (size_t row = 0; row < n_rows; ++row) g[row] -= fleet_bound * column[row];
+        }
+        if (static_cast<size_t>(kVehicleRow) < n_rows) g[static_cast<size_t>(kVehicleRow)] = 0.0;
+        return g;
+    }
+
     // Cut handling can add or remove master rows without re-solving, which
     // leaves the solver's duals sized for the old rows. Re-solve in that case
     // so duals, objective and rows agree. Returns true if it re-solved.
@@ -245,6 +319,15 @@ public:
             if (hasNegativeReducedCost(routeReducedCost(node, route, label->real_cost, master_duals))) return true;
         }
         return false;
+    }
+
+    // Vehicle multiplier for Lagrangian bounds lp + K * min(0, rc). It must
+    // bound the fleet of every solution, so use the fleet row's bound when
+    // there is one; ceil(sum lambda) of the current LP is not such a bound and
+    // would overstate the bound (and understate fixing/enumeration gaps)
+    // while pricing still finds negative columns.
+    static int lagrangianFleetBound(const BucketGraph *bucket_graph, int numK) {
+        return bucket_graph != nullptr && bucket_graph->max_vehicles > 0 ? bucket_graph->max_vehicles : numK;
     }
 
     // Lagrangian bound L(v) = b·v + U·min(0, rc_min(v)) at the duals of the
@@ -906,9 +989,14 @@ public:
 
             std::vector<double> coeffs;
             if (!loaded) {
-                if (cut.coefficients.size() == allPaths.size()) {
+                // An updated cut has a new (merged) memory: its cached
+                // coefficients are stale and must be recomputed first.
+                if (cut.added && cut.updated) {
+                    coeffs           = r1c->cutStorage.loadCoefficients(allPaths, cut);
+                    cut.coefficients = coeffs;
+                } else if (cut.coefficients.size() == allPaths.size()) {
                     coeffs = cut.coefficients;
-                } else if ((cut.added && cut.updated) || !cut.hasSparseCoefficients()) {
+                } else if (!cut.hasSparseCoefficients()) {
                     coeffs           = r1c->cutStorage.loadCoefficients(allPaths, cut);
                     cut.coefficients = coeffs;
                 }
@@ -1310,7 +1398,8 @@ public:
                                 fmt::print("No violated cuts found with obj = {}\n", inner_obj);
                                 if (!hasNegativeReducedCost(inner_obj)) {
                                     const double pricing_lower_bound =
-                                        PricingStateMachine::lowerBound(lp_obj, numK, inner_obj);
+                                        PricingStateMachine::lowerBound(
+                                            lp_obj, lagrangianFleetBound(bucket_graph.get(), numK), inner_obj);
                                     const bool cuts_stable = PricingStateMachine::cutsStable(
                                         bucket_graph.get(), non_violated_cuts, non_violated_ctr);
                                     if (pricing_policy.maybeStartEnumeration(bucket_graph.get(), pricing_lower_bound,
@@ -1336,13 +1425,27 @@ public:
                             non_violated_ctr  = 0;
                             cuts_enabled      = true;
 
-                            // Handle the newly found cuts.
+                            // Make room for the pending cuts if the master is at
+                            // its SRC capacity, then add them.
+                            size_t pending_cuts = 0;
+                            for (const auto &cut : r1c->cutStorage) {
+                                if (!cut.added) ++pending_cuts;
+                            }
+                            if (pending_cuts > 0 && r1c->cutCleaner(node, SRCconstraints, pending_cuts)) {
+                                node->optimize();
+                            }
                             changed = cutHandler(r1c, node, SRCconstraints);
                             if (changed) {
 #ifndef IPM
                                 stab.cut_added = true;
                                 node->optimize();
 #endif
+                            } else {
+                                // Nothing reached the master (capacity full of
+                                // binding cuts): count the round as cut-free so
+                                // the loop can terminate instead of repeating it.
+                                non_violated_cuts = true;
+                                non_violated_ctr++;
                             }
                         }
                     });
@@ -1424,7 +1527,8 @@ public:
                 pricing_policy.handleEnumerationFailure(bucket_graph.get());
 
                 if (colAdded == 0 && non_violated_cuts && !hasNegativeReducedCost(inner_obj)) {
-                    const double pricing_lower_bound = PricingStateMachine::lowerBound(lp_obj, numK, inner_obj);
+                    const double pricing_lower_bound = PricingStateMachine::lowerBound(
+                                            lp_obj, lagrangianFleetBound(bucket_graph.get(), numK), inner_obj);
                     const bool   cuts_stable =
                         PricingStateMachine::cutsStable(bucket_graph.get(), non_violated_cuts, non_violated_ctr);
                     if (pricing_policy.maybeStartEnumeration(bucket_graph.get(), pricing_lower_bound, cuts_stable, true,
@@ -1451,7 +1555,8 @@ public:
 
                 // define numK as the number of non-zero vars in solution
                 numK              = std::ceil(std::accumulate(solution.begin(), solution.end(), 0.0));
-                double newBound   = lp_obj + numK * std::min(0.0, inner_obj);
+                double newBound =
+                    lp_obj + lagrangianFleetBound(bucket_graph.get(), numK) * std::min(0.0, inner_obj);
                 lag_gap           = integer_solution - newBound;
                 bucket_graph->gap = lag_gap;
                 stab.set_pseudo_dual_bound(newBound);
@@ -1606,11 +1711,17 @@ public:
                         nodeDuals = master_duals;
                     }
 
-                    lag_gap = integer_solution - (lp_obj + numK * std::min(0.0, inner_obj));
+                    lag_gap = integer_solution -
+                              (lp_obj + lagrangianFleetBound(bucket_graph.get(), numK) * std::min(0.0, inner_obj));
 
                     matrix      = node->extractModelDataSparse();
                     stab.lp_obj = lp_obj;
 
+                    if (matrix.b.size() == master_duals.size()) {
+                        stab.set_pricing_subgradient(pricingSubgradient(
+                            node, matrix, paths, stab.duals_sep.empty() ? master_duals : stab.duals_sep,
+                            lagrangianFleetBound(bucket_graph.get(), numK)));
+                    }
                     stab.update_stabilization_after_pricing_optim(matrix, master_duals, sep_bound, paths, !improving);
                     paths.clear();
                     if (improving || !smoothed) {
@@ -1632,7 +1743,8 @@ public:
                 // so column generation only stopped at max_iter.
                 pricing_policy.recordPricingStage(stage);
 
-                const double pricing_lower_bound = PricingStateMachine::lowerBound(lp_obj, numK, inner_obj);
+                const double pricing_lower_bound = PricingStateMachine::lowerBound(
+                                            lp_obj, lagrangianFleetBound(bucket_graph.get(), numK), inner_obj);
                 const bool   no_negative_pricing = colAdded == 0 && !hasNegativeReducedCost(inner_obj);
                 const bool   cuts_stable =
                     PricingStateMachine::cutsStable(bucket_graph.get(), non_violated_cuts, non_violated_ctr);

@@ -33,6 +33,36 @@ constexpr int    REHEAT_INTERVAL        = 50;
 } // namespace LocalSearchConfig
 
 namespace rank1 {
+// Memory vertices a route needs so that its limited-memory rank-1
+// coefficient equals the full one: walking the route, the state grows by the multiplier
+// of each base vertex; every non-base vertex visited while the state is
+// positive is collected, and the collected segment is emitted whenever the
+// state overflows (state >= den, then state -= den). Segments that never
+// overflow do not change the coefficient and are not emitted. The same set
+// works for vertex memory and for the vertex approximation of arc memory used
+// by computeLimitedMemoryCoefficient. Depots (route ends) are skipped.
+template <typename IsBase, typename Multiplier, typename Emit>
+inline void forEachRequiredMemoryNode(const std::vector<uint16_t> &route, int den, IsBase &&is_base,
+                                      Multiplier &&multiplier, Emit &&emit) {
+    if (den <= 0) return;
+    static thread_local std::vector<int> segment;
+    segment.clear();
+    int state = 0;
+    for (size_t pos = 1; pos + 1 < route.size(); ++pos) {
+        const int node = route[pos];
+        if (is_base(node)) {
+            state += multiplier(node);
+            if (state >= den) {
+                for (int memory_node : segment) emit(memory_node);
+                segment.clear();
+                state -= den;
+            }
+        } else if (state > 0) {
+            segment.push_back(node);
+        }
+    }
+}
+
 // Change in the rank-3 floor coefficient when a third node contributes
 // extra visits to a route whose first two nodes contribute base_visits.
 constexpr int rank3_floor_coefficient_delta(int base_visits, int extra_visits) noexcept {

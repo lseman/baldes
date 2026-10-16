@@ -291,7 +291,10 @@ public:
         }
     }
 
-    bool cutCleaner(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints);
+    // Removes SRC rows that stayed slack for several rounds; with
+    // required_slots > 0 it then evicts further non-binding rows (largest
+    // slack first) until that many master slots are free.
+    bool cutCleaner(BNBNode *node, std::vector<baldesCtrPtr> &SRCconstraints, size_t required_slots = 0);
 
     /**
      * @brief Adjacency-based rank-3 SRC separation (RouteOpt-style).

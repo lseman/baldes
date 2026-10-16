@@ -8,6 +8,10 @@
 
 #include <span>
 #include <atomic>
+#include <bit>
+#if defined(__BMI2__)
+#include <immintrin.h>
+#endif
 #include <condition_variable>
 #include <cstring>
 
@@ -24,6 +28,8 @@
 #include "search/PSTEP.h"
 #include "search/RIH.h"
 #include "utils/UnionFind.h"
+#include "pricing/bucket_graph/PhaseConfiguration.h"
+#include "pricing/bucket_graph/ArcNGMemory.h"
 
 #define RCESPP_TOL_ZERO 1.E-6
 
@@ -135,6 +141,9 @@ public:
                 break;
             }
         }
+        // Initialize phase configurations from binary selector.
+        phase_configurations = baldes::initialize_phase_configurations(options.heur_labeling_strategy);
+        current_phase_index = 0;
     }
 
 #ifdef SCHRODINGER
@@ -226,7 +235,10 @@ public:
     int                  A_MAX                  = N_SIZE;
     double               split_imbalance_ema    = 0.0;
     int                  last_split_update_iter = -1000000;
-
+    using PhaseConfiguration = baldes::PhaseConfiguration;
+    // Phase configuration.
+    std::vector<PhaseConfiguration> phase_configurations;
+    int current_phase_index = 0;
     struct EnumerationPolicy {
         bool   enabled                     = true;
         bool   require_nonnegative_pricing = true;
@@ -252,6 +264,7 @@ public:
         bool                 skip_stage_transition         = false;
         bool                 pricing_truncated             = false;
     };
+    void transition_after_bucket_pricing_phase(Stage active_stage, const BucketPricingResult &result);
 
     struct BucketPricingTimings {
         double preparation_ms       = 0.0;
@@ -494,6 +507,40 @@ public:
     std::vector<int> num_buckets_index_fw;
     std::vector<int> num_buckets_index_bw;
 
+    // Per-node bucket indexing tables filled by define_buckets<D>(), stored
+    // node-major with `dims` (= main resources) entries per node. The
+    // per-extension lookup then reduces to one
+    // floor/clamp/multiply-add per resource, with no split or range
+    // recomputation. A zero width marks a degenerate (single-bucket) range.
+    struct BucketIndexTable {
+        std::vector<double> lb;
+        std::vector<double> ub;
+        std::vector<double> width;
+        std::vector<int>    splits;
+        std::vector<int>    stride;
+        size_t              dims = 0;
+    };
+    BucketIndexTable fw_bucket_index_table;
+    BucketIndexTable bw_bucket_index_table;
+
+    // Resources that must be equal (within eps) for dominance in each
+    // direction; filled by define_buckets<D>(). Empty for the usual
+    // disposable time/capacity resources.
+    // Positive-SRC allowance used by bucket arc elimination (set per run).
+    double elimination_src_discount = 0.0;
+
+    std::vector<int> fw_eq_dominance_resources;
+    std::vector<int> bw_eq_dominance_resources;
+
+    template <Direction D>
+    [[nodiscard]] inline bool equality_resources_match(const Label *lhs, const Label *rhs) const noexcept {
+        const auto &eq_resources = assign_buckets<D>(fw_eq_dominance_resources, bw_eq_dominance_resources);
+        for (int r : eq_resources) {
+            if (std::abs(lhs->resources[r] - rhs->resources[r]) > numericutils::eps) return false;
+        }
+        return true;
+    }
+
     // Statistics
     int  stat_n_labels_fw = 0;
     int  stat_n_labels_bw = 0;
@@ -514,12 +561,29 @@ public:
     std::array<uint64_t, PROFILE_STAGE_COUNT> profile_signature_rejections_fw{};
     std::array<uint64_t, PROFILE_STAGE_COUNT> profile_signature_rejections_bw{};
 
+    // Symmetry detection.
+    // The binary checks: unique opposite arcs, identical pure costs, and
+    // ordered variable coefficients. The two depot copies are exchanged at
+    // the ends of a route.
+    struct SymmetricArcInput {
+        int id = -1;
+        int from = -1, to = -1;
+        double pure_cost = 0.0;
+        std::vector<std::pair<int, double>> variable_coefficients; // {var_index, cost_coeff}
+    };
+    struct SymmetricArcMap {
+        bool symmetric = false;
+        std::map<int, int> opposite; // arc_id -> opposite_arc_id
+    };
+
     std::vector<double>                R_max;
     std::vector<double>                R_min;
     std::vector<std::vector<uint64_t>> neighborhoods_bitmap; // Bitmap for neighborhoods of each
                                                              // node
     std::vector<std::vector<uint64_t>> elementarity_bitmap;  // Bitmap for elementarity sets
     std::vector<std::vector<uint64_t>> packing_bitmap;       // Bitmap for packing sets
+    // Physical-arc NG memories with grouped elementarity sets.
+    ArcNGMemory arc_ng_memory;
 
     void define_elementarity_sets() {
         size_t num_nodes = nodes.size();
@@ -561,6 +625,10 @@ public:
     double min_red_cost = std::numeric_limits<double>::infinity();
     bool   first_reset  = true;
 
+    // Symmetry execution support.
+    SymmetricArcMap symmetry_map;            // Populated by detectIfSymmetric
+    std::vector<double> node_duals;          // Node duals for half-dual cost
+    SymmetricArcMap symmetry_map_prev;       // Previous iteration symmetry map (for caching)
     std::vector<int> dominance_checks_per_bucket;
     int              non_dominated_labels_per_bucket;
     int              non_dominated_labels_per_bucket_bw = 0;
@@ -742,6 +810,62 @@ public:
         enumeration_failed.store(false, std::memory_order_relaxed);
         gap = std::max(0.0, incumbent - lower_bound);
     }
+    /**
+     * @brief Save initial NG memories before the reduction pricing loop.
+     *
+     * Legacy DSSR preparation: restores initial vertex
+     * and physical-arc memories before the reduction pricing loop.
+     */
+    void save_ng_memories() {
+        if (arc_ng_memory.enabled) arc_ng_memory.save_initial_memories();
+    }
+
+    /**
+     * @brief Restore initial NG memories and return whether they changed.
+     *
+     * Legacy DSSR preparation: called after the reduction
+     * pricing loop to restore memories. Returns true if memories changed.
+     */
+    bool restore_ng_memories() {
+        if (!arc_ng_memory.enabled) return false;
+        return arc_ng_memory.restore_initial_memories();
+    }
+
+    /**
+     * @brief Strengthen NG memories using the legacy DSSR cycle detection.
+     *
+     * Legacy NG memory increase and cycle forbidding:
+     * reduction mode only remembers initial permitted sets; augmentation
+     * may enlarge the permitted domain subject to per-cycle cap.
+     */
+    ArcNGMemory::Result strengthen_ng_memories_legacy(const std::vector<ArcNGMemory::Column>& columns,
+                                                      bool reduction = true) {
+        if (!arc_ng_memory.enabled) return ArcNGMemory::Result{};
+        ArcNGMemory::Controls controls;
+        controls.mode = 1; // vertex mode
+        controls.max_columns = options.ng_neighborhood; // use ng_neighborhood as max_columns
+        controls.max_cycle_size = 5;
+        controls.max_vertex_size = 0;
+        controls.max_average_size = 0;
+        return arc_ng_memory.strengthen_legacy(columns, controls, reduction);
+    }
+
+    /**
+     * @brief Strengthen NG memories using the current relaxation method.
+     *
+     * Relaxation strengthening: descending fractional value,
+     * ascending cycle size, strict phase-I cycle limit and vertex growth caps.
+     */
+    ArcNGMemory::Result strengthen_ng_memories(const std::vector<ArcNGMemory::Column>& columns) {
+        if (!arc_ng_memory.enabled) return ArcNGMemory::Result{};
+        ArcNGMemory::Controls controls;
+        controls.mode = 1; // vertex mode
+        controls.max_columns = options.ng_neighborhood;
+        controls.max_cycle_size = 5;
+        controls.max_vertex_size = 0;
+        controls.max_average_size = 0;
+        return arc_ng_memory.strengthen(columns, controls);
+    }
 
     void forbidCycle(const std::vector<int> &cycle, bool aggressive);
     void augment_ng_memories(std::vector<double> &solution, std::vector<Path> &paths, bool aggressive, int eta1,
@@ -827,6 +951,49 @@ public:
                                          // contains the node_id
         int bit_position = node_id & 63; // Determine the bit position within that segment
         bitmap[word_index] |= (1ULL << bit_position);
+    }
+
+    /**
+     * @brief Sets label->visited_sig (see Label::visited_signature()).
+     *
+     * For ng-relaxed labels whose visited set lies inside N(node) and
+     * |N(node)| <= 63, the signature is the exact ng-memory word in node-local
+     * coordinates: position p is the p-th set bit of N(node) in increasing
+     * node id, gathered with PEXT one bitmap word at a time. This gives a
+     * single-word ng state, so same-vertex dominance compares one
+     * word instead of the whole bitmap. Elementary (PSTEP/TSP) labels, labels
+     * with memory outside N(node) and oversized neighbourhoods fall back to
+     * the conservative OR-fold; mixing the two encodings is always safe.
+     */
+    template <Full F>
+    inline void finalize_visited_signature(Label *label, int node) const noexcept {
+        if constexpr (F == Full::PSTEP || F == Full::TSP) {
+            label->visited_sig = label->conservative_visited_signature();
+        } else {
+            const auto &ng_row = neighborhoods_bitmap[node];
+            uint64_t    word   = 0;
+            unsigned    shift  = 0;
+            for (size_t w = 0; w < Label::bitmap_words; ++w) {
+                const uint64_t mask    = w < ng_row.size() ? ng_row[w] : 0;
+                const uint64_t visited = label->visited_bitmap[w];
+                const unsigned count   = static_cast<unsigned>(std::popcount(mask));
+                if ((visited & ~mask) != 0 || shift + count > 63) {
+                    label->visited_sig = label->conservative_visited_signature();
+                    return;
+                }
+                if (count == 0) continue;
+#if defined(__BMI2__)
+                word |= _pext_u64(visited, mask) << shift;
+#else
+                unsigned pos = shift;
+                for (uint64_t m = mask; m != 0; m &= m - 1, ++pos) {
+                    if (visited & m & (~m + 1)) word |= 1ULL << pos;
+                }
+#endif
+                shift += count;
+            }
+            label->visited_sig = word | Label::kExactNgBit;
+        }
     }
 
     /**
@@ -1089,22 +1256,23 @@ public:
         // Compute travel time only once.
         const auto travel_time = getcij(fw_label->node_id, bw_label->node_id);
 
-        // Check time feasibility using precomputed resource index.
-        if (time_idx >= 0 && time_idx < static_cast<int>(n_resources)) {
-            const double fw_time = splice_state ? fw_resources[time_idx] : fw_resources[time_idx] + travel_time + node.duration;
-            if (numericutils::gt(fw_time, bw_resources[time_idx])) return false;
-        }
-
-        // Check additional resource feasibility (assuming resources[0] is
-        // "time") and additional resources (from index 1 onward) represent
-        // capacity constraints.
-        for (size_t i = 1; i < n_resources; ++i) {
-            const double fw_resource = splice_state ? fw_resources[i] : fw_resources[i] + node.demand;
-            if (fw_resource > bw_resources[i]) return false;
+        // Use the same increments as Extend along a bucket arc (Topology:
+        // node consumption, plus travel time on the time resource) for every
+        // resource index; the time resource need not be index 0.
+        for (size_t r = 0; r < n_resources && r < R_SIZE; ++r) {
+            double fw_resource = fw_resources[r];
+            if (!splice_state) {
+                fw_resource += r < node.consumption.size() ? node.consumption[r] : 0.0;
+                if (static_cast<int>(r) == time_idx) fw_resource += travel_time;
+            }
+            if (numericutils::gt(fw_resource, bw_resources[r])) return false;
         }
 
         return true;
     }
+
+    uint64_t split_fw_work_seen = 0;
+    uint64_t split_bw_work_seen = 0;
 
     void updateSplit() {
         // Base thresholds and parameters for adjustments.
@@ -1123,11 +1291,18 @@ public:
         // profiler hasn't recorded data yet (first iteration / profiling off).
         // Sum across stages because Stage 1-3 may be active early and Stage 4
         // dominates later iterations.
-        uint64_t fw_work = 0, bw_work = 0;
+        // The profiler counters accumulate over the whole run; use the work
+        // done since the previous call so the split follows the latest pass
+        // (the last forward and backward runs are compared).
+        uint64_t fw_total = 0, bw_total = 0;
         for (size_t i = 0; i < PROFILE_STAGE_COUNT; ++i) {
-            fw_work += profile_inner_bin_scan_labels_fw[i];
-            bw_work += profile_inner_bin_scan_labels_bw[i];
+            fw_total += profile_inner_bin_scan_labels_fw[i];
+            bw_total += profile_inner_bin_scan_labels_bw[i];
         }
+        const uint64_t fw_work = fw_total >= split_fw_work_seen ? fw_total - split_fw_work_seen : fw_total;
+        const uint64_t bw_work = bw_total >= split_bw_work_seen ? bw_total - split_bw_work_seen : bw_total;
+        split_fw_work_seen     = fw_total;
+        split_bw_work_seen     = bw_total;
         const bool   have_work_signal = (fw_work + bw_work) > 0;
         const double fw_labels    = have_work_signal ? static_cast<double>(fw_work) : static_cast<double>(n_fw_labels);
         const double bw_labels    = have_work_signal ? static_cast<double>(bw_work) : static_cast<double>(n_bw_labels);
@@ -1316,6 +1491,12 @@ public:
                                           std::atomic<double>                    &best_cost);
 
     template <Stage S>
+
+    void collect_complete_forward_route(const Label *forward_label, std::atomic<double> &best_cost,
+
+                                        std::vector<ConcatenationCandidate> &chunk_candidates);
+
+    template <Stage S>
     bool collect_concatenation_candidate(const Label *forward_label, const Label *backward_label, double path_cost,
                                          const SpliceState                              *splice_state,
                                          [[maybe_unused]] std::span<const ActiveCutInfo> active_cuts,
@@ -1341,6 +1522,9 @@ public:
 
     template <Direction D>
     int get_opposite_bucket_number(int current_bucket_index, std::span<double> inc);
+
+    bool backward_completion_exists(const Label *parent, int node_id, int opposite_bucket, double base_cost,
+                                    double cutoff) const;
 
     void update_neighborhoods(const std::vector<std::pair<size_t, size_t>> &conflicts) {
         size_t num_nodes = nodes.size();
@@ -1384,6 +1568,115 @@ public:
             count += __builtin_popcountll(segment); // Count set bits
         }
         return count;
+    }
+    /**
+     * @brief Build physical-arc NG memories from the graph structure.
+     *
+     * Grouped set-distance initialization and arc memory update. Each vertex starts in its own elementarity
+     * group; physical arcs inherit the visited sets of their endpoints.
+     * Neighborhoods are indexed by elementarity set ID, not vertex ID.
+     */
+    void build_arc_ng_memory(int ng_neighborhood_size = 8) {
+        const size_t num_nodes = nodes.size();
+        if (num_nodes == 0) return;
+
+        // 1. Build elementarity groups: each vertex is its own group.
+        //    Groups are indexed 0..num_nodes-1 (one per vertex).
+        int num_groups = static_cast<int>(num_nodes);
+        std::vector<std::vector<int>> membership(num_groups);
+        for (int i = 0; i < num_groups; ++i) membership[i] = {i};
+
+        // 2. Build vertex neighborhoods by elementarity set.
+        //    For each set s, collect neighbors of all vertices in s.
+        std::vector<std::vector<int>> vertex_neighborhoods(num_groups);
+        for (int s = 0; s < num_groups; ++s) {
+            std::set<int> neighbors;
+            for (int v : membership[s]) {
+                // Add vertices in the neighborhood bitmap
+                if (v < static_cast<int>(num_nodes) &&
+                    static_cast<size_t>(v) < neighborhoods_bitmap.size()) {
+                    for (size_t seg = 0; seg < neighborhoods_bitmap[v].size(); ++seg) {
+                        uint64_t word = neighborhoods_bitmap[v][seg];
+                        while (word) {
+                            int bit = __builtin_ctzll(word);
+                            int neighbor = static_cast<int>((seg << 6) + bit);
+                            if (neighbor >= 0 && neighbor < static_cast<int>(num_nodes) && neighbor != v) {
+                                neighbors.insert(neighbor);
+                            }
+                            word &= word - 1; // Clear lowest set bit
+                        }
+                    }
+                }
+            }
+            vertex_neighborhoods[s].assign(neighbors.begin(), neighbors.end());
+            ArcNGMemory::normalize(vertex_neighborhoods[s]);
+            // Limit to ng_neighborhood_size nearest
+            if (static_cast<int>(vertex_neighborhoods[s].size()) > ng_neighborhood_size) {
+                vertex_neighborhoods[s].resize(ng_neighborhood_size);
+            }
+        }
+
+        // 3. Build physical arcs from graph arcs.
+        //    Each arc gets its visited_sets = union of endpoint groups.
+        std::vector<ArcNGMemory::Arc> physical_arcs;
+        int arc_id = 0;
+        for (size_t u = 0; u < num_nodes; ++u) {
+            for (const auto &arc : nodes[u].get_arcs<Direction::Forward>()) {
+                if (arc.from < 0 || arc.to < 0 ||
+                    static_cast<size_t>(arc.to) >= num_nodes)
+                    continue;
+                ArcNGMemory::Arc ng_arc;
+                ng_arc.id = arc_id;
+                ng_arc.from = static_cast<int>(u);
+                ng_arc.to = arc.to;
+                // Visited sets = union of endpoint groups
+                ng_arc.visited_sets = membership[static_cast<int>(u)];
+                for (int vs : membership[arc.to])
+                    ng_arc.visited_sets.push_back(vs);
+                ArcNGMemory::normalize(ng_arc.visited_sets);
+                physical_arcs.push_back(ng_arc);
+                ++arc_id;
+            }
+        }
+
+        // 4. Initialize ArcNGMemory.
+        //    Use identity neighborhood as initial (empty) memory;
+        //    set_distance will populate from elementarity distances.
+        std::vector<std::vector<int>> initial_neighborhooods(num_groups);
+        try {
+            arc_ng_memory.initialize(num_groups, membership,
+                                     initial_neighborhooods, physical_arcs);
+        } catch (const std::exception& e) {
+            print_info("Warning: ArcNGMemory initialization failed: %s\n", e.what());
+            arc_ng_memory.enabled = false;
+        }
+    }
+    // Symmetry detection: unique opposite arcs, identical costs, ordered coeffs.
+    SymmetricArcMap detectIfSymmetric(const std::vector<SymmetricArcInput> &arcs,
+                                      int source, int sink) const {
+        SymmetricArcMap result;
+        std::map<std::pair<int, int>, const SymmetricArcInput *> by_endpoints;
+        for (const auto &arc : arcs) {
+            if (!by_endpoints.emplace(std::make_pair(arc.from, arc.to), &arc).second) return result;
+        }
+        for (const auto &arc : arcs) {
+            int from = arc.to, to = arc.from;
+            if (arc.from == source && arc.to != source) to = sink;
+            else if (arc.from != sink && arc.to == sink) from = source;
+            const auto found = by_endpoints.find({from, to});
+            if (found == by_endpoints.end() || found->second->pure_cost != arc.pure_cost ||
+                found->second->variable_coefficients != arc.variable_coefficients) {
+                result.opposite.clear(); return result;
+            }
+            result.opposite.emplace(arc.id, found->second->id);
+        }
+        result.symmetric = true;
+        return result;
+    }
+
+    // Half-dual arc cost for symmetric execution.
+    static double symmetric_arc_cost(double pure_cost, double tail_dual, double head_dual) noexcept {
+        return pure_cost - 0.5 * (tail_dual + head_dual);
     }
 
     // Method to get all neighbors of node i
@@ -1517,6 +1810,7 @@ public:
         new_label->resources   = L.resources;
         new_label->SRCmap      = updated_SRCmap;
         new_label->fresh       = false;
+        finalize_visited_signature<Full::Full>(new_label, new_label->node_id);
 
         // Determine bucket number for the new label.
         std::vector<double> new_resources(options.resources.size());

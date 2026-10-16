@@ -57,6 +57,35 @@ void BucketGraph::publish_concatenation_candidates(std::span<const Concatenation
     }
 }
 
+// Complete forward route (label at the end depot that never crossed the
+// half-way point): same cut-offs and best-cost claiming as a joined
+// candidate, with no backward part.
+template <Stage S>
+void BucketGraph::collect_complete_forward_route(const Label *forward_label, std::atomic<double> &best_cost,
+                                                 std::vector<ConcatenationCandidate> &chunk_candidates) {
+    const double total_cost = forward_label->cost;
+    if constexpr (S == Stage::Enumerate) {
+        const double cutoff = std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed));
+        if (!numericutils::lt(total_cost, cutoff)) return;
+    } else {
+        double observed_best = best_cost.load(std::memory_order_relaxed);
+        bool   keep          = false;
+        for (;;) {
+            if (!numericutils::lt(total_cost, observed_best)) {
+                keep = numericutils::lte(total_cost, observed_best);
+                break;
+            }
+            if (best_cost.compare_exchange_weak(observed_best, total_cost, std::memory_order_relaxed,
+                                                std::memory_order_relaxed)) {
+                keep = true;
+                break;
+            }
+        }
+        if (!keep) return;
+    }
+    chunk_candidates.push_back({forward_label, nullptr, total_cost});
+}
+
 inline void BucketGraph::push_unvisited_phi_neighbors(std::span<const int> neighbors,
                                                       ConcatenationScratch &scratch) const {
     if (scratch.bucket_stack.capacity() < scratch.bucket_stack.size() + neighbors.size()) {

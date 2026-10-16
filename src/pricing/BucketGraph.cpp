@@ -664,6 +664,7 @@ void BucketGraph::mono_initialization() {
                 depot->cost += pstep_duals.getThreeThreeDualValue(depot_id);
                 depot->addNode(depot_id);
                 set_node_visited(depot->visited_bitmap, depot_id);
+                finalize_visited_signature<Full::Full>(depot, depot_id);
                 SRC_MODE_BLOCK(depot->SRCmap.assign(cut_storage->activeSize(), 0);)
                 buckets[calculated_index].add_label(depot);
                 buckets[calculated_index].node_id = depot_id;
