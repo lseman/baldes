@@ -2,10 +2,15 @@
 //! separator (`separation`, `local_search`, `tuple`) and its adapter, and the
 //! route coefficient walk. Ported from the C++ reference adapters
 //! `native/adapters/RankOneApiAdapter.h` and `src/api/NativeCutCoefficient.h`.
+pub mod bits;
+pub mod capacity;
 pub mod local_search;
+pub mod mincut;
+pub mod pulse;
 pub mod rbtree;
 pub mod separation;
 pub mod state;
+pub mod stdhash;
 pub mod stdsort;
 pub mod subcuts;
 pub mod tuple;
