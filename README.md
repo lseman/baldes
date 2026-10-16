@@ -18,8 +18,7 @@ pricing. Version 2.0 is a complete rewrite in Rust.
 
 The 2.0 solver is a Rust port of our C++ RCSP engine, OpenRSCP.
 
-The C++ BALDES 1.x code is kept in [`legacy/`](legacy/), with its own README
-and CMake build.
+The C++ BALDES 1.x code remains in the git history before the 2.0 commit.
 
 ## What is in 2.0
 
@@ -84,7 +83,7 @@ Solomon instances are in [`instances/`](instances/).
 
 Strong k-path and rounded capacity cuts, the C API entry points for cuts,
 CVRP and EVRP front ends, branching, the heuristics, and the Python bindings
-of 1.x. They remain available in [`legacy/`](legacy/). [PORTING.md](PORTING.md)
+of 1.x. [PORTING.md](PORTING.md)
 maps each Rust module to its C++ counterpart.
 
 ## Repository layout
@@ -96,7 +95,7 @@ maps each Rust module to its C++ counterpart.
 | `tools/` | comparison scripts against the C++ reference |
 | `instances/` | Solomon VRPTW instances |
 | `assets/` | logo |
-| `legacy/` | BALDES 1.x (C++) |
+| `landing/` | project landing page (deployed to GitHub Pages) |
 
 ## Citation
 
