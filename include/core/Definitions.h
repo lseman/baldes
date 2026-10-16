@@ -48,6 +48,8 @@ struct BucketOptions {
     int three_five_sign  = 1;
 
     bool symmetric = false;
+    int  heur_labeling_strategy = 0;  // Pricing phase selector
+    int  ng_neighborhood = 8;  // NG initial neighborhood size (default 8)
 
     std::vector<int>         main_resources      = {0};
     std::vector<std::string> resources           = {"time"};

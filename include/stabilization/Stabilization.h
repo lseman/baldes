@@ -67,8 +67,20 @@ public:
     DualSolution smooth_dual_sol;
 
     double              subgradient_norm = 0.0;
-    DualSolution        subgradient;
+    DualSolution        subgradient; // subgradient at the last separation point
     std::vector<double> new_rows;
+
+    // Subgradient at the stability center. Directional smoothing uses this
+    // one: pi_g = pi_in + g_in/||g_in|| * ||pi_out - pi_in||. It moves only
+    // when the center moves.
+    DualSolution subgradient_in;
+    double       subgradient_in_norm = 0.0;
+    DualSolution pending_subgradient_in;
+    double       pending_subgradient_in_norm = 0.0;
+
+    // Set by set_pricing_subgradient() for the current round; otherwise the
+    // route-count estimate in update_subgradient() is used.
+    bool subgradient_from_caller = false;
 
     // Lagrangian bound at the current stability center; the center only
     // moves to a separation point whose bound beats it (Wentges).
@@ -104,6 +116,14 @@ public:
             subgradient_norm = 0.0;
             beta             = 0.0;
         }
+        if (subgradient_in.size() != new_size) {
+            subgradient_in.clear();
+            subgradient_in_norm = 0.0;
+        }
+        if (pending_subgradient_in.size() != new_size) {
+            pending_subgradient_in.clear();
+            pending_subgradient_in_norm = 0.0;
+        }
 
         sizeDual = static_cast<int>(new_size);
     }
@@ -136,6 +156,12 @@ public:
         if (!stab_center_for_next_iteration.empty()) {
             cur_stab_center = stab_center_for_next_iteration;
             stab_center_for_next_iteration.clear();
+            // The center moved to a separation point: its subgradient is the
+            // one computed there.
+            subgradient_in      = std::move(pending_subgradient_in);
+            subgradient_in_norm = pending_subgradient_in_norm;
+            pending_subgradient_in.clear();
+            pending_subgradient_in_norm = 0.0;
         }
     }
 
@@ -204,7 +230,20 @@ public:
         // If directional components are unavailable, return the convex
         // combination. Since both endpoints are dual-feasible, the combination
         // respects each row's dual domain.
-        if (subgradient.empty() || subgradient_norm <= EPSILON || beta <= 0.0) {
+        // Directional smoothing needs the subgradient at the center; beta is
+        // the cosine between g_in and pi_out - pi_in, and it stays off during a misprice
+        // sequence (beta == 0 there).
+        if (beta > 0.0 && subgradient_in.size() == n && subgradient_in_norm > EPSILON) {
+            double dot = 0.0, dir_sq = 0.0;
+            for (size_t i = 0; i < n; ++i) {
+                const double d = pi_out[i] - cur_stab_center[i];
+                dot += d * subgradient_in[i];
+                dir_sq += d * d;
+            }
+            const double dir_norm = std::sqrt(dir_sq);
+            beta = dir_norm > EPSILON ? std::clamp(dot / (dir_norm * subgradient_in_norm), 0.0, 1.0) : 0.0;
+        }
+        if (subgradient_in.size() != n || subgradient_in_norm <= EPSILON || beta <= 0.0) {
             smooth_dual_sol = pi_tilde;
             duals_sep       = pi_tilde;
             return pi_tilde;
@@ -224,7 +263,7 @@ public:
 
         DualSolution pi_g(n);
         for (size_t i = 0; i < n; ++i) {
-            pi_g[i] = cur_stab_center[i] + (subgradient[i] / subgradient_norm) * norm_in_out;
+            pi_g[i] = cur_stab_center[i] + (subgradient_in[i] / subgradient_in_norm) * norm_in_out;
         }
 
         DualSolution rho(n);
@@ -354,6 +393,15 @@ public:
         subgradient_norm = norm(subgradient);
     }
 
+    // Exact Lagrangian subgradient at this round's separation point,
+    // g = b - U * a(best column) (computed by the caller, which knows every
+    // master row). Takes precedence over update_subgradient() for this round.
+    void set_pricing_subgradient(DualSolution g) {
+        subgradient             = std::move(g);
+        subgradient_norm        = norm(subgradient);
+        subgradient_from_caller = true;
+    }
+
     void set_pseudo_dual_bound(double bound) { pseudo_dual_bound = bound; }
 
     int no_progress_count = 0;
@@ -383,7 +431,7 @@ public:
         // The alpha and beta rules use the subgradient of a successful round;
         // during a misprice sequence alpha follows the misprice schedule.
         if (!mispriced && nb_misprices == 0) {
-            update_subgradient(dados, master_duals, best_pricing_cols);
+            if (!subgradient_from_caller) update_subgradient(dados, master_duals, best_pricing_cols);
 
             // Dynamic alpha schedule (Table 1 right, with the paper's sign
             // error corrected, as in GCG): if g_sep · (pi_out - pi_in) > 0
@@ -398,11 +446,9 @@ public:
                 }
             }
 
+            // f_incr / f_decr of the paper.
             auto fincr = [](double a) { return a + (1.0 - a) * 0.1; };
-            auto fdecr = [](double a) {
-                if (a >= 0.5) return a / 1.1;
-                return std::max(0.0, a - (1.0 - a) * 0.1);
-            };
+            auto fdecr = [](double a) { return std::max(0.0, a - 0.1); };
             if (has_direction) {
                 alpha      = (g_dot_dir > 0.0) ? fdecr(alpha) : fincr(alpha);
                 alpha      = std::clamp(alpha, 0.0, kAlphaMax);
@@ -410,22 +456,16 @@ public:
                 cur_alpha  = alpha;
             }
 
-            // Adaptive beta schedule (Section directional smoothing):
-            // beta = cos(gamma) between (pi_out - pi_in) and (pi_g - pi_in).
-            if (has_direction) {
-                double dir_norm_sq = 0.0;
-                double dot         = 0.0;
-                for (size_t i = 0; i < master_duals.size(); ++i) {
-                    const double d = master_duals[i] - cur_stab_center[i];
-                    dir_norm_sq += d * d;
-                    dot += d * subgradient[i];
-                }
-                const double dir_norm = std::sqrt(dir_norm_sq + EPSILON);
-                beta                  = std::clamp(dot / (dir_norm * subgradient_norm), 0.0, 1.0);
-            } else {
-                beta = 0.0;
-            }
+            // Directional smoothing is re-enabled after a successful round;
+            // getStabDualSol sets beta = cos(g_in, pi_out - pi_in).
+            beta = 1.0;
+        } else if (mispriced && nb_misprices == 0) {
+            // A misprice at the first pricing of the round means the step was
+            // too cautious for this center: alpha is lowered as well.
+            alpha      = std::max(0.0, alpha - 0.1);
+            base_alpha = std::clamp(alpha, kAlphaMin, kAlphaMax);
         }
+        subgradient_from_caller = false;
 
         // Stability center (Wentges): move to the separation point only when
         // its Lagrangian bound beats the center's. Heuristic pricing gives no
@@ -435,9 +475,13 @@ public:
             if (lagrangian_bound > center_bound + kBoundTolerance) {
                 center_bound                   = lagrangian_bound;
                 stab_center_for_next_iteration = separation_point;
+                pending_subgradient_in         = subgradient;
+                pending_subgradient_in_norm    = subgradient_norm;
             }
         } else if (!mispriced) {
             stab_center_for_next_iteration = separation_point;
+            pending_subgradient_in         = subgradient;
+            pending_subgradient_in_norm    = subgradient_norm;
         }
 
         if (std::isnan(alpha) || std::isinf(alpha)) {
@@ -452,6 +496,11 @@ public:
         stab_constraint_values.clear();
         smooth_dual_sol.clear();
         subgradient.clear();
+        subgradient_in.clear();
+        pending_subgradient_in.clear();
+        subgradient_norm            = 0.0;
+        subgradient_in_norm         = 0.0;
+        pending_subgradient_in_norm = 0.0;
         duals_sep.clear();
         beta      = 0.0;
         alpha     = base_alpha;

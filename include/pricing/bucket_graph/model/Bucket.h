@@ -248,6 +248,8 @@ struct alignas(64) Bucket {
     void flush_extra_labels_if_large() {
         if (should_flush_extra_labels()) flush_extra_labels();
     }
+    // Add a label to the extra_labels tier (used for backward prefixes in symmetric mode).
+    void add_extra_label(Label *label) noexcept { extra_labels.push_back(label); }
 
     size_t compact_dominated_labels() {
         size_t removed = 0;
@@ -447,11 +449,13 @@ struct alignas(64) Bucket {
      */
     template <Direction D>
     void add_bucket_arc(int from_bucket, int to_bucket, const std::array<double, R_SIZE> &res_inc, double cost_inc,
-                        bool fixed, int jump_to_node = -1) {
+                        bool fixed, int jump_to_node = -1, int physical_arc_id = -1) {
         if constexpr (D == Direction::Forward) {
             fw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, fixed, jump_to_node);
+            if (!fw_bucket_arcs.empty()) fw_bucket_arcs.back().physical_arc_id = physical_arc_id;
         } else {
             bw_bucket_arcs.emplace_back(from_bucket, to_bucket, res_inc, cost_inc, fixed, jump_to_node);
+            if (!bw_bucket_arcs.empty()) bw_bucket_arcs.back().physical_arc_id = physical_arc_id;
         }
     }
 

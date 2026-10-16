@@ -788,8 +788,11 @@ private:
     double evalPlanGroup(const std::array<uint64_t, num_words> &C, const std::array<uint64_t, num_words> &AM,
                          std::vector<int> &node_order, const std::vector<int> &paths, const PlanGroup &pg,
                          const std::vector<double> &x, const SRCPermutation *&best_perm_out) const {
-        double                best_vio  = 0.0;
-        const SRCPermutation *best_perm = nullptr;
+        // Orderings are ranked by relative violation lhs/rhs - 1, so plans with a larger rhs are not favoured
+        // just for their scale; the absolute violation is returned.
+        double                best_vio   = 0.0;
+        double                best_score = 0.0;
+        const SRCPermutation *best_perm  = nullptr;
         for (const auto *pp : pg.perms) {
             const double rhs = pp->getRHS();
             double       lhs = 0.0;
@@ -800,10 +803,12 @@ private:
                 lhs += static_cast<double>(computeLimitedMemoryCoefficient(C, AM, *pp, allPaths[r].route, node_order)) *
                        xv;
             }
-            const double vio = lhs - rhs;
-            if (vio > best_vio) {
-                best_vio  = vio;
-                best_perm = pp;
+            const double vio   = lhs - rhs;
+            const double score = rhs > 0.0 ? vio / rhs : vio;
+            if (vio > 0.0 && score > best_score) {
+                best_score = score;
+                best_vio   = vio;
+                best_perm  = pp;
             }
         }
         best_perm_out = best_perm;
@@ -1158,6 +1163,16 @@ private:
             return xa > xb;
         });
 
+        // perm.num is indexed by rank in the sorted node list (see
+        // computeViolationWithBestPermBits). With a valid multiplier vector
+        // use the state-driven memory rule; otherwise
+        // fall back to every gap between consecutive base visits.
+        std::vector<int> sorted_nodes(candidate_nodes.begin(), candidate_nodes.end());
+        std::sort(sorted_nodes.begin(), sorted_nodes.end());
+        std::vector<int> sorted_rank(N_SIZE, -1);
+        for (int r = 0; r < static_cast<int>(sorted_nodes.size()); ++r) { sorted_rank[sorted_nodes[r]] = r; }
+        const bool use_state_rule = perm.den > 0 && perm.num.size() == sorted_nodes.size();
+
         constexpr int    MAX_PATHS_FOR_MEMORY = 40;
         int              paths_seen           = 0;
         std::vector<int> base_positions;
@@ -1175,6 +1190,19 @@ private:
             }
             if (base_positions.size() < 2) continue;
             ++paths_seen;
+
+            if (use_state_rule) {
+                // Only the segments the coefficient actually depends on.
+                rank1::forEachRequiredMemoryNode(
+                    route, perm.den, [&](int node) { return node > 0 && node < N_SIZE - 1 && in_candidate[node]; },
+                    [&](int node) { return perm.num[sorted_rank[node]]; },
+                    [&](int node) {
+                        if (node > 0 && node < N_SIZE - 1 && static_cast<int>(memory.size()) < max_memory_nodes) {
+                            memory.insert(node);
+                        }
+                    });
+                continue;
+            }
 
             for (size_t b = 1; b < base_positions.size(); ++b) {
                 const int from = base_positions[b - 1];
@@ -1212,6 +1240,222 @@ private:
         return CandidateSet(candidate_nodes, limited_violation, limited_perm, limited_memory, limited_rhs);
     }
 
+    // ---------------------------------------------------------------------
+    // Clique-based 4- and 5-row packing separation.
+    //
+    // Candidates are the 4- and 5-cliques of the packing graph G, where
+    // i ~ j iff the ng-style neighbourhoods N(i) and N(j) (the vertex plus its
+    // kPackingNeighbourhood closest customers) intersect. Each clique is
+    // scored over the fractional routes with every optimal multiplier vector
+    // of its size (Pecin et al.) and
+    // ranked by relative violation lhs/rhs - 1. A 4-clique is skipped when
+    // one of its 3-subsets already gives a violated 3-row cut, and 5-cliques
+    // are only searched when the 4-row pass left room in the round's budget.
+    // The best cliques then get their exact limited-memory evaluation.
+    // ---------------------------------------------------------------------
+    static constexpr int    kPackingNeighbourhood     = 8;
+    static constexpr size_t kCliqueCandidatesPerRank  = 60;
+    static constexpr size_t kMaxCliquesPerRank        = 4000000;
+    static constexpr double kCliqueMinRelViolation    = 1e-3;
+
+    std::vector<std::vector<char>> packing_graph; // packing_graph[i][j], customers only
+
+    bool buildPackingGraph() {
+        if (!packing_graph.empty()) return true;
+        if (distances.size() != static_cast<size_t>(N_SIZE)) return false;
+        std::vector<std::array<uint64_t, num_words>> hood(N_SIZE);
+        std::vector<std::pair<double, int>>        by_distance;
+        for (int i = 1; i < N_SIZE - 1; ++i) {
+            if (distances[i].size() != static_cast<size_t>(N_SIZE)) return false;
+            by_distance.clear();
+            for (int j = 1; j < N_SIZE - 1; ++j) {
+                if (j != i) by_distance.emplace_back(distances[i][j], j);
+            }
+            const size_t k = std::min<size_t>(kPackingNeighbourhood, by_distance.size());
+            std::partial_sort(by_distance.begin(), by_distance.begin() + k, by_distance.end());
+            hood[i] = {};
+            hood[i][i / 64] |= bit_mask_lookup[i % 64];
+            for (size_t t = 0; t < k; ++t) {
+                const int j = by_distance[t].second;
+                hood[i][j / 64] |= bit_mask_lookup[j % 64];
+            }
+        }
+        packing_graph.assign(N_SIZE, std::vector<char>(N_SIZE, 0));
+        for (int i = 1; i < N_SIZE - 1; ++i) {
+            for (int j = i + 1; j < N_SIZE - 1; ++j) {
+                bool intersect = false;
+                for (size_t w = 0; w < num_words && !intersect; ++w) intersect = (hood[i][w] & hood[j][w]) != 0;
+                packing_graph[i][j] = packing_graph[j][i] = intersect ? 1 : 0;
+            }
+        }
+        return true;
+    }
+
+    struct CliqueScore {
+        double           score = 0.0; // relative violation
+        std::vector<int> nodes;
+        bool operator<(const CliqueScore &other) const noexcept { return score > other.score; } // min-heap on score
+    };
+
+    CandidateSetCollection generateCliquePackingCandidates(const SparseMatrix &A, const std::vector<double> &x) {
+        CandidateSetCollection out;
+        if (!buildPackingGraph()) return out;
+
+        // Fractional support: vertices visited by a route with 0 < x < 1.
+        std::vector<std::vector<int>> support(N_SIZE);
+        std::vector<char>             fractional(N_SIZE, 0);
+        for (int path_idx : nonzero_paths) {
+            if (static_cast<size_t>(path_idx) >= allPaths.size() || static_cast<size_t>(path_idx) >= x.size()) continue;
+            const bool is_fractional = x[path_idx] < 1.0 - 1e-6;
+            for (uint16_t v : allPaths[path_idx].route) {
+                if (v == 0 || v >= N_SIZE - 1) continue;
+                if (support[v].empty() || support[v].back() != path_idx) support[v].push_back(path_idx);
+                if (is_fractional) fractional[v] = 1;
+            }
+        }
+        std::vector<int> F;
+        for (int v = 1; v < N_SIZE - 1; ++v) {
+            if (fractional[v]) F.push_back(v);
+        }
+
+        const auto exact4 = generateExactPermutations(4);
+        const auto exact5 = generateExactPermutations(5);
+
+        std::vector<uint32_t> stamp(allPaths.size(), 0);
+        uint32_t              epoch = 0;
+        std::vector<int>      routes;
+        std::vector<int>      counts; // routes.size() x rank, row-major
+
+        // Gathers the fractional routes touching the clique with their visit
+        // counts; returns an upper bound on any packing lhs (every multiplier
+        // is below den, so a route contributes at most hits - 1).
+        auto gather = [&](const std::vector<int> &clique) {
+            ++epoch;
+            routes.clear();
+            for (int v : clique) {
+                for (int r : support[v]) {
+                    if (stamp[r] == epoch) continue;
+                    stamp[r] = epoch;
+                    routes.push_back(r);
+                }
+            }
+            const size_t rank = clique.size();
+            counts.assign(routes.size() * rank, 0);
+            double upper = 0.0;
+            for (size_t t = 0; t < routes.size(); ++t) {
+                int hits = 0;
+                for (size_t p = 0; p < rank; ++p) {
+                    const int c                = vertex_route_map[clique[p]][routes[t]];
+                    counts[t * rank + p] = c;
+                    hits += c;
+                }
+                if (hits >= 2) upper += x[routes[t]] * (hits - 1);
+            }
+            return upper;
+        };
+        auto best_relative = [&](const std::vector<SRCPermutation> &perms, size_t rank, double upper) {
+            double best = 0.0;
+            for (const auto &perm : perms) {
+                const double rhs = perm.getRHS();
+                if (rhs <= 0.0 || upper <= rhs) continue;
+                double lhs = 0.0;
+                for (size_t t = 0; t < routes.size(); ++t) {
+                    int weighted = 0;
+                    for (size_t p = 0; p < rank; ++p) weighted += perm.num[p] * counts[t * rank + p];
+                    lhs += x[routes[t]] * static_cast<double>(weighted / perm.den);
+                }
+                best = std::max(best, (lhs - rhs) / rhs);
+            }
+            return best;
+        };
+        auto three_row_violated = [&](const std::vector<int> &clique) {
+            // clique is the 4-clique just gathered (counts row-major, rank 4).
+            for (size_t skip = 0; skip < 4; ++skip) {
+                double lhs = 0.0;
+                for (size_t t = 0; t < routes.size(); ++t) {
+                    int hits = 0;
+                    for (size_t p = 0; p < 4; ++p) {
+                        if (p != skip) hits += counts[t * 4 + p];
+                    }
+                    lhs += x[routes[t]] * static_cast<double>(hits / 2);
+                }
+                if (lhs > 1.0 + 1e-3) return true;
+            }
+            (void)clique;
+            return false;
+        };
+        auto keep = [](std::vector<CliqueScore> &heap, CliqueScore item) {
+            if (heap.size() < kCliqueCandidatesPerRank) {
+                heap.push_back(std::move(item));
+                std::push_heap(heap.begin(), heap.end());
+            } else if (item.score > heap.front().score) {
+                std::pop_heap(heap.begin(), heap.end());
+                heap.back() = std::move(item);
+                std::push_heap(heap.begin(), heap.end());
+            }
+        };
+
+        // Enumerates k-cliques (k = 4 or 5) of G restricted to F in
+        // increasing vertex order and scores them.
+        auto enumerate = [&](size_t rank, const std::vector<SRCPermutation> &perms) {
+            std::vector<CliqueScore> heap;
+            std::vector<int>         clique(rank);
+            size_t                   evaluated = 0;
+            std::vector<std::vector<int>> level(rank);
+            for (size_t a = 0; a < F.size() && evaluated < kMaxCliquesPerRank; ++a) {
+                clique[0] = F[a];
+                level[1].clear();
+                for (size_t b = a + 1; b < F.size(); ++b) {
+                    if (packing_graph[F[a]][F[b]]) level[1].push_back(F[b]);
+                }
+                // depth-first extension keeping every chosen pair adjacent
+                std::function<void(size_t, size_t)> extend = [&](size_t depth, size_t from) {
+                    const auto &cands = level[depth];
+                    for (size_t idx = from; idx < cands.size() && evaluated < kMaxCliquesPerRank; ++idx) {
+                        clique[depth] = cands[idx];
+                        if (depth + 1 == rank) {
+                            ++evaluated;
+                            const double upper = gather(clique);
+                            if (upper <= 1.0) continue;
+                            if (rank == 4 && three_row_violated(clique)) continue;
+                            const double rel = best_relative(perms, rank, upper);
+                            if (rel > kCliqueMinRelViolation) keep(heap, CliqueScore{rel, clique});
+                            continue;
+                        }
+                        auto &next = level[depth + 1];
+                        next.clear();
+                        for (size_t t = idx + 1; t < cands.size(); ++t) {
+                            if (packing_graph[cands[idx]][cands[t]]) next.push_back(cands[t]);
+                        }
+                        if (next.size() + depth + 1 >= rank) extend(depth + 1, 0);
+                    }
+                };
+                if (level[1].size() + 1 >= rank) extend(1, 0);
+            }
+            return heap;
+        };
+
+        auto materialize = [&](std::vector<CliqueScore> &heap) {
+            std::sort(heap.begin(), heap.end(), [](const CliqueScore &l, const CliqueScore &r) { return l.score > r.score; });
+            size_t accepted = 0;
+            for (const auto &item : heap) {
+                auto candidate = evaluateBaseThenMemory(item.nodes, A, x);
+                if (!candidate) continue;
+                insertBestCandidate(out, std::move(*candidate));
+                ++accepted;
+            }
+            return accepted;
+        };
+
+        auto four_rows = enumerate(4, exact4);
+        const size_t four_accepted = materialize(four_rows);
+        if (!cutStorage || four_accepted < cutStorage->remainingRoundCutBudget()) {
+            auto five_rows = enumerate(5, exact5);
+            materialize(five_rows);
+        }
+        return out;
+    }
+
     void collectCandidatePathUnion(const std::vector<int> &candidate_nodes, std::vector<int> &candidate_paths) const {
         thread_local std::vector<uint32_t> seen_epoch;
         thread_local uint32_t              epoch = 1;
@@ -1243,6 +1487,7 @@ private:
         const int RANK = static_cast<int>(node_vec.size());
 
         double                best_violation = 0.0;
+        double                best_score     = 0.0; // relative violation, see evalPlanGroup
         double                best_rhs       = 0.0;
         const SRCPermutation *best_perm      = nullptr;
 
@@ -1287,7 +1532,9 @@ private:
             }
 
             const double violation = lhs - (rhs + EPSILON);
-            if (violation > best_violation) {
+            const double score     = rhs > 0.0 ? violation / rhs : violation;
+            if (violation > 0.0 && score > best_score) {
+                best_score     = score;
                 best_violation = violation;
                 best_perm      = &perm;
                 best_rhs       = rhs;
@@ -1428,6 +1675,76 @@ public:
 
     std::vector<double> solution;
 
+    // Picks cuts from a candidate pool: relative-violation order with small
+    // penalties for memory and rank, a per-vertex budget for diversity, and
+    // the exact limited-memory check in addCutToCutStorage.
+    void selectAndAddCandidates(const CandidateSetCollection &candidate_pool, const std::vector<double> &x,
+                                size_t generated) {
+        const int                 initial_cut_size = cutStorage->size();
+        std::vector<CandidateSet> unique_candidates(candidate_pool.begin(), candidate_pool.end());
+        // Per-vertex budget over base sets only, like the rank-3 separator.
+        // Counting memory vertices too exhausted every vertex after a few
+        // dozen cuts (memories hold 15-25 vertices), so no high-rank cut could
+        // ever be added.
+        std::vector<int>          vertex_budget(N_SIZE, 8);
+        for (const auto &cut : *cutStorage) {
+            for (int node = 1; node < N_SIZE - 1; ++node) {
+                const size_t   segment = static_cast<size_t>(node) >> 6;
+                const uint64_t bit     = 1ULL << (node & 63);
+                if (cut.baseSet[segment] & bit) { vertex_budget[node] = std::max(0, vertex_budget[node] - 1); }
+            }
+        }
+
+        auto candidate_score = [](const CandidateSet &candidate) {
+            const double relative_violation =
+                candidate.rhs > 0.0 ? candidate.violation / candidate.rhs : candidate.violation;
+            return relative_violation - 1e-3 * static_cast<double>(candidate.neighbor.size()) -
+                   5e-4 * static_cast<double>(candidate.nodes.size());
+        };
+        pdqsort(unique_candidates.begin(), unique_candidates.end(),
+                [&](const CandidateSet &a, const CandidateSet &b) { return candidate_score(a) > candidate_score(b); });
+
+        // Add cuts from top candidates while keeping the round diverse.
+        const int        max_cuts   = 10;
+        int              cuts_added = 0;
+        int              max_trials = 80;
+        std::vector<int> touched_nodes;
+        touched_nodes.reserve(MAX_RANK + MAX_WORKING_SET_SIZE);
+        std::vector<char> touched_seen(N_SIZE, 0);
+        for (const auto &candidate : unique_candidates) {
+            if (cuts_added >= max_cuts || max_trials <= 0) break;
+
+            touched_nodes.clear();
+            for (const int node : candidate.nodes) {
+                if (node <= 0 || node >= N_SIZE - 1 || touched_seen[node]) continue;
+                touched_seen[node] = 1;
+                touched_nodes.push_back(node);
+            }
+            for (const int node : candidate.neighbor) {
+                if (node <= 0 || node >= N_SIZE - 1 || touched_seen[node]) continue;
+                touched_seen[node] = 1;
+                touched_nodes.push_back(node);
+            }
+
+            bool budget_available = true;
+            for (const int node : touched_nodes) {
+                if (vertex_budget[node] <= 0) {
+                    budget_available = false;
+                    break;
+                }
+            }
+            for (const int node : touched_nodes) { touched_seen[node] = 0; }
+            if (!budget_available) continue;
+
+            --max_trials;
+            if (!addCutToCutStorage(candidate, x)) continue;
+
+            ++cuts_added;
+            for (const int node : touched_nodes) { vertex_budget[node] = std::max(0, vertex_budget[node] - 1); }
+        }
+        print_cut("Candidates: {} | Added {} SRC 4-5 cuts\n", generated, cutStorage->size() - initial_cut_size);
+    }
+
     void separate(const SparseMatrix &A, const std::vector<double> &x) {
         // Set the solution.
         solution = x;
@@ -1441,6 +1758,17 @@ public:
         // Compute node scores.
         auto node_scores = computeNodeScores(A, x);
         initializeRank1Memory(node_scores);
+
+#if !defined(BALDES_R1C_LOCAL_SEARCH)
+        // Default: clique enumeration for the 4- and 5-row cuts.
+        // Fall back to the seed/local-search pipeline when no distance matrix
+        // is available to build the packing graph.
+        if (buildPackingGraph()) {
+            CandidateSetCollection clique_candidates = generateCliquePackingCandidates(A, x);
+            selectAndAddCandidates(clique_candidates, x, clique_candidates.size());
+            return;
+        }
+#endif
 
         // Generate candidate sets.
         // (Assuming generateCandidates returns a container type that is not
@@ -1503,66 +1831,8 @@ public:
         // Provide feedback using the improved candidates.
         ml_scorer.provideFeedback(improved_candidates);
 
-        // Process and sort unique candidates based on violation and diversity.
-        int                       initial_cut_size = cutStorage->size();
-        std::vector<CandidateSet> unique_candidates(improved_candidates.begin(), improved_candidates.end());
-        std::vector<int>          vertex_budget(N_SIZE, 8);
-        for (const auto &cut : *cutStorage) {
-            for (int node = 1; node < N_SIZE - 1; ++node) {
-                const size_t   segment = static_cast<size_t>(node) >> 6;
-                const uint64_t bit     = 1ULL << (node & 63);
-                if ((cut.baseSet[segment] & bit) || (cut.neighbors[segment] & bit)) {
-                    vertex_budget[node] = std::max(0, vertex_budget[node] - 1);
-                }
-            }
-        }
-
-        auto candidate_score = [](const CandidateSet &candidate) {
-            return candidate.violation - 1e-3 * static_cast<double>(candidate.neighbor.size()) -
-                   5e-4 * static_cast<double>(candidate.nodes.size());
-        };
-        pdqsort(unique_candidates.begin(), unique_candidates.end(),
-                [&](const CandidateSet &a, const CandidateSet &b) { return candidate_score(a) > candidate_score(b); });
-
-        // Add cuts from top candidates while keeping the round diverse.
-        const int        max_cuts   = 10;
-        int              cuts_added = 0;
-        int              max_trials = 80;
-        std::vector<int> touched_nodes;
-        touched_nodes.reserve(MAX_RANK + MAX_WORKING_SET_SIZE);
-        std::vector<char> touched_seen(N_SIZE, 0);
-        for (const auto &candidate : unique_candidates) {
-            if (cuts_added >= max_cuts || max_trials <= 0) break;
-
-            touched_nodes.clear();
-            for (const int node : candidate.nodes) {
-                if (node <= 0 || node >= N_SIZE - 1 || touched_seen[node]) continue;
-                touched_seen[node] = 1;
-                touched_nodes.push_back(node);
-            }
-            for (const int node : candidate.neighbor) {
-                if (node <= 0 || node >= N_SIZE - 1 || touched_seen[node]) continue;
-                touched_seen[node] = 1;
-                touched_nodes.push_back(node);
-            }
-
-            bool budget_available = true;
-            for (const int node : touched_nodes) {
-                if (vertex_budget[node] <= 0) {
-                    budget_available = false;
-                    break;
-                }
-            }
-            for (const int node : touched_nodes) { touched_seen[node] = 0; }
-            if (!budget_available) continue;
-
-            --max_trials;
-            if (!addCutToCutStorage(candidate, x)) continue;
-
-            ++cuts_added;
-            for (const int node : touched_nodes) { vertex_budget[node] = std::max(0, vertex_budget[node] - 1); }
-        }
-        int final_cut_size = cutStorage->size();
+        const int initial_cut_size = cutStorage->size();
+        selectAndAddCandidates(improved_candidates, x, candidates.size());
 
         // RouteOpt-style deterministic greedy search: runs AFTER the SA pass
         // so it can polish seeds that the stochastic search may have missed.
@@ -1570,9 +1840,8 @@ public:
         getHighDimCutsRouteOpt(x, seed_map);
 
         // Print summary of the candidate processing.
-        print_cut("Candidates: {} | Improved Candidates: {} | Added {} SRC 3-4-5 "
-                  "cuts\n",
-                  candidates.size(), improved_candidates.size(), cutStorage->size() - initial_cut_size);
+        print_cut("Improved Candidates: {} | Total SRC 3-4-5 cuts added {}\n", improved_candidates.size(),
+                  cutStorage->size() - initial_cut_size);
     }
 
     static constexpr std::array<uint64_t, 64> bit_mask_lookup = []() {

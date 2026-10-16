@@ -67,6 +67,7 @@ struct BucketArc {
     int                          to_bucket;
     std::array<double, R_SIZE>   resource_increment{};
     double                       cost_increment;
+    int                          physical_arc_id = -1;  // Physical arc ID for NG memory
     bool                         jump = false;
     int                          jump_to_node = -1;
 

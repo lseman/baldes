@@ -95,7 +95,10 @@ std::vector<double> BucketGraph::labeling_algorithm() {
     auto       &best_label        = assign_buckets<D>(fw_best_label, bw_best_label);
 
     const bool profile_labeling = options.profile_labeling;
-    const double src_compensation_bound = pricing_src_compensation_bound;
+    // Dominance brackets need no SRC widening: with the limited-memory R1C
+    // rule in dominates_cost_state the SRC allowance is never positive, so a
+    // dominator is never more expensive than the label it dominates.
+    constexpr double src_compensation_bound = 0.0;
 
     // Reset the total label count.
     n_labels = 0;
@@ -188,61 +191,73 @@ std::vector<double> BucketGraph::labeling_algorithm() {
             auto     &pending_labels = pending_labels_by_bucket[bucket_idx];
             size_t   &pending_cursor = pending_label_cursor[bucket_idx];
 
+            // Extension order within a connected component:
+            // filter the bucket's pending labels first (stage cut-off and
+            // dominance by component-wise smaller buckets), then extend
+            // arc-outer / label-inner so each bucket arc's data (resource
+            // increments, head node bounds, ng row, costs) stays hot across
+            // labels. Bucket arcs never lead back into this bucket, so a
+            // round's own insertions cannot add labels to it.
+            const auto &node_arcs = buckets[bucket].template get_bucket_arcs<D>();
+            static thread_local std::vector<Label *>                     round_labels;
+            static thread_local std::vector<std::pair<Label *, Label *>> destination_batch;
+
             while (pending_cursor < pending_labels.size()) {
-                Label *label = pending_labels[pending_cursor++];
+                round_labels.clear();
+                while (pending_cursor < pending_labels.size()) {
+                    Label *label = pending_labels[pending_cursor++];
 
-                // Skip labels already processed.
-                if (__builtin_expect(label->is_extended || label->is_dominated, 0)) continue;
+                    // Skip labels already processed.
+                    if (__builtin_expect(label->is_extended || label->is_dominated, 0)) continue;
 
-                // For partial solutions, check resource feasibility.
-                if constexpr (F != Full::PSTEP && F != Full::TSP) {
-                    if constexpr (is_partial) {
-                        const auto main_resource = label->resources[main_res_index];
-                        if ((D == Direction::Forward && main_resource > q_star_value) ||
-                            (D == Direction::Backward && main_resource <= q_star_value)) {
-                            label->set_extended(true);
-                            continue;
+                    // For partial solutions, check resource feasibility.
+                    if constexpr (F != Full::PSTEP && F != Full::TSP) {
+                        if constexpr (is_partial) {
+                            const auto main_resource = label->resources[main_res_index];
+                            if ((D == Direction::Forward && main_resource > q_star_value) ||
+                                (D == Direction::Backward && main_resource <= q_star_value)) {
+                                label->set_extended(true);
+                                continue;
+                            }
                         }
                     }
-                }
 
-                for (uint32_t segment_idx : touched_segments) { Bvisited[segment_idx] = 0; }
-                touched_segments.clear();
+                    for (uint32_t segment_idx : touched_segments) { Bvisited[segment_idx] = 0; }
+                    touched_segments.clear();
 
-                // Check if the label is dominated by labels in smaller
-                // buckets.
-                if constexpr (F != Full::TSP) {
-                    if (profile_labeling) profile_record_dominance_check(D, S);
-                    if (DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, touched_segments,
-                                                                stat_n_dom))
+                    // Check if the label is dominated by labels in smaller
+                    // buckets.
+                    if constexpr (F != Full::TSP) {
+                        if (profile_labeling) profile_record_dominance_check(D, S);
+                        if (DominatedInCompWiseSmallerBuckets<D, S>(label, bucket, c_bar, Bvisited, touched_segments,
+                                                                    stat_n_dom))
+                            continue;
+                    }
+
+                    if (__builtin_expect(node_arcs.empty(), 0)) {
+                        label->set_extended(true);
                         continue;
+                    }
+                    round_labels.push_back(label);
                 }
+                if (round_labels.empty()) break;
 
-                // Retrieve outgoing arcs for the current label.
-                const auto &node_arcs = buckets[bucket].template get_bucket_arcs<D>();
-                if (__builtin_expect(node_arcs.empty(), 0)) {
-                    label->set_extended(true);
-                    continue;
-                }
-
-                // Extend all outgoing arcs before mutating destination buckets.
-                // Process the successful extensions in arc order: ordinary
-                // bucket insertion already compares later siblings with any
-                // earlier sibling that survived, so sorting/grouping them is
-                // redundant for correctness.
-                static thread_local std::vector<Label *> destination_batch;
-                destination_batch.clear();
                 for (size_t arc_idx = 0; arc_idx < node_arcs.size(); ++arc_idx) {
                     const auto &arc = node_arcs[arc_idx];
+                    if (arc_idx + 1 < node_arcs.size()) { __builtin_prefetch(&node_arcs[arc_idx + 1], 0, 3); }
 
-                    // Prefetch next arc if available
-                    if (arc_idx + 4 < node_arcs.size()) { __builtin_prefetch(&node_arcs[arc_idx + 4], 0, 3); }
+                    // Extend every round label along this arc before mutating
+                    // the destination buckets; insertion still compares later
+                    // siblings against earlier survivors.
+                    destination_batch.clear();
+                    for (Label *label : round_labels) {
+                        auto new_label = Extend<D, S, ArcType::Bucket, Mutability::Mut, F>(label, arc);
+                        if (new_label != nullptr) destination_batch.emplace_back(label, new_label);
+                    }
 
-                    auto new_label = Extend<D, S, ArcType::Bucket, Mutability::Mut, F>(label, arc);
-                    if (new_label != nullptr) destination_batch.push_back(new_label);
-                }
-
-                for (Label *new_label : destination_batch) {
+                for (const auto &extension : destination_batch) {
+                    Label *const label     = extension.first;
+                    Label *const new_label = extension.second;
                     // Process each new label produced by the extension.
                     if (new_label != nullptr) {
                         if (new_label->is_dominated) continue;
@@ -266,10 +281,24 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                         constexpr bool uses_visited_dominance =
                             S == Stage::Three || S == Stage::Four || S == Stage::Enumerate;
                         const uint64_t new_visited_signature = new_label->visited_signature();
-                        auto existing_visited_subset_of_new = [&](size_t index) noexcept {
-                            if ((mother_bucket.soa_visited_signatures[index] & ~new_visited_signature) != 0) {
-                                return false;
+                        // Enumeration must keep every route under the gap, so a
+                        // label is only dominated by one with the same visited
+                        // set (as in enumeration storage); both subset
+                        // tests then mean equality.
+                        auto visited_equal = [&](size_t index) noexcept {
+                            if (mother_bucket.soa_visited_signatures[index] != new_visited_signature) return false;
+                            for (size_t word = 0; word < Label::bitmap_words; ++word) {
+                                if (mother_bucket.soa_visited_words[word][index] != new_label->visited_bitmap[word]) {
+                                    return false;
+                                }
                             }
+                            return true;
+                        };
+                        auto existing_visited_subset_of_new = [&](size_t index) noexcept {
+                            if constexpr (S == Stage::Enumerate) return visited_equal(index);
+                            const uint64_t existing_signature = mother_bucket.soa_visited_signatures[index];
+                            if ((existing_signature & ~new_visited_signature) != 0) { return false; }
+                            if (Label::exact_visited_pair(existing_signature, new_visited_signature)) return true;
                             for (size_t word = 0; word < Label::bitmap_words; ++word) {
                                 if ((mother_bucket.soa_visited_words[word][index] &
                                      ~new_label->visited_bitmap[word]) != 0) {
@@ -279,9 +308,10 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             return true;
                         };
                         auto new_visited_subset_of_existing = [&](size_t index) noexcept {
-                            if ((new_visited_signature & ~mother_bucket.soa_visited_signatures[index]) != 0) {
-                                return false;
-                            }
+                            if constexpr (S == Stage::Enumerate) return visited_equal(index);
+                            const uint64_t existing_signature = mother_bucket.soa_visited_signatures[index];
+                            if ((new_visited_signature & ~existing_signature) != 0) { return false; }
+                            if (Label::exact_visited_pair(existing_signature, new_visited_signature)) return true;
                             for (size_t word = 0; word < Label::bitmap_words; ++word) {
                                 if ((new_label->visited_bitmap[word] &
                                      ~mother_bucket.soa_visited_words[word][index]) != 0) {
@@ -331,12 +361,9 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             //     dominate cur, so test resource/path dominance
                             //     of cur by new; mark cur dominated if true.
                             //   near-equal costs: test both full predicates.
-                            // SRC compensation can overturn raw cost order, so
-                            // widen the bracket by a conservative bound: the
-                            // sum of absolute active SRC duals. Outside this
-                            // interval only one dominance direction is
-                            // possible; inside it the full SRC predicate is
-                            // evaluated in both directions.
+                            // SRC states only ever add to the dominator's
+                            // side (see dominates_cost_state), so raw cost
+                            // order is decisive in every stage.
                             const double cost_lo =
                                 new_label->cost - src_compensation_bound - numericutils::eps;
                             const double cost_hi =
@@ -350,8 +377,7 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                             // cur can only dominate new if it is not more
                             // expensive, and vice versa. The 2*eps slack keeps
                             // these filters looser than dominates_cost_state.
-                            const bool src_one_sided =
-                                !(S == Stage::Four || S == Stage::Enumerate) || src_duals_nonpositive;
+                            constexpr bool src_one_sided = true;
                             const double cur_may_dominate_max     = new_label->cost + 2 * numericutils::eps;
                             const double cur_may_be_dominated_min = new_label->cost - 2 * numericutils::eps;
 
@@ -573,12 +599,15 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                                             }
                                             Label *cur = to_bucket_labels[i + lane];
                                             if (__builtin_expect(cur->is_dominated, 0)) continue;
-                                            if (cur_dominates_new[lane] && dominates_cost_state<S>(new_label, cur)) {
+                                            const bool eq_resources = equality_resources_match<D>(cur, new_label);
+                                            if (cur_dominates_new[lane] && eq_resources &&
+                                                dominates_cost_state<S>(new_label, cur)) {
                                                 ++stat_n_dom;
                                                 dominated = true;
                                                 return;
                                             }
-                                            if (new_dominates_cur[lane] && dominates_cost_state<S>(cur, new_label)) {
+                                            if (new_dominates_cur[lane] && eq_resources &&
+                                                dominates_cost_state<S>(cur, new_label)) {
                                                 cur->set_dominated(true);
                                             }
                                         }
@@ -706,7 +735,8 @@ std::vector<double> BucketGraph::labeling_algorithm() {
                         }
                     }
                 }
-                label->set_extended(true);
+                }
+                for (Label *label : round_labels) label->set_extended(true);
             }
 
             bucket_is_active[bucket_idx] = 0;
@@ -846,6 +876,42 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
         else
             return result;
     }
+    // Arc NG memory cycle check.
+    // If physical-arc NG memories are enabled, use them for tighter cycle detection.
+    // The arc NG memory tracks which elementarity sets are forbidden on each physical arc.
+    if constexpr (F != Full::PSTEP && F != Full::TSP) {
+        if (arc_ng_memory.enabled && A == ArcType::Bucket) {
+            // Get the physical arc ID from the bucket arc.
+            int phys_id = -1;
+            if constexpr (A == ArcType::Bucket) {
+                phys_id = gamma.physical_arc_id;
+            }
+            if (phys_id >= 0) {
+                auto it = arc_ng_memory.arcs.find(phys_id);
+                if (it != arc_ng_memory.arcs.end()) {
+                    // Check if current label state intersects with arc's visited sets.
+                    const auto& visited = it->second.visited_sets;
+                    bool forbidden = false;
+                    for (int set_id : visited) {
+                        if (static_cast<size_t>(set_id) < Label::visited_sets.size() &&
+                            Label::visited_sets[set_id]) {
+                            forbidden = true;
+                            break;
+                        }
+                    }
+                    if (forbidden) {
+                        return result;  // Reject: would create a cycle
+                    }
+                    // Update label state: merge arc's visited sets into label.
+                    for (int set_id : visited) {
+                        if (static_cast<size_t>(set_id) < Label::visited_sets.size()) {
+                            Label::visited_sets[set_id] = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // For stages where fixed arcs matter
     if constexpr (S >= Stage::Three || S == Stage::Eliminate) {
@@ -865,8 +931,12 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
             if (jump_bucket_id < 0 || jump_bucket_id >= static_cast<int>(buckets.size())) return false;
             const auto &jump_bucket = buckets[jump_bucket_id];
 
+            // Buckets only bound the main (bucketed) resources, which occupy
+            // the leading resource slots (as in get_bucket_number); the other
+            // resources are not lifted by a jump.
             std::array<double, R_SIZE> jumped_resources = initial_resources;
-            for (size_t i = 0; i < n_resources; ++i) {
+            const size_t n_bucketed = std::min({n_resources, jump_bucket.lb.size(), jump_bucket.ub.size()});
+            for (size_t i = 0; i < n_bucketed; ++i) {
                 if constexpr (D == Direction::Forward) {
                     jumped_resources[i] = std::max(jumped_resources[i], static_cast<double>(jump_bucket.lb[i]));
                 } else {
@@ -1001,7 +1071,9 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
                     const double cutoff = S == Stage::Enumerate
                                               ? std::min(gap, enumeration_route_cutoff.load(std::memory_order_relaxed))
                                               : 0.0;
-                    if (new_cost + completion - pricing_src_compensation_bound >= cutoff - numericutils::eps) {
+                    const double base_cost = new_cost - pricing_src_compensation_bound;
+                    if (base_cost + completion >= cutoff - numericutils::eps ||
+                        !backward_completion_exists(L_prime, node_id, opposite_bucket, base_cost, cutoff)) {
                         completion_bound_rejections.fetch_add(1, std::memory_order_relaxed);
                         return result;
                     }
@@ -1019,8 +1091,9 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
     new_label->path_len  = L_prime->path_len + 1;
 
     // Update visited bitmap: intersect parent's visited bits with neighborhood
-    // mask
-    if constexpr (F != Full::PSTEP) {
+    // mask. Enumeration keeps the full visited set instead (elementary
+    // routes; see the Enumerate dominance rule in dominates_resource_path).
+    if constexpr (F != Full::PSTEP && S != Stage::Enumerate) {
         // Branch-free so the compiler can vectorize it; ng rows are padded
         // to Label::bitmap_words (see calculate_neighborhoods).
         const uint64_t *__restrict ng     = neighborhoods_bitmap[node_id].data();
@@ -1035,6 +1108,12 @@ inline auto BucketGraph::Extend(const std::conditional_t<M == Mutability::Mut, L
     }
 
     set_node_visited(new_label->visited_bitmap, node_id);
+    if constexpr (S == Stage::Enumerate) {
+        // Full (elementary) memory: the node-local ng word is not exact here.
+        new_label->visited_sig = new_label->conservative_visited_signature();
+    } else {
+        finalize_visited_signature<F>(new_label, node_id);
+    }
 
     // Keep the extension O(1). Routes are materialized only for labels that
     // survive pricing and become column candidates.
@@ -1122,9 +1201,20 @@ inline bool BucketGraph::dominates_resource_path(const Label *__restrict new_lab
         }
         if (n_res > 0 && numericutils::lt(lbl_res[0], new_res[0])) { return false; }
     }
+    if (!equality_resources_match<D>(label, new_label)) { return false; }
 
     // visits of label.
     if constexpr (S == Stage::Three || S == Stage::Four || S == Stage::Enumerate) {
+        const uint64_t label_signature = label->visited_signature();
+        const uint64_t new_signature   = new_label->visited_signature();
+        if constexpr (S == Stage::Enumerate) {
+            // Enumeration: dominance only between labels with the same
+            // visited set, so no route under the gap is lost.
+            return label_signature == new_signature && label->visited_bitmap == new_label->visited_bitmap;
+        }
+        if ((label_signature & ~new_signature) != 0) return false;
+        if (Label::exact_visited_pair(label_signature, new_signature)) return true;
+
         const size_t n_bitmap = label->visited_bitmap.size();
 
         for (size_t i = 0; i < n_bitmap; ++i) {
@@ -1159,12 +1249,21 @@ inline bool BucketGraph::dominates_cost_state(const Label *__restrict new_label,
     // adjustments.
     if constexpr (S == Stage::Four || S == Stage::Enumerate) {
         const double local_cost_diff = label->cost - new_label->cost;
-        // With non-positive duals the SRC term can only add to label's cost.
-        if (src_duals_nonpositive && numericutils::gt(local_cost_diff, 0.0)) return false;
+        // The SRC allowance below is never positive, so a more expensive
+        // label can never dominate.
+        if (numericutils::gt(local_cost_diff, 0.0)) return false;
 
-        // Sum the duals of cuts where label's memory state exceeds
-        // new_label's. Inactive slots have a zero dual, so whole chunks can
-        // be compared without masking.
+        // Limited-memory R1C dominance (per-cut signed charge):
+        // a cut with dual sigma is charged (red_cost -= sigma) when its state
+        // overflows, so a higher state reaches the charge first. The
+        // dominator must absorb
+        //   sigma < 0 on cuts where its state is higher (it may pay first),
+        //   sigma > 0 on cuts where new_label's state is higher (new_label
+        //              may collect the discount first),
+        // i.e. local_cost_diff <= sum_{label>new} min(sigma,0)
+        //                         - sum_{new>label} max(sigma,0).
+        // Inactive slots have a zero dual, so whole chunks can be compared
+        // without masking.
         const uint8_t *label_state = label->SRCmap.data();
         const uint8_t *new_state   = new_label->SRCmap.data();
         double         dual_sum    = 0.0;
@@ -1172,8 +1271,15 @@ inline bool BucketGraph::dominates_cost_state(const Label *__restrict new_label,
             const size_t base = chunk * 32;
             uint32_t     mask = src_greater_mask32(label_state + base, new_state + base);
             while (mask) {
-                dual_sum += src_dense_duals[base + std::countr_zero(mask)];
+                dual_sum += std::min(src_dense_duals[base + std::countr_zero(mask)], 0.0);
                 mask &= mask - 1;
+            }
+            if (!src_duals_nonpositive) {
+                uint32_t lower = src_greater_mask32(new_state + base, label_state + base);
+                while (lower) {
+                    dual_sum -= std::max(src_dense_duals[base + std::countr_zero(lower)], 0.0);
+                    lower &= lower - 1;
+                }
             }
         }
         return !numericutils::gt(local_cost_diff, dual_sum);
@@ -1231,16 +1337,26 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     // mutate labels in compwise-smaller buckets — they belong to already-
     // processed (or concurrently processed) buckets, and marking them
     // dominated mid-walk silently drops queued pending labels. Cost is a
-    // necessary condition for cur-dominates-L; SRC-aware stages widen the
-    // sorted-bin stopping threshold by the safe compensation bound.
+    // necessary condition for cur-dominates-L in every stage (the SRC
+    // allowance in dominates_cost_state is never positive).
     const double cost_hi_break = label_cost + numericutils::eps;
-    const double bounded_cost_hi = cost_hi_break + pricing_src_compensation_bound;
+    const double bounded_cost_hi = cost_hi_break;
 
     auto inline_check_dominance = [&](const BucketLabelSoAView &view, uint &n_dom) -> bool {
         const size_t size = view.labels.size();
         if (profile_labeling) profile_record_inner_bin_scan(D, S, size);
         auto visited_subset = [&](size_t index) noexcept {
-            if ((view.visited_signatures[index] & ~label_visited_signature) != 0) return false;
+            if constexpr (S == Stage::Enumerate) {
+                // Enumeration: same visited set only (see the insertion scan).
+                if (view.visited_signatures[index] != label_visited_signature) return false;
+                for (size_t word = 0; word < Label::bitmap_words; ++word) {
+                    if (view.visited_words[word][index] != L->visited_bitmap[word]) return false;
+                }
+                return true;
+            }
+            const uint64_t signature = view.visited_signatures[index];
+            if ((signature & ~label_visited_signature) != 0) return false;
+            if (Label::exact_visited_pair(signature, label_visited_signature)) return true;
             for (size_t word = 0; word < Label::bitmap_words; ++word) {
                 if ((view.visited_words[word][index] & ~L->visited_bitmap[word]) != 0) return false;
             }
@@ -1296,7 +1412,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
                     }
                     Label *cur = view.labels[i + lane];
                     if (cur->is_dominated) continue;
-                    if (dominates_cost_state<S>(L, cur)) {
+                    if (equality_resources_match<D>(cur, L) && dominates_cost_state<S>(L, cur)) {
                         ++n_dom;
                         return true;
                     }
@@ -1339,7 +1455,7 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
 
                 Label *cur = view.labels[i];
                 if (cur->is_dominated) continue;
-                if (dominates_cost_state<S>(L, cur)) {
+                if (equality_resources_match<D>(cur, L) && dominates_cost_state<S>(L, cur)) {
                     ++n_dom;
                     return true;
                 }
@@ -1421,12 +1537,13 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
         if (Bvisited[segment] == 0) { touched_segments.push_back(static_cast<uint32_t>(segment)); }
         Bvisited[segment] |= bit;
 
-        // Fast path: no predecessor label can dominate L on cost. In
-        // SRC-aware stages a higher raw-cost label may still dominate after
-        // cut-state compensation, so include the safe compensation bound.
+        // Subtree prune: c_bar[b] bounds the cost of every label in b and in
+        // all buckets reachable from b through Phi, so none of them can
+        // dominate L on cost. Sibling subtrees still on the stack are not
+        // covered by this bound and must still be scanned.
         if (likely(bounded_cost_hi < c_bar[current_bucket] &&
                    bucket_scc_rank[current_bucket] < label_rank))
-            return false;
+            continue;
 
         // Whole-bucket prune: if no label in this bucket or any predecessor bin
         // at this node can dominate L in the second resource, skip it entirely.
@@ -1494,6 +1611,90 @@ inline bool BucketGraph::DominatedInCompWiseSmallerBuckets(const Label *__restri
     }
 
     return false;
+}
+
+/**
+ * @brief Exact completion test for a forward extension into node_id
+ * (completion check in exact mode).
+ *
+ * The c_bar test in Extend bounds only the cost of the best backward
+ * completion. This walks the backward bucket closure of opposite_bucket
+ * (opposite_bucket plus its Phi predecessors, pruned by bw_c_bar like the
+ * concatenation scan) and looks for one backward label at node_id that is
+ * cheap enough under the same cost convention and whose ng-memory meets the
+ * extended forward memory only at node_id. The forward memory is the
+ * extension's (parent & N(node_id)), computed without allocating the label.
+ *
+ * Returns false only when every candidate is ruled out; a backward label
+ * dominated away is covered by its dominator (cheaper, memory subset). The
+ * scan is budgeted: once kLabelBudget labels have been examined the
+ * completion is assumed to exist, so the extension is kept.
+ */
+inline bool BucketGraph::backward_completion_exists(const Label *parent, int node_id, int opposite_bucket,
+                                                    double base_cost, double cutoff) const {
+    constexpr size_t kLabelBudget = 256;
+    const double     limit        = cutoff - numericutils::eps;
+
+    static thread_local std::vector<int>      stack;
+    static thread_local std::vector<uint64_t> seen;
+    static thread_local std::vector<uint32_t> touched;
+    const size_t n_segments = (bw_buckets.size() + 63) >> 6;
+    if (seen.size() < n_segments) seen.resize(n_segments, 0);
+    stack.clear();
+    touched.clear();
+
+    std::array<uint64_t, Label::bitmap_words> forward_memory;
+    const auto &ng_row = neighborhoods_bitmap[node_id];
+    for (size_t w = 0; w < Label::bitmap_words; ++w) {
+        forward_memory[w] = parent->visited_bitmap[w] & (w < ng_row.size() ? ng_row[w] : 0);
+    }
+    forward_memory[static_cast<size_t>(node_id) >> 6] &= ~(1ULL << (node_id & 63));
+
+    size_t scanned = 0;
+    bool   found   = false;
+    // Returns true when the scan can stop (completion found or budget hit).
+    auto examine = [&](const Label *backward) noexcept {
+        if (backward->is_dominated || base_cost + backward->cost >= limit) return false;
+        if (++scanned > kLabelBudget || !visited_overlap(forward_memory, backward->visited_bitmap)) {
+            found = true;
+            return true;
+        }
+        return false;
+    };
+
+    stack.push_back(opposite_bucket);
+    while (!stack.empty() && !found) {
+        const int      b       = stack.back();
+        const size_t   segment = static_cast<size_t>(b) >> 6;
+        const uint64_t bit     = 1ULL << (b & 63);
+        stack.pop_back();
+        if (seen[segment] & bit) continue;
+        if (seen[segment] == 0) touched.push_back(static_cast<uint32_t>(segment));
+        seen[segment] |= bit;
+
+        // bw_c_bar[b] bounds every label in b and in its Phi closure.
+        if (base_cost + bw_c_bar[b] >= limit) continue;
+
+        const auto &bucket = bw_buckets[b];
+        for (const Label *backward : bucket.get_sorted_labels()) {
+            if (base_cost + backward->cost >= limit) break; // cost-sorted tier
+            if (examine(backward)) break;
+        }
+        if (found) break;
+        for (const Label *backward : bucket.get_extra_labels()) {
+            if (examine(backward)) break;
+        }
+        if (found) break;
+
+        for (int predecessor : Phi_bw[b]) {
+            if (!(seen[static_cast<size_t>(predecessor) >> 6] & (1ULL << (predecessor & 63)))) {
+                stack.push_back(predecessor);
+            }
+        }
+    }
+
+    for (uint32_t segment : touched) seen[segment] = 0;
+    return found;
 }
 
 /**
@@ -1610,20 +1811,21 @@ void BucketGraph::run_labeling_algorithms(std::vector<double> &forward_cbar, std
  */
 template <Stage S>
 Label *BucketGraph::compute_label(const Label *L, const Label *L_prime, double red_cost) {
-    // Compute cost values
-    double      cij_cost       = getcij(L->node_id, L_prime->node_id);
-    double      real_cost      = L->real_cost + L_prime->real_cost + cij_cost;
+    // L_prime == nullptr: L is a complete forward route (it reached the end
+    // depot without crossing the half-way point).
+    double      cij_cost       = L_prime ? getcij(L->node_id, L_prime->node_id) : 0.0;
+    double      real_cost      = L->real_cost + (L_prime ? L_prime->real_cost + cij_cost : 0.0);
     std::vector<uint16_t> forward_route;
     std::vector<uint16_t> backward_route;
     L->materializeRoute(forward_route);
-    L_prime->materializeRoute(backward_route);
+    if (L_prime) L_prime->materializeRoute(backward_route);
 
     // Acquire a new label from the pool and initialize its cost fields.
     auto new_label       = label_pool_fw->acquire();
     new_label->cost      = red_cost;
     new_label->real_cost = real_cost;
     new_label->parent    = nullptr;
-    new_label->path_len  = L->path_len + L_prime->path_len;
+    new_label->path_len  = L->path_len + (L_prime ? L_prime->path_len : 0);
 
     auto &merged_route = new_label->mutableRoute();
     merged_route.reserve(forward_route.size() + backward_route.size());
