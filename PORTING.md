@@ -1,8 +1,7 @@
 # Porting status
 
 BALDES 2.0 is a Rust port of the C++ OpenRSCP RCSP engine. The C++ OpenRSCP
-code is the reference implementation; it is not part of this repository. The previous C++ BALDES code is in `legacy/` and is
-not used by the Rust crate.
+code is the reference implementation; it is not part of this repository.
 
 ## Module map
 

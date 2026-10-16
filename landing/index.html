@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description"
+        content="BALDES 2.0 is a bucket-graph labeling RCSP solver and column-and-cut generation root for vehicle routing, rewritten in Rust." />
+    <link rel="canonical" href="https://laioseman.com/baldes/" />
+    <title>BALDES 2.0 — Bucket-Graph Labeling for Vehicle Routing, in Rust</title>
+
+    <!-- Preconnect for fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet" />
+
+    <!-- External CSS -->
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+    <!-- Shared logo parts: the bucket, and the Rust crab sitting in it -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <linearGradient id="logo-bucket" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#111a21" />
+                <stop offset="50%" stop-color="#263845" />
+                <stop offset="73%" stop-color="#5e7d91" />
+                <stop offset="100%" stop-color="#17232c" />
+            </linearGradient>
+            <linearGradient id="logo-metal" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#dceaf1" />
+                <stop offset="30%" stop-color="#ffffff" />
+                <stop offset="55%" stop-color="#8fb2c7" />
+                <stop offset="100%" stop-color="#f7fbfd" />
+            </linearGradient>
+            <linearGradient id="crab-shell" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#ff6a1f" />
+                <stop offset="1" stop-color="#d83f00" />
+            </linearGradient>
+            <g id="claw">
+                <path d="M432 300 Q404 286 386 262" fill="none" stroke="#b33600" stroke-width="16" stroke-linecap="round" />
+                <path d="M386 262 Q352 258 344 226 Q340 204 356 192 Q356 214 372 222 Q368 204 382 190 Q402 204 400 232 Q398 254 386 262 Z"
+                    fill="url(#crab-shell)" stroke="#8f2a00" stroke-width="6" stroke-linejoin="round" />
+            </g>
+            <clipPath id="bucket-opening">
+                <rect x="0" y="0" width="1024" height="322" />
+                <ellipse cx="512" cy="322" rx="138" ry="43" />
+            </clipPath>
+        </defs>
+        <symbol id="baldes-mark" viewBox="0 0 1024 1024">
+            <!-- handle -->
+            <path d="M332 315 C342 205 405 137 512 137 C619 137 682 205 692 315"
+                fill="none" stroke="url(#logo-metal)" stroke-width="26" stroke-linecap="round" />
+            <!-- bucket body and rim -->
+            <path d="M363 333 L398 560 Q408 610 512 620 Q616 610 626 560 L661 333 Z"
+                fill="url(#logo-bucket)" stroke="#eef7fb" stroke-width="10" />
+            <ellipse cx="512" cy="328" rx="170" ry="71" fill="#0b1217" stroke="#eef7fb" stroke-width="12" />
+            <ellipse cx="512" cy="322" rx="142" ry="47" fill="#0a1116" stroke="url(#logo-metal)" stroke-width="10" />
+            <!-- crab -->
+            <use href="#claw" />
+            <use href="#claw" transform="translate(1024 0) scale(-1 1)" />
+            <g clip-path="url(#bucket-opening)">
+                <path d="M414 330 Q412 262 468 250 L478 240 L490 252 L502 238 L512 252 L522 238 L534 252 L546 240 L556 250
+                         Q612 262 610 330 Q610 366 512 368 Q414 366 414 330 Z"
+                    fill="url(#crab-shell)" stroke="#8f2a00" stroke-width="7" stroke-linejoin="round" />
+            </g>
+            <path d="M488 262 L480 222 M536 262 L544 222" stroke="#8f2a00" stroke-width="9" stroke-linecap="round" />
+            <circle cx="478" cy="212" r="17" fill="#fbfdfe" stroke="#8f2a00" stroke-width="5" />
+            <circle cx="546" cy="212" r="17" fill="#fbfdfe" stroke="#8f2a00" stroke-width="5" />
+            <circle cx="482" cy="214" r="8" fill="#0f1920" />
+            <circle cx="542" cy="214" r="8" fill="#0f1920" />
+            <path d="M494 306 Q512 320 530 306" fill="none" stroke="#3a1100" stroke-width="6" stroke-linecap="round" />
+            <!-- front of the rim over the crab -->
+            <path d="M370 322 A142 47 0 0 0 654 322" fill="none" stroke="url(#logo-metal)" stroke-width="10" />
+            <path d="M342 328 A170 71 0 0 0 682 328" fill="none" stroke="#eef7fb" stroke-width="12" />
+            <!-- title -->
+            <text x="512" y="900" font-family="Montserrat, Arial, sans-serif" font-size="132" font-weight="800"
+                letter-spacing="9" text-anchor="middle" fill="#eef7fb">BALDES</text>
+        </symbol>
+    </svg>
+
+    <!-- ══════════════════════════
+     BACKGROUND LAYERS
+     ═══════════════════════════ -->
+    <div class="bg-mesh" aria-hidden="true">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- ══════════════════════════
+     NAV
+     ═══════════════════════════ -->
+    <nav id="main-nav">
+        <div class="nav-inner">
+            <a href="#" class="brand">
+                <svg class="brand-logo" viewBox="0 0 1024 1024" aria-hidden="true"><use href="#baldes-mark" /></svg>
+                <span class="brand-name">BALDES</span>
+            </a>
+
+            <div class="nav-actions">
+                <a class="btn btn-ghost" href="https://github.com/lseman/baldes/blob/main/README.md" target="_blank"
+                    rel="noopener">README</a>
+                <a class="btn btn-ghost" href="https://github.com/lseman/baldes" target="_blank" rel="noopener">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                    </svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ══════════════════════════
+     HERO
+     ═══════════════════════════ -->
+    <section class="hero">
+        <div class="hero-inner">
+
+            <!-- Large logo -->
+            <div class="hero-logo-wrap reveal">
+                <div class="hero-logo-ring"></div>
+                <div class="hero-logo-ring hero-logo-ring-2"></div>
+                <svg class="hero-logo" viewBox="0 0 1024 1024" aria-hidden="true"><use href="#baldes-mark" /></svg>
+            </div>
+
+            <!-- Copy -->
+            <div class="hero-copy">
+                <div class="reveal">
+                    <div class="hero-kicker">BALDES 2.0 · Rust · Bucket Graphs · Column-and-Cut Generation</div>
+                </div>
+
+                <h1 class="hero-title reveal reveal-d1">
+                    Vehicle routing,<br>
+                    <span class="grad">rewritten in Rust.</span>
+                </h1>
+
+                <p class="hero-desc reveal reveal-d2">
+                    BALDES 2.0 is a complete Rust rewrite of the bucket-graph labeling engine. It prices
+                    resource-constrained shortest paths, separates limited-memory rank-one cuts, fixes arcs
+                    and enumerates elementary routes, and drives a stabilized column-and-cut generation root.
+                    The core uses only the Rust standard library.
+                </p>
+
+                <div class="hero-actions reveal reveal-d3">
+                    <a class="btn btn-primary btn-large" href="#quickstart">Build it</a>
+                    <a class="btn btn-ghost btn-large" href="https://github.com/lseman/baldes" target="_blank"
+                        rel="noopener">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                        </svg>
+                        View source
+                    </a>
+                </div>
+
+                <div class="hero-tags reveal reveal-d4">
+                    <span class="tag">🦀 Rust</span>
+                    <span class="tag">📐 Bucket Graphs</span>
+                    <span class="tag">✂️ Rank-One Cuts</span>
+                    <span class="tag">🧭 Fixing &amp; Enumeration</span>
+                    <span class="tag">📈 Stabilized Column Generation</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="scroll-hint" aria-hidden="true">scroll</div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════
+     WHY BALDES
+     ═══════════════════════════ -->
+    <section class="section">
+        <div class="container">
+            <div class="reveal">
+                <div class="section-tag">01 — Engine</div>
+                <h2 class="section-title">What's in <span class="grad">2.0</span></h2>
+                <p class="section-copy">A purpose-built pricing engine for vehicle routing. Bucket graphs organize
+                    dominance, bidirectional labeling meets in the middle, and rank-one cuts tighten the
+                    relaxation, all inside a column-and-cut generation loop.</p>
+            </div>
+
+            <div class="features-grid">
+                <div class="feat reveal reveal-d1">
+                    <span class="feat-icon">🗂️</span>
+                    <div class="feat-title">Bucket Graph Labeling</div>
+                    <div class="feat-desc">Labels grouped in buckets by vertex and resource interval, processed in
+                        strongly connected component order, with jump arcs and dominance against preceding
+                        buckets.</div>
+                </div>
+                <div class="feat reveal reveal-d2">
+                    <span class="feat-icon">↔️</span>
+                    <div class="feat-title">Bidirectional Pricing</div>
+                    <div class="feat-desc">Forward and backward labeling with a half-way point that moves toward the
+                        lighter direction, and symmetric joins when the graph allows a single direction.</div>
+                </div>
+                <div class="feat reveal reveal-d3">
+                    <span class="feat-icon">✂️</span>
+                    <div class="feat-title">Limited-Memory Rank-One Cuts</div>
+                    <div class="feat-desc">One- and three-row separation, local-search and tuple-based four- and
+                        five-row separation, and packed cut state in pricing and enumeration labels.</div>
+                </div>
+                <div class="feat reveal reveal-d1">
+                    <span class="feat-icon">🧭</span>
+                    <div class="feat-title">Fixing &amp; Enumeration</div>
+                    <div class="feat-desc">Reduced-cost fixing removes bucket arcs that cannot lead to an improving
+                        route; when the gap is small, every elementary route is enumerated and priced by
+                        inspection.</div>
+                </div>
+                <div class="feat reveal reveal-d2">
+                    <span class="feat-icon">📈</span>
+                    <div class="feat-title">Stabilized Column Generation</div>
+                    <div class="feat-desc">Dual-price smoothing with misprice handling, a Clp restricted master,
+                        cut rounds with basic-cut removal, and artificial-column penalties.</div>
+                </div>
+                <div class="feat reveal reveal-d3">
+                    <span class="feat-icon">🦀</span>
+                    <div class="feat-title">Safe, Dependency-Light Rust</div>
+                    <div class="feat-desc">The solver core is plain Rust on the standard library. Clp is an optional
+                        feature, linked through its C interface only for the master LP.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════
+     QUICK START
+     ═══════════════════════════ -->
+    <section class="section" id="quickstart">
+        <div class="container">
+            <div class="reveal">
+                <div class="section-tag">02 — Quick start</div>
+                <h2 class="section-title">Up in <span class="grad">three commands</span></h2>
+                <p class="section-copy">Build with Cargo. The root solve needs the Clp feature: point
+                    <code>BALDES_CLP_LIB_DIR</code> at the static Clp and CoinUtils archives.</p>
+            </div>
+
+            <div class="commands-wrap reveal reveal-d1">
+                <div class="commands-header">
+                    <span class="term-dot" style="background:#ff5f57"></span>
+                    <span class="term-dot" style="background:#ffbd2e"></span>
+                    <span class="term-dot" style="background:#28c840"></span>
+                    <span class="commands-header-label">terminal — build &amp; run</span>
+                </div>
+
+                <div class="command-item">
+                    <div class="command-code">export BALDES_CLP_LIB_DIR=/path/to/clp/archives</div>
+                    <div class="command-desc">Locate the Clp archives</div>
+                </div>
+                <div class="command-item">
+                    <div class="command-code">cargo build --release --features clp</div>
+                    <div class="command-desc">Build the library and <code>baldes-vrptw</code></div>
+                </div>
+                <div class="command-item">
+                    <div class="command-code">./target/release/baldes-vrptw instances/R101.txt --customers 25 --rank1</div>
+                    <div class="command-desc">Solve a VRPTW root with rank-one cuts</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════
+     ALGORITHMS
+     ═══════════════════════════ -->
+    <section class="section">
+        <div class="container">
+            <div class="reveal">
+                <div class="section-tag">03 — Algorithms</div>
+                <h2 class="section-title">Staged <span class="grad">pricing strategy</span></h2>
+                <p class="section-copy">Cheap heuristic phases find improving columns fast; the exact phase proves
+                    there are none left; fixing and enumeration then shrink what remains to be priced.</p>
+            </div>
+
+            <div class="phases-wrap reveal reveal-d1">
+                <div class="phase">
+                    <div class="phase-num">01</div>
+                    <div class="phase-label">Heuristic labeling</div>
+                    <div class="phase-sub">Few labels per bucket and resource-and-cost dominance only. Phases move
+                        toward the exact one when they stop finding negative columns.</div>
+                </div>
+                <div class="phase">
+                    <div class="phase-num">02</div>
+                    <div class="phase-label">Exact labeling</div>
+                    <div class="phase-sub">Full dominance on resources, NG memory and cut state, with jump arcs.
+                        No negative column left means the master LP is optimal.</div>
+                </div>
+                <div class="phase">
+                    <div class="phase-num">03</div>
+                    <div class="phase-label">Cut separation</div>
+                    <div class="phase-sub">Rank-one cuts are separated on the fractional master solution, rank by
+                        rank, until the bound tails off.</div>
+                </div>
+                <div class="phase">
+                    <div class="phase-num">04</div>
+                    <div class="phase-label">Fixing &amp; enumeration</div>
+                    <div class="phase-sub">With an incumbent, bucket arcs are fixed by reduced cost and, when few
+                        routes remain, all elementary routes are enumerated and priced by inspection.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════
+     DESIGN PRINCIPLES
+     ═══════════════════════════ -->
+    <section class="section">
+        <div class="container">
+            <div class="reveal">
+                <div class="section-tag">04 — Design</div>
+                <h2 class="section-title">Built for <span class="grad">research &amp; production</span></h2>
+                <p class="section-copy">Every architectural decision balances algorithmic correctness, memory
+                    efficiency, and reproducibility over convenience magic.</p>
+            </div>
+
+            <div class="principles-strip reveal reveal-d1">
+                <div class="principle">
+                    <div class="principle-num">01</div>
+                    <div class="principle-label">Algorithm-first design</div>
+                    <div class="principle-sub">The bucket graph mirrors the mathematical structure of the pricing
+                        problem; no abstraction leaks the model.</div>
+                </div>
+                <div class="principle">
+                    <div class="principle-num">02</div>
+                    <div class="principle-label">Memory-conscious</div>
+                    <div class="principle-sub">Packed cut words in every label, arena-held label ancestry and bounded
+                        buckets keep peak memory predictable.</div>
+                </div>
+                <div class="principle">
+                    <div class="principle-num">03</div>
+                    <div class="principle-label">Deterministic</div>
+                    <div class="principle-sub">Fixed tie-breaking and seeded randomness: the same instance gives the
+                        same trajectory, iteration by iteration.</div>
+                </div>
+                <div class="principle">
+                    <div class="principle-num">04</div>
+                    <div class="principle-label">Rust all the way down</div>
+                    <div class="principle-sub">Memory safety without a garbage collector; the only foreign code is
+                        the optional LP backend.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════
+     FOOTER
+     ═══════════════════════════ -->
+    <footer>
+        <div class="footer-inner">
+            <div>
+                <div class="footer-brand">
+                    <svg class="footer-logo" viewBox="0 0 1024 1024" aria-hidden="true"><use href="#baldes-mark" /></svg>
+                    <span class="footer-name">BALDES</span>
+                </div>
+                <div class="footer-desc">Bucket-graph labeling and column-and-cut generation for vehicle routing,
+                    in Rust.</div>
+            </div>
+            <div class="footer-links">
+                <a class="btn btn-ghost" href="https://github.com/lseman/baldes" target="_blank"
+                    rel="noopener">GitHub</a>
+                <a class="btn btn-ghost" href="https://github.com/lseman/baldes/blob/main/README.md">README</a>
+                <a class="btn btn-ghost" href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT License</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>BALDES 2.0 — MIT License</span>
+            <span>github.com/lseman/baldes</span>
+        </div>
+    </footer>
+
+    <!-- External JS -->
+    <script src="app.js" defer></script>
+</body>
+
+</html>
