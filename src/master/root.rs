@@ -467,15 +467,15 @@ impl Controller for RootController {
         let mut state = self.state.borrow_mut();
         let state = &mut *state;
         let value = master.objective;
+        // Every converged column generation, round 0 included, reports to the
+        // pricing solver with flag3 = flag5 = 0 (traced at ELF 0x67e9a0).
+        let stop = state.solver.column_generation_terminated(0, 0)?;
         if state.cut.rounds == 0 {
             state.cut.lp_before_cuts = value;
         } else {
             let gain = (value - state.cut.separation_lp) / (0.1 * state.cut.separation_lp.abs()).max(1e-9);
             let rank_active = state.cut.options.enabled &&
                 (state.cut.capacity_separator.is_none() || state.cut.capacity_level_finished);
-            let enumerated = state.solver.enumeration.is_some();
-            let grid = state.solver.engine.as_ref().map(|e| &e.grid);
-            let (stop, _) = state.solver.round.action(&state.solver.options, grid, enumerated, false, 0, 1)?;
             let min_rounds = state.cut.options.min_rounds_before_stop_by_sp;
             if rank_active && stop && state.cut.rounds >= min_rounds {
                 return Ok(0);

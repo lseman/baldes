@@ -300,11 +300,8 @@ fn cosine(center: &[f64], priced: &[f64], g: &[f64]) -> f64 {
         .enumerate()
         .map(|(i, v)| priced.get(i).copied().unwrap_or(0.) - v)
         .collect();
-    let a = norm(&toward);
-    let b = norm(g);
-    if a <= 1e-15 || b <= 1e-15 {
-        0.
-    } else {
-        dot(&toward, g) / (a * b)
-    }
+    // calculateAngleAtPricingPoint (ELF 0x2d87f0) divides unguarded: a
+    // round-off step toward the pricing point still yields an angle, and a
+    // zero step gives NaN, which then fails both alpha-update comparisons.
+    dot(&toward, g) / (norm(g) * norm(&toward))
 }

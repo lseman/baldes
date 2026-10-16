@@ -357,6 +357,24 @@ impl Solver {
             .ok_or_else(|| invalid("pricing must precede fixing"))?
             .fix_bucket_arcs(&self.graph, threshold)
     }
+    /// columnGenerationTerminated (ELF 0x67e9a0) as Alg4EvalByLagrangianDuality
+    /// calls it after each converged column generation: the statistics form,
+    /// then the end-of-round form that applies a pending bucket-step decrease.
+    /// Returns the stop-cut-generation flag of the statistics form.
+    pub fn column_generation_terminated(&mut self, flag3: i32, flag5: i32) -> Result<bool> {
+        let enumerated = self.enumeration.is_some();
+        let grid = self.engine.as_ref().map(|e| &e.grid);
+        let (stop, _) = self.round.action(&self.options, grid, enumerated, false, flag3, flag5)?;
+        let (_, decrease) = self.round.action(&self.options, grid, enumerated, true, flag3, flag5)?;
+        if decrease {
+            if let Some(engine) = self.engine.as_mut() {
+                // "cannot decrease bucket steps" is reported and ignored.
+                let _ = engine.grid.decrease_steps(&self.graph);
+                self.bucket_steps = engine.grid.step;
+            }
+        }
+        Ok(stop)
+    }
 }
 impl Solver {
     pub fn complete_labels(&mut self, enforce_time_limit: bool) -> Result<()> {

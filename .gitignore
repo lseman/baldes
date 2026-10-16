@@ -95,7 +95,6 @@ ariadne.db
 snapshot.bin
 *.md
 !README.md
-!PORTING.md
 !CHANGELOG.md
 
 # OS
