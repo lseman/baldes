@@ -94,6 +94,12 @@ CLAUDE.md
 ariadne.db
 snapshot.bin
 *.md
+!README.md
+!PORTING.md
+!CHANGELOG.md
 
 # OS
 .DS_Store
+
+# Rust build outputs
+/target/

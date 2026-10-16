@@ -30,6 +30,20 @@
       <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000" flood-opacity=".32"/>
     </filter>
     <clipPath id="leftHalf"><rect x="0" y="0" width="512" height="1024"/></clipPath>
+    <!-- the crab shows above the rim and inside the bucket opening -->
+    <clipPath id="bucketOpening">
+      <rect x="0" y="0" width="1024" height="322"/>
+      <ellipse cx="512" cy="322" rx="138" ry="43"/>
+    </clipPath>
+    <linearGradient id="crabShell" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff6a1f"/>
+      <stop offset="1" stop-color="#d83f00"/>
+    </linearGradient>
+    <g id="claw">
+      <path d="M432 300 Q404 286 386 262" fill="none" stroke="#b33600" stroke-width="16" stroke-linecap="round"/>
+      <path d="M386 262 Q352 258 344 226 Q340 204 356 192 Q356 214 372 222 Q368 204 382 190 Q402 204 400 232 Q398 254 386 262 Z"
+            fill="url(#crabShell)" stroke="#8f2a00" stroke-width="6" stroke-linejoin="round"/>
+    </g>
     <clipPath id="rightHalf"><rect x="512" y="0" width="512" height="1024"/></clipPath>
 
     <g id="truck">
@@ -151,6 +165,29 @@
     <path d="M535 280 C590 287 625 303 642 322 C618 342 594 352 566 358 C560 326 548 301 535 280Z"
           fill="#7897aa" opacity=".32"/>
 
+    <!-- Rust crab in the bucket -->
+    <g id="crab">
+      <use href="#claw"/>
+      <use href="#claw" transform="translate(1024 0) scale(-1 1)"/>
+      <g clip-path="url(#bucketOpening)">
+        <path d="M414 330 Q412 262 468 250 L478 240 L490 252 L502 238 L512 252 L522 238 L534 252 L546 240 L556 250
+                 Q612 262 610 330 Q610 366 512 368 Q414 366 414 330 Z"
+              fill="url(#crabShell)" stroke="#8f2a00" stroke-width="7" stroke-linejoin="round"/>
+        <path d="M444 292 Q512 270 580 292" fill="none" stroke="#ff9a5c" stroke-width="7" stroke-linecap="round" opacity=".7"/>
+      </g>
+      <path d="M488 262 L480 222 M536 262 L544 222" stroke="#8f2a00" stroke-width="9" stroke-linecap="round"/>
+      <circle cx="478" cy="212" r="17" fill="#fbfdfe" stroke="#8f2a00" stroke-width="5"/>
+      <circle cx="546" cy="212" r="17" fill="#fbfdfe" stroke="#8f2a00" stroke-width="5"/>
+      <circle cx="482" cy="214" r="8" fill="#0f1920"/>
+      <circle cx="542" cy="214" r="8" fill="#0f1920"/>
+      <circle cx="485" cy="210" r="2.6" fill="#fbfdfe"/>
+      <circle cx="545" cy="210" r="2.6" fill="#fbfdfe"/>
+      <path d="M494 306 Q512 320 530 306" fill="none" stroke="#3a1100" stroke-width="6" stroke-linecap="round"/>
+    </g>
+    <!-- front of the rim over the crab -->
+    <path d="M370 322 A142 47 0 0 0 654 322" fill="none" stroke="url(#metal)" stroke-width="10"/>
+    <path d="M342 328 A170 71 0 0 0 682 328" fill="none" stroke="#eef7fb" stroke-width="12"/>
+
     <!-- bands and highlights -->
     <path d="M378 404 Q512 453 646 404" fill="none" stroke="#0b141a" stroke-width="28" opacity=".92"/>
     <path d="M390 420 Q512 460 634 420" fill="none" stroke="#a6c1d0" stroke-width="9" opacity=".45"/>
@@ -162,12 +199,12 @@
   <!-- orbit dots -->
   <g>
     <g fill="#101a21">
-      <circle cx="432" cy="214" r="11"/><circle cx="485" cy="204" r="9"/>
+      
       <circle cx="282" cy="257" r="11"/><circle cx="201" cy="331" r="8"/>
       <circle cx="322" cy="365" r="13"/>
     </g>
     <g fill="#eef7fb">
-      <circle cx="560" cy="207" r="10"/><circle cx="618" cy="215" r="10"/>
+      
       <circle cx="739" cy="220" r="7"/><circle cx="820" cy="280" r="6"/>
       <circle cx="874" cy="370" r="10"/>
     </g>
@@ -179,4 +216,9 @@
     <text x="512" y="895" fill="#0f1920" clip-path="url(#leftHalf)">BALDES</text>
     <text x="512" y="895" fill="#f2f8fb" clip-path="url(#rightHalf)">BALDES</text>
   </g>
+
+  <!-- version mark -->
+  <rect x="442" y="926" width="140" height="62" rx="31" fill="url(#crabShell)" stroke="#8f2a00" stroke-width="4"/>
+  <text x="512" y="972" font-family="Montserrat, Arial, Helvetica, sans-serif" font-size="44" font-weight="800"
+        letter-spacing="4" text-anchor="middle" fill="#fbfdfe">2.0</text>
 </svg>
