@@ -1,0 +1,35 @@
+[package]
+name = "baldes"
+version = "2.0.0"
+edition = "2021"
+description = "BALDES 2.0: bucket-graph labeling RCSP solver and branch-cut-and-price root, written in Rust"
+license = "MIT"
+autobins = false
+
+[lib]
+name = "baldes"
+path = "src/lib.rs"
+# cdylib/staticlib expose the ported no-cut C API entry points.
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[features]
+default = []
+# Clp restricted master and column-generation loop.
+clp = []
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+debug = false
+panic = "unwind"
+
+[profile.dev]
+opt-level = 1
+panic = "unwind"
+
+[[bin]]
+name = "baldes-vrptw"
+path = "src/bin/vrptw.rs"
+required-features = ["clp"]
