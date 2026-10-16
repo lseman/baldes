@@ -743,3 +743,10 @@ footer {
         display: none;
     }
 }
+
+/* inline code in copy */
+.section-copy code,
+.command-desc code {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.9em;
+}
