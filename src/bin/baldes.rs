@@ -1,10 +1,11 @@
 use baldes::master::root::RootOptions;
 use baldes::vrptw::{Instance, Rounding};
-const HELP: &str = "Usage: baldes <vrptw|cvrp> INSTANCE [OPTIONS]
+const HELP: &str = "Usage: baldes <vrptw|cvrp|hgs> INSTANCE [OPTIONS]
 
 Instance types (Solomon-format or CVRPLIB .vrp input):
   vrptw                 Vehicle routing with time windows
   cvrp                  Capacitated vehicle routing; ignores time windows and service times
+  hgs                   Hybrid Genetic Search heuristic
 
 Options:
   --customers N         Keep the first N customers
@@ -18,8 +19,12 @@ Options:
   --no-enumeration      Disable reduced-cost fixing and enumeration
   --upper-bound X       Initial incumbent
   --iterations N        Master iteration limit
-  --time SECONDS        Time limit
-  --json FILE           Write results as JSON
+  --time SECONDS        Time limit (BOTH vrptw/cvrp and hgs)
+  --json FILE           Write results as JSON (BOTH vrptw/cvrp and hgs)
+  --population-size N   HGS minimum population size (default: 25)
+  --nb-iter N           HGS iterations without improvement before stopping, or
+                        restarting under a time limit (default: 20000)
+  --seed N              HGS random seed (default: 0)
   -h, --help            Print help";
 
 fn run() -> std::result::Result<(), String> {
@@ -29,7 +34,7 @@ fn run() -> std::result::Result<(), String> {
         println!("{HELP}");
         return Ok(());
     }
-    if kind != "vrptw" && kind != "cvrp" {
+    if kind != "vrptw" && kind != "cvrp" && kind != "hgs" {
         return Err(format!("unknown instance type: {kind}\n\n{HELP}"));
     }
     let file = args.next().ok_or(HELP)?;
@@ -48,6 +53,9 @@ fn run() -> std::result::Result<(), String> {
     let mut rank1 = false;
     let mut capacity = false;
     let mut rounding = None;
+    let mut hgs_pop_size: Option<u32> = None;
+    let mut hgs_nb_iter: Option<u32> = None;
+    let mut hgs_seed = 0;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" | "-h" => {
@@ -103,6 +111,29 @@ fn run() -> std::result::Result<(), String> {
                     .parse()
                     .map_err(|e: std::num::ParseFloatError| e.to_string())?
             }
+            "--population-size" => {
+                hgs_pop_size = Some(
+                    args.next()
+                        .ok_or("missing population size")?
+                        .parse::<u32>()
+                        .map_err(|e| e.to_string())?,
+                )
+            }
+            "--nb-iter" => {
+                hgs_nb_iter = Some(
+                    args.next()
+                        .ok_or("missing nb-iter value")?
+                        .parse::<u32>()
+                        .map_err(|e| e.to_string())?,
+                )
+            }
+            "--seed" => {
+                hgs_seed = args
+                    .next()
+                    .ok_or("missing seed")?
+                    .parse::<i32>()
+                    .map_err(|e| e.to_string())?
+            }
             _ => return Err(format!("unknown argument: {arg}")),
         }
     }
@@ -113,6 +144,60 @@ fn run() -> std::result::Result<(), String> {
     if let Some(n) = customers {
         instance.truncate(n).map_err(|e| e.to_string())?;
     }
+    // HGS heuristic path
+    if kind == "hgs" {
+        use baldes::hgs::{HgsOptions, run_hgs};
+        if let Some(rounding) = rounding {
+            instance.rounding = rounding;
+        }
+        let time_limit = if options.cg.time_limit.as_secs_f64() > 0.0 {
+            options.cg.time_limit.as_secs_f64()
+        } else {
+            60.0
+        };
+        let opts = HgsOptions {
+            time_limit,
+            nb_iter: hgs_nb_iter.unwrap_or(20000),
+            population_size: hgs_pop_size.unwrap_or(25),
+            seed: hgs_seed,
+            verbose: true,
+        };
+        let started = std::time::Instant::now();
+        let result = run_hgs(&instance, &opts).map_err(|e| e.to_string())?;
+        let elapsed = started.elapsed().as_secs_f64();
+        if let Some(path) = json_path {
+            fn number(v: f64) -> String {
+                if v.is_finite() { v.to_string() } else { "null".into() }
+            }
+            let routes_json: Vec<_> = result.routes.iter().enumerate().map(|(i, r)| {
+                format!("{{\"route\":{},\"customers\":{:?}}}", i, r)
+            }).collect();
+            let json = format!("{{\"instance\":{:?},\"status\":\"{}\",\"cost\":{},\"generations\":{},\"seconds\":{},\"routes\":[{}]}}\n",
+                instance.name,
+                if result.best_cost.is_some() { "Found" } else { "None" },
+                result.best_cost.map(number).unwrap_or("null".into()),
+                result.generations,
+                elapsed,
+                routes_json.join(","),
+            );
+            std::fs::write(path, json).map_err(|e| e.to_string())?;
+        }
+        println!(
+            "instance={} status={} cost={} generations={} seconds={}",
+            instance.name,
+            if result.best_cost.is_some() { "Found" } else { "None" },
+            result.best_cost.map_or("null".into(), |c| format!("{:.2}", c)),
+            result.generations,
+            elapsed
+        );
+        for (i, route) in result.routes.iter().enumerate() {
+            if !route.is_empty() {
+                println!("route={} customers={:?}", i, route);
+            }
+        }
+        return Ok(());
+    }
+
     if capacity {
         options = options.with_capacity_cuts(baldes::master::root::CapacityCutConfig::new(
             instance.customers.iter().map(|c| c.demand).collect(),

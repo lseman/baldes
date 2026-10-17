@@ -129,3 +129,24 @@ fn cli_solves_a_cvrplib_root() {
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("no time windows"));
 }
+
+#[test]
+fn tenth_rounding_uses_integer_times_and_tenth_costs() {
+    let instance = Instance::parse(
+        "tiny\nVEHICLE\nNUMBER CAPACITY\n2 10\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 1 1 2 50 3\n2 2 0 1 0 60 0\n",
+    )
+    .unwrap();
+    let graph = instance.graph(4, Rounding::Tenth).unwrap();
+    for arc in &graph.arcs {
+        let time = arc.consumption[0];
+        assert_eq!(time, time.round(), "integer travel time {time}");
+        // Cost: the HGS distance in tenths; time adds the scaled service.
+        let tail = if arc.tail == 3 { 0 } else { arc.tail };
+        let service = instance.customers[tail].service * 10.;
+        assert!((arc.cost * 10. - (time - service)).abs() < 1e-9, "{} vs {}", arc.cost, time);
+    }
+    // sqrt(2) = 1.414... -> 14 tenths.
+    let arc = graph.arcs.iter().find(|a| a.tail == 0 && a.head == 1).unwrap();
+    assert_eq!((arc.consumption[0], arc.cost), (14., 1.4));
+    assert_eq!(graph.vertices[1].bounds[0].upper, 500.);
+}

@@ -29,11 +29,25 @@ pub enum Rounding {
     None,
     /// floor(d + 0.5): TSPLIB nint, the CVRPLIB EUC_2D convention.
     Nearest,
+    /// Truncated to tenths. Graph times use HGS's integer metric (see
+    /// [`Rounding::scale`]); costs stay in instance units.
     Tenth,
     /// TSPLIB CEIL_2D.
     Ceil,
 }
 impl Rounding {
+    /// Factor applied to graph times: 10 for `Tenth`, so travel times, time
+    /// windows and service times are integers, as in HGS. Only the time
+    /// resource is scaled: pricing and stabilization tolerances are absolute,
+    /// and scaled costs slow column generation down several times.
+    pub fn scale(self) -> f64 {
+        if self == Self::Tenth {
+            10.
+        } else {
+            1.
+        }
+    }
+
     pub fn parse(name: &str) -> Result<Self> {
         match name {
             "none" => Ok(Self::None),
@@ -309,7 +323,19 @@ impl Instance {
     pub fn capacity_graph(&self, ng_size: usize, rounding: Rounding) -> Result<Graph> {
         self.build_graph(ng_size, rounding, false)
     }
+    /// Distance in graph time units: `distance * rounding.scale()`, with
+    /// `Tenth` computed as HGS does, from the scaled coordinates.
+    pub fn graph_distance(&self, i: usize, j: usize, rounding: Rounding) -> f64 {
+        let scale = rounding.scale();
+        if rounding != Rounding::Tenth || self.distances.is_some() {
+            return self.distance(i, j, rounding) * scale;
+        }
+        let (a, b) = (&self.customers[i], &self.customers[j]);
+        let (dx, dy) = (a.x * scale - b.x * scale, a.y * scale - b.y * scale);
+        (dx * dx + dy * dy).sqrt().floor()
+    }
     fn build_graph(&self, ng_size: usize, rounding: Rounding, time_windows: bool) -> Result<Graph> {
+        let scale = rounding.scale();
         let n = self.customers.len() - 1;
         let sink = n + 1;
         let mut graph = Graph::new(n + 2, 2)?;
@@ -318,14 +344,14 @@ impl Instance {
             let j = if v == sink { 0 } else { v };
             let from = &self.customers[i];
             let to = &self.customers[j];
-            let d = self.distance(i, j, rounding);
-            let travel = if time_windows { from.service + d } else { 0. };
-            if (time_windows && from.ready + travel > to.due + 1e-6)
+            let d = self.graph_distance(i, j, rounding);
+            let travel = if time_windows { from.service * scale + d } else { 0. };
+            if (time_windows && from.ready * scale + travel > to.due * scale + 1e-6)
                 || (u != 0 && v != sink && from.demand + to.demand > self.capacity + 1e-6)
             {
                 return Ok(());
             }
-            let id = graph.add_arc(u, v, d)?;
+            let id = graph.add_arc(u, v, d / scale)?;
             graph.arc_mut(id)?.consumption = [travel, if v == sink { 0. } else { to.demand }];
             Ok(())
         };
@@ -341,7 +367,7 @@ impl Instance {
         for v in 0..=sink {
             let i = if v == sink { 0 } else { v };
             let (ready, due) = if time_windows {
-                (self.customers[i].ready, self.customers[i].due)
+                (self.customers[i].ready * scale, self.customers[i].due * scale)
             } else {
                 (0., 1.)
             };
@@ -359,7 +385,7 @@ impl Instance {
             graph.set_ng(v, &order)?;
         }
         graph.initial[0] = Some(if time_windows {
-            self.customers[0].ready
+            self.customers[0].ready * scale
         } else {
             0.
         });

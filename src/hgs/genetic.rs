@@ -1,466 +1,366 @@
 //! Genetic algorithm engine: selection, crossover (OX + SREX), local search orchestration.
 //!
 //! This module implements the core evolutionary loop of HGS:
-//! - Two crossover operators: OX (Order Crossover) and SREX (Segment-based RECombining XOver)
+//! - Two crossover operators: OX (Order Crossover) and SREX (Selective Route Exchange)
 //! - Local search application to offspring
 //! - Insertion of unplanned clients into offspring
 
-use crate::hgs::{Individual, Params, Split};
+use std::collections::HashSet;
+
 use crate::hgs::local_search::HGSLocalSearch;
+use crate::hgs::{Individual, Params, Population, Split};
 
 /// Number of candidate offspring created from one individual pair.
-const NUMBER_OF_CANDIDATE_OFFSPRINGS: usize = 4;
+pub const NUMBER_OF_CANDIDATE_OFFSPRINGS: usize = 4;
 
-/// Genetic engine that runs the crossover operators.
-///
-/// Holds references to the problem parameters, split algorithm, and local search structure.
-/// Manages crossover operators and offspring pool.
-pub struct Genetic<'p> {
-    params: &'p Params,                  /// Problem parameters
-    split: &'p mut Split<'p>,            /// Split algorithm
-    local_search: &'p HGSLocalSearch<'p>, /// Local search structure
-
-    /// Pre-allocated offspring for in-place crossover (0,1 = SREX; 2,3 = OX).
+/// Genetic engine that runs the crossover operators and main evolutionary loop.
+pub struct Genetic<'a, 'p> {
+    params: &'p Params,
+    split: &'a mut Split<'p>,
+    local_search: &'a mut HGSLocalSearch<'p>,
+    /// Reused offspring buffers: SREX writes 0 and 1, OX writes 2 and 3.
     candidate_offsprings: Vec<Individual<'p>>,
 }
 
-impl<'p> Genetic<'p> {
+impl<'a, 'p> Genetic<'a, 'p> {
     /// Create a new Genetic engine.
     pub fn new(
         params: &'p Params,
-        split: &'p mut Split<'p>,
-        local_search: &'p HGSLocalSearch<'p>,
+        split: &'a mut Split<'p>,
+        local_search: &'a mut HGSLocalSearch<'p>,
     ) -> Self {
-        let mut candidate_offsprings = Vec::with_capacity(NUMBER_OF_CANDIDATE_OFFSPRINGS);
-        for _ in 0..NUMBER_OF_CANDIDATE_OFFSPRINGS {
-            candidate_offsprings.push(Individual::new_random(params));
+        let candidate_offsprings =
+            (0..NUMBER_OF_CANDIDATE_OFFSPRINGS).map(|_| Individual::new_empty(params)).collect();
+        Genetic { params, split, local_search, candidate_offsprings }
+    }
+
+    /// Run the genetic algorithm until `max_iter_non_prod` consecutive
+    /// iterations without improvement or the time limit. With a time limit,
+    /// the population restarts instead of stopping on non-improvement.
+    pub fn run(&mut self, population: &mut Population<'p>, max_iter_non_prod: usize) {
+        if self.params.nb_clients == 1 {
+            return;
         }
-        Genetic {
-            params,
-            split,
-            local_search,
-            candidate_offsprings,
+        const MDM_NON_UPDATING_RESTARTS: f64 = 0.05;
+        let config = &self.params.config;
+        let repair_threshold = config.repair_probability.max(0) as u64;
+        let repeat_until_time_limit = config.time_limit > 0.0 && config.do_repeat_until_time_limit;
+        let mut nb_granular = config.nb_granular;
+        let mut nb_restarts = 0;
+        let mut nb_iter_non_prod = 1;
+        let mut nb_iter = 0usize;
+        while nb_iter_non_prod <= max_iter_non_prod && !self.params.is_time_limit_exceeded() {
+            // Selection and crossover, then local search on the best offspring.
+            let best = {
+                let (parent_a, parent_b) = population.get_non_identical_parents();
+                self.best_of_srex_and_ox_crossovers(parent_a, parent_b)
+            };
+            let offspring = &mut self.candidate_offsprings[best];
+            self.local_search.run(
+                offspring,
+                self.params.penalty_capacity.get(),
+                self.params.penalty_time_warp.get(),
+            );
+            let mut is_new_best = population.add_individual(offspring, true);
+
+            // Repair half of the infeasible offspring with stronger penalties.
+            if !offspring.is_feasible && self.params.rng.borrow_mut().next() % 100 < repair_threshold {
+                self.local_search.run(
+                    offspring,
+                    self.params.penalty_capacity.get() * 10.0,
+                    self.params.penalty_time_warp.get() * 10.0,
+                );
+                if offspring.is_feasible {
+                    is_new_best |= population.add_individual(offspring, false);
+                }
+            }
+
+            nb_iter_non_prod = if is_new_best { 1 } else { nb_iter_non_prod + 1 };
+
+            if nb_iter % 100 == 0 {
+                population.manage_penalties();
+            }
+            let log_interval = if config.log_pool_interval > 0 { config.log_pool_interval as usize } else { 500 };
+            if nb_iter % log_interval == 0 {
+                population.print_state(nb_iter as i32, nb_iter_non_prod as i32);
+            }
+
+            if repeat_until_time_limit && nb_iter_non_prod == max_iter_non_prod {
+                nb_restarts += 1;
+                let per_restart = self.params.elapsed_secs() / nb_restarts as f64;
+                let estimated_restarts = ((config.time_limit / per_restart) as i64).min(1000);
+                population.mdm_elite_max_non_updating_restarts =
+                    (MDM_NON_UPDATING_RESTARTS * estimated_restarts as f64) as usize;
+                population.mine_elite();
+                population.restart(self.split, self.local_search);
+                nb_iter_non_prod = 1;
+            }
+
+            // Growth of the granular neighborhoods and of the population.
+            let grows = |every_iter: i32, every_non_improving: i32| {
+                (every_iter > 0 && nb_iter % every_iter as usize == 0)
+                    || (every_non_improving > 0 && nb_iter_non_prod % every_non_improving as usize == 0)
+            };
+            if config.grow_nb_granular_size != 0
+                && grows(
+                    config.grow_nb_granular_after_iterations,
+                    config.grow_nb_granular_after_non_improvement_iterations,
+                )
+            {
+                nb_granular += config.grow_nb_granular_size;
+                self.local_search.set_granular(nb_granular);
+            }
+            if config.grow_population_size != 0
+                && grows(
+                    config.grow_population_after_iterations,
+                    config.grow_population_after_non_improvement_iterations,
+                )
+            {
+                population.minimum_population_size += config.grow_population_size;
+            }
+
+            nb_iter += 1;
+            population.nb_generations += 1;
         }
     }
 
-    /// Order Crossover (OX): creates offspring by copying a segment from parent A
-    /// and filling remaining positions from parent B in order.
-    fn crossover_ox(&mut self, parents: (&Individual<'p>, &Individual<'p>)) -> Individual<'p> {
-        let nb_clients = self.params.nb_clients as usize;
-        let start = (self.params.rng.borrow_mut().next_u64(nb_clients as u64)) as usize;
-        let mut end: usize;
-        loop {
-            end = (self.params.rng.borrow_mut().next_u64(nb_clients as u64)) as usize;
-            if end != start { break; }
+    /// Order Crossover (OX) on a random segment, in both parent orders.
+    /// Returns the index of the better candidate (2 or 3).
+    fn crossover_ox(&mut self, parent_a: &Individual<'p>, parent_b: &Individual<'p>) -> usize {
+        let nb_clients = self.params.nb_clients as u64;
+        let start = self.params.rng.borrow_mut().next() % nb_clients;
+        let end = loop {
+            let end = self.params.rng.borrow_mut().next() % nb_clients;
+            if end != start {
+                break end;
+            }
+        };
+        let (start, end) = (start as usize, end as usize);
+        for (index, (first, second)) in [(2, (parent_a, parent_b)), (3, (parent_b, parent_a))] {
+            let child = &mut self.candidate_offsprings[index];
+            Self::do_ox_crossover(&mut child.chrom_t, &first.chrom_t, &second.chrom_t, start, end);
+            self.split.general_split(child, self.params.nb_vehicles as usize);
         }
-
-        // Clone parent chrom_t to avoid borrow conflicts
-        let p1_chrom: Vec<usize> = parents.0.chrom_t.clone();
-        let p2_chrom: Vec<usize> = parents.1.chrom_t.clone();
-
-        // Perform crossovers in-place on candidates 2 and 3 (sequential to avoid double borrow)
-        Genetic::do_ox_crossover(self.params, self.split, &mut self.candidate_offsprings[2], &p1_chrom, &p2_chrom, start, end);
-        Genetic::do_ox_crossover(self.params, self.split, &mut self.candidate_offsprings[3], &parents.0.chrom_t, &parents.1.chrom_t, start, end);
-
-        // Return best offspring (take ownership)
-        if self.candidate_offsprings[2].my_cost_sol.penalized_cost < self.candidate_offsprings[3].my_cost_sol.penalized_cost {
-            std::mem::replace(&mut self.candidate_offsprings[2], Individual::new_random(self.params))
+        if self.candidate_offsprings[2].my_cost_sol.penalized_cost
+            < self.candidate_offsprings[3].my_cost_sol.penalized_cost
+        {
+            2
         } else {
-            std::mem::replace(&mut self.candidate_offsprings[3], Individual::new_random(self.params))
+            3
         }
     }
 
-    /// Perform one OX crossover for result from parents, with crossover zone [start, end].
-    fn do_ox_crossover(
-        params: &'p Params,
-        split: &mut Split<'p>,
-        result: &mut Individual<'p>,
-        p1: &[usize],
-        p2: &[usize],
-        start: usize,
-        end: usize,
-    ) {
-        let n = params.nb_clients as usize;
-
-        assert!(params.nb_clients > 0);
-        assert_eq!(p1.len(), n);
-        assert_eq!(p2.len(), n);
-
-        // Detect gene domain: 0..n-1 or 1..n (depot handling varies per codebase)
-        let mut min_gene = p1[0];
-        let mut max_gene = p1[0];
-        for &g in p1.iter() {
-            if g < min_gene { min_gene = g; }
-            if g > max_gene { max_gene = g; }
-        }
-        for &g in p2.iter() {
-            if g < min_gene { min_gene = g; }
-            if g > max_gene { max_gene = g; }
-        }
-
-        // Case A: genes in [0..n-1] -> used size n, index = g
-        // Case B: genes in [1..n]   -> used size n+1, index = g
-        let one_based = min_gene >= 1 && max_gene <= n;
-        let _zero_based = min_gene >= 0 && max_gene <= n.saturating_sub(1);
-        assert!(one_based || _zero_based);
-
-        let used_size = if one_based { n + 1 } else { n };
-        let mut used = vec![false; used_size];
-        let mut filled = vec![false; n];
-        let mut child = vec![0usize; n];
-
-        // Phase 1: copy segment from p1 (inclusive, with wrap support)
+    /// One OX crossover: copy `p1[start..=end]` (cyclically), then fill the
+    /// positions after `end` with the missing clients in `p2` order from `end + 1`.
+    fn do_ox_crossover(child: &mut Vec<usize>, p1: &[usize], p2: &[usize], start: usize, end: usize) {
+        let n = p1.len();
+        child.clear();
+        child.resize(n, 0);
+        let mut used = vec![false; n + 1];
         let mut i = start;
         loop {
-            let gene = p1[i];
-            assert!(gene < used_size);
-            child[i] = gene;
-            filled[i] = true;
-            used[gene] = true;
-
-            if i == end { break; }
+            child[i] = p1[i];
+            used[p1[i]] = true;
+            if i == end {
+                break;
+            }
             i = (i + 1) % n;
         }
-
-        // Phase 2: fill remaining positions from p2, skipping already used genes
         let mut write = (end + 1) % n;
-        let mut read_pos = (end + 1) % n;
-        let mut placed = if start <= end { end - start + 1 } else { (n - start) + (end + 1) };
-
-        while placed < n {
-            let g = p2[read_pos];
-            assert!(g < used_size);
-
-            if !used[g] {
-                while filled[write] {
-                    write = (write + 1) % n;
-                }
-                child[write] = g;
-                filled[write] = true;
-                used[g] = true;
-                placed += 1;
+        for k in 1..=n {
+            let client = p2[(end + k) % n];
+            if !used[client] {
+                child[write] = client;
                 write = (write + 1) % n;
             }
-            read_pos = (read_pos + 1) % n;
         }
-
-        result.chrom_t = child;
-        split.general_split(result, params.nb_vehicles as usize);
     }
 
-    /// Segment-based RECombining XOver (SREX): selects adjacent routes from each parent,
-    /// locally improves the selection by shifting boundaries, then builds offspring.
-    fn crossover_srex(&mut self, parents: (&Individual<'p>, &Individual<'p>)) -> Individual<'p> {
-        let n_of_routes_a = parents.0.my_cost_sol.nb_routes as usize;
-        let n_of_routes_b = parents.1.my_cost_sol.nb_routes as usize;
-
-        if n_of_routes_a == 0 || n_of_routes_b == 0 {
-            // Fallback: copy parent A
-            self.candidate_offsprings[0].chrom_r = parents.0.chrom_r.clone();
+    /// Selective Route Exchange (SREX, Nagata and Kobayashi 2010): replace
+    /// adjacent routes of parent A by routes of parent B, shifted to minimize
+    /// the clients they disagree on. Returns the better candidate (0 or 1).
+    fn crossover_srex(&mut self, parent_a: &Individual<'p>, parent_b: &Individual<'p>) -> usize {
+        let routes_a = &parent_a.chrom_r;
+        let routes_b = &parent_b.chrom_r;
+        let n_routes_a = parent_a.my_cost_sol.nb_routes;
+        let n_routes_b = parent_b.my_cost_sol.nb_routes;
+        if n_routes_a == 0 || n_routes_b == 0 {
+            self.candidate_offsprings[0].chrom_r.clone_from(routes_a);
             self.candidate_offsprings[0].evaluate_complete_cost();
-            return std::mem::replace(&mut self.candidate_offsprings[0], Individual::new_random(self.params));
+            return 0;
         }
 
-        let mut start_a = self.params.rng.borrow_mut().next_u64(n_of_routes_a as u64) as usize;
-        let min_routes = n_of_routes_a.min(n_of_routes_b);
-        let n_of_moved_routes = if min_routes == 1 {
+        let mut start_a = (self.params.rng.borrow_mut().next() % n_routes_a as u64) as usize;
+        let n_moved = if n_routes_a.min(n_routes_b) == 1 {
             1
         } else {
-            (self.params.rng.borrow_mut().next_u64((min_routes - 1) as u64) as usize) + 1
+            (self.params.rng.borrow_mut().next() % (n_routes_a - 1).min(n_routes_b - 1) as u64) as usize + 1
         };
-        let mut start_b = if start_a < n_of_routes_b { start_a } else { 0 };
+        let mut start_b = if start_a < n_routes_b { start_a } else { 0 };
 
-        // Collect clients from selected routes in each parent
-        let mut clients_in_selected_a: std::collections::HashSet<usize> = std::collections::HashSet::new();
-        for r in 0..n_of_moved_routes {
-            let route_idx = (start_a + r) % n_of_routes_a;
-            for &c in &parents.0.chrom_r[route_idx] {
-                clients_in_selected_a.insert(c);
+        let selected = |routes: &[Vec<usize>], start: usize, count: usize| -> HashSet<usize> {
+            (0..n_moved).flat_map(|r| routes[(start + r) % count].iter().copied()).collect()
+        };
+        let mut selected_a = selected(routes_a, start_a, n_routes_a);
+        let mut selected_b = selected(routes_b, start_b, n_routes_b);
+
+        // Shift either selection by one route while that lowers the number of
+        // clients in A's selection outside B's (or vice versa).
+        loop {
+            let a_left = (start_a + n_routes_a - 1) % n_routes_a;
+            let a_right = (start_a + n_moved) % n_routes_a;
+            let a_last = (start_a + n_moved - 1) % n_routes_a;
+            let b_left = (start_b + n_routes_b - 1) % n_routes_b;
+            let b_right = (start_b + n_moved) % n_routes_b;
+            let b_last = (start_b + n_moved - 1) % n_routes_b;
+            let outside =
+                |route: &[usize], set: &HashSet<usize>| route.iter().filter(|c| !set.contains(c)).count() as i32;
+            let inside =
+                |route: &[usize], set: &HashSet<usize>| route.iter().filter(|c| set.contains(c)).count() as i32;
+            let differences = [
+                outside(&routes_a[a_left], &selected_b) - outside(&routes_a[a_last], &selected_b),
+                outside(&routes_a[a_right], &selected_b) - outside(&routes_a[start_a], &selected_b),
+                inside(&routes_b[b_last], &selected_a) - inside(&routes_b[b_left], &selected_a),
+                inside(&routes_b[start_b], &selected_a) - inside(&routes_b[b_right], &selected_a),
+            ];
+            let best = *differences.iter().min().unwrap();
+            if best >= 0 {
+                break;
             }
-        }
-
-        let mut clients_in_selected_b: std::collections::HashSet<usize> = std::collections::HashSet::new();
-        for r in 0..n_of_moved_routes {
-            let route_idx = (start_b + r) % n_of_routes_b;
-            for &c in &parents.1.chrom_r[route_idx] {
-                clients_in_selected_b.insert(c);
-            }
-        }
-
-        // Phase 2: Local improvement by shifting selected routes
-        let mut improved = true;
-        while improved {
-            let idx_a_left = (start_a + n_of_routes_a - 1) % n_of_routes_a;
-            let idx_a_right = (start_a + n_of_moved_routes) % n_of_routes_a;
-            let idx_a_last_moved = (start_a + n_of_moved_routes - 1) % n_of_routes_a;
-            let idx_b_left = (start_b + n_of_routes_b - 1) % n_of_routes_b;
-            let idx_b_right = (start_b + n_of_moved_routes) % n_of_routes_b;
-            let idx_b_last_moved = (start_b + n_of_moved_routes - 1) % n_of_routes_b;
-
-            let count_clients = |route: &[usize], client_set: &std::collections::HashSet<usize>, count_outside: bool| -> i32 {
-                route.iter().filter(|&&c| (client_set.contains(&c) != count_outside) as bool).count() as i32
-            };
-
-            let left_a_first = count_clients(&parents.0.chrom_r[idx_a_left], &clients_in_selected_b, true);
-            let left_a_second = count_clients(&parents.0.chrom_r[idx_a_last_moved], &clients_in_selected_b, true);
-            let right_a_first = count_clients(&parents.0.chrom_r[idx_a_right], &clients_in_selected_b, true);
-            let right_a_second = count_clients(&parents.0.chrom_r[start_a], &clients_in_selected_b, true);
-
-            let left_b_first = count_clients(&parents.1.chrom_r[idx_b_last_moved], &clients_in_selected_a, false);
-            let left_b_second = count_clients(&parents.1.chrom_r[idx_b_left], &clients_in_selected_a, false);
-            let right_b_first = count_clients(&parents.1.chrom_r[start_b], &clients_in_selected_a, false);
-            let right_b_second = count_clients(&parents.1.chrom_r[idx_b_right], &clients_in_selected_a, false);
-
-            let diff_a_left = left_a_first - left_a_second;
-            let diff_a_right = right_a_first - right_a_second;
-            let diff_b_left = left_b_first - left_b_second;
-            let diff_b_right = right_b_first - right_b_second;
-
-            let best_diff = diff_a_left.min(diff_a_right).min(diff_b_left).min(diff_b_right);
-
-            if best_diff < 0 {
-                if best_diff == diff_a_left {
-                    for &c in &parents.0.chrom_r[idx_a_last_moved] {
-                        clients_in_selected_a.remove(&c);
-                    }
-                    start_a = (start_a + n_of_routes_a - 1) % n_of_routes_a;
-                    let add_idx = start_a;
-                    for &c in &parents.0.chrom_r[add_idx] {
-                        clients_in_selected_a.insert(c);
-                    }
-                } else if best_diff == diff_a_right {
-                    let remove_idx = start_a;
-                    for &c in &parents.0.chrom_r[remove_idx] {
-                        clients_in_selected_a.remove(&c);
-                    }
-                    start_a = (start_a + 1) % n_of_routes_a;
-                    let add_idx = (start_a + n_of_moved_routes - 1) % n_of_routes_a;
-                    for &c in &parents.0.chrom_r[add_idx] {
-                        clients_in_selected_a.insert(c);
-                    }
-                } else if best_diff == diff_b_left {
-                    for &c in &parents.1.chrom_r[idx_b_last_moved] {
-                        clients_in_selected_b.remove(&c);
-                    }
-                    start_b = (start_b + n_of_routes_b - 1) % n_of_routes_b;
-                    let add_idx = start_b;
-                    for &c in &parents.1.chrom_r[add_idx] {
-                        clients_in_selected_b.insert(c);
-                    }
-                } else if best_diff == diff_b_right {
-                    let remove_idx = start_b;
-                    for &c in &parents.1.chrom_r[remove_idx] {
-                        clients_in_selected_b.remove(&c);
-                    }
-                    start_b = (start_b + 1) % n_of_routes_b;
-                    let add_idx = (start_b + n_of_moved_routes - 1) % n_of_routes_b;
-                    for &c in &parents.1.chrom_r[add_idx] {
-                        clients_in_selected_b.insert(c);
-                    }
-                }
+            // The first shift reaching the minimum: A left, A right, B left, B right.
+            let shift = differences.iter().position(|&d| d == best).unwrap();
+            let (routes, selection, start, count) = if shift < 2 {
+                (routes_a, &mut selected_a, &mut start_a, n_routes_a)
             } else {
-                improved = false;
+                (routes_b, &mut selected_b, &mut start_b, n_routes_b)
+            };
+            let (removed, added) = if shift % 2 == 0 {
+                *start = (*start + count - 1) % count;
+                ((*start + n_moved) % count, *start)
+            } else {
+                let removed = *start;
+                *start = (*start + 1) % count;
+                (removed, (*start + n_moved - 1) % count)
+            };
+            for client in &routes[removed] {
+                selection.remove(client);
             }
+            selection.extend(routes[added].iter().copied());
         }
 
-        // Phase 3: Identify differences (A - B and B - A)
-        let mut sorted_a: Vec<usize> = clients_in_selected_a.into_iter().collect();
-        sorted_a.sort();
-        let mut sorted_b: Vec<usize> = clients_in_selected_b.into_iter().collect();
-        sorted_b.sort();
+        let mut a_not_b: Vec<usize> = selected_a.difference(&selected_b).copied().collect();
+        a_not_b.sort_unstable();
+        let b_not_a: HashSet<usize> = selected_b.difference(&selected_a).copied().collect();
 
-        let mut clients_a_not_b = Vec::new();
-        let mut clients_b_not_a = Vec::new();
-
-        // Set difference: A - B
-        let mut ai = 0usize;
-        let mut bi = 0usize;
-        while ai < sorted_a.len() && bi < sorted_b.len() {
-            match sorted_a[ai].cmp(&sorted_b[bi]) {
-                std::cmp::Ordering::Less => { clients_a_not_b.push(sorted_a[ai]); ai += 1; }
-                std::cmp::Ordering::Equal => { ai += 1; bi += 1; }
-                std::cmp::Ordering::Greater => { bi += 1; }
-            }
+        // Offspring 0 keeps B's routes whole and drops B-only clients from A's
+        // other routes; offspring 1 does the opposite.
+        let nb_vehicles = self.params.nb_vehicles as usize;
+        let (first, rest) = self.candidate_offsprings.split_at_mut(1);
+        let (child0, child1) = (&mut first[0], &mut rest[0]);
+        for r in 0..n_moved {
+            let index_a = (start_a + r) % n_routes_a;
+            let route_b = &routes_b[(start_b + r) % n_routes_b];
+            child0.chrom_r[index_a].clone_from(route_b);
+            child1.chrom_r[index_a] = route_b.iter().copied().filter(|c| !b_not_a.contains(c)).collect();
         }
-        clients_a_not_b.extend_from_slice(&sorted_a[ai..]);
-
-        // Set difference: B - A
-        let mut clients_in_selected_b_not_a: std::collections::HashSet<usize> = std::collections::HashSet::new();
-        ai = 0; bi = 0;
-        while ai < sorted_a.len() && bi < sorted_b.len() {
-            match sorted_a[ai].cmp(&sorted_b[bi]) {
-                std::cmp::Ordering::Less => { ai += 1; }
-                std::cmp::Ordering::Equal => { ai += 1; bi += 1; }
-                std::cmp::Ordering::Greater => { clients_b_not_a.push(sorted_b[bi]); bi += 1; }
-            }
+        for r in n_moved..n_routes_a {
+            let index_a = (start_a + r) % n_routes_a;
+            child0.chrom_r[index_a] =
+                routes_a[index_a].iter().copied().filter(|c| !b_not_a.contains(c)).collect();
+            child1.chrom_r[index_a].clone_from(&routes_a[index_a]);
         }
-        clients_b_not_a.extend_from_slice(&sorted_b[bi..]);
-        for &c in &clients_b_not_a {
-            clients_in_selected_b_not_a.insert(c);
+        for r in n_routes_a..nb_vehicles {
+            child0.chrom_r[r].clear();
+            child1.chrom_r[r].clear();
         }
 
-        // Phase 4: Build offspring by replacing selected routes
-        for r in 0..n_of_moved_routes {
-            let index_a = (start_a + r) % n_of_routes_a;
-            let index_b = (start_b + r) % n_of_routes_b;
-            let mut offspring0_route = Vec::new();
-            let mut offspring1_route = Vec::new();
-
-            for &c in &parents.1.chrom_r[index_b] {
-                offspring0_route.push(c);
-            }
-            for &c in &parents.1.chrom_r[index_b] {
-                if !clients_in_selected_b_not_a.contains(&c) {
-                    offspring1_route.push(c);
-                }
-            }
-
-            self.candidate_offsprings[0].chrom_r[index_a] = offspring0_route;
-            self.candidate_offsprings[1].chrom_r[index_a] = offspring1_route;
+        for child in [child0, child1] {
+            Self::insert_unplanned_tasks(self.params, child, &a_not_b);
+            child.evaluate_complete_cost();
         }
-
-        for r in n_of_moved_routes..n_of_routes_a {
-            let index_a = (start_a + r) % n_of_routes_a;
-            let mut offspring0_route = Vec::new();
-            let mut offspring1_route = Vec::new();
-
-            for &c in &parents.0.chrom_r[index_a] {
-                if !clients_in_selected_b_not_a.contains(&c) {
-                    offspring0_route.push(c);
-                }
-                offspring1_route.push(c);
-            }
-
-            self.candidate_offsprings[0].chrom_r[index_a] = offspring0_route;
-            self.candidate_offsprings[1].chrom_r[index_a] = offspring1_route;
-        }
-
-        for r in n_of_routes_a..self.params.nb_vehicles as usize {
-            self.candidate_offsprings[0].chrom_r[r].clear();
-            self.candidate_offsprings[1].chrom_r[r].clear();
-        }
-
-        // Phase 5: Insert unplanned clients
-        Self::insert_unplanned_tasks(self.params, self.split, &mut self.candidate_offsprings[0], &clients_a_not_b);
-        Self::insert_unplanned_tasks(self.params, self.split, &mut self.candidate_offsprings[1], &clients_a_not_b);
-
-        self.candidate_offsprings[0].evaluate_complete_cost();
-        self.candidate_offsprings[1].evaluate_complete_cost();
-
-        if self.candidate_offsprings[0].my_cost_sol.penalized_cost < self.candidate_offsprings[1].my_cost_sol.penalized_cost {
-            std::mem::replace(&mut self.candidate_offsprings[0], Individual::new_random(self.params))
+        if self.candidate_offsprings[0].my_cost_sol.penalized_cost
+            < self.candidate_offsprings[1].my_cost_sol.penalized_cost
+        {
+            0
         } else {
-            std::mem::replace(&mut self.candidate_offsprings[1], Individual::new_random(self.params))
+            1
         }
     }
 
-    /// Insert unplanned clients (those in removed routes but not in inserted routes) into offspring.
-    fn insert_unplanned_tasks(
-        params: &'p Params,
-        _split: &mut Split<'p>,
-        offspring: &mut Individual<'p>,
-        unplanned_tasks: &[usize],
-    ) {
-        let mut non_empty_routes = Vec::new();
-        for r in 0..params.nb_vehicles as usize {
-            if !offspring.chrom_r[r].is_empty() {
-                non_empty_routes.push(r);
-            }
-        }
-
+    /// Insert each unplanned client at its cheapest position whose time
+    /// windows look reachable. HGS drops a client with no such position; this
+    /// port then uses the cheapest position overall so no client is lost.
+    fn insert_unplanned_tasks(params: &Params, offspring: &mut Individual<'p>, unplanned_tasks: &[usize]) {
         let time_cost = &params.time_cost;
         let clients = &params.cli;
+        let non_empty: Vec<usize> =
+            (0..params.nb_vehicles as usize).filter(|&r| !offspring.chrom_r[r].is_empty()).collect();
 
         for &client in unplanned_tasks {
-            let client_data = &clients[client];
-            let client_earliest = client_data.earliest_arrival;
-            let client_latest = client_data.latest_arrival;
-
-            #[derive(Clone)]
-            struct InsertionPoint {
-                route_idx: usize,
-                position: usize,
-                cost: i32,
-            }
-
-            let mut insertion_points = Vec::new();
-
-            for &route_idx in &non_empty_routes {
-                let route = &offspring.chrom_r[route_idx];
-                let route_size = route.len();
-
-                // Insertion at beginning or between clients or at end
-                if route_size > 0 {
-                    let first_client = route[0];
-                    let cost_to_client = time_cost.get(0, client) as i32;
-                    let cost_client_to_first = time_cost.get(client, first_client) as i32;
-                    let orig_cost = time_cost.get(0, first_client) as i32;
-
-                    if client_earliest + cost_client_to_first < clients[first_client].latest_arrival {
-                        insertion_points.push(InsertionPoint {
-                            route_idx,
-                            position: 0,
-                            cost: cost_to_client + cost_client_to_first - orig_cost,
-                        });
-                    }
-
-                    // Insertion between clients
-                    let mut prev_client = first_client;
-                    let prev_earliest = clients[prev_client].earliest_arrival;
-                    for pos in 1..route_size {
-                        let next_client = route[pos];
-                        let cost_from_prev = time_cost.get(prev_client, client) as i32;
-                        let cost_to_next = time_cost.get(client, next_client) as i32;
-                        let orig_cost_between = time_cost.get(prev_client, next_client) as i32;
-
-                        if prev_earliest + cost_from_prev < client_latest
-                            && client_earliest + cost_to_next < clients[next_client].latest_arrival
-                        {
-                            insertion_points.push(InsertionPoint {
-                                route_idx,
-                                position: pos,
-                                cost: cost_from_prev + cost_to_next - orig_cost_between,
-                            });
-                        }
-                        prev_client = next_client;
-                    }
-
-                    // Insertion at end
-                    let last_client = route[route_size - 1];
-                    let cost_from_last = time_cost.get(last_client, client) as i32;
-                    if clients[last_client].earliest_arrival + cost_from_last < client_latest {
-                        let cost_from_client_to_depot = time_cost.get(client, 0) as i32;
-                        let orig_cost_from_last_to_depot = time_cost.get(last_client, 0) as i32;
-                        insertion_points.push(InsertionPoint {
-                            route_idx,
-                            position: route_size,
-                            cost: cost_from_last + cost_from_client_to_depot - orig_cost_from_last_to_depot,
-                        });
-                    }
+            let earliest = clients[client].earliest_arrival;
+            let latest = clients[client].latest_arrival;
+            // (cost, route, position); the first minimum wins, as std::min_element.
+            let mut best_feasible: Option<(i32, usize, usize)> = None;
+            let mut best_any: Option<(i32, usize, usize)> = None;
+            let mut consider = |cost: i32, route: usize, position: usize, feasible: bool| {
+                if best_any.map_or(true, |b| cost < b.0) {
+                    best_any = Some((cost, route, position));
                 }
+                if feasible && best_feasible.map_or(true, |b| cost < b.0) {
+                    best_feasible = Some((cost, route, position));
+                }
+            };
+            for &r in &non_empty {
+                let route = &offspring.chrom_r[r];
+                let first = route[0];
+                let cost_to_first = time_cost.get(client, first);
+                consider(
+                    time_cost.get(0, client) + cost_to_first - time_cost.get(0, first),
+                    r,
+                    0,
+                    earliest + cost_to_first < clients[first].latest_arrival,
+                );
+                for pos in 1..route.len() {
+                    let (prev, next) = (route[pos - 1], route[pos]);
+                    let (from_prev, to_next) = (time_cost.get(prev, client), time_cost.get(client, next));
+                    consider(
+                        from_prev + to_next - time_cost.get(prev, next),
+                        r,
+                        pos,
+                        clients[prev].earliest_arrival + from_prev < latest
+                            && earliest + to_next < clients[next].latest_arrival,
+                    );
+                }
+                let last = *route.last().unwrap();
+                let from_last = time_cost.get(last, client);
+                consider(
+                    from_last + time_cost.get(client, 0) - time_cost.get(last, 0),
+                    r,
+                    route.len(),
+                    clients[last].earliest_arrival + from_last < latest,
+                );
             }
-
-            if let Some(best_point) = insertion_points.iter().min_by_key(|p| p.cost) {
-                offspring.chrom_r[best_point.route_idx].insert(best_point.position, client);
+            match best_feasible.or(best_any) {
+                Some((_, route, position)) => offspring.chrom_r[route].insert(position, client),
+                None => offspring.chrom_r[0].push(client),
             }
         }
     }
 
-    /// Run both OX and SREX crossovers, returning the best result.
+    /// Run both crossovers and return the index of the better offspring.
     pub fn best_of_srex_and_ox_crossovers(
         &mut self,
-        parents: (&Individual<'p>, &Individual<'p>),
-    ) -> Individual<'p> {
-        let mut offspring_ox = self.crossover_ox(parents);
-        let ox_cost = offspring_ox.my_cost_sol.penalized_cost;
-
-        let mut offspring_srex = self.crossover_srex(parents);
-        let srex_cost = offspring_srex.my_cost_sol.penalized_cost;
-
-        if ox_cost < srex_cost {
-            std::mem::replace(&mut offspring_ox, Individual::new_random(self.params))
+        parent_a: &Individual<'p>,
+        parent_b: &Individual<'p>,
+    ) -> usize {
+        let ox = self.crossover_ox(parent_a, parent_b);
+        let srex = self.crossover_srex(parent_a, parent_b);
+        if self.candidate_offsprings[ox].my_cost_sol.penalized_cost
+            < self.candidate_offsprings[srex].my_cost_sol.penalized_cost
+        {
+            ox
         } else {
-            std::mem::replace(&mut offspring_srex, Individual::new_random(self.params))
+            srex
         }
     }
 }

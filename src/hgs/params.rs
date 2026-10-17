@@ -2,13 +2,21 @@
 //!
 //! Mirrors `Params.h` / `Params.cpp` from the original HGS-CVRP codebase.
 
+use std::cell::Cell;
 use std::fmt;
 use std::time::Instant;
 
-use crate::vrptw::Instance;
+use crate::vrptw::{Instance, Rounding};
 
 use super::circle_sector::CircleSector;
 use super::matrix::Matrix;
+
+/// Precision used to avoid numerical instabilities (HGS MY_EPSILON).
+pub const MY_EPSILON: f64 = 1e-5;
+
+/// Latest time used for clients without a time window. Time-window merges
+/// add and subtract several times, so i32::MAX would overflow.
+pub const HORIZON: i32 = 1_000_000_000;
 
 /// Problem type identifier.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -74,7 +82,7 @@ impl Default for Client {
             service_duration: 0,
             demand: 0,
             earliest_arrival: 0,
-            latest_arrival: i32::MAX,
+            latest_arrival: HORIZON,
             release_time: 0,
             polar_angle: 0,
             time_windows: Vec::new(),
@@ -205,7 +213,16 @@ impl Default for Config {
     }
 }
 
-/// Simple Xoroshiro128+ PRNG (fast, good enough for HGS).
+/// SplitMix64 step; advances `x` like the C++ reference parameter.
+fn splitmix64(x: &mut u64) -> u64 {
+    *x = x.wrapping_add(0x9e3779b97f4a7c15);
+    let mut z = *x;
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+    z ^ (z >> 31)
+}
+
+/// Xoroshiro128+ with SplitMix64 seeding, as BALDES's C++ `math/RNG.h`.
 #[derive(Clone, Debug)]
 pub struct Xoroshiro128Plus {
     s0: u64,
@@ -213,11 +230,13 @@ pub struct Xoroshiro128Plus {
 }
 
 impl Xoroshiro128Plus {
-    /// Create a new generator seeded from `seed`.
+    /// Seed as the C++ constructor, which converts the int seed to uint64.
     pub fn new(seed: i32) -> Self {
-        // Simple seed mixing to avoid all-zero state
-        let s0 = (seed as u64).wrapping_add(0x9E3779B97F4A7C15);
-        let s1 = if seed == 0 { 1 } else { (seed as u64).wrapping_mul(6364136223846793005) };
+        let mut x = seed as i64 as u64;
+        let mut s0 = splitmix64(&mut x);
+        // SplitMix64 takes its argument by reference, so seeding the second
+        // word also advances the first one.
+        let s1 = splitmix64(&mut s0);
         Self { s0, s1 }
     }
 
@@ -228,21 +247,15 @@ impl Xoroshiro128Plus {
         let mut s1 = self.s1;
         let result = s0.wrapping_add(s1);
         s1 ^= s0;
-        self.s0 = ((s0 << 55).wrapping_add(s0)) ^ s1 ^ (s1 << 14);
-        self.s1 = (s1 << 36).wrapping_add(s1);
+        self.s0 = s0.rotate_left(55) ^ s1 ^ (s1 << 14);
+        self.s1 = s1.rotate_left(36);
         result
     }
 
-    /// Random u64 in [0, max).
+    /// `rng() % max`, as HGS draws bounded values (no rejection sampling).
     #[inline]
     pub fn next_u64(&mut self, max: u64) -> u64 {
-        let threshold = ((u64::MAX - max) % max).wrapping_add(1);
-        loop {
-            let r = self.next();
-            if r >= threshold {
-                return r % max;
-            }
-        }
+        self.next() % max
     }
 
     /// Random f64 in [0, 1).
@@ -260,11 +273,43 @@ impl Xoroshiro128Plus {
         &items[idx]
     }
 
-    /// Shuffle a slice in place (Fisher-Yates).
+    /// Uniform value in [0, range) as libstdc++'s uniform_int_distribution
+    /// with a 64-bit generator (Lemire's nearly divisionless method).
+    pub fn uniform_below(&mut self, range: u64) -> u64 {
+        let mut product = self.next() as u128 * range as u128;
+        if (product as u64) < range {
+            let threshold = range.wrapping_neg() % range;
+            while (product as u64) < threshold {
+                product = self.next() as u128 * range as u128;
+            }
+        }
+        (product >> 64) as u64
+    }
+
+    /// Shuffle a slice in place as libstdc++'s std::shuffle: two swap
+    /// positions per draw when the generator range allows it.
     pub fn shuffle<T>(&mut self, items: &mut [T]) {
-        for i in (1..items.len()).rev() {
-            let j = self.next_u64((i + 1) as u64) as usize;
-            items.swap(i, j);
+        let n = items.len() as u64;
+        if n == 0 {
+            return;
+        }
+        if u64::MAX / n >= n {
+            let mut i = 1;
+            if n % 2 == 0 {
+                items.swap(1, self.uniform_below(2) as usize);
+                i = 2;
+            }
+            while i < n {
+                let swap_range = i + 1;
+                let x = self.uniform_below(swap_range * (swap_range + 1));
+                items.swap(i as usize, (x / (swap_range + 1)) as usize);
+                items.swap(i as usize + 1, (x % (swap_range + 1)) as usize);
+                i += 2;
+            }
+        } else {
+            for i in 1..n {
+                items.swap(i as usize, self.uniform_below(i + 1) as usize);
+            }
         }
     }
 }
@@ -279,9 +324,9 @@ pub struct Params {
     start_time: Instant,
 
     // ── Adaptive penalty coefficients ────────────────────────────────
-    pub penalty_capacity: f64,
+    pub penalty_capacity: Cell<f64>,
     pub penalty_wait_time: f64,
-    pub penalty_time_warp: f64,
+    pub penalty_time_warp: Cell<f64>,
 
     // ── Proximity weights ────────────────────────────────────────────
     pub proximity_weight_wait_time: f64,
@@ -346,367 +391,213 @@ pub struct InstanceData {
 }
 
 impl Params {
-    /// Create params from a BALDES `Instance`.
+    /// Create Params from a BALDES Instance. Coordinates, times and explicit
+    /// distances are scaled by 10 and truncated, as in HGS-VRPTW.
     pub fn from_instance(instance: &Instance) -> Self {
-        let n_customers = instance.customers.len();
-        // Instance has depot at index 0 (first customer in the list is actually the depot)
-        // In BALDES, customers[0] is the depot
-        
-        let mut cli = Vec::with_capacity(n_customers);
-        
-        for (i, c) in instance.customers.iter().enumerate() {
-            let client = Client {
-                cust_num: i as i32,
-                coord_x: c.x * 10.0,
-                coord_y: c.y * 10.0,
-                service_duration: (c.service * 10.0) as i32,
-                demand: c.demand as i32,
-                earliest_arrival: (c.ready * 10.0) as i32,
-                latest_arrival: (c.due * 10.0) as i32,
-                release_time: 0,
-                polar_angle: 0, // computed below
-                time_windows: Vec::new(),
-                n_tw: 0,
-            };
-            cli.push(client);
-        }
-
-        // Compute polar angles and track demand totals
-        let mut total_demand = 0i32;
-        let mut max_demand = 0i32;
-        let depot_x = cli[0].coord_x;
-        let depot_y = cli[0].coord_y;
-        
-        for client in cli.iter_mut().skip(1) { // skip depot
-            let dx = client.coord_x - depot_x;
-            let dy = client.coord_y - depot_y;
-            let angle_degrees = (32768.0 * dy.atan2(dx) / std::f64::consts::PI).round() as i32;
-            client.polar_angle = CircleSector::positive_mod(angle_degrees);
-            
-            if client.demand > max_demand {
-                max_demand = client.demand;
-            }
-            total_demand += client.demand;
-        }
-
-        let nb_clients = (n_customers - 1) as i32; // exclude depot
-        
-        // Set default fleet size if not specified
-        let nb_vehicles = if instance.vehicles == 0 {
-            ((1.3 * total_demand as f64 / instance.capacity as f64).ceil() + 3.0) as i32
-        } else {
-            instance.vehicles as i32
-        };
-
-        // Build distance matrix
-        let is_explicit = instance.distances.is_some();
-        let mut time_cost = Matrix::new(n_customers);
-        let mut max_dist = 0i32;
-        
-        if !is_explicit {
-            for i in 0..n_customers {
-                time_cost.set(i, i, 0);
-                for j in (i + 1)..n_customers {
-                    let dx = cli[i].coord_x - cli[j].coord_x;
-                    let dy = cli[i].coord_y - cli[j].coord_y;
-                    let d = (dx * dx + dy * dy).sqrt();
-                    let cost = d as i32;
-                    time_cost.set(i, j, cost);
-                    time_cost.set(j, i, cost);
-                    if cost > max_dist {
-                        max_dist = cost;
-                    }
+        let scale = |value: f64| (value * 10.0) as i32;
+        let mut has_time_windows = false;
+        let cli = instance
+            .customers
+            .iter()
+            .enumerate()
+            .map(|(i, c)| {
+                has_time_windows |= c.due.is_finite();
+                Client {
+                    cust_num: i as i32,
+                    coord_x: c.x * 10.0,
+                    coord_y: c.y * 10.0,
+                    service_duration: scale(c.service),
+                    demand: c.demand as i32,
+                    earliest_arrival: scale(c.ready),
+                    latest_arrival: if c.due.is_finite() { scale(c.due).min(HORIZON) } else { HORIZON },
+                    ..Client::default()
                 }
-            }
-        } else if let Some(ref dists) = instance.distances {
-            for i in 0..n_customers {
-                time_cost.set(i, i, 0);
-                for j in 0..n_customers {
-                    if i != j {
-                        let cost = dists[i][j] as i32;
-                        time_cost.set(i, j, cost);
-                        if cost > max_dist {
-                            max_dist = cost;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Compute order proximities
-        let mut order_proximities = vec![Vec::new(); n_customers];
-        let pw_wait = 0.2;
-        let pw_twarp = 1.0;
-        
-        for i in 1..n_customers {
-            for j in 1..n_customers {
-                if i != j {
-                    let time_ij = time_cost.get(i, j);
-                    let c_j = &cli[j];
-                    let c_i = &cli[i];
-                    
-                    let prox = time_ij as f64
-                        + (pw_wait * ((c_j.earliest_arrival - time_ij - c_i.service_duration - c_i.latest_arrival).max(0) as f64)
-                            + pw_twarp * ((c_i.earliest_arrival + c_i.service_duration + time_ij - c_j.latest_arrival).max(0) as f64))
-                        .min(
-                            pw_wait * ((c_i.earliest_arrival - time_ij - c_j.service_duration - c_j.latest_arrival).max(0) as f64)
-                                + pw_twarp * ((c_j.earliest_arrival + c_j.service_duration + time_ij - c_i.latest_arrival).max(0) as f64),
-                        );
-                    
-                    order_proximities[i].push((prox, j as i32));
-                }
-            }
-            order_proximities[i].sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-        }
-
-        // Compute correlated vertices (granular neighbourhood)
-        let mut correlated_vertices = vec![Vec::new(); n_customers];
-        for i in 1..n_customers {
-            let limit = Config::default().nb_granular as usize;
-            for j in 0..limit.min(order_proximities[i].len()) {
-                if let Some(&(_, cust_j)) = order_proximities[i].get(j) {
-                    correlated_vertices[i].push(cust_j);
-                }
-            }
-        }
-
-        // Build savings list (Clarke & Wright)
-        let mut savings_list = Vec::new();
-        for i in 1..n_customers {
-            for j in 1..i {
-                let value = time_cost.get(0, i) as f64
-                    + time_cost.get(0, j) as f64
-                    - time_cost.get(i, j) as f64;
-                savings_list.push(Savings {
-                    c1: i as i32,
-                    c2: j as i32,
-                    value,
-                });
-            }
-        }
-        savings_list.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap());
-
-        // Initial penalty values
-        let penalty_capacity = (max_dist as f64 / max_demand.max(1) as f64).max(0.1).min(1000.0);
-        let penalty_time_warp = 1.0; // VRPTW default
-
-        Params {
-            config: Config::default(),
-            rng: std::cell::RefCell::new(Xoroshiro128Plus::new(0)),
-            start_time: Instant::now(),
-            penalty_capacity,
-            penalty_wait_time: 0.0,
-            penalty_time_warp,
-            proximity_weight_wait_time: pw_wait,
-            proximity_weight_time_warp: pw_twarp,
-            problem_type: ProblemType::Vrptw,
-            instance_name: instance.name.clone(),
-            is_duration_constrained: false,
-            is_time_window_constrained: true,
-            is_explicit_distance_matrix: is_explicit,
-            nb_clients,
-            nb_vehicles,
-            duration_limit: i32::MAX,
-            vehicle_capacity: instance.capacity as i32,
-            total_demand,
-            max_demand,
-            max_dist,
+            })
+            .collect();
+        // Explicit or rounded distances (CVRPLIB) are used as given; unrounded
+        // Solomon distances are truncated to tenths from the coordinates.
+        let n = instance.customers.len();
+        let distances = (instance.distances.is_some() || instance.rounding != Rounding::None).then(|| {
+            (0..n)
+                .map(|i| (0..n).map(|j| (instance.distance(i, j, instance.rounding) * 10.0).round()).collect())
+                .collect::<Vec<Vec<f64>>>()
+        });
+        let problem_type = if has_time_windows { ProblemType::Vrptw } else { ProblemType::Cvrp };
+        let mut params = Self::build(
             cli,
-            time_cost,
-            order_proximities,
-            correlated_vertices,
-            circle_sector_overlap_tolerance: 0,
-            min_circle_sector_size: (15i32 as f64 / 360.0 * 65536.0) as u16,
-            savings_list,
-            duals_ptr: None,
-            forbidden_edges_set: None,
-            verbose: true,
-        }
+            instance.vehicles as i32,
+            instance.capacity as i32,
+            problem_type,
+            distances.as_ref(),
+        );
+        params.instance_name = instance.name.clone();
+        params
     }
 
-    /// Create params from raw instance data.
+    /// Create Params from raw instance data. Coordinates are scaled by 10;
+    /// times are taken as given.
     pub fn from_instance_data(data: &InstanceData) -> Self {
-        let n_customers = data.x_coord.len();
-        
-        let mut cli = Vec::with_capacity(n_customers);
-        
-        for i in 0..n_customers {
-            let client = Client {
+        let cli = (0..data.x_coord.len())
+            .map(|i| Client {
                 cust_num: i as i32,
                 coord_x: data.x_coord[i] * 10.0,
                 coord_y: data.y_coord[i] * 10.0,
                 service_duration: data.service_time[i],
                 demand: data.demand[i],
                 earliest_arrival: data.window_open[i],
-                latest_arrival: data.window_close[i],
-                release_time: 0,
-                polar_angle: 0,
+                latest_arrival: data.window_close[i].min(HORIZON),
                 time_windows: if data.n_tw[i] > 0 {
                     data.time_windows[i].iter().map(|&(e, l)| TimeWindow::new(e, l)).collect()
                 } else {
                     Vec::new()
                 },
                 n_tw: data.n_tw[i],
-            };
-            cli.push(client);
-        }
+                ..Client::default()
+            })
+            .collect();
+        Self::build(cli, data.n_v, data.q, data.problem_type, data.distances.as_ref())
+    }
 
-        // Compute polar angles and track demand totals
-        let mut total_demand = 0i32;
-        let mut max_demand = 0i32;
-        let depot_x = cli[0].coord_x;
-        let depot_y = cli[0].coord_y;
-        
-        for client in cli.iter_mut().skip(1) {
-            let dx = client.coord_x - depot_x;
-            let dy = client.coord_y - depot_y;
-            let angle_degrees = (32768.0 * dy.atan2(dx) / std::f64::consts::PI).round() as i32;
-            client.polar_angle = CircleSector::positive_mod(angle_degrees);
-            
-            if client.demand > max_demand {
-                max_demand = client.demand;
-            }
+    /// Shared part of the constructors (HGS Params::Params). `nb_vehicles` 0
+    /// means the default fleet ceil(1.3 * demand / capacity) + 3.
+    fn build(
+        mut cli: Vec<Client>,
+        nb_vehicles: i32,
+        vehicle_capacity: i32,
+        problem_type: ProblemType,
+        distances: Option<&Vec<Vec<f64>>>,
+    ) -> Self {
+        let config = Config::default();
+        let n = cli.len();
+        let nb_clients = n as i32 - 1;
+
+        let (depot_x, depot_y) = (cli[0].coord_x, cli[0].coord_y);
+        let mut total_demand = 0;
+        let mut max_demand = 0;
+        for client in &mut cli {
+            let angle = 32768. * (client.coord_y - depot_y).atan2(client.coord_x - depot_x) / std::f64::consts::PI;
+            client.polar_angle = CircleSector::positive_mod(angle as i32);
+            max_demand = max_demand.max(client.demand);
             total_demand += client.demand;
         }
-
-        let nb_clients = (n_customers - 1) as i32;
-        
-        let nb_vehicles = if data.n_v == 0 {
-            ((1.3 * total_demand as f64 / data.q as f64).ceil() + 3.0) as i32
+        let nb_vehicles = if nb_vehicles <= 0 {
+            ((1.3 * total_demand as f64 / vehicle_capacity as f64).ceil() + 3.) as i32
         } else {
-            data.n_v
+            nb_vehicles
         };
 
-        // Build distance matrix
-        let is_explicit = data.distances.is_some();
-        let mut time_cost = Matrix::new(n_customers);
-        let mut max_dist = 0i32;
-        
-        if !is_explicit {
-            for i in 0..n_customers {
-                time_cost.set(i, i, 0);
-                for j in (i + 1)..n_customers {
-                    let dx = cli[i].coord_x - cli[j].coord_x;
-                    let dy = cli[i].coord_y - cli[j].coord_y;
-                    let d = (dx * dx + dy * dy).sqrt();
-                    let cost = d as i32;
-                    time_cost.set(i, j, cost);
-                    time_cost.set(j, i, cost);
-                    if cost > max_dist {
-                        max_dist = cost;
-                    }
-                }
-            }
-        } else if let Some(ref dists) = data.distances {
-            for i in 0..n_customers {
-                time_cost.set(i, i, 0);
-                for j in 0..n_customers {
-                    if i != j {
-                        let cost = dists[i][j] as i32;
-                        time_cost.set(i, j, cost);
-                        if cost > max_dist {
-                            max_dist = cost;
-                        }
-                    }
-                }
+        let mut time_cost = Matrix::new(n);
+        let mut max_dist = 0;
+        for i in 0..n {
+            for j in 0..n {
+                let cost = if i == j {
+                    0
+                } else if let Some(distances) = distances {
+                    distances[i][j] as i32
+                } else {
+                    let (dx, dy) = (cli[i].coord_x - cli[j].coord_x, cli[i].coord_y - cli[j].coord_y);
+                    (dx * dx + dy * dy).sqrt() as i32
+                };
+                time_cost.set(i, j, cost);
+                max_dist = max_dist.max(cost);
             }
         }
 
-        // Compute order proximities
-        let mut order_proximities = vec![Vec::new(); n_customers];
-        let pw_wait = 0.2;
-        let pw_twarp = 1.0;
-        
-        for i in 1..n_customers {
-            for j in 1..n_customers {
-                if i != j {
-                    let time_ij = time_cost.get(i, j);
-                    let c_j = &cli[j];
-                    let c_i = &cli[i];
-                    
-                    let prox = time_ij as f64
-                        + (pw_wait * ((c_j.earliest_arrival - time_ij - c_i.service_duration - c_i.latest_arrival).max(0) as f64)
-                            + pw_twarp * ((c_i.earliest_arrival + c_i.service_duration + time_ij - c_j.latest_arrival).max(0) as f64))
-                        .min(
-                            pw_wait * ((c_i.earliest_arrival - time_ij - c_j.service_duration - c_j.latest_arrival).max(0) as f64)
-                                + pw_twarp * ((c_j.earliest_arrival + c_j.service_duration + time_ij - c_i.latest_arrival).max(0) as f64),
-                        );
-                    
-                    order_proximities[i].push((prox, j as i32));
-                }
+        // Neighbors by distance plus the cheaper of the two waiting/time-warp
+        // orientations (Vidal et al. 2013).
+        let (weight_wait, weight_warp) = (0.2, 1.0);
+        let mut order_proximities = vec![Vec::new(); n];
+        for i in 1..n {
+            for j in (1..n).filter(|&j| j != i) {
+                let t = time_cost.get(i, j) as i64;
+                let (a, b) = (&cli[i], &cli[j]);
+                let orient = |a: &Client, b: &Client| {
+                    let wait = (b.earliest_arrival as i64 - t - a.service_duration as i64 - a.latest_arrival as i64).max(0);
+                    let warp = (a.earliest_arrival as i64 + a.service_duration as i64 + t - b.latest_arrival as i64).max(0);
+                    weight_wait * wait as f64 + weight_warp * warp as f64
+                };
+                order_proximities[i].push((t as f64 + orient(a, b).min(orient(b, a)), j as i32));
             }
-            order_proximities[i].sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            order_proximities[i].sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         }
 
-        // Compute correlated vertices
-        let mut correlated_vertices = vec![Vec::new(); n_customers];
-        for i in 1..n_customers {
-            let limit = (data.n_v.max(0) as usize).min(n_customers - 1);
-            for j in 0..limit.min(order_proximities[i].len()) {
-                if let Some(&(_, cust_j)) = order_proximities[i].get(j) {
-                    correlated_vertices[i].push(cust_j);
-                }
-            }
-        }
-
-        // Build savings list
-        let mut savings_list = Vec::new();
-        for i in 1..n_customers {
+        let mut savings_list = Vec::with_capacity(n * n.saturating_sub(1) / 2);
+        for i in 1..n {
             for j in 1..i {
-                let value = time_cost.get(0, i as usize) as f64
-                    + time_cost.get(0, j as usize) as f64
-                    - time_cost.get(i as usize, j as usize) as f64;
-                savings_list.push(Savings {
-                    c1: i as i32,
-                    c2: j as i32,
-                    value,
-                });
+                let value = (time_cost.get(0, i) + time_cost.get(0, j) - time_cost.get(i, j)) as f64;
+                savings_list.push(Savings { c1: i as i32, c2: j as i32, value });
             }
         }
-        savings_list.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap());
+        savings_list.sort_by(|a, b| b.value.total_cmp(&a.value));
 
-        let penalty_capacity = (max_dist as f64 / max_demand.max(1) as f64).max(0.1).min(1000.0);
-        let penalty_time_warp = if matches!(data.problem_type, ProblemType::Vrptw | ProblemType::Evrp) {
-            1.0
-        } else {
-            0.0
+        let penalty_capacity = (max_dist as f64 / max_demand.max(1) as f64).clamp(0.1, 1000.);
+        let penalty_time_warp = match problem_type {
+            ProblemType::Vrptw | ProblemType::Evrp => config.initial_time_warp_penalty,
+            ProblemType::Cvrp => 0.,
         };
-
-        let circle_sector_overlap_tolerance = 0u16; // default
-        let min_circle_sector_size = (15i32 as f64 / 360.0 * 65536.0) as u16;
-
-        Params {
-            config: Config::default(),
-            rng: std::cell::RefCell::new(Xoroshiro128Plus::new(0)),
+        let degrees_to_ring = |degrees: i32| (degrees as f64 / 360. * 65536.) as u16;
+        let mut params = Params {
+            rng: std::cell::RefCell::new(Xoroshiro128Plus::new(config.seed)),
             start_time: Instant::now(),
-            penalty_capacity,
+            penalty_capacity: Cell::new(penalty_capacity),
             penalty_wait_time: 0.0,
-            penalty_time_warp,
-            proximity_weight_wait_time: pw_wait,
-            proximity_weight_time_warp: pw_twarp,
-            problem_type: data.problem_type,
+            penalty_time_warp: Cell::new(penalty_time_warp),
+            proximity_weight_wait_time: weight_wait,
+            proximity_weight_time_warp: weight_warp,
+            problem_type,
             instance_name: String::new(),
             is_duration_constrained: false,
-            is_time_window_constrained: true,
-            is_explicit_distance_matrix: is_explicit,
+            is_time_window_constrained: problem_type != ProblemType::Cvrp,
+            is_explicit_distance_matrix: distances.is_some(),
             nb_clients,
             nb_vehicles,
             duration_limit: i32::MAX,
-            vehicle_capacity: data.q,
+            vehicle_capacity,
             total_demand,
             max_demand,
             max_dist,
             cli,
             time_cost,
             order_proximities,
-            correlated_vertices,
-            circle_sector_overlap_tolerance,
-            min_circle_sector_size,
+            correlated_vertices: Vec::new(),
+            circle_sector_overlap_tolerance: degrees_to_ring(config.circle_sector_overlap_tolerance_degrees),
+            min_circle_sector_size: degrees_to_ring(config.min_circle_sector_size_degrees),
             savings_list,
             duals_ptr: None,
             forbidden_edges_set: None,
             verbose: true,
+            config,
+        };
+        params.correlated_vertices = params.correlated_vertices_for(params.config.nb_granular);
+        params
+    }
+
+    /// The `nb_granular` nearest neighbors of each client by proximity, in
+    /// increasing index order (HGS SetCorrelatedVertices).
+    pub fn correlated_vertices_for(&self, nb_granular: i32) -> Vec<Vec<i32>> {
+        let n = self.nb_clients as usize;
+        let count = (nb_granular.max(0) as usize).min(n.saturating_sub(1));
+        let mut sets = vec![std::collections::BTreeSet::new(); n + 1];
+        for i in 1..=n {
+            for &(_, j) in &self.order_proximities[i][..count] {
+                sets[i].insert(j);
+                if self.config.use_symmetric_correlated_vertices {
+                    sets[j as usize].insert(i as i32);
+                }
+            }
         }
+        sets.into_iter().map(|set| set.into_iter().collect()).collect()
+    }
+
+    /// Set the seed of the random number generator.
+    pub fn set_seed(&mut self, seed: i32) {
+        self.config.seed = seed;
+        self.rng = std::cell::RefCell::new(Xoroshiro128Plus::new(seed));
+    }
+
+    /// Restart the clock used by the time limit.
+    pub fn reset_clock(&mut self) {
+        self.start_time = Instant::now();
     }
 
     /// Elapsed seconds since creation.
@@ -736,26 +627,26 @@ impl Params {
         
         // Adapt capacity penalty
         if best_capacity_excess > 0 {
-            self.penalty_capacity *= 1.5;
+            self.penalty_capacity.set(self.penalty_capacity.get() * 1.5);
         } else if best_capacity_excess == 0 && ratio_feasible > self.config.target_feasible {
-            self.penalty_capacity /= 1.5;
+            self.penalty_capacity.set(self.penalty_capacity.get() / 1.5);
         }
 
         // Adapt time warp penalty
         if best_time_warp > 0 {
-            self.penalty_time_warp *= 1.5;
+            self.penalty_time_warp.set(self.penalty_time_warp.get() * 1.5);
         } else if best_time_warp == 0 && ratio_feasible > self.config.target_feasible {
-            self.penalty_time_warp /= 1.5;
+            self.penalty_time_warp.set(self.penalty_time_warp.get() / 1.5);
         }
 
         // Ensure penalties stay in reasonable bounds
-        self.penalty_capacity = self.penalty_capacity.max(0.1).min(1000.0);
-        self.penalty_time_warp = self.penalty_time_warp.max(0.1).min(1000.0);
+        self.penalty_capacity.set(self.penalty_capacity.get().max(0.1).min(1000.0));
+        self.penalty_time_warp.set(self.penalty_time_warp.get().max(0.1).min(1000.0));
 
         // Penalty booster: if no feasible solutions, increase penalties faster
         if num_feasible == 0 && self.config.penalty_booster > 0.0 {
-            self.penalty_capacity *= self.config.penalty_booster;
-            self.penalty_time_warp *= self.config.penalty_booster;
+            self.penalty_capacity.set(self.penalty_capacity.get() * self.config.penalty_booster);
+            self.penalty_time_warp.set(self.penalty_time_warp.get() * self.config.penalty_booster);
         }
     }
 
@@ -768,8 +659,8 @@ impl Params {
             self.nb_vehicles,
             self.vehicle_capacity,
             self.total_demand,
-            self.penalty_capacity,
-            self.penalty_time_warp,
+            self.penalty_capacity.get(),
+            self.penalty_time_warp.get(),
         )
     }
 }
@@ -843,10 +734,10 @@ mod tests {
         let instance = make_test_instance();
         let mut params = Params::from_instance(&instance);
         
-        let old_cap = params.penalty_capacity;
+        let old_cap = params.penalty_capacity.get();
         params.update_penalties(0, 10, 5, 0); // infeasible due to capacity
         
-        assert!(params.penalty_capacity > old_cap, 
+        assert!(params.penalty_capacity.get() > old_cap, 
                 "capacity penalty should increase when there's excess load");
     }
 
@@ -855,11 +746,11 @@ mod tests {
         let instance = make_test_instance();
         let mut params = Params::from_instance(&instance);
         
-        let old_cap = params.penalty_capacity;
+        let old_cap = params.penalty_capacity.get();
         // All feasible, above target ratio → decrease penalty
         params.update_penalties(10, 0, 0, 0);
         
-        assert!(params.penalty_capacity < old_cap, 
+        assert!(params.penalty_capacity.get() < old_cap, 
                 "capacity penalty should decrease when all solutions are feasible");
     }
 
@@ -872,6 +763,22 @@ mod tests {
             assert!(params.savings_list[i].value <= params.savings_list[i-1].value,
                     "savings list should be sorted descending");
         }
+    }
+
+    #[test]
+    fn rng_matches_cpp_reference() {
+        // Values from BALDES's C++ math/RNG.h and libstdc++ 16 std::shuffle.
+        let mut rng = Xoroshiro128Plus::new(0);
+        assert_eq!(
+            [rng.next(), rng.next(), rng.next()],
+            [2836985337983649843, 17383111449422238058, 15852657771511707500]
+        );
+        assert_eq!(rng.next_u64(100), 86);
+        let mut shuffled: Vec<Vec<usize>> = [1, 2, 10].iter().map(|&n| (0..n).collect()).collect();
+        for v in &mut shuffled {
+            rng.shuffle(v);
+        }
+        assert_eq!(shuffled, [vec![0], vec![1, 0], vec![7, 5, 9, 2, 3, 4, 1, 0, 8, 6]]);
     }
 
     #[test]

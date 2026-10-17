@@ -6,21 +6,28 @@
 //! - Predecessor/successor maps for fast arc queries
 //! - Cost, feasibility, and fitness information
 
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::cmp::Ordering;
+use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 
 use crate::hgs::{Params, ProblemType, TimeWindow};
+
+static NEXT_INDIVIDUAL_ID: AtomicUsize = AtomicUsize::new(1);
+
+fn next_individual_id() -> usize {
+    NEXT_INDIVIDUAL_ID.fetch_add(1, AtomicOrdering::Relaxed)
+}
 
 /// Wrapper for f64 that implements Ord by comparing bit patterns.
 /// This allows using f64 as a BTreeMap key. Note: NaN and negative zero
 /// have special behavior; we assume valid positive distances only.
 #[derive(Clone, Copy, Debug)]
-pub struct SortableF64(f64);
+pub struct SortableF64(pub f64);
 
 
 impl PartialEq for SortableF64 {
     fn eq(&self, other: &Self) -> bool {
-        self.0.to_bits() == other.0.to_bits()
+        self.0.total_cmp(&other.0).is_eq()
     }
 }
 
@@ -34,7 +41,8 @@ impl PartialOrd for SortableF64 {
 
 impl Ord for SortableF64 {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.0.to_bits().cmp(&other.0.to_bits())
+        // Raw bit patterns order negative values above positive ones.
+        self.0.total_cmp(&other.0)
     }
 }
 
@@ -59,6 +67,8 @@ pub struct CostSol {
 
 /// A solution individual in the HGS population.
 pub struct Individual<'p> {
+    /// Unique identifier for this individual.
+    pub id: usize,
     /// Reference to problem parameters.
     pub params: &'p Params,
     /// Number of vehicles available.
@@ -73,17 +83,65 @@ pub struct Individual<'p> {
     pub successors: Vec<usize>,
     /// `predecessors[i]` = customer before i in the giant tour (0 = depot).
     pub predecessors: Vec<usize>,
-    /// Proximity index: `(SortableF64, individual_index)` sorted by distance.
-    /// Used for diversity management — stores indices to other individuals.
-    pub indivs_per_proximity: BTreeMap<SortableF64, usize>,
+    /// Proximity index: `(SortableF64, individual_id)` sorted by distance.
+    /// Used for diversity management.
+    pub indivs_per_proximity: BTreeSet<(SortableF64, usize)>,
     /// Feasibility flag.
     pub is_feasible: bool,
     /// Biased fitness value (penalized cost adjusted by frequency).
     pub biased_fitness: f64,
 }
 
+impl<'p> Clone for Individual<'p> {
+    fn clone(&self) -> Self {
+        Self {
+            id: next_individual_id(),
+            params: self.params,
+            nb_vehicles: self.nb_vehicles,
+            my_cost_sol: self.my_cost_sol.clone(),
+            chrom_t: self.chrom_t.clone(),
+            chrom_r: self.chrom_r.clone(),
+            successors: self.successors.clone(),
+            predecessors: self.predecessors.clone(),
+            indivs_per_proximity: BTreeSet::new(),
+            is_feasible: self.is_feasible,
+            biased_fitness: self.biased_fitness,
+        }
+    }
+}
+
 impl<'p> Individual<'p> {
     // ── Construction ──────────────────────────────────────────────────────
+
+    /// Clone an individual, copying over map fields (successors, predecessors, proximity).
+    pub fn clone_with_maps(indiv: &Self) -> Self {
+        indiv.clone()
+    }
+
+    /// Create an empty individual (no routes, no clients scheduled).
+    pub fn new_empty(params: &'p Params) -> Self {
+        let chrom_r = vec![Vec::new(); params.nb_vehicles as usize];
+        let chrom_t = Vec::new();
+        let nb_clients = params.nb_clients as usize;
+        let successors = vec![0; nb_clients + 1];
+        let predecessors = vec![0; nb_clients + 1];
+        let indivs_per_proximity = BTreeSet::new();
+        let mut my_cost_sol = CostSol::default();
+        my_cost_sol.penalized_cost = 1e30;
+        Self {
+            id: next_individual_id(),
+            params,
+            nb_vehicles: params.nb_vehicles as usize,
+            my_cost_sol,
+            chrom_t,
+            chrom_r,
+            successors,
+            predecessors,
+            indivs_per_proximity,
+            is_feasible: false,
+            biased_fitness: 0.0,
+        }
+    }
 
     /// Create a random individual with a shuffled giant tour.
     pub fn new_random(params: &'p Params) -> Self {
@@ -92,7 +150,8 @@ impl<'p> Individual<'p> {
         params.rng.borrow_mut().shuffle(&mut chrom_t);
 
         let mut indiv = Self::from_giant_tour(params, &chrom_t);
-        indiv.evaluate_complete_cost();
+        // Not evaluated until Split assigns routes.
+        indiv.my_cost_sol.penalized_cost = 1e30;
         indiv
     }
 
@@ -326,6 +385,7 @@ impl<'p> Individual<'p> {
         let nb_vehicles = params.nb_vehicles as usize;
 
         Individual {
+            id: next_individual_id(),
             params,
             nb_vehicles,
             my_cost_sol: CostSol::default(),
@@ -333,7 +393,7 @@ impl<'p> Individual<'p> {
             chrom_r: vec![Vec::new(); nb_vehicles],
             successors: vec![0; nb_clients + 1],
             predecessors: vec![0; nb_clients + 1],
-            indivs_per_proximity: BTreeMap::new(),
+            indivs_per_proximity: BTreeSet::new(),
             is_feasible: false,
             biased_fitness: 0.0,
         }
@@ -344,6 +404,7 @@ impl<'p> Individual<'p> {
         let nb_vehicles = params.nb_vehicles as usize;
 
         let mut indiv = Individual {
+            id: next_individual_id(),
             params,
             nb_vehicles,
             my_cost_sol: CostSol::default(),
@@ -351,7 +412,7 @@ impl<'p> Individual<'p> {
             chrom_r: chrom_r.to_vec(),
             successors: vec![0; nb_clients + 1],
             predecessors: vec![0; nb_clients + 1],
-            indivs_per_proximity: BTreeMap::new(),
+            indivs_per_proximity: BTreeSet::new(),
             is_feasible: false,
             biased_fitness: 0.0,
         };
@@ -484,7 +545,6 @@ impl<'p> Individual<'p> {
             // Handle depot time window.
             if time > self.params.cli[0].latest_arrival {
                 time_warp += time - self.params.cli[0].latest_arrival;
-                time = self.params.cli[0].latest_arrival;
             }
 
             // Update solution metrics.
@@ -502,8 +562,8 @@ impl<'p> Individual<'p> {
 
         // Calculate penalized cost.
         cost_sol.penalized_cost = cost_sol.distance as f64
-            + cost_sol.capacity_excess as f64 * self.params.penalty_capacity
-            + cost_sol.time_warp as f64 * self.params.penalty_time_warp
+            + cost_sol.capacity_excess as f64 * self.params.penalty_capacity.get()
+            + cost_sol.time_warp as f64 * self.params.penalty_time_warp.get()
             + cost_sol.wait_time as f64 * self.params.penalty_wait_time;
 
         cost_sol.is_feasible = cost_sol.capacity_excess == 0 && cost_sol.time_warp == 0;
@@ -545,20 +605,13 @@ impl<'p> Individual<'p> {
     // ── Proximity / diversity ─────────────────────────────────────────────
 
     /// Add a reference to another individual in the proximity structure.
-    pub fn add_proximity(&mut self, distance: f64, indiv_idx: usize) {
-        self.indivs_per_proximity.insert(SortableF64(distance), indiv_idx);
+    pub fn add_proximity(&mut self, distance: f64, indiv_id: usize) {
+        self.indivs_per_proximity.insert((SortableF64(distance), indiv_id));
     }
 
-    /// Remove an individual from the proximity structure by index.
-    pub fn remove_proximity(&mut self, _indiv_idx: usize) {
-        let mut new_map = BTreeMap::new();
-        let map: BTreeMap<SortableF64, usize> = std::mem::take(&mut self.indivs_per_proximity);
-        for (dist, idx) in map {
-            if idx != _indiv_idx {
-                new_map.insert(dist, idx);
-            }
-        }
-        self.indivs_per_proximity = new_map;
+    /// Remove an individual from the proximity structure by ID.
+    pub fn remove_proximity(&mut self, indiv_id: usize) {
+        self.indivs_per_proximity.retain(|&(_, id)| id != indiv_id);
     }
 
     /// Broken pairs distance between this individual and indiv2.
@@ -595,9 +648,9 @@ impl<'p> Individual<'p> {
 
         let sum: f64 = self
             .indivs_per_proximity
-            .keys()
+            .iter()
             .take(size)
-            .map(|d| d.0)
+            .map(|(d, _)| d.0)
             .sum();
 
         sum / size as f64
