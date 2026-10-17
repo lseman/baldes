@@ -38,7 +38,8 @@ The C++ BALDES 1.x code remains in the git history before the 2.0 commit.
   branching, shared elementary columns and a restricted-master integer heuristic.
 - Phased strong branching (100 → 3 → 1 candidates), native product and
   tree-depth scores, and bounded strong round-up diving with discrepancy limits.
-- Solomon VRPTW and CVRPLIB CVRP input and a root-solve command.
+- Solomon VRPTW and CVRPLIB CVRP input, HGS heuristic, and root-solve.
+- Dynamic NG strengthening from master cycles at configurable separator priority.
 
 The core solver uses only the Rust standard library. The `clp` feature links
 COIN-OR Clp through its C interface for the restricted master.
@@ -67,11 +68,14 @@ The `clp` feature compiles Clp 1.17.10 and CoinUtils 2.11 from the
 ./target/release/baldes vrptw instances/R101.txt --customers 25 --rank1
 ./target/release/baldes cvrp instances/cvrplib/A-n32-k5.vrp --capacity-cuts
 ./target/release/baldes vrptw instances/R101.txt --customers 10 --two-path-cuts --tree --time 60
+./target/release/baldes hgs instances/R101.txt --population-size 50 --nb-iter 5000
 ```
 
-The first argument selects the instance type. Both commands read Solomon-format
-files and CVRPLIB (TSPLIB) `.vrp` files; the format is detected from the
-content. `vrptw` enforces time windows and service times; `cvrp` ignores them.
+The first argument selects the instance type: `vrptw` (time windows), `cvrp`
+(capacitated, no time windows), or `hgs` (Hybrid Genetic Search heuristic). Both
+commands read Solomon-format files and CVRPLIB (TSPLIB) `.vrp` files; the format
+is detected from the content. `vrptw` enforces time windows and service times;
+`cvrp` ignores them.
 CVRPLIB instances have no time windows, so they are solved as `cvrp`. They use
 the file's distance convention: TSPLIB `nint` for `EUC_2D`, `ceil` for
 `CEIL_2D`, or the explicit `EDGE_WEIGHT_SECTION` (full or triangular). As for
@@ -93,8 +97,13 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--no-enumeration` | no reduced-cost fixing or enumeration |
 | `--upper-bound X` | initial incumbent for fixing |
 | `--no-stabilization` | no dual-price smoothing |
+| `--dynamic-ng P` | strengthen NG memories from master cycles at separator priority P |
+| `--option NAME=VALUE` | set an RCSP pricing option (repeatable) |
 | `--iterations N`, `--time S` | master iteration and time limits |
 | `--json FILE` | write the root result, history and positive routes |
+| `--population-size N` | HGS minimum population size (default: 25) |
+| `--nb-iter N` | HGS iterations without improvement before stopping/restarting |
+| `--seed N` | HGS random seed (default: 0) |
 
 Solomon instances are in [`instances/`](instances/), and a few CVRPLIB ones in
 [`instances/cvrplib/`](instances/cvrplib/).
