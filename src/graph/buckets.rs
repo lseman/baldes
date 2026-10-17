@@ -287,22 +287,34 @@ impl BucketGraph {
             &mut self.backward
         }
     }
+    // Both take `q` element by element through selects: indexing it with a
+    // runtime slot keeps the array in memory, and reloading it right after
+    // its two scalar stores stalls on store forwarding in the labeling loop.
+    #[inline]
     pub fn coordinate(&self, q: [f64; 2]) -> [f64; 2] {
-        let mut result = [0.; 2];
-        for (i, &r) in self.resource_slots.iter().enumerate() {
-            result[i] = q[r];
-        }
-        result
+        let pick = |r: usize| if r == 0 { q[0] } else { q[1] };
+        let slots = &self.resource_slots;
+        [
+            slots.first().map_or(0., |&r| pick(r)),
+            slots.get(1).map_or(0., |&r| pick(r)),
+        ]
     }
+    #[inline]
     pub fn bucket_id(&self, forward: bool, vertex: usize, q: [f64; 2]) -> Option<usize> {
-        let mut index = 0isize;
-        for r in 0..self.dimensions {
+        let term = |r: usize, q: f64| {
             let x = if forward {
-                q[r] - (self.lower[vertex][r] - 1e-6)
+                q - (self.lower[vertex][r] - 1e-6)
             } else {
-                self.upper[vertex][r] + 1e-6 - q[r]
+                self.upper[vertex][r] + 1e-6 - q
             };
-            index += (x / self.step[r]).floor() as isize * self.stride[vertex][r] as isize;
+            floor_isize(x / self.step[r]) * self.stride[vertex][r] as isize
+        };
+        let mut index = 0isize;
+        if self.dimensions > 0 {
+            index += term(0, q[0]);
+        }
+        if self.dimensions > 1 {
+            index += term(1, q[1]);
         }
         usize::try_from(index).ok().filter(|&i| {
             self.direction(forward)
@@ -1099,5 +1111,16 @@ impl BucketGraph {
             self.regenerate_jumps(g, false);
         }
         Ok(())
+    }
+}
+/// `x.floor() as isize` without the libm call that baseline x86-64 makes for
+/// `floor` (no SSE4.1 round): the same value for every input, ±inf and NaN too.
+#[inline(always)]
+fn floor_isize(x: f64) -> isize {
+    let t = x as isize;
+    if t != isize::MIN && t as f64 > x {
+        t - 1
+    } else {
+        t
     }
 }

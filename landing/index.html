@@ -242,8 +242,8 @@
             <div class="reveal">
                 <div class="section-tag">02 — Quick start</div>
                 <h2 class="section-title">Up in <span class="grad">three commands</span></h2>
-                <p class="section-copy">Build with Cargo. The root solve needs the Clp feature: point
-                    <code>BALDES_CLP_LIB_DIR</code> at the static Clp and CoinUtils archives.</p>
+                <p class="section-copy">Build with Cargo. The root solve needs the Clp feature, which
+                    compiles Clp and CoinUtils from the <code>vendor/</code> submodules.</p>
             </div>
 
             <div class="commands-wrap reveal reveal-d1">
@@ -255,8 +255,8 @@
                 </div>
 
                 <div class="command-item">
-                    <div class="command-code">export BALDES_CLP_LIB_DIR=/path/to/clp/archives</div>
-                    <div class="command-desc">Locate the Clp archives</div>
+                    <div class="command-code">git submodule update --init</div>
+                    <div class="command-desc">Fetch the Clp and CoinUtils sources</div>
                 </div>
                 <div class="command-item">
                     <div class="command-code">cargo build --release --features clp</div>

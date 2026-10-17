@@ -72,7 +72,7 @@ def compare(args):
         representative=samples[0];cpp=representative['cpp'];rust=representative['rust'];binary=representative['binary']
         summary={'case':case,'fixing':args.fixing,'rank1':args.rank1,'rust_lp':rust['lp'],'cpp_lp':cpp['lp_value'],'binary_lp':binary['root_lp'],'rust_cuts':rust['cuts'],'cpp_cuts':cpp['cuts'],'binary_cuts':binary.get('cuts'),'rust_cut_rounds':rust['cut_rounds'],'cpp_cut_rounds':cpp['cut_rounds'],
             'rust_solves':rust['iterations'],'cpp_solves':cpp['iterations'],'rust_pricing_calls':rust['pricing_calls'],'cpp_pricing_calls':cpp['pricing_calls'],'binary_pricing_calls':binary['pricing_calls'],
-            'rust_master_columns':rust['columns'],'cpp_master_columns':cpp['history'][-1]['columns'],'rust_route_columns':rust['route_columns'],'cpp_route_columns':cpp['columns'],'rust_audit':representative['rust_audit'],
+            'rust_master_columns':rust['master_columns'],'cpp_master_columns':cpp['history'][-1]['columns'],'rust_route_columns':rust['route_columns'],'cpp_route_columns':cpp['route_columns'],'rust_audit':representative['rust_audit'],
             'rust_seconds':statistics.median(s['rust']['seconds'] for s in samples),'cpp_seconds':statistics.median(s['cpp_wall_seconds'] for s in samples),'binary_seconds':statistics.median(s['binary']['seconds'] for s in samples),
             'rust_pricing_seconds':statistics.median(s['rust']['pricing_seconds'] for s in samples),'cpp_pricing_seconds':statistics.median(s['cpp']['pricing_seconds'] for s in samples)}
         keys=['lp','min_reduced_cost','new_columns','columns','pricing_calls','misprices','alpha']

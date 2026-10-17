@@ -92,7 +92,12 @@ pub struct LocalSearch<const COVERING: bool> {
     num_iterations: i32,
     byte_value_sums: Vec<Vec<f64>>,
     row_values: Vec<f64>,
-    count_difference_bitsets: Vec<Vec<Vec<Vec<u64>>>>,
+    /// Columns whose count in row i exceeds that in row j by c, as nwords
+    /// words at ((i * rows + j) * (max_count + 1) + c) * nwords.
+    count_difference_bits: Vec<u64>,
+    /// Whether any bit of row pair (i, j) is set.
+    difference_nonzero: Vec<bool>,
+    nwords: usize,
     max_count: i32,
     row_max_count: Vec<i32>,
     rng: MinStd,
@@ -105,6 +110,14 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
         } else {
             &c.packing_set_count
         }
+    }
+    /// The count-difference bitset of rows (from, to) at difference c.
+    #[inline]
+    fn difference(&self, from: usize, to: usize, c: usize) -> &[u64] {
+        let rows = self.num_rows.max(0) as usize;
+        let slots = (self.max_count.max(0) + 1) as usize;
+        let start = ((from * rows + to) * slots + c) * self.nwords;
+        &self.count_difference_bits[start..start + self.nwords]
     }
     fn divide(a: i32, d: i32) -> i32 {
         if COVERING {
@@ -168,19 +181,19 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                 max_count = *m;
             }
         }
-        let mut count_difference_bitsets = vec![vec![vec![]; rows]; rows];
-        for i in 0..rows {
-            for j in 0..rows {
-                if i == j {
-                    continue;
-                }
-                let bits = &mut count_difference_bitsets[i][j];
-                *bits = vec![vec![0u64; nwords]; (row_max_count[i] + 1) as usize];
-                for k in 0..n {
-                    let cnt = Self::counts(&cols[column_indices[k] as usize]);
+        let slots = (max_count.max(0) + 1) as usize;
+        let mut count_difference_bits = vec![0u64; rows * rows * slots * nwords];
+        let mut difference_nonzero = vec![false; rows * rows];
+        for k in 0..n {
+            let cnt = Self::counts(&cols[column_indices[k] as usize]);
+            for i in 0..rows {
+                for j in 0..rows {
                     let (ci, cj) = (cnt[i], cnt[j]);
-                    if cj < ci {
-                        bits[(ci - cj) as usize][k >> 6] |= 1u64 << (k & 63);
+                    if i != j && cj < ci {
+                        let pair = i * rows + j;
+                        count_difference_bits[(pair * slots + (ci - cj) as usize) * nwords + (k >> 6)] |=
+                            1u64 << (k & 63);
+                        difference_nonzero[pair] = true;
                     }
                 }
             }
@@ -194,7 +207,9 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
             num_iterations: parent.params.ls_num_iterations,
             byte_value_sums,
             row_values,
-            count_difference_bitsets,
+            count_difference_bits,
+            difference_nonzero,
+            nwords,
             max_count,
             row_max_count,
             rng: MinStd(1),
@@ -354,6 +369,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
         let n = self.column_indices.len();
         let nbytes = n / 8 + (n & 7 != 0) as usize;
         let nwords = nbytes / 8 + (nbytes & 7 != 0) as usize;
+        let row_count = self.num_rows.max(0) as usize;
         let max_multiplier = *multipliers.iter().max().unwrap();
         let max_change = self.max_count * max_multiplier;
         let mut increases: Vec<Vec<(i32, i32)>> = vec![vec![]; (max_change + 1) as usize];
@@ -440,17 +456,17 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                                       changes: &Vec<Vec<(i32, i32)>>,
                                       target: &mut Vec<Vec<u64>>| {
                         let cnt = self.row_max_count[from];
-                        if cnt <= 0 {
+                        // An all-zero difference ORs nothing in.
+                        if cnt <= 0 || !self.difference_nonzero[from * row_count + to] {
                             return;
                         }
-                        let diff = &self.count_difference_bitsets[from][to];
                         for c in 1..=cnt {
-                            let bits = &diff[c as usize];
+                            let bits = self.difference(from, to, c as usize);
                             for &(s, l) in &changes[(c * step) as usize] {
-                                let st = &states[s as usize];
-                                let tg = &mut target[l as usize];
-                                for w in 0..nwords {
-                                    tg[w] |= bits[w] & st[w];
+                                let st = &states[s as usize][..nwords];
+                                let tg = &mut target[l as usize][..nwords];
+                                for ((t, &b), &s) in tg.iter_mut().zip(bits).zip(st) {
+                                    *t |= b & s;
                                 }
                             }
                         }

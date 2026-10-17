@@ -3,7 +3,7 @@
 //! driver `_solve_root_clp` of `python/src/openrscp/vrptw.py`.
 use super::{
     clp::ClpMaster,
-    column_generation::{self, Answer, Column, Controller, Options, Output},
+    column_generation::{self, Answer, Column, Controller, LpMaster, Options, Output},
     RowSense,
 };
 use crate::cuts::FractionalColumn;
@@ -26,6 +26,8 @@ pub struct RootProblem {
     pub route_entries: Vec<(usize, f64)>,
     /// Vertices with a unit covering row: the rank-one cut customers.
     pub customers: Vec<usize>,
+    /// Arc id -> first index in `graph.arcs`.
+    arc_index: std::collections::HashMap<i32, usize>,
 }
 impl RootProblem {
     /// Cover each nonterminal vertex and bound the number of vehicle routes.
@@ -62,13 +64,21 @@ impl RootProblem {
                 }
             })
             .collect();
+        let mut arc_index = std::collections::HashMap::with_capacity(graph.arcs.len());
+        for (index, a) in graph.arcs.iter().enumerate() {
+            arc_index.entry(a.id).or_insert(index);
+        }
         Ok(Self {
             graph,
             rows,
             arc_entries,
             route_entries: vec![],
             customers,
+            arc_index,
         })
+    }
+    pub fn arc_position(&self, id: i32) -> Option<usize> {
+        self.arc_index.get(&id).copied()
     }
     fn base_entries(&self, route: &Route) -> Result<Vec<(usize, f64)>> {
         let mut coefficients = std::collections::BTreeMap::new();
@@ -77,10 +87,7 @@ impl RootProblem {
         }
         for id in &route.arcs {
             let physical = self
-                .graph
-                .arcs
-                .iter()
-                .position(|a| a.id == *id)
+                .arc_position(*id)
                 .ok_or_else(|| invalid("unknown priced route arc"))?;
             for &(r, a) in &self.arc_entries[physical] {
                 *coefficients.entry(r).or_insert(0.) += a;
@@ -97,7 +104,7 @@ impl RootProblem {
             *counts.entry(id).or_insert(0usize) += 1;
         }
         for (id, count) in counts {
-            cost += self.graph.arcs.iter().find(|a| a.id == id).unwrap().cost * count as f64;
+            cost += self.graph.arcs[self.arc_position(id).unwrap()].cost * count as f64;
         }
         (cost, identities)
     }
@@ -177,6 +184,9 @@ impl Default for RootOptions {
     fn default() -> Self {
         let mut cg = Options::default();
         cg.artificial_cost = 2.76;
+        // BaPCod's master column clean-up: threshold 10000, keep ratio 0.66.
+        cg.column_cleanup_threshold = 10000.;
+        cg.column_cleanup_ratio = 0.66;
         Self {
             cg,
             pricing_options: vec![],
@@ -247,6 +257,8 @@ struct CutState {
 struct State {
     solver: Solver,
     routes: Vec<Route>,
+    /// Arc sequence -> tag of each entry in `routes`.
+    route_tags: std::collections::HashMap<Vec<i32>, i32>,
     incumbent: f64,
     enumerate: bool,
     rounded: bool,
@@ -297,7 +309,7 @@ impl State {
         let mut entries = problem.base_entries(route)?;
         entries.extend(self.cut_entries(route)?);
         entries.sort_by_key(|&(row, _)| row);
-        let (cost, identities) = problem.route_cost(route);
+        let (cost, _) = problem.route_cost(route);
         let mut reduced_cost = cost;
         for &(r, a) in &entries {
             reduced_cost -= duals.get(r).copied().unwrap_or(0.) * a;
@@ -308,11 +320,10 @@ impl State {
             entries,
             acceptable: true,
             tag,
-            identity: identities
-                .iter()
-                .map(i32::to_string)
-                .collect::<Vec<_>>()
-                .join(","),
+            // The route's arcs in path order: NG routes with the same arcs in
+            // another order (a cycle traversed in reverse) are distinct columns,
+            // as in BaPCod, and can have different rank-one coefficients.
+            identity: route.arcs.iter().map(i32::to_string).collect::<Vec<_>>().join(","),
         })
     }
     /// cache_costs: arc reduced costs and the rounded cut duals, active cuts
@@ -345,24 +356,24 @@ struct RootController {
     problem: Rc<RootProblem>,
     state: Rc<RefCell<State>>,
 }
-impl Controller for RootController {
+impl<M: LpMaster> Controller<M> for RootController {
     fn master_solved(
         &mut self,
-        master: &ClpMaster,
+        master: &M,
         tags: &[i32],
         artificials: &[usize],
     ) -> Result<()> {
-        if artificials.iter().any(|&i| master.values[i] > 1e-6) {
+        if artificials.iter().any(|&i| master.values()[i] > 1e-6) {
             return Ok(());
         }
-        if master.values.iter().all(|x| (*x - x.round()).abs() <= 1e-6)
+        if master.values().iter().all(|x| (*x - x.round()).abs() <= 1e-6)
             && tags
                 .iter()
-                .zip(&master.values)
+                .zip(master.values())
                 .all(|(&tag, &x)| tag >= 0 || x <= 1e-6)
         {
             let mut state = self.state.borrow_mut();
-            for (&tag, &value) in tags.iter().zip(&master.values) {
+            for (&tag, &value) in tags.iter().zip(master.values()) {
                 if tag < 0 || value <= 1e-6 {
                     continue;
                 }
@@ -378,7 +389,7 @@ impl Controller for RootController {
                     return Ok(());
                 }
             }
-            state.incumbent = state.incumbent.min(master.objective);
+            state.incumbent = state.incumbent.min(master.objective());
         }
         Ok(())
     }
@@ -435,7 +446,7 @@ impl Controller for RootController {
             .collect();
         let mut columns = vec![];
         for route in routes {
-            let tag = register(&mut state.routes, &route)?;
+            let tag = register(&mut state, &route)?;
             columns.push(state.column(&self.problem, &route, duals, tag)?);
         }
         Ok(Some(columns))
@@ -463,10 +474,10 @@ impl Controller for RootController {
         let state = self.state.borrow();
         state.cut.options.enabled || state.cut.capacity_separator.is_some()
     }
-    fn separate(&mut self, master: &mut ClpMaster, tags: &[i32]) -> Result<usize> {
+    fn separate(&mut self, master: &mut M, tags: &[i32]) -> Result<usize> {
         let mut state = self.state.borrow_mut();
         let state = &mut *state;
-        let value = master.objective;
+        let value = master.objective();
         // Every converged column generation, round 0 included, reports to the
         // pricing solver with flag3 = flag5 = 0 (traced at ELF 0x67e9a0).
         let stop = state.solver.column_generation_terminated(0, 0)?;
@@ -496,7 +507,7 @@ impl Controller for RootController {
             }
         }
         state.cut.separation_lp = value;
-        let values = master.values.clone();
+        let values = master.values().to_vec();
         let tagged: Vec<(usize, usize)> = tags
             .iter()
             .enumerate()
@@ -599,12 +610,14 @@ impl Controller for RootController {
         Ok(if added > 0 { added } else { changed as usize })
     }
 }
-fn register(routes: &mut Vec<Route>, route: &Route) -> Result<i32> {
-    if let Some(i) = routes.iter().position(|r| r.arcs == route.arcs) {
-        return i32::try_from(i).map_err(|_| invalid("route tag overflow"));
+/// Tag of `route`, the index of the first registered route with its arcs.
+fn register(state: &mut State, route: &Route) -> Result<i32> {
+    if let Some(&tag) = state.route_tags.get(&route.arcs) {
+        return Ok(tag);
     }
-    let id = i32::try_from(routes.len()).map_err(|_| invalid("route tag overflow"))?;
-    routes.push(route.clone());
+    let id = i32::try_from(state.routes.len()).map_err(|_| invalid("route tag overflow"))?;
+    state.routes.push(route.clone());
+    state.route_tags.insert(route.arcs.clone(), id);
     Ok(id)
 }
 pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutput> {
@@ -637,6 +650,7 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
     let state = Rc::new(RefCell::new(State {
         solver,
         routes: vec![],
+        route_tags: Default::default(),
         incumbent: options.incumbent,
         enumerate: options.enumerate,
         rounded: options.round_reduced_costs,
@@ -664,7 +678,7 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
     options.cg.known.clear();
     for route in &options.initial_routes {
         let mut s = state.borrow_mut();
-        let tag = register(&mut s.routes, route)?;
+        let tag = register(&mut s, route)?;
         let column = s.column(&problem, route, &zeros, tag)?;
         master.add_column(column.cost, &column.entries)?;
         options.cg.known.push(column);
@@ -674,7 +688,7 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
         problem: problem.clone(),
         state: state.clone(),
     };
-    let output = column_generation::optimize(
+    let output = column_generation::optimize::<ClpMaster, _, _>(
         &mut master,
         &schedule,
         |phase, duals| {
@@ -688,7 +702,7 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
             let mut minimum = result.minimum_reduced_cost + offset;
             let mut corrected = 0.;
             for route in result.columns {
-                let tag = register(&mut state.routes, &route)?;
+                let tag = register(&mut state, &route)?;
                 let mut column = state.column(&problem, &route, duals, tag)?;
                 if columns.is_empty() {
                     corrected = route.cost + offset;
@@ -698,7 +712,7 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
                     }
                     if rounded {
                         for (id, count) in counts {
-                            let index = problem.graph.arcs.iter().position(|a| a.id == id).unwrap();
+                            let index = problem.arc_position(id).unwrap();
                             let mut raw = problem.graph.arcs[index].cost;
                             for &(r, a) in &problem.arc_entries[index] {
                                 raw -= duals[r] * a;
@@ -736,8 +750,8 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
     Ok(RootOutput {
         master: output,
         routes: state.routes.clone(),
-        values: master.values.clone(),
-        duals: master.duals.clone(),
+        values: master.values().to_vec(),
+        duals: master.duals().to_vec(),
         incumbent: state.incumbent,
         pricing_seconds: state.pricing_seconds,
         solver_seconds: solve_started.elapsed().as_secs_f64(),

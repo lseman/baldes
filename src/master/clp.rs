@@ -1,6 +1,6 @@
 //! Ownership-safe bridge to COIN-OR Clp's C interface. No original solver code
 //! is called: labeling, pricing, stabilization and CG belong to this Rust port.
-use super::RowSense;
+use super::{LpMaster, RowSense};
 use crate::{incomplete, invalid, Result};
 use std::ffi::c_void;
 use std::ptr::NonNull;
@@ -39,6 +39,7 @@ extern "C" {
     fn Clp_objectiveValue(m: *mut Model) -> f64;
     fn Clp_dualRowSolution(m: *mut Model) -> *const f64;
     fn Clp_primalColumnSolution(m: *mut Model) -> *const f64;
+    fn Clp_getReducedCost(m: *mut Model) -> *const f64;
     fn Clp_setDualTolerance(m: *mut Model, tolerance: f64);
     fn Clp_setPrimalTolerance(m: *mut Model, tolerance: f64);
     fn Clp_getRowStatus(m: *mut Model, row: i32) -> i32;
@@ -56,6 +57,7 @@ pub struct ClpMaster {
     pub upper: Vec<f64>,
     pub duals: Vec<f64>,
     pub values: Vec<f64>,
+    pub reduced_costs: Vec<f64>,
     pub objective: f64,
     pub status: i32,
     pub solved: bool,
@@ -65,6 +67,11 @@ pub struct ClpMaster {
     pub zero_tolerance: f64,
 }
 impl ClpMaster {
+    /// Returns a copy of the dual (shadow) prices for each row.
+    pub fn duals(&self) -> Vec<f64> { self.duals.clone() }
+    /// Returns a copy of the primal column values.
+    pub fn values(&self) -> Vec<f64> { self.values.clone() }
+
     pub fn new() -> Result<Self> {
         // SAFETY: Clp returns an exclusively owned model, freed by Drop below.
         let model = NonNull::new(unsafe { Clp_newModel() })
@@ -81,6 +88,7 @@ impl ClpMaster {
             upper: vec![],
             duals: vec![],
             values: vec![],
+            reduced_costs: vec![],
             objective: 0.,
             status: -1,
             solved: false,
@@ -128,39 +136,59 @@ impl ClpMaster {
         Ok(id)
     }
     pub fn add_column(&mut self, cost: f64, entries: &[(usize, f64)]) -> Result<usize> {
-        if !cost.is_finite() {
-            return Err(invalid("finite column cost required"));
+        Ok(self.add_columns(&[(cost, entries)])?.start)
+    }
+    /// Adds the columns in order with one Clp call: Clp copies the whole
+    /// matrix on every append, so adding them one by one was quadratic.
+    /// The model and bookkeeping match adding each with `add_column`.
+    pub fn add_columns(&mut self, columns: &[(f64, &[(usize, f64)])]) -> Result<std::ops::Range<usize>> {
+        let first = self.costs.len();
+        if columns.is_empty() {
+            return Ok(first..first);
         }
-        let (indices, values) = entries_of(entries, self.rhs.len())?;
-        let mut reduced = cost;
-        for (&r, &a) in indices.iter().zip(&values) {
-            reduced -= self.duals.get(r as usize).copied().unwrap_or(0.) * a;
+        let mut starts = vec![0i32];
+        let mut indices = vec![];
+        let mut values = vec![];
+        let mut costs = Vec::with_capacity(columns.len());
+        // `add_column` kept a zero value per column while `solved` held.
+        let mut preserve = self.solved;
+        let mut preserved = 0;
+        for &(cost, entries) in columns {
+            if !cost.is_finite() {
+                return Err(invalid("finite column cost required"));
+            }
+            let (ids, vals) = entries_of(entries, self.rhs.len())?;
+            let mut reduced = cost;
+            for (&r, &a) in ids.iter().zip(&vals) {
+                reduced -= self.duals.get(r as usize).copied().unwrap_or(0.) * a;
+            }
+            preserve = preserve && reduced >= -self.dual_tolerance;
+            preserved += preserve as usize;
+            indices.extend(ids);
+            values.extend(vals);
+            starts.push(indices.len() as i32);
+            costs.push(cost);
         }
-        let preserve = self.solved && reduced >= -self.dual_tolerance;
-        let lower = 0.;
-        let upper = 1e12;
-        let starts = [0, indices.len() as i32];
+        let lower = vec![0.; columns.len()];
+        let upper = vec![1e12; columns.len()];
         // SAFETY: Model is exclusively borrowed, Clp copies the supplied arrays.
         unsafe {
             Clp_addColumns(
                 self.model.as_ptr(),
-                1,
-                &lower,
-                &upper,
-                &cost,
+                columns.len() as i32,
+                lower.as_ptr(),
+                upper.as_ptr(),
+                costs.as_ptr(),
                 starts.as_ptr(),
                 indices.as_ptr(),
                 values.as_ptr(),
             );
         }
-        let id = self.costs.len();
-        self.costs.push(cost);
-        self.upper.push(upper);
+        self.costs.extend(&costs);
+        self.upper.extend(&upper);
         self.solved = preserve;
-        if preserve {
-            self.values.push(0.);
-        }
-        Ok(id)
+        self.values.resize(self.values.len() + preserved, 0.);
+        Ok(first..self.costs.len())
     }
     pub fn set_coefficient(&mut self, row: usize, column: usize, value: f64) -> Result<()> {
         if row >= self.rhs.len() || column >= self.costs.len() || !value.is_finite() {
@@ -231,9 +259,23 @@ impl ClpMaster {
                     )
                     .to_vec()
                 };
+                self.reduced_costs = if self.costs.is_empty() {
+                    vec![]
+                } else {
+                    std::slice::from_raw_parts(
+                        Clp_getReducedCost(self.model.as_ptr()),
+                        self.costs.len(),
+                    )
+                    .to_vec()
+                };
                 let tolerance = self.zero_tolerance;
                 if tolerance > 0. {
-                    for x in self.duals.iter_mut().chain(self.values.iter_mut()) {
+                    for x in self
+                        .duals
+                        .iter_mut()
+                        .chain(self.values.iter_mut())
+                        .chain(self.reduced_costs.iter_mut())
+                    {
                         if !(*x > tolerance || *x < -tolerance) {
                             *x = 0.;
                         }
@@ -253,48 +295,7 @@ impl ClpMaster {
     /// and retention ratio 0.66. The normalization divides by the SIGNED RHS
     /// when |rhs| > 1: a slack packing cut with rhs < -1 is retained.
     pub fn cleanup_cut_rows(&self, initial_rows: usize) -> Result<Vec<usize>> {
-        if initial_rows > self.rhs.len() || !self.solved {
-            return Err(invalid("cut cleanup requires a solved master and valid base rows"));
-        }
-        let count = self.rhs.len() - initial_rows;
-        if count <= 1 { return Ok(vec![]); }
-        let mut activity = vec![0.; self.rhs.len()];
-        for (column, &value) in self.values.iter().enumerate() {
-            if value == 0. { continue; }
-            for (row, coefficient) in self.column_entries(column)? {
-                activity[row] += coefficient * value;
-            }
-        }
-        let mut kept = 0;
-        let mut candidates = vec![];
-        for row in initial_rows..self.rhs.len() {
-            if !self.row_is_basic(row)? { kept += 1; continue; }
-            let rhs = self.rhs[row];
-            let mut slack = match self.senses[row] {
-                RowSense::LessEqual => rhs - activity[row],
-                RowSense::GreaterEqual => activity[row] - rhs,
-                RowSense::Equal => 0.,
-            };
-            if rhs.abs() > 1. { slack /= rhs; }
-            // VarConstr::violation(Double) snaps values in [-precision,precision].
-            if slack.abs() <= 1e-6 { slack = 0.; }
-            if slack < 0. { kept += 1; } else { candidates.push((row, slack)); }
-        }
-        let target = 1.min((count as f32 * 0.66_f32) as usize);
-        if target > kept {
-            // SortConstraintsByViolation: smaller normalized slack first, then
-            // creation order for Double comparisons equal within tolerance.
-            candidates.sort_by(|a,b| {
-                let tolerance = 1e-6 + a.1.abs().max(b.1.abs()) * 1e-10;
-                if a.1 < b.1 - tolerance { std::cmp::Ordering::Less }
-                else if b.1 < a.1 - tolerance { std::cmp::Ordering::Greater }
-                else { a.0.cmp(&b.0) }
-            });
-        }
-        let mut rows: Vec<_> = candidates.into_iter().skip(target.saturating_sub(kept))
-            .map(|(row,_)| row).collect();
-        rows.sort_unstable();
-        Ok(rows)
+        super::lp_master::cleanup_cut_rows(self, initial_rows)
     }
     /// Sparse column of the current matrix, sorted by row.
     pub fn column_entries(&self, column: usize) -> Result<Vec<(usize, f64)>> {
@@ -326,6 +327,7 @@ impl ClpMaster {
         let solved = self.solved;
         let duals = self.duals.clone();
         let values = self.values.clone();
+        let reduced_costs = self.reduced_costs.clone();
         let (rm, cm) = self.remove(rows, columns)?;
         if solved {
             self.duals = duals
@@ -334,6 +336,11 @@ impl ClpMaster {
                 .filter_map(|(x, m)| m.map(|_| x))
                 .collect();
             self.values = values
+                .into_iter()
+                .zip(&cm)
+                .filter_map(|(x, m)| m.map(|_| x))
+                .collect();
+            self.reduced_costs = reduced_costs
                 .into_iter()
                 .zip(&cm)
                 .filter_map(|(x, m)| m.map(|_| x))
@@ -409,6 +416,105 @@ impl Drop for ClpMaster {
         }
     }
 }
+
+// ── LpMaster trait implementation ─────────────────────────────────────
+
+impl LpMaster for ClpMaster {
+    fn add_row(
+        &mut self,
+        sense: RowSense,
+        rhs: f64,
+        entries: &[(usize, f64)],
+    ) -> Result<usize> {
+        Self::add_row(self, sense, rhs, entries)
+    }
+
+    fn add_column(&mut self, cost: f64, entries: &[(usize, f64)]) -> Result<usize> {
+        Self::add_column(self, cost, entries)
+    }
+
+    fn add_columns(
+        &mut self,
+        columns: &[(f64, &[(usize, f64)])],
+    ) -> Result<std::ops::Range<usize>> {
+        Self::add_columns(self, columns)
+    }
+
+    fn set_coefficient(&mut self, row: usize, column: usize, value: f64) -> Result<()> {
+        Self::set_coefficient(self, row, column, value)
+    }
+
+    fn set_cost(&mut self, column: usize, cost: f64) -> Result<()> {
+        Self::set_cost(self, column, cost)
+    }
+
+    fn set_upper(&mut self, column: usize, upper: f64) -> Result<()> {
+        Self::set_upper(self, column, upper)
+    }
+
+    fn set_tolerances(&mut self, primal: f64, dual: f64) -> Result<()> {
+        Self::set_tolerances(self, primal, dual)
+    }
+
+    fn solve(&mut self) -> bool {
+        Self::solve(self)
+    }
+
+    fn duals(&self) -> &[f64] {
+        &self.duals
+    }
+    fn values(&self) -> &[f64] {
+        &self.values
+    }
+    fn reduced_costs(&self) -> &[f64] {
+        &self.reduced_costs
+    }
+    fn objective(&self) -> f64 {
+        self.objective
+    }
+    fn status(&self) -> i32 {
+        self.status
+    }
+    fn solved(&self) -> bool {
+        self.solved
+    }
+    fn rhs(&self) -> &[f64] {
+        &self.rhs
+    }
+    fn senses(&self) -> &[RowSense] {
+        &self.senses
+    }
+    fn costs(&self) -> &[f64] {
+        &self.costs
+    }
+    fn upper(&self) -> &[f64] {
+        &self.upper
+    }
+    fn row_is_basic(&self, row: usize) -> Result<bool> {
+        Self::row_is_basic(self, row)
+    }
+    fn cleanup_cut_rows(&self, initial_rows: usize) -> Result<Vec<usize>> {
+        Self::cleanup_cut_rows(self, initial_rows)
+    }
+    fn column_entries(&self, column: usize) -> Result<Vec<(usize, f64)>> {
+        Self::column_entries(self, column)
+    }
+    fn remove(
+        &mut self,
+        rows: &[usize],
+        columns: &[usize],
+    ) -> Result<(Vec<Option<usize>>, Vec<Option<usize>>)> {
+        Self::remove(self, rows, columns)
+    }
+    fn remove_cuts(
+        &mut self,
+        rows: &[usize],
+        columns: &[usize],
+    ) -> Result<(Vec<Option<usize>>, Vec<Option<usize>>)> {
+        Self::remove_cuts(self, rows, columns)
+    }
+}
+
 fn entries_of(entries: &[(usize, f64)], size: usize) -> Result<(Vec<i32>, Vec<f64>)> {
     let mut accumulated = std::collections::BTreeMap::new();
     for &(id, value) in entries {

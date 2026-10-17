@@ -1,7 +1,11 @@
 //! Column generation with cut rounds and fixing/enumeration master
 //! transitions, from the C++ reference `master/ColumnGeneration.h`.
+//!
+//! Generic over any `LpMaster` backend (Clp, HiGHS).  The controller trait
+//! receives a mutable reference to the generic master so it can inspect
+//! primal/dual values and add columns.
+pub use super::lp_master::LpMaster;
 use super::{
-    clp::ClpMaster,
     stabilization::{DualPriceSmoothing, Feedback, Parameters},
     RowSense,
 };
@@ -9,6 +13,7 @@ use crate::pricing::phases::{self, Phase};
 use crate::{invalid, Result};
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
+
 #[derive(Clone, Debug)]
 pub struct Column {
     pub cost: f64,
@@ -18,6 +23,7 @@ pub struct Column {
     pub tag: i32,
     pub identity: String,
 }
+
 impl Column {
     fn signature(&self) -> String {
         if !self.identity.is_empty() {
@@ -32,6 +38,7 @@ impl Column {
         s
     }
 }
+
 #[derive(Clone, Debug)]
 pub struct Answer {
     pub columns: Vec<Column>,
@@ -39,6 +46,7 @@ pub struct Answer {
     pub exact: bool,
     pub bound_minimum: Option<f64>,
 }
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
     Optimal,
@@ -48,6 +56,7 @@ pub enum Status {
     TimeLimit,
     Stalled,
 }
+
 #[derive(Clone, Debug)]
 pub struct Iteration {
     pub iteration: usize,
@@ -63,6 +72,7 @@ pub struct Iteration {
     pub phase: usize,
     pub pricing_calls: usize,
 }
+
 #[derive(Clone, Debug)]
 pub struct Options {
     pub smoothing: Parameters,
@@ -88,7 +98,12 @@ pub struct Options {
     pub remove_basic_cuts: bool,
     /// Cost of the local artificials of separated rows.
     pub cut_artificial_cost: f64,
+    /// cleanupRestrictedMastColumns: with more generated columns than this
+    /// (0 disables), keep `column_cleanup_ratio` of them before pricing.
+    pub column_cleanup_threshold: f32,
+    pub column_cleanup_ratio: f32,
 }
+
 impl Default for Options {
     fn default() -> Self {
         Self {
@@ -111,9 +126,12 @@ impl Default for Options {
             tailing_off_counter: 3,
             remove_basic_cuts: false,
             cut_artificial_cost: 0.,
+            column_cleanup_threshold: 0.,
+            column_cleanup_ratio: 0.66,
         }
     }
 }
+
 #[derive(Clone, Debug)]
 pub struct Output {
     pub status: Status,
@@ -130,12 +148,12 @@ pub struct Output {
     pub pruned_by_bound: bool,
     pub cut_rounds: usize,
 }
-/// The controller owns incumbent tracking and the pricing route universe. It is
-/// called only after exact convergence, with the same raw master dual point.
-pub trait Controller {
+
+/// The controller owns incumbent tracking and the pricing route universe.
+pub trait Controller<M> {
     fn master_solved(
         &mut self,
-        _master: &ClpMaster,
+        _master: &M,
         _tags: &[i32],
         _artificials: &[usize],
     ) -> Result<()> {
@@ -160,12 +178,14 @@ pub trait Controller {
     }
     /// Adds a cut family once pricing has converged on an exact phase;
     /// returns how many rows were added (or changed). Zero ends the rounds.
-    fn separate(&mut self, _master: &mut ClpMaster, _tags: &[i32]) -> Result<usize> {
+    fn separate(&mut self, _master: &mut M, _tags: &[i32]) -> Result<usize> {
         Ok(0)
     }
 }
+
 pub struct NoController;
-impl Controller for NoController {}
+impl<M> Controller<M> for NoController {}
+
 pub fn gap_smaller_than_tolerance(dual: f64, primal: f64, absolute: f64, relative: f64) -> bool {
     let largest = dual.abs().max(primal.abs());
     if !(dual < primal - (largest * 1e-10 + 1e-6)) {
@@ -182,9 +202,10 @@ pub fn gap_smaller_than_tolerance(dual: f64, primal: f64, absolute: f64, relativ
     }
     (primal - dual) / primal.abs() <= relative
 }
-fn lagrangian(master: &ClpMaster, duals: &[f64], minimum: f64, multiplicity: f64) -> f64 {
+
+fn lagrangian<M: LpMaster>(master: &M, duals: &[f64], minimum: f64, multiplicity: f64) -> f64 {
     let mut value = 0.;
-    for (pi, rhs) in duals.iter().zip(&master.rhs) {
+    for (pi, rhs) in duals.iter().zip(master.rhs().iter()) {
         value += pi * rhs;
     }
     if minimum < 0. {
@@ -192,6 +213,7 @@ fn lagrangian(master: &ClpMaster, duals: &[f64], minimum: f64, multiplicity: f64
     }
     value
 }
+
 fn master_reduced_cost(column: &Column, duals: &[f64]) -> f64 {
     let mut value = column.cost;
     for &(r, a) in &column.entries {
@@ -201,8 +223,10 @@ fn master_reduced_cost(column: &Column, duals: &[f64]) -> f64 {
     }
     value
 }
-pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
-    master: &mut ClpMaster,
+
+/// Generic column generation loop that works with any `LpMaster` backend.
+pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller<M>>(
+    master: &mut M,
     supplied: &[Phase],
     mut price: P,
     controller: &mut C,
@@ -217,14 +241,14 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
     let mut smoothing = DualPriceSmoothing::new(options.smoothing.clone());
     let mut seen: HashSet<_> = options.known.iter().map(Column::signature).collect();
     let mut loaded: Vec<Option<Column>> = options.known.iter().cloned().map(Some).collect();
-    loaded.resize(master.costs.len(), None);
+    loaded.resize(master.costs().len(), None);
     let mut out = Output {
         status: Status::IterationLimit,
         lp: 0.,
         bound: f64::NEG_INFINITY,
         iterations: 0,
         pricing_calls: 0,
-        columns: master.costs.len(),
+        columns: master.costs().len(),
         history: vec![],
         column_tags: options.known.iter().map(|c| c.tag).collect(),
         inserted_tags: vec![],
@@ -233,16 +257,16 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
         pruned_by_bound: false,
         cut_rounds: 0,
     };
-    out.column_tags.resize(master.costs.len(), -1);
+    out.column_tags.resize(master.costs().len(), -1);
     if options.artificial_cost > 0. {
-        for r in 0..master.rhs.len() {
-            if master.senses[r] != RowSense::LessEqual {
+        for r in 0..master.rhs().len() {
+            if master.senses()[r] != RowSense::LessEqual {
                 out.artificials
                     .push(master.add_column(options.artificial_cost, &[(r, 1.)])?);
                 loaded.push(None);
                 out.column_tags.push(-1);
             }
-            if master.senses[r] != RowSense::GreaterEqual {
+            if master.senses()[r] != RowSense::GreaterEqual {
                 out.artificials
                     .push(master.add_column(options.artificial_cost, &[(r, -1.)])?);
                 loaded.push(None);
@@ -259,7 +283,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
     let mut tailing = 0;
     let mut lp_at_separation = 0.0f64;
     let mut separated_once = false;
-    let initial_rows = master.rhs.len();
+    let initial_rows = master.rhs().len();
     let mut cut_artificials: Vec<(usize, usize)> = vec![];
     for iteration in 1..=options.max_iterations {
         if started.elapsed() > options.time_limit {
@@ -267,7 +291,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
             return Ok(out);
         }
         if !master.solve() {
-            out.status = if master.status == 2 {
+            out.status = if master.status() == 2 {
                 Status::Unbounded
             } else {
                 Status::Infeasible
@@ -275,19 +299,19 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
             out.lp = if out.status == Status::Infeasible {
                 1e12
             } else {
-                master.objective
+                master.objective()
             };
             out.iterations = iteration;
             return Ok(out);
         }
-        out.lp = master.objective;
+        out.lp = master.objective();
         out.iterations = iteration;
-        let raw = master.duals.clone();
-        let positive = out.artificials.iter().any(|&i| master.values[i] > 1e-6);
+        let raw = master.duals().to_vec();
+        let positive = out.artificials.iter().any(|&i| master.values()[i] > 1e-6);
         controller.master_solved(master, &out.column_tags, &out.artificials)?;
         let gap = if out.bound.is_finite() { out.lp - out.bound } else { 0. };
         if options.stabilize {
-            smoothing.after_master(&raw, &master.senses, gap, 0, iteration == 1);
+            smoothing.after_master(&raw, master.senses(), gap, 0, iteration == 1);
         }
         // earlyCGtermType1 (ELF 0xdd560) uses the phase value for stage > 0
         // and the certified bound for stage zero, before another pricing call.
@@ -321,6 +345,26 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
             }
         }
         if !converged {
+            if options.column_cleanup_threshold > 0. {
+                let removed = cleanup_columns(master, &out.column_tags, &options);
+                if !removed.is_empty() {
+                    for &i in &removed {
+                        if let Some(column) = &loaded[i] {
+                            seen.remove(&column.signature());
+                        }
+                    }
+                    let (_, map) = master.remove_cuts(&[], &removed)?;
+                    loaded = loaded.into_iter().zip(&map).filter_map(|(c, m)| m.map(|_| c)).collect();
+                    out.column_tags =
+                        out.column_tags.iter().zip(&map).filter_map(|(&t, m)| m.map(|_| t)).collect();
+                    out.artificials = out.artificials.iter().filter_map(|&i| map[i]).collect();
+                    cut_artificials = cut_artificials
+                        .iter()
+                        .filter_map(|&(r, c)| Some((r, map[c]?)))
+                        .collect();
+                    controller.remap_columns(&map)?;
+                }
+            }
             let mut current = if options.stabilize {
                 smoothing.pricing.clone()
             } else {
@@ -356,7 +400,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
                 }
                 exact = answer.exact;
                 answer_phase = stage;
-                let mut gradient = master.rhs.clone();
+                let mut gradient = master.rhs().to_vec();
                 if let Some(best) = answer
                     .columns
                     .iter()
@@ -411,6 +455,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
                 stage_bound = -1e12;
                 round_penalty_updates = 0;
             }
+            let first = loaded.len();
             for batch in pending {
                 let mut identities = vec![];
                 for column in batch {
@@ -424,7 +469,6 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
                     if seen.contains(&identity) {
                         continue;
                     }
-                    master.add_column(column.cost, &column.entries)?;
                     out.column_tags.push(column.tag);
                     out.inserted_tags.push(column.tag);
                     loaded.push(Some(column));
@@ -433,8 +477,14 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
                 }
                 seen.extend(identities);
             }
+            // One master append for the round, in insertion order.
+            let added: Vec<(f64, &[(usize, f64)])> = loaded[first..]
+                .iter()
+                .map(|c| c.as_ref().map(|c| (c.cost, c.entries.as_slice())).unwrap())
+                .collect();
+            master.add_columns(&added)?;
         }
-        out.columns = master.costs.len();
+        out.columns = master.costs().len();
         out.history.push(Iteration {
             iteration,
             lp: out.lp,
@@ -465,7 +515,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
         }
         if penalties {
             for &id in &out.artificials {
-                master.set_cost(id, master.costs[id] * options.penalty_factor)?;
+                master.set_cost(id, master.costs()[id] * options.penalty_factor)?;
             }
             out.penalty_updates += 1;
             round_penalty_updates += 1;
@@ -485,7 +535,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
                         let column = loaded[i].as_ref().unwrap();
                         if allowed.contains(&column.signature()) {
                             let mut c = column.clone();
-                            c.cost = master.costs[i];
+                            c.cost = master.costs()[i];
                             c.entries = master.column_entries(i)?;
                             c.tag = out.column_tags[i];
                             regenerated.push(c);
@@ -520,7 +570,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
                         loaded.push(Some(column.clone()));
                     }
                     // eval restarts the phase walk whether or not the master changed.
-                    out.columns = master.costs.len();
+                    out.columns = master.costs().len();
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
                     stage = schedule.len() - 1;
                     stage_bound = -1e12;
@@ -565,22 +615,22 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
                         controller.remap_rows(&row_map)?;
                     }
                 }
-                if !master.solved && !master.solve() {
+                if !master.solved() && !master.solve() {
                     return Err(invalid("master could not restore its solution before separation"));
                 }
-                let previous_rows = master.rhs.len();
+                let previous_rows = master.rhs().len();
                 let added = controller.separate(master, &out.column_tags)?;
                 if added > 0 {
                     if options.cut_artificial_cost > 0. {
-                        for row in previous_rows..master.rhs.len() {
-                            if master.senses[row] != RowSense::LessEqual {
+                        for row in previous_rows..master.rhs().len() {
+                            if master.senses()[row] != RowSense::LessEqual {
                                 let c = master.add_column(options.cut_artificial_cost, &[(row, 1.)])?;
                                 out.artificials.push(c);
                                 out.column_tags.push(-1);
                                 loaded.push(None);
                                 cut_artificials.push((row, c));
                             }
-                            if master.senses[row] != RowSense::GreaterEqual {
+                            if master.senses()[row] != RowSense::GreaterEqual {
                                 let c = master.add_column(options.cut_artificial_cost, &[(row, -1.)])?;
                                 out.artificials.push(c);
                                 out.column_tags.push(-1);
@@ -595,7 +645,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
                     separated_once = true;
                     stage = schedule.len() - 1;
                     stage_bound = -1e12;
-                    out.columns = master.costs.len();
+                    out.columns = master.costs().len();
                     continue;
                 }
             }
@@ -618,4 +668,42 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
         }
     }
     Ok(out)
+}
+
+/// Alg4EvalByLagrangianDuality::cleanupRestrictedMastColumns (ELF 0xe0380),
+/// run before pricing. With N generated columns above the threshold, columns
+/// in the primal solution stay; the others are stably sorted by reduced cost
+/// (Double tolerance 1e-10 relative + 1e-6, creation order on ties) and only
+/// the first (int)(N * ratio) minus the solution columns are kept.
+fn cleanup_columns<M: LpMaster>(master: &M, tags: &[i32], options: &Options) -> Vec<usize> {
+    let threshold = options.column_cleanup_threshold as i32;
+    let generated: Vec<usize> = (0..tags.len()).filter(|&i| tags[i] >= 0).collect();
+    let count = generated.len() as i32;
+    if threshold >= count {
+        return vec![];
+    }
+    let (solution, mut candidates): (Vec<usize>, Vec<usize>) =
+        generated.into_iter().partition(|&i| master.values()[i] != 0.);
+    let in_solution = solution.len() as i32;
+    if candidates.len() as i32 + in_solution <= threshold {
+        return vec![];
+    }
+    let keep = (count as f32 * options.column_cleanup_ratio) as i32;
+    if in_solution >= keep {
+        return vec![];
+    }
+    let rc = master.reduced_costs();
+    crate::cuts::stdsort::stable_sort(&mut candidates, |&a, &b| {
+        let tolerance = rc[b].abs().max(rc[a].abs()) * 1e-10 + 1e-6;
+        if rc[b] - tolerance > rc[a] {
+            return true;
+        }
+        if rc[a] - tolerance > rc[b] {
+            return false;
+        }
+        a < b
+    });
+    let mut removed = candidates.split_off((keep - in_solution) as usize);
+    removed.sort_unstable();
+    removed
 }

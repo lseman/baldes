@@ -2,7 +2,7 @@ use baldes::master::root::RootOptions;
 use baldes::vrptw::{Instance, Rounding};
 const HELP: &str = "Usage: baldes <vrptw|cvrp> INSTANCE [OPTIONS]
 
-Instance types (Solomon-format input):
+Instance types (Solomon-format or CVRPLIB .vrp input):
   vrptw                 Vehicle routing with time windows
   cvrp                  Capacitated vehicle routing; ignores time windows and service times
 
@@ -10,6 +10,8 @@ Options:
   --customers N         Keep the first N customers
   --ng N                NG neighborhood size (default: 8)
   --reference-ng        Use reference-compatible customer neighborhoods
+  --rounding MODE       Distances: none, nearest, tenth or ceil (default: the
+                        file's convention; none for Solomon, nearest for EUC_2D)
   --rank1               Enable rank-one cuts
   --capacity-cuts        Enable capacity cuts (alias: --capacity)
   --no-stabilization    Disable dual stabilization
@@ -45,6 +47,7 @@ fn run() -> std::result::Result<(), String> {
     let mut options = RootOptions::default();
     let mut rank1 = false;
     let mut capacity = false;
+    let mut rounding = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" | "-h" => {
@@ -86,6 +89,11 @@ fn run() -> std::result::Result<(), String> {
             }
             "--no-stabilization" => options.cg.stabilize = false,
             "--no-enumeration" => options.enumerate = false,
+            "--rounding" => {
+                rounding = Some(
+                    Rounding::parse(&args.next().ok_or("missing rounding")?).map_err(|e| e.to_string())?,
+                )
+            }
             "--rank1" => rank1 = true,
             "--capacity" | "--capacity-cuts" => capacity = true,
             "--upper-bound" => {
@@ -111,11 +119,12 @@ fn run() -> std::result::Result<(), String> {
             instance.capacity,
         ));
     }
+    let rounding = rounding.unwrap_or(instance.rounding);
     let started = std::time::Instant::now();
     let mut graph = if kind == "cvrp" {
-        instance.capacity_graph(ng, Rounding::None)
+        instance.capacity_graph(ng, rounding)
     } else {
-        instance.graph(ng, Rounding::None)
+        instance.graph(ng, rounding)
     }
     .map_err(|e| e.to_string())?;
     let n = instance.customers.len() - 1;
@@ -128,8 +137,8 @@ fn run() -> std::result::Result<(), String> {
                 let mut ids: Vec<_> = (1..=n).collect();
                 ids.sort_by(|&a, &b| {
                     instance
-                        .distance(v, a, Rounding::None)
-                        .total_cmp(&instance.distance(v, b, Rounding::None))
+                        .distance(v, a, rounding)
+                        .total_cmp(&instance.distance(v, b, rounding))
                         .then(a.cmp(&b))
                 });
                 ids.truncate(ng);
@@ -180,23 +189,28 @@ fn run() -> std::result::Result<(), String> {
             && output.incumbent.is_finite()
             && bound > output.incumbent + (bound.abs().max(output.incumbent.abs()) * 1e-10 + 1e-6);
         let lp_value = if cut_off { 1e12 } else { output.master.lp };
+        // "columns" is BaPCod's bcCountCol: generated columns inserted over the
+        // run, including any later removed by the clean-ups. "master_columns" is
+        // the final master size, artificials included; "route_columns" the route
+        // columns still in it.
         let route_columns = output
             .master
             .column_tags
             .iter()
             .filter(|&&t| t >= 0)
             .count();
-        let json=format!("{{\"instance\":{:?},\"status\":\"{}\",\"lp\":{},\"cuts\":{},\"cut_rounds\":{},\"lp_before_cuts\":{},\"route_columns\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"incumbent\":{},\"bound\":{},\"iterations\":{},\"pricing_calls\":{},\"columns\":{},\"seconds\":{},\"pricing_seconds\":{},\"master_seconds\":{},\"history\":[{}],\"routes\":[{}]}}\n",instance.name,if cut_off {"Cutoff".to_string()} else {format!("{:?}",output.master.status)},number(lp_value),output.cuts,output.master.cut_rounds,number(output.lp_before_cuts),route_columns,output.fixing_calls,output.enumerated_routes,number(output.incumbent),number(output.master.bound),output.master.iterations,output.master.pricing_calls,output.master.columns,seconds,output.pricing_seconds,output.solver_seconds-output.pricing_seconds,history.join(","),routes.join(","));
+        let json=format!("{{\"instance\":{:?},\"status\":\"{}\",\"lp\":{},\"cuts\":{},\"cut_rounds\":{},\"lp_before_cuts\":{},\"route_columns\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"incumbent\":{},\"bound\":{},\"iterations\":{},\"pricing_calls\":{},\"columns\":{},\"master_columns\":{},\"seconds\":{},\"pricing_seconds\":{},\"master_seconds\":{},\"history\":[{}],\"routes\":[{}]}}\n",instance.name,if cut_off {"Cutoff".to_string()} else {format!("{:?}",output.master.status)},number(lp_value),output.cuts,output.master.cut_rounds,number(output.lp_before_cuts),route_columns,output.fixing_calls,output.enumerated_routes,number(output.incumbent),number(output.master.bound),output.master.iterations,output.master.pricing_calls,output.master.inserted_tags.len(),output.master.columns,seconds,output.pricing_seconds,output.solver_seconds-output.pricing_seconds,history.join(","),routes.join(","));
         std::fs::write(path, json).map_err(|e| e.to_string())?;
     }
     println!(
-        "instance={} status={:?} lp={:.12} bound={:.12} solves={} pricing_calls={} columns={} cuts={} cut_rounds={}",
+        "instance={} status={:?} lp={:.12} bound={:.12} solves={} pricing_calls={} columns={} master_columns={} cuts={} cut_rounds={}",
         instance.name,
         output.master.status,
         output.master.lp,
         output.master.bound,
         output.master.iterations,
         output.master.pricing_calls,
+        output.master.inserted_tags.len(),
         output.master.columns,
         output.cuts,
         output.master.cut_rounds
