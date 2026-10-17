@@ -515,9 +515,11 @@ impl Controller for RootController {
                 });
             }
         }
+        // BaPCod separates every cut class whose priority is at or above the
+        // current level, so capacity cuts (priority 3) are still separated, before
+        // the rank-one cuts, once the level has dropped to rank-one (priority 1).
         let mut capacity_added = 0;
-        let capacity_active = !state.cut.capacity_level_finished;
-        if let Some(separator) = state.cut.capacity_separator.as_mut().filter(|_| capacity_active) {
+        if let Some(separator) = state.cut.capacity_separator.as_mut() {
             let columns: Vec<_> = fractional.iter().map(|c| (c.vertices.clone(), c.value)).collect();
             for cut in separator.separate(&columns)? {
                 let entries: Vec<_> = tagged.iter().filter_map(|&(column, tag)| {
@@ -538,7 +540,7 @@ impl Controller for RootController {
             }
         }
         // Capacity cuts have root priority 3; rank-one cuts have priority 1.
-        if capacity_added > 0 || !state.cut.options.enabled {
+        if !state.cut.capacity_level_finished && (capacity_added > 0 || !state.cut.options.enabled) {
             if capacity_added > 0 { state.cut.rounds += 1; }
             return Ok(capacity_added);
         }
@@ -590,7 +592,7 @@ impl Controller for RootController {
                 master.set_coefficient(row, column, c as f64)?;
             }
         }
-        let added = after - before;
+        let added = after - before + capacity_added;
         if added > 0 || changed {
             state.cut.rounds += 1;
         }
@@ -609,7 +611,9 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
     let solve_started = std::time::Instant::now();
     problem.graph.validate()?;
     let mut master = ClpMaster::new()?;
-    master.set_tolerances(1e-9, 1e-9)?;
+    // BaPCod leaves Clp's default 1e-7 primal and dual tolerances in place.
+    master.set_tolerances(1e-7, 1e-7)?;
+    master.zero_tolerance = 1e-7;
     for row in &problem.rows {
         master.add_row(row.sense, row.rhs, &[])?;
     }
