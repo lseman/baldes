@@ -123,11 +123,23 @@ struct Candidate {
     bounds: [f64; 2],
 }
 fn restricted_value(
+    parent: Option<&Rc<root::NodeSnapshot>>,
     problem: &RootProblem,
     branches: &[Branch],
     pool: &Pool,
     options: &TreeOptions,
 ) -> Result<f64> {
+    let penalty = options.root.cg.artificial_cost;
+    if let Some(parent) = parent {
+        let depth = parent.branch_depth();
+        if depth <= branches.len() {
+            let delta: Vec<_> = branches[depth..]
+                .iter()
+                .map(|b| (b.arc, b.sense, b.rhs))
+                .collect();
+            return Ok(parent.restricted_value(&delta, penalty)?.0);
+        }
+    }
     let child = branch_problem(problem, branches);
     let mut master = ClpMaster::new()?;
     master.set_tolerances(1e-7, 1e-7)?;
@@ -149,7 +161,6 @@ fn restricted_value(
             &entries.into_iter().collect::<Vec<_>>(),
         )?;
     }
-    let penalty = options.root.cg.artificial_cost;
     for (r, row) in child.rows.iter().enumerate() {
         if row.sense != RowSense::LessEqual {
             master.add_column(penalty, &[(r, 1.)])?;
@@ -167,6 +178,7 @@ fn restricted_value(
 /// Return a chosen candidate and its certified child bounds. Restricted LP
 /// objectives and heuristic pricing values affect scores only.
 pub(super) fn choose(
+    parent: Option<&Rc<root::NodeSnapshot>>,
     problem: &RootProblem,
     node: &Node,
     flows: &BTreeMap<usize, f64>,
@@ -220,10 +232,10 @@ pub(super) fn choose(
                 });
                 output.strong_branching_trials += 1;
                 if phase.restricted_master_only {
-                    estimates[side] = restricted_value(problem, &branches, pool, options)?;
+                    estimates[side] = restricted_value(parent, problem, &branches, pool, options)?;
                 } else {
                     let result = evaluate(
-                        node.parent.as_ref(),
+                        parent,
                         problem,
                         &branches,
                         pool,
@@ -232,6 +244,7 @@ pub(super) fn choose(
                         end.min(Instant::now() + config.trial_time_limit),
                         phase.max_iterations,
                         phase.pricing_phase_floor,
+                        false,
                     );
                     match result {
                         Ok(result) => {

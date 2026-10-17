@@ -8,7 +8,7 @@
 //! use isolated node evaluations via fork-and-carry.
 use super::{
     column_generation::Status,
-    root::{self, RootOptions, RootProblem, Row},
+    root::{self, RootOptions, RootProblem},
     RowSense,
 };
 use std::rc::Rc;
@@ -306,8 +306,10 @@ fn evaluate(
     deadline: Instant,
     max_iterations: usize,
     floor: usize,
+    capture_state: bool,
 ) -> Result<root::RootOutput> {
     let mut controls = options.root.clone();
+    controls.capture_state = capture_state;
     controls.node_depth = branches.len();
     controls.pricing_phase_floor = floor;
     controls.cg.max_iterations = max_iterations;
@@ -331,9 +333,16 @@ fn evaluate(
             .pricing_options
             .push(("RCSPhardTimeThresholdInPricing".into(), remaining));
     }
-    let branches_tuple: Vec<_> = branches.iter().map(|b| (b.arc, b.sense, b.rhs)).collect();
     if let Some(parent) = parent {
-        root::inherit(parent, &branches_tuple, controls)
+        let depth = parent.branch_depth();
+        if depth > branches.len() {
+            return Err(invalid("parent branch depth exceeds child branches"));
+        }
+        let delta: Vec<_> = branches[depth..]
+            .iter()
+            .map(|b| (b.arc, b.sense, b.rhs))
+            .collect();
+        root::inherit(parent, &delta, controls)
     } else {
         root::solve(branch_problem(problem, branches), controls)
     }
@@ -462,6 +471,7 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
             deadline,
             options.root.cg.max_iterations,
             0,
+            true,
         ) {
             Ok(result) => result,
             Err(error) if budget_error(&error) => {
@@ -517,7 +527,7 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
                 *flows.entry(problem.arc_position(id).unwrap()).or_default() += value;
             }
         }
-        // Capture parent snapshot before moving result into diving.
+        // Capture this node's solved snapshot before moving result into diving.
         let parent_snapshot = result.snapshot.clone();
         diving::run(
             &problem,
@@ -532,6 +542,7 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
             continue;
         }
         let branch = strong::choose(
+            parent_snapshot.as_ref(),
             &problem,
             &node,
             &flows,

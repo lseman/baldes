@@ -159,6 +159,7 @@ pub struct Output {
     pub penalty_updates: usize,
     pub pruned_by_bound: bool,
     pub cut_rounds: usize,
+    pub warm_start: WarmStart,
 }
 
 /// The controller owns incumbent tracking and the pricing route universe.
@@ -285,6 +286,12 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
         penalty_updates: 0,
         pruned_by_bound: false,
         cut_rounds: 0,
+        warm_start: WarmStart {
+            columns: vec![],
+            artificials: vec![],
+            cut_artificials: vec![],
+            initial_rows: 0,
+        },
     };
     out.column_tags.resize(master.costs().len(), -1);
     if options.artificial_cost > 0. && options.warm_start.is_none() {
@@ -315,10 +322,19 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
     let initial_rows = options.warm_start.as_ref().map_or(master.rhs().len(), |w| w.initial_rows);
     let mut cut_artificials: Vec<(usize, usize)> = options.warm_start.as_ref()
         .map_or_else(Vec::new, |w| w.cut_artificials.clone());
+    let finish = |mut out: Output, loaded: Vec<Option<Column>>, cut_artificials: Vec<(usize, usize)>| {
+        out.warm_start = WarmStart {
+            columns: loaded,
+            artificials: out.artificials.clone(),
+            cut_artificials,
+            initial_rows,
+        };
+        Ok(out)
+    };
     for iteration in 1..=options.max_iterations {
         if started.elapsed() > options.time_limit {
             out.status = Status::TimeLimit;
-            return Ok(out);
+            return finish(out, loaded, cut_artificials);
         }
         if !master.solve() {
             out.status = if master.status() == 2 {
@@ -332,7 +348,7 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                 master.objective()
             };
             out.iterations = iteration;
-            return Ok(out);
+            return finish(out, loaded, cut_artificials);
         }
         out.lp = master.objective();
         out.iterations = iteration;
@@ -541,7 +557,7 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
         {
             out.status = Status::Optimal;
             out.pruned_by_bound = true;
-            return Ok(out);
+            return finish(out, loaded, cut_artificials);
         }
         if penalties {
             for &id in &out.artificials {
@@ -703,17 +719,17 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
             if positive {
                 out.lp = 1e12;
             }
-            return Ok(out);
+            return finish(out, loaded, cut_artificials);
         }
         if advanced {
             continue;
         }
         if fresh == 0 {
             out.status = Status::Stalled;
-            return Ok(out);
+            return finish(out, loaded, cut_artificials);
         }
     }
-    Ok(out)
+    finish(out, loaded, cut_artificials)
 }
 
 /// Alg4EvalByLagrangianDuality::cleanupRestrictedMastColumns ,

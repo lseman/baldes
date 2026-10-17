@@ -197,3 +197,77 @@ fn heuristic_pricing_trial_never_certifies_a_bound() {
     assert!(!out.master.bound.is_finite(), "{out:?}");
     assert!(!out.master.pruned_by_bound);
 }
+
+#[test]
+fn fork_and_carry_inherits_cuts_basis_and_protects_branch_rows() {
+    use baldes::master::{
+        root::{self, CapacityCutConfig},
+        tree::{DivingOptions, StrongBranchingOptions},
+        RowSense,
+    };
+    let mut text = String::from(
+        "five\nVEHICLE\nNUMBER CAPACITY\n5 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000 0\n",
+    );
+    for i in 1..=5 {
+        text.push_str(&format!("{i} {} {} 1 0 1000 0\n", (i * 7) % 11, (i * 3) % 13));
+    }
+    let instance = Instance::parse(&text).unwrap();
+    let problem =
+        RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 5.).unwrap();
+    let demands: Vec<f64> = instance.customers.iter().map(|c| c.demand).collect();
+    let mut root_opts = RootOptions::default()
+        .with_capacity_cuts(CapacityCutConfig::new(demands, instance.capacity))
+        .with_rank_one_cuts();
+    root_opts.capture_state = true;
+    root_opts.cg.stabilize = false;
+    root_opts.enumerate = false;
+
+    let parent_out = root::solve(problem.clone(), root_opts.clone()).unwrap();
+    let snapshot = parent_out
+        .snapshot
+        .as_ref()
+        .expect("root::solve must capture NodeSnapshot");
+    assert_eq!(snapshot.branch_depth(), 0);
+    assert!(
+        snapshot.active_cuts() > 0,
+        "expected active cuts at root, got {snapshot:?}"
+    );
+
+    // Pick a fractional customer-to-customer arc from the root solution to branch on.
+    let mut branch_arc = 0;
+    for (index, arc) in problem.graph.arcs.iter().enumerate() {
+        if arc.tail >= 1 && arc.head >= 1 {
+            branch_arc = index;
+            break;
+        }
+    }
+    let delta = [(branch_arc, RowSense::LessEqual, 0.)];
+    let child_down = root::inherit(snapshot, &delta, root_opts.clone()).unwrap();
+    assert_eq!(child_down.inherited_cuts, snapshot.active_cuts());
+    let child_snap = child_down
+        .snapshot
+        .as_ref()
+        .expect("root::inherit must capture child NodeSnapshot");
+    assert_eq!(child_snap.branch_depth(), 1);
+
+    // Fork a grandchild with a second branch delta to verify incremental delta slicing
+    // and branch-row protection across cut cleanup rounds.
+    let second_arc = (branch_arc + 1) % problem.graph.arcs.len();
+    let grandchild_delta = [(second_arc, RowSense::LessEqual, 0.)];
+    let grandchild = root::inherit(child_snap, &grandchild_delta, root_opts.clone()).unwrap();
+    assert_eq!(
+        grandchild.snapshot.as_ref().unwrap().branch_depth(),
+        2,
+        "grandchild must have exactly 2 branch rows"
+    );
+
+    // Verify full tree solve with cuts + strong branching + diving agrees with exact optimum.
+    let exact = exhaustive(&instance);
+    let mut controls = options();
+    controls.root = root_opts;
+    controls.strong_branching = Some(StrongBranchingOptions::default());
+    controls.diving = Some(DivingOptions::default());
+    let tree_out = tree::solve(problem, controls).unwrap();
+    assert_eq!(tree_out.status, TreeStatus::Optimal, "{tree_out:?}");
+    assert!((tree_out.incumbent - exact).abs() < 1e-5, "{tree_out:?}");
+}

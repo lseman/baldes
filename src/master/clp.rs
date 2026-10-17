@@ -77,6 +77,7 @@ impl ClpMaster {
         // an independently owned Clp wrapper, released by this type's Drop.
         let model = NonNull::new(unsafe { baldes_clp_clone(self.model.as_ptr()) })
             .ok_or_else(|| incomplete("Clp model copy failed"))?;
+        unsafe { Clp_setLogLevel(model.as_ptr(), 0) };
         Ok(Self { model, rhs:self.rhs.clone(), senses:self.senses.clone(), costs:self.costs.clone(),
             upper:self.upper.clone(), duals:self.duals.clone(), values:self.values.clone(),
             reduced_costs:self.reduced_costs.clone(), objective:self.objective, status:self.status,

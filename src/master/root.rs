@@ -994,8 +994,10 @@ fn solve_seeded(problem: RootProblem, mut options: RootOptions,
         problem: problem.clone(),
         state: state.clone(),
     };
-    let initial_rows=options.cg.warm_start.as_ref().map_or(problem.rows.len(),|w|w.initial_rows);
-    let output = column_generation::optimize::<ClpMaster, _, _>(
+    let initial_rows = options.cg.warm_start.as_ref().map_or(problem.rows.len(), |w| w.initial_rows);
+    let capture_state = options.capture_state;
+    let inherited_cuts = saved.map_or(0, |s| s.active_cuts());
+    let mut output = column_generation::optimize::<ClpMaster, _, _>(
         &mut master,
         &schedule,
         |phase, duals| {
@@ -1053,32 +1055,26 @@ fn solve_seeded(problem: RootProblem, mut options: RootOptions,
         &mut controller,
         options.cg,
     )?;
+    output.warm_start.initial_rows = initial_rows;
     let state = state.borrow();
-    // Extract values/duals before potentially moving master into snapshot.
+    // Extract values, duals and simplex iterations before moving master into snapshot.
     let values = master.values().to_vec();
     let duals = master.duals().to_vec();
-    let inherited_cuts = saved.map_or(0, |s| {
-        s.cut.rows.iter().filter(|r| r.is_some()).count()
-            + s.cut.capacity_rows.iter().filter(|r| r.is_some()).count()
+    let simplex_iterations = master.simplex_iterations;
+    let snapshot = capture_state.then(|| {
+        Rc::new(NodeSnapshot {
+            master,
+            problem: (*problem).clone(),
+            cut: state.cut.clone(),
+            registry: state.solver.cuts.clone(),
+            pricing_graph: state.solver.graph.clone(),
+            routes: state.routes.clone(),
+            warm: output.warm_start.clone(),
+        })
     });
-    let snapshot = saved.map(|saved| Rc::new(NodeSnapshot {
-        master,
-        problem: saved.problem.clone(),
-        cut: saved.cut.clone(),
-        registry: saved.registry.clone(),
-        pricing_graph: saved.pricing_graph.clone(),
-        routes: state.routes.clone(),
-        warm: column_generation::WarmStart {
-            columns: vec![],
-            artificials: vec![],
-            cut_artificials: vec![],
-            initial_rows: 0,
-        },
-    }));
     Ok(RootOutput {
         snapshot,
-        #[allow(deprecated)]
-        simplex_iterations: 0,
+        simplex_iterations,
         inherited_cuts,
         master: output,
         routes: state.routes.clone(),

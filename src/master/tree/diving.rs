@@ -152,7 +152,7 @@ pub(super) fn run(
             }
             output.diving_nodes += 1;
             match evaluate(
-                node.parent.as_ref(),
+                dive.result.snapshot.as_ref(),
                 problem,
                 &branches,
                 pool,
@@ -161,6 +161,7 @@ pub(super) fn run(
                 end,
                 config.max_iterations,
                 0,
+                dive.depth + 1 < config.max_depth,
             ) {
                 Ok(result) => {
                     output.pricing_calls += result.master.pricing_calls;
