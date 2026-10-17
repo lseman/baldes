@@ -12,6 +12,10 @@ pub trait LpMaster: Sized + 'static {
     /// Add a constraint row to the master problem.
     fn add_row(&mut self, sense: RowSense, rhs: f64, entries: &[(usize, f64)]) -> Result<usize>;
 
+    /// Add several constraint rows in one call, in order. Returns their
+    /// index range. Must leave the model as adding them one by one would.
+    fn add_rows(&mut self, rows: &[(RowSense, f64, &[(usize, f64)])]) -> Result<std::ops::Range<usize>>;
+
     /// Add a single variable (column).
     fn add_column(&mut self, cost: f64, entries: &[(usize, f64)]) -> Result<usize>;
 

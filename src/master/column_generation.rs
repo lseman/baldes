@@ -626,6 +626,29 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                 }
                 let previous_rows = master.rhs().len();
                 let added = controller.separate(master, &out.column_tags)?;
+                // the solver adds the cut artificials in one call, then deletes
+                // the columns a strengthened relaxation forbids.
+                if added > 0 && options.cut_artificial_cost > 0. {
+                    let mut artificials: Vec<(usize, f64)> = vec![];
+                    for row in previous_rows..master.rhs().len() {
+                        if master.senses()[row] != RowSense::LessEqual {
+                            artificials.push((row, 1.));
+                        }
+                        if master.senses()[row] != RowSense::GreaterEqual {
+                            artificials.push((row, -1.));
+                        }
+                    }
+                    let entries: Vec<[(usize, f64); 1]> = artificials.iter().map(|&e| [e]).collect();
+                    let batch: Vec<_> =
+                        entries.iter().map(|e| (options.cut_artificial_cost, e.as_slice())).collect();
+                    let columns = master.add_columns(&batch)?;
+                    for (c, &(row, _)) in columns.zip(&artificials) {
+                        out.artificials.push(c);
+                        out.column_tags.push(-1);
+                        loaded.push(None);
+                        cut_artificials.push((row, c));
+                    }
+                }
                 let removed = controller.take_removed_columns();
                 if !removed.is_empty() {
                     let (_, map) = master.remove_cuts(&[], &removed)?;
@@ -636,24 +659,6 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                     controller.remap_columns(&map)?;
                 }
                 if added > 0 {
-                    if options.cut_artificial_cost > 0. {
-                        for row in previous_rows..master.rhs().len() {
-                            if master.senses()[row] != RowSense::LessEqual {
-                                let c = master.add_column(options.cut_artificial_cost, &[(row, 1.)])?;
-                                out.artificials.push(c);
-                                out.column_tags.push(-1);
-                                loaded.push(None);
-                                cut_artificials.push((row, c));
-                            }
-                            if master.senses()[row] != RowSense::GreaterEqual {
-                                let c = master.add_column(options.cut_artificial_cost, &[(row, -1.)])?;
-                                out.artificials.push(c);
-                                out.column_tags.push(-1);
-                                loaded.push(None);
-                                cut_artificials.push((row, c));
-                            }
-                        }
-                    }
                     out.cut_rounds += 1;
                     round_penalty_updates = 0;
                     smoothing.restart_schedule((schedule.len() - 1) as i32);

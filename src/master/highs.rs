@@ -192,6 +192,14 @@ impl LpMaster for HighsMaster {
         Ok(id)
     }
 
+    fn add_rows(&mut self, rows: &[(RowSense, f64, &[(usize, f64)])]) -> Result<std::ops::Range<usize>> {
+        let first = self.rhs.len();
+        for &(sense, rhs, entries) in rows {
+            self.add_row(sense, rhs, entries)?;
+        }
+        Ok(first..self.rhs.len())
+    }
+
     fn add_column(&mut self, cost: f64, entries: &[(usize, f64)]) -> Result<usize> {
         Ok(self.add_columns(&[(cost, entries)])?.start)
     }
