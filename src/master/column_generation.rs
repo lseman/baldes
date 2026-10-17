@@ -181,6 +181,12 @@ pub trait Controller<M> {
     fn separate(&mut self, _master: &mut M, _tags: &[i32]) -> Result<usize> {
         Ok(0)
     }
+    /// Master columns to delete after `separate`, ascending: columns that a
+    /// strengthened pricing relaxation no longer allows
+    /// (removeColumnsNotSatisfyingColGenSpRelaxation).
+    fn take_removed_columns(&mut self) -> Vec<usize> {
+        vec![]
+    }
 }
 
 pub struct NoController;
@@ -620,6 +626,15 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                 }
                 let previous_rows = master.rhs().len();
                 let added = controller.separate(master, &out.column_tags)?;
+                let removed = controller.take_removed_columns();
+                if !removed.is_empty() {
+                    let (_, map) = master.remove_cuts(&[], &removed)?;
+                    loaded = loaded.into_iter().zip(&map).filter_map(|(c, m)| m.map(|_| c)).collect();
+                    out.column_tags = out.column_tags.iter().zip(&map).filter_map(|(&t, m)| m.map(|_| t)).collect();
+                    out.artificials = out.artificials.iter().filter_map(|&i| map[i]).collect();
+                    cut_artificials = cut_artificials.iter().filter_map(|&(r, c)| Some((r, map[c]?))).collect();
+                    controller.remap_columns(&map)?;
+                }
                 if added > 0 {
                     if options.cut_artificial_cost > 0. {
                         for row in previous_rows..master.rhs().len() {

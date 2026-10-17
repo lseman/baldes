@@ -18,6 +18,10 @@ Options:
   --no-stabilization    Disable dual stabilization
   --no-enumeration      Disable reduced-cost fixing and enumeration
   --upper-bound X       Initial incumbent
+  --dynamic-ng P        Strengthen NG memories from master cycles at separator
+                        priority P (capacity cuts 3, rank-one 1); see
+                        RCSPdynamicNGmode and RCSPmaxNGneighbourhoodSize
+  --option NAME=VALUE   Set an RCSP pricing option (repeatable)
   --iterations N        Master iteration limit
   --time SECONDS        Time limit (BOTH vrptw/cvrp and hgs)
   --json FILE           Write results as JSON (BOTH vrptw/cvrp and hgs)
@@ -96,6 +100,19 @@ fn run() -> std::result::Result<(), String> {
                 .map_err(|e| e.to_string())?
             }
             "--no-stabilization" => options.cg.stabilize = false,
+            "--dynamic-ng" => {
+                options.relaxation_improvement_priority = args
+                    .next()
+                    .ok_or("missing dynamic NG priority")?
+                    .parse()
+                    .map_err(|e: std::num::ParseFloatError| e.to_string())?
+            }
+            "--option" => {
+                let setting = args.next().ok_or("missing NAME=VALUE")?;
+                let (name, value) = setting.split_once('=').ok_or("option must be NAME=VALUE")?;
+                let value = value.parse().map_err(|e: std::num::ParseFloatError| e.to_string())?;
+                options.pricing_options.push((name.to_string(), value));
+            }
             "--no-enumeration" => options.enumerate = false,
             "--rounding" => {
                 rounding = Some(

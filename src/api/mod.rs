@@ -840,35 +840,7 @@ pub unsafe extern "C" fn or_rcsp_route_satisfies_relaxation(
         let s = unsafe { solver(p.cast_mut())? };
         let vertices = unsafe { input(vertices, count(nv)?)? };
         let arcs = unsafe { input(arcs, count(na)?)? };
-        if vertices.len() != arcs.len() + 1 {
-            return Err(invalid("route node/arc dimensions"));
-        }
-        let ng = crate::graph::ng::PreparedNg::new(&s.graph)?;
-        let Some(&first) = vertices.first() else {
-            return Ok(0);
-        };
-        let first = count(first)?;
-        let mut bits = *ng
-            .vertex_bits
-            .get(first)
-            .ok_or_else(|| invalid("route vertex out of range"))?;
-        for (i, &id) in arcs.iter().enumerate() {
-            let a = s
-                .graph
-                .arcs
-                .iter()
-                .position(|a| a.id == id)
-                .ok_or_else(|| invalid("route arc out of range"))?;
-            let arc = &s.graph.arcs[a];
-            if vertices[i] != arc.tail as i32 || vertices[i + 1] != arc.head as i32 {
-                return Ok(0);
-            }
-            let Some(next) = ng.forward[a].extend(bits, ng.vertex_bits[arc.head]) else {
-                return Ok(0);
-            };
-            bits = next;
-        }
-        Ok(1)
+        Ok(s.route_satisfies_relaxation(vertices, arcs)? as i32)
     })
 }
 #[no_mangle]

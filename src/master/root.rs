@@ -179,6 +179,12 @@ pub struct RootOptions {
     pub round_reduced_costs: bool,
     pub cuts: CutOptions,
     pub capacity_cuts: Option<CapacityCutConfig>,
+    /// ColGenSpRelaxationImprovementPriority: separator priority of dynamic
+    /// NG strengthening (0 disables it, BaPCod's default). Its mode and caps
+    /// are the pricing options RCSPdynamicNGmode, RCSPmaxNGneighbourhoodSize,
+    /// RCSPmaxNGaverNeighbourhoodSize, RCSPmaxNumOfColumnsInDynamicNG and
+    /// RCSPmaxCycleSizeInDynamicNG.
+    pub relaxation_improvement_priority: f32,
 }
 impl Default for RootOptions {
     fn default() -> Self {
@@ -196,6 +202,7 @@ impl Default for RootOptions {
             round_reduced_costs: true,
             cuts: CutOptions::default(),
             capacity_cuts: None,
+            relaxation_improvement_priority: 0.,
         }
     }
 }
@@ -252,7 +259,48 @@ struct CutState {
     capacity_cuts: Vec<CapacityCut>,
     capacity_rows: Vec<Option<usize>>,
     capacity_arc_entries: Vec<Vec<(usize, f64)>>,
-    capacity_level_finished: bool,
+    /// Current separator priority level: separators at or above it run
+    /// every round, lower ones only while nothing at a higher one succeeds.
+    level: f64,
+    /// Dynamic NG priority, 0 when disabled.
+    relaxation_priority: f64,
+    /// Master columns to delete after a relaxation strengthening.
+    removed_columns: Vec<usize>,
+}
+/// Root separator priorities: capacity cuts, then rank-one cuts.
+const CAPACITY_PRIORITY: f64 = 3.;
+const RANK_ONE_PRIORITY: f64 = 1.;
+#[derive(Clone, Copy, PartialEq)]
+enum Separator {
+    Capacity,
+    RankOne,
+    Relaxation,
+}
+impl CutState {
+    /// Installed separators by decreasing priority. On a tie the relaxation
+    /// improvement, which has no name, sorts after the cut families.
+    fn separators(&self) -> Vec<(f64, Separator)> {
+        let mut list = vec![];
+        if self.capacity_separator.is_some() {
+            list.push((CAPACITY_PRIORITY, Separator::Capacity));
+        }
+        if self.options.enabled {
+            list.push((RANK_ONE_PRIORITY, Separator::RankOne));
+        }
+        if self.relaxation_priority > 0. {
+            list.push((self.relaxation_priority, Separator::Relaxation));
+        }
+        list.sort_by(|a, b| b.0.total_cmp(&a.0).then((a.1 == Separator::Relaxation).cmp(&(b.1 == Separator::Relaxation))));
+        list
+    }
+    /// Whether rank-one cuts are at or above the current level.
+    fn rank_one_active(&self) -> bool {
+        self.options.enabled && self.level <= RANK_ONE_PRIORITY
+    }
+    /// The next lower priority level, if any.
+    fn next_level(&self) -> Option<f64> {
+        self.separators().into_iter().map(|(p, _)| p).find(|&p| p < self.level)
+    }
 }
 struct State {
     solver: Solver,
@@ -471,8 +519,7 @@ impl<M: LpMaster> Controller<M> for RootController {
         Ok(())
     }
     fn separates(&self) -> bool {
-        let state = self.state.borrow();
-        state.cut.options.enabled || state.cut.capacity_separator.is_some()
+        !self.state.borrow().cut.separators().is_empty()
     }
     fn separate(&mut self, master: &mut M, tags: &[i32]) -> Result<usize> {
         let mut state = self.state.borrow_mut();
@@ -493,8 +540,7 @@ impl<M: LpMaster> Controller<M> for RootController {
             let tenth = (0.1 * previous.abs()).max(1e-9);
             let denominator = if gap - (gap.abs().max(tenth) * 1e-10 + 1e-6) > tenth { tenth } else { gap };
             let gain = (value - previous) / denominator;
-            let rank_active = state.cut.options.enabled &&
-                (state.cut.capacity_separator.is_none() || state.cut.capacity_level_finished);
+            let rank_active = state.cut.rank_one_active();
             let min_rounds = state.cut.options.min_rounds_before_stop_by_sp;
             if rank_active && stop && state.cut.rounds >= min_rounds {
                 return Ok(0);
@@ -508,11 +554,16 @@ impl<M: LpMaster> Controller<M> for RootController {
                 } else {
                     state.cut.tailing += 1;
                 }
+                // Tailing off at a level moves to the next lower priority, and
+                // stops cut generation at the lowest one.
                 if state.cut.tailing >= state.cut.options.tailing_off_counter && state.cut.rounds >= min_rounds {
-                    if !rank_active && state.cut.options.enabled {
-                        state.cut.capacity_level_finished = true;
-                        state.cut.tailing = 0;
-                    } else { return Ok(0); }
+                    match state.cut.next_level() {
+                        Some(level) => {
+                            state.cut.level = level;
+                            state.cut.tailing = 0;
+                        }
+                        None => return Ok(0),
+                    }
                 }
             }
         }
@@ -544,46 +595,87 @@ impl<M: LpMaster> Controller<M> for RootController {
                 });
             }
         }
-        // BaPCod separates every cut class whose priority is at or above the
-        // current level, so capacity cuts (priority 3) are still separated, before
-        // the rank-one cuts, once the level has dropped to rank-one (priority 1).
-        let mut capacity_added = 0;
-        if let Some(separator) = state.cut.capacity_separator.as_mut() {
-            let columns: Vec<_> = fractional.iter().map(|c| (c.vertices.clone(), c.value)).collect();
-            for cut in separator.separate(&columns)? {
-                let entries: Vec<_> = tagged.iter().filter_map(|&(column, tag)| {
-                    let coefficient = cut.coefficient(&State::customers(&state.routes[tag]));
-                    (coefficient != 0).then_some((column, coefficient as f64))
-                }).collect();
-                let sense = if cut.greater_equal() { RowSense::GreaterEqual } else { RowSense::LessEqual };
-                let row = master.add_row(sense, cut.rhs as f64, &entries)?;
-                for (index, arc) in self.problem.graph.arcs.iter().enumerate() {
-                    let u = if arc.tail == self.problem.graph.sink { 0 } else { arc.tail };
-                    let v = if arc.head == self.problem.graph.sink { 0 } else { arc.head };
-                    let coefficient = cut.edge_coefficient(u, v);
-                    if coefficient != 0. { state.cut.capacity_arc_entries[index].push((row, coefficient)); }
+        // Alg4EvalOfNode::addCutToMaster: separators by decreasing priority.
+        // Those at or above the level run; a lower one runs, and becomes the
+        // level, only while nothing has been added this round.
+        let mut level = state.cut.level;
+        let mut added = 0;
+        let mut success = false;
+        for (priority, separator) in state.cut.separators() {
+            if priority < level {
+                if success {
+                    break;
                 }
-                state.cut.capacity_rows.push(Some(row));
-                state.cut.capacity_cuts.push(cut);
-                capacity_added += 1;
+                level = priority;
             }
+            let (count, changed) = match separator {
+                Separator::Capacity => (self.separate_capacity(state, master, &tagged, &fractional)?, false),
+                Separator::RankOne => self.separate_rank_one(state, master, &tagged, &fractional)?,
+                Separator::Relaxation => (0, self.improve_relaxation(state, &tagged, &values)?),
+            };
+            added += count;
+            success |= count > 0 || changed;
         }
-        // Capacity cuts have root priority 3; rank-one cuts have priority 1.
-        if !state.cut.capacity_level_finished && (capacity_added > 0 || !state.cut.options.enabled) {
-            if capacity_added > 0 { state.cut.rounds += 1; }
-            return Ok(capacity_added);
+        state.cut.level = level;
+        if success {
+            state.cut.rounds += 1;
         }
-        state.cut.capacity_level_finished = true;
+        Ok(if added > 0 { added } else { success as usize })
+    }
+    fn take_removed_columns(&mut self) -> Vec<usize> {
+        std::mem::take(&mut self.state.borrow_mut().cut.removed_columns)
+    }
+}
+impl RootController {
+    fn separate_capacity<M: LpMaster>(
+        &self,
+        state: &mut State,
+        master: &mut M,
+        tagged: &[(usize, usize)],
+        fractional: &[FractionalColumn],
+    ) -> Result<usize> {
+        let Some(separator) = state.cut.capacity_separator.as_mut() else {
+            return Ok(0);
+        };
+        let columns: Vec<_> = fractional.iter().map(|c| (c.vertices.clone(), c.value)).collect();
+        let mut added = 0;
+        for cut in separator.separate(&columns)? {
+            let entries: Vec<_> = tagged.iter().filter_map(|&(column, tag)| {
+                let coefficient = cut.coefficient(&State::customers(&state.routes[tag]));
+                (coefficient != 0).then_some((column, coefficient as f64))
+            }).collect();
+            let sense = if cut.greater_equal() { RowSense::GreaterEqual } else { RowSense::LessEqual };
+            let row = master.add_row(sense, cut.rhs as f64, &entries)?;
+            for (index, arc) in self.problem.graph.arcs.iter().enumerate() {
+                let u = if arc.tail == self.problem.graph.sink { 0 } else { arc.tail };
+                let v = if arc.head == self.problem.graph.sink { 0 } else { arc.head };
+                let coefficient = cut.edge_coefficient(u, v);
+                if coefficient != 0. { state.cut.capacity_arc_entries[index].push((row, coefficient)); }
+            }
+            state.cut.capacity_rows.push(Some(row));
+            state.cut.capacity_cuts.push(cut);
+            added += 1;
+        }
+        Ok(added)
+    }
+    /// New rank-one cuts, and whether existing cut memories changed.
+    fn separate_rank_one<M: LpMaster>(
+        &self,
+        state: &mut State,
+        master: &mut M,
+        tagged: &[(usize, usize)],
+        fractional: &[FractionalColumn],
+    ) -> Result<(usize, bool)> {
         let before = state.solver.cuts.cuts.len();
         let options = state.solver.options.clone();
         let graph = state.solver.graph.clone();
         state
             .solver
             .cuts
-            .separate_default(&graph, &options, &self.problem.customers, &fractional)?;
+            .separate_default(&graph, &options, &self.problem.customers, fractional)?;
         let after = state.solver.cuts.cuts.len();
         let mut paths = vec![];
-        for &(_, tag) in &tagged {
+        for &(_, tag) in tagged {
             let route = &state.routes[tag];
             paths.push((state.solver.cuts.route(&graph, &State::customers(route))?, state.is_enumerated(route)));
         }
@@ -621,11 +713,52 @@ impl<M: LpMaster> Controller<M> for RootController {
                 master.set_coefficient(row, column, c as f64)?;
             }
         }
-        let added = after - before + capacity_added;
-        if added > 0 || changed {
-            state.cut.rounds += 1;
+        Ok((after - before, changed))
+    }
+    /// Dynamic NG (runColGenSpRelaxationImprovement and
+    /// BcRCSPFunctor::improveCurrentSpRelaxation): strengthen the NG memories
+    /// from the cycles of the routes in the LP solution, then mark the master
+    /// columns the stronger relaxation forbids for removal. A negative
+    /// RCSPdynamicNGmode only strengthens while no rank-one cut is active.
+    fn improve_relaxation(&self, state: &mut State, tagged: &[(usize, usize)], values: &[f64]) -> Result<bool> {
+        let option = |name: &str| state.solver.options.get(name);
+        let mode = option("RCSPdynamicNGmode")? as i32;
+        if mode == 0 || (mode < 0 && state.cut.rows.iter().any(Option::is_some)) {
+            return Ok(false);
         }
-        Ok(if added > 0 { added } else { changed as usize })
+        let controls = crate::graph::relaxation::Controls {
+            mode: mode.abs(),
+            max_vertex_size: option("RCSPmaxNGneighbourhoodSize")?.max(0.) as usize,
+            max_average_size: option("RCSPmaxNGaverNeighbourhoodSize")?.max(0.) as usize,
+            max_columns: option("RCSPmaxNumOfColumnsInDynamicNG")?.max(0.) as usize,
+            max_cycle_size: option("RCSPmaxCycleSizeInDynamicNG")? as i32,
+            mirror: false,
+        };
+        let paths: Vec<_> = tagged
+            .iter()
+            .filter(|&&(column, _)| values[column] > 1e-9)
+            .map(|&(column, tag)| crate::graph::relaxation::FractionalPath {
+                arcs: state.routes[tag].arcs.clone(),
+                value: values[column],
+            })
+            .collect();
+        let counts = state.solver.strengthen_ng(&paths, &controls)?;
+        if std::env::var_os("BALDES_DEBUG_NG").is_some() {
+            eprintln!("dynamic NG: columns={} paths={} forbidden={} steps={:?}", values.len(), paths.len(), counts.columns_forbidden,
+                state.solver.engine.as_ref().map(|e| e.grid.step));
+        }
+        if counts.columns_forbidden == 0 {
+            return Ok(false);
+        }
+        let mut removed = vec![];
+        for &(column, tag) in tagged {
+            let route = &state.routes[tag];
+            if !state.solver.route_satisfies_relaxation(&route.nodes, &route.arcs)? {
+                removed.push(column);
+            }
+        }
+        state.cut.removed_columns = removed;
+        Ok(true)
     }
 }
 /// Tag of `route`, the index of the first registered route with its arcs.
@@ -687,11 +820,18 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
             capacity_cuts: vec![],
             capacity_rows: vec![],
             capacity_arc_entries: vec![vec![]; arc_count],
-            capacity_level_finished: false,
+            level: f64::INFINITY,
+            relaxation_priority: options.relaxation_improvement_priority as f64,
+            removed_columns: vec![],
         },
         fixing_calls: 0,
         enumerated_routes: 0,
     }));
+    {
+        // eval starts at the highest separator priority.
+        let mut s = state.borrow_mut();
+        s.cut.level = s.cut.separators().first().map_or(0., |&(priority, _)| priority);
+    }
     let zeros = vec![0.; problem.rows.len()];
     options.cg.known.clear();
     for route in &options.initial_routes {
