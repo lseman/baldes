@@ -104,3 +104,4 @@ snapshot.bin
 
 # Rust build outputs
 /target/
+/release.sh

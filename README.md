@@ -6,7 +6,7 @@
 
 <img src="https://img.shields.io/badge/version-2.0-blue" alt="version 2.0" />
 <img src="https://img.shields.io/badge/language-Rust-orange" alt="Rust" />
-<img src="https://img.shields.io/github/license/lseman/baldes.svg" alt="License" />
+<img src="https://img.shields.io/github/license/lseman/baldes" alt="License: MIT" />
 
 </div>
 
@@ -33,6 +33,11 @@ The C++ BALDES 1.x code remains in the git history before the 2.0 commit.
   limited- and full-memory cut state in pricing and enumeration labels.
 - Dual-price smoothing, and a Clp-backed restricted master with cut rounds,
   basic-cut removal and artificial-column penalties.
+- Rounded capacity and Kohl 2-path cuts, with time-window feasibility checks.
+- An initial best-bound branch-and-price tree with directed arc-flow
+  branching, shared elementary columns and a restricted-master integer heuristic.
+- Phased strong branching (100 → 3 → 1 candidates), native product and
+  tree-depth scores, and bounded strong round-up diving with discrepancy limits.
 - Solomon VRPTW and CVRPLIB CVRP input and a root-solve command.
 
 The core solver uses only the Rust standard library. The `clp` feature links
@@ -61,6 +66,7 @@ The `clp` feature compiles Clp 1.17.10 and CoinUtils 2.11 from the
 ```bash
 ./target/release/baldes vrptw instances/R101.txt --customers 25 --rank1
 ./target/release/baldes cvrp instances/cvrplib/A-n32-k5.vrp --capacity-cuts
+./target/release/baldes vrptw instances/R101.txt --customers 10 --two-path-cuts --tree --time 60
 ```
 
 The first argument selects the instance type. Both commands read Solomon-format
@@ -80,6 +86,10 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--rounding MODE` | distances `none`, `nearest`, `tenth` or `ceil` (default: the file's convention) |
 | `--rank1` | separate limited-memory rank-one cuts |
 | `--capacity` / `--capacity-cuts` | separate native rounded capacity cuts in the Clp root master |
+| `--two-path-cuts` | enable capacity cuts with Kohl's time resource attached (VRPTW only) |
+| `--tree`, `--nodes N` | branch-and-price; default node limit 10,000 |
+| `--no-strong-branching`, `--no-diving` | disable the corresponding tree mechanism |
+| `--no-mip-heuristic`, `--mip-nodes N` | disable or budget restricted-master integer search |
 | `--no-enumeration` | no reduced-cost fixing or enumeration |
 | `--upper-bound X` | initial incumbent for fixing |
 | `--no-stabilization` | no dual-price smoothing |
@@ -174,6 +184,40 @@ LP routes, duals, iteration history, cut/fixing counts, and timers;
 become `null` in JSON. Cut counts include generated rows later retired.
 These are root LP relaxations; `Optimal` does not certify an integer VRP optimum.
 
+Python root solves enable Kohl with `two_path_cuts=True`. This attaches time
+resource 0, corresponding to generic capacity-cut registration;
+ordinary capacity cuts retain the default resource -1. Both use the capacity
+family's priority 3 at root and 1 below it, complement form and persistent subset pool.
+
+### Initial branch-and-price tree
+
+`--tree` solves the integer routing model and respects the instance's vehicle
+limit. Its JSON contains an incumbent with validated routes, a global lower
+bound, node counts and status. `Optimal` means the requested numerical gap is
+closed; `TimeLimit`, `NodeLimit` and `Incomplete` preserve bounds for unfinished
+nodes. The cost-only `--upper-bound` is a root/fixing option; the tree builds
+its incumbent from feasible routes instead. Limits are checked between master
+iterations and during pricing and integer search.
+
+The Rust API is `master::tree::solve(problem, TreeOptions)`. The integer
+heuristic searches the binary set-partitioning model over generated elementary
+routes, with per-call time and node budgets. Its restricted optimum is never
+used as a lower bound. Children price the duals of inherited arc-flow branch
+rows. They rebuild their Clp master and separate cuts anew while sharing
+feasible elementary columns. Strong branching screens 100 candidates with
+restricted LPs, prices three survivors heuristically, then evaluates one with
+exact pricing. Its product and tree-depth score formulas are ported from the
+reference; heuristic scores never certify bounds. Strong round-up diving uses
+priced route-fixing trials with depth, discrepancy, time and node budgets.
+Dive bounds remain private to the heuristic subspace. Both mechanisms are
+enabled by default in the tree and configurable through `TreeOptions`.
+
+Full the solver tree-trajectory parity has not been established. Generator-history
+ranking, basis/cut inheritance and a general-purpose MIP backend remain work;
+the current restricted-master integer search solves the binary routing
+set-partitioning model directly.
+The Python API currently exposes root solving; use Rust or the CLI for the tree.
+
 For pricing alone, build without Clp:
 
 ```bash
@@ -187,7 +231,7 @@ run `python -m pytest python/tests` to test a build with Clp.
 
 ## Not in 2.0 yet
 
-Strong k-path root integration, EVRP front ends, branching, the heuristics, and remaining
+Strong k-path root integration, EVRP front ends, tree basis/cut inheritance, and remaining
 1.x Python APIs.
 
 ## TODO
@@ -231,5 +275,6 @@ MIT. See [LICENSE](LICENSE).
 
 ## References
 
-1. Ruslan Sadykov, Eduardo Uchoa, Artur Alves Pessoa. "A Bucket Graph Based Labeling Algorithm for Vehicle Routing." Transportation Science, 2021. https://doi.org/10.1287/trsc.2020.0985
-2. Diego Pecin, Artur Pessoa, Marcus Poggi, Eduardo Uchoa, Haroldo Santos. "Limited memory rank-1 cuts for vehicle routing problems." Operations Research Letters 45.3 (2017): 206-209. https://doi.org/10.1016/j.orl.2017.02.006
+1. Ruslan Sadykov, François Vanderbeck. "BaPCod - a generic branch-and-price code." Technical report HAL-03340548, Inria Bordeaux Sud-Ouest, 2021.
+2. Ruslan Sadykov, Eduardo Uchoa, Artur Alves Pessoa. "A Bucket Graph Based Labeling Algorithm for Vehicle Routing." Transportation Science, 2021. https://doi.org/10.1287/trsc.2020.0985
+3. Diego Pecin, Artur Pessoa, Marcus Poggi, Eduardo Uchoa, Haroldo Santos. "Limited memory rank-1 cuts for vehicle routing problems." Operations Research Letters 45.3 (2017): 206-209. https://doi.org/10.1016/j.orl.2017.02.006

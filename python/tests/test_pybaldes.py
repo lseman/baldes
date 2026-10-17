@@ -148,3 +148,19 @@ def test_low_level_pricing_validation_and_route_ownership():
     del solver
     gc.collect()
     assert route.cost == -1 and route.nodes() == [0, 1, 2]
+
+
+def test_kohl_time_resource_closes_r101_root_gap():
+    from pathlib import Path
+    instance = Instance.from_file(Path(__file__).resolve().parents[2] / 'instances/R101.txt').truncated(10)
+    plain = solve_root(instance, stabilize=False, reduced_cost_fixing=False)
+    kohl = solve_root(instance, two_path_cuts=True, stabilize=False, reduced_cost_fixing=False)
+    assert plain.lp == pytest.approx(261.30231910442023)
+    assert kohl.status == 'Optimal'
+    assert kohl.lp == pytest.approx(269.533140900765)
+    assert kohl.cuts > 0
+
+
+def test_kohl_rejects_cvrp_without_time_resource():
+    with pytest.raises(ValueError, match='time windows'):
+        solve_root(triangle(), problem_type='cvrp', two_path_cuts=True)

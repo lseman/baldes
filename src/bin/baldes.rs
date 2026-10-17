@@ -15,6 +15,13 @@ Options:
                         file's convention; none for Solomon, nearest for EUC_2D)
   --rank1               Enable rank-one cuts
   --capacity-cuts        Enable capacity cuts (alias: --capacity)
+  --two-path-cuts        Enable capacity and Kohl 2-path cuts using time windows
+  --tree                Run branch-and-price with a restricted-master MIP heuristic
+  --nodes N             Tree node limit (default: 10000)
+  --no-strong-branching  Use fractionality instead of phased strong branching
+  --no-diving           Disable strong diving in the tree
+  --no-mip-heuristic    Disable restricted-master integer search
+  --mip-nodes N         Restricted-master integer-search node budget per call
   --no-stabilization    Disable dual stabilization
   --no-enumeration      Disable reduced-cost fixing and enumeration
   --upper-bound X       Initial incumbent
@@ -56,6 +63,10 @@ fn run() -> std::result::Result<(), String> {
     let mut options = RootOptions::default();
     let mut rank1 = false;
     let mut capacity = false;
+    let mut two_path = false;
+    let mut tree = false;
+    let mut node_limit = 10000usize;
+    let mut tree_options = baldes::master::tree::TreeOptions::default();
     let mut rounding = None;
     let mut hgs_pop_size: Option<u32> = None;
     let mut hgs_nb_iter: Option<u32> = None;
@@ -121,6 +132,13 @@ fn run() -> std::result::Result<(), String> {
             }
             "--rank1" => rank1 = true,
             "--capacity" | "--capacity-cuts" => capacity = true,
+            "--two-path-cuts" => { capacity = true; two_path = true; }
+            "--tree" => tree = true,
+            "--no-strong-branching" => tree_options.strong_branching = None,
+            "--no-diving" => tree_options.diving = None,
+            "--no-mip-heuristic" => tree_options.mip_node_limit = 0,
+            "--mip-nodes" => tree_options.mip_node_limit = args.next().ok_or("missing MIP node budget")?.parse::<usize>().map_err(|e|e.to_string())?,
+            "--nodes" => node_limit = args.next().ok_or("missing node limit")?.parse::<usize>().map_err(|e| e.to_string())?,
             "--upper-bound" => {
                 options.incumbent = args
                     .next()
@@ -215,13 +233,11 @@ fn run() -> std::result::Result<(), String> {
         return Ok(());
     }
 
-    if capacity {
-        options = options.with_capacity_cuts(baldes::master::root::CapacityCutConfig::new(
-            instance.customers.iter().map(|c| c.demand).collect(),
-            instance.capacity,
-        ));
-    }
     let rounding = rounding.unwrap_or(instance.rounding);
+    if two_path && kind == "cvrp" { return Err("Kohl 2-path cuts require vrptw time windows".into()); }
+    if capacity {
+        options = options.with_capacity_cuts(instance.capacity_cut_config(rounding, two_path));
+    }
     let started = std::time::Instant::now();
     let mut graph = if kind == "cvrp" {
         instance.capacity_graph(ng, rounding)
@@ -251,8 +267,20 @@ fn run() -> std::result::Result<(), String> {
         }
     }
     options.cg.multiplicity = n as f64;
-    let problem = baldes::master::root::RootProblem::set_partitioning(graph, n as f64)
+    let fleet = if tree { instance.vehicles as f64 } else { n as f64 };
+    let problem = baldes::master::root::RootProblem::set_partitioning(graph, fleet)
         .map_err(|e| e.to_string())?;
+    if tree {
+        tree_options.node_limit = node_limit;
+        tree_options.time_limit = options.cg.time_limit;
+        tree_options.root = options;
+        let result = baldes::master::tree::solve(problem, tree_options).map_err(|e| e.to_string())?;
+        if let Some(path) = json_path { std::fs::write(path, result.to_json(&instance.name)).map_err(|e| e.to_string())?; }
+        println!("instance={} status={:?} incumbent={} bound={} nodes={} pricing_calls={}",
+            instance.name, result.status, result.incumbent, result.bound, result.nodes, result.pricing_calls);
+        for route in &result.routes { println!("cost={} nodes={:?}", route.original_cost, route.nodes); }
+        return Ok(());
+    }
     let output = baldes::master::root::solve(problem, options).map_err(|e| e.to_string())?;
     let seconds = started.elapsed().as_secs_f64();
     if let Some(path) = json_path {

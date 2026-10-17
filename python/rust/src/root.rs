@@ -33,7 +33,7 @@ fn _read_instance(py: Python<'_>, path: PathBuf) -> PyResult<Py<PyDict>> {
 
 #[cfg(feature = "clp")]
 #[pyfunction]
-#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options))]
+#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false))]
 #[allow(clippy::too_many_arguments)]
 fn _solve_root(
     py: Python<'_>,
@@ -55,13 +55,17 @@ fn _solve_root(
     max_iterations: usize,
     max_cut_rounds: Option<usize>,
     pricing_options: std::collections::BTreeMap<String, f64>,
+    two_path_cuts: bool,
 ) -> PyResult<Py<PyDict>> {
-    use baldes::master::root::{self, CapacityCutConfig, RootOptions, RootProblem};
+    use baldes::master::root::{self, RootOptions, RootProblem};
     use baldes::vrptw::{Customer, Rounding};
     if problem_type != "vrptw" && problem_type != "cvrp" {
         return Err(PyValueError::new_err(
             "problem_type must be 'vrptw' or 'cvrp'",
         ));
+    }
+    if two_path_cuts && problem_type == "cvrp" {
+        return Err(PyValueError::new_err("Kohl 2-path cuts require vrptw time windows"));
     }
     let rounding = Rounding::parse(rounding)
         .map_err(|_| PyValueError::new_err("rounding must be 'none', 'nearest', 'tenth' or 'ceil'"))?;
@@ -149,11 +153,8 @@ fn _solve_root(
     if rank_one_cuts {
         options = options.with_rank_one_cuts();
     }
-    if capacity_cuts {
-        options = options.with_capacity_cuts(CapacityCutConfig::new(
-            instance.customers.iter().map(|c| c.demand).collect(),
-            instance.capacity,
-        ));
+    if capacity_cuts || two_path_cuts {
+        options = options.with_capacity_cuts(instance.capacity_cut_config(rounding, two_path_cuts));
     }
     if let Some(limit) = max_cut_rounds {
         options.cg.max_cut_rounds = limit;

@@ -16,3 +16,5 @@ pub enum RowSense {
 
 #[cfg(feature = "clp")]
 pub mod root;
+#[cfg(feature = "clp")]
+pub mod tree;

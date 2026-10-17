@@ -74,7 +74,18 @@ pub struct Iteration {
 }
 
 #[derive(Clone, Debug)]
+pub struct WarmStart {
+    pub columns: Vec<Option<Column>>,
+    pub artificials: Vec<usize>,
+    pub cut_artificials: Vec<(usize, usize)>,
+    pub initial_rows: usize,
+}
+
+#[derive(Clone, Debug)]
 pub struct Options {
+    /// Metadata of an already populated, solved master. No duplicate base
+    /// artificials are added when resuming a node.
+    pub warm_start: Option<WarmStart>,
     pub smoothing: Parameters,
     pub stabilize: bool,
     pub tolerance: f64,
@@ -107,6 +118,7 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            warm_start: None,
             smoothing: Parameters::default(),
             stabilize: true,
             tolerance: 1e-6,
@@ -151,6 +163,9 @@ pub struct Output {
 
 /// The controller owns incumbent tracking and the pricing route universe.
 pub trait Controller<M> {
+    /// Logical base/branch rows can follow inherited cut rows. Cleanup must
+    /// never delete these rows, even when their slacks are basic.
+    fn protected_rows(&self) -> Vec<usize> { vec![] }
     fn master_solved(
         &mut self,
         _master: &M,
@@ -245,9 +260,17 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
     }
     let started = Instant::now();
     let mut smoothing = DualPriceSmoothing::new(options.smoothing.clone());
-    let mut seen: HashSet<_> = options.known.iter().map(Column::signature).collect();
-    let mut loaded: Vec<Option<Column>> = options.known.iter().cloned().map(Some).collect();
+    if let Some(warm) = &options.warm_start {
+        if warm.columns.len() != master.costs().len() || warm.initial_rows > master.rhs().len()
+            || warm.artificials.iter().any(|&c| c >= master.costs().len())
+            || warm.cut_artificials.iter().any(|&(r,c)| r >= master.rhs().len() || c >= master.costs().len()) {
+            return Err(invalid("warm master metadata dimensions"));
+        }
+    }
+    let mut loaded: Vec<Option<Column>> = options.warm_start.as_ref()
+        .map_or_else(|| options.known.iter().cloned().map(Some).collect(), |w| w.columns.clone());
     loaded.resize(master.costs().len(), None);
+    let mut seen: HashSet<_> = loaded.iter().flatten().map(Column::signature).collect();
     let mut out = Output {
         status: Status::IterationLimit,
         lp: 0.,
@@ -256,15 +279,15 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
         pricing_calls: 0,
         columns: master.costs().len(),
         history: vec![],
-        column_tags: options.known.iter().map(|c| c.tag).collect(),
+        column_tags: loaded.iter().map(|c| c.as_ref().map_or(-1, |c| c.tag)).collect(),
         inserted_tags: vec![],
-        artificials: vec![],
+        artificials: options.warm_start.as_ref().map_or_else(Vec::new, |w| w.artificials.clone()),
         penalty_updates: 0,
         pruned_by_bound: false,
         cut_rounds: 0,
     };
     out.column_tags.resize(master.costs().len(), -1);
-    if options.artificial_cost > 0. {
+    if options.artificial_cost > 0. && options.warm_start.is_none() {
         for r in 0..master.rhs().len() {
             if master.senses()[r] != RowSense::LessEqual {
                 out.artificials
@@ -289,8 +312,9 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
     let mut tailing = 0;
     let mut lp_at_separation = 0.0f64;
     let mut separated_once = false;
-    let initial_rows = master.rhs().len();
-    let mut cut_artificials: Vec<(usize, usize)> = vec![];
+    let initial_rows = options.warm_start.as_ref().map_or(master.rhs().len(), |w| w.initial_rows);
+    let mut cut_artificials: Vec<(usize, usize)> = options.warm_start.as_ref()
+        .map_or_else(Vec::new, |w| w.cut_artificials.clone());
     for iteration in 1..=options.max_iterations {
         if started.elapsed() > options.time_limit {
             out.status = Status::TimeLimit;
@@ -600,7 +624,9 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
             lp_at_separation = out.lp;
             if !stop_cuts {
                 if options.remove_basic_cuts && separated_once {
-                    let rows = master.cleanup_cut_rows(initial_rows)?;
+                    let protected = controller.protected_rows();
+                    let rows: Vec<_> = master.cleanup_cut_rows(initial_rows)?.into_iter()
+                        .filter(|r| !protected.contains(r)).collect();
                     let columns: Vec<usize> = cut_artificials
                         .iter()
                         .filter(|(r, _)| rows.binary_search(r).is_ok())

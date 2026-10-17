@@ -201,6 +201,7 @@ struct Graph {
 }
 
 /// RoundCapCutSeparation state.
+#[derive(Clone)]
 pub struct Separation {
     params: Params,
     n: usize,
@@ -1357,6 +1358,7 @@ fn expand_subset(c: &mut FracCandidate, q: f64, nodes: &[usize], demand: &[f64],
 
 /// Standalone separator: depot 0, customers 1..n. State persists across
 /// calls and is rebuilt when the parameters or time windows change.
+#[derive(Clone)]
 pub struct CapacitySeparator {
     pub parameters: CapacityParameters,
     demands: Vec<f64>,

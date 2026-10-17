@@ -7,6 +7,8 @@ use std::ptr::NonNull;
 type Model = c_void;
 extern "C" {
     fn Clp_newModel() -> *mut Model;
+    fn baldes_clp_clone(m: *const Model) -> *mut Model;
+    fn Clp_numberIterations(m: *mut Model) -> i32;
     fn Clp_deleteModel(m: *mut Model);
     fn Clp_setLogLevel(m: *mut Model, level: i32);
     fn Clp_setOptimizationDirection(m: *mut Model, direction: f64);
@@ -62,11 +64,25 @@ pub struct ClpMaster {
     pub status: i32,
     pub solved: bool,
     pub dual_tolerance: f64,
+    pub simplex_iterations: usize,
     /// Primal values and duals with magnitude at most this are read as zero,
     /// as LpClpInterface::getSol  does with 1e-7.
     pub zero_tolerance: f64,
 }
 impl ClpMaster {
+    /// Fork the model through Clp's deep-copy operation, retaining its basis,
+    /// primal/dual solution, scaling and simplex state. The fork owns all data.
+    pub fn try_clone(&self) -> Result<Self> {
+        // SAFETY: source stays alive and is not mutated; the C++ bridge returns
+        // an independently owned Clp wrapper, released by this type's Drop.
+        let model = NonNull::new(unsafe { baldes_clp_clone(self.model.as_ptr()) })
+            .ok_or_else(|| incomplete("Clp model copy failed"))?;
+        Ok(Self { model, rhs:self.rhs.clone(), senses:self.senses.clone(), costs:self.costs.clone(),
+            upper:self.upper.clone(), duals:self.duals.clone(), values:self.values.clone(),
+            reduced_costs:self.reduced_costs.clone(), objective:self.objective, status:self.status,
+            solved:self.solved, dual_tolerance:self.dual_tolerance, zero_tolerance:self.zero_tolerance,
+            simplex_iterations:0 })
+    }
     /// Returns a copy of the dual (shadow) prices for each row.
     pub fn duals(&self) -> Vec<f64> { self.duals.clone() }
     /// Returns a copy of the primal column values.
@@ -93,6 +109,7 @@ impl ClpMaster {
             status: -1,
             solved: false,
             dual_tolerance: 1e-7,
+            simplex_iterations: 0,
             zero_tolerance: 0.,
         })
     }
@@ -244,6 +261,7 @@ impl ClpMaster {
         // SAFETY: All returned arrays are owned by this model. Copy before further mutation.
         unsafe {
             Clp_dual(self.model.as_ptr(), 0);
+            self.simplex_iterations += Clp_numberIterations(self.model.as_ptr()).max(0) as usize;
             self.status = Clp_status(self.model.as_ptr());
             self.solved = self.status == 0;
             if self.solved {

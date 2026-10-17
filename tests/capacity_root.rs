@@ -90,3 +90,22 @@ fn routing_fractional_capacity_snapshot_has_twenty_cuts() {
     assert_eq!(cuts[0].rhs, 1);
     assert!(!cuts[0].greater_equal());
 }
+
+#[test]
+fn kohl_time_resource_closes_r101_ten_customer_root_gap() {
+    let mut instance = Instance::read("instances/R101.txt").unwrap();
+    instance.truncate(10).unwrap();
+    let mut options = RootOptions::default();
+    options.enumerate = false;
+    options.cg.stabilize = false;
+    let plain = instance.solve_root(10, Rounding::None, options.clone()).unwrap();
+    assert!((plain.master.lp - 261.30231910442023).abs() < 1e-5);
+    let capacity_only = instance.solve_root(10, Rounding::None,
+        options.clone().with_capacity_cuts(instance.capacity_cut_config(Rounding::None, false))).unwrap();
+    let kohl = instance.solve_root(10, Rounding::None,
+        options.with_capacity_cuts(instance.capacity_cut_config(Rounding::None, true))).unwrap();
+    assert_eq!(kohl.master.status, Status::Optimal);
+    assert!(kohl.cuts > 0);
+    assert!(kohl.master.lp > capacity_only.master.lp + 1.);
+    assert!((kohl.master.lp - 269.5330).abs() < 1e-3);
+}

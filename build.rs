@@ -55,6 +55,28 @@ mod clp {
         files.sort();
         for file in &mut files {
             let name = file.file_name().unwrap().to_str().unwrap();
+            if name == "Clp_C_Interface.cpp" {
+                // Keep the opaque C wrapper in its own translation unit;
+                // upstream Clp implements the deep model/basis copy.
+                let mut text = fs::read_to_string(&*file).unwrap();
+                text.push_str(r#"
+extern "C" Clp_Simplex *baldes_clp_clone(const Clp_Simplex *source) {
+  Clp_Simplex *copy = NULL;
+  try {
+    copy = Clp_newModel();
+    *copy->model_ = *source->model_;
+    return copy;
+  } catch (...) {
+    if (copy) Clp_deleteModel(copy);
+    return NULL;
+  }
+}
+"#);
+                let copy = patched.join(name);
+                fs::write(&copy, text).unwrap();
+                *file = copy;
+                continue;
+            }
             if let Some((_, old, new)) = CORRECTIONS.iter().find(|(n, _, _)| *n == name) {
                 let text = fs::read_to_string(&*file).unwrap();
                 assert_eq!(text.matches(old).count(), 1, "unsupported {name}: expected one correction site");

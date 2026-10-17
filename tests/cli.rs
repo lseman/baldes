@@ -74,3 +74,15 @@ fn hgs_respects_time_windows() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("status=Found cost=4.00"), "{stdout}");
 }
+
+#[test]
+fn tree_and_kohl_controls_reach_integer_solve_and_reject_cvrp_time_resource() {
+    let output = command().args(["vrptw", "instances/R101.txt", "--customers", "10",
+        "--tree", "--two-path-cuts", "--time", "10"]).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("status=Optimal incumbent=269.533140900"), "{stdout}");
+    let output = command().args(["cvrp", "instances/R101.txt", "--two-path-cuts"]).output().unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("require vrptw time windows"));
+}

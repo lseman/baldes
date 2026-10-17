@@ -28,6 +28,9 @@ pub struct RootProblem {
     pub customers: Vec<usize>,
     /// Arc id -> first index in `graph.arcs`.
     arc_index: std::collections::HashMap<i32, usize>,
+    /// Logical base/branch row -> physical master row. Branches appended
+    /// after inherited cuts stay valid when those cuts are retired.
+    row_map: RefCell<Vec<usize>>,
 }
 impl RootProblem {
     /// Cover each nonterminal vertex and bound the number of vehicle routes.
@@ -68,6 +71,7 @@ impl RootProblem {
         for (index, a) in graph.arcs.iter().enumerate() {
             arc_index.entry(a.id).or_insert(index);
         }
+        let row_map = RefCell::new((0..rows.len()).collect());
         Ok(Self {
             graph,
             rows,
@@ -75,22 +79,30 @@ impl RootProblem {
             route_entries: vec![],
             customers,
             arc_index,
+            row_map,
         })
     }
     pub fn arc_position(&self, id: i32) -> Option<usize> {
         self.arc_index.get(&id).copied()
     }
+    pub(crate) fn append_branch(&mut self, arc: usize, sense: RowSense, rhs: f64, physical: usize) {
+        let logical = self.rows.len();
+        self.rows.push(Row { sense, rhs });
+        self.row_map.borrow_mut().push(physical);
+        self.arc_entries[arc].push((logical, 1.));
+    }
     fn base_entries(&self, route: &Route) -> Result<Vec<(usize, f64)>> {
+        let map = self.row_map.borrow();
         let mut coefficients = std::collections::BTreeMap::new();
         for &(r, a) in &self.route_entries {
-            *coefficients.entry(r).or_insert(0.) += a;
+            *coefficients.entry(map[r]).or_insert(0.) += a;
         }
         for id in &route.arcs {
             let physical = self
                 .arc_position(*id)
                 .ok_or_else(|| invalid("unknown priced route arc"))?;
             for &(r, a) in &self.arc_entries[physical] {
-                *coefficients.entry(r).or_insert(0.) += a;
+                *coefficients.entry(map[r]).or_insert(0.) += a;
             }
         }
         Ok(coefficients.into_iter().filter(|(_, a)| *a != 0.).collect())
@@ -110,13 +122,14 @@ impl RootProblem {
     }
     fn reprice(&self, solver: &mut Solver, duals: &[f64], round: bool,
         capacity_entries: &[Vec<(usize, f64)>]) -> Result<f64> {
+        let map = self.row_map.borrow();
         if duals.len() < self.rows.len() || self.arc_entries.len() != self.graph.arcs.len() {
             return Err(invalid("root master dimensions"));
         }
         for (index, arc) in solver.graph.arcs.iter_mut().enumerate() {
             let mut cost = self.graph.arcs[index].cost;
             for &(r, a) in &self.arc_entries[index] {
-                cost -= duals[r] * a;
+                cost -= duals[map[r]] * a;
             }
             for &(r, a) in &capacity_entries[index] {
                 cost -= duals[r] * a;
@@ -130,7 +143,7 @@ impl RootProblem {
         Ok(-self
             .route_entries
             .iter()
-            .map(|&(r, a)| duals[r] * a)
+            .map(|&(r, a)| duals[map[r]] * a)
             .sum::<f64>())
     }
 }
@@ -161,6 +174,13 @@ pub struct CapacityCutConfig {
     pub time_windows: Option<TimeWindows>,
 }
 impl CapacityCutConfig {
+    /// Attach the time resource used by Kohl 2-path separator.
+    /// These cuts share the capacity family's separation priority and pool.
+    pub fn with_time_windows(mut self, windows: TimeWindows) -> Self {
+        self.parameters.use_two_path = true;
+        self.time_windows = Some(windows);
+        self
+    }
     pub fn new(demands: Vec<f64>, capacity: f64) -> Self {
         let mut parameters = CapacityParameters::default();
         // GenericRCSPCapacityCutConstr's packing form, no Kohl resource.
@@ -171,6 +191,14 @@ impl CapacityCutConfig {
 }
 #[derive(Clone, Debug)]
 pub struct RootOptions {
+    /// Retain an independently forkable model and active cuts for descendants.
+    pub capture_state: bool,
+    /// Node depth: capacity/Kohl priority is 3 at root and 1 below it,
+    /// as in generic capacity-cut registration.
+    pub node_depth: usize,
+    /// Lowest pricing phase evaluated (0 for a certified node solve).
+    /// Strong-branching heuristic trials may stop above the exact phase.
+    pub pricing_phase_floor: usize,
     pub cg: Options,
     pub pricing_options: Vec<(String, f64)>,
     pub initial_routes: Vec<Route>,
@@ -194,6 +222,9 @@ impl Default for RootOptions {
         cg.column_cleanup_threshold = 10000.;
         cg.column_cleanup_ratio = 0.66;
         Self {
+            capture_state: false,
+            node_depth: 0,
+            pricing_phase_floor: 0,
             cg,
             pricing_options: vec![],
             initial_routes: vec![],
@@ -231,6 +262,9 @@ impl RootOptions {
 }
 #[derive(Debug)]
 pub struct RootOutput {
+    pub snapshot: Option<Rc<NodeSnapshot>>,
+    pub simplex_iterations: usize,
+    pub inherited_cuts: usize,
     pub master: Output,
     pub routes: Vec<Route>,
     pub values: Vec<f64>,
@@ -243,6 +277,63 @@ pub struct RootOutput {
     pub fixing_calls: usize,
     pub enumerated_routes: usize,
 }
+/// Immutable solved-node state, shared by siblings and copied only when a
+/// descendant or a trial is evaluated. No sibling mutates this model.
+pub struct NodeSnapshot {
+    master: ClpMaster,
+    problem: RootProblem,
+    cut: CutState,
+    registry: crate::cuts::CutRegistry,
+    pricing_graph: Graph,
+    routes: Vec<Route>,
+    warm: column_generation::WarmStart,
+}
+impl std::fmt::Debug for NodeSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NodeSnapshot").field("rows", &self.master.rhs.len())
+            .field("columns", &self.master.costs.len()).field("cuts", &self.active_cuts()).finish()
+    }
+}
+impl NodeSnapshot {
+    pub fn branch_depth(&self) -> usize { self.problem.rows.len()-self.problem.customers.len()-1 }
+    pub fn active_cuts(&self) -> usize {
+        self.cut.rows.iter().filter(|r|r.is_some()).count()
+            + self.cut.capacity_rows.iter().filter(|r|r.is_some()).count()
+    }
+    fn fork(&self, branches: &[(usize,RowSense,f64)], penalty: f64)
+        -> Result<(RootProblem,ClpMaster,column_generation::WarmStart)> {
+        let mut master=self.master.try_clone()?;
+        let mut problem=self.problem.clone();
+        let mut warm=self.warm.clone();
+        let penalty=warm.artificials.iter().map(|&c|master.costs[c]).fold(penalty,f64::max);
+        for &(arc,sense,rhs) in branches {
+            if arc>=problem.graph.arcs.len() || !rhs.is_finite() {return Err(invalid("inherited branch row"));}
+            let id=problem.graph.arcs[arc].id;
+            let mut entries=vec![];
+            for (c,column) in warm.columns.iter_mut().enumerate() {
+                let Some(column)=column else {continue;};
+                let coefficient=self.routes[column.tag as usize].arcs.iter().filter(|&&a|a==id).count() as f64;
+                if coefficient!=0. {entries.push((c,coefficient));column.entries.push((master.rhs.len(),coefficient));}
+            }
+            let row=master.add_row(sense,rhs,&entries)?;
+            problem.append_branch(arc,sense,rhs,row);
+            if penalty>0. {
+                for sign in [1.,-1.] {
+                    if (sign>0. && sense==RowSense::LessEqual) || (sign<0. && sense==RowSense::GreaterEqual) {continue;}
+                    let c=master.add_column(penalty,&[(row,sign)])?;
+                    warm.columns.push(None);warm.artificials.push(c);
+                }
+            }
+        }
+        Ok((problem,master,warm))
+    }
+    pub(crate) fn restricted_value(&self, branches: &[(usize,RowSense,f64)], penalty:f64) -> Result<(f64,usize)> {
+        let (_,mut master,_)=self.fork(branches,penalty)?;
+        let value=if master.solve() {master.objective} else {1e12};
+        Ok((value,master.simplex_iterations))
+    }
+}
+#[derive(Clone)]
 struct CutState {
     options: CutOptions,
     /// Master row of each registered cut (None once removed).
@@ -256,6 +347,7 @@ struct CutState {
     rounds: usize,
     tailing: usize,
     capacity_separator: Option<CapacitySeparator>,
+    capacity_priority: f64,
     capacity_cuts: Vec<CapacityCut>,
     capacity_rows: Vec<Option<usize>>,
     capacity_arc_entries: Vec<Vec<(usize, f64)>>,
@@ -294,7 +386,7 @@ impl CutState {
     fn separators(&self) -> Vec<(f64, Separator)> {
         let mut list = vec![];
         if self.capacity_separator.is_some() {
-            list.push((CAPACITY_PRIORITY, Separator::Capacity));
+            list.push((self.capacity_priority, Separator::Capacity));
         }
         if self.options.enabled {
             list.push((RANK_ONE_PRIORITY, Separator::RankOne));
@@ -417,6 +509,7 @@ struct RootController {
     state: Rc<RefCell<State>>,
 }
 impl<M: LpMaster> Controller<M> for RootController {
+    fn protected_rows(&self) -> Vec<usize> { self.problem.row_map.borrow().clone() }
     fn master_solved(
         &mut self,
         master: &M,
@@ -512,6 +605,9 @@ impl<M: LpMaster> Controller<M> for RootController {
         Ok(Some(columns))
     }
     fn remap_rows(&mut self, rows: &[Option<usize>]) -> Result<()> {
+        for row in self.problem.row_map.borrow_mut().iter_mut() {
+            *row = rows[*row].ok_or_else(|| invalid("attempt to remove a base or branch row"))?;
+        }
         let mut state = self.state.borrow_mut();
         for row in &mut state.cut.capacity_rows {
             *row = row.and_then(|r| rows[r]);
@@ -797,22 +893,36 @@ fn register(state: &mut State, route: &Route) -> Result<i32> {
     Ok(id)
 }
 pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutput> {
+    options.cg.warm_start = None;
+    solve_seeded(problem, options, None)
+}
+pub fn inherit(parent:&NodeSnapshot, branches:&[(usize,RowSense,f64)], options:RootOptions) -> Result<RootOutput> {
+    let (problem,master,warm)=parent.fork(branches,options.cg.artificial_cost)?;
+    solve_seeded(problem,options,Some((parent,master,warm)))
+}
+fn solve_seeded(problem: RootProblem, mut options: RootOptions,
+    seed: Option<(&NodeSnapshot,ClpMaster,column_generation::WarmStart)>) -> Result<RootOutput> {
     let solve_started = std::time::Instant::now();
     problem.graph.validate()?;
-    let mut master = ClpMaster::new()?;
+    let (saved,mut master)=if let Some((saved,master,warm))=seed {
+        options.cg.warm_start=Some(warm);(Some(saved),master)
+    } else {(None,ClpMaster::new()?)};
     // the solver leaves Clp's default 1e-7 primal and dual tolerances in place.
     master.set_tolerances(1e-7, 1e-7)?;
     master.zero_tolerance = 1e-7;
-    for row in &problem.rows {
-        master.add_row(row.sense, row.rhs, &[])?;
+    if saved.is_none() {
+        for row in &problem.rows { master.add_row(row.sense, row.rhs, &[])?; }
     }
     let mut solver = Solver::new(problem.graph.vertices.len(), problem.graph.resources.len())?;
-    solver.graph = problem.graph.clone();
+    solver.graph = saved.map_or_else(||problem.graph.clone(),|s|s.pricing_graph.clone());
+    if let Some(saved)=saved { solver.cuts=saved.registry.clone(); }
     for (name, value) in &options.pricing_options {
         solver.set_option(name, *value)?;
     }
-    let schedule = solver.phases.clone();
-    let capacity_separator = if let Some(config) = options.capacity_cuts.take() {
+    let phase_floor = options.pricing_phase_floor;
+    if phase_floor >= solver.phases.len() { return Err(invalid("pricing phase floor outside schedule")); }
+    let schedule = solver.phases[phase_floor..].to_vec();
+    let capacity_separator = if saved.is_some() { None } else if let Some(config) = options.capacity_cuts.take() {
         if problem.graph.source != 0 || problem.graph.sink != config.demands.len()
             || problem.graph.vertices.len() != config.demands.len() + 1 {
             return Err(invalid("capacity cuts require depot 0, customers 1..n, sink n+1"));
@@ -825,8 +935,8 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
     let arc_count = problem.graph.arcs.len();
     let state = Rc::new(RefCell::new(State {
         solver,
-        routes: vec![],
-        route_tags: Default::default(),
+        routes: saved.map_or_else(Vec::new,|s|s.routes.clone()),
+        route_tags: saved.map_or_else(Default::default,|s|s.routes.iter().enumerate().map(|(i,r)|(r.arcs.clone(),i as i32)).collect()),
         incumbent: options.incumbent,
         enumerate: options.enumerate,
         rounded: options.round_reduced_costs,
@@ -842,6 +952,7 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
             rounds: 0,
             tailing: 0,
             capacity_separator,
+            capacity_priority: if options.node_depth == 0 { CAPACITY_PRIORITY } else { 1. },
             capacity_cuts: vec![],
             capacity_rows: vec![],
             capacity_arc_entries: vec![vec![]; arc_count],
@@ -855,22 +966,35 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
     {
         // eval starts at the highest separator priority.
         let mut s = state.borrow_mut();
+        if let Some(saved)=saved {
+            s.cut=saved.cut.clone();
+            s.cut.options=options.cuts.clone();
+            s.cut.capacity_priority=if options.node_depth==0 {CAPACITY_PRIORITY} else {1.};
+            s.cut.relaxation_priority=options.relaxation_improvement_priority as f64;
+            s.cut.rounds=0;s.cut.tailing=0;s.cut.separation_lp=f64::NAN;
+            s.cut.lp_before_cuts=f64::NAN;s.cut.removed_columns.clear();
+        }
         s.cut.level = s.cut.separators().first().map_or(0., |&(priority, _)| priority);
     }
     let zeros = vec![0.; problem.rows.len()];
     options.cg.known.clear();
+    let mut live:HashSet<i32>=options.cg.warm_start.as_ref().map_or_else(HashSet::new,|w|
+        w.columns.iter().flatten().map(|c|c.tag).collect());
     for route in &options.initial_routes {
         let mut s = state.borrow_mut();
         let tag = register(&mut s, route)?;
+        if !live.insert(tag) {continue;}
         let column = s.column(&problem, route, &zeros, tag)?;
         master.add_column(column.cost, &column.entries)?;
-        options.cg.known.push(column);
+        if let Some(warm)=options.cg.warm_start.as_mut() {warm.columns.push(Some(column));}
+        else {options.cg.known.push(column);}
     }
     let problem = Rc::new(problem);
     let mut controller = RootController {
         problem: problem.clone(),
         state: state.clone(),
     };
+    let initial_rows=options.cg.warm_start.as_ref().map_or(problem.rows.len(),|w|w.initial_rows);
     let output = column_generation::optimize::<ClpMaster, _, _>(
         &mut master,
         &schedule,
@@ -880,7 +1004,7 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
             let rounded = state.rounded;
             let offset = state.reprice(&problem, duals)?;
             let maximum = state.solver.controls.max_columns;
-            let result = state.solver.price_phase(phase, maximum, false)?;
+            let result = state.solver.price_phase(phase + phase_floor, maximum, false)?;
             let mut columns = vec![];
             let mut minimum = result.minimum_reduced_cost + offset;
             let mut corrected = 0.;
@@ -898,7 +1022,7 @@ pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutpu
                             let index = problem.arc_position(id).unwrap();
                             let mut raw = problem.graph.arcs[index].cost;
                             for &(r, a) in &problem.arc_entries[index] {
-                                raw -= duals[r] * a;
+                                raw -= duals[problem.row_map.borrow()[r]] * a;
                             }
                             for &(r, a) in &state.cut.capacity_arc_entries[index] {
                                 raw -= duals[r] * a;

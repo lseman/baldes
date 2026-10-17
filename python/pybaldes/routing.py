@@ -150,6 +150,7 @@ def solve_root(
     reference_ng: bool = False,
     rounding: Optional[str] = None,
     capacity_cuts: bool = False,
+    two_path_cuts: bool = False,
     rank_one_cuts: bool = False,
     stabilize: bool = True,
     reduced_cost_fixing: bool = True,
@@ -166,6 +167,8 @@ def solve_root(
     (unrounded for Solomon, TSPLIB nint for CVRPLIB EUC_2D); rounding accepts
     'none', 'nearest', 'tenth' and 'ceil'.
     Capacity cuts use complement form; rank-one cuts use limited memory.
+    two_path_cuts attaches the time resource for Kohl separation and enables
+    the capacity family. It requires problem_type='vrptw'.
     Disabling reduced_cost_fixing also disables route enumeration. Cut counts
     include generated rows that were later retired. These are root relaxations:
     status 'Optimal' does not mean an optimal integer routing solution.
@@ -182,7 +185,7 @@ def solve_root(
         instance.name, instance.vehicles, instance.capacity, rows, distances, problem_type,
         ng, reference_ng, rounding or instance.rounding, capacity_cuts, rank_one_cuts, stabilize,
         reduced_cost_fixing, upper_bound, time_limit, max_iterations,
-        max_cut_rounds, dict(pricing_options or {}),
+        max_cut_rounds, dict(pricing_options or {}), two_path_cuts,
     )
     data["duals"] = tuple(data["duals"])
     data["routes"] = tuple(
