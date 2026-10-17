@@ -20,12 +20,20 @@ fn _read_instance(py: Python<'_>, path: PathBuf) -> PyResult<Py<PyDict>> {
         .map(|c| (c.x, c.y, c.demand, c.ready, c.due, c.service))
         .collect();
     data.set_item("customers", customers)?;
+    let rounding = match instance.rounding {
+        baldes::vrptw::Rounding::None => "none",
+        baldes::vrptw::Rounding::Nearest => "nearest",
+        baldes::vrptw::Rounding::Tenth => "tenth",
+        baldes::vrptw::Rounding::Ceil => "ceil",
+    };
+    data.set_item("rounding", rounding)?;
+    data.set_item("distances", instance.distances)?;
     Ok(data.unbind())
 }
 
 #[cfg(feature = "clp")]
 #[pyfunction]
-#[pyo3(signature = (name, vehicles, capacity, customers, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options))]
+#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options))]
 #[allow(clippy::too_many_arguments)]
 fn _solve_root(
     py: Python<'_>,
@@ -33,6 +41,7 @@ fn _solve_root(
     vehicles: usize,
     capacity: f64,
     customers: Vec<CustomerData>,
+    distances: Option<Vec<Vec<f64>>>,
     problem_type: &str,
     ng: usize,
     reference_ng: bool,
@@ -54,16 +63,17 @@ fn _solve_root(
             "problem_type must be 'vrptw' or 'cvrp'",
         ));
     }
-    let rounding = match rounding {
-        "none" => Rounding::None,
-        "nearest" => Rounding::Nearest,
-        "tenth" => Rounding::Tenth,
-        _ => {
+    let rounding = Rounding::parse(rounding)
+        .map_err(|_| PyValueError::new_err("rounding must be 'none', 'nearest', 'tenth' or 'ceil'"))?;
+    if let Some(matrix) = &distances {
+        if matrix.len() != customers.len()
+            || matrix.iter().any(|row| row.len() != customers.len() || row.iter().any(|&d| !(d >= 0. && d.is_finite())))
+        {
             return Err(PyValueError::new_err(
-                "rounding must be 'none', 'nearest', or 'tenth'",
-            ))
+                "distances must be a square matrix over the depot and customers, finite and nonnegative",
+            ));
         }
-    };
+    }
     if ng == 0
         || max_iterations == 0
         || time_limit <= 0.
@@ -76,6 +86,11 @@ fn _solve_root(
     if vehicles == 0 || capacity <= 0. || !capacity.is_finite() || customers.len() < 2 {
         return Err(PyValueError::new_err(
             "instance needs positive vehicles/capacity, a depot and at least one customer",
+        ));
+    }
+    if problem_type == "vrptw" && customers.iter().any(|c| c.4.is_infinite()) {
+        return Err(PyValueError::new_err(
+            "the instance has no time windows (e.g. CVRPLIB input); use problem_type='cvrp'",
         ));
     }
     // CVRP has no time resource constraints, including when callers omit due times.
@@ -120,6 +135,8 @@ fn _solve_root(
                 service,
             })
             .collect(),
+        rounding,
+        distances,
     };
     let mut options = RootOptions::default();
     options.cg.stabilize = stabilize;
@@ -191,7 +208,9 @@ fn _solve_root(
     field!("cut_rounds", output.master.cut_rounds);
     field!("iterations", output.master.iterations);
     field!("pricing_calls", output.master.pricing_calls);
-    field!("columns", output.master.columns);
+    // bcCountCol: generated columns inserted over the run.
+    field!("columns", output.master.inserted_tags.len());
+    field!("master_columns", output.master.columns);
     field!("fixing_calls", output.fixing_calls);
     field!("enumerated_routes", output.enumerated_routes);
     field!("pruned_by_bound", output.master.pruned_by_bound);

@@ -59,6 +59,41 @@ pub struct Statistics {
     pub backward_time: f64,
     pub concatenation_time: f64,
 }
+impl Statistics {
+    /// Adds another sweep's counters; the times are left as they are.
+    pub fn absorb(&mut self, other: &Statistics) {
+        let Statistics {
+            generated,
+            expanded,
+            dominated,
+            dominance_checks,
+            other_dominance_checks,
+            other_bucket_searches,
+            concatenation_tests,
+            later_label_checks,
+            other_dominated,
+            capped,
+            forward_labels,
+            backward_labels,
+            elapsed: _,
+            forward_time: _,
+            backward_time: _,
+            concatenation_time: _,
+        } = other;
+        self.generated += generated;
+        self.expanded += expanded;
+        self.dominated += dominated;
+        self.dominance_checks += dominance_checks;
+        self.other_dominance_checks += other_dominance_checks;
+        self.other_bucket_searches += other_bucket_searches;
+        self.concatenation_tests += concatenation_tests;
+        self.later_label_checks += later_label_checks;
+        self.other_dominated += other_dominated;
+        self.capped += capped;
+        self.forward_labels += forward_labels;
+        self.backward_labels += backward_labels;
+    }
+}
 #[derive(Debug)]
 pub struct PricingResult {
     pub columns: Vec<Route>,
@@ -81,54 +116,64 @@ struct Label {
 
 /// StdResources transitions: disposable resources may wait at a lower bound;
 /// equality resources cannot. Backward propagation clips before subtraction.
-pub fn extend_resources(g: &Graph, a: &Arc, mut q: [f64; 2], forward: bool) -> Option<[f64; 2]> {
-    for (r, kind) in g.resources.iter().enumerate() {
-        let mut head = g.vertices[a.head].bounds[r];
-        if let Some(window) = a.bounds[r] {
-            head.lower = head.lower.max(window.lower);
-            head.upper = head.upper.min(window.upper);
+/// Each resource goes through a scalar step so `q` stays in registers; a
+/// loop writing `q[r]` kept it in memory, and the next 16-byte read of the
+/// resources stalled on store forwarding.
+#[inline(always)]
+pub fn extend_resources(g: &Graph, a: &Arc, q: [f64; 2], forward: bool) -> Option<[f64; 2]> {
+    let n = g.resources.len();
+    let q0 = if n > 0 { extend_resource(g, a, 0, q[0], forward)? } else { q[0] };
+    let q1 = if n > 1 { extend_resource(g, a, 1, q[1], forward)? } else { q[1] };
+    Some([q0, q1])
+}
+#[inline(always)]
+fn extend_resource(g: &Graph, a: &Arc, r: usize, mut q: f64, forward: bool) -> Option<f64> {
+    let equality = g.resources[r] == ResourceKind::Equality;
+    let mut head = g.vertices[a.head].bounds[r];
+    if let Some(window) = a.bounds[r] {
+        head.lower = head.lower.max(window.lower);
+        head.upper = head.upper.min(window.upper);
+    }
+    if forward {
+        q += a.consumption[r];
+        if q < head.lower {
+            if equality {
+                return None;
+            }
+            q = head.lower;
         }
+        if q > head.upper {
+            return None;
+        }
+    } else {
         let mut tail = g.vertices[a.tail].bounds[r];
         if a.tail == g.source {
             if let Some(initial) = g.initial[r] {
                 tail.lower = tail.lower.max(initial);
             }
         }
-        if forward {
-            q[r] += a.consumption[r];
-            if q[r] < head.lower {
-                if *kind == ResourceKind::Equality {
-                    return None;
-                }
-                q[r] = head.lower;
-            }
-            if q[r] > head.upper {
+        if q > head.upper {
+            if equality {
                 return None;
             }
-        } else {
-            if q[r] > head.upper {
-                if *kind == ResourceKind::Equality {
-                    return None;
-                }
-                q[r] = head.upper;
-            }
-            if q[r] < head.lower {
-                return None;
-            }
-            q[r] -= a.consumption[r];
-            if q[r] > tail.upper {
-                if *kind == ResourceKind::Equality {
-                    return None;
-                }
-                q[r] = tail.upper;
-            }
-            if q[r] < tail.lower {
-                return None;
-            }
+            q = head.upper;
         }
-        if !q[r].is_finite() {
+        if q < head.lower {
             return None;
         }
+        q -= a.consumption[r];
+        if q > tail.upper {
+            if equality {
+                return None;
+            }
+            q = tail.upper;
+        }
+        if q < tail.lower {
+            return None;
+        }
+    }
+    if !q.is_finite() {
+        return None;
     }
     Some(q)
 }

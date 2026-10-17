@@ -1,0 +1,6 @@
+[submodule "vendor/CoinUtils"]
+	path = vendor/CoinUtils
+	url = https://github.com/coin-or/CoinUtils
+[submodule "vendor/Clp"]
+	path = vendor/Clp
+	url = https://github.com/coin-or/Clp

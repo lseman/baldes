@@ -30,21 +30,35 @@ class Customer:
 
 @dataclass(frozen=True)
 class Instance:
-    """Routing data, including the depot at index 0."""
+    """Routing data, including the depot at index 0.
+
+    ``rounding`` is the distance convention of the source (``"none"`` for
+    Solomon files, ``"nearest"`` for CVRPLIB EUC_2D, ``"ceil"`` for CEIL_2D).
+    ``distances`` holds explicit CVRPLIB edge weights over the depot and
+    customers; when given, coordinates and rounding do not define distances.
+    """
 
     name: str
     capacity: float
     customers: Tuple[Customer, ...]
     vehicles: int = 1
+    rounding: str = "none"
+    distances: Optional[Tuple[Tuple[float, ...], ...]] = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "customers", tuple(self.customers))
         if not all(isinstance(c, Customer) for c in self.customers):
             raise TypeError("customers must contain Customer objects")
+        if self.distances is not None:
+            object.__setattr__(self, "distances", tuple(tuple(row) for row in self.distances))
 
     @classmethod
     def from_file(cls, path: Union[str, PathLike]) -> Instance:
-        """Read a Solomon-format file, including converted CVRP instances."""
+        """Read a Solomon-format file or a CVRPLIB ``.vrp`` file.
+
+        CVRPLIB customers have no time windows (infinite due times): solve
+        them with ``problem_type="cvrp"``.
+        """
         data = _core._read_instance(path)
         data["customers"] = tuple(Customer(*row) for row in data["customers"])
         return cls(**data)
@@ -53,7 +67,10 @@ class Instance:
         """Keep the first N customers plus the depot."""
         if not 0 < customers < len(self.customers):
             raise ValueError("customer limit out of range")
-        return replace(self, customers=self.customers[:customers + 1])
+        distances = self.distances
+        if distances is not None:
+            distances = tuple(row[:customers + 1] for row in distances[:customers + 1])
+        return replace(self, customers=self.customers[:customers + 1], distances=distances)
 
     def solve_root(self, **options) -> RootResult:
         return solve_root(self, **options)
@@ -94,7 +111,8 @@ class RootResult:
     cut_rounds: int
     iterations: int
     pricing_calls: int
-    columns: int
+    columns: int  # bcCountCol: route columns added over the run
+    master_columns: int  # final master size, artificial columns included
     fixing_calls: int
     enumerated_routes: int
     pruned_by_bound: bool
@@ -130,7 +148,7 @@ def solve_root(
     customers: Optional[int] = None,
     ng: int = 8,
     reference_ng: bool = False,
-    rounding: str = "none",
+    rounding: Optional[str] = None,
     capacity_cuts: bool = False,
     rank_one_cuts: bool = False,
     stabilize: bool = True,
@@ -143,8 +161,10 @@ def solve_root(
 ) -> RootResult:
     """Solve a VRPTW/CVRP root relaxation directly in Rust, releasing the GIL.
 
-    Input paths use Solomon format. CVRP ignores time windows and service times.
-    Costs are unrounded by default; rounding also accepts 'nearest' and 'tenth'.
+    Input paths use Solomon or CVRPLIB format. CVRP ignores time windows and
+    service times. Distances follow the instance's convention by default
+    (unrounded for Solomon, TSPLIB nint for CVRPLIB EUC_2D); rounding accepts
+    'none', 'nearest', 'tenth' and 'ceil'.
     Capacity cuts use complement form; rank-one cuts use limited memory.
     Disabling reduced_cost_fixing also disables route enumeration. Cut counts
     include generated rows that were later retired. These are root relaxations:
@@ -157,9 +177,10 @@ def solve_root(
     if customers is not None:
         instance = instance.truncated(customers)
     rows = [(c.x, c.y, c.demand, c.ready, c.due, c.service) for c in instance.customers]
+    distances = None if instance.distances is None else [list(row) for row in instance.distances]
     data = _core._solve_root(
-        instance.name, instance.vehicles, instance.capacity, rows, problem_type,
-        ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize,
+        instance.name, instance.vehicles, instance.capacity, rows, distances, problem_type,
+        ng, reference_ng, rounding or instance.rounding, capacity_cuts, rank_one_cuts, stabilize,
         reduced_cost_fixing, upper_bound, time_limit, max_iterations,
         max_cut_rounds, dict(pricing_options or {}),
     )

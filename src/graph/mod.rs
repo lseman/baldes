@@ -66,6 +66,74 @@ pub struct Graph {
     grouped: bool,
 }
 impl Graph {
+    /// `self == other` with every arc's `reduced_cost` ignored, without
+    /// cloning. The destructuring breaks the build if a field is added.
+    pub fn same_topology(&self, other: &Graph) -> bool {
+        let Graph {
+            vertices,
+            arcs,
+            resources,
+            source,
+            sink,
+            element_count,
+            elementary,
+            initial,
+            graph_id,
+            main_resource,
+            grouped,
+        } = self;
+        if !(*source == other.source
+            && *sink == other.sink
+            && *element_count == other.element_count
+            && *elementary == other.elementary
+            && *initial == other.initial
+            && *graph_id == other.graph_id
+            && *main_resource == other.main_resource
+            && *grouped == other.grouped
+            && *resources == other.resources
+            && vertices.len() == other.vertices.len()
+            && arcs.len() == other.arcs.len())
+        {
+            return false;
+        }
+        let same_arc_scalars = |a: &Arc, b: &Arc| {
+            let Arc {
+                id,
+                tail,
+                head,
+                cost,
+                reduced_cost: _,
+                variables,
+                consumption,
+                bounds,
+                elements,
+                memory,
+            } = a;
+            *id == b.id
+                && *tail == b.tail
+                && *head == b.head
+                && *cost == b.cost
+                && *consumption == b.consumption
+                && *bounds == b.bounds
+                && variables.len() == b.variables.len()
+                && elements.len() == b.elements.len()
+                && memory.len() == b.memory.len()
+        };
+        // Lengths are equal here. Empty vectors skip the comparison: glibc's
+        // AVX-512 memcmp on their dangling pointer takes a fault-suppression
+        // assist, which made this check a third of a C201 root.
+        fn same<T: PartialEq>(a: &[T], b: &[T]) -> bool {
+            a.is_empty() || a == b
+        }
+        // Contiguous fields first; the per-arc vectors cost a pointer chase.
+        arcs.iter().zip(&other.arcs).all(|(a, b)| same_arc_scalars(a, b))
+            && *vertices == other.vertices
+            && arcs.iter().zip(&other.arcs).all(|(a, b)| {
+                same(&a.variables, &b.variables)
+                    && same(&a.elements, &b.elements)
+                    && same(&a.memory, &b.memory)
+            })
+    }
     pub fn new(vertices: usize, resources: usize) -> Result<Self> {
         if vertices == 0 || vertices > 1024 || resources > 2 {
             return Err(invalid(

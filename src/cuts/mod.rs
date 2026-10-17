@@ -619,7 +619,10 @@ pub fn coefficient(input: &RankOneCut, graph: i32, route: &[(usize, usize, i32)]
         if w != 0 {
             step(sign * w);
         }
-        if let Some(&aw) = input.arc_weights.get(&id) {
+        if let Some(&aw) = (!input.arc_weights.is_empty())
+            .then(|| input.arc_weights.get(&id))
+            .flatten()
+        {
             if aw != 0 {
                 step(sign * aw);
             }

@@ -202,11 +202,10 @@ impl Solver {
             .get(index)
             .ok_or_else(|| invalid("pricing phase out of range"))?;
         self.refresh_cuts()?;
-        let topology = self.topology();
         if self
             .enumeration_snapshot
             .as_ref()
-            .is_some_and(|snapshot| snapshot != &topology)
+            .is_some_and(|snapshot| !snapshot.same_topology(&self.graph))
         {
             self.restore_arcs();
         }
@@ -244,9 +243,11 @@ impl Solver {
         };
         controls.max_columns = maximum.min(limit);
         controls.negative_only = negative_only;
-        let topology = self.topology();
         let engine_controls = self.engine_controls(phase.exact());
-        let reuse = self.prepared.as_ref() == Some(&topology)
+        let reuse = self
+            .prepared
+            .as_ref()
+            .is_some_and(|prepared| prepared.same_topology(&self.graph))
             && self
                 .engine
                 .as_ref()
@@ -286,7 +287,9 @@ impl Solver {
             }
         }
         self.engine = Some(engine);
-        self.prepared = Some(topology);
+        if !reuse {
+            self.prepared = Some(self.topology());
+        }
         if let Err(error) = &answer {
             self.requires_rollback =
                 self.rollback_point_saved && error.message.contains("time limit");

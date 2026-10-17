@@ -33,7 +33,7 @@ The C++ BALDES 1.x code remains in the git history before the 2.0 commit.
   limited- and full-memory cut state in pricing and enumeration labels.
 - Dual-price smoothing, and a Clp-backed restricted master with cut rounds,
   basic-cut removal and artificial-column penalties.
-- A Solomon VRPTW model and a root-solve command.
+- Solomon VRPTW and CVRPLIB CVRP input and a root-solve command.
 
 The core solver uses only the Rust standard library. The `clp` feature links
 COIN-OR Clp through its C interface for the restricted master.
@@ -49,32 +49,35 @@ cargo build --release
 With the Clp master and the `baldes` command:
 
 ```bash
-export BALDES_CLP_LIB_DIR=/path/to/clp/archives
+git submodule update --init   # vendor/Clp and vendor/CoinUtils
 cargo build --release --features clp
 ```
 
-`BALDES_CLP_LIB_DIR` must contain the static archives
-`libopenrscp_clp_solver.a` and `libopenrscp_coinutils.a`. The C++ OpenRSCP
-Python build produces them in `python/build/openrscp_core`. Using the same Clp
-build as the reference keeps degenerate master solutions, and therefore
-trajectories, comparable.
+The `clp` feature compiles Clp 1.17.10 and CoinUtils 2.11 from the
+[`vendor/`](vendor/) submodules; a C++14 compiler is needed.
 
 ## Run
 
 ```bash
 ./target/release/baldes vrptw instances/R101.txt --customers 25 --rank1
-./target/release/baldes cvrp /path/to/P-n16-k8.txt --capacity-cuts
+./target/release/baldes cvrp instances/cvrplib/A-n32-k5.vrp --capacity-cuts
 ```
 
 The first argument selects the instance type. Both commands read Solomon-format
-files, including CVRP instances converted to that format. `vrptw` enforces time
-windows and service times; `cvrp` ignores them. Run `baldes --help` for usage.
+files and CVRPLIB (TSPLIB) `.vrp` files; the format is detected from the
+content. `vrptw` enforces time windows and service times; `cvrp` ignores them.
+CVRPLIB instances have no time windows, so they are solved as `cvrp`. They use
+the file's distance convention: TSPLIB `nint` for `EUC_2D`, `ceil` for
+`CEIL_2D`, or the explicit `EDGE_WEIGHT_SECTION` (full or triangular). As for
+Solomon files, the root fleet bound is the customer count. Route-length limits (`DISTANCE`) and service times are not supported. Run
+`baldes --help` for usage.
 
 | Option | Meaning |
 | --- | --- |
 | `--customers N` | keep the first N customers |
 | `--ng N` | NG neighbourhood size (default 8) |
 | `--reference-ng` | the N nearest customers, ties by index (the comparison setup) |
+| `--rounding MODE` | distances `none`, `nearest`, `tenth` or `ceil` (default: the file's convention) |
 | `--rank1` | separate limited-memory rank-one cuts |
 | `--capacity` / `--capacity-cuts` | separate native rounded capacity cuts in the Clp root master |
 | `--no-enumeration` | no reduced-cost fixing or enumeration |
@@ -83,17 +86,47 @@ windows and service times; `cvrp` ignores them. Run `baldes --help` for usage.
 | `--iterations N`, `--time S` | master iteration and time limits |
 | `--json FILE` | write the root result, history and positive routes |
 
-Solomon instances are in [`instances/`](instances/).
+Solomon instances are in [`instances/`](instances/), and a few CVRPLIB ones in
+[`instances/cvrplib/`](instances/cvrplib/).
+
+## Comparison with the solver
+
+Root relaxations of Solomon VRPTW instances (100 customers), BALDES against
+the the solver binary. Both solve the same split-depot graph with unrounded
+Euclidean distances, the same NG neighbourhoods (the 8 nearest customers), the
+Clp master and no reduced-cost fixing or enumeration. Times are the solvers' own
+root timers, medians of three runs, each solver running alone on an AMD
+Ryzen 9 9950X. the solver is single-threaded; BALDES runs the forward and backward
+labeling of exact pricing on two threads, so it is timed on one and two cores.
+
+| Instance | Cuts | Root LP | Pricing calls | Cuts added | BaPCod (s) | BALDES 1 core (s) | BALDES 2 cores (s) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| C101 | none | 828.937 | 82 | 0 | 0.09 | 0.058 | 0.057 |
+| C102 | none | 828.937 | 133 | 0 | 0.39 | 0.38 | 0.36 |
+| C103 | none | 828.065 | 138 | 0 | 1.13 | 1.18 | 1.11 |
+| C201 | none | 591.557 | 98 | 0 | 0.16 | 0.12 | 0.12 |
+| C202 | none | 591.557 | 1257 | 0 | 14.64 | 13.17 | 12.16 |
+| R101 | none | 1636.389 | 95 | 0 | 0.07 | 0.046 | 0.045 |
+| R101 | rank-one | 1641.509 | 121 | 225 | 1.07 | 1.10 | 1.09 |
+| R102 | none | 1472.815 | 145 | 0 | 0.32 | 0.29 | 0.28 |
+| R103 | none | 1211.107 | 220 | 0 | 0.91 | 0.91 | 0.89 |
+| R103 | rank-one | 1213.624 | 289 | 343 | 1.98 | 1.90 | 1.83 |
+| R201 | none | 1140.130 | 364 | 0 | 1.57 | 1.47 | 1.43 |
+| R201 | rank-one | 1147.804 | 636 | 832 | 8.98 | 7.46 | 7.27 |
+| R202 | none | 1020.646 | 470 | 0 | 5.92 | 5.98 | 5.66 |
+
+On C101–C103, C201, C202 and R102, rank-one separation finds no violated cut,
+so those runs equal the ones without cuts.
 
 ## Python: pybaldes
 
 The Python distribution and import are both named `pybaldes`. It contains the
 low-level `Solver`, `Route`, and `Phase` bindings and direct Rust-backed VRPTW/CVRP
-root solving. The default build includes the Clp master and requires the same
-archives as the Rust CLI:
+root solving. The default build includes the Clp master, built from the same
+`vendor/` submodules as the Rust CLI:
 
 ```bash
-export BALDES_CLP_LIB_DIR=/path/to/clp/archives
+git submodule update --init
 python -m pip install .
 ```
 
@@ -102,7 +135,7 @@ import pybaldes
 
 result = pybaldes.solve_root(
     "instances/R101.txt",
-    problem_type="vrptw",  # or "cvrp" for converted CVRP files
+    problem_type="vrptw",  # or "cvrp" for CVRPLIB .vrp files
     customers=25,
     capacity_cuts=True,
     rank_one_cuts=True,
@@ -113,7 +146,7 @@ for route in result.routes:
     print(route.value, route.cost, route.nodes)
 ```
 
-`Instance.from_file(path)` reads Solomon-format files. You can also build inputs
+`Instance.from_file(path)` reads Solomon-format and CVRPLIB `.vrp` files. You can also build inputs
 in memory:
 
 ```python
@@ -130,7 +163,7 @@ result = instance.solve_root(problem_type="cvrp", capacity_cuts=True)
 CVRP ignores time windows and service times; in-memory VRPTW data requires finite
 `ready`/`due` windows, including the depot. `vehicles` is retained as input
 metadata; the current root model uses the customer count as its fleet upper
-bound, matching the Rust CLI. Native CVRPLIB `.vrp` input is not supported yet.
+bound, matching the Rust CLI.
 
 Options include `ng`, `reference_ng`, `rounding` (`none`, `nearest`, `tenth`),
 `stabilize`, `reduced_cost_fixing`, `upper_bound`, `max_iterations`,
@@ -154,8 +187,7 @@ run `python -m pytest python/tests` to test a build with Clp.
 
 ## Not in 2.0 yet
 
-Strong k-path root integration, the C API entry points for cuts,
-Native CVRPLIB input, EVRP front ends, branching, the heuristics, and remaining
+Strong k-path root integration, EVRP front ends, branching, the heuristics, and remaining
 1.x Python APIs.
 
 ## TODO
@@ -173,7 +205,7 @@ Native CVRPLIB input, EVRP front ends, branching, the heuristics, and remaining
 | `python/pybaldes/` | Python package and typed routing API |
 | `python/tests/` | installed-package integration tests |
 | `tools/` | comparison scripts against the C++ reference |
-| `instances/` | Solomon VRPTW instances |
+| `instances/` | Solomon VRPTW instances; `cvrplib/` holds CVRPLIB samples |
 | `assets/` | logo |
 | `landing/` | project landing page (deployed to GitHub Pages) |
 

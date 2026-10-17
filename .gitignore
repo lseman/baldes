@@ -73,6 +73,8 @@ savings.py
 
 # Reports & examples
 reports/
+# Internal parity notes and tools (Clp/the solver trajectory investigations)
+internal/
 more_examples/
 new_examples/
 testing/
