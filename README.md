@@ -287,3 +287,4 @@ MIT. See [LICENSE](LICENSE).
 1. Ruslan Sadykov, François Vanderbeck. "BaPCod - a generic branch-and-price code." Technical report HAL-03340548, Inria Bordeaux Sud-Ouest, 2021.
 2. Ruslan Sadykov, Eduardo Uchoa, Artur Alves Pessoa. "A Bucket Graph Based Labeling Algorithm for Vehicle Routing." Transportation Science, 2021. https://doi.org/10.1287/trsc.2020.0985
 3. Diego Pecin, Artur Pessoa, Marcus Poggi, Eduardo Uchoa, Haroldo Santos. "Limited memory rank-1 cuts for vehicle routing problems." Operations Research Letters 45.3 (2017): 206-209. https://doi.org/10.1016/j.orl.2017.02.006
+4. Talal Vidal. "Hybrid genetic search for the CVRP: Open-source implementation and SWAP* neighborhood." Computers & Operations Research 140 (2022): 105643. https://doi.org/10.1016/j.cor.2021.105643
