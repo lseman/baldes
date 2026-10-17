@@ -54,7 +54,7 @@ def reference_worker(name, n, config, limit):
         ng_sets=differential.ng_sets(inst, 8),
         rank1_cuts=flags["rank1"],
         capacity_cuts=flags["capacity"],
-        params={"GlobalTimeLimit": int(limit)},
+        params={"GlobalTimeLimit": int(limit), **json.loads(os.environ.get("BAPCOD_PARAMS", "{}"))},
     )
     print(json.dumps({"lp": r.root_lp, "seconds": r.time_root, "pricing_calls": r.pricing_calls,
                       "cuts": r.cuts, "columns": r.columns,

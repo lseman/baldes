@@ -102,38 +102,45 @@ impl ClpMaster {
         rhs: f64,
         entries: &[(usize, f64)],
     ) -> Result<usize> {
-        if !rhs.is_finite() {
-            return Err(invalid("finite row RHS required"));
+        Ok(self.add_rows(&[(sense, rhs, entries)])?.start)
+    }
+    /// Adds the rows in order with one Clp call, as BaPCod adds a cut round.
+    pub fn add_rows(&mut self, rows: &[(RowSense, f64, &[(usize, f64)])]) -> Result<std::ops::Range<usize>> {
+        let first = self.rhs.len();
+        if rows.is_empty() {
+            return Ok(first..first);
         }
-        let (indices, values) = entries_of(entries, self.costs.len())?;
-        let lower = if sense == RowSense::LessEqual {
-            -f64::MAX
-        } else {
-            rhs
-        };
-        let upper = if sense == RowSense::GreaterEqual {
-            f64::MAX
-        } else {
-            rhs
-        };
-        let starts = [0, indices.len() as i32];
+        let (mut lower, mut upper, mut starts) = (vec![], vec![], vec![0i32]);
+        let (mut indices, mut values) = (vec![], vec![]);
+        for &(sense, rhs, entries) in rows {
+            if !rhs.is_finite() {
+                return Err(invalid("finite row RHS required"));
+            }
+            let (i, v) = entries_of(entries, self.costs.len())?;
+            lower.push(if sense == RowSense::LessEqual { -f64::MAX } else { rhs });
+            upper.push(if sense == RowSense::GreaterEqual { f64::MAX } else { rhs });
+            indices.extend(i);
+            values.extend(v);
+            starts.push(indices.len() as i32);
+        }
         // SAFETY: All arrays contain the declared row and nonzero counts; Clp copies them.
         unsafe {
             Clp_addRows(
                 self.model.as_ptr(),
-                1,
-                &lower,
-                &upper,
+                rows.len() as i32,
+                lower.as_ptr(),
+                upper.as_ptr(),
                 starts.as_ptr(),
                 indices.as_ptr(),
                 values.as_ptr(),
             );
         }
-        let id = self.rhs.len();
-        self.rhs.push(rhs);
-        self.senses.push(sense);
+        for &(sense, rhs, _) in rows {
+            self.rhs.push(rhs);
+            self.senses.push(sense);
+        }
         self.solved = false;
-        Ok(id)
+        Ok(first..self.rhs.len())
     }
     pub fn add_column(&mut self, cost: f64, entries: &[(usize, f64)]) -> Result<usize> {
         Ok(self.add_columns(&[(cost, entries)])?.start)
@@ -377,9 +384,15 @@ impl ClpMaster {
         }
         let (rm, ri) = mapping(self.rhs.len(), rows)?;
         let (cm, ci) = mapping(self.costs.len(), columns)?;
+        // Empty deletions are skipped: BaPCod issues none, and a Clp call
+        // with no index still resets internal state.
         unsafe {
-            Clp_deleteRows(self.model.as_ptr(), ri.len() as i32, ri.as_ptr());
-            Clp_deleteColumns(self.model.as_ptr(), ci.len() as i32, ci.as_ptr());
+            if !ri.is_empty() {
+                Clp_deleteRows(self.model.as_ptr(), ri.len() as i32, ri.as_ptr());
+            }
+            if !ci.is_empty() {
+                Clp_deleteColumns(self.model.as_ptr(), ci.len() as i32, ci.as_ptr());
+            }
         }
         self.rhs = self
             .rhs
@@ -427,6 +440,10 @@ impl LpMaster for ClpMaster {
         entries: &[(usize, f64)],
     ) -> Result<usize> {
         Self::add_row(self, sense, rhs, entries)
+    }
+
+    fn add_rows(&mut self, rows: &[(RowSense, f64, &[(usize, f64)])]) -> Result<std::ops::Range<usize>> {
+        Self::add_rows(self, rows)
     }
 
     fn add_column(&mut self, cost: f64, entries: &[(usize, f64)]) -> Result<usize> {

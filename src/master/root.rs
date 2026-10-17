@@ -267,6 +267,18 @@ struct CutState {
     /// Master columns to delete after a relaxation strengthening.
     removed_columns: Vec<usize>,
 }
+/// Cut rows of one separation round, added to the master together.
+struct PendingRows {
+    base: usize,
+    rows: Vec<(RowSense, f64, Vec<(usize, f64)>)>,
+}
+impl PendingRows {
+    /// Queue a row; returns the master index it will have.
+    fn push(&mut self, sense: RowSense, rhs: f64, entries: Vec<(usize, f64)>) -> usize {
+        self.rows.push((sense, rhs, entries));
+        self.base + self.rows.len() - 1
+    }
+}
 /// Root separator priorities: capacity cuts, then rank-one cuts.
 const CAPACITY_PRIORITY: f64 = 3.;
 const RANK_ONE_PRIORITY: f64 = 1.;
@@ -599,6 +611,9 @@ impl<M: LpMaster> Controller<M> for RootController {
         // Those at or above the level run; a lower one runs, and becomes the
         // level, only while nothing has been added this round.
         let mut level = state.cut.level;
+        let mut rows = PendingRows { base: master.rhs().len(), rows: vec![] };
+        // Cuts separated this round reach the formulation after the loop.
+        let rank_one_in_master = state.cut.rows.iter().any(Option::is_some);
         let mut added = 0;
         let mut success = false;
         for (priority, separator) in state.cut.separators() {
@@ -609,14 +624,17 @@ impl<M: LpMaster> Controller<M> for RootController {
                 level = priority;
             }
             let (count, changed) = match separator {
-                Separator::Capacity => (self.separate_capacity(state, master, &tagged, &fractional)?, false),
-                Separator::RankOne => self.separate_rank_one(state, master, &tagged, &fractional)?,
-                Separator::Relaxation => (0, self.improve_relaxation(state, &tagged, &values)?),
+                Separator::Capacity => (self.separate_capacity(state, &mut rows, &tagged, &fractional)?, false),
+                Separator::RankOne => self.separate_rank_one(state, master, &mut rows, &tagged, &fractional)?,
+                Separator::Relaxation => (0, self.improve_relaxation(state, rank_one_in_master, &tagged, &values)?),
             };
             added += count;
             success |= count > 0 || changed;
         }
         state.cut.level = level;
+        // BaPCod adds the round's cuts to Clp in one call.
+        let batch: Vec<_> = rows.rows.iter().map(|(sense, rhs, entries)| (*sense, *rhs, entries.as_slice())).collect();
+        master.add_rows(&batch)?;
         if success {
             state.cut.rounds += 1;
         }
@@ -627,10 +645,10 @@ impl<M: LpMaster> Controller<M> for RootController {
     }
 }
 impl RootController {
-    fn separate_capacity<M: LpMaster>(
+    fn separate_capacity(
         &self,
         state: &mut State,
-        master: &mut M,
+        rows: &mut PendingRows,
         tagged: &[(usize, usize)],
         fractional: &[FractionalColumn],
     ) -> Result<usize> {
@@ -645,7 +663,7 @@ impl RootController {
                 (coefficient != 0).then_some((column, coefficient as f64))
             }).collect();
             let sense = if cut.greater_equal() { RowSense::GreaterEqual } else { RowSense::LessEqual };
-            let row = master.add_row(sense, cut.rhs as f64, &entries)?;
+            let row = rows.push(sense, cut.rhs as f64, entries);
             for (index, arc) in self.problem.graph.arcs.iter().enumerate() {
                 let u = if arc.tail == self.problem.graph.sink { 0 } else { arc.tail };
                 let v = if arc.head == self.problem.graph.sink { 0 } else { arc.head };
@@ -663,6 +681,7 @@ impl RootController {
         &self,
         state: &mut State,
         master: &mut M,
+        rows: &mut PendingRows,
         tagged: &[(usize, usize)],
         fractional: &[FractionalColumn],
     ) -> Result<(usize, bool)> {
@@ -693,7 +712,7 @@ impl RootController {
             } else {
                 RowSense::LessEqual
             };
-            let row = master.add_row(sense, cut.rhs as f64, &entries)?;
+            let row = rows.push(sense, cut.rhs as f64, entries);
             state.cut.rows.push(Some(row));
             state.cut.memories.push(cut.memory_for_graph(graph.graph_id.max(0)));
         }
@@ -719,11 +738,18 @@ impl RootController {
     /// BcRCSPFunctor::improveCurrentSpRelaxation): strengthen the NG memories
     /// from the cycles of the routes in the LP solution, then mark the master
     /// columns the stronger relaxation forbids for removal. A negative
-    /// RCSPdynamicNGmode only strengthens while no rank-one cut is active.
-    fn improve_relaxation(&self, state: &mut State, tagged: &[(usize, usize)], values: &[f64]) -> Result<bool> {
+    /// RCSPdynamicNGmode only strengthens while no rank-one cut is in the
+    /// master (cuts of the current round do not count yet).
+    fn improve_relaxation(
+        &self,
+        state: &mut State,
+        rank_one_in_master: bool,
+        tagged: &[(usize, usize)],
+        values: &[f64],
+    ) -> Result<bool> {
         let option = |name: &str| state.solver.options.get(name);
         let mode = option("RCSPdynamicNGmode")? as i32;
-        if mode == 0 || (mode < 0 && state.cut.rows.iter().any(Option::is_some)) {
+        if mode == 0 || (mode < 0 && rank_one_in_master) {
             return Ok(false);
         }
         let controls = crate::graph::relaxation::Controls {
