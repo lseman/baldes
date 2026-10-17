@@ -60,6 +60,9 @@ pub struct ClpMaster {
     pub status: i32,
     pub solved: bool,
     pub dual_tolerance: f64,
+    /// Primal values and duals with magnitude at most this are read as zero,
+    /// as LpClpInterface::getSol  does with 1e-7.
+    pub zero_tolerance: f64,
 }
 impl ClpMaster {
     pub fn new() -> Result<Self> {
@@ -82,6 +85,7 @@ impl ClpMaster {
             status: -1,
             solved: false,
             dual_tolerance: 1e-7,
+            zero_tolerance: 0.,
         })
     }
     pub fn add_row(
@@ -227,6 +231,14 @@ impl ClpMaster {
                     )
                     .to_vec()
                 };
+                let tolerance = self.zero_tolerance;
+                if tolerance > 0. {
+                    for x in self.duals.iter_mut().chain(self.values.iter_mut()) {
+                        if !(*x > tolerance || *x < -tolerance) {
+                            *x = 0.;
+                        }
+                    }
+                }
             }
         }
         self.solved
