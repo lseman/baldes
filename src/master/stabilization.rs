@@ -150,9 +150,11 @@ impl DualPriceSmoothing {
         self.angle = cosine(&self.center, &self.pricing, &f.subgradient);
         if self.parameters.alpha_factor >= 1. && self.misprices == 0 {
             let tolerance = self.parameters.tolerance;
-            if f.negative_columns == 0 || self.angle > tolerance {
+            // The angle test uses its own native threshold, independently of
+            // the tolerance for bounds and dual values .
+            if f.negative_columns == 0 || self.angle > 1e-12 {
                 self.alpha -= 0.1;
-            } else if self.angle < -tolerance
+            } else if self.angle < -1e-12
                 && self.alpha < 0.999 - (self.alpha.abs().min(0.999) * 1e-10 + tolerance)
             {
                 self.alpha += 0.1 * (1. - self.alpha);
@@ -304,4 +306,25 @@ fn cosine(center: &[f64], priced: &[f64], g: &[f64]) -> f64 {
     // round-off step toward the pricing point still yields an angle, and a
     // zero step gives NaN, which then fails both alpha-update comparisons.
     dot(&toward, g) / (norm(g) * norm(&toward))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn angle_threshold_is_independent_of_bound_tolerance() {
+        for (angle, expected_alpha) in [(2e-12, 0.4), (-2e-12, 0.55), (5e-13, 0.5), (-5e-13, 0.5)] {
+            let mut smoothing = DualPriceSmoothing::default();
+            smoothing.center = vec![0., 0.];
+            smoothing.pricing = vec![1., 0.];
+            assert!(!smoothing.after_pricing(&Feedback {
+                negative_columns: 1,
+                subgradient: vec![angle, 1.],
+                lagrangian: f64::NEG_INFINITY,
+                phase: 1,
+            }));
+            assert_eq!(smoothing.alpha, expected_alpha, "angle {angle}");
+        }
+    }
 }
