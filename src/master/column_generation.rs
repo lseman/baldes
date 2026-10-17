@@ -312,6 +312,9 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
             stage -= 1;
             // eval  clears both values on each phase change.
             stage_bound = -1e12;
+            // Each phase is a new solveMastLpPrimPh1A2  call,
+            // whose penalty-update count starts at zero.
+            round_penalty_updates = 0;
             advanced = true;
             if options.stabilize {
                 smoothing.after_iteration();
@@ -406,6 +409,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
             if advanced {
                 stage -= 1;
                 stage_bound = -1e12;
+                round_penalty_updates = 0;
             }
             for batch in pending {
                 let mut identities = vec![];
@@ -520,6 +524,7 @@ pub fn optimize<P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller>(
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
                     stage = schedule.len() - 1;
                     stage_bound = -1e12;
+                    round_penalty_updates = 0;
                     continue;
                 }
             }
