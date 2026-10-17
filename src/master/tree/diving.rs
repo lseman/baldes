@@ -152,6 +152,7 @@ pub(super) fn run(
             }
             output.diving_nodes += 1;
             match evaluate(
+                node.parent.as_ref(),
                 problem,
                 &branches,
                 pool,

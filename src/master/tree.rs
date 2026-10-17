@@ -1,15 +1,17 @@
 //! Best-bound branch-and-price for a routing set-partitioning master.
 //!
 //! Directed arc-flow rows are priced through `RootProblem::arc_entries`.
-//! Each node rebuilds its LP and cut pools; feasible elementary columns are
-//! shared between nodes. Bounds come only from exact pricing, never from the
+//! Each child forks the parent's solved Clp model (with cuts intact) and
+//! carries the cut registry forward; feasible elementary columns are shared
+//! between nodes. Bounds come only from exact pricing, never from the
 //! restricted-master integer heuristic. Phased strong branching and diving
-//! use isolated node evaluations; node masters are currently rebuilt.
+//! use isolated node evaluations via fork-and-carry.
 use super::{
     column_generation::Status,
     root::{self, RootOptions, RootProblem, Row},
     RowSense,
 };
+use std::rc::Rc;
 use crate::{invalid, labeling::extend_resources, Result, Route};
 use std::collections::{BTreeMap, HashSet};
 use std::time::{Duration, Instant};
@@ -102,6 +104,7 @@ struct Branch {
 struct Node {
     branches: Vec<Branch>,
     bound: f64,
+    parent: Option<Rc<root::NodeSnapshot>>,
 }
 struct Pool {
     routes: Vec<Route>,
@@ -294,6 +297,7 @@ fn budget_error(error: &crate::core::error::OrError) -> bool {
     error.message.contains("time limit") || error.message.contains("label limit")
 }
 fn evaluate(
+    parent: Option<&Rc<root::NodeSnapshot>>,
     problem: &RootProblem,
     branches: &[Branch],
     pool: &Pool,
@@ -327,7 +331,12 @@ fn evaluate(
             .pricing_options
             .push(("RCSPhardTimeThresholdInPricing".into(), remaining));
     }
-    root::solve(branch_problem(problem, branches), controls)
+    let branches_tuple: Vec<_> = branches.iter().map(|b| (b.arc, b.sense, b.rhs)).collect();
+    if let Some(parent) = parent {
+        root::inherit(parent, &branches_tuple, controls)
+    } else {
+        root::solve(branch_problem(problem, branches), controls)
+    }
 }
 /// Solve a standard routing set-partitioning problem. `root.initial_routes`
 /// may seed incumbents; the cost-only `root.incumbent` is not used without a
@@ -421,6 +430,7 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
     let mut open = vec![Node {
         branches: vec![],
         bound: 0.,
+        parent: None,
     }];
     let mut unresolved = vec![];
     while !open.is_empty() {
@@ -441,7 +451,9 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
             .min_by(|&a, &b| open[a].bound.total_cmp(&open[b].bound))
             .unwrap();
         let mut node = open.remove(index);
+        let parent_ref = node.parent.as_ref();
         let result = match evaluate(
+            parent_ref,
             &problem,
             &node.branches,
             &pool,
@@ -505,6 +517,8 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
                 *flows.entry(problem.arc_position(id).unwrap()).or_default() += value;
             }
         }
+        // Capture parent snapshot before moving result into diving.
+        let parent_snapshot = result.snapshot.clone();
         diving::run(
             &problem,
             &node,
@@ -539,6 +553,7 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
                 open.push(Node {
                     branches,
                     bound: bounds[side],
+                    parent: parent_snapshot.clone(),
                 });
             }
         } else {

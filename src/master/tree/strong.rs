@@ -223,6 +223,7 @@ pub(super) fn choose(
                     estimates[side] = restricted_value(problem, &branches, pool, options)?;
                 } else {
                     let result = evaluate(
+                        node.parent.as_ref(),
                         problem,
                         &branches,
                         pool,
