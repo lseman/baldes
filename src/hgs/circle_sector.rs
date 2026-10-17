@@ -1,0 +1,152 @@
+//! Circle sector arithmetic on a [0, 65536) modular ring.
+//!
+//! Angles are stored as u16 in [0, 65535] instead of degrees [0, 359] so that
+//! modulo operations become cheap bitwise ANDs.  This matches the original
+//! HGS implementation and its interval-overlap tricks.
+//!
+//! See: <https://web.archive.org/web/20200912191950/https://fgiesen.wordpress.com/2015/09/24/intervals-in-modular-arithmetic/>
+
+/// A circle sector on a [0, 65536) modular ring.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CircleSector {
+    /// Angle where the sector starts (inclusive), in [0, 65535].
+    pub start: u16,
+    /// Angle where the sector ends (inclusive), in [0, 65535].
+    pub end: u16,
+}
+
+impl CircleSector {
+    /// Positive modulo 65536 via bitwise AND — equivalent to `i % 65536` but faster.
+    #[inline]
+    pub fn positive_mod(i: i32) -> u16 {
+        (i & 0xFFFF) as u16
+    }
+
+    /// Initialise a sector from a single point.
+    #[inline]
+    pub fn from_point(point: u16) -> Self {
+        Self {
+            start: point,
+            end: point,
+        }
+    }
+
+    /// Test whether `point` is enclosed within this sector.
+    #[inline]
+    pub fn is_enclosed(&self, point: u16) -> bool {
+        let start_diff = Self::positive_mod(i32::from(point) - i32::from(self.start)) as i32;
+        let end_diff = Self::positive_mod(i32::from(self.end) - i32::from(self.start)) as i32;
+        start_diff <= end_diff
+    }
+
+    /// Test whether two sectors overlap or are within `tolerance` modular-arithmetic units.
+    ///
+    /// Two sectors are considered overlapping if the clockwise gap from one's end to
+    /// the other's start is ≤ tolerance, or vice versa. This handles wrap-around on
+    /// the [0, 65536) ring correctly.
+    #[inline]
+    pub fn overlaps(sector1: &CircleSector, sector2: &CircleSector, tolerance: u16) -> bool {
+        let gap_forward = i32::from(sector2.start) - i32::from(sector1.end);
+        let gap_backward = i32::from(sector1.start) - i32::from(sector2.end);
+
+        // Sectors already overlap or are within tolerance in the forward direction
+        if gap_forward >= 0 && gap_forward <= i32::from(tolerance) {
+            return true;
+        }
+        // Within tolerance in the backward direction
+        if gap_backward >= 0 && gap_backward <= i32::from(tolerance) {
+            return true;
+        }
+        false
+    }
+
+    /// Extend this sector to include `point`, greedily growing the smaller side.
+    pub fn extend(&mut self, point: u16) {
+        if !self.is_enclosed(point) {
+            let extend_end_diff = Self::positive_mod(i32::from(point) - i32::from(self.end)) as i32;
+            let extend_start_diff = Self::positive_mod(i32::from(self.start) - i32::from(point)) as i32;
+            if extend_end_diff <= extend_start_diff {
+                self.end = point;
+            } else {
+                self.start = point;
+            }
+        }
+    }
+
+    /// Convert a polar angle in degrees [0, 359] to the modular-arithmetic space.
+    #[inline]
+    pub fn from_degrees(degrees: i32) -> u16 {
+        Self::positive_mod(32768 * degrees / 180)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn positive_mod_roundtrips() {
+        assert_eq!(CircleSector::positive_mod(0), 0);
+        assert_eq!(CircleSector::positive_mod(65535), 65535);
+        assert_eq!(CircleSector::positive_mod(65536), 0);
+        assert_eq!(CircleSector::positive_mod(-1), 65535);
+        assert_eq!(CircleSector::positive_mod(-65536), 0);
+    }
+
+    #[test]
+    fn single_point_enclosed() {
+        let s = CircleSector::from_point(100);
+        assert!(s.is_enclosed(100));
+        assert!(!s.is_enclosed(101));
+    }
+
+    #[test]
+    fn extended_sector_encloses() {
+        let mut s = CircleSector::from_point(100);
+        s.extend(150);
+        assert!(s.is_enclosed(125));
+        assert!(s.is_enclosed(100));
+        assert!(s.is_enclosed(150));
+    }
+
+    #[test]
+    fn wrap_around_sector() {
+        let mut s = CircleSector::from_point(65530);
+        s.extend(10);
+        // Sector now wraps: [65530, 65535] ∪ [0, 10]
+        assert!(s.is_enclosed(65535));
+        assert!(s.is_enclosed(5));
+        assert!(!s.is_enclosed(20));
+    }
+
+    #[test]
+    fn overlap_basic() {
+        let s1 = CircleSector::from_point(0);
+        let mut s2 = CircleSector::from_point(100);
+        s2.extend(200);
+        assert!(!CircleSector::overlaps(&s1, &s2, 0));
+    }
+
+    #[test]
+    fn overlap_with_tolerance() {
+        // s1 = [0, 45], s2 = [50, 100] → gap = 5, tolerance = 5 → should overlap
+        let mut s1 = CircleSector::from_point(0);
+        s1.extend(45);
+        let mut s2 = CircleSector::from_point(50);
+        s2.extend(50);
+        assert!(CircleSector::overlaps(&s1, &s2, 5));
+
+        // No tolerance → no overlap (gap is 5)
+        assert!(!CircleSector::overlaps(&s1, &s2, 0));
+    }
+
+    #[test]
+    fn overlap_with_tolerance_wrap_around() {
+        // s1 = [65530, 5] (wraps), s2 = [10, 20] → gap from s1.end to s2.start = 5
+        let mut s1 = CircleSector::from_point(65530);
+        s1.extend(5);
+        let mut s2 = CircleSector::from_point(10);
+        s2.extend(10);
+        assert!(CircleSector::overlaps(&s1, &s2, 5));
+    }
+}
