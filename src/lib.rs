@@ -36,3 +36,4 @@ pub(crate) fn incomplete(message: impl Into<String>) -> core::error::OrError {
 }
 
 pub mod vrptw;
+pub mod hgs;
