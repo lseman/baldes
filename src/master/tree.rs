@@ -285,12 +285,8 @@ fn closed(bound: f64, incumbent: f64, options: &TreeOptions) -> bool {
 fn branch_problem(problem: &RootProblem, branches: &[Branch]) -> RootProblem {
     let mut child = problem.clone();
     for branch in branches {
-        let row = child.rows.len();
-        child.rows.push(Row {
-            sense: branch.sense,
-            rhs: branch.rhs,
-        });
-        child.arc_entries[branch.arc].push((row, 1.));
+        // Use append_branch to correctly update row_map alongside rows and arc_entries.
+        child.append_branch(branch.arc, branch.sense, branch.rhs, child.rows.len());
     }
     child
 }

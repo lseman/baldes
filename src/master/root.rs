@@ -1054,11 +1054,36 @@ fn solve_seeded(problem: RootProblem, mut options: RootOptions,
         options.cg,
     )?;
     let state = state.borrow();
+    // Extract values/duals before potentially moving master into snapshot.
+    let values = master.values().to_vec();
+    let duals = master.duals().to_vec();
+    let inherited_cuts = saved.map_or(0, |s| {
+        s.cut.rows.iter().filter(|r| r.is_some()).count()
+            + s.cut.capacity_rows.iter().filter(|r| r.is_some()).count()
+    });
+    let snapshot = saved.map(|saved| Rc::new(NodeSnapshot {
+        master,
+        problem: saved.problem.clone(),
+        cut: saved.cut.clone(),
+        registry: saved.registry.clone(),
+        pricing_graph: saved.pricing_graph.clone(),
+        routes: state.routes.clone(),
+        warm: column_generation::WarmStart {
+            columns: vec![],
+            artificials: vec![],
+            cut_artificials: vec![],
+            initial_rows: 0,
+        },
+    }));
     Ok(RootOutput {
+        snapshot,
+        #[allow(deprecated)]
+        simplex_iterations: 0,
+        inherited_cuts,
         master: output,
         routes: state.routes.clone(),
-        values: master.values().to_vec(),
-        duals: master.duals().to_vec(),
+        values,
+        duals,
         incumbent: state.incumbent,
         pricing_seconds: state.pricing_seconds,
         solver_seconds: solve_started.elapsed().as_secs_f64(),
