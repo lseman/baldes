@@ -483,14 +483,24 @@ impl<M: LpMaster> Controller<M> for RootController {
         if state.cut.rounds == 0 {
             state.cut.lp_before_cuts = value;
         } else {
-            let gain = (value - state.cut.separation_lp) / (0.1 * state.cut.separation_lp.abs()).max(1e-9);
+            // Alg4EvalByColAndCutGen::eval: the gain is relative to the gap to
+            // the incumbent (an integral master solution) when that gap is at
+            // most a tenth of the bound, else to a tenth of the bound.
+            let previous = state.cut.separation_lp;
+            let upper = if state.incumbent.is_finite() { state.incumbent } else { 1e12 };
+            let gap = upper - previous;
+            let tenth = (0.1 * previous.abs()).max(1e-9);
+            let denominator = if gap - (gap.abs().max(tenth) * 1e-10 + 1e-6) > tenth { tenth } else { gap };
+            let gain = (value - previous) / denominator;
             let rank_active = state.cut.options.enabled &&
                 (state.cut.capacity_separator.is_none() || state.cut.capacity_level_finished);
             let min_rounds = state.cut.options.min_rounds_before_stop_by_sp;
             if rank_active && stop && state.cut.rounds >= min_rounds {
                 return Ok(0);
             }
-            if gain < state.cut.options.tailing_off_threshold - 1e-6 {
+            // the solver stores the threshold as a float.
+            let threshold = state.cut.options.tailing_off_threshold as f32 as f64;
+            if gain < threshold - (threshold.abs().max(gain.abs()) * 1e-10 + 1e-6) {
                 if rank_active && !state.solver.cuts.separation_phase(&state.solver.options)?.1 {
                     let options = state.solver.options.clone();
                     state.solver.cuts.increase_phase(&options)?;
@@ -506,6 +516,14 @@ impl<M: LpMaster> Controller<M> for RootController {
             }
         }
         state.cut.separation_lp = value;
+        // Each cut round first checks gapSmallerThanTol: separation stops once
+        // the bound reaches the incumbent (absolute 1e-6, relative 1e-9).
+        if state.incumbent.is_finite() {
+            let gap = state.incumbent - value;
+            if gap <= value.abs().max(state.incumbent.abs()) * 1e-10 + 1e-6 || gap / state.incumbent.abs() <= 1e-9 {
+                return Ok(0);
+            }
+        }
         let values = master.values().to_vec();
         let tagged: Vec<(usize, usize)> = tags
             .iter()

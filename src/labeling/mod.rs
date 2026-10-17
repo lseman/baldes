@@ -23,7 +23,9 @@ pub struct Controls {
 impl Default for Controls {
     fn default() -> Self {
         Self {
-            max_labels: 1_000_000,
+            // the solver has no label limit: R202 with rank-one cuts exceeds a
+            // million labels in one pricing call.
+            max_labels: usize::MAX,
             max_columns: 150,
             max_route_arcs: None,
             time_limit: Duration::from_secs(1000),

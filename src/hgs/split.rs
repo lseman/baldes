@@ -7,6 +7,7 @@
 //! This is the core decomposition routine used by HGS-CVRP to evaluate
 //! individuals represented as giant tours.
 
+use crate::hgs::params::MY_EPSILON;
 use crate::hgs::{Individual, Params};
 
 /// Data for a single client during split processing.
@@ -22,8 +23,6 @@ struct ClientSplit {
     dx_0: i32,
     /// Distance from this client to the next in the giant tour.
     dnext: i32,
-    /// Original customer number (1-based index).
-    cust_num: usize,
 }
 
 /// A lightweight deque implementation for the O(n) split algorithm.
@@ -32,9 +31,9 @@ struct TrivialDeque {
     /// Storage for deque elements.
     my_deque: Vec<i32>,
     /// Index of the front element.
-    index_front: usize,
+    index_front: i32,
     /// Index of the back element (inclusive).
-    index_back: usize,
+    index_back: i32,
 }
 
 impl TrivialDeque {
@@ -62,29 +61,29 @@ impl TrivialDeque {
     /// Append an element to the back.
     fn push_back(&mut self, i: i32) {
         let cap = self.my_deque.len();
-        if self.index_back + 1 >= cap {
+        if self.index_back + 1 >= cap as i32 {
             self.my_deque.resize(cap * 2, 0);
         }
         self.index_back += 1;
-        if self.index_back >= self.my_deque.len() {
-            self.my_deque.resize(self.index_back + 1, 0);
+        if self.index_back >= self.my_deque.len() as i32 {
+            self.my_deque.resize((self.index_back + 1) as usize, 0);
         }
-        self.my_deque[self.index_back] = i;
+        self.my_deque[self.index_back as usize] = i;
     }
 
     /// Get the front element.
     fn get_front(&self) -> i32 {
-        self.my_deque[self.index_front]
+        self.my_deque[self.index_front as usize]
     }
 
     /// Get the next-front element.
     fn get_next_front(&self) -> i32 {
-        self.my_deque[self.index_front + 1]
+        self.my_deque[(self.index_front + 1) as usize]
     }
 
     /// Get the back element.
     fn get_back(&self) -> i32 {
-        self.my_deque[self.index_back]
+        self.my_deque[self.index_back as usize]
     }
 
     /// Reset the deque with a single first node.
@@ -100,7 +99,7 @@ impl TrivialDeque {
 
     /// Current size of the deque.
     fn size(&self) -> usize {
-        (self.index_back as isize - self.index_front as isize + 1).max(0) as usize
+        (self.index_back - self.index_front + 1).max(0) as usize
     }
 }
 
@@ -159,7 +158,6 @@ impl<'p> Split<'p> {
                 service_time: self.params.cli[chrom_idx].service_duration,
                 d0_x: self.params.time_cost.get(0, chrom_idx),
                 dx_0: self.params.time_cost.get(chrom_idx, 0),
-                cust_num: chrom_idx,
                 ..Default::default()
             };
 
@@ -202,7 +200,7 @@ impl<'p> Split<'p> {
             for i in 0..self.params.nb_clients as usize {
                 let mut load = 0i32;
                 let mut distance = 0i32;
-                let mut service_duration = 0i32;
+                let mut _service_duration = 0i32;
                 let cumulative_cost = self.potential[0][i];
 
                 for j in (i + 1)..=self.params.nb_clients as usize {
@@ -211,7 +209,7 @@ impl<'p> Split<'p> {
                         break;
                     }
 
-                    service_duration += self.cli_split[j].service_time;
+                    _service_duration += self.cli_split[j].service_time;
                     distance += if j == i + 1 {
                         self.cli_split[j].d0_x
                     } else {
@@ -220,7 +218,7 @@ impl<'p> Split<'p> {
 
                     let cost = distance as f64
                         + self.cli_split[j].dx_0 as f64
-                        + self.params.penalty_capacity * (load - self.params.vehicle_capacity).max(0) as f64;
+                        + self.params.penalty_capacity.get() * (load - self.params.vehicle_capacity).max(0) as f64;
 
                     if cumulative_cost + cost < self.potential[0][j] {
                         self.potential[0][j] = cumulative_cost + cost;
@@ -247,8 +245,10 @@ impl<'p> Split<'p> {
                         queue.push_back(i as i32);
                     }
 
-                    let next_front_prop = self.propagate(queue.get_front() as usize, i + 1, 0);
-                    while queue.size() > 1 && next_front_prop > self.propagate(queue.get_next_front() as usize, i + 1, 0) - 1e-10 {
+                    while queue.size() > 1
+                        && self.propagate(queue.get_front() as usize, i + 1, 0)
+                            > self.propagate(queue.get_next_front() as usize, i + 1, 0) - MY_EPSILON
+                    {
                         queue.pop_front();
                     }
                 }
@@ -298,7 +298,7 @@ impl<'p> Split<'p> {
                     }
 
                     let mut load = 0i32;
-                    let mut service_duration = 0i32;
+                    let mut _service_duration = 0i32;
                     let mut distance = 0i32;
                     let cumulative_cost = self.potential[k][i];
 
@@ -308,7 +308,7 @@ impl<'p> Split<'p> {
                             break;
                         }
 
-                        service_duration += self.cli_split[j].service_time;
+                        _service_duration += self.cli_split[j].service_time;
                         distance += if j == i + 1 {
                             self.cli_split[j].d0_x
                         } else {
@@ -317,7 +317,7 @@ impl<'p> Split<'p> {
 
                         let cost = distance as f64
                             + self.cli_split[j].dx_0 as f64
-                            + self.params.penalty_capacity * (load - self.params.vehicle_capacity).max(0) as f64;
+                            + self.params.penalty_capacity.get() * (load - self.params.vehicle_capacity).max(0) as f64;
 
                         if cumulative_cost + cost < self.potential[k + 1][j] {
                             self.potential[k + 1][j] = cumulative_cost + cost;
@@ -328,8 +328,9 @@ impl<'p> Split<'p> {
             }
         } else {
             // O(n) algorithm with limited fleet.
+            let mut queue = TrivialDeque::new(self.params.nb_clients as usize + 1, 0);
             for k in 0..self.max_vehicles {
-                let mut queue = TrivialDeque::new(self.params.nb_clients as usize + 1, k as i32);
+                queue.reset(k as i32);
 
                 for i in (k + 1)..=self.params.nb_clients as usize {
                     if queue.size() == 0 {
@@ -353,7 +354,7 @@ impl<'p> Split<'p> {
                         }
 
                         let mut next_front_prop = self.propagate(queue.get_front() as usize, i + 1, k);
-                        while queue.size() > 1 && next_front_prop > self.propagate(queue.get_next_front() as usize, i + 1, k) - 1e-10 {
+                        while queue.size() > 1 && next_front_prop > self.propagate(queue.get_next_front() as usize, i + 1, k) - MY_EPSILON {
                             queue.pop_front();
                             if queue.size() > 0 {
                                 next_front_prop = self.propagate(queue.get_front() as usize, i + 1, k);
@@ -409,7 +410,7 @@ impl<'p> Split<'p> {
             + dist_diff as f64
             + self.cli_split[i + 1].d0_x as f64
             + self.cli_split[j].dx_0 as f64
-            + self.params.penalty_capacity * (load_diff - self.params.vehicle_capacity).max(0) as f64
+            + self.params.penalty_capacity.get() * (load_diff - self.params.vehicle_capacity).max(0) as f64
     }
 
     /// Test if `i` dominates `j` as a predecessor for all nodes >= j+1. Assumes i < j.
@@ -420,7 +421,7 @@ impl<'p> Split<'p> {
         self.potential[k][j] + self.cli_split[j + 1].d0_x as f64
             > self.potential[k][i] + self.cli_split[i + 1].d0_x as f64
                 + dist_diff as f64
-                + self.params.penalty_capacity * load_diff as f64
+                + self.params.penalty_capacity.get() * load_diff as f64
     }
 
     /// Test if `j` dominates `i` as a predecessor for all nodes >= j+1. Assumes i < j.
@@ -428,7 +429,7 @@ impl<'p> Split<'p> {
         let dist_diff = self.sum_distance[j + 1] - self.sum_distance[i + 1];
 
         (self.potential[k][j] + self.cli_split[j + 1].d0_x as f64)
-            < (self.potential[k][i] + self.cli_split[i + 1].d0_x as f64 + dist_diff as f64 + 1e-10)
+            < (self.potential[k][i] + self.cli_split[i + 1].d0_x as f64 + dist_diff as f64 + MY_EPSILON)
     }
 }
 

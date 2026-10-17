@@ -1085,7 +1085,12 @@ impl BucketGraph {
                 }
             }
             self.direction_mut(forward).arc_counter = identity;
+            // regenerateBuckets after a step change only scales the preceding
+            // depths below: createBucketGraph's depth initialization (the
+            // maximum with the new graph's chain depth) does not run here.
+            let depth = self.direction(forward).depth.clone();
             self.order_components(g, forward)?;
+            self.direction_mut(forward).depth = depth;
             self.refresh_counts(g, forward);
             self.regenerate_jumps(g, forward);
             let factor = if self.dimensions == 1 { 2. } else { 1.4 };

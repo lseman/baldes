@@ -31,6 +31,13 @@ impl CircleSector {
         }
     }
 
+    /// Re-initialize the sector to a single point.
+    #[inline]
+    pub fn initialize(&mut self, point: u16) {
+        self.start = point;
+        self.end = point;
+    }
+
     /// Test whether `point` is enclosed within this sector.
     #[inline]
     pub fn is_enclosed(&self, point: u16) -> bool {
@@ -39,25 +46,14 @@ impl CircleSector {
         start_diff <= end_diff
     }
 
-    /// Test whether two sectors overlap or are within `tolerance` modular-arithmetic units.
-    ///
-    /// Two sectors are considered overlapping if the clockwise gap from one's end to
-    /// the other's start is ≤ tolerance, or vice versa. This handles wrap-around on
-    /// the [0, 65536) ring correctly.
+    /// Test whether two sectors overlap, each widened by `tolerance` units
+    /// (HGS CircleSector::overlap): one start lies within the other sector.
     #[inline]
     pub fn overlaps(sector1: &CircleSector, sector2: &CircleSector, tolerance: u16) -> bool {
-        let gap_forward = i32::from(sector2.start) - i32::from(sector1.end);
-        let gap_backward = i32::from(sector1.start) - i32::from(sector2.end);
-
-        // Sectors already overlap or are within tolerance in the forward direction
-        if gap_forward >= 0 && gap_forward <= i32::from(tolerance) {
-            return true;
-        }
-        // Within tolerance in the backward direction
-        if gap_backward >= 0 && gap_backward <= i32::from(tolerance) {
-            return true;
-        }
-        false
+        let size1 = i32::from(Self::positive_mod(i32::from(sector1.end) - i32::from(sector1.start))) + i32::from(tolerance);
+        let size2 = i32::from(Self::positive_mod(i32::from(sector2.end) - i32::from(sector2.start))) + i32::from(tolerance);
+        i32::from(Self::positive_mod(i32::from(sector2.start) - i32::from(sector1.start))) <= size1
+            || i32::from(Self::positive_mod(i32::from(sector1.start) - i32::from(sector2.start))) <= size2
     }
 
     /// Extend this sector to include `point`, greedily growing the smaller side.
@@ -148,5 +144,16 @@ mod tests {
         let mut s2 = CircleSector::from_point(10);
         s2.extend(10);
         assert!(CircleSector::overlaps(&s1, &s2, 5));
+    }
+
+    #[test]
+    fn overlapping_sectors() {
+        // s1 = [0, 100] and s2 = [50, 200] share [50, 100].
+        let mut s1 = CircleSector::from_point(0);
+        s1.extend(100);
+        let mut s2 = CircleSector::from_point(50);
+        s2.extend(200);
+        assert!(CircleSector::overlaps(&s1, &s2, 0));
+        assert!(CircleSector::overlaps(&s2, &s1, 0));
     }
 }

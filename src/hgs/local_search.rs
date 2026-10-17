@@ -1,38 +1,33 @@
 //! Local search operators for HGS-CVRP/VRPTW.
 //!
-//! Implements the core local search moves used by Hybrid Genetic Search:
-//! - **RI (Relocate Individual)**: Remove a client and insert it elsewhere
-//! - **SWAP***: Swap clients between routes with optimal insertion positions
+//! Implements the local search moves and constructive heuristics used by Hybrid Genetic Search:
+//! - **RI (Relocate Individual)**: Remove a client (or two) and insert elsewhere
+//! - **SWAP**: Swap clients between or within routes
 //! - **2-opt / 2-opt***: Reverse segments within or between routes
 //! - **Constructive heuristics**: Seed-based and sweep construction
 
 use std::cmp::{max, min};
-use std::f64::INFINITY;
 
-use crate::hgs::individual::CostSol;
-use crate::hgs::{Individual, Params};
+use crate::hgs::circle_sector::CircleSector;
+use crate::hgs::individual::SortableF64;
+use crate::hgs::{Individual, Params, ProblemType};
 
-/// Time window data for a sequence of nodes.
+use crate::hgs::params::MY_EPSILON;
+
+/// Time window data for a sequence of nodes (Vidal 2012).
 #[derive(Clone, Debug, Default)]
 pub struct TimeWindowData {
-    /// Index of the first node in the sequence.
     pub first_node_index: i32,
-    /// Index of the last node in the sequence.
     pub last_node_index: i32,
-    /// Cumulative duration (driving + service, excluding waiting).
     pub duration: i32,
-    /// Cumulative time warp.
     pub time_warp: i32,
-    /// Earliest start of servicing first node (given min cost route sequence).
     pub earliest_arrival: i32,
-    /// Latest start of servicing first node (given min cost route sequence).
     pub latest_arrival: i32,
-    /// Latest of all release times in the sequence.
     pub latest_release_time: i32,
 }
 
 impl TimeWindowData {
-    /// Create a new TimeWindowData for a single node.
+    /// Create TimeWindowData for a single node.
     pub fn single(node_idx: i32, params: &Params) -> Self {
         let cli = &params.cli[node_idx as usize];
         TimeWindowData {
@@ -46,1336 +41,2183 @@ impl TimeWindowData {
         }
     }
 
-    /// Merge two consecutive time window data segments.
+    /// Merge two consecutive time window data segments (Vidal 2012).
     pub fn merge(tw1: &TimeWindowData, tw2: &TimeWindowData, params: &Params) -> TimeWindowData {
-        let mut result = TimeWindowData::default();
-        result.first_node_index = tw1.first_node_index;
-        result.last_node_index = tw2.last_node_index;
+        let delta_cost = params
+            .time_cost
+            .get(tw1.last_node_index as usize, tw2.first_node_index as usize);
+        let delta_duration = delta_cost;
+        let delta = tw1.duration - tw1.time_warp + delta_duration;
+        let delta_wait_time = max(0, tw2.earliest_arrival - delta - tw1.latest_arrival);
+        let delta_time_warp = max(0, tw1.earliest_arrival + delta - tw2.latest_arrival);
 
-        // Duration: drive from last of tw1 to first of tw2, plus service and driving within segments
-        let edge_duration = params.time_cost.get(tw1.last_node_index as usize, tw2.first_node_index as usize) as i32;
-        result.duration = tw1.duration + edge_duration + tw2.duration;
-
-        // Time warp calculation
-        let arrival_at_tw2_start = tw1.earliest_arrival + tw1.duration + edge_duration;
-        let wait_time = max(0, tw2.earliest_arrival - arrival_at_tw2_start);
-        let earliest_arr = min(tw1.earliest_arrival, tw2.earliest_arrival - wait_time - edge_duration);
-
-        let arrival_latest = tw1.latest_arrival + tw1.duration + edge_duration;
-        let time_warp_tw2 = max(0, tw2.latest_arrival - arrival_latest) as i32;
-        result.time_warp = tw1.time_warp + time_warp_tw2;
-
-        result.earliest_arrival = earliest_arr;
-        result.latest_arrival = min(tw1.latest_arrival, tw2.latest_arrival - time_warp_tw2 as i32) as i32;
-        result.latest_release_time = max(tw1.latest_release_time, tw2.latest_release_time);
-
-        result
+        TimeWindowData {
+            first_node_index: tw1.first_node_index,
+            last_node_index: tw2.last_node_index,
+            duration: tw1.duration + tw2.duration + delta_duration + delta_wait_time,
+            time_warp: tw1.time_warp + tw2.time_warp + delta_time_warp,
+            earliest_arrival: max(tw2.earliest_arrival - delta, tw1.earliest_arrival) - delta_wait_time,
+            latest_arrival: min(tw2.latest_arrival - delta, tw1.latest_arrival) + delta_time_warp,
+            latest_release_time: max(tw1.latest_release_time, tw2.latest_release_time),
+        }
     }
 }
 
 /// A route in the local search representation.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct HGSRoute {
-    /// Route index.
     pub cour: i32,
-    /// Number of customers in the route.
     pub nb_customers: i32,
-    /// When this route was last modified.
     pub when_last_modified: i32,
-    /// When large neighborhood moves were last tested.
     pub when_last_tested_large_nb: i32,
-    /// Flag for deltaRemovalTW data staleness.
     pub is_delta_removel_tw_outdated: bool,
-    /// Total duration (driving + service).
     pub duration: i32,
-    /// Total load on the route.
     pub load: i32,
-    /// Cost difference if the route is reversed.
     pub reversal_distance: i32,
-    /// Time window data for the entire route.
     pub tw_data: TimeWindowData,
-    /// Current penalty (capacity + time warp).
     pub penalty: f64,
-    /// Polar angle of barycenter.
     pub polar_angle_barycenter: f64,
+    pub sector: CircleSector,
 }
 
-impl Default for HGSRoute {
-    fn default() -> Self {
-        HGSRoute {
-            cour: 0,
-            nb_customers: 0,
-            when_last_modified: 0,
-            when_last_tested_large_nb: 0,
-            is_delta_removel_tw_outdated: true,
-            duration: 0,
-            load: 0,
-            reversal_distance: 0,
-            tw_data: TimeWindowData::default(),
-            penalty: 0.0,
-            polar_angle_barycenter: 0.0,
-        }
-    }
-}
-
-/// A node in the linked-list representation of routes.
-#[derive(Clone, Debug)]
+/// A node in the local search representation.
+#[derive(Clone, Debug, Default)]
 pub struct Node {
-    /// Whether this is a depot node.
     pub is_depot: bool,
-    /// Node index (1-based for clients).
     pub cour: i32,
-    /// Position in the route.
     pub position: i32,
-    /// When RI moves were last tested.
     pub when_last_tested_ri: i32,
-    /// Next node in the route (index into clients/depots vectors).
-    pub next_idx: i32,
-    /// Previous node in the route (index into clients/depots vectors).
-    pub prev_idx: i32,
-    /// Associated route index.
+    pub next: i32,
+    pub prev: i32,
     pub route_idx: i32,
-    /// Cumulative load until this node.
     pub cumulated_load: i32,
-    /// Cumulative time until this node.
     pub cumulated_time: i32,
-    /// Cumulative reversal distance (0..cour).
     pub cumulated_reversal_distance: i32,
-    /// Cost delta if removed from current route.
     pub delta_removal: i32,
-    /// Cost delta if removed including time warp.
     pub delta_removal_tw: i32,
-    /// Time window data for this node.
     pub tw_data: TimeWindowData,
-    /// Time window data list (for multi-TW clients).
-    pub tw_data_list: Vec<TimeWindowData>,
-    /// Prefix TW data (0..cour including self).
     pub prefix_tw_data: TimeWindowData,
-    /// Postfix TW data (cour..0 including self).
     pub postfix_tw_data: TimeWindowData,
-    /// Whether a next seed is available.
+    /// Whether `next_seed` is set: the node four positions later.
     pub is_seed: bool,
-    /// Next seeded node's TW data (excluding self).
-    pub to_next_seed_tw_d: TimeWindowData,
-    /// Index of next seeded node (-1 if none).
-    pub next_seed_idx: i32,
+    /// Time window data of the nodes after this one up to `next_seed`.
+    pub to_next_seed_tw_data: TimeWindowData,
+    pub next_seed: i32,
 }
 
-impl Default for Node {
-    fn default() -> Self {
-        Node {
-            is_depot: false,
-            cour: 0,
-            position: 0,
-            when_last_tested_ri: 0,
-            next_idx: 0,
-            prev_idx: 0,
-            route_idx: 0,
-            cumulated_load: 0,
-            cumulated_time: 0,
-            cumulated_reversal_distance: 0,
-            delta_removal: 0,
-            delta_removal_tw: 0,
-            tw_data: TimeWindowData::default(),
-            tw_data_list: Vec::new(),
-            prefix_tw_data: TimeWindowData::default(),
-            postfix_tw_data: TimeWindowData::default(),
-            is_seed: false,
-            to_next_seed_tw_d: TimeWindowData::default(),
-            next_seed_idx: -1,
-        }
-    }
-}
-
-/// Stores the three best insertion positions for SWAP*.
+/// Helper struct for construction heuristics.
 #[derive(Clone, Debug)]
+pub struct NodeToInsert {
+    pub client_idx: i32,
+    pub load: i32,
+    pub service_duration: i32,
+    pub angle_from_depot: f64,
+    pub tw_data: TimeWindowData,
+}
+
+/// Three best insertion positions of a client in a route.
+#[derive(Clone, Debug, Default)]
 pub struct ThreeBestInsert {
-    /// When last calculated.
     pub when_last_calculated: i32,
-    /// Best costs (sorted ascending).
     pub best_cost: [i32; 3],
-    /// Best locations (indices into nodes vector).
     pub best_location: [i32; 3],
 }
 
-impl Default for ThreeBestInsert {
-    fn default() -> Self {
-        ThreeBestInsert::new()
-    }
-}
-
 impl ThreeBestInsert {
-    fn new() -> Self {
-        ThreeBestInsert {
-            when_last_calculated: 0,
+    pub fn new() -> Self {
+        Self {
+            when_last_calculated: -1,
             best_cost: [i32::MAX, i32::MAX, i32::MAX],
             best_location: [-1, -1, -1],
         }
     }
 
-    /// Compare and potentially add a new insertion position.
-    fn compare_and_add(&mut self, cost_insert: i32, place_insert: i32) {
-        if cost_insert >= self.best_cost[2] {
+    /// Forget the stored positions, keeping `when_last_calculated`.
+    pub fn reset(&mut self) {
+        self.best_cost = [i32::MAX; 3];
+        self.best_location = [-1; 3];
+    }
+
+    /// Keep `location` if its cost is among the three best.
+    pub fn compare_and_add(&mut self, cost: i32, location: i32) {
+        if cost >= self.best_cost[2] {
             return;
-        } else if cost_insert >= self.best_cost[1] {
-            self.best_cost[2] = cost_insert;
-            self.best_location[2] = place_insert;
-        } else if cost_insert >= self.best_cost[0] {
-            self.best_cost[2] = self.best_cost[1];
-            self.best_location[2] = self.best_location[1];
-            self.best_cost[1] = cost_insert;
-            self.best_location[1] = place_insert;
+        }
+        let rank = if cost >= self.best_cost[1] {
+            2
+        } else if cost >= self.best_cost[0] {
+            1
         } else {
-            self.best_cost[2] = self.best_cost[1];
-            self.best_location[2] = self.best_location[1];
-            self.best_cost[1] = self.best_cost[0];
-            self.best_location[1] = self.best_location[0];
-            self.best_cost[0] = cost_insert;
-            self.best_location[0] = place_insert;
+            0
+        };
+        for k in (rank + 1..3).rev() {
+            self.best_cost[k] = self.best_cost[k - 1];
+            self.best_location[k] = self.best_location[k - 1];
         }
-    }
-
-    /// Reset to no insertion calculated.
-    fn reset(&mut self) {
-        self.best_cost = [i32::MAX, i32::MAX, i32::MAX];
-        self.best_location = [-1, -1, -1];
+        self.best_cost[rank] = cost;
+        self.best_location[rank] = location;
     }
 }
 
-/// Tracks the best SWAP* move between two routes.
+/// Best SWAP* move found between two routes.
 #[derive(Clone, Debug)]
-pub struct SwapStarElement {
-    /// Cost of the move.
-    pub move_cost: f64,
-    /// Load penalty for route U.
-    pub load_pen_u: f64,
-    /// Load penalty for route V.
-    pub load_pen_v: f64,
-    /// Node U to be removed from route U.
-    pub u_idx: i32,
-    /// Best position for U in route V.
-    pub best_position_u_idx: i32,
-    /// Node V to be removed from route V.
-    pub v_idx: i32,
-    /// Best position for V in route U.
-    pub best_position_v_idx: i32,
+struct SwapStarElement {
+    move_cost: f64,
+    load_pen_u: f64,
+    load_pen_v: f64,
+    u: usize,
+    best_position_u: Option<usize>,
+    v: usize,
+    best_position_v: Option<usize>,
 }
 
-impl Default for SwapStarElement {
-    fn default() -> Self {
-        SwapStarElement {
-            move_cost: INFINITY,
-            load_pen_u: INFINITY,
-            load_pen_v: INFINITY,
-            u_idx: 0,
-            best_position_u_idx: 0,
-            v_idx: 0,
-            best_position_v_idx: 0,
-        }
-    }
-}
-
-/// Data for nodes during construction heuristics.
-#[derive(Clone, Debug)]
-pub struct NodeToInsert {
-    /// Index in the clients vector (1-based).
-    pub client_idx: i32,
-    /// Load of the node.
-    pub load: i32,
-    /// Service duration.
-    pub service_duration: i32,
-    /// Angle from depot (-PI to PI).
-    pub angle_from_depot: f64,
-    /// Time window data.
-    pub tw_data: TimeWindowData,
-    /// Time window data list.
-    pub tw_data_list: Vec<TimeWindowData>,
-}
-
-/// Hybrid Genetic Search local search engine.
-///
-/// Represents the solution as a linked list of nodes for efficient modifications.
+/// Main Local Search engine for HGS.
 pub struct HGSLocalSearch<'p> {
-    /// Reference to problem parameters.
     params: &'p Params,
-    /// Whether all moves have been evaluated without success.
-    search_completed: bool,
-    /// Total number of moves applied (also used to avoid repeating evaluations).
-    nb_moves: i32,
-    /// Randomized order for RI move evaluation.
-    order_nodes: Vec<i32>,
-    /// Randomized order for SWAP* route evaluation.
-    order_routes: Vec<i32>,
-    /// Indices of empty routes.
-    empty_routes: std::collections::HashSet<i32>,
-    /// Current loop index.
-    loop_id: i32,
+    pub search_completed: bool,
+    pub nb_moves: i32,
+    pub order_nodes: Vec<usize>,
+    pub order_routes: Vec<usize>,
+    pub empty_routes: std::collections::BTreeSet<usize>,
+    pub loop_id: i32,
 
-    /// Linked list nodes (clients[0] is a sentinel).
-    clients: Vec<Node>,
-    /// Depot nodes.
-    depots: Vec<Node>,
-    /// End depot nodes (mark route ends).
-    depots_end: Vec<Node>,
-    /// Route data.
-    routes: Vec<HGSRoute>,
+    /// All nodes:
+    /// - 0: unused sentinel
+    /// - 1..=nb_clients: clients
+    /// - nb_clients + 1 + r: start depot for route r
+    /// - nb_clients + 1 + nb_vehicles + r: end depot for route r
+    pub nodes: Vec<Node>,
+    pub routes: Vec<HGSRoute>,
 
-    /// For each route, whether best insertions have been initialized.
-    best_insert_initialized_for_route: Vec<bool>,
-    /// Best insertion costs (excluding TW) for SWAP*.
-    best_insert_client: Vec<Vec<ThreeBestInsert>>,
-    /// Best insertion costs (including TW) for SWAP*.
-    best_insert_client_tw: Vec<Vec<ThreeBestInsert>>,
+    pub best_insert_initialized_for_route: Vec<bool>,
+    pub best_insert_client: Vec<Vec<ThreeBestInsert>>,
+    pub best_insert_client_tw: Vec<Vec<ThreeBestInsert>>,
 
-    /// Temporary variables for move evaluation.
-    node_u_idx: i32,
-    node_x_idx: i32,
-    node_v_idx: i32,
-    node_y_idx: i32,
-    route_u_idx: i32,
-    route_v_idx: i32,
-    node_u_prev_idx: i32,
-    node_u_index: i32,
-    node_x_index: i32,
-    node_x_next_index: i32,
-    node_v_prev_idx: i32,
-    node_v_index: i32,
-    node_y_index: i32,
-    node_y_next_index: i32,
-    load_u: i32,
-    load_x: i32,
-    load_v: i32,
-    load_y: i32,
-    service_u: i32,
-    service_x: i32,
-    service_v: i32,
-    service_y: i32,
-    route_u_time_warp: bool,
-    route_u_load_penalty: bool,
-    route_v_time_warp: bool,
-    route_v_load_penalty: bool,
-    penalty_capacity_ls: f64,
-    penalty_time_warp_ls: f64,
+    pub penalty_capacity_ls: f64,
+    pub penalty_time_warp_ls: f64,
 
-    /// Cached distance values for route U.
-    local_dist_route_u: Vec<i32>,
-    /// Cached distance values for route V.
-    local_dist_route_v: Vec<i32>,
+    /// Granular neighborhoods, reshuffled during the search. Owned here
+    /// because the search mutates them and `params` is shared.
+    correlated_vertices: Vec<Vec<usize>>,
+    nb_granular: i32,
 }
 
 impl<'p> HGSLocalSearch<'p> {
-    /// Create a new local search instance.
+    /// Create a new local search engine.
     pub fn new(params: &'p Params) -> Self {
         let nb_clients = params.nb_clients as usize;
         let nb_vehicles = params.nb_vehicles as usize;
+        let total_nodes = nb_clients + 2 * nb_vehicles + 1;
 
-        HGSLocalSearch {
-            params,
-            search_completed: false,
-            nb_moves: 0,
-            order_nodes: Vec::new(),
-            order_routes: Vec::new(),
-            empty_routes: std::collections::HashSet::new(),
-            loop_id: 0,
-
-            clients: vec![Node::default(); nb_clients + 1],
-            depots: vec![Node::default(); nb_vehicles],
-            depots_end: vec![Node::default(); nb_vehicles],
-            routes: (0..nb_vehicles)
-                .map(|r| HGSRoute {
-                    cour: r as i32,
-                    ..Default::default()
-                })
-                .collect(),
-
-            best_insert_initialized_for_route: vec![false; nb_vehicles],
-            best_insert_client: vec![vec![ThreeBestInsert::new(); nb_clients + 1]; nb_vehicles],
-            best_insert_client_tw: vec![vec![ThreeBestInsert::new(); nb_clients + 1]; nb_vehicles],
-
-            node_u_idx: 0,
-            node_x_idx: 0,
-            node_v_idx: 0,
-            node_y_idx: 0,
-            route_u_idx: 0,
-            route_v_idx: 0,
-            node_u_prev_idx: 0,
-            node_u_index: 0,
-            node_x_index: 0,
-            node_x_next_index: 0,
-            node_v_prev_idx: 0,
-            node_v_index: 0,
-            node_y_index: 0,
-            node_y_next_index: 0,
-            load_u: 0,
-            load_x: 0,
-            load_v: 0,
-            load_y: 0,
-            service_u: 0,
-            service_x: 0,
-            service_v: 0,
-            service_y: 0,
-            route_u_time_warp: false,
-            route_u_load_penalty: false,
-            route_v_time_warp: false,
-            route_v_load_penalty: false,
-            penalty_capacity_ls: 0.0,
-            penalty_time_warp_ls: 0.0,
-
-            local_dist_route_u: Vec::new(),
-            local_dist_route_v: Vec::new(),
-        }
-    }
-
-    // =========================================================================
-    // PUBLIC INTERFACE
-    // =========================================================================
-
-    /// Run the local search with the specified penalty values.
-    pub fn run(&mut self, indiv: &mut Individual, penalty_capacity: f64, penalty_time_warp: f64) {
-        self.penalty_capacity_ls = penalty_capacity;
-        self.penalty_time_warp_ls = penalty_time_warp;
-
-        // Load the individual into the local search representation.
-        self.load_individual(indiv);
-
-        self.nb_moves = 0;
-        self.loop_id = 0;
-
-        // Main local search loop — iterate until no improving moves found.
-        loop {
-            self.search_completed = true;
-            self.loop_id += 1;
-
-            // Initialize randomized orders.
-            self.init_order_nodes();
-            self.init_order_routes();
-
-            // Try RI (Relocate Individual) moves.
-            self.try_ri_moves();
-
-            // Try SWAP* moves.
-            self.try_swap_star_moves();
-
-            // Try 2-opt and 2-opt* moves.
-            self.try_two_opt_moves();
-
-            // Reorder time windows if beneficial.
-            self.reorder_tws_if_needed();
-
-            // If no improvement, check if we should terminate.
-            if self.search_completed {
-                // Try RelocateStar on recently modified routes.
-                if !self.relocate_star() {
-                    break;
-                }
-            }
-
-            self.nb_moves += 1;
-            if self.nb_moves > 100000 {
-                // Safety limit to prevent infinite loops.
-                break;
-            }
+        let mut nodes = vec![Node::default(); total_nodes];
+        for i in 1..=nb_clients {
+            nodes[i].cour = i as i32;
+            nodes[i].is_depot = false;
         }
 
-        // Export the improved solution back to the individual.
-        self.export_individual(indiv);
-    }
-
-    /// Load an individual into the local search representation.
-    pub fn load_individual(&mut self, indiv: &Individual<'_>) {
-        let nb_clients = self.params.nb_clients as usize;
-        let nb_vehicles = self.params.nb_vehicles as usize;
-
-        // Reset data structures.
-        self.clients = vec![Node::default(); nb_clients + 1];
-        self.depots = vec![Node::default(); nb_vehicles];
-        self.depots_end = vec![Node::default(); nb_vehicles];
-        self.routes = (0..nb_vehicles)
+        let routes = (0..nb_vehicles)
             .map(|r| HGSRoute {
                 cour: r as i32,
                 ..Default::default()
             })
             .collect();
-        self.empty_routes.clear();
 
-        // Initialize depot links and TW data.
-        for r in 0..nb_vehicles {
-            let depot_tw = TimeWindowData {
-                first_node_index: 0,
-                last_node_index: 0,
-                duration: 0,
-                time_warp: 0,
-                earliest_arrival: self.params.cli[0].earliest_arrival,
-                latest_arrival: self.params.cli[0].latest_arrival,
-                latest_release_time: self.params.cli[0].release_time,
-            };
+        let order_nodes: Vec<usize> = (1..=nb_clients).collect();
+        let order_routes: Vec<usize> = (0..nb_vehicles).collect();
 
-            let depot = &mut self.depots[r];
-            depot.is_depot = true;
-            depot.cour = 0;
-            depot.route_idx = r as i32;
-            depot.next_idx = (nb_vehicles + r) as i32;
-            depot.prev_idx = (nb_vehicles + r) as i32;
-            depot.tw_data = depot_tw.clone();
-            depot.prefix_tw_data = depot_tw.clone();
-            depot.postfix_tw_data = depot_tw.clone();
-
-            let depot_end = &mut self.depots_end[r];
-            depot_end.is_depot = true;
-            depot_end.cour = 0;
-            depot_end.route_idx = r as i32;
-            depot_end.next_idx = r as i32;
-            depot_end.prev_idx = r as i32;
-            depot_end.tw_data = depot_tw.clone();
-            depot_end.prefix_tw_data = depot_tw.clone();
-            depot_end.postfix_tw_data = depot_tw;
+        Self {
+            params,
+            search_completed: false,
+            nb_moves: 0,
+            order_nodes,
+            order_routes,
+            empty_routes: std::collections::BTreeSet::new(),
+            loop_id: 0,
+            nodes,
+            routes,
+            best_insert_initialized_for_route: vec![false; nb_vehicles],
+            best_insert_client: vec![vec![ThreeBestInsert::new(); nb_clients + 1]; nb_vehicles],
+            best_insert_client_tw: vec![vec![ThreeBestInsert::new(); nb_clients + 1]; nb_vehicles],
+            penalty_capacity_ls: 0.0,
+            penalty_time_warp_ls: 0.0,
+            correlated_vertices: Vec::new(),
+            nb_granular: 0,
         }
-
-        // Load clients into routes.
-        for r in 0..nb_vehicles {
-            let route_clients: Vec<usize> = indiv.chrom_r[r].clone();
-            if route_clients.is_empty() {
-                self.empty_routes.insert(r as i32);
-                continue;
-            }
-
-            let route_idx = r as i32;
-            let depot_idx = r as i32;
-            let depot_end_idx = (nb_vehicles + r) as i32;
-
-            // Insert clients in order between depot and depot_end.
-            let mut prev_idx = depot_idx;
-            for (pos, &client_idx) in route_clients.iter().enumerate() {
-                let node_idx = client_idx as i32;
-                let mut node = Node::clone(&self.clients[node_idx as usize]);
-                node.is_depot = false;
-                node.cour = node_idx;
-                node.position = (pos + 1) as i32;
-                node.route_idx = route_idx;
-                node.prev_idx = prev_idx;
-                node.next_idx = 0; // will be set in next iteration
-
-                // Update cumulated load and time.
-                if pos == 0 {
-                    node.cumulated_load = self.params.cli[client_idx].demand;
-                    node.cumulated_time = self.params.time_cost.get(0, client_idx) as i32
-                        + self.params.cli[client_idx].service_duration;
-                } else {
-                    let prev_client = route_clients[pos - 1];
-                    let prev_cum_load = self.clients[self.clients[prev_idx as usize].next_idx as usize].cumulated_load;
-                    node.cumulated_load = prev_cum_load + self.params.cli[client_idx].demand;
-                    let prev_cum_time = self.clients[prev_idx as usize].cumulated_time;
-                    let edge_dist = self.params.time_cost.get(
-                        if prev_client == 0 { 0 } else { prev_client },
-                        client_idx,
-                    ) as i32;
-                    node.cumulated_time = prev_cum_time + edge_dist;
-                }
-
-                // Initialize TW data for single node.
-                let cli = &self.params.cli[client_idx];
-                node.tw_data = TimeWindowData {
-                    first_node_index: node_idx,
-                    last_node_index: node_idx,
-                    duration: cli.service_duration,
-                    time_warp: 0,
-                    earliest_arrival: cli.earliest_arrival,
-                    latest_arrival: cli.latest_arrival,
-                    latest_release_time: cli.release_time,
-                };
-                node.prefix_tw_data = node.tw_data.clone();
-                node.postfix_tw_data = node.tw_data.clone();
-
-                self.clients[node_idx as usize] = node;
-
-                // Link previous to current.
-                self.clients[prev_idx as usize].next_idx = node_idx;
-                prev_idx = node_idx;
-            }
-
-            // Link last client to depot_end.
-            self.clients[prev_idx as usize].next_idx = depot_end_idx;
-            self.clients[depot_end_idx as usize].prev_idx = prev_idx;
-
-            // Update route data.
-            self.routes[route_idx as usize] = self.compute_route_data(route_idx);
-        }
-
-        // Initialize best insert tracking.
-        self.best_insert_initialized_for_route = vec![false; nb_vehicles];
+        .with_granular(params.config.nb_granular)
     }
 
-    /// Export the local search solution back to an individual.
-    pub fn export_individual(&self, indiv: &mut Individual) {
-        let nb_vehicles = self.params.nb_vehicles as usize;
+    fn with_granular(mut self, nb_granular: i32) -> Self {
+        self.set_granular(nb_granular);
+        self
+    }
 
-        // Clear all routes.
-        for r in 0..indiv.chrom_r.len() {
-            indiv.chrom_r[r].clear();
+    /// Use the `nb_granular` closest clients as neighborhoods (HGS
+    /// SetCorrelatedVertices, used when the granular size grows).
+    pub fn set_granular(&mut self, nb_granular: i32) {
+        self.nb_granular = nb_granular.max(1);
+        self.correlated_vertices = self
+            .params
+            .correlated_vertices_for(nb_granular)
+            .into_iter()
+            .map(|list| list.into_iter().map(|v| v as usize).collect())
+            .collect();
+    }
+
+    #[inline(always)]
+    pub fn depot_start(&self, r: usize) -> usize {
+        self.params.nb_clients as usize + 1 + r
+    }
+
+    #[inline(always)]
+    pub fn depot_end(&self, r: usize) -> usize {
+        self.params.nb_clients as usize + 1 + self.params.nb_vehicles as usize + r
+    }
+
+    #[inline(always)]
+    fn penalty_excess_load(&self, load: i32) -> f64 {
+        max(0, load - self.params.vehicle_capacity) as f64 * self.penalty_capacity_ls
+    }
+
+    #[inline(always)]
+    fn penalty_time_windows(&self, tw_data: &TimeWindowData) -> f64 {
+        if matches!(self.params.problem_type, ProblemType::Vrptw | ProblemType::Evrp) {
+            (tw_data.time_warp + max(0, tw_data.latest_release_time - tw_data.latest_arrival)) as f64
+                * self.penalty_time_warp_ls
+        } else {
+            0.0
+        }
+    }
+
+    #[inline(always)]
+    pub fn insert_node(&mut self, to_insert: usize, insertion_point: usize) {
+        let prev = self.nodes[to_insert].prev as usize;
+        let next = self.nodes[to_insert].next as usize;
+        let ins_next = self.nodes[insertion_point].next as usize;
+
+        self.nodes[prev].next = next as i32;
+        self.nodes[next].prev = prev as i32;
+
+        self.nodes[ins_next].prev = to_insert as i32;
+        self.nodes[to_insert].prev = insertion_point as i32;
+        self.nodes[to_insert].next = ins_next as i32;
+        self.nodes[insertion_point].next = to_insert as i32;
+
+        self.nodes[to_insert].route_idx = self.nodes[insertion_point].route_idx;
+    }
+
+    #[inline(always)]
+    fn insert_unlinked_node(&mut self, to_insert: usize, insertion_point: usize) {
+        let ins_next = self.nodes[insertion_point].next as usize;
+
+        self.nodes[ins_next].prev = to_insert as i32;
+        self.nodes[to_insert].prev = insertion_point as i32;
+        self.nodes[to_insert].next = ins_next as i32;
+        self.nodes[insertion_point].next = to_insert as i32;
+
+        self.nodes[to_insert].route_idx = self.nodes[insertion_point].route_idx;
+    }
+
+    #[inline(always)]
+    pub fn swap_node(&mut self, u: usize, v: usize) {
+        let u_pred = self.nodes[u].prev as usize;
+        let u_suiv = self.nodes[u].next as usize;
+        let v_pred = self.nodes[v].prev as usize;
+        let v_suiv = self.nodes[v].next as usize;
+        let route_u = self.nodes[u].route_idx;
+        let route_v = self.nodes[v].route_idx;
+
+        if u_suiv == v {
+            self.nodes[u_pred].next = v as i32;
+            self.nodes[v].prev = u_pred as i32;
+            self.nodes[v].next = u as i32;
+            self.nodes[u].prev = v as i32;
+            self.nodes[u].next = v_suiv as i32;
+            self.nodes[v_suiv].prev = u as i32;
+        } else if v_suiv == u {
+            self.nodes[v_pred].next = u as i32;
+            self.nodes[u].prev = v_pred as i32;
+            self.nodes[u].next = v as i32;
+            self.nodes[v].prev = u as i32;
+            self.nodes[v].next = u_suiv as i32;
+            self.nodes[u_suiv].prev = v as i32;
+        } else {
+            self.nodes[u_pred].next = v as i32;
+            self.nodes[u_suiv].prev = v as i32;
+            self.nodes[v_pred].next = u as i32;
+            self.nodes[v_suiv].prev = u as i32;
+
+            self.nodes[u].prev = v_pred as i32;
+            self.nodes[u].next = v_suiv as i32;
+            self.nodes[v].prev = u_pred as i32;
+            self.nodes[v].next = u_suiv as i32;
         }
 
-        // Extract routes from the linked list.
-        for r in 0..nb_vehicles {
-            let depot_idx = r as i32;
-            let mut curr = self.clients[depot_idx as usize].next_idx;
-            while curr != (self.params.nb_clients + r as i32 + 1) && !self.clients[curr as usize].is_depot {
-                indiv.chrom_r[r].push(curr as usize);
-                curr = self.clients[curr as usize].next_idx;
+        self.nodes[u].route_idx = route_v;
+        self.nodes[v].route_idx = route_u;
+    }
+
+    /// Update preprocessed route data (duration, load, TW, penalties, barycenter).
+    pub fn update_route_data(&mut self, route_idx: usize) {
+        let depot_s = self.depot_start(route_idx);
+        let depot_e = self.depot_end(route_idx);
+
+        let mut myplace = 0i32;
+        let mut myload = 0i32;
+        let mut mytime = 0i32;
+        let mut my_reversal_distance = 0i32;
+        // HGS accumulates the scaled coordinates in ints, truncating each sum.
+        let mut cumulated_x = 0i32;
+        let mut cumulated_y = 0i32;
+
+        self.nodes[depot_s].position = 0;
+        self.nodes[depot_s].cumulated_load = 0;
+        self.nodes[depot_s].cumulated_time = 0;
+        self.nodes[depot_s].cumulated_reversal_distance = 0;
+
+        let mut mynode = depot_s;
+        let mut first_it = true;
+        let mut seed_tw = TimeWindowData::default();
+        let mut seed_node: Option<usize> = None;
+
+        while mynode != depot_e {
+            let next_node = self.nodes[mynode].next as usize;
+            myplace += 1;
+            self.nodes[next_node].position = myplace;
+            let cour = self.nodes[next_node].cour as usize;
+            let prev_cour = self.nodes[mynode].cour as usize;
+
+            myload += self.params.cli[cour].demand;
+            let edge_cost = self.params.time_cost.get(prev_cour, cour);
+            let edge_reverse = self.params.time_cost.get(cour, prev_cour);
+            mytime += edge_cost + self.params.cli[cour].service_duration;
+            my_reversal_distance += edge_reverse - edge_cost;
+
+            self.nodes[next_node].cumulated_load = myload;
+            self.nodes[next_node].cumulated_time = mytime;
+            self.nodes[next_node].cumulated_reversal_distance = my_reversal_distance;
+            self.nodes[next_node].prefix_tw_data = TimeWindowData::merge(
+                &self.nodes[mynode].prefix_tw_data,
+                &self.nodes[next_node].tw_data,
+                self.params,
+            );
+            self.nodes[next_node].is_seed = false;
+            self.nodes[next_node].next_seed = -1;
+
+            if !self.nodes[next_node].is_depot {
+                cumulated_x = (cumulated_x as f64 + self.params.cli[cour].coord_x) as i32;
+                cumulated_y = (cumulated_y as f64 + self.params.cli[cour].coord_y) as i32;
+                if first_it {
+                    self.routes[route_idx].sector.initialize(self.params.cli[cour].polar_angle);
+                } else {
+                    self.routes[route_idx].sector.extend(self.params.cli[cour].polar_angle);
+                }
+                // Every fourth node stores the merged data up to the next one.
+                match myplace % 4 {
+                    0 => {
+                        if let Some(seed) = seed_node {
+                            self.nodes[seed].is_seed = true;
+                            self.nodes[seed].to_next_seed_tw_data =
+                                TimeWindowData::merge(&seed_tw, &self.nodes[next_node].tw_data, self.params);
+                            self.nodes[seed].next_seed = next_node as i32;
+                        }
+                        seed_node = Some(next_node);
+                    }
+                    1 => seed_tw = self.nodes[next_node].tw_data.clone(),
+                    _ => seed_tw = TimeWindowData::merge(&seed_tw, &self.nodes[next_node].tw_data, self.params),
+                }
+            }
+
+            first_it = false;
+            mynode = next_node;
+        }
+
+        let route = &mut self.routes[route_idx];
+        route.duration = mytime;
+        route.load = myload;
+        route.tw_data = self.nodes[depot_e].prefix_tw_data.clone();
+        route.nb_customers = myplace - 1;
+        route.reversal_distance = my_reversal_distance;
+        route.when_last_modified = self.nb_moves;
+        route.is_delta_removel_tw_outdated = true;
+        self.routes[route_idx].penalty = self.penalty_excess_load(myload)
+            + self.penalty_time_windows(&self.routes[route_idx].tw_data);
+
+        // Postfix TW data in reverse direction
+        mynode = depot_e;
+        while mynode != depot_s {
+            let prev_node = self.nodes[mynode].prev as usize;
+            self.nodes[prev_node].postfix_tw_data = TimeWindowData::merge(
+                &self.nodes[prev_node].tw_data,
+                &self.nodes[mynode].postfix_tw_data,
+                self.params,
+            );
+            mynode = prev_node;
+        }
+
+        let route = &mut self.routes[route_idx];
+        if route.nb_customers == 0 {
+            route.polar_angle_barycenter = 1e30;
+            self.empty_routes.insert(route_idx);
+        } else {
+            let inv_n = 1.0 / route.nb_customers as f64;
+            let diff_x = cumulated_x as f64 * inv_n - self.params.cli[0].coord_x;
+            let diff_y = cumulated_y as f64 * inv_n - self.params.cli[0].coord_y;
+            route.polar_angle_barycenter = diff_y.atan2(diff_x);
+
+            // Enforce a minimum circle sector size.
+            if self.params.min_circle_sector_size > 0 {
+                let sector_size =
+                    CircleSector::positive_mod(route.sector.end as i32 - route.sector.start as i32) as i32;
+                let grow_by = (self.params.min_circle_sector_size as i32 - sector_size + 1) / 2;
+                if grow_by > 0 {
+                    let (start, end) = (route.sector.start as i32, route.sector.end as i32);
+                    route.sector.extend(CircleSector::positive_mod(start - grow_by));
+                    route.sector.extend(CircleSector::positive_mod(end + grow_by));
+                }
+            }
+            self.empty_routes.remove(&route_idx);
+        }
+    }
+
+    /// Time window data of the route segment from `u` to `v`, both included.
+    pub fn get_route_segment_tw_data(&self, u: usize, v: usize) -> TimeWindowData {
+        if self.nodes[u].is_depot {
+            return self.nodes[v].prefix_tw_data.clone();
+        }
+        if self.nodes[v].is_depot {
+            return self.nodes[u].postfix_tw_data.clone();
+        }
+
+        let target = self.nodes[v].position;
+        let mut tw_data = self.nodes[u].tw_data.clone();
+        let mut curr = u;
+        while curr != v {
+            let node = &self.nodes[curr];
+            if node.is_seed && node.position + 4 <= target {
+                tw_data = TimeWindowData::merge(&tw_data, &node.to_next_seed_tw_data, self.params);
+                curr = node.next_seed as usize;
+            } else {
+                curr = node.next as usize;
+                tw_data = TimeWindowData::merge(&tw_data, &self.nodes[curr].tw_data, self.params);
+            }
+        }
+        tw_data
+    }
+
+    /// Merge consecutive time window segments left to right.
+    fn merge_all(&self, parts: &[&TimeWindowData]) -> TimeWindowData {
+        let mut result = parts[0].clone();
+        for part in &parts[1..] {
+            result = TimeWindowData::merge(&result, part, self.params);
+        }
+        result
+    }
+
+    /// Penalty difference of replacing the route time windows `old` by `new`.
+    fn delta_penalty_time_windows(&self, new: &TimeWindowData, old: &TimeWindowData) -> f64 {
+        self.penalty_time_windows(new) - self.penalty_time_windows(old)
+    }
+
+    /// Load an individual into the local search representation.
+    pub fn load_individual(&mut self, indiv: &Individual<'_>) {
+        self.empty_routes.clear();
+        self.nb_moves = 0;
+        debug_assert_eq!(
+            indiv.chrom_r.iter().map(Vec::len).sum::<usize>(),
+            self.params.nb_clients as usize,
+            "every client must be routed"
+        );
+
+        let depot_tw = TimeWindowData {
+            first_node_index: 0,
+            last_node_index: 0,
+            duration: 0,
+            time_warp: 0,
+            earliest_arrival: self.params.cli[0].earliest_arrival,
+            latest_arrival: self.params.cli[0].latest_arrival,
+            latest_release_time: self.params.cli[0].release_time,
+        };
+
+        for i in 1..=self.params.nb_clients as usize {
+            self.nodes[i].cour = i as i32;
+            self.nodes[i].is_depot = false;
+            self.nodes[i].prev = 0;
+            self.nodes[i].next = 0;
+            self.nodes[i].route_idx = 0;
+            self.nodes[i].when_last_tested_ri = -1;
+            self.nodes[i].tw_data = TimeWindowData {
+                first_node_index: i as i32,
+                last_node_index: i as i32,
+                duration: self.params.cli[i].service_duration,
+                time_warp: 0,
+                earliest_arrival: self.params.cli[i].earliest_arrival,
+                latest_arrival: self.params.cli[i].latest_arrival,
+                latest_release_time: self.params.cli[i].release_time,
+            };
+        }
+
+        for r in 0..self.params.nb_vehicles as usize {
+            let start = self.depot_start(r);
+            let end = self.depot_end(r);
+
+            self.nodes[start].cour = 0;
+            self.nodes[start].is_depot = true;
+            self.nodes[start].route_idx = r as i32;
+            self.nodes[start].tw_data = depot_tw.clone();
+            self.nodes[start].prefix_tw_data = depot_tw.clone();
+            self.nodes[start].postfix_tw_data = depot_tw.clone();
+
+            self.nodes[end].cour = 0;
+            self.nodes[end].is_depot = true;
+            self.nodes[end].route_idx = r as i32;
+            self.nodes[end].tw_data = depot_tw.clone();
+            self.nodes[end].prefix_tw_data = depot_tw.clone();
+            self.nodes[end].postfix_tw_data = depot_tw.clone();
+
+            self.routes[r].cour = r as i32;
+
+            let route = &indiv.chrom_r[r];
+            if !route.is_empty() {
+                let first = route[0];
+                self.nodes[first].route_idx = r as i32;
+                self.nodes[first].prev = start as i32;
+                self.nodes[start].next = first as i32;
+
+                let mut pred = first;
+                for i in 1..route.len() {
+                    let curr = route[i];
+                    self.nodes[curr].route_idx = r as i32;
+                    self.nodes[curr].prev = pred as i32;
+                    self.nodes[pred].next = curr as i32;
+                    pred = curr;
+                }
+
+                let last = pred;
+                self.nodes[last].next = end as i32;
+                self.nodes[end].prev = last as i32;
+            } else {
+                self.nodes[start].next = end as i32;
+                self.nodes[end].prev = start as i32;
+            }
+
+            self.nodes[start].prev = end as i32;
+            self.nodes[end].next = start as i32;
+
+            self.update_route_data(r);
+            self.routes[r].when_last_tested_large_nb = -1;
+            self.best_insert_initialized_for_route[r] = false;
+        }
+    }
+
+    /// Export the local search solution back to the individual.
+    pub fn export_individual(&mut self, indiv: &mut Individual<'_>) {
+        let mut route_polar_angles: Vec<(SortableF64, usize)> = Vec::new();
+        for r in 0..self.params.nb_vehicles as usize {
+            route_polar_angles.push((SortableF64(self.routes[r].polar_angle_barycenter), r));
+        }
+        route_polar_angles.sort();
+
+        let mut pos = 0;
+        for (r, &(_, old_r)) in route_polar_angles.iter().enumerate() {
+            indiv.chrom_r[r].clear();
+            let start = self.depot_start(old_r);
+            let mut curr = self.nodes[start].next as usize;
+
+            while !self.nodes[curr].is_depot {
+                let cust = self.nodes[curr].cour as usize;
+                if pos < indiv.chrom_t.len() {
+                    indiv.chrom_t[pos] = cust;
+                } else {
+                    indiv.chrom_t.push(cust);
+                }
+                indiv.chrom_r[r].push(cust);
+                pos += 1;
+                curr = self.nodes[curr].next as usize;
             }
         }
 
-        // Rebuild predecessor/successor maps from routes.
-        indiv.rebuild_maps();
         indiv.evaluate_complete_cost();
     }
 
-    // =========================================================================
-    // RI (RELOCATE INDIVIDUAL) MOVES
-    // =========================================================================
-
-    /// Initialize randomized node order for RI moves.
-    fn init_order_nodes(&mut self) {
-        let nb_clients = self.params.nb_clients as usize;
-        self.order_nodes = (1..=nb_clients as i32).collect();
-        self.params.rng.borrow_mut().shuffle(&mut self.order_nodes);
+    #[inline(always)]
+    fn route_has_tw_violation(&self, r: usize) -> bool {
+        matches!(self.params.problem_type, ProblemType::Vrptw | ProblemType::Evrp)
+            && self.routes[r].tw_data.time_warp > 0
     }
 
-    /// Initialize randomized route order for SWAP* moves.
-    fn init_order_routes(&mut self) {
-        let nb_vehicles = self.params.nb_vehicles as usize;
-        self.order_routes = (0..nb_vehicles as i32).collect();
-        self.params.rng.borrow_mut().shuffle(&mut self.order_routes);
+    #[inline(always)]
+    fn route_has_load_penalty(&self, r: usize) -> bool {
+        self.routes[r].load > self.params.vehicle_capacity
     }
 
-    /// Try all RI (relocate) moves.
-    fn try_ri_moves(&mut self) {
-        let order: Vec<i32> = self.order_nodes.iter().copied().collect();
-        for u in order {
-            if u <= 0 || u > self.params.nb_clients {
-                continue;
+    /// Move single client U and insert it after V.
+    pub fn move_single_client(&mut self, u: usize, v: usize) -> bool {
+        let u_prev = self.nodes[u].prev as usize;
+        let x = self.nodes[u].next as usize;
+        let y = self.nodes[v].next as usize;
+
+        if u == y {
+            return false;
+        }
+
+        let u_cour = self.nodes[u].cour as usize;
+        let x_cour = self.nodes[x].cour as usize;
+        let u_prev_cour = self.nodes[u_prev].cour as usize;
+        let v_cour = self.nodes[v].cour as usize;
+        let y_cour = self.nodes[y].cour as usize;
+
+        let mut cost_supp_u = (self.params.time_cost.get(u_prev_cour, x_cour)
+            - self.params.time_cost.get(u_prev_cour, u_cour)
+            - self.params.time_cost.get(u_cour, x_cour)) as f64;
+        let mut cost_supp_v = (self.params.time_cost.get(v_cour, u_cour)
+            + self.params.time_cost.get(u_cour, y_cour)
+            - self.params.time_cost.get(v_cour, y_cour)) as f64;
+
+        let r_u = self.nodes[u].route_idx as usize;
+        let r_v = self.nodes[v].route_idx as usize;
+        let load_u = self.params.cli[u_cour].demand;
+
+        let route_u_load_pen = self.route_has_load_penalty(r_u);
+        let route_u_tw_pen = self.route_has_tw_violation(r_u);
+
+        if r_u != r_v {
+            if !route_u_load_pen && !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
+                return false;
             }
 
-            let node_u_idx = u as usize;
-            let is_depot = self.clients[node_u_idx].is_depot;
-            if is_depot {
-                continue;
-            }
+            let route_u_tw = TimeWindowData::merge(
+                &self.nodes[u_prev].prefix_tw_data,
+                &self.nodes[x].postfix_tw_data,
+                self.params,
+            );
+            let v_prefix_u = TimeWindowData::merge(
+                &self.nodes[v].prefix_tw_data,
+                &self.nodes[u].tw_data,
+                self.params,
+            );
+            let route_v_tw = TimeWindowData::merge(
+                &v_prefix_u,
+                &self.nodes[y].postfix_tw_data,
+                self.params,
+            );
 
-            // Try removing U and inserting after each other node V.
-            let route_u_idx = self.clients[node_u_idx].route_idx;
-            self.routes[route_u_idx as usize].when_last_modified = self.loop_id;
-
-            let mut curr = self.clients[self.clients[node_u_idx].prev_idx as usize].next_idx; // U itself
-            while curr != (self.params.nb_clients + route_u_idx + 1) {
-                let v = curr;
-                let is_v_depot = self.clients[v as usize].is_depot;
-                if !is_v_depot && v != u {
-                    if self.move_single_client(u, v) {
-                        break; // Move applied, restart RI loop.
-                    }
-                }
-                curr = self.clients[curr as usize].next_idx;
-            }
-        }
-    }
-
-    /// Try to relocate client U and insert it after V.
-    fn move_single_client(&mut self, u: i32, v: i32) -> bool {
-        // Calculate cost of removing U from its current position.
-        let u_prev = self.clients[u as usize].prev_idx;
-        let u_next = self.clients[u as usize].next_idx;
-
-        // Cost change from removing U.
-        let remove_cost = self.calculate_removal_cost(u);
-
-        // Cost change from inserting U after V.
-        let insert_cost = self.calculate_insertion_cost(v, u);
-
-        let total_delta = remove_cost + insert_cost;
-
-        if total_delta < -1 {
-            // Apply the move: remove U, insert after V.
-            self.remove_node(u);
-            self.insert_node_after(u, v);
-            self.update_route_data_for_changed_routes(vec![u_prev, u_next, v]);
-            return true;
-        }
-
-        false
-    }
-
-    /// Calculate the cost delta of removing node U from its route.
-    fn calculate_removal_cost(&self, u: i32) -> i32 {
-        let u_prev = self.clients[u as usize].prev_idx;
-        let u_next = self.clients[u as usize].next_idx;
-
-        // Old cost: depot -> ... -> u_prev -> u -> u_next -> ... -> depot
-        // New cost: depot -> ... -> u_prev -> u_next -> ... -> depot
-        let old_edge = self.params.time_cost.get(u_prev as usize, u as usize)
-            + self.params.time_cost.get(u as usize, u_next as usize);
-        let new_edge = self.params.time_cost.get(u_prev as usize, u_next as usize);
-
-        new_edge - old_edge
-    }
-
-    /// Calculate the cost delta of inserting node U after V.
-    fn calculate_insertion_cost(&self, v: i32, u: i32) -> i32 {
-        let v_next = self.clients[v as usize].next_idx;
-
-        // Old edge: v -> v_next
-        // New edges: v -> u -> v_next
-        let old_edge = self.params.time_cost.get(v as usize, v_next as usize);
-        let new_edges = self.params.time_cost.get(v as usize, u as usize)
-            + self.params.time_cost.get(u as usize, v_next as usize);
-
-        new_edges - old_edge
-    }
-
-    /// Remove a node from its route.
-    fn remove_node(&mut self, u: i32) {
-        let u_prev = self.clients[u as usize].prev_idx;
-        let u_next = self.clients[u as usize].next_idx;
-
-        self.clients[u_prev as usize].next_idx = u_next;
-        self.clients[u_next as usize].prev_idx = u_prev;
-
-        // Clear the node.
-        self.clients[u as usize] = Node::default();
-    }
-
-    /// Insert node U after V.
-    fn insert_node_after(&mut self, u: i32, v: i32) {
-        let v_next = self.clients[v as usize].next_idx;
-
-        self.clients[v as usize].next_idx = u;
-        self.clients[u as usize].prev_idx = v;
-        self.clients[u as usize].next_idx = v_next;
-        self.clients[v_next as usize].prev_idx = u;
-    }
-
-    /// Update route data for routes that were affected by a move.
-    fn update_route_data_for_changed_routes(&mut self, node_indices: Vec<i32>) {
-        // First collect route indices without borrowing self.clients and self.routes simultaneously.
-        let mut route_indices: Vec<i32> = Vec::new();
-        for &idx in &node_indices {
-            if idx > 0 && idx <= self.params.nb_clients {
-                let r = self.clients[idx as usize].route_idx;
-                if !route_indices.contains(&r) {
-                    route_indices.push(r);
-                }
-            }
-        }
-
-        // Now update each route.
-        for &r in &route_indices {
-            self.routes[r as usize] = self.compute_route_data(r);
-        }
-    }
-
-    /// Compute route data without mutating self (for use in load_individual).
-    fn compute_route_data(&self, route_idx: i32) -> HGSRoute {
-        let depot_idx = route_idx;
-        let depot_end_idx = self.params.nb_clients + route_idx + 1;
-
-        // Traverse the route and compute cumulative values.
-        let mut cum_load = 0i32;
-        let mut cum_time = 0i32;
-        let mut nb_customers = 0i32;
-        let mut total_duration = 0i32;
-        let mut prev_idx = depot_idx as i32;
-
-        let mut route = HGSRoute::default();
-        route.cour = route_idx;
-
-        let mut curr = self.clients[depot_idx as usize].next_idx;
-        while curr != depot_end_idx {
-            let node = &self.clients[curr as usize];
-            nb_customers += 1;
-
-            let client_demand = self.params.cli[node.cour as usize].demand;
-            cum_load += client_demand;
-            route.load = cum_load;
-
-            let edge_dist = if prev_idx == depot_idx {
-                self.params.time_cost.get(0, node.cour as usize)
-            } else {
-                self.params.time_cost.get(prev_idx as usize, node.cour as usize)
-            } as i32;
-
-            cum_time += edge_dist + self.params.cli[node.cour as usize].service_duration;
-            total_duration += edge_dist;
-
-            prev_idx = curr;
-            curr = self.clients[curr as usize].next_idx;
-        }
-
-        route.nb_customers = nb_customers;
-        route.duration = total_duration;
-
-        // Calculate TW data for the entire route.
-        if nb_customers > 0 {
-            let first_node = self.clients[depot_idx as usize].next_idx;
-
-            let mut tw_acc = TimeWindowData::single(first_node, &self.params);
-
-            curr = self.clients[first_node as usize].next_idx;
-            while curr != depot_end_idx {
-                let next_tw = TimeWindowData::single(curr, &self.params);
-                let edge_dist = self.params.time_cost.get(
-                    if self.clients[curr as usize].prev_idx == depot_idx { 0 }
-                    else { self.clients[curr as usize].prev_idx as usize },
-                    curr as usize,
-                ) as i32;
-
-                tw_acc.duration += edge_dist + next_tw.duration;
-
-                let arrival = tw_acc.earliest_arrival + edge_dist;
-                let wait = if arrival < next_tw.earliest_arrival {
-                    next_tw.earliest_arrival - arrival
-                } else {
-                    0
-                };
-                tw_acc.earliest_arrival = if arrival < next_tw.earliest_arrival {
-                    next_tw.earliest_arrival - wait
-                } else {
-                    arrival
-                };
-
-                let arrival_latest = tw_acc.latest_arrival + edge_dist;
-                let tw_warp = if arrival_latest > next_tw.latest_arrival {
-                    arrival_latest - next_tw.latest_arrival
-                } else {
-                    0
-                };
-                tw_acc.time_warp += tw_warp;
-                tw_acc.latest_arrival = if arrival_latest + tw_warp < next_tw.latest_arrival {
-                    arrival_latest + tw_warp
-                } else {
-                    next_tw.latest_arrival
-                };
-
-                curr = self.clients[curr as usize].next_idx;
-            }
-
-            route.tw_data = tw_acc;
-        }
-
-        // Calculate penalty.
-        let capacity_penalty = if route.load > self.params.vehicle_capacity {
-            (route.load - self.params.vehicle_capacity) as f64 * self.penalty_capacity_ls
+            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load - load_u)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
+            cost_supp_v += self.penalty_excess_load(self.routes[r_v].load + load_u)
+                + self.penalty_time_windows(&route_v_tw)
+                - self.routes[r_v].penalty;
         } else {
-            0.0
-        };
-        let tw_penalty = route.tw_data.time_warp as f64 * self.penalty_time_warp_ls;
-        route.penalty = capacity_penalty + tw_penalty;
+            if !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
+                return false;
+            }
 
-        route
-    }
-
-    /// Update preprocessed data for a route.
-    fn update_route_data(&mut self, route: &mut HGSRoute) {
-        let route_idx = route.cour;
-        let depot_idx = route_idx;
-        let depot_end_idx = self.params.nb_clients + route_idx + 1;
-
-        // Traverse the route and compute cumulative values.
-        let mut cum_load = 0i32;
-        let mut cum_time = 0i32;
-        let mut nb_customers = 0i32;
-        let mut total_duration = 0i32;
-        let mut prev_idx = depot_idx as i32;
-
-        route.nb_customers = 0;
-        route.load = 0;
-        route.duration = 0;
-
-        let mut curr = self.clients[depot_idx as usize].next_idx;
-        while curr != depot_end_idx {
-            let node = &mut self.clients[curr as usize];
-            nb_customers += 1;
-
-            let client_demand = self.params.cli[node.cour as usize].demand;
-            cum_load += client_demand;
-            route.load = cum_load;
-
-            let edge_dist = if prev_idx == depot_idx {
-                self.params.time_cost.get(0, node.cour as usize)
+            let route_u_tw = if self.nodes[u].position < self.nodes[v].position {
+                let seg_tw = self.get_route_segment_tw_data(x, v);
+                let p1 = TimeWindowData::merge(
+                    &self.nodes[u_prev].prefix_tw_data,
+                    &seg_tw,
+                    self.params,
+                );
+                let p2 = TimeWindowData::merge(&p1, &self.nodes[u].tw_data, self.params);
+                TimeWindowData::merge(&p2, &self.nodes[y].postfix_tw_data, self.params)
             } else {
-                self.params.time_cost.get(prev_idx as usize, node.cour as usize)
-            } as i32;
+                let seg_tw = self.get_route_segment_tw_data(y, u_prev);
+                let p1 = TimeWindowData::merge(
+                    &self.nodes[v].prefix_tw_data,
+                    &self.nodes[u].tw_data,
+                    self.params,
+                );
+                let p2 = TimeWindowData::merge(&p1, &seg_tw, self.params);
+                TimeWindowData::merge(&p2, &self.nodes[x].postfix_tw_data, self.params)
+            };
 
-            cum_time += edge_dist + self.params.cli[node.cour as usize].service_duration;
-            total_duration += edge_dist;
-
-            node.cumulated_load = cum_load;
-            node.cumulated_time = cum_time;
-            node.position = nb_customers;
-
-            prev_idx = curr;
-            curr = self.clients[curr as usize].next_idx;
+            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
         }
 
-        route.nb_customers = nb_customers;
-        route.duration = total_duration;
+        if cost_supp_u + cost_supp_v > -MY_EPSILON {
+            return false;
+        }
 
-        // Calculate TW data for the entire route.
-        if nb_customers > 0 {
-            let first_node = self.clients[depot_idx as usize].next_idx;
-            let last_node_idx = prev_idx;
+        self.insert_node(u, v);
+        self.nb_moves += 1;
+        self.search_completed = false;
+        self.update_route_data(r_u);
+        if r_u != r_v {
+            self.update_route_data(r_v);
+        }
 
-            let mut tw_acc = TimeWindowData::single(first_node, &self.params);
+        true
+    }
 
-            curr = self.clients[first_node as usize].next_idx;
-            while curr != depot_end_idx {
-                let next_tw = TimeWindowData::single(curr, &self.params);
-                let edge_dist = self.params.time_cost.get(
-                    if self.clients[curr as usize].prev_idx == depot_idx { 0 }
-                    else { self.clients[curr as usize].prev_idx as usize },
-                    curr as usize,
-                ) as i32;
+    /// Move two clients (U, X) and insert them after V.
+    pub fn move_two_clients(&mut self, u: usize, v: usize) -> bool {
+        let x = self.nodes[u].next as usize;
+        if self.nodes[x].is_depot {
+            return false;
+        }
+        let y = self.nodes[v].next as usize;
+        if u == y || x == v {
+            return false;
+        }
 
-                tw_acc.duration += edge_dist + next_tw.duration;
+        let u_prev = self.nodes[u].prev as usize;
+        let x_next = self.nodes[x].next as usize;
 
-                let arrival = tw_acc.earliest_arrival + edge_dist;
-                let wait = if arrival < next_tw.earliest_arrival {
-                    next_tw.earliest_arrival - arrival
-                } else {
-                    0
-                };
-                tw_acc.earliest_arrival = if arrival < next_tw.earliest_arrival {
-                    next_tw.earliest_arrival - wait
-                } else {
-                    arrival
-                };
+        let u_cour = self.nodes[u].cour as usize;
+        let x_cour = self.nodes[x].cour as usize;
+        let u_prev_cour = self.nodes[u_prev].cour as usize;
+        let x_next_cour = self.nodes[x_next].cour as usize;
+        let v_cour = self.nodes[v].cour as usize;
+        let y_cour = self.nodes[y].cour as usize;
 
-                let arrival_latest = tw_acc.latest_arrival + edge_dist;
-                let tw_warp = if arrival_latest > next_tw.latest_arrival {
-                    arrival_latest - next_tw.latest_arrival
-                } else {
-                    0
-                };
-                tw_acc.time_warp += tw_warp;
-                tw_acc.latest_arrival = if arrival_latest + tw_warp < next_tw.latest_arrival {
-                    arrival_latest + tw_warp
-                } else {
-                    next_tw.latest_arrival
-                };
+        let mut cost_supp_u = (self.params.time_cost.get(u_prev_cour, x_next_cour)
+            - self.params.time_cost.get(u_prev_cour, u_cour)
+            - self.params.time_cost.get(x_cour, x_next_cour)) as f64;
+        let mut cost_supp_v = (self.params.time_cost.get(v_cour, u_cour)
+            + self.params.time_cost.get(x_cour, y_cour)
+            - self.params.time_cost.get(v_cour, y_cour)) as f64;
 
-                curr = self.clients[curr as usize].next_idx;
+        let r_u = self.nodes[u].route_idx as usize;
+        let r_v = self.nodes[v].route_idx as usize;
+        let load_ux = self.params.cli[u_cour].demand + self.params.cli[x_cour].demand;
+
+        let route_u_load_pen = self.route_has_load_penalty(r_u);
+        let route_u_tw_pen = self.route_has_tw_violation(r_u);
+
+        if r_u != r_v {
+            if !route_u_load_pen && !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
+                return false;
             }
 
-            route.tw_data = tw_acc;
-        }
+            let route_u_tw = TimeWindowData::merge(
+                &self.nodes[u_prev].prefix_tw_data,
+                &self.nodes[x_next].postfix_tw_data,
+                self.params,
+            );
+            let ux_tw = TimeWindowData::merge(
+                &self.nodes[u].tw_data,
+                &self.nodes[x].tw_data,
+                self.params,
+            );
+            let v_ux = TimeWindowData::merge(&self.nodes[v].prefix_tw_data, &ux_tw, self.params);
+            let route_v_tw =
+                TimeWindowData::merge(&v_ux, &self.nodes[y].postfix_tw_data, self.params);
 
-        // Calculate penalty.
-        let capacity_penalty = if route.load > self.params.vehicle_capacity {
-            (route.load - self.params.vehicle_capacity) as f64 * self.penalty_capacity_ls
+            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load - load_ux)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
+            cost_supp_v += self.penalty_excess_load(self.routes[r_v].load + load_ux)
+                + self.penalty_time_windows(&route_v_tw)
+                - self.routes[r_v].penalty;
         } else {
-            0.0
-        };
-        let tw_penalty = route.tw_data.time_warp as f64 * self.penalty_time_warp_ls;
-        route.penalty = capacity_penalty + tw_penalty;
-    }
-
-    // =========================================================================
-    // SWAP* MOVES (simplified)
-    // =========================================================================
-
-    /// Try all SWAP* moves between pairs of routes.
-    fn try_swap_star_moves(&mut self) {
-        let order: Vec<i32> = self.order_routes.iter().copied().collect();
-        for r_u in &order {
-            if self.empty_routes.contains(r_u) {
-                continue;
+            if !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
+                return false;
             }
 
-            self.routes[*r_u as usize].when_last_modified = self.loop_id;
+            let ux_tw = TimeWindowData::merge(
+                &self.nodes[u].tw_data,
+                &self.nodes[x].tw_data,
+                self.params,
+            );
+            let route_u_tw = if self.nodes[u].position < self.nodes[v].position {
+                let seg_tw = self.get_route_segment_tw_data(x_next, v);
+                let p1 = TimeWindowData::merge(
+                    &self.nodes[u_prev].prefix_tw_data,
+                    &seg_tw,
+                    self.params,
+                );
+                let p2 = TimeWindowData::merge(&p1, &ux_tw, self.params);
+                TimeWindowData::merge(&p2, &self.nodes[y].postfix_tw_data, self.params)
+            } else {
+                let seg_tw = self.get_route_segment_tw_data(y, u_prev);
+                let p1 = TimeWindowData::merge(
+                    &self.nodes[v].prefix_tw_data,
+                    &ux_tw,
+                    self.params,
+                );
+                let p2 = TimeWindowData::merge(&p1, &seg_tw, self.params);
+                TimeWindowData::merge(&p2, &self.nodes[x_next].postfix_tw_data, self.params)
+            };
 
-            for r_v in &order {
-                if *r_v == *r_u || self.empty_routes.contains(r_v) {
-                    continue;
-                }
-
-                self.routes[*r_v as usize].when_last_modified = self.loop_id;
-
-                // Simplified SWAP*: try swapping each pair of clients.
-                if self.swap_two_single_clients(*r_u, *r_v) {
-                    break;
-                }
-            }
-        }
-    }
-
-    /// Try swapping two single clients between routes.
-    fn swap_two_single_clients(&mut self, r_u: i32, r_v: i32) -> bool {
-        let depot_u = r_u;
-        let depot_end_u = self.params.nb_clients + r_u + 1;
-        let depot_v = r_v;
-        let depot_end_v = self.params.nb_clients + r_v + 1;
-
-        // Traverse route U.
-        let mut curr_u = self.clients[depot_u as usize].next_idx;
-        while curr_u != depot_end_u {
-            if self.clients[curr_u as usize].is_depot {
-                curr_u = self.clients[curr_u as usize].next_idx;
-                continue;
-            }
-
-            let u = curr_u;
-            let u_next = self.clients[u as usize].next_idx;
-            let u_prev = self.clients[u as usize].prev_idx;
-
-            // Traverse route V.
-            let mut curr_v = self.clients[depot_v as usize].next_idx;
-            while curr_v != depot_end_v {
-                if self.clients[curr_v as usize].is_depot {
-                    curr_v = self.clients[curr_v as usize].next_idx;
-                    continue;
-                }
-
-                let v = curr_v;
-                let v_next = self.clients[v as usize].next_idx;
-                let v_prev = self.clients[v as usize].prev_idx;
-
-                // Calculate cost of swapping U and V.
-                let cost_u_remove = self.params.time_cost.get(u_prev as usize, u as usize)
-                    + self.params.time_cost.get(u as usize, u_next as usize);
-                let cost_u_insert = self.params.time_cost.get(v_prev as usize, u as usize)
-                    + self.params.time_cost.get(u as usize, v_next as usize);
-
-                let cost_v_remove = self.params.time_cost.get(v_prev as usize, v as usize)
-                    + self.params.time_cost.get(v as usize, v_next as usize);
-                let cost_v_insert = self.params.time_cost.get(u_prev as usize, v as usize)
-                    + self.params.time_cost.get(v as usize, u_next as usize);
-
-                let total_delta = (cost_u_insert + cost_v_insert) - (cost_u_remove + cost_v_remove);
-
-                if total_delta < -1 {
-                    // Apply swap.
-                    let u_pos_in_v = v_prev;
-                    let u_next_after_swap = v_next;
-                    let v_pos_in_u = u_prev;
-                    let v_next_after_swap = u_next;
-
-                    // Remove U from route U, V from route V.
-                    self.clients[u_prev as usize].next_idx = u_next;
-                    self.clients[u_next as usize].prev_idx = u_prev;
-                    self.clients[v_prev as usize].next_idx = v_next;
-                    self.clients[v_next as usize].prev_idx = v_prev;
-
-                    // Insert V into route U, U into route V.
-                    self.clients[v_prev as usize].next_idx = v;
-                    self.clients[v as usize].prev_idx = v_prev;
-                    self.clients[v as usize].next_idx = u_next;
-                    self.clients[u_next as usize].prev_idx = v;
-
-                    self.clients[u_prev as usize].next_idx = u;
-                    self.clients[u as usize].prev_idx = u_prev;
-                    self.clients[u as usize].next_idx = v_next;
-                    self.clients[v_next as usize].prev_idx = u;
-
-                    // Update route data.
-                    self.routes[r_u as usize] = self.compute_route_data(r_u);
-                    self.routes[r_v as usize] = self.compute_route_data(r_v);
-                    return true;
-                }
-
-                curr_v = self.clients[curr_v as usize].next_idx;
-            }
-
-            curr_u = self.clients[curr_u as usize].next_idx;
+            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
         }
 
-        false
+        if cost_supp_u + cost_supp_v > -MY_EPSILON {
+            return false;
+        }
+
+        self.insert_node(u, v);
+        self.insert_node(x, u);
+        self.nb_moves += 1;
+        self.search_completed = false;
+        self.update_route_data(r_u);
+        if r_u != r_v {
+            self.update_route_data(r_v);
+        }
+
+        true
     }
 
-    // =========================================================================
-    // 2-OPT / 2-OPT* MOVES (simplified)
-    // =========================================================================
-
-    /// Try 2-opt and 2-opt* moves.
-    fn try_two_opt_moves(&mut self) {
-        let order: Vec<i32> = self.order_routes.iter().copied().collect();
-        for r_u in &order {
-            let nb_cust = self.routes[*r_u as usize].nb_customers;
-            if self.empty_routes.contains(r_u) || nb_cust < 2 {
-                continue;
-            }
-
-            self.routes[*r_u as usize].when_last_modified = self.loop_id;
-
-            // Try 2-opt within the same route.
-            if self.two_opt_within_trip(*r_u, *r_u) {
-                continue;
-            }
-
-            // Try 2-opt* between different routes.
-            for r_v in &order {
-                if *r_v == *r_u || self.empty_routes.contains(r_v) {
-                    continue;
-                }
-
-                if self.two_opt_between_trips(*r_u, *r_v) {
-                    break;
-                }
-            }
+    /// Move two clients (X, U) reversed and insert them after V.
+    pub fn move_two_clients_reversed(&mut self, u: usize, v: usize) -> bool {
+        let x = self.nodes[u].next as usize;
+        if self.nodes[x].is_depot {
+            return false;
         }
+        let y = self.nodes[v].next as usize;
+        if u == y || x == v {
+            return false;
+        }
+
+        let u_prev = self.nodes[u].prev as usize;
+        let x_next = self.nodes[x].next as usize;
+
+        let u_cour = self.nodes[u].cour as usize;
+        let x_cour = self.nodes[x].cour as usize;
+        let u_prev_cour = self.nodes[u_prev].cour as usize;
+        let x_next_cour = self.nodes[x_next].cour as usize;
+        let v_cour = self.nodes[v].cour as usize;
+        let y_cour = self.nodes[y].cour as usize;
+
+        let mut cost_supp_u = (self.params.time_cost.get(u_prev_cour, x_next_cour)
+            - self.params.time_cost.get(u_prev_cour, u_cour)
+            - self.params.time_cost.get(u_cour, x_cour)
+            - self.params.time_cost.get(x_cour, x_next_cour)) as f64;
+        let mut cost_supp_v = (self.params.time_cost.get(v_cour, x_cour)
+            + self.params.time_cost.get(x_cour, u_cour)
+            + self.params.time_cost.get(u_cour, y_cour)
+            - self.params.time_cost.get(v_cour, y_cour)) as f64;
+
+        let r_u = self.nodes[u].route_idx as usize;
+        let r_v = self.nodes[v].route_idx as usize;
+        let load_ux = self.params.cli[u_cour].demand + self.params.cli[x_cour].demand;
+
+        let route_u_load_pen = self.route_has_load_penalty(r_u);
+        let route_u_tw_pen = self.route_has_tw_violation(r_u);
+
+        if r_u != r_v {
+            if !route_u_load_pen && !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
+                return false;
+            }
+
+            let route_u_tw = TimeWindowData::merge(
+                &self.nodes[u_prev].prefix_tw_data,
+                &self.nodes[x_next].postfix_tw_data,
+                self.params,
+            );
+            let xu_tw = TimeWindowData::merge(
+                &self.nodes[x].tw_data,
+                &self.nodes[u].tw_data,
+                self.params,
+            );
+            let v_xu = TimeWindowData::merge(&self.nodes[v].prefix_tw_data, &xu_tw, self.params);
+            let route_v_tw =
+                TimeWindowData::merge(&v_xu, &self.nodes[y].postfix_tw_data, self.params);
+
+            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load - load_ux)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
+            cost_supp_v += self.penalty_excess_load(self.routes[r_v].load + load_ux)
+                + self.penalty_time_windows(&route_v_tw)
+                - self.routes[r_v].penalty;
+        } else {
+            if !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
+                return false;
+            }
+
+            let xu_tw = TimeWindowData::merge(
+                &self.nodes[x].tw_data,
+                &self.nodes[u].tw_data,
+                self.params,
+            );
+            let route_u_tw = if self.nodes[u].position < self.nodes[v].position {
+                let seg_tw = self.get_route_segment_tw_data(x_next, v);
+                let p1 = TimeWindowData::merge(
+                    &self.nodes[u_prev].prefix_tw_data,
+                    &seg_tw,
+                    self.params,
+                );
+                let p2 = TimeWindowData::merge(&p1, &xu_tw, self.params);
+                TimeWindowData::merge(&p2, &self.nodes[y].postfix_tw_data, self.params)
+            } else {
+                let seg_tw = self.get_route_segment_tw_data(y, u_prev);
+                let p1 = TimeWindowData::merge(
+                    &self.nodes[v].prefix_tw_data,
+                    &xu_tw,
+                    self.params,
+                );
+                let p2 = TimeWindowData::merge(&p1, &seg_tw, self.params);
+                TimeWindowData::merge(&p2, &self.nodes[x_next].postfix_tw_data, self.params)
+            };
+
+            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
+        }
+
+        if cost_supp_u + cost_supp_v > -MY_EPSILON {
+            return false;
+        }
+
+        self.insert_node(x, v);
+        self.insert_node(u, x);
+        self.nb_moves += 1;
+        self.search_completed = false;
+        self.update_route_data(r_u);
+        if r_u != r_v {
+            self.update_route_data(r_v);
+        }
+
+        true
+    }
+
+    /// Swap two single clients U and V.
+    pub fn swap_two_single_clients(&mut self, u: usize, v: usize) -> bool {
+        let u_prev = self.nodes[u].prev as usize;
+        let x = self.nodes[u].next as usize;
+        let v_prev = self.nodes[v].prev as usize;
+        let y = self.nodes[v].next as usize;
+
+        if u == v_prev || u == y {
+            return false;
+        }
+
+        let u_cour = self.nodes[u].cour as usize;
+        let v_cour = self.nodes[v].cour as usize;
+        let u_prev_cour = self.nodes[u_prev].cour as usize;
+        let x_cour = self.nodes[x].cour as usize;
+        let v_prev_cour = self.nodes[v_prev].cour as usize;
+        let y_cour = self.nodes[y].cour as usize;
+
+        let mut cost_supp_u = (self.params.time_cost.get(u_prev_cour, v_cour)
+            + self.params.time_cost.get(v_cour, x_cour)
+            - self.params.time_cost.get(u_prev_cour, u_cour)
+            - self.params.time_cost.get(u_cour, x_cour)) as f64;
+        let mut cost_supp_v = (self.params.time_cost.get(v_prev_cour, u_cour)
+            + self.params.time_cost.get(u_cour, y_cour)
+            - self.params.time_cost.get(v_prev_cour, v_cour)
+            - self.params.time_cost.get(v_cour, y_cour)) as f64;
+
+        let r_u = self.nodes[u].route_idx as usize;
+        let r_v = self.nodes[v].route_idx as usize;
+        let load_u = self.params.cli[u_cour].demand;
+        let load_v = self.params.cli[v_cour].demand;
+
+        let route_u_load_pen = self.route_has_load_penalty(r_u);
+        let route_u_tw_pen = self.route_has_tw_violation(r_u);
+        let route_v_load_pen = self.route_has_load_penalty(r_v);
+        let route_v_tw_pen = self.route_has_tw_violation(r_v);
+
+        if r_u != r_v {
+            if !route_u_load_pen
+                && !route_u_tw_pen
+                && !route_v_load_pen
+                && !route_v_tw_pen
+                && cost_supp_u + cost_supp_v > -MY_EPSILON
+            {
+                return false;
+            }
+
+            let u_prefix_v = TimeWindowData::merge(
+                &self.nodes[u_prev].prefix_tw_data,
+                &self.nodes[v].tw_data,
+                self.params,
+            );
+            let route_u_tw =
+                TimeWindowData::merge(&u_prefix_v, &self.nodes[x].postfix_tw_data, self.params);
+
+            let v_prefix_u = TimeWindowData::merge(
+                &self.nodes[v_prev].prefix_tw_data,
+                &self.nodes[u].tw_data,
+                self.params,
+            );
+            let route_v_tw =
+                TimeWindowData::merge(&v_prefix_u, &self.nodes[y].postfix_tw_data, self.params);
+
+            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load + load_v - load_u)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
+            cost_supp_v += self.penalty_excess_load(self.routes[r_v].load + load_u - load_v)
+                + self.penalty_time_windows(&route_v_tw)
+                - self.routes[r_v].penalty;
+        } else {
+            if !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
+                return false;
+            }
+
+            let route_u_tw = if self.nodes[u].position < self.nodes[v].position {
+                let seg_tw = self.get_route_segment_tw_data(x, v_prev);
+                let p1 = TimeWindowData::merge(
+                    &self.nodes[u_prev].prefix_tw_data,
+                    &self.nodes[v].tw_data,
+                    self.params,
+                );
+                let p2 = TimeWindowData::merge(&p1, &seg_tw, self.params);
+                let p3 = TimeWindowData::merge(&p2, &self.nodes[u].tw_data, self.params);
+                TimeWindowData::merge(&p3, &self.nodes[y].postfix_tw_data, self.params)
+            } else {
+                let seg_tw = self.get_route_segment_tw_data(y, u_prev);
+                let p1 = TimeWindowData::merge(
+                    &self.nodes[v_prev].prefix_tw_data,
+                    &self.nodes[u].tw_data,
+                    self.params,
+                );
+                let p2 = TimeWindowData::merge(&p1, &seg_tw, self.params);
+                let p3 = TimeWindowData::merge(&p2, &self.nodes[v].tw_data, self.params);
+                TimeWindowData::merge(&p3, &self.nodes[x].postfix_tw_data, self.params)
+            };
+
+            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
+        }
+
+        if cost_supp_u + cost_supp_v > -MY_EPSILON {
+            return false;
+        }
+
+        self.swap_node(u, v);
+        self.nb_moves += 1;
+        self.search_completed = false;
+        self.update_route_data(r_u);
+        if r_u != r_v {
+            self.update_route_data(r_v);
+        }
+
+        true
+    }
+
+    /// Swap two clients (U, X) for one client V.
+    pub fn swap_two_clients_for_one(&mut self, u: usize, v: usize) -> bool {
+        let x = self.nodes[u].next as usize;
+        if self.nodes[x].is_depot {
+            return false;
+        }
+        let u_prev = self.nodes[u].prev as usize;
+        let x_next = self.nodes[x].next as usize;
+        let v_prev = self.nodes[v].prev as usize;
+        let y = self.nodes[v].next as usize;
+
+        if u == v_prev || x == v_prev || u == y {
+            return false;
+        }
+
+        let u_cour = self.nodes[u].cour as usize;
+        let x_cour = self.nodes[x].cour as usize;
+        let v_cour = self.nodes[v].cour as usize;
+        let u_prev_cour = self.nodes[u_prev].cour as usize;
+        let x_next_cour = self.nodes[x_next].cour as usize;
+        let v_prev_cour = self.nodes[v_prev].cour as usize;
+        let y_cour = self.nodes[y].cour as usize;
+
+        let mut cost_supp_u = (self.params.time_cost.get(u_prev_cour, v_cour)
+            + self.params.time_cost.get(v_cour, x_next_cour)
+            - self.params.time_cost.get(u_prev_cour, u_cour)
+            - self.params.time_cost.get(x_cour, x_next_cour)) as f64;
+        let mut cost_supp_v = (self.params.time_cost.get(v_prev_cour, u_cour)
+            + self.params.time_cost.get(x_cour, y_cour)
+            - self.params.time_cost.get(v_prev_cour, v_cour)
+            - self.params.time_cost.get(v_cour, y_cour)) as f64;
+
+        let r_u = self.nodes[u].route_idx as usize;
+        let r_v = self.nodes[v].route_idx as usize;
+        let load_ux = self.params.cli[u_cour].demand + self.params.cli[x_cour].demand;
+        let load_v = self.params.cli[v_cour].demand;
+
+        let route_u_load_pen = self.route_has_load_penalty(r_u);
+        let route_u_tw_pen = self.route_has_tw_violation(r_u);
+        let route_v_load_pen = self.route_has_load_penalty(r_v);
+        let route_v_tw_pen = self.route_has_tw_violation(r_v);
+
+        if r_u != r_v {
+            if !route_u_load_pen
+                && !route_u_tw_pen
+                && !route_v_load_pen
+                && !route_v_tw_pen
+                && cost_supp_u + cost_supp_v > -MY_EPSILON
+            {
+                return false;
+            }
+
+            let u_prefix_v = TimeWindowData::merge(
+                &self.nodes[u_prev].prefix_tw_data,
+                &self.nodes[v].tw_data,
+                self.params,
+            );
+            let route_u_tw = TimeWindowData::merge(
+                &u_prefix_v,
+                &self.nodes[x_next].postfix_tw_data,
+                self.params,
+            );
+
+            let ux_tw = TimeWindowData::merge(
+                &self.nodes[u].tw_data,
+                &self.nodes[x].tw_data,
+                self.params,
+            );
+            let v_prefix_ux = TimeWindowData::merge(
+                &self.nodes[v_prev].prefix_tw_data,
+                &ux_tw,
+                self.params,
+            );
+            let route_v_tw = TimeWindowData::merge(
+                &v_prefix_ux,
+                &self.nodes[y].postfix_tw_data,
+                self.params,
+            );
+
+            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load + load_v - load_ux)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
+            cost_supp_v += self.penalty_excess_load(self.routes[r_v].load + load_ux - load_v)
+                + self.penalty_time_windows(&route_v_tw)
+                - self.routes[r_v].penalty;
+        } else {
+            if !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
+                return false;
+            }
+
+            let ux_tw = TimeWindowData::merge(
+                &self.nodes[u].tw_data,
+                &self.nodes[x].tw_data,
+                self.params,
+            );
+            let route_u_tw = if self.nodes[u].position < self.nodes[v].position {
+                let seg_tw = self.get_route_segment_tw_data(x_next, v_prev);
+                let p1 = TimeWindowData::merge(
+                    &self.nodes[u_prev].prefix_tw_data,
+                    &self.nodes[v].tw_data,
+                    self.params,
+                );
+                let p2 = TimeWindowData::merge(&p1, &seg_tw, self.params);
+                let p3 = TimeWindowData::merge(&p2, &ux_tw, self.params);
+                TimeWindowData::merge(&p3, &self.nodes[y].postfix_tw_data, self.params)
+            } else {
+                let seg_tw = self.get_route_segment_tw_data(y, u_prev);
+                let p1 = TimeWindowData::merge(
+                    &self.nodes[v_prev].prefix_tw_data,
+                    &ux_tw,
+                    self.params,
+                );
+                let p2 = TimeWindowData::merge(&p1, &seg_tw, self.params);
+                let p3 = TimeWindowData::merge(&p2, &self.nodes[v].tw_data, self.params);
+                TimeWindowData::merge(&p3, &self.nodes[x_next].postfix_tw_data, self.params)
+            };
+
+            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
+        }
+
+        if cost_supp_u + cost_supp_v > -MY_EPSILON {
+            return false;
+        }
+
+        self.swap_node(u, v);
+        self.insert_node(x, u);
+        self.nb_moves += 1;
+        self.search_completed = false;
+        self.update_route_data(r_u);
+        if r_u != r_v {
+            self.update_route_data(r_v);
+        }
+
+        true
+    }
+
+    /// Swap two client pairs (U, X) and (V, Y).
+    pub fn swap_two_client_pairs(&mut self, u: usize, v: usize) -> bool {
+        let x = self.nodes[u].next as usize;
+        let y = self.nodes[v].next as usize;
+        let u_prev = self.nodes[u].prev as usize;
+        let x_next = self.nodes[x].next as usize;
+
+        if self.nodes[x].is_depot
+            || self.nodes[y].is_depot
+            || y == u_prev
+            || u == y
+            || x == v
+            || v == x_next
+        {
+            return false;
+        }
+
+        let v_prev = self.nodes[v].prev as usize;
+        let y_next = self.nodes[y].next as usize;
+
+        let u_cour = self.nodes[u].cour as usize;
+        let x_cour = self.nodes[x].cour as usize;
+        let v_cour = self.nodes[v].cour as usize;
+        let y_cour = self.nodes[y].cour as usize;
+        let u_prev_cour = self.nodes[u_prev].cour as usize;
+        let x_next_cour = self.nodes[x_next].cour as usize;
+        let v_prev_cour = self.nodes[v_prev].cour as usize;
+        let y_next_cour = self.nodes[y_next].cour as usize;
+
+        let mut cost_supp_u = (self.params.time_cost.get(u_prev_cour, v_cour)
+            + self.params.time_cost.get(y_cour, x_next_cour)
+            - self.params.time_cost.get(u_prev_cour, u_cour)
+            - self.params.time_cost.get(x_cour, x_next_cour)) as f64;
+        let mut cost_supp_v = (self.params.time_cost.get(v_prev_cour, u_cour)
+            + self.params.time_cost.get(x_cour, y_next_cour)
+            - self.params.time_cost.get(v_prev_cour, v_cour)
+            - self.params.time_cost.get(y_cour, y_next_cour)) as f64;
+
+        let r_u = self.nodes[u].route_idx as usize;
+        let r_v = self.nodes[v].route_idx as usize;
+        let load_ux = self.params.cli[u_cour].demand + self.params.cli[x_cour].demand;
+        let load_vy = self.params.cli[v_cour].demand + self.params.cli[y_cour].demand;
+
+        let route_u_load_pen = self.route_has_load_penalty(r_u);
+        let route_u_tw_pen = self.route_has_tw_violation(r_u);
+        let route_v_load_pen = self.route_has_load_penalty(r_v);
+        let route_v_tw_pen = self.route_has_tw_violation(r_v);
+
+        if r_u != r_v {
+            if !route_u_load_pen
+                && !route_u_tw_pen
+                && !route_v_load_pen
+                && !route_v_tw_pen
+                && cost_supp_u + cost_supp_v > -MY_EPSILON
+            {
+                return false;
+            }
+
+            let vy_tw = TimeWindowData::merge(
+                &self.nodes[v].tw_data,
+                &self.nodes[y].tw_data,
+                self.params,
+            );
+            let ux_tw = TimeWindowData::merge(
+                &self.nodes[u].tw_data,
+                &self.nodes[x].tw_data,
+                self.params,
+            );
+
+            let u_prefix_vy = TimeWindowData::merge(
+                &self.nodes[u_prev].prefix_tw_data,
+                &vy_tw,
+                self.params,
+            );
+            let route_u_tw = TimeWindowData::merge(
+                &u_prefix_vy,
+                &self.nodes[x_next].postfix_tw_data,
+                self.params,
+            );
+
+            let v_prefix_ux = TimeWindowData::merge(
+                &self.nodes[v_prev].prefix_tw_data,
+                &ux_tw,
+                self.params,
+            );
+            let route_v_tw = TimeWindowData::merge(
+                &v_prefix_ux,
+                &self.nodes[y_next].postfix_tw_data,
+                self.params,
+            );
+
+            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load + load_vy - load_ux)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
+            cost_supp_v += self.penalty_excess_load(self.routes[r_v].load + load_ux - load_vy)
+                + self.penalty_time_windows(&route_v_tw)
+                - self.routes[r_v].penalty;
+        } else {
+            if !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
+                return false;
+            }
+
+            let vy_tw = TimeWindowData::merge(
+                &self.nodes[v].tw_data,
+                &self.nodes[y].tw_data,
+                self.params,
+            );
+            let ux_tw = TimeWindowData::merge(
+                &self.nodes[u].tw_data,
+                &self.nodes[x].tw_data,
+                self.params,
+            );
+
+            let route_u_tw = if self.nodes[u].position < self.nodes[v].position {
+                let seg_tw = self.get_route_segment_tw_data(x_next, v_prev);
+                let p1 = TimeWindowData::merge(
+                    &self.nodes[u_prev].prefix_tw_data,
+                    &vy_tw,
+                    self.params,
+                );
+                let p2 = TimeWindowData::merge(&p1, &seg_tw, self.params);
+                let p3 = TimeWindowData::merge(&p2, &ux_tw, self.params);
+                TimeWindowData::merge(&p3, &self.nodes[y_next].postfix_tw_data, self.params)
+            } else {
+                let seg_tw = self.get_route_segment_tw_data(y_next, u_prev);
+                let p1 = TimeWindowData::merge(
+                    &self.nodes[v_prev].prefix_tw_data,
+                    &ux_tw,
+                    self.params,
+                );
+                let p2 = TimeWindowData::merge(&p1, &seg_tw, self.params);
+                let p3 = TimeWindowData::merge(&p2, &vy_tw, self.params);
+                TimeWindowData::merge(&p3, &self.nodes[x_next].postfix_tw_data, self.params)
+            };
+
+            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
+        }
+
+        if cost_supp_u + cost_supp_v > -MY_EPSILON {
+            return false;
+        }
+
+        self.swap_node(u, v);
+        self.swap_node(x, y);
+        self.nb_moves += 1;
+        self.search_completed = false;
+        self.update_route_data(r_u);
+        if r_u != r_v {
+            self.update_route_data(r_v);
+        }
+
+        true
     }
 
     /// 2-opt within a single route.
-    fn two_opt_within_trip(&mut self, r_u: i32, _r_v: i32) -> bool {
-        let depot_idx = r_u;
-        let depot_end_idx = self.params.nb_clients + r_u + 1;
-
-        // Get all nodes in the route.
-        let mut route_nodes: Vec<i32> = Vec::new();
-        let mut curr = self.clients[depot_idx as usize].next_idx;
-        while curr != depot_end_idx {
-            if !self.clients[curr as usize].is_depot {
-                route_nodes.push(curr);
-            }
-            curr = self.clients[curr as usize].next_idx;
-        }
-
-        if route_nodes.len() < 2 {
+    pub fn two_opt_within_trip(&mut self, u: usize, v: usize) -> bool {
+        if self.nodes[u].position >= self.nodes[v].position - 1 {
             return false;
         }
 
-        // Try all pairs (i, j) with i < j.
-        for i in 0..route_nodes.len() - 1 {
-            for j in (i + 1)..route_nodes.len() {
-                let u = route_nodes[i];
-                let u_next = self.clients[u as usize].next_idx;
-                let v = route_nodes[j];
-                let v_prev = self.clients[v as usize].prev_idx;
+        let x = self.nodes[u].next as usize;
+        let y = self.nodes[v].next as usize;
+        let u_cour = self.nodes[u].cour as usize;
+        let v_cour = self.nodes[v].cour as usize;
+        let x_cour = self.nodes[x].cour as usize;
+        let y_cour = self.nodes[y].cour as usize;
 
-                // Old edges: u -> u_next ... v_prev -> v
-                // New edges: u -> v, u_next -> ... -> v_prev (reversed segment)
-                let old_cost = self.params.time_cost.get(u as usize, u_next as usize)
-                    + self.params.time_cost.get(v_prev as usize, v as usize);
+        let mut cost = (self.params.time_cost.get(u_cour, v_cour)
+            + self.params.time_cost.get(x_cour, y_cour)
+            - self.params.time_cost.get(u_cour, x_cour)
+            - self.params.time_cost.get(v_cour, y_cour)
+            + self.nodes[v].cumulated_reversal_distance
+            - self.nodes[x].cumulated_reversal_distance) as f64;
 
-                let new_cost = self.params.time_cost.get(u as usize, v as usize)
-                    + self.params.time_cost.get(u_next as usize, v_prev as usize);
-
-                if new_cost + 2 < old_cost {
-                    // Apply 2-opt reversal.
-                    self.apply_2_opt_reversal(v, u_next);
-                    self.routes[r_u as usize] = self.compute_route_data(r_u);
-                    return true;
-                }
-            }
+        let r_u = self.nodes[u].route_idx as usize;
+        if !self.route_has_tw_violation(r_u) && cost > -MY_EPSILON {
+            return false;
         }
 
-        false
-    }
+        let mut route_tw = self.nodes[u].prefix_tw_data.clone();
+        let mut it = v;
+        while it != u {
+            route_tw = TimeWindowData::merge(&route_tw, &self.nodes[it].tw_data, self.params);
+            it = self.nodes[it].prev as usize;
+        }
+        route_tw = TimeWindowData::merge(&route_tw, &self.nodes[y].postfix_tw_data, self.params);
 
-    /// Apply a 2-opt reversal: reverse the segment between `v` and `u_next`.
-    fn apply_2_opt_reversal(&mut self, v: i32, u_next: i32) {
-        // Reverse the linked list segment from v to u_next.
-        let depot_end_idx = self.params.nb_clients + self.clients[v as usize].route_idx + 1;
+        cost += self.penalty_excess_load(self.routes[r_u].load)
+            + self.penalty_time_windows(&route_tw)
+            - self.routes[r_u].penalty;
 
-        let mut prev = v;
-        let mut curr = self.clients[v as usize].next_idx;
-        let first = Some(v);
-
-        while curr != depot_end_idx && curr != u_next {
-            let next = self.clients[curr as usize].next_idx;
-            self.clients[curr as usize].next_idx = prev;
-            self.clients[curr as usize].prev_idx = next;
-            prev = curr;
-            curr = next;
+        if cost > -MY_EPSILON {
+            return false;
         }
 
-        // Fix endpoints.
-        if let Some(first_node) = first {
-            self.clients[first_node as usize].prev_idx = prev;
-            self.clients[first_node as usize].next_idx = u_next;
+        let mut it = v;
+        let mut ins_point = u;
+        while it != x {
+            let current = it;
+            it = self.nodes[it].prev as usize;
+            self.insert_node(current, ins_point);
+            ins_point = current;
         }
-        self.clients[v as usize].next_idx = first.unwrap();
-        self.clients[u_next as usize].prev_idx = v;
+
+        self.nb_moves += 1;
+        self.search_completed = false;
+        self.update_route_data(r_u);
+
+        true
     }
 
     /// 2-opt* between two different routes.
-    fn two_opt_between_trips(&mut self, r_u: i32, r_v: i32) -> bool {
-        let depot_u = r_u;
-        let depot_end_u = self.params.nb_clients + r_u + 1;
-        let depot_v = r_v;
-        let depot_end_v = self.params.nb_clients + r_v + 1;
+    pub fn two_opt_between_trips(&mut self, u: usize, v: usize) -> bool {
+        let x = self.nodes[u].next as usize;
+        let y = self.nodes[v].next as usize;
 
-        // Get nodes from route U.
-        let mut nodes_u: Vec<i32> = Vec::new();
-        let mut curr = self.clients[depot_u as usize].next_idx;
-        while curr != depot_end_u {
-            if !self.clients[curr as usize].is_depot {
-                nodes_u.push(curr);
-            }
-            curr = self.clients[curr as usize].next_idx;
-        }
+        let u_cour = self.nodes[u].cour as usize;
+        let v_cour = self.nodes[v].cour as usize;
+        let x_cour = self.nodes[x].cour as usize;
+        let y_cour = self.nodes[y].cour as usize;
 
-        // Get nodes from route V.
-        let mut nodes_v: Vec<i32> = Vec::new();
-        curr = self.clients[depot_v as usize].next_idx;
-        while curr != depot_end_v {
-            if !self.clients[curr as usize].is_depot {
-                nodes_v.push(curr);
-            }
-            curr = self.clients[curr as usize].next_idx;
-        }
+        let mut cost_supp_u = (self.params.time_cost.get(u_cour, y_cour)
+            - self.params.time_cost.get(u_cour, x_cour)) as f64;
+        let mut cost_supp_v = (self.params.time_cost.get(v_cour, x_cour)
+            - self.params.time_cost.get(v_cour, y_cour)) as f64;
 
-        if nodes_u.is_empty() || nodes_v.is_empty() {
+        let r_u = self.nodes[u].route_idx as usize;
+        let r_v = self.nodes[v].route_idx as usize;
+
+        if !self.route_has_load_penalty(r_u)
+            && !self.route_has_tw_violation(r_u)
+            && !self.route_has_load_penalty(r_v)
+            && !self.route_has_tw_violation(r_v)
+            && cost_supp_u + cost_supp_v > -MY_EPSILON
+        {
             return false;
         }
 
-        // Try all pairs.
-        for &u in &nodes_u {
-            let u_next = self.clients[u as usize].next_idx;
-            for &v in &nodes_v {
-                let v_prev = self.clients[v as usize].prev_idx;
+        let route_u_tw = TimeWindowData::merge(
+            &self.nodes[u].prefix_tw_data,
+            &self.nodes[y].postfix_tw_data,
+            self.params,
+        );
+        let route_v_tw = TimeWindowData::merge(
+            &self.nodes[v].prefix_tw_data,
+            &self.nodes[x].postfix_tw_data,
+            self.params,
+        );
 
-                // Old: u -> u_next (route U), v_prev -> v (route V)
-                // New: u -> v (route U), u_next -> ... -> depot_U -> ... -> depot_V -> ... -> v_prev -> u_next (route V, 2-opt*)
-                let old_cost = self.params.time_cost.get(u as usize, u_next as usize)
-                    + self.params.time_cost.get(v_prev as usize, v as usize);
+        cost_supp_u += self.penalty_excess_load(
+            self.nodes[u].cumulated_load + self.routes[r_v].load - self.nodes[v].cumulated_load,
+        ) + self.penalty_time_windows(&route_u_tw)
+            - self.routes[r_u].penalty;
 
-                let new_cost = self.params.time_cost.get(u as usize, v as usize)
-                    + self.params.time_cost.get(u_next as usize, depot_end_u as usize)
-                    + self.params.time_cost.get(depot_end_u as usize, depot_v as usize)
-                    + self.params.time_cost.get(depot_v as usize, depot_end_v as usize)
-                    + self.params.time_cost.get(depot_end_v as usize, u_next as usize)
-                    + self.params.time_cost.get(v_prev as usize, u_next as usize);
+        cost_supp_v += self.penalty_excess_load(
+            self.nodes[v].cumulated_load + self.routes[r_u].load - self.nodes[u].cumulated_load,
+        ) + self.penalty_time_windows(&route_v_tw)
+            - self.routes[r_v].penalty;
 
-                if new_cost + 2 < old_cost {
-                    // Apply 2-opt* crossover.
-                    // Route U: depot -> ... -> u -> v -> ... -> depot_V (old route V ending at v)
-                    // Route V: depot -> ... -> u_next -> ... -> depot_U -> ... -> depot -> ... -> v_prev -> u_next
+        if cost_supp_u + cost_supp_v > -MY_EPSILON {
+            return false;
+        }
 
-                    // This is a complex move — simplified version just swaps the tails.
-                    self.clients[u as usize].next_idx = v;
-                    self.clients[v as usize].prev_idx = u;
-                    self.clients[v_prev as usize].next_idx = u_next;
-                    self.clients[u_next as usize].prev_idx = v_prev;
+        let mut it_v = y;
+        let mut ins = u;
+        while !self.nodes[it_v].is_depot {
+            let curr = it_v;
+            it_v = self.nodes[it_v].next as usize;
+            self.insert_node(curr, ins);
+            ins = curr;
+        }
 
-                    // Update route assignments.
-                    let mut curr_node = v;
-                    while curr_node != depot_end_v {
-                        self.clients[curr_node as usize].route_idx = r_u;
-                        curr_node = self.clients[curr_node as usize].next_idx;
-                    }
+        let mut it_u = x;
+        ins = v;
+        while !self.nodes[it_u].is_depot {
+            let curr = it_u;
+            it_u = self.nodes[it_u].next as usize;
+            self.insert_node(curr, ins);
+            ins = curr;
+        }
 
-                    curr_node = u_next;
-                    let route_v_new = r_u; // will be updated
-                    while curr_node != depot_end_u {
-                        self.clients[curr_node as usize].route_idx = r_v;
-                        curr_node = self.clients[curr_node as usize].next_idx;
-                    }
+        self.nb_moves += 1;
+        self.search_completed = false;
+        self.update_route_data(r_u);
+        self.update_route_data(r_v);
 
-                    self.routes[r_u as usize] = self.compute_route_data(r_u);
-                    self.routes[r_v as usize] = self.compute_route_data(r_v);
-                    return true;
+        true
+    }
+
+    /// Run the full local search with the specified penalty values.
+    pub fn run(
+        &mut self,
+        indiv: &mut Individual<'_>,
+        penalty_capacity_ls: f64,
+        penalty_time_warp_ls: f64,
+    ) {
+        let intensification = self.params.config.intensification_probability_ls;
+        let run_intensification =
+            (self.params.rng.borrow_mut().next() % 100) < intensification.max(0) as u64;
+        self.penalty_capacity_ls = penalty_capacity_ls;
+        self.penalty_time_warp_ls =
+            if matches!(self.params.problem_type, ProblemType::Vrptw | ProblemType::Evrp) {
+                penalty_time_warp_ls
+            } else {
+                0.0
+            };
+
+        self.load_individual(indiv);
+
+        {
+            let mut rng = self.params.rng.borrow_mut();
+            rng.shuffle(&mut self.order_nodes);
+            rng.shuffle(&mut self.order_routes);
+            // Shuffle neighborhoods only sporadically to avoid O(n^2) work.
+            for i in 1..=self.params.nb_clients as usize {
+                if rng.next() % self.nb_granular as u64 == 0 {
+                    rng.shuffle(&mut self.correlated_vertices[i]);
                 }
             }
         }
 
-        false
-    }
-
-    // =========================================================================
-    // TIME WINDOW REORDERING
-    // =========================================================================
-
-    /// Reorder time windows within a route if beneficial.
-    fn reorder_tws_if_needed(&mut self) {
-        for r in 0..self.params.nb_vehicles as i32 {
-            if self.empty_routes.contains(&r) || self.routes[r as usize].nb_customers < 2 {
-                continue;
+        self.search_completed = false;
+        self.loop_id = 0;
+        while !self.search_completed {
+            if self.loop_id > 1 {
+                self.search_completed = true;
             }
 
-            // Check if reordering by earliest arrival improves the solution.
-            let depot_idx = r;
-            let depot_end_idx = self.params.nb_clients + r + 1;
+            // Phase 1: classical route improvement (RI) moves.
+            for pos_u in 0..self.params.nb_clients as usize {
+                let u = self.order_nodes[pos_u];
+                let last_test_ri = self.nodes[u].when_last_tested_ri;
+                self.nodes[u].when_last_tested_ri = self.nb_moves;
 
-            // Collect nodes in order.
-            let mut nodes: Vec<i32> = Vec::new();
-            let mut curr = self.clients[depot_idx as usize].next_idx;
-            while curr != depot_end_idx {
-                if !self.clients[curr as usize].is_depot {
-                    nodes.push(curr);
+                for k in 0..self.correlated_vertices[u].len() {
+                    let v = self.correlated_vertices[u][k];
+                    let r_u = self.nodes[u].route_idx as usize;
+                    let r_v = self.nodes[v].route_idx as usize;
+                    if self.loop_id != 0
+                        && max(self.routes[r_u].when_last_modified, self.routes[r_v].when_last_modified)
+                            <= last_test_ri
+                    {
+                        continue;
+                    }
+                    if self.move_single_client(u, v)
+                        || self.move_two_clients(u, v)
+                        || self.move_two_clients_reversed(u, v)
+                        || (u < v && self.swap_two_single_clients(u, v))
+                        || self.swap_two_clients_for_one(u, v)
+                        || (u < v && self.swap_two_client_pairs(u, v))
+                        || (r_u < r_v && self.two_opt_between_trips(u, v))
+                        || (r_u == r_v && self.two_opt_within_trip(u, v))
+                    {
+                        continue;
+                    }
+
+                    // Also try inserting U right after the depot preceding V.
+                    let v_prev = self.nodes[v].prev as usize;
+                    if self.nodes[v_prev].is_depot {
+                        let _ = self.move_single_client(u, v_prev)
+                            || self.move_two_clients(u, v_prev)
+                            || self.move_two_clients_reversed(u, v_prev)
+                            || (r_u < self.nodes[v_prev].route_idx as usize
+                                && self.two_opt_between_trips(u, v_prev));
+                    }
                 }
-                curr = self.clients[curr as usize].next_idx;
+
+                // Phase 2: moves into an empty route.
+                if self.loop_id > 0 && !self.empty_routes.is_empty() {
+                    let depot_v = self.depot_start(*self.empty_routes.iter().next().unwrap());
+                    let _ = self.move_single_client(u, depot_v)
+                        || self.move_two_clients(u, depot_v)
+                        || self.move_two_clients_reversed(u, depot_v)
+                        || self.two_opt_between_trips(u, depot_v);
+                }
             }
 
-            if nodes.len() < 2 {
-                continue;
-            }
-
-            // Try sorting by earliest arrival.
-            let mut sorted = nodes.clone();
-            sorted.sort_by(|&a, &b| {
-                self.params.cli[a as usize]
-                    .earliest_arrival
-                    .cmp(&self.params.cli[b as usize].earliest_arrival)
-            });
-
-            if sorted != nodes {
-                // Calculate cost of current order.
-                let current_cost = self.calculate_route_cost(r);
-
-                // Calculate cost of sorted order (simplified: just check TW feasibility).
-                let mut has_tw_violation = false;
-                let mut arrival_time = 0i32;
-                for &node in &sorted {
-                    let edge_dist = if nodes.is_empty() || node == sorted[0] {
-                        self.params.time_cost.get(0, node as usize)
-                    } else {
-                        let prev = sorted.iter().position(|&x| x == node).unwrap();
-                        if prev == 0 {
-                            self.params.time_cost.get(0, node as usize)
-                        } else {
-                            self.params.time_cost.get(sorted[prev - 1] as usize, node as usize)
+            // Phase 3: SWAP* and RELOCATE* between routes with overlapping sectors.
+            if intensification != 0
+                && self.search_completed
+                && (intensification == 100 || run_intensification)
+            {
+                for pos_u in 0..self.params.nb_vehicles as usize {
+                    let r_u = self.order_routes[pos_u];
+                    if self.routes[r_u].nb_customers == 0 {
+                        continue;
+                    }
+                    let last_test_large_nb = self.routes[r_u].when_last_tested_large_nb;
+                    self.routes[r_u].when_last_tested_large_nb = self.nb_moves;
+                    for pos_v in 0..self.params.nb_vehicles as usize {
+                        let r_v = self.order_routes[pos_v];
+                        if self.routes[r_v].nb_customers == 0
+                            || r_u >= r_v
+                            || (self.loop_id > 0
+                                && max(self.routes[r_u].when_last_modified, self.routes[r_v].when_last_modified)
+                                    <= last_test_large_nb)
+                            || !CircleSector::overlaps(
+                                &self.routes[r_u].sector,
+                                &self.routes[r_v].sector,
+                                self.params.circle_sector_overlap_tolerance,
+                            )
+                        {
+                            continue;
                         }
-                    };
-                    arrival_time += edge_dist;
-                    if arrival_time > self.params.cli[node as usize].latest_arrival {
-                        has_tw_violation = true;
-                        break;
+                        if !self.relocate_star(r_u, r_v)
+                            && (self.params.config.skip_swap_star_dist || !self.swap_star(r_u, r_v, false))
+                            && self.params.config.use_swap_star_tw
+                        {
+                            self.swap_star(r_u, r_v, true);
+                        }
                     }
                 }
+            }
+            self.loop_id += 1;
+        }
 
-                if !has_tw_violation && current_cost > 0 {
-                    // TODO: Full reordering implementation would rebuild the route.
-                    // For now, skip this optimization.
+        self.export_individual(indiv);
+    }
+
+    /// Clients of a route in order.
+    fn route_clients(&self, r: usize) -> Vec<usize> {
+        let mut clients = Vec::with_capacity(self.routes[r].nb_customers.max(0) as usize);
+        let mut node = self.nodes[self.depot_start(r)].next as usize;
+        while !self.nodes[node].is_depot {
+            clients.push(node);
+            node = self.nodes[node].next as usize;
+        }
+        clients
+    }
+
+    fn cost(&self, a: usize, b: usize) -> i32 {
+        self.params.time_cost.get(self.nodes[a].cour as usize, self.nodes[b].cour as usize)
+    }
+
+    /// RELOCATE*: the best move of one client of `r_u` after a client of `r_v`.
+    fn relocate_star(&mut self, r_u: usize, r_v: usize) -> bool {
+        let mut best_cost = 0.;
+        let mut best: Option<(usize, usize)> = None;
+        for u in self.route_clients(r_u) {
+            let (prev, next) = (self.nodes[u].prev as usize, self.nodes[u].next as usize);
+            let route_u_tw = TimeWindowData::merge(
+                &self.nodes[prev].prefix_tw_data,
+                &self.nodes[next].postfix_tw_data,
+                self.params,
+            );
+            let load_u = self.params.cli[self.nodes[u].cour as usize].demand;
+            let cost_supp_u = (self.cost(prev, next) - self.cost(prev, u) - self.cost(u, next)) as f64
+                + self.penalty_excess_load(self.routes[r_u].load - load_u)
+                + self.penalty_time_windows(&route_u_tw)
+                - self.routes[r_u].penalty;
+            for v in self.route_clients(r_v) {
+                let v_next = self.nodes[v].next as usize;
+                let route_v_tw = self.merge_all(&[
+                    &self.nodes[v].prefix_tw_data,
+                    &self.nodes[u].tw_data,
+                    &self.nodes[v_next].postfix_tw_data,
+                ]);
+                let cost_supp_v = (self.cost(v, u) + self.cost(u, v_next) - self.cost(v, v_next)) as f64
+                    + self.penalty_excess_load(self.routes[r_v].load + load_u)
+                    + self.penalty_time_windows(&route_v_tw)
+                    - self.routes[r_v].penalty;
+                if cost_supp_u + cost_supp_v < best_cost - MY_EPSILON {
+                    best_cost = cost_supp_u + cost_supp_v;
+                    best = Some((u, v));
                 }
             }
         }
+        let Some((u, v)) = best else { return false };
+        self.insert_node(u, v);
+        self.nb_moves += 1;
+        self.search_completed = false;
+        self.update_route_data(r_u);
+        self.update_route_data(r_v);
+        true
     }
 
-    /// Calculate the total cost of a route.
-    fn calculate_route_cost(&self, r: i32) -> i32 {
-        let depot_idx = r;
-        let depot_end_idx = self.params.nb_clients + r + 1;
-
-        let mut cost = 0i32;
-        let mut prev = depot_idx as i32;
-        let mut curr = self.clients[depot_idx as usize].next_idx;
-
-        while curr != depot_end_idx {
-            cost += self.params.time_cost.get(prev as usize, curr as usize);
-            prev = curr;
-            curr = self.clients[curr as usize].next_idx;
+    /// Insertion costs of each client of `r1` into `r2` (SWAP* preprocessing),
+    /// with time-warp penalty deltas when `with_tw`.
+    fn preprocess_insertions(&mut self, r1: usize, r2: usize, with_tw: bool) {
+        let depot2 = self.depot_start(r2);
+        let first2 = self.nodes[depot2].next as usize;
+        let route2_tw = self.routes[r2].tw_data.clone();
+        let tw_outdated = self.routes[r1].is_delta_removel_tw_outdated;
+        let route1_tw = self.routes[r1].tw_data.clone();
+        for u in self.route_clients(r1) {
+            let (prev, next) = (self.nodes[u].prev as usize, self.nodes[u].next as usize);
+            let removal = self.cost(prev, next) - self.cost(prev, u) - self.cost(u, next);
+            if !with_tw {
+                self.nodes[u].delta_removal = removal;
+            } else if tw_outdated {
+                let tw = TimeWindowData::merge(
+                    &self.nodes[prev].prefix_tw_data,
+                    &self.nodes[next].postfix_tw_data,
+                    self.params,
+                );
+                // HGS adds the double penalty to the int cost, then truncates.
+                self.nodes[u].delta_removal_tw =
+                    (removal as f64 + self.delta_penalty_time_windows(&tw, &route1_tw)) as i32;
+            }
+            let cour = self.nodes[u].cour as usize;
+            let when = if with_tw {
+                self.best_insert_client_tw[r2][cour].when_last_calculated
+            } else {
+                self.best_insert_client[r2][cour].when_last_calculated
+            };
+            if self.routes[r2].when_last_modified <= when {
+                continue;
+            }
+            let mut option = ThreeBestInsert::new();
+            option.when_last_calculated = self.nb_moves;
+            let insertion = |ls: &Self, v: usize| {
+                let v_next = ls.nodes[v].next as usize;
+                let mut delta = ls.cost(v, u) + ls.cost(u, v_next) - ls.cost(v, v_next);
+                if with_tw {
+                    let tw = ls.merge_all(&[
+                        &ls.nodes[v].prefix_tw_data,
+                        &ls.nodes[u].tw_data,
+                        &ls.nodes[v_next].postfix_tw_data,
+                    ]);
+                    delta = (delta as f64 + ls.delta_penalty_time_windows(&tw, &route2_tw)) as i32;
+                }
+                delta
+            };
+            option.best_cost[0] = insertion(self, depot2);
+            option.best_location[0] = depot2 as i32;
+            let mut v = first2;
+            while !self.nodes[v].is_depot {
+                option.compare_and_add(insertion(self, v), v as i32);
+                v = self.nodes[v].next as usize;
+            }
+            if with_tw {
+                self.best_insert_client_tw[r2][cour] = option;
+            } else {
+                self.best_insert_client[r2][cour] = option;
+            }
         }
-        cost += self.params.time_cost.get(prev as usize, 0); // back to depot
-
-        cost
+        if with_tw {
+            self.routes[r1].is_delta_removel_tw_outdated = false;
+        }
     }
 
-    // =========================================================================
-    // RELOCATE STAR
-    // =========================================================================
+    /// Cheapest insertion of `u` into the route of `v` once `v` is removed:
+    /// one of the three preprocessed positions not adjacent to `v`, or `v`'s
+    /// own place. Returns the cost and the node to insert after.
+    fn cheapest_insert_simult_removal(&self, u: usize, v: usize, with_tw: bool) -> (i32, usize) {
+        let r_v = self.nodes[v].route_idx as usize;
+        let cour = self.nodes[u].cour as usize;
+        let best = if with_tw {
+            &self.best_insert_client_tw[r_v][cour]
+        } else {
+            &self.best_insert_client[r_v][cour]
+        };
+        let not_adjacent = |p: i32| p as usize != v && self.nodes[p as usize].next as usize != v;
+        let mut position = best.best_location[0];
+        let mut cost = best.best_cost[0];
+        let mut found = not_adjacent(position);
+        if !found && best.best_location[1] >= 0 {
+            position = best.best_location[1];
+            cost = best.best_cost[1];
+            found = not_adjacent(position);
+            if !found && best.best_location[2] >= 0 {
+                position = best.best_location[2];
+                cost = best.best_cost[2];
+                found = true;
+            }
+        }
+        let (v_prev, v_next) = (self.nodes[v].prev as usize, self.nodes[v].next as usize);
+        let mut delta = self.cost(v_prev, u) + self.cost(u, v_next) - self.cost(v_prev, v_next);
+        if with_tw {
+            let tw = self.merge_all(&[
+                &self.nodes[v_prev].prefix_tw_data,
+                &self.nodes[u].tw_data,
+                &self.nodes[v_next].postfix_tw_data,
+            ]);
+            delta = (delta as f64 + self.delta_penalty_time_windows(&tw, &self.routes[r_v].tw_data)) as i32;
+        }
+        if !found || delta < cost {
+            (delta, v_prev)
+        } else {
+            (cost, position as usize)
+        }
+    }
 
-    /// Try RelocateStar moves on recently modified routes.
-    fn relocate_star(&mut self) -> bool {
-        // Simplified: just check if we found any improvements this iteration.
-        // Full implementation would try relocating each node to all recently modified routes.
-        false
+    /// Route time window data after replacing `removed` by `inserted` placed
+    /// after `position`, all in the route of `removed`.
+    fn swap_star_route_tw(&self, removed: usize, inserted: usize, position: usize) -> TimeWindowData {
+        let (prev, next) = (self.nodes[removed].prev as usize, self.nodes[removed].next as usize);
+        let position_next = self.nodes[position].next as usize;
+        if self.nodes[position].position == self.nodes[removed].position - 1 {
+            self.merge_all(&[
+                &self.nodes[position].prefix_tw_data,
+                &self.nodes[inserted].tw_data,
+                &self.nodes[next].postfix_tw_data,
+            ])
+        } else if self.nodes[position].position < self.nodes[removed].position {
+            let segment = self.get_route_segment_tw_data(position_next, prev);
+            self.merge_all(&[
+                &self.nodes[position].prefix_tw_data,
+                &self.nodes[inserted].tw_data,
+                &segment,
+                &self.nodes[next].postfix_tw_data,
+            ])
+        } else {
+            let segment = self.get_route_segment_tw_data(next, position);
+            self.merge_all(&[
+                &self.nodes[prev].prefix_tw_data,
+                &segment,
+                &self.nodes[inserted].tw_data,
+                &self.nodes[position_next].postfix_tw_data,
+            ])
+        }
+    }
+
+    /// Distance change of removing `removed` and inserting `inserted` after
+    /// `position` in the same route.
+    fn swap_star_route_cost(&self, removed: usize, inserted: usize, position: usize) -> f64 {
+        let (prev, next) = (self.nodes[removed].prev as usize, self.nodes[removed].next as usize);
+        let mut cost = self.cost(position, inserted) - self.cost(prev, removed) - self.cost(removed, next);
+        if position == prev {
+            cost += self.cost(inserted, next);
+        } else {
+            let position_next = self.nodes[position].next as usize;
+            cost += self.cost(inserted, position_next) + self.cost(prev, next) - self.cost(position, position_next);
+        }
+        cost as f64
+    }
+
+    /// SWAP* (Vidal 2022): exchange a client of `r_u` with one of `r_v`,
+    /// each reinserted at its best position, if it improves the penalized cost.
+    fn swap_star(&mut self, r_u: usize, r_v: usize, with_tw: bool) -> bool {
+        for r in [r_u, r_v] {
+            if !self.best_insert_initialized_for_route[r] {
+                self.best_insert_initialized_for_route[r] = true;
+                for option in self.best_insert_client[r].iter_mut().chain(self.best_insert_client_tw[r].iter_mut()) {
+                    option.when_last_calculated = -1;
+                }
+            }
+        }
+        self.preprocess_insertions(r_u, r_v, with_tw);
+        self.preprocess_insertions(r_v, r_u, with_tw);
+
+        let (load_u, load_v) = (self.routes[r_u].load, self.routes[r_v].load);
+        let current_load_pen = self.penalty_excess_load(load_u) + self.penalty_excess_load(load_v);
+        let clients_v = self.route_clients(r_v);
+        let mut best = SwapStarElement {
+            move_cost: 1e30,
+            load_pen_u: 1e30,
+            load_pen_v: 1e30,
+            u: 0,
+            best_position_u: None,
+            v: 0,
+            best_position_v: None,
+        };
+        for u in self.route_clients(r_u) {
+            let demand_u = self.params.cli[self.nodes[u].cour as usize].demand;
+            for &v in &clients_v {
+                let demand_v = self.params.cli[self.nodes[v].cour as usize].demand;
+                let load_pen_u = self.penalty_excess_load(load_u + demand_v - demand_u);
+                let load_pen_v = self.penalty_excess_load(load_v + demand_u - demand_v);
+                let delta_load_pen = load_pen_u + load_pen_v - current_load_pen;
+                let delta_removal = if with_tw {
+                    self.nodes[u].delta_removal_tw + self.nodes[v].delta_removal_tw
+                } else {
+                    self.nodes[u].delta_removal + self.nodes[v].delta_removal
+                };
+                // Insertion costs are nonnegative bounds: skip hopeless pairs.
+                if delta_load_pen + delta_removal as f64 > 0. {
+                    continue;
+                }
+                let (extra_v, position_u) = self.cheapest_insert_simult_removal(u, v, with_tw);
+                let (extra_u, position_v) = self.cheapest_insert_simult_removal(v, u, with_tw);
+                let move_cost = delta_load_pen + (delta_removal + extra_u + extra_v) as f64;
+                if move_cost < best.move_cost {
+                    best = SwapStarElement {
+                        move_cost,
+                        load_pen_u,
+                        load_pen_v,
+                        u,
+                        best_position_u: Some(position_u),
+                        v,
+                        best_position_v: Some(position_v),
+                    };
+                }
+            }
+        }
+        let (Some(position_u), Some(position_v)) = (best.best_position_u, best.best_position_v) else {
+            return false;
+        };
+        let (u, v) = (best.u, best.v);
+
+        // Exact cost, including time warp.
+        let route_u_tw = self.swap_star_route_tw(u, v, position_v);
+        let route_v_tw = self.swap_star_route_tw(v, u, position_u);
+        let cost_supp_u = self.swap_star_route_cost(u, v, position_v) + best.load_pen_u
+            + self.penalty_time_windows(&route_u_tw)
+            - self.routes[r_u].penalty;
+        let cost_supp_v = self.swap_star_route_cost(v, u, position_u) + best.load_pen_v
+            + self.penalty_time_windows(&route_v_tw)
+            - self.routes[r_v].penalty;
+        if cost_supp_u + cost_supp_v > -MY_EPSILON {
+            return false;
+        }
+
+        self.insert_node(u, position_u);
+        self.insert_node(v, position_v);
+        self.nb_moves += 1;
+        self.search_completed = false;
+        self.update_route_data(r_u);
+        self.update_route_data(r_v);
+        true
+    }
+
+    /// Initialize construction heuristic data.
+    pub fn initialize_construction(&mut self, nodes_to_insert: &mut Vec<NodeToInsert>) {
+        self.empty_routes.clear();
+        let depot_tw = TimeWindowData {
+            first_node_index: 0,
+            last_node_index: 0,
+            duration: 0,
+            time_warp: 0,
+            earliest_arrival: self.params.cli[0].earliest_arrival,
+            latest_arrival: self.params.cli[0].latest_arrival,
+            latest_release_time: self.params.cli[0].release_time,
+        };
+
+        for i in 1..=self.params.nb_clients as usize {
+            self.nodes[i].cour = i as i32;
+            self.nodes[i].is_depot = false;
+            self.nodes[i].prev = 0;
+            self.nodes[i].next = 0;
+            self.nodes[i].route_idx = 0;
+            self.nodes[i].tw_data = TimeWindowData {
+                first_node_index: i as i32,
+                last_node_index: i as i32,
+                duration: self.params.cli[i].service_duration,
+                time_warp: 0,
+                earliest_arrival: self.params.cli[i].earliest_arrival,
+                latest_arrival: self.params.cli[i].latest_arrival,
+                latest_release_time: self.params.cli[i].release_time,
+            };
+        }
+
+        for r in 0..self.params.nb_vehicles as usize {
+            let start = self.depot_start(r);
+            let end = self.depot_end(r);
+
+            self.nodes[start].cour = 0;
+            self.nodes[start].is_depot = true;
+            self.nodes[start].route_idx = r as i32;
+            self.nodes[start].prev = end as i32;
+            self.nodes[end].next = start as i32;
+            self.nodes[start].next = end as i32;
+            self.nodes[end].prev = start as i32;
+
+            self.nodes[start].tw_data = depot_tw.clone();
+            self.nodes[start].prefix_tw_data = depot_tw.clone();
+            self.nodes[start].postfix_tw_data = depot_tw.clone();
+
+            self.nodes[end].cour = 0;
+            self.nodes[end].is_depot = true;
+            self.nodes[end].route_idx = r as i32;
+            self.nodes[end].tw_data = depot_tw.clone();
+            self.nodes[end].prefix_tw_data = depot_tw.clone();
+            self.nodes[end].postfix_tw_data = depot_tw.clone();
+
+            self.update_route_data(r);
+        }
+
+        nodes_to_insert.clear();
+        for i in 1..=self.params.nb_clients as usize {
+            let dx = self.params.cli[i].coord_x - self.params.cli[0].coord_x;
+            let dy = self.params.cli[i].coord_y - self.params.cli[0].coord_y;
+            nodes_to_insert.push(NodeToInsert {
+                client_idx: i as i32,
+                load: self.params.cli[i].demand,
+                service_duration: self.params.cli[i].service_duration,
+                angle_from_depot: dy.atan2(dx),
+                tw_data: self.nodes[i].tw_data.clone(),
+            });
+        }
+    }
+
+    /// Construct individual by sweep heuristic (Vidal 2012).
+    pub fn construct_individual_by_sweep(&mut self, fill_percentage: i32, indiv: &mut Individual<'_>) {
+        let mut nodes_to_insert = Vec::new();
+        self.initialize_construction(&mut nodes_to_insert);
+
+        nodes_to_insert.sort_by(|a, b| {
+            a.angle_from_depot
+                .partial_cmp(&b.angle_from_depot)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let mut node_indices_per_route: Vec<Vec<usize>> = Vec::new();
+        let mut current_route_indices = Vec::new();
+        let mut current_load = 0;
+        let cap_threshold = (fill_percentage as f64 * self.params.vehicle_capacity as f64 / 100.0) as i32;
+
+        for (i, node) in nodes_to_insert.iter().enumerate() {
+            if current_load > 0
+                && current_load + node.load > cap_threshold
+                && node_indices_per_route.len() + 1 < self.routes.len()
+            {
+                node_indices_per_route.push(current_route_indices);
+                current_route_indices = Vec::new();
+                current_load = 0;
+            }
+            current_load += node.load;
+            current_route_indices.push(i);
+        }
+        node_indices_per_route.push(current_route_indices);
+
+        for (r, indices) in node_indices_per_route.iter().enumerate() {
+            if r >= self.routes.len() {
+                break;
+            }
+            let depot_s = self.depot_start(r);
+            let depot_opening = self.nodes[depot_s].tw_data.latest_arrival
+                - self.nodes[depot_s].tw_data.earliest_arrival;
+
+            let mut short_tw_indices = Vec::new();
+            let mut long_tw_indices = Vec::new();
+
+            for &idx in indices {
+                let tw_dur = nodes_to_insert[idx].tw_data.latest_arrival
+                    - nodes_to_insert[idx].tw_data.earliest_arrival;
+                if (tw_dur as i64) * 2 > depot_opening as i64 {
+                    long_tw_indices.push(idx);
+                } else {
+                    short_tw_indices.push(idx);
+                }
+            }
+
+            short_tw_indices.sort_by_key(|&idx| nodes_to_insert[idx].tw_data.latest_arrival);
+
+            let mut prev = depot_s;
+            for idx in short_tw_indices {
+                let to_insert = nodes_to_insert[idx].client_idx as usize;
+                self.insert_unlinked_node(to_insert, prev);
+                prev = to_insert;
+            }
+            self.update_route_data(r);
+
+            for idx in long_tw_indices {
+                let mut best_cost = f64::MAX;
+                let mut best_pred = depot_s;
+                let mut curr = depot_s;
+
+                for _ in 0..=self.routes[r].nb_customers {
+                    let next = self.nodes[curr].next as usize;
+                    let curr_cour = self.nodes[curr].cour as usize;
+                    let next_cour = self.nodes[next].cour as usize;
+                    let cand_cour = nodes_to_insert[idx].client_idx as usize;
+
+                    let cost = (self.params.time_cost.get(curr_cour, cand_cour)
+                        + self.params.time_cost.get(cand_cour, next_cour)
+                        - self.params.time_cost.get(curr_cour, next_cour)) as f64;
+
+                    if cost < best_cost {
+                        best_cost = cost;
+                        best_pred = curr;
+                    }
+                    curr = next;
+                }
+
+                let to_insert = nodes_to_insert[idx].client_idx as usize;
+                self.insert_unlinked_node(to_insert, best_pred);
+                self.update_route_data(r);
+            }
+        }
+
+        self.export_individual(indiv);
+    }
+
+    /// Construct individual with seed order (Furthest or Nearest seed).
+    pub fn construct_individual_with_seed_order(
+        &mut self,
+        tolerated_capacity_violation: i32,
+        tolerated_time_warp: i32,
+        use_seed_client_furthest_from_depot: bool,
+        indiv: &mut Individual<'_>,
+    ) {
+        let mut nodes_to_insert = Vec::new();
+        self.initialize_construction(&mut nodes_to_insert);
+
+        let mut unassigned: std::collections::BTreeSet<usize> =
+            (0..self.params.nb_clients as usize).collect();
+
+        for r in 0..self.routes.len() {
+            if unassigned.is_empty() {
+                break;
+            }
+            let depot_s = self.depot_start(r);
+
+            if use_seed_client_furthest_from_depot {
+                let mut furthest_idx = None;
+                let mut max_insertion_cost = -1.0;
+
+                for &idx in &unassigned {
+                    let cand_client = nodes_to_insert[idx].client_idx as usize;
+                    let cost = (self.params.time_cost.get(0, cand_client)
+                        + self.params.time_cost.get(cand_client, 0)
+                        - self.params.time_cost.get(0, 0)) as f64;
+                    if cost > max_insertion_cost {
+                        max_insertion_cost = cost;
+                        furthest_idx = Some(idx);
+                    }
+                }
+
+                if let Some(f_idx) = furthest_idx {
+                    let seed_node = nodes_to_insert[f_idx].client_idx as usize;
+                    self.insert_unlinked_node(seed_node, depot_s);
+                    self.update_route_data(r);
+                    unassigned.remove(&f_idx);
+                }
+            }
+
+            let mut node_inserted = true;
+            while node_inserted {
+                node_inserted = false;
+                let mut best_insertion_cost = f64::MAX;
+                let mut best_pred = depot_s;
+                let mut best_node_idx = None;
+
+                for &idx in &unassigned {
+                    if self.routes[r].load + nodes_to_insert[idx].load
+                        > self.params.vehicle_capacity + tolerated_capacity_violation
+                    {
+                        continue;
+                    }
+
+                    let mut prev = depot_s;
+                    for _ in 0..=self.routes[r].nb_customers {
+                        let next = self.nodes[prev].next as usize;
+                        let cand = nodes_to_insert[idx].client_idx as usize;
+
+                        let merged_prefix_cand = TimeWindowData::merge(
+                            &self.nodes[prev].prefix_tw_data,
+                            &nodes_to_insert[idx].tw_data,
+                            self.params,
+                        );
+                        let merged_all = TimeWindowData::merge(
+                            &merged_prefix_cand,
+                            &self.nodes[next].postfix_tw_data,
+                            self.params,
+                        );
+
+                        if merged_all.time_warp <= tolerated_time_warp {
+                            let prev_cour = self.nodes[prev].cour as usize;
+                            let next_cour = self.nodes[next].cour as usize;
+                            let cost = (self.params.time_cost.get(prev_cour, cand)
+                                + self.params.time_cost.get(cand, next_cour)
+                                - self.params.time_cost.get(prev_cour, next_cour)) as f64;
+
+                            if cost < best_insertion_cost {
+                                best_insertion_cost = cost;
+                                best_pred = prev;
+                                best_node_idx = Some(idx);
+                            }
+                        }
+                        prev = next;
+                    }
+                }
+
+                if let Some(best_idx) = best_node_idx {
+                    let node_to_ins = nodes_to_insert[best_idx].client_idx as usize;
+                    self.insert_unlinked_node(node_to_ins, best_pred);
+                    self.update_route_data(r);
+                    unassigned.remove(&best_idx);
+                    node_inserted = true;
+                }
+            }
+        }
+
+        if !unassigned.is_empty() {
+            let last_r = self.routes.len() - 1;
+            let depot_e = self.depot_end(last_r);
+            // HGS inserts each one right after the same node, reversing them.
+            let prev = self.nodes[depot_e].prev as usize;
+            for idx in unassigned {
+                let to_ins = nodes_to_insert[idx].client_idx as usize;
+                self.insert_unlinked_node(to_ins, prev);
+            }
+            self.update_route_data(last_r);
+        }
+
+        self.export_individual(indiv);
     }
 }
