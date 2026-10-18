@@ -6,12 +6,12 @@ pub use preparation::{KPathGraph, KPathPreparation};
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::bits::Bits1024;
+use super::shared::bits::Bits1024;
 use super::capacity::TimeWindows;
-use super::mincut::MinCutDigraph;
-use super::pulse::PulseDigraph;
-use super::stdhash::UnorderedSet;
-use super::stdsort;
+use super::shared::mincut::MinCutDigraph;
+use super::shared::pulse::PulseDigraph;
+use super::shared::stdhash::UnorderedSet;
+use super::shared::stdsort;
 use crate::core::options::Options;
 use crate::{invalid, Result};
 
@@ -1300,7 +1300,7 @@ impl NativeKPathSeparator {
     }
     pub fn separate(
         &mut self,
-        solutions: &[super::separation::Solution],
+        solutions: &[super::rank_one::separation::Solution],
         values: &[f64],
     ) -> Result<Vec<NativeKPathCut>> {
         let prep = &self.preparation;
@@ -1422,7 +1422,7 @@ impl NativeKPathSeparator {
     }
     pub fn coefficient(
         &self,
-        path: &super::separation::Solution,
+        path: &super::rank_one::separation::Solution,
         cut: &NativeKPathCut,
     ) -> Result<i32> {
         let memory = cut.memory.get(&path.graph_id);

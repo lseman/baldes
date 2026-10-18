@@ -271,3 +271,23 @@ fn fork_and_carry_inherits_cuts_basis_and_protects_branch_rows() {
     assert_eq!(tree_out.status, TreeStatus::Optimal, "{tree_out:?}");
     assert!((tree_out.incumbent - exact).abs() < 1e-5, "{tree_out:?}");
 }
+
+
+#[test]
+fn ryan_foster_tree_agrees_with_exhaustive_routes_and_strong_trials() {
+    use baldes::master::branching::BranchingOptions;
+    for (n,capacity) in [(3,2),(4,2),(5,3),(6,3)] {
+        let mut text=format!("small\nVEHICLE\nNUMBER CAPACITY\n{n} {capacity}\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000 0\n");
+        for i in 1..=n {text.push_str(&format!("{i} {} {} 1 0 1000 0\n",(i*7)%11,(i*3)%13));}
+        let instance=Instance::parse(&text).unwrap();let exact=exhaustive(&instance);
+        for enumerate in [false,true] {
+            let problem=RootProblem::set_partitioning(instance.graph(1,Rounding::None).unwrap(),n as f64).unwrap();
+            let mut controls=options();controls.root.enumerate=enumerate;
+            controls.branching=BranchingOptions{ryan_foster:true,..BranchingOptions::arc_flow_only()};
+            controls.strong_branching=Some(Default::default());controls.diving=Some(Default::default());
+            let out=tree::solve(problem,controls).unwrap_or_else(|e|panic!("n={n} enum={enumerate}: {e:?}"));
+            assert_eq!(out.status,TreeStatus::Optimal,"n={n}, enum={enumerate} {out:?}");
+            assert!((out.incumbent-exact).abs()<1e-5,"n={n}, enum={enumerate} {out:?}");
+        }
+    }
+}

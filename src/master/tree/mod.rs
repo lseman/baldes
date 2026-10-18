@@ -1,6 +1,8 @@
 //! Best-bound branch-and-price for a routing set-partitioning master.
 //!
-//! Directed arc-flow rows are priced through `RootProblem::arc_entries`.
+//! Vehicle counts, packing-set assignments and directed arc-flow rows are
+//! priced through `RootProblem::arc_entries`. Ryan–Foster rows additionally
+//! install native binary resources in labeling and filter enumeration.
 //! Each child forks the parent's solved Clp model (with cuts intact) and
 //! carries the cut registry forward; feasible elementary columns are shared
 //! between nodes. Bounds come only from exact pricing, never from the
@@ -11,11 +13,13 @@ use super::{
     root::{self, RootOptions, RootProblem},
     RowSense,
 };
-use std::rc::Rc;
 use crate::{invalid, labeling::extend_resources, Result, Route};
 use std::collections::{BTreeMap, HashSet};
+use std::rc::Rc;
 use std::time::{Duration, Instant};
+pub mod candidates;
 mod diving;
+pub use super::branching::{BranchConstraint, BranchingOptions};
 pub mod strong;
 pub use diving::DivingOptions;
 pub use strong::{StrongBranchingOptions, StrongPhase};
@@ -23,6 +27,7 @@ pub use strong::{StrongBranchingOptions, StrongPhase};
 #[derive(Clone, Debug)]
 pub struct TreeOptions {
     pub root: RootOptions,
+    pub branching: BranchingOptions,
     pub node_limit: usize,
     pub time_limit: Duration,
     /// Work budget of the binary restricted-master set-partitioning search.
@@ -37,6 +42,7 @@ impl Default for TreeOptions {
     fn default() -> Self {
         Self {
             root: RootOptions::default(),
+            branching: BranchingOptions::default(),
             node_limit: 10000,
             time_limit: Duration::from_secs(120),
             mip_node_limit: 10000,
@@ -64,6 +70,10 @@ pub struct TreeOutput {
     pub nodes: usize,
     pub open_nodes: usize,
     pub pricing_calls: usize,
+    /// Fixing/inspection calls across normal nodes, strong trials and dives.
+    pub fixing_calls: usize,
+    /// Sum of retained route counts reported by those evaluations.
+    pub enumerated_routes: usize,
     pub mip_nodes: usize,
     pub strong_branching_trials: usize,
     pub diving_nodes: usize,
@@ -90,17 +100,12 @@ impl TreeOutput {
                 )
             })
             .collect();
-        format!("{{\"instance\":{:?},\"status\":\"{:?}\",\"incumbent\":{},\"bound\":{},\"nodes\":{},\"open_nodes\":{},\"pricing_calls\":{},\"mip_nodes\":{},\"strong_branching_trials\":{},\"diving_nodes\":{},\"seconds\":{},\"routes\":[{}]}}\n",
+        format!("{{\"instance\":{:?},\"status\":\"{:?}\",\"incumbent\":{},\"bound\":{},\"nodes\":{},\"open_nodes\":{},\"pricing_calls\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"mip_nodes\":{},\"strong_branching_trials\":{},\"diving_nodes\":{},\"seconds\":{},\"routes\":[{}]}}\n",
             name, self.status, number(self.incumbent), number(self.bound), self.nodes,
-            self.open_nodes, self.pricing_calls, self.mip_nodes, self.strong_branching_trials, self.diving_nodes, self.seconds, routes.join(","))
+            self.open_nodes, self.pricing_calls, self.fixing_calls, self.enumerated_routes, self.mip_nodes, self.strong_branching_trials, self.diving_nodes, self.seconds, routes.join(","))
     }
 }
-#[derive(Clone)]
-struct Branch {
-    arc: usize,
-    sense: RowSense,
-    rhs: f64,
-}
+type Branch = BranchConstraint;
 struct Node {
     branches: Vec<Branch>,
     bound: f64,
@@ -285,13 +290,12 @@ fn closed(bound: f64, incumbent: f64, options: &TreeOptions) -> bool {
                 - options.absolute_gap
                 - options.relative_gap * incumbent.abs().max(bound.abs())
 }
-fn branch_problem(problem: &RootProblem, branches: &[Branch]) -> RootProblem {
+fn branch_problem(problem: &RootProblem, branches: &[Branch]) -> Result<RootProblem> {
     let mut child = problem.clone();
     for branch in branches {
-        // Use append_branch to correctly update row_map alongside rows and arc_entries.
-        child.append_branch(branch.arc, branch.sense, branch.rhs, child.rows.len());
+        child.append_constraint(branch.clone(), child.rows.len())?;
     }
-    child
+    Ok(child)
 }
 fn budget_error(error: &crate::core::error::OrError) -> bool {
     error.message.contains("time limit") || error.message.contains("label limit")
@@ -317,7 +321,7 @@ fn evaluate(
     controls.cg.multiplicity = problem.customers.len() as f64;
     controls.initial_routes = pool.routes.clone();
     controls.incumbent = incumbent;
-    controls.enumerate = false;
+    controls.enumerate = options.root.enumerate && floor == 0;
     // Bound trial pricing by its own remaining time as well as the CG limit.
     let remaining = controls.cg.time_limit.as_secs_f64().max(1e-6);
     if let Some((_, value)) = controls
@@ -338,13 +342,9 @@ fn evaluate(
         if depth > branches.len() {
             return Err(invalid("parent branch depth exceeds child branches"));
         }
-        let delta: Vec<_> = branches[depth..]
-            .iter()
-            .map(|b| (b.arc, b.sense, b.rhs))
-            .collect();
-        root::inherit(parent, &delta, controls)
+        root::inherit_branches(parent, &branches[depth..], controls)
     } else {
-        root::solve(branch_problem(problem, branches), controls)
+        root::solve(branch_problem(problem, branches)?, controls)
     }
 }
 /// Solve a standard routing set-partitioning problem. `root.initial_routes`
@@ -400,6 +400,8 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
         nodes: 0,
         open_nodes: 1,
         pricing_calls: 0,
+        fixing_calls: 0,
+        enumerated_routes: 0,
         mip_nodes: 0,
         strong_branching_trials: 0,
         diving_nodes: 0,
@@ -487,6 +489,8 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
         };
         output.nodes += 1;
         output.pricing_calls += result.master.pricing_calls;
+        output.fixing_calls += result.fixing_calls;
+        output.enumerated_routes += result.enumerated_routes;
         // The LP objective may include artificials or come from a heuristic
         // pricing phase. Only the pricing certificate is a node lower bound.
         if result.master.bound.is_finite() {
@@ -527,6 +531,12 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
                 *flows.entry(problem.arc_position(id).unwrap()).or_default() += value;
             }
         }
+        let candidates = candidates::candidates_with_history(
+            &problem,
+            &result,
+            &options.branching,
+            &node.branches,
+        );
         // Capture this node's solved snapshot before moving result into diving.
         let parent_snapshot = result.snapshot.clone();
         diving::run(
@@ -545,22 +555,16 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
             parent_snapshot.as_ref(),
             &problem,
             &node,
-            &flows,
+            candidates,
             &mut pool,
             &options,
             &mut output,
             deadline,
         )?;
-        if let Some((arc, flow, bounds)) = branch {
-            for (side, (sense, rhs)) in [
-                (RowSense::LessEqual, flow.floor()),
-                (RowSense::GreaterEqual, flow.ceil()),
-            ]
-            .into_iter()
-            .enumerate()
-            {
+        if let Some((candidate, bounds)) = branch {
+            for (side, constraint) in [candidate.down, candidate.up].into_iter().enumerate() {
                 let mut branches = node.branches.clone();
-                branches.push(Branch { arc, sense, rhs });
+                branches.push(constraint);
                 open.push(Node {
                     branches,
                     bound: bounds[side],

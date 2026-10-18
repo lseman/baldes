@@ -117,8 +117,8 @@ pub fn tree_depth_score(
     }
 }
 struct Candidate {
-    arc: usize,
-    flow: f64,
+    branch: super::candidates::BranchCandidate,
+    order: usize,
     score: f64,
     bounds: [f64; 2],
 }
@@ -133,14 +133,10 @@ fn restricted_value(
     if let Some(parent) = parent {
         let depth = parent.branch_depth();
         if depth <= branches.len() {
-            let delta: Vec<_> = branches[depth..]
-                .iter()
-                .map(|b| (b.arc, b.sense, b.rhs))
-                .collect();
-            return Ok(parent.restricted_value(&delta, penalty)?.0);
+            return Ok(parent.restricted_value(&branches[depth..], penalty)?.0);
         }
     }
-    let child = branch_problem(problem, branches);
+    let child = branch_problem(problem, branches)?;
     let mut master = ClpMaster::new()?;
     master.set_tolerances(1e-7, 1e-7)?;
     for row in &child.rows {
@@ -155,6 +151,12 @@ fn restricted_value(
         }
         for &(r, a) in &child.route_entries {
             *entries.entry(r).or_insert(0.) += a;
+        }
+        for (offset,branch) in branches.iter().enumerate() {
+            if matches!(branch,BranchConstraint::RyanFoster(_)) {
+                let value=branch.coefficient(problem,route);
+                if value!=0. {entries.insert(problem.rows.len()+offset,value);}
+            }
         }
         master.add_column(
             route.original_cost,
@@ -181,30 +183,16 @@ pub(super) fn choose(
     parent: Option<&Rc<root::NodeSnapshot>>,
     problem: &RootProblem,
     node: &Node,
-    flows: &BTreeMap<usize, f64>,
+    supplied: Vec<super::candidates::BranchCandidate>,
     pool: &mut Pool,
     options: &TreeOptions,
     output: &mut TreeOutput,
     deadline: Instant,
-) -> Result<Option<(usize, f64, [f64; 2])>> {
-    let mut candidates: Vec<_> = flows
-        .iter()
-        .filter(|(_, x)| (**x - x.round()).abs() > 1e-6)
-        .map(|(&arc, &flow)| Candidate {
-            arc,
-            flow,
-            score: 0.,
-            bounds: [node.bound; 2],
-        })
-        .collect();
-    candidates.sort_by(|a, b| {
-        ((a.flow - a.flow.floor()) - 0.5)
-            .abs()
-            .total_cmp(&((b.flow - b.flow.floor()) - 0.5).abs())
-            .then(a.arc.cmp(&b.arc))
-    });
+) -> Result<Option<(super::candidates::BranchCandidate, [f64; 2])>> {
+    let mut candidates: Vec<_> = supplied.into_iter().enumerate().map(|(order,branch)|
+        Candidate {branch,order,score:0.,bounds:[node.bound;2]}).collect();
     let Some(config) = &options.strong_branching else {
-        return Ok(candidates.first().map(|c| (c.arc, c.flow, c.bounds)));
+        return Ok(candidates.first().map(|c| (c.branch.clone(), c.bounds)));
     };
     let end = deadline.min(Instant::now() + config.time_limit);
     for phase in &config.phases {
@@ -214,22 +202,10 @@ pub(super) fn choose(
         }
         for candidate in &mut candidates {
             let mut estimates = [node.bound; 2];
-            for (side, (sense, rhs)) in [
-                (RowSense::LessEqual, candidate.flow.floor()),
-                (RowSense::GreaterEqual, candidate.flow.ceil()),
-            ]
-            .into_iter()
-            .enumerate()
-            {
-                if Instant::now() >= end {
-                    break;
-                }
+            for (side,constraint) in [candidate.branch.down.clone(),candidate.branch.up.clone()].into_iter().enumerate() {
+                if Instant::now() >= end {break;}
                 let mut branches = node.branches.clone();
-                branches.push(Branch {
-                    arc: candidate.arc,
-                    sense,
-                    rhs,
-                });
+                branches.push(constraint);
                 output.strong_branching_trials += 1;
                 if phase.restricted_master_only {
                     estimates[side] = restricted_value(parent, problem, &branches, pool, options)?;
@@ -249,6 +225,8 @@ pub(super) fn choose(
                     match result {
                         Ok(result) => {
                             output.pricing_calls += result.master.pricing_calls;
+                            output.fixing_calls += result.fixing_calls;
+                            output.enumerated_routes += result.enumerated_routes;
                             estimates[side] = result.master.lp;
                             if result.master.bound.is_finite() {
                                 candidate.bounds[side] =
@@ -277,7 +255,7 @@ pub(super) fn choose(
                 product_score(node.bound, output.incumbent.min(1e12), estimates)
             };
         }
-        candidates.sort_by(|a, b| b.score.total_cmp(&a.score).then(a.arc.cmp(&b.arc)));
+        candidates.sort_by(|a, b| b.score.total_cmp(&a.score).then(a.order.cmp(&b.order)));
     }
-    Ok(candidates.first().map(|c| (c.arc, c.flow, c.bounds)))
+    Ok(candidates.first().map(|c| (c.branch.clone(), c.bounds)))
 }

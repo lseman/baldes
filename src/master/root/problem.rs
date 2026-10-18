@@ -1,0 +1,168 @@
+//! Routing master rows, route coefficients, and reduced costs.
+use super::*;
+#[derive(Clone, Debug)]
+pub struct Row {
+    pub sense: RowSense,
+    pub rhs: f64,
+}
+#[derive(Clone, Debug)]
+pub struct RootProblem {
+    pub graph: Graph,
+    pub rows: Vec<Row>,
+    pub arc_entries: Vec<Vec<(usize, f64)>>,
+    pub route_entries: Vec<(usize, f64)>,
+    /// Vertices with a unit covering row: the rank-one cut customers.
+    pub customers: Vec<usize>,
+    pub(super) branch_constraints: Vec<(usize, BranchConstraint)>,
+    /// Arc id -> first index in `graph.arcs`.
+    pub(super) arc_index: std::collections::HashMap<i32, usize>,
+    /// Logical base/branch row -> physical master row. Branches appended
+    /// after inherited cuts stay valid when those cuts are retired.
+    pub(super) row_map: RefCell<Vec<usize>>,
+}
+impl RootProblem {
+    /// Cover each nonterminal vertex and bound the number of vehicle routes.
+    /// Arc entries charge the head vertex, retaining repeated-visit coefficients.
+    pub fn set_partitioning(graph: Graph, vehicles: f64) -> Result<Self> {
+        if !vehicles.is_finite() || vehicles <= 0. {
+            return Err(invalid("positive finite vehicle multiplicity required"));
+        }
+        let mut rows = vec![Row {
+            sense: RowSense::LessEqual,
+            rhs: vehicles,
+        }];
+        let mut customer_row = vec![None; graph.vertices.len()];
+        let mut customers = vec![];
+        for v in 0..graph.vertices.len() {
+            if v != graph.source && v != graph.sink {
+                customer_row[v] = Some(rows.len());
+                customers.push(v);
+                rows.push(Row {
+                    sense: RowSense::Equal,
+                    rhs: 1.,
+                });
+            }
+        }
+        let fleet = 0;
+        let arc_entries = graph
+            .arcs
+            .iter()
+            .map(|a| {
+                if a.head == graph.sink {
+                    vec![(fleet, 1.)]
+                } else {
+                    customer_row[a.head].map_or_else(Vec::new, |r| vec![(r, 1.)])
+                }
+            })
+            .collect();
+        let mut arc_index = std::collections::HashMap::with_capacity(graph.arcs.len());
+        for (index, a) in graph.arcs.iter().enumerate() {
+            arc_index.entry(a.id).or_insert(index);
+        }
+        let row_map = RefCell::new((0..rows.len()).collect());
+        Ok(Self {
+            graph,
+            rows,
+            arc_entries,
+            route_entries: vec![],
+            customers,
+            branch_constraints: vec![],
+            arc_index,
+            row_map,
+        })
+    }
+    pub fn arc_position(&self, id: i32) -> Option<usize> {
+        self.arc_index.get(&id).copied()
+    }
+    /// Add a branch to a fresh problem before constructing its master.
+    pub fn branch(&mut self, constraint: BranchConstraint) -> Result<()> {
+        self.append_constraint(constraint, self.rows.len())
+    }
+    pub(crate) fn append_constraint(
+        &mut self,
+        constraint: BranchConstraint,
+        physical: usize,
+    ) -> Result<()> {
+        constraint.validate(self)?;
+        let logical = self.rows.len();
+        let (sense, rhs) = constraint.row();
+        for a in 0..self.graph.arcs.len() {
+            let value = constraint.arc_coefficient(self, a);
+            if value != 0. {
+                self.arc_entries[a].push((logical, value));
+            }
+        }
+        self.rows.push(Row { sense, rhs });
+        self.row_map.borrow_mut().push(physical);
+        self.branch_constraints.push((logical, constraint));
+        Ok(())
+    }
+    pub(super) fn base_entries(&self, route: &Route) -> Result<Vec<(usize, f64)>> {
+        let map = self.row_map.borrow();
+        let mut coefficients = std::collections::BTreeMap::new();
+        for &(r, a) in &self.route_entries {
+            *coefficients.entry(map[r]).or_insert(0.) += a;
+        }
+        for id in &route.arcs {
+            let physical = self
+                .arc_position(*id)
+                .ok_or_else(|| invalid("unknown priced route arc"))?;
+            for &(r, a) in &self.arc_entries[physical] {
+                *coefficients.entry(map[r]).or_insert(0.) += a;
+            }
+        }
+        for (r, c) in &self.branch_constraints {
+            if matches!(c, BranchConstraint::RyanFoster(_)) {
+                let value = c.coefficient(self, route);
+                if value != 0. {
+                    *coefficients.entry(map[*r]).or_insert(0.) += value;
+                }
+            }
+        }
+        Ok(coefficients.into_iter().filter(|(_, a)| *a != 0.).collect())
+    }
+    pub(super) fn route_cost(&self, route: &Route) -> (f64, Vec<i32>) {
+        let mut identities = route.arcs.clone();
+        identities.sort_unstable();
+        let mut cost = 0.;
+        let mut counts = std::collections::BTreeMap::new();
+        for &id in &identities {
+            *counts.entry(id).or_insert(0usize) += 1;
+        }
+        for (id, count) in counts {
+            cost += self.graph.arcs[self.arc_position(id).unwrap()].cost * count as f64;
+        }
+        (cost, identities)
+    }
+    pub(super) fn reprice(
+        &self,
+        solver: &mut Solver,
+        duals: &[f64],
+        round: bool,
+        capacity_entries: &[Vec<(usize, f64)>],
+    ) -> Result<f64> {
+        let map = self.row_map.borrow();
+        if duals.len() < self.rows.len() || self.arc_entries.len() != self.graph.arcs.len() {
+            return Err(invalid("root master dimensions"));
+        }
+        for (index, arc) in solver.graph.arcs.iter_mut().enumerate() {
+            let mut cost = self.graph.arcs[index].cost;
+            for &(r, a) in &self.arc_entries[index] {
+                cost -= duals[map[r]] * a;
+            }
+            for &(r, a) in &capacity_entries[index] {
+                cost -= duals[r] * a;
+            }
+            arc.reduced_cost = if round {
+                (cost * 1e8 + 0.5).floor() / 1e8
+            } else {
+                cost
+            };
+        }
+        Ok(-self
+            .route_entries
+            .iter()
+            .map(|&(r, a)| duals[map[r]] * a)
+            .sum::<f64>())
+    }
+}

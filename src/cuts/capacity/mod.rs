@@ -4,11 +4,11 @@
 //! 2 ceil(d(S)/Q) on undirected edge flows (or the complement form), and Kohl
 //! 2-path cuts when time windows are given. The subset pool persists across
 //! separation calls.
-use super::bits::Bits1024;
-use super::mincut::MinCutDigraph;
-use super::pulse::PulseDigraph;
-use super::stdhash::UnorderedSet;
-use super::stdsort;
+use super::shared::bits::Bits1024;
+use super::shared::mincut::MinCutDigraph;
+use super::shared::pulse::PulseDigraph;
+use super::shared::stdhash::UnorderedSet;
+use super::shared::stdsort;
 use crate::{invalid, Result};
 use std::collections::{BTreeMap, HashSet};
 

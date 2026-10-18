@@ -1,6 +1,6 @@
-use super::super::{
-    pulse::PulseDigraph,
-    separation::{GraphData, Incidence},
+use crate::cuts::{
+    shared::pulse::PulseDigraph,
+    rank_one::separation::{GraphData, Incidence},
 };
 use crate::{invalid, Result};
 use std::collections::BTreeMap;

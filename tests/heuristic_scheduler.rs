@@ -19,6 +19,7 @@ fn single_label_phase_replaces_cheaper_prefix_and_requests_expansion() {
         original_cost: cost,
         resources: [resource, 0.],
         ng: 0,
+        branch_state: None,
         parent: None,
         arc: None,
         hops: 1,

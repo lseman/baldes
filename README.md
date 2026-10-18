@@ -92,6 +92,7 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--capacity` / `--capacity-cuts` | separate native rounded capacity cuts in the Clp root master |
 | `--two-path-cuts` | enable capacity cuts with Kohl's time resource attached (VRPTW only) |
 | `--tree`, `--nodes N` | branch-and-price; default node limit 10,000 |
+| `--branching MODE` | tree families: `native` (default), `ryan-foster`, `vehicles`, or `arc` |
 | `--no-strong-branching`, `--no-diving` | disable the corresponding tree mechanism |
 | `--no-mip-heuristic`, `--mip-nodes N` | disable or budget restricted-master integer search |
 | `--no-enumeration` | no reduced-cost fixing or enumeration |
@@ -109,6 +110,12 @@ Solomon instances are in [`instances/`](instances/), and a few CVRPLIB ones in
 [`instances/cvrplib/`](instances/cvrplib/).
 
 ## Comparison with the solver
+
+The [branching guide](docs/branching.md) documents Ryan–Foster, vehicle-count,
+and packing-set assignment branches for the single-network tree.
+
+The [node lifecycle audit](docs/node-lifecycle-audit.md) records fork/carry,
+setup and teardown, fixing/enumeration fixes, tests, and remaining parity gaps.
 
 Root relaxations of Solomon VRPTW instances (100 customers), BALDES against
 the the solver binary. Both solve the same split-depot graph with unrounded
@@ -240,8 +247,9 @@ run `python -m pytest python/tests` to test a build with Clp.
 
 Strong k-path and route-load knapsack cuts are available in the Rust root API
 through `with_kpath_cuts` and `with_knapsack_cuts`. The latter takes original
-integer resource rows; it carries load-dependent costs through pricing,
-completion bounds, enumeration, and inherited master rows. See
+integer resource rows; `KnapsackCutConfig::with_resource_indices` maps original
+resource IDs to solver coordinates. Load-dependent costs and that mapping pass
+through pricing, enumeration, and inherited master rows. See
 [cut integration and binary parity checks](docs/cut-port-parity/README.md).
 
 ## Not in 2.0 yet
@@ -254,6 +262,9 @@ EVRP front ends, complete the solver tree-trajectory parity, and remaining 1.x P
 - Pickup and delivery
 
 ## Repository layout
+
+See the [source layout guide](docs/source-layout.md) for module responsibilities
+and the cut, pricing, enumeration, master, and tree subfolders.
 
 | Path | Contents |
 | --- | --- |

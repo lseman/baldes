@@ -27,7 +27,7 @@ impl Transition {
         Some((next | vertex_bits) & !(1 << 15))
     }
 }
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PreparedNg {
     pub vertex_bits: Vec<u16>,
     pub local_elements: Vec<Vec<usize>>,

@@ -11,7 +11,7 @@ use super::{
 };
 use crate::pricing::phases::{self, Phase};
 use crate::{invalid, Result};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 #[derive(Clone, Debug)]
@@ -573,16 +573,18 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                     // Every route column leaves the master; those of the
                     // enumerated set return as new columns after the others,
                     // in their previous order, with their current entries.
-                    let allowed: HashSet<_> = universe.iter().map(Column::signature).collect();
+                    let allowed: HashMap<_, _> = universe.iter().map(|c| (c.signature(), c)).collect();
                     let mut loaded_set = seen.clone();
                     let removed: Vec<usize> = (0..loaded.len()).filter(|&i| loaded[i].is_some()).collect();
                     let mut regenerated = vec![];
                     for &i in &removed {
                         let column = loaded[i].as_ref().unwrap();
-                        if allowed.contains(&column.signature()) {
+                        if let Some(current) = allowed.get(&column.signature()) {
                             let mut c = column.clone();
                             c.cost = master.costs()[i];
-                            c.entries = master.column_entries(i)?;
+                            // Enumeration switches limited-memory rows to full-memory
+                            // coefficients. The old matrix still has the old entries.
+                            c.entries = current.entries.clone();
                             c.tag = out.column_tags[i];
                             regenerated.push(c);
                         }

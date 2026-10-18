@@ -21,6 +21,7 @@ pub struct StoredLabel {
     pub original_cost: f64,
     pub resources: [f64; 2],
     pub ng: u16,
+    pub branch_state: crate::pricing::branching::BranchState,
     pub parent: Option<usize>,
     pub arc: Option<usize>,
     pub hops: usize,
@@ -267,7 +268,7 @@ impl LabelStorage {
         hop_limit: bool,
         cuts: &[DominanceDescriptor],
     ) -> bool {
-        Self::dominates_hot(
+        a.branch_state == b.branch_state && Self::dominates_hot(
             g,
             &HotLabel::of(a),
             &HotLabel::of(b),
@@ -428,7 +429,7 @@ impl LabelStorage {
             stats.dominance_checks += 1;
             let previous = bucket.active[position];
             let hot = bucket.hot.get(position);
-            if Self::dominates_hot(g, &hot, &candidate, forward, test, hop_limit, cuts, || {
+            if labels[previous].branch_state == label.branch_state && Self::dominates_hot(g, &hot, &candidate, forward, test, hop_limit, cuts, || {
                 (&labels[previous].cut_words, &label.cut_words)
             }) {
                 stats.dominated += 1;
@@ -469,7 +470,7 @@ impl LabelStorage {
             read = next + 1;
             let id = bucket.active[next];
             let hot = bucket.hot.get(next);
-            if Self::dominates_hot(g, &candidate, &hot, forward, test, hop_limit, cuts, || {
+            if labels[inserted].branch_state == labels[id].branch_state && Self::dominates_hot(g, &candidate, &hot, forward, test, hop_limit, cuts, || {
                 (&labels[inserted].cut_words, &labels[id].cut_words)
             }) {
                 stats.dominated += 1;

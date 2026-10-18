@@ -98,6 +98,7 @@ snapshot.bin
 *.md
 !README.md
 !CHANGELOG.md
+!/docs/source-layout.md
 
 # OS
 .DS_Store

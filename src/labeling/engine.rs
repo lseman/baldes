@@ -63,6 +63,7 @@ pub struct LabelingEngine {
     pub controls: EngineControls,
     pub phase: Phase,
     pub ng: PreparedNg,
+    pub branching: crate::pricing::branching::RyanFosterResources,
     pub half_ready: bool,
     pub full_ready: bool,
     last_costs: Vec<f64>,
@@ -89,6 +90,7 @@ fn insert_terminals(
 struct Context<'a> {
     grid: &'a BucketGraph,
     ng: &'a PreparedNg,
+    branching: &'a crate::pricing::branching::RyanFosterResources,
     cuts: &'a EngineCuts,
     controls: &'a EngineControls,
     phase: Phase,
@@ -106,6 +108,8 @@ impl<'a> Context<'a> {
     /// The meeting vertex's NG bits and cut supports.
     fn vertex_step(&self, label: &mut StoredLabel) {
         label.ng |= self.ng.vertex_bits[label.vertex];
+        let valid = self.branching.visit(&mut label.branch_state, label.vertex);
+        debug_assert!(valid, "extension checked the target's branch resource");
         if let Some(v) = self.cuts.info.vertices.get(label.vertex) {
             state::apply_vertex_support(&mut label.cut_words, &mut label.additional_cost, &v.support);
         }
@@ -123,7 +127,7 @@ impl<'a> Context<'a> {
     /// cost (forward + backward reduced cost) + 0, then NG, then the cut join.
     /// The cost is 0 when resources reject and has no cut part when NG does.
     fn concatenate(&self, g: &Graph, vertex: usize, f: &StoredLabel, b: &StoredLabel) -> (bool, f64) {
-        if !self.resources_join(g, f, b) {
+        if !self.branching.joins(&f.branch_state, &b.branch_state) || !self.resources_join(g, f, b) {
             return (false, 0.);
         }
         let cost = (f.cost + b.cost) + self.cuts.knapsack.join_cost(g, &f.resources, &b.resources, self.consumption_joins);
@@ -161,6 +165,7 @@ impl<'a> Context<'a> {
         root.vertex = root_vertex;
         root.cost = 0.;
         root.ng = self.ng.vertex_bits[root_vertex];
+        root.branch_state = None;
         for (r, _) in g.resources.iter().enumerate() {
             let w = g.vertices[root_vertex].bounds[r];
             root.resources[r] = if root_forward {
@@ -218,6 +223,9 @@ impl<'a> Context<'a> {
         } else {
             physical.tail
         };
+        if !self.branching.can_visit(&from.branch_state, vertex) { return None; }
+        // Like NG state, a crossing label excludes its meeting vertex.
+        let branch_state = from.branch_state.clone();
         let transition = if forward {
             &self.ng.forward[arc.physical]
         } else {
@@ -250,6 +258,7 @@ impl<'a> Context<'a> {
             original_cost: physical.cost + from.original_cost,
             resources,
             ng,
+            branch_state,
             parent: Some(from.id),
             arc: Some(arc.physical),
             hops: from.hops + 1,
@@ -384,7 +393,7 @@ impl<'a> Sweep<'a> {
                             break;
                         }
                         self.statistics.other_dominance_checks += 1;
-                        if LabelStorage::dominates_hot(
+                        if storage.labels[other].branch_state == candidate_label.branch_state && LabelStorage::dominates_hot(
                             g,
                             hot,
                             candidate_hot,
@@ -501,6 +510,7 @@ impl<'a> Sweep<'a> {
                             };
                             let terminal = label.vertex == if forward { g.sink } else { g.source };
                             if terminal {
+                                if !self.ctx.branching.accepts(&label.branch_state) { continue; }
                                 if !self.ctx.controls.sink_concatenation {
                                     continue;
                                 }
@@ -587,6 +597,7 @@ impl LabelingEngine {
         Context {
             grid: &self.grid,
             ng: &self.ng,
+            branching: &self.branching,
             cuts: &self.cuts,
             controls: &self.controls,
             phase: self.phase,
@@ -616,6 +627,7 @@ impl LabelingEngine {
         let ctx = Context {
             grid: &self.grid,
             ng: &self.ng,
+            branching: &self.branching,
             cuts: &self.cuts,
             controls: &self.controls,
             phase: self.phase,
@@ -672,6 +684,7 @@ impl LabelingEngine {
         let ctx = Context {
             grid: &self.grid,
             ng: &self.ng,
+            branching: &self.branching,
             cuts: &self.cuts,
             controls: &self.controls,
             phase: self.phase,
@@ -727,6 +740,29 @@ impl LabelingEngine {
         self.update_knapsack_bounds(g, false);
         Ok((forward_time, backward_time))
     }
+    /// Carry the bucket graph (including fixed arcs), adaptive state and cuts.
+    /// Labels depend on the node's duals and are rebuilt in the child.
+    pub(crate) fn fork_for_node(&self) -> Self {
+        Self {
+            grid: self.grid.clone(),
+            forward: LabelStorage::new(self.forward.buckets.iter().map(Vec::len)),
+            backward: LabelStorage::new(self.backward.buckets.iter().map(Vec::len)),
+            statistics: Statistics::default(),
+            controls: self.controls.clone(),
+            phase: self.phase,
+            ng: self.ng.clone(),
+            branching: self.branching.clone(),
+            half_ready: false,
+            full_ready: false,
+            last_costs: vec![],
+            pending_middle: self.pending_middle,
+            consumption_joins: self.consumption_joins,
+            reverse: self.reverse.clone(),
+            extension_checks: vec![0; self.extension_checks.len()],
+            filter_checks: vec![0; self.filter_checks.len()],
+            cuts: self.cuts.clone(),
+        }
+    }
     pub fn prepare(g: &Graph, controls: EngineControls, phase: Phase) -> Result<Self> {
         phase.validate()?;
         let mut grid = BucketGraph::prepare(
@@ -763,6 +799,7 @@ impl LabelingEngine {
             controls,
             phase,
             ng: PreparedNg::new(g)?,
+            branching: crate::pricing::branching::RyanFosterResources::prepare(g, &[])?,
             half_ready: false,
             full_ready: false,
             last_costs: vec![],
@@ -910,6 +947,7 @@ impl LabelingEngine {
             original_cost: 0.,
             resources,
             ng: self.ng.vertex_bits[vertex],
+            branch_state: None,
             parent: None,
             arc: None,
             hops: 0,
@@ -1508,6 +1546,7 @@ impl LabelingEngine {
         threshold: f64,
         scan: bool,
     ) -> bool {
+        if self.branching.resources != 0 { return true; }
         let mut ng = 0;
         for (bit, &e) in self.ng.local_elements[label.vertex].iter().enumerate() {
             if label.visited[e / 64] & (1u64 << (e % 64)) != 0 {
@@ -1530,6 +1569,7 @@ impl LabelingEngine {
             original_cost: label.original_cost,
             resources: label.resources,
             ng,
+            branch_state: None,
             parent: None,
             arc: None,
             hops: label.hops,

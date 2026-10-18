@@ -975,28 +975,34 @@ fn knapsack_root_cuts_close_fractional_capacity_gap_and_survive_snapshot() {
     assert_eq!(scaled.master.status, Status::Optimal);
     assert!(scaled.master.lp.is_finite());
     for enumerate in [false, true] {
-        // Sum of the three unit customer-cover rows gives total load <= 3.
-        let mut config = KnapsackCutConfig::new(vec![KnapsackRow::new(0, 1, 1., 3)]);
-        config.parameters.use_rounding = true;
-        config.parameters.max_one_k = 0;
-        let mut options = RootOptions::default().with_knapsack_cuts(config);
-        options.enumerate = enumerate;
-        options.capture_state = true;
-        let out = instance.solve_root(8, Rounding::None, options).unwrap();
-        assert_eq!(out.master.status, Status::Optimal);
-        assert!(out.cuts > 0);
-        assert!(out.master.cut_rounds > 0);
-        assert!((out.master.lp - (4. + 2f64.sqrt())).abs() < 1e-8);
-        assert!(out.snapshot.as_ref().unwrap().active_cuts() > 0);
-        let mut child_options = RootOptions::default();
-        child_options.enumerate = enumerate;
-        child_options.node_depth = 1;
-        let child =
-            baldes::master::root::inherit(out.snapshot.as_ref().unwrap(), &[], child_options)
-                .unwrap();
-        assert_eq!(child.master.status, Status::Optimal);
-        assert!(child.inherited_cuts > 0);
-        assert!((child.master.lp - out.master.lp).abs() < 1e-8);
+        for original_resource in [1, 7] {
+            // Sum of the three unit customer-cover rows gives total load <= 3.
+            let mut config =
+                KnapsackCutConfig::new(vec![KnapsackRow::new(0, original_resource, 1., 3)]);
+            if original_resource == 7 {
+                config.resource_indices = BTreeMap::from([(12, 0), (7, 1)]);
+            }
+            config.parameters.use_rounding = true;
+            config.parameters.max_one_k = 0;
+            let mut options = RootOptions::default().with_knapsack_cuts(config);
+            options.enumerate = enumerate;
+            options.capture_state = true;
+            let out = instance.solve_root(8, Rounding::None, options).unwrap();
+            assert_eq!(out.master.status, Status::Optimal);
+            assert!(out.cuts > 0);
+            assert!(out.master.cut_rounds > 0);
+            assert!((out.master.lp - (4. + 2f64.sqrt())).abs() < 1e-8);
+            assert!(out.snapshot.as_ref().unwrap().active_cuts() > 0);
+            let mut child_options = RootOptions::default();
+            child_options.enumerate = enumerate;
+            child_options.node_depth = 1;
+            let child =
+                baldes::master::root::inherit(out.snapshot.as_ref().unwrap(), &[], child_options)
+                    .unwrap();
+            assert_eq!(child.master.status, Status::Optimal);
+            assert!(child.inherited_cuts > 0);
+            assert!((child.master.lp - out.master.lp).abs() < 1e-8);
+        }
     }
 }
 
@@ -1160,4 +1166,97 @@ fn knapsack_retrieval_remaps_resources_and_retains_inactive_slots() {
     assert!(cache.retrieve(&[cut], 4, &mapping).is_err());
     assert!(!cache.active);
     assert!(cache.resources.values().all(BTreeMap::is_empty));
+}
+
+
+
+
+
+
+
+
+
+
+#[test]
+fn mapped_knapsack_separation_retains_original_ids() {
+    use baldes::cuts::knapsack::{KnapsackColumn, KnapsackRow, ResourceKnapsackSeparator};
+    let mut direct = ResourceKnapsackSeparator::default();
+    direct.parameters.use_rounding = true;
+    direct.parameters.max_one_k = 0;
+    direct.rows = vec![KnapsackRow::new(4, 7, 1., 4), KnapsackRow::new(4, 3, 1., 3)];
+    let mut mapped = direct.clone();
+    let mut resources = vec![0.; 8];
+    resources[7] = 3.;
+    resources[3] = 2.;
+    let expected = direct
+        .separate(&[KnapsackColumn {
+            graph_id: 4,
+            resources,
+            value: 1.5,
+        }])
+        .unwrap();
+    let indices = BTreeMap::from([(4, BTreeMap::from([(7, 1), (3, 0)]))]);
+    let actual = mapped
+        .separate_mapped(
+            &[KnapsackColumn {
+                graph_id: 4,
+                resources: vec![2., 3.],
+                value: 1.5,
+            }],
+            &indices,
+        )
+        .unwrap();
+    assert!(!actual.is_empty());
+    assert_eq!(actual, expected);
+    assert_eq!(mapped.num_separate_calls, direct.num_separate_calls);
+    assert_eq!(mapped.next_cut_id, direct.next_cut_id);
+    for cut in &actual {
+        let mut original = vec![0.; 8];
+        original[7] = 3.;
+        original[3] = 2.;
+        assert_eq!(
+            cut.coefficient_mapped(4, &[2., 3.], &indices[&4]),
+            cut.coefficient(4, &original)
+        );
+        assert!(cut.graph_resources[&4].0 == 7 || cut.graph_resources[&4].0 == 3);
+    }
+}
+
+#[test]
+fn original_knapsack_ids_survive_pricing_and_enumeration() {
+    for bidirectional in [false, true] {
+        let mut solver = knapsack_pricing_solver(bidirectional);
+        for cut in &mut solver.cuts.knapsack_cuts {
+            cut.graph_resources.get_mut(&0).unwrap().0 = 7;
+        }
+        solver.knapsack_resource_indices = BTreeMap::from([(7, 0)]);
+        assert_eq!(
+            solver.knapsack_coefficient(&solver.cuts.knapsack_cuts[0], &[3.]),
+            2
+        );
+        let priced = solver.price_phase(0, 10, false).unwrap();
+        let route = priced
+            .columns
+            .iter()
+            .find(|r| r.nodes == [0, 2, 3])
+            .unwrap();
+        assert_eq!(route.cost, -2.);
+        let routes = solver.enumerate(10.).unwrap();
+        assert_eq!(
+            routes.iter().find(|r| r.nodes == [0, 2, 3]).unwrap().cost,
+            -2.
+        );
+        solver.cuts.knapsack_cuts[0].dual = -4.;
+        let routes = solver.price_phase(0, 10, false).unwrap();
+        assert_eq!(
+            routes
+                .columns
+                .iter()
+                .find(|r| r.nodes == [0, 2, 3])
+                .unwrap()
+                .cost,
+            2.
+        );
+        assert!(solver.enumeration.is_some());
+    }
 }

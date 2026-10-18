@@ -5,12 +5,8 @@
 //! limited-memory rank-one cuts (`cuts`), and the optional Clp root master
 //! (`--features clp`). The reference implementation is the C++ OpenRSCP
 //! RCSP engine.
-pub mod core {
-    pub mod error;
-    pub mod log;
-    pub mod options;
-}
 pub mod api;
+pub mod core;
 pub mod cuts;
 pub mod enumeration;
 pub mod graph;
@@ -35,5 +31,5 @@ pub(crate) fn incomplete(message: impl Into<String>) -> core::error::OrError {
     }
 }
 
-pub mod vrptw;
 pub mod hgs;
+pub mod vrptw;

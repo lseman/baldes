@@ -136,11 +136,11 @@ pub(super) fn run(
                 let arc = problem.arc_position(id).unwrap();
                 if branches
                     .iter()
-                    .any(|b| b.arc == arc && b.sense == RowSense::GreaterEqual && b.rhs >= 1.)
+                    .any(|b| matches!(b,BranchConstraint::ArcFlow {arc:a,sense:RowSense::GreaterEqual,rhs} if *a==arc && *rhs>=1.))
                 {
                     continue;
                 }
-                branches.push(Branch {
+                branches.push(BranchConstraint::ArcFlow {
                     arc,
                     sense: RowSense::GreaterEqual,
                     rhs: 1.,
@@ -165,6 +165,8 @@ pub(super) fn run(
             ) {
                 Ok(result) => {
                     output.pricing_calls += result.master.pricing_calls;
+                    output.fixing_calls += result.fixing_calls;
+                    output.enumerated_routes += result.enumerated_routes;
                     for route in &result.routes {
                         pool.add(problem, &route.arcs);
                     }

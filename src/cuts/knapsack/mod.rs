@@ -860,6 +860,23 @@ impl ResourceKnapsackCut {
             self.cut.coefficient((q * scale + 1e-6).floor() as i32)
         })
     }
+    /// Evaluate an original-ID cut on a solver-coordinate resource vector.
+    pub fn coefficient_mapped(
+        &self,
+        graph: i32,
+        resources: &[f64],
+        indices: &BTreeMap<usize, usize>,
+    ) -> i32 {
+        let Some(&(original, scale)) = self.graph_resources.get(&graph) else {
+            return 0;
+        };
+        indices
+            .get(&original)
+            .and_then(|&slot| resources.get(slot))
+            .map_or(0, |q| {
+                self.cut.coefficient((q * scale + 1e-6).floor() as i32)
+            })
+    }
 }
 #[derive(Clone, Debug, Default)]
 pub struct ResourceKnapsackSeparator {
@@ -911,6 +928,21 @@ impl ResourceKnapsackSeparator {
         Ok(())
     }
     pub fn separate(&mut self, columns: &[KnapsackColumn]) -> Result<Vec<ResourceKnapsackCut>> {
+        self.separate_impl(columns, None)
+    }
+    /// Columns use solver coordinates, while rows/cuts retain original IDs.
+    pub fn separate_mapped(
+        &mut self,
+        columns: &[KnapsackColumn],
+        indices: &BTreeMap<i32, BTreeMap<usize, usize>>,
+    ) -> Result<Vec<ResourceKnapsackCut>> {
+        self.separate_impl(columns, Some(indices))
+    }
+    fn separate_impl(
+        &mut self,
+        columns: &[KnapsackColumn],
+        indices: Option<&BTreeMap<i32, BTreeMap<usize, usize>>>,
+    ) -> Result<Vec<ResourceKnapsackCut>> {
         validate_parameters(&self.parameters)?;
         self.num_separate_calls += 1;
         let mut rows = Vec::with_capacity(self.rows.len());
@@ -931,6 +963,13 @@ impl ResourceKnapsackSeparator {
                 }
                 let Some(&(resource, scale)) = row.graph_resources.get(&column.graph_id) else {
                     continue;
+                };
+                let resource = match indices {
+                    Some(indices) => *indices
+                        .get(&column.graph_id)
+                        .and_then(|map| map.get(&resource))
+                        .ok_or_else(|| invalid("knapsack original resource is not mapped"))?,
+                    None => resource,
                 };
                 let q = *column
                     .resources
@@ -1044,6 +1083,9 @@ impl KnapsackPricing {
     pub fn cost(&self, resources: &[f64]) -> f64 {
         let mut result = 0.;
         for (&resource, steps) in &self.resources {
+            if steps.is_empty() {
+                continue;
+            }
             let load = (resources[resource] + 1e-6).floor() as i32;
             if let Some((_, &cost)) = steps.range(..=load).next_back() {
                 result += cost;

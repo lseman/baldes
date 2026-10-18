@@ -4,7 +4,7 @@
 //! packed words and an additional cost; enumeration labels sixty words.
 //! Vertex tables are indexed by physical vertex, arc tables by the arc's
 //! position in `Graph::arcs`.
-use super::{CutClass, CutRegistry, MemoryKind};
+use crate::cuts::{CutClass, CutRegistry, MemoryKind};
 use crate::graph::Graph;
 use std::collections::{BTreeMap, BTreeSet};
 

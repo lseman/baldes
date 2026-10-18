@@ -2,7 +2,7 @@
 //! reference `native/separation/LocalSearchRankOneSeparation.h`. Packing row
 //! sets use the separator's own std::minstd_rand0 (seed 1); covering row sets
 //! use the C library rand().
-use super::rbtree::CandidateSet;
+use crate::cuts::shared::rbtree::CandidateSet;
 use super::separation::{bit, Bits, ColumnInfo, NativeCut, Separation};
 use super::subcuts;
 use std::collections::{BTreeMap, HashSet};

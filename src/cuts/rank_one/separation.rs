@@ -2,7 +2,7 @@
 //! `native/separation/RankOneSeparation.h`. Iteration orders, comparison
 //! directions, tie breaking and unfused products are kept; Rust never contracts `a * b + c` into an FMA.
 use super::local_search::LocalSearch;
-use super::rbtree::CandidateSet;
+use crate::cuts::shared::rbtree::CandidateSet;
 use super::tuple::TupleSeparation;
 use std::collections::{BTreeMap, BTreeSet};
 

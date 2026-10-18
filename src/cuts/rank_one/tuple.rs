@@ -1,8 +1,8 @@
 //! Tuple-based 4- and 5-row rank-one separation, from the C++ reference `native/separation/TupleRankOneSeparation.h`. Its hash
 //! sets are used for membership only; `std::sort` ties follow libstdc++.
-use super::rbtree::CandidateSet;
+use crate::cuts::shared::rbtree::CandidateSet;
 use super::separation::{ColumnInfo, NativeCut, Separation};
-use super::stdsort;
+use crate::cuts::shared::stdsort;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// A row tuple and its value; ordering is by value descending.
