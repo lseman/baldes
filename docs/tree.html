@@ -183,9 +183,29 @@ solution. JSON encodes nonfinite numbers as <code>null</code>.</p>
 <code>mip_time_limit</code>; CLI <code>--mip-nodes</code> budgets that heuristic. Optional HiGHS node
 MIP has separate controls and counters; see <a href="enumerated-mip.html">Enumerated MIP</a>.</p>
 <h2 id="limits-and-validation">Limits and validation</h2>
-<p>The tree does not yet provide multiple pricing networks, generic node
-preprocessing, or cut callbacks during the integer solve. Python exposes
-root solving; use Rust or the CLI for the tree.</p>
+<p>Every root, child, and priced trial runs node preprocessing before column
+generation. A worklist propagates continuous bounds through the original
+arc-flow master rows and flow conservation, including equivalent outgoing
+cover rows. Contradictions certify node infeasibility without LP solving or
+pricing. Zero upper bounds retire inherited columns and restrict both pricing
+directions and complete enumeration. Positive aggregate lower bounds remain
+enforced by their original master rows; they do not require every route to
+contain the arc. Parent and sibling state remains independent.</p>
+<p><code>RootOutput::preprocessing</code> reports bound updates, processed rows,
+infeasibility, and whether the bounded worklist reached completion. Reaching
+the work limit keeps valid deductions and continues ordinary node evaluation.
+The reusable <code>master::preprocessing</code> engine accepts signed sparse rows and
+infinite variable bounds, but callers must supply a complete formulation.
+Applying it to an unfinished restricted-column master would be unsound.</p>
+<p>Preprocessing currently covers the single-network routing model.
+Nonlinear Ryan–Foster rules retain their
+existing pricing resources; separator cuts and decomposition-specific
+local/global multiplicity bounds are not propagated by this adapter. There is
+no integer rounding, so propagation preserves the node LP relaxation.</p>
+<p>The tree does not yet provide multiple pricing networks or cut callbacks
+during the integer solve. Python exposes root solving; use Rust or the CLI
+for the tree. <code>Infeasible</code> means all nodes were certified closed without a
+feasible incumbent.</p>
 <ul>
 <li><a href="https://github.com/lseman/baldes/blob/main/src/master/root/mod.rs">Node snapshots and inheritance</a></li>
 <li><a href="https://github.com/lseman/baldes/blob/main/src/master/tree/mod.rs">Tree driver</a></li>
