@@ -6,9 +6,9 @@ on:
     paths:
       - 'landing/**'
       - 'docs/**'
-      - 'tools/compile_docs.py'
-      - 'tools/test_compile_docs.py'
-      - 'tools/docs-requirements.txt'
+      - '.github/scripts/compile_docs.py'
+      - '.github/scripts/test_compile_docs.py'
+      - '.github/scripts/docs-requirements.txt'
       - '.github/workflows/landing.yaml'
   workflow_dispatch:
 
@@ -28,13 +28,13 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: tools/docs-requirements.txt
+          cache-dependency-path: .github/scripts/docs-requirements.txt
       - name: Install documentation dependencies
-        run: python -m pip install -r tools/docs-requirements.txt
+        run: python -m pip install -r .github/scripts/docs-requirements.txt
       - name: Test documentation compiler
-        run: python -m unittest discover -s tools -p 'test_compile_docs.py'
+        run: python -m unittest discover -s .github/scripts -p 'test_compile_docs.py'
       - name: Compile Markdown guides
-        run: python tools/compile_docs.py
+        run: python .github/scripts/compile_docs.py
       - name: GH Pages Deployment
         uses: peaceiris/actions-gh-pages@v3
         with:

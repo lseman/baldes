@@ -12,17 +12,17 @@ The website build needs Python 3.10 or newer. It does not build the Rust solver.
 Create a separate environment and install the pinned documentation dependencies:
 
 ```sh
-python3 -m venv tools/.venv
-tools/.venv/bin/python -m pip install -r tools/docs-requirements.txt
-tools/.venv/bin/python tools/compile_docs.py
-tools/.venv/bin/python -m http.server 8000 --directory landing
+python3 -m venv .venv
+.venv/bin/python -m pip install -r .github/scripts/docs-requirements.txt
+.venv/bin/python .github/scripts/compile_docs.py
+.venv/bin/python -m http.server 8000 --directory landing
 ```
 
 Open `http://localhost:8000/` for the landing page and
 `http://localhost:8000/docs/` for the guides. Use an HTTP server rather than
 opening HTML files directly, so search can load its local index.
 
-On Windows, use `tools/.venv/Scripts/python.exe` instead of the `bin/python`
+On Windows, use `.venv/Scripts/python.exe` instead of the `bin/python`
 path. Re-run the compiler after changing Markdown, reader styles, or scripts.
 No JavaScript bundler or external search service is required.
 
@@ -50,7 +50,7 @@ A new guide appears in the reader automatically. Add its link to
 ## Custom destinations
 
 ```sh
-tools/.venv/bin/python tools/compile_docs.py \
+.venv/bin/python .github/scripts/compile_docs.py \
   --output /tmp/baldes-docs \
   --base-url https://example.org/baldes/ \
   --repository-url https://github.com/lseman/baldes
@@ -91,8 +91,8 @@ scrolling and decorative transitions.
 ## Validate changes
 
 ```sh
-tools/.venv/bin/python -m unittest discover -s tools -p 'test_compile_docs.py'
-tools/.venv/bin/python tools/compile_docs.py
+.venv/bin/python -m unittest discover -s .github/scripts -p 'test_compile_docs.py'
+.venv/bin/python .github/scripts/compile_docs.py
 ```
 
 The tests cover nested navigation, local/source/image links, duplicate anchors,

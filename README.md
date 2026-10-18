@@ -346,12 +346,12 @@ responsibilities and subfolders.
 | `python/rust/` | Rust/PyO3 extension crate |
 | `python/pybaldes/` | Python package and typed routing API |
 | `python/tests/` | installed-package integration tests |
-| `tools/` | pricing comparison utilities |
+| `.github/scripts/` | documentation build and checks |
 | `instances/` | Solomon VRPTW instances; `cvrplib/` holds CVRPLIB samples |
 | `assets/` | logo |
 | `landing/` | landing page and generated documentation website |
 
-Build the website documentation with `tools/compile_docs.py`; see the
+Build the website documentation with `.github/scripts/compile_docs.py`; see the
 [website publishing guide](docs/website.md) for setup and preview commands.
 
 ## Citation
