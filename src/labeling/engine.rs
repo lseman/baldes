@@ -107,9 +107,15 @@ impl<'a> Context<'a> {
     }
     /// The meeting vertex's NG bits and cut supports.
     fn vertex_step(&self, label: &mut StoredLabel) {
+        self.vertex_step_with_branching::<true>(label);
+    }
+    #[inline(always)]
+    fn vertex_step_with_branching<const BRANCHING: bool>(&self, label: &mut StoredLabel) {
         label.ng |= self.ng.vertex_bits[label.vertex];
-        let valid = self.branching.visit(&mut label.branch_state, label.vertex);
-        debug_assert!(valid, "extension checked the target's branch resource");
+        if BRANCHING {
+            let valid = self.branching.visit(&mut label.branch_state, label.vertex);
+            debug_assert!(valid, "extension checked the target's branch resource");
+        }
         if let Some(v) = self.cuts.info.vertices.get(label.vertex) {
             state::apply_vertex_support(&mut label.cut_words, &mut label.additional_cost, &v.support);
         }
@@ -189,13 +195,13 @@ impl<'a> Context<'a> {
         arc: &BucketArc,
         from: &StoredLabel,
     ) -> Option<StoredLabel> {
-        self.extend_resources_kept(g, forward, arc, from).map(|(label, _)| label)
+        self.extend_resources_kept::<true>(g, forward, arc, from).map(|(label, _)| label)
     }
     /// `extend`, also returning the label's resources as a value: reading
     /// them back from the new label (two 8-byte stores, one 16-byte load)
     /// stalls on store forwarding.
     #[inline(always)]
-    fn extend_resources_kept(
+    fn extend_resources_kept<const BRANCHING: bool>(
         &self,
         g: &Graph,
         forward: bool,
@@ -223,9 +229,7 @@ impl<'a> Context<'a> {
         } else {
             physical.tail
         };
-        if !self.branching.can_visit(&from.branch_state, vertex) { return None; }
-        // Like NG state, a crossing label excludes its meeting vertex.
-        let branch_state = from.branch_state.clone();
+        if BRANCHING && !self.branching.can_visit(&from.branch_state, vertex) { return None; }
         let transition = if forward {
             &self.ng.forward[arc.physical]
         } else {
@@ -258,7 +262,8 @@ impl<'a> Context<'a> {
             original_cost: physical.cost + from.original_cost,
             resources,
             ng,
-            branch_state,
+            // Like NG state, a crossing label excludes its meeting vertex.
+            branch_state: if BRANCHING { from.branch_state.clone() } else { None },
             parent: Some(from.id),
             arc: Some(arc.physical),
             hops: from.hops + 1,
@@ -306,7 +311,7 @@ struct Sweep<'a> {
 }
 impl<'a> Sweep<'a> {
     #[inline(always)]
-    fn insert(
+    fn insert<const BRANCHING: bool>(
         &mut self,
         g: &Graph,
         forward: bool,
@@ -330,7 +335,7 @@ impl<'a> Sweep<'a> {
             .map_or(&[][..], |v| v.dominance.as_slice());
         let stats = &mut *self.statistics;
         let storage = &mut *self.storage;
-        let inserted = storage.insert_ref(
+        let inserted = storage.insert_ref_with_branching::<BRANCHING>(
             g,
             label,
             hot,
@@ -345,7 +350,7 @@ impl<'a> Sweep<'a> {
             .wrapping_add((self.statistics.dominance_checks - before) as i32);
         inserted
     }
-    fn filter(&mut self, g: &Graph, forward: bool, id: BucketId, controls: &Controls) {
+    fn filter<const BRANCHING: bool>(&mut self, g: &Graph, forward: bool, id: BucketId, controls: &Controls) {
         if !self.ctx.controls.filter_other_buckets {
             return;
         }
@@ -361,11 +366,11 @@ impl<'a> Sweep<'a> {
         if bucket.active.iter().all(|&i| storage.labels[i].expanded) {
             return;
         }
-        let active = bucket.active.clone();
+        let active = &bucket.active;
         let mut retained = Vec::with_capacity(active.len());
         let before = self.statistics.other_dominance_checks;
         let mut work = vec![];
-        for &candidate in &active {
+        for &candidate in active {
             if self.storage.labels[candidate].expanded {
                 retained.push(candidate);
                 continue;
@@ -393,7 +398,7 @@ impl<'a> Sweep<'a> {
                             break;
                         }
                         self.statistics.other_dominance_checks += 1;
-                        if storage.labels[other].branch_state == candidate_label.branch_state && LabelStorage::dominates_hot(
+                        if (!BRANCHING || storage.labels[other].branch_state == candidate_label.branch_state) && LabelStorage::dominates_hot(
                             g,
                             hot,
                             candidate_hot,
@@ -456,7 +461,25 @@ impl<'a> Sweep<'a> {
         controls: &Controls,
         started: Instant,
     ) -> Result<()> {
-        let components = self.ctx.grid.direction(forward).components.clone();
+        // Decide once per sweep: keep direction constant through resource
+        // propagation and bucket lookup, and let root dominance stay on the
+        // hot columns without loading branch state from full label records.
+        match (self.ctx.branching.resources != 0, forward) {
+            (false, true) => self.run_direction_with_branching::<false, true>(g, controls, started),
+            (false, false) => self.run_direction_with_branching::<false, false>(g, controls, started),
+            (true, true) => self.run_direction_with_branching::<true, true>(g, controls, started),
+            (true, false) => self.run_direction_with_branching::<true, false>(g, controls, started),
+        }
+    }
+    fn run_direction_with_branching<const BRANCHING: bool, const FORWARD: bool>(
+        &mut self,
+        g: &Graph,
+        controls: &Controls,
+        started: Instant,
+    ) -> Result<()> {
+        let forward = FORWARD;
+        let ctx = self.ctx;
+        let components = &ctx.grid.direction(forward).components;
         let flags = if self.ctx.runtime_bidirectional() {
             self.ctx.controls.direction_flags
         } else {
@@ -467,8 +490,8 @@ impl<'a> Sweep<'a> {
         for component in components {
             loop {
                 let mut repeat = false;
-                for &id in &component {
-                    self.filter(g, forward, id, controls);
+                for &id in component {
+                    self.filter::<BRANCHING>(g, forward, id, controls);
                     // The bucket graph is fixed during the sweep: copy each arc
                     // as it is used instead of cloning the bucket's arc list.
                     let arc_count = self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket]
@@ -477,9 +500,7 @@ impl<'a> Sweep<'a> {
                     let mut pending = vec![];
                     // Same-bucket extensions go to `pending`, so this bucket's
                     // active list is fixed for the whole arc loop.
-                    let labels = self.storage.buckets[id.vertex][id.bucket]
-                        .active
-                        .clone();
+                    let labels = self.storage.buckets[id.vertex][id.bucket].active.clone();
                     for k in 0..arc_count {
                         let arc = self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket].arcs[k].clone();
                         if (!self.ctx.phase.jump_arcs && arc.jump.is_some()) || arc.flags & flags == 0 {
@@ -504,13 +525,13 @@ impl<'a> Sweep<'a> {
                                 continue;
                             }
                             let Some((mut label, resources)) =
-                                self.ctx.extend_resources_kept(g, forward, &arc, from)
+                                self.ctx.extend_resources_kept::<BRANCHING>(g, forward, &arc, from)
                             else {
                                 continue;
                             };
                             let terminal = label.vertex == if forward { g.sink } else { g.source };
                             if terminal {
-                                if !self.ctx.branching.accepts(&label.branch_state) { continue; }
+                                if BRANCHING && !self.ctx.branching.accepts(&label.branch_state) { continue; }
                                 if !self.ctx.controls.sink_concatenation {
                                     continue;
                                 }
@@ -540,7 +561,7 @@ impl<'a> Sweep<'a> {
                                 }
                                 continue;
                             }
-                            self.ctx.vertex_step(&mut label);
+                            self.ctx.vertex_step_with_branching::<BRANCHING>(&mut label);
                             let hot = HotLabel { resources, ..HotLabel::of(&label) };
                             if label.bucket == id {
                                 pending.push((label, hot));
@@ -551,22 +572,19 @@ impl<'a> Sweep<'a> {
                                 .component
                                 == self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket]
                                     .component;
-                            if self.insert(g, forward, &label, hot, controls) && same {
+                            if self.insert::<BRANCHING>(g, forward, &label, hot, controls) && same {
                                 repeat = true;
                             }
                         }
                     }
-                    let active = self.storage.buckets[id.vertex][id.bucket]
-                        .active
-                        .clone();
-                    for index in active {
+                    for &index in &self.storage.buckets[id.vertex][id.bucket].active {
                         if !self.storage.labels[index].expanded {
                             self.statistics.expanded += 1;
                         }
                         self.storage.labels[index].expanded = true;
                     }
                     for (label, hot) in pending {
-                        if self.insert(g, forward, &label, hot, controls) {
+                        if self.insert::<BRANCHING>(g, forward, &label, hot, controls) {
                             repeat = true;
                         }
                     }
@@ -652,7 +670,7 @@ impl LabelingEngine {
     fn insert(&mut self, g: &Graph, forward: bool, label: &StoredLabel, hot: HotLabel, controls: &Controls) -> bool {
         let mut terminals = vec![];
         let counts = Default::default();
-        self.sweep(forward, &mut terminals, &counts).insert(g, forward, label, hot, controls)
+        self.sweep(forward, &mut terminals, &counts).insert::<true>(g, forward, label, hot, controls)
     }
     fn run_direction(
         &mut self,

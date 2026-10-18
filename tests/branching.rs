@@ -290,24 +290,27 @@ fn randomized_branch_pricing_with_cuts_matches_complete_paths() {
 
 #[test]
 fn removing_branch_rebuilds_the_unrestricted_pricing_domain() {
-    let mut s = solver();
-    let c = RyanFosterConstraint {
-        first: 1,
-        second: 2,
-        together: true,
-    };
-    s.set_ryan_foster(vec![c]).unwrap();
-    assert_eq!(
-        s.price_phase(0, 150, false).unwrap().minimum_reduced_cost,
-        -6.
-    );
-    s.run_fixing_enumeration(0, 0., -5.).unwrap();
-    s.set_ryan_foster(vec![]).unwrap();
-    assert!(s.enumeration.is_none());
-    // NG pricing again permits 0->1->2->1->sink, which RF binary resources
-    // had excluded by making both endpoints elementary.
-    assert_eq!(
-        s.price_phase(0, 150, false).unwrap().minimum_reduced_cost,
-        -7.
-    );
+    for mode in [0., 1., 2.] {
+        let mut s = solver();
+        s.set_option("BALDESuseBidirectionalSearch", mode).unwrap();
+        let c = RyanFosterConstraint {
+            first: 1,
+            second: 2,
+            together: true,
+        };
+        s.set_ryan_foster(vec![c]).unwrap();
+        assert_eq!(
+            s.price_phase(0, 150, false).unwrap().minimum_reduced_cost,
+            -6.
+        );
+        s.run_fixing_enumeration(0, 0., -5.).unwrap();
+        s.set_ryan_foster(vec![]).unwrap();
+        assert!(s.enumeration.is_none());
+        // NG pricing again permits 0->1->2->1->sink, which RF binary resources
+        // had excluded by making both endpoints elementary.
+        assert_eq!(
+            s.price_phase(0, 150, false).unwrap().minimum_reduced_cost,
+            -7.
+        );
+    }
 }

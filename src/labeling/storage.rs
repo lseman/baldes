@@ -137,7 +137,9 @@ impl HotColumns {
         &self,
         from: usize,
         threshold: f64,
-        c: &HotLabel,
+        candidate_r0: f64,
+        candidate_r1: f64,
+        candidate_ng: u16,
     ) -> usize {
         let n = self.key.len();
         // One label's test on values, so the 8-wide block below reads
@@ -145,11 +147,12 @@ impl HotColumns {
         let test = |key: f64, r0: f64, r1: f64, ng: u16| -> bool {
             let mut pass = true;
             for (r, x) in [r0, r1].into_iter().enumerate().take(RESOURCES) {
-                let (a, b) = if PREFIX { (x, c.resources[r]) } else { (c.resources[r], x) };
+                let candidate = if r == 0 { candidate_r0 } else { candidate_r1 };
+                let (a, b) = if PREFIX { (x, candidate) } else { (candidate, x) };
                 pass &= if FORWARD { a <= b + EPSILON } else { b <= a + EPSILON };
             }
             if NG {
-                let (a, b) = if PREFIX { (ng, c.ng) } else { (c.ng, ng) };
+                let (a, b) = if PREFIX { (ng, candidate_ng) } else { (candidate_ng, ng) };
                 pass &= a & !b == 0;
             }
             if PREFIX {
@@ -327,21 +330,26 @@ impl LabelStorage {
         }
     }
     /// `HotColumns::next_candidate` for this graph's resources; without a
-    /// specialization every index is a candidate.
+    /// specialization every index is a candidate. Pass the candidate resources
+    /// as scalars instead of reloading a freshly assembled `HotLabel`.
     #[inline]
     fn next_candidate<const PREFIX: bool>(
         g: &Graph,
         cols: &HotColumns,
         from: usize,
         threshold: f64,
-        c: &HotLabel,
+        candidate_r0: f64,
+        candidate_r1: f64,
+        candidate_ng: u16,
         forward: bool,
         ng: bool,
     ) -> usize {
         let disposable = g.resources.iter().all(|k| matches!(k, ResourceKind::Disposable));
         macro_rules! scan {
             ($f:literal, $r:literal, $n:literal) => {
-                cols.next_candidate::<PREFIX, $f, $r, $n>(from, threshold, c)
+                cols.next_candidate::<PREFIX, $f, $r, $n>(
+                    from, threshold, candidate_r0, candidate_r1, candidate_ng,
+                )
             };
         }
         match (disposable, g.resources.len(), forward, ng) {
@@ -388,6 +396,25 @@ impl LabelStorage {
         cuts: &[DominanceDescriptor],
         stats: &mut Statistics,
     ) -> bool {
+        self.insert_ref_with_branching::<true>(
+            g, label, candidate, forward, test, capacity, hop_limit, cuts, stats,
+        )
+    }
+    /// The branch-free specialization is only used by a sweep with no active
+    /// branch resources; the public insertion path checks branch state.
+    #[inline(always)]
+    pub(crate) fn insert_ref_with_branching<const BRANCHING: bool>(
+        &mut self,
+        g: &Graph,
+        label: &StoredLabel,
+        candidate: HotLabel,
+        forward: bool,
+        test: InsertionTest,
+        capacity: usize,
+        hop_limit: bool,
+        cuts: &[DominanceDescriptor],
+        stats: &mut Statistics,
+    ) -> bool {
         let b = label.bucket;
         let labels = &self.labels;
         let bucket = &mut self.buckets[b.vertex][b.bucket];
@@ -420,7 +447,8 @@ impl LabelStorage {
             // Labels skipped here fail dominance's resource or NG test, but
             // still count as checked.
             let next =
-                Self::next_candidate::<true>(g, &bucket.hot, position, threshold, &candidate, forward, ng);
+                Self::next_candidate::<true>(g, &bucket.hot, position, threshold,
+                    candidate.resources[0], candidate.resources[1], candidate.ng, forward, ng);
             stats.dominance_checks += next - position;
             position = next;
             if position == bucket.active.len() || bucket.hot.key[position] > threshold {
@@ -429,7 +457,7 @@ impl LabelStorage {
             stats.dominance_checks += 1;
             let previous = bucket.active[position];
             let hot = bucket.hot.get(position);
-            if labels[previous].branch_state == label.branch_state && Self::dominates_hot(g, &hot, &candidate, forward, test, hop_limit, cuts, || {
+            if (!BRANCHING || labels[previous].branch_state == label.branch_state) && Self::dominates_hot(g, &hot, &candidate, forward, test, hop_limit, cuts, || {
                 (&labels[previous].cut_words, &label.cut_words)
             }) {
                 stats.dominated += 1;
@@ -458,7 +486,8 @@ impl LabelStorage {
         let mut read = position + 1;
         loop {
             let next =
-                Self::next_candidate::<false>(g, &bucket.hot, read, 0., &candidate, forward, ng);
+                Self::next_candidate::<false>(g, &bucket.hot, read, 0.,
+                    candidate.resources[0], candidate.resources[1], candidate.ng, forward, ng);
             if kept != read {
                 bucket.active.copy_within(read..next, kept);
                 bucket.hot.move_run(read..next, kept);
@@ -470,7 +499,7 @@ impl LabelStorage {
             read = next + 1;
             let id = bucket.active[next];
             let hot = bucket.hot.get(next);
-            if labels[inserted].branch_state == labels[id].branch_state && Self::dominates_hot(g, &candidate, &hot, forward, test, hop_limit, cuts, || {
+            if (!BRANCHING || labels[inserted].branch_state == labels[id].branch_state) && Self::dominates_hot(g, &candidate, &hot, forward, test, hop_limit, cuts, || {
                 (&labels[inserted].cut_words, &labels[id].cut_words)
             }) {
                 stats.dominated += 1;
@@ -498,5 +527,94 @@ impl LabelStorage {
         bucket.hot.truncate(len);
         stats.generated += 1;
         accepted
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn check_scan<
+        const PREFIX: bool,
+        const FORWARD: bool,
+        const RESOURCES: usize,
+        const NG: bool,
+    >() {
+        // A unique qualifying label at every position exercises short scans,
+        // vector block boundaries, and resuming after a previous candidate.
+        const LEN: usize = 25;
+        for use_ng in [false, true] {
+            if use_ng && !NG {
+                continue;
+            }
+            for matching in 0..=LEN {
+                let mut columns = HotColumns::default();
+                for i in 0..LEN {
+                    let failing = if PREFIX == FORWARD { 2. } else { 0. };
+                    let resources = if i == matching || use_ng {
+                        [1.; 2]
+                    } else {
+                        [failing; 2]
+                    };
+                    columns.push(HotLabel {
+                        key: 0.,
+                        cost: 0.,
+                        additional_cost: 0.,
+                        resources,
+                        hops: 1,
+                        ng: if !use_ng || i == matching {
+                            1
+                        } else if PREFIX {
+                            2
+                        } else {
+                            0
+                        },
+                    });
+                }
+                for from in [0, 1, 7, 8, 9, 15, 16, 24, LEN] {
+                    let expected = if matching >= from { matching } else { LEN };
+                    assert_eq!(
+                        columns.next_candidate::<PREFIX, FORWARD, RESOURCES, NG>(from, 1., 1., 1., 1),
+                        expected,
+                        "prefix={PREFIX} forward={FORWARD} resources={RESOURCES} ng={NG} use_ng={use_ng} matching={matching} from={from}"
+                    );
+                }
+            }
+        }
+        if PREFIX {
+            let mut columns = HotColumns::default();
+            for _ in 0..LEN {
+                columns.push(HotLabel {
+                    key: 2.,
+                    cost: 0.,
+                    additional_cost: 0.,
+                    resources: [3.; 2],
+                    hops: 1,
+                    ng: 2,
+                });
+            }
+            // A key above the prefix threshold stops the scan independently
+            // of resource and NG dominance.
+            assert_eq!(
+                columns.next_candidate::<PREFIX, FORWARD, RESOURCES, NG>(0, 1., 1., 1., 1),
+                0
+            );
+        }
+    }
+
+    #[test]
+    fn dominance_scan_preserves_first_candidate_across_block_boundaries() {
+        macro_rules! check {
+            ($p:literal, $f:literal) => {
+                check_scan::<$p, $f, 1, false>();
+                check_scan::<$p, $f, 1, true>();
+                check_scan::<$p, $f, 2, false>();
+                check_scan::<$p, $f, 2, true>();
+            };
+        }
+        check!(true, true);
+        check!(true, false);
+        check!(false, true);
+        check!(false, false);
     }
 }

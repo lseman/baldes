@@ -299,7 +299,7 @@ impl BucketGraph {
             slots.get(1).map_or(0., |&r| pick(r)),
         ]
     }
-    #[inline]
+    #[inline(always)]
     pub fn bucket_id(&self, forward: bool, vertex: usize, q: [f64; 2]) -> Option<usize> {
         let term = |r: usize, q: f64| {
             let x = if forward {
@@ -1122,10 +1122,62 @@ impl BucketGraph {
 /// `floor` (no SSE4.1 round): the same value for every input, ±inf and NaN too.
 #[inline(always)]
 fn floor_isize(x: f64) -> isize {
+    // Bucket coordinates are normally non-negative: truncation is already
+    // floor in this case, including the saturating positive overflow result.
+    if x >= 0. {
+        return x as isize;
+    }
     let t = x as isize;
     if t != isize::MIN && t as f64 > x {
         t - 1
     } else {
         t
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::floor_isize;
+
+    #[test]
+    fn bucket_floor_matches_standard_floor_at_numeric_boundaries() {
+        for value in [
+            0.,
+            -0.,
+            1.,
+            -1.,
+            1.5,
+            -1.5,
+            1e-6,
+            -1e-6,
+            isize::MIN as f64,
+            isize::MAX as f64,
+            f64::MIN,
+            f64::MAX,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ] {
+            for bits in [
+                value.to_bits().wrapping_sub(1),
+                value.to_bits(),
+                value.to_bits().wrapping_add(1),
+            ] {
+                let x = f64::from_bits(bits);
+                assert_eq!(floor_isize(x), x.floor() as isize, "x={x:?}");
+            }
+        }
+        for n in -1000..1000 {
+            let x = n as f64 / 7.;
+            assert_eq!(floor_isize(x), x.floor() as isize, "x={x:?}");
+        }
+        // Sample the entire IEEE-754 bit range, including subnormal values
+        // and overflow, against the standard-library operation.
+        let mut bits = 0x8e71_23a4_917b_cdef_u64;
+        for _ in 0..10000 {
+            bits = bits.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let x = f64::from_bits(bits);
+            assert_eq!(floor_isize(x), x.floor() as isize, "bits={bits:x} x={x:?}");
+        }
     }
 }
