@@ -3,7 +3,7 @@
 //! `enumeration/FullMemoryPreparation.h`. Limited-memory labels carry twenty
 //! packed words and an additional cost; enumeration labels sixty words.
 //! Vertex tables are indexed by physical vertex, arc tables by the arc's
-//! position in `Graph::arcs`. Strong k-path cuts are not ported.
+//! position in `Graph::arcs`.
 use super::{CutClass, CutRegistry, MemoryKind};
 use crate::graph::Graph;
 use std::collections::{BTreeMap, BTreeSet};
@@ -55,7 +55,7 @@ pub struct ArcInfo {
 }
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct CutResourceInfo {
-    /// Minus the duals of k-path cuts supported at the vertex (zero here).
+    /// Minus the duals of k-path cuts supported at the vertex.
     pub vertex_cut_potential: Vec<f64>,
     pub vertices: Vec<VertexInfo>,
     pub forward: Vec<ArcInfo>,
@@ -226,6 +226,14 @@ pub struct LimitedInput {
     pub memory_vertices: Vec<usize>,
     pub memory_arcs: BTreeSet<i32>,
 }
+/// A limited-memory strong k-path cut restated at vertex level.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LimitedKPathInput {
+    pub dual: f64,
+    pub arc_memory: bool,
+    pub support: Vec<bool>,
+    pub memory_vertices: Vec<usize>,
+}
 /// FullMemoryRankOneInput.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FullInput {
@@ -235,6 +243,13 @@ pub struct FullInput {
     pub dual: f64,
     pub vertex_coefficient: Vec<i32>,
     pub arc_coefficient: BTreeMap<i32, i32>,
+}
+/// FullMemoryKPathInput.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FullKPathInput {
+    pub ordered_support: Vec<usize>,
+    pub dual: f64,
+    pub vertex_support: Vec<bool>,
 }
 
 const BITMASK: [u32; 8] = [0, 1, 1, 3, 3, 7, 7, 7];
@@ -269,6 +284,7 @@ pub fn prepare_vertices(
     prep: &mut LimitedPreparation,
     g: &Graph,
     cuts: &[LimitedInput],
+    kpath: &[LimitedKPathInput],
 ) -> bool {
     let n = g.vertices.len();
     prep.positions.clear();
@@ -280,7 +296,8 @@ pub fn prepare_vertices(
     prep.dominance_cut = vec![vec![]; n];
     prep.support_cut = vec![vec![]; n];
     let mut next = vec![0i32; n];
-    for (index, cut) in cuts.iter().enumerate() {
+    let mut index = 0usize;
+    for cut in cuts {
         let mask = lim_memory_mask(cut.denominator);
         let bits = lim_memory_bits(cut.denominator);
         let mut position = vec![-1i32; n];
@@ -340,8 +357,38 @@ pub fn prepare_vertices(
             }
         }
         prep.positions.push(position);
+        index += 1;
+    }
+    for cut in kpath {
+        if cut.arc_memory {
+            return false;
+        }
+        let mut position = vec![-1i32; n];
+        for &vertex in &cut.memory_vertices {
+            let at = next[vertex];
+            next[vertex] += 1;
+            position[vertex] = at;
+            info.vertices[vertex].dominance.push(DominanceDescriptor {
+                mask: 1,
+                denominator: -2,
+                word: at >> 5,
+                shift: at & 31,
+                subtract_cost: true,
+                cost: cut.dual,
+            });
+            prep.dominance_cut[vertex].push(index);
+        }
+        prep.positions.push(position);
+        index += 1;
     }
     info.vertex_cut_potential = vec![0.0; n];
+    for vertex in 0..n {
+        for cut in kpath {
+            if cut.support.get(vertex).copied().unwrap_or(false) {
+                info.vertex_cut_potential[vertex] -= cut.dual;
+            }
+        }
+    }
     next.iter().all(|&used| {
         let words = if used <= 0 { 1 } else { (used - 1) / 32 + 1 };
         words <= LIMITED_WORDS as i32
@@ -353,6 +400,7 @@ pub fn prepare_arcs(
     prep: &mut LimitedPreparation,
     g: &Graph,
     cuts: &[LimitedInput],
+    kpath: &[LimitedKPathInput],
     forward: bool,
 ) {
     let tables = if forward {
@@ -378,26 +426,37 @@ pub fn prepare_arcs(
         let to = if forward { g.arcs[i].head } else { g.arcs[i].tail };
         into[to].push(i);
     }
-    for (index, cut) in cuts.iter().enumerate() {
-        let position = &prep.positions[index];
+    let coordinates = |at: i32| if at < 0 { (-1, -1) } else { (at >> 5, at % 32) };
+    let mut push = |arc: usize,
+                    owner: usize,
+                    mask: u32,
+                    denominator: i32,
+                    source: i32,
+                    target: i32,
+                    increment: i32,
+                    covering: bool,
+                    cost: f64| {
+        let (sw, ss) = coordinates(source);
+        let (tw, ts) = coordinates(target);
+        tables[arc].ordinary.push(ArcTransition {
+            mask,
+            denominator,
+            source_word: sw,
+            source_shift: ss,
+            target_word: tw,
+            target_shift: ts,
+            increment,
+            covering,
+            overflow_cost: cost,
+        });
+        owners[arc].push(owner);
+    };
+    let mut cut_index = 0usize;
+    for cut in cuts {
+        let owner = cut_index;
+        let position = &prep.positions[cut_index];
+        cut_index += 1;
         let mask = lim_memory_mask(cut.denominator);
-        let coordinates = |at: i32| if at < 0 { (-1, -1) } else { (at >> 5, at % 32) };
-        let mut push = |arc: usize, source: i32, target: i32, increment: i32| {
-            let (sw, ss) = coordinates(source);
-            let (tw, ts) = coordinates(target);
-            tables[arc].ordinary.push(ArcTransition {
-                mask,
-                denominator: cut.denominator,
-                source_word: sw,
-                source_shift: ss,
-                target_word: tw,
-                target_shift: ts,
-                increment,
-                covering: cut.covering,
-                overflow_cost: cut.dual,
-            });
-            owners[arc].push(index);
-        };
         let coefficient = |id: i32| cut.arc_coefficient.get(&id).copied().unwrap_or(0);
         if !cut.arc_memory {
             for &memory in &cut.memory_vertices {
@@ -409,7 +468,17 @@ pub fn prepare_arcs(
                     if source < 0 && increment == 0 {
                         continue;
                     }
-                    push(i, source, target, increment);
+                    push(
+                        i,
+                        owner,
+                        mask,
+                        cut.denominator,
+                        source,
+                        target,
+                        increment,
+                        cut.covering,
+                        cut.dual,
+                    );
                 }
             }
         } else {
@@ -424,7 +493,17 @@ pub fn prepare_arcs(
                 if increment == 0 && (source < 0 || target < 0) {
                     continue;
                 }
-                push(i, source, target, increment);
+                push(
+                    i,
+                    owner,
+                    mask,
+                    cut.denominator,
+                    source,
+                    target,
+                    increment,
+                    cut.covering,
+                    cut.dual,
+                );
             }
         }
         for (&id, &increment) in &cut.arc_coefficient {
@@ -435,25 +514,86 @@ pub fn prepare_arcs(
             if increment < 1 || position[a.head] >= 0 || position[a.tail] >= 0 {
                 continue;
             }
-            push(i, -1, -1, increment);
+            push(
+                i,
+                owner,
+                mask,
+                cut.denominator,
+                -1,
+                -1,
+                increment,
+                cut.covering,
+                cut.dual,
+            );
+        }
+    }
+    for cut in kpath {
+        let owner = cut_index;
+        let position = &prep.positions[cut_index];
+        cut_index += 1;
+        for &memory in &cut.memory_vertices {
+            let target = position[memory];
+            for &i in &into[memory] {
+                let a = &g.arcs[i];
+                let other = if forward { a.tail } else { a.head };
+                let source = position[other];
+                if source < 0 && !cut.support[other] {
+                    continue;
+                }
+                push(i, owner, 1, -2, source, target, if source < 0 { 1 } else { 0 }, true, cut.dual);
+            }
+        }
+        for support in 0..n {
+            if !cut.support[support] {
+                continue;
+            }
+            for &i in &into[support] {
+                let a = &g.arcs[i];
+                let other = if forward { a.tail } else { a.head };
+                if cut.support[other] {
+                    continue;
+                }
+                push(i, owner, 1, -2, position[other], -1, -1, true, cut.dual);
+            }
         }
     }
 }
 /// Dual-only change: every cost copied from a dual takes the new dual.
-pub fn update_duals(info: &mut CutResourceInfo, prep: &LimitedPreparation, cuts: &[LimitedInput], forward: bool, backward: bool) {
+pub fn update_duals(
+    info: &mut CutResourceInfo,
+    prep: &LimitedPreparation,
+    cuts: &[LimitedInput],
+    kpath: &[LimitedKPathInput],
+    forward: bool,
+    backward: bool,
+) {
+    let dual = |cut: usize| {
+        if cut < cuts.len() {
+            cuts[cut].dual
+        } else {
+            kpath[cut - cuts.len()].dual
+        }
+    };
     for (v, vertex) in info.vertices.iter_mut().enumerate() {
         if v >= prep.dominance_cut.len() {
             break;
         }
         for (i, d) in vertex.dominance.iter_mut().enumerate() {
-            d.cost = cuts[prep.dominance_cut[v][i]].dual;
+            d.cost = dual(prep.dominance_cut[v][i]);
         }
         for (i, s) in vertex.support.iter_mut().enumerate() {
-            s.cost = cuts[prep.support_cut[v][i]].dual;
+            s.cost = dual(prep.support_cut[v][i]);
         }
     }
     let n = info.vertex_cut_potential.len();
     info.vertex_cut_potential = vec![0.0; n];
+    for vertex in 0..n {
+        for cut in kpath {
+            if cut.support.get(vertex).copied().unwrap_or(false) {
+                info.vertex_cut_potential[vertex] -= cut.dual;
+            }
+        }
+    }
     for (direction, enabled) in [(0, forward), (1, backward)] {
         if !enabled {
             continue;
@@ -468,7 +608,7 @@ pub fn update_duals(info: &mut CutResourceInfo, prep: &LimitedPreparation, cuts:
                 break;
             }
             for (i, t) in tables[arc].ordinary.iter_mut().enumerate() {
-                t.overflow_cost = cuts[owners[i]].dual;
+                t.overflow_cost = dual(owners[i]);
             }
         }
     }
@@ -497,21 +637,37 @@ pub fn prepare_full_memory(
     prep: &mut FullPreparation,
     g: &Graph,
     cuts: &[FullInput],
+    kpath: &[FullKPathInput],
     backward: bool,
 ) -> bool {
     let vertices = g.vertices.len();
     let mut groups: BTreeMap<Vec<(usize, i32)>, Vec<usize>> = BTreeMap::new();
+    let mut kpath_groups: BTreeMap<Vec<usize>, Vec<usize>> = BTreeMap::new();
     for (row, cut) in cuts.iter().enumerate() {
         groups.entry(cut.ordered_support.clone()).or_default().push(row);
     }
+    for (row, cut) in kpath.iter().enumerate() {
+        kpath_groups.entry(cut.ordered_support.clone()).or_default().push(row);
+    }
     let mut next = FullPreparation {
         fields: vec![],
-        row_to_field: vec![-1; cuts.len()],
+        row_to_field: vec![-1; cuts.len() + kpath.len()],
     };
     let mut vertex_tables: Vec<Vec<VertexSupport>> = vec![vec![]; vertices];
     let mut forward_tables: Vec<Vec<ArcTransition>> = vec![vec![]; g.arcs.len()];
     let mut backward_tables: Vec<Vec<ArcTransition>> = vec![vec![]; g.arcs.len()];
     let mut position = 0i32;
+    let transition = |f: &FullField, increment: i32, target_word: i32, target_shift: i32| ArcTransition {
+        mask: f.mask,
+        denominator: f.denominator,
+        source_word: f.word,
+        source_shift: f.shift,
+        target_word,
+        target_shift,
+        increment,
+        covering: f.covering,
+        overflow_cost: f.cost,
+    };
     for rows in groups.values() {
         let cut = &cuts[rows[0]];
         let mut cost = 0.0;
@@ -558,20 +714,50 @@ pub fn prepare_full_memory(
             let Some(&increment) = cut.arc_coefficient.get(&a.id) else {
                 continue;
             };
-            let t = ArcTransition {
-                mask: f.mask,
-                denominator: f.denominator,
-                source_word: f.word,
-                source_shift: f.shift,
-                target_word: f.word,
-                target_shift: f.shift,
-                increment,
-                covering: f.covering,
-                overflow_cost: f.cost,
-            };
+            let t = transition(&f, increment, f.word, f.shift);
             forward_tables[i].push(t);
             if backward {
                 backward_tables[i].push(t);
+            }
+        }
+    }
+    for rows in kpath_groups.values() {
+        let cut = &kpath[rows[0]];
+        let mut cost = 0.0;
+        for &row in rows {
+            cost = cost + kpath[row].dual;
+        }
+        let f = FullField {
+            mask: 1,
+            denominator: -2,
+            word: position / 32,
+            shift: position % 32,
+            covering: true,
+            index: next.fields.len() as i32,
+            cost,
+        };
+        position += 1;
+        next.fields.push(f);
+        if position > (FULL_WORDS * 32) as i32 {
+            return false;
+        }
+        for &row in rows {
+            next.row_to_field[cuts.len() + row] = f.index;
+        }
+        for (i, a) in g.arcs.iter().enumerate() {
+            let add = |direction: bool, tables: &mut Vec<Vec<ArcTransition>>| {
+                let from = cut.vertex_support[if direction { a.tail } else { a.head }];
+                let to = cut.vertex_support[if direction { a.head } else { a.tail }];
+                if !from && to {
+                    tables[i].push(transition(&f, -1, -1, -1));
+                } else if from && !to {
+                    // The native call supplies the word coordinate for BOTH
+                    tables[i].push(transition(&f, 1, f.word, f.word));
+                }
+            };
+            add(true, &mut forward_tables);
+            if backward {
+                add(false, &mut backward_tables);
             }
         }
     }
@@ -653,10 +839,16 @@ pub fn project_words(
     }
     result
 }
-/// Rank-one costs of an
+/// Rank-one and strong k-path costs of an
 /// enumerated path from physical incidence (no memory), the byte-wide
 /// accumulator included.
-pub fn enumerated_path_cut_cost(cuts: &[LimitedInput], vertices: &[usize], arc_ids: &[i32], mut cost: f64) -> f64 {
+pub fn enumerated_path_cut_cost(
+    cuts: &[LimitedInput],
+    kpath: &[LimitedKPathInput],
+    vertices: &[usize],
+    arc_ids: &[i32],
+    mut cost: f64,
+) -> f64 {
     for cut in cuts {
         let mut sum: u8 = 0;
         let mut add = |value: i32| {
@@ -684,13 +876,26 @@ pub fn enumerated_path_cut_cost(cuts: &[LimitedInput], vertices: &[usize], arc_i
             cost = cost + coefficient as f64 * cut.dual;
         }
     }
+    for cut in kpath {
+        if vertices.iter().any(|&v| cut.support.get(v).copied().unwrap_or(false)) {
+            cost = cost + cut.dual;
+        }
+    }
     cost
 }
 
 /// build_cut_inputs: active registry cuts in pricing order. Zero-dual and
 /// retired cuts allocate no label state. The cost of a cut is minus its
 /// master dual.
-pub fn build_inputs(registry: &CutRegistry, g: &Graph) -> (Vec<LimitedInput>, Vec<FullInput>) {
+pub fn build_inputs(
+    registry: &CutRegistry,
+    g: &Graph,
+) -> (
+    Vec<LimitedInput>,
+    Vec<LimitedKPathInput>,
+    Vec<FullInput>,
+    Vec<FullKPathInput>,
+) {
     let graph = g.graph_id.max(0);
     let vertices = g.vertices.len();
     let mut order = registry.pricing_order.clone();
@@ -700,34 +905,71 @@ pub fn build_inputs(registry: &CutRegistry, g: &Graph) -> (Vec<LimitedInput>, Ve
     }
     order.extend((0..registry.cuts.len()).filter(|&i| !ordered[i]));
     let mut limited = vec![];
+    let mut kpath = vec![];
     let mut full = vec![];
+    let mut full_kpath = vec![];
     for index in order {
         let cut = &registry.cuts[index];
         if registry.retired.contains(&index) || cut.dual.abs() <= 1e-6 {
             continue;
         }
+        let dual = if cut.visit_once { (-cut.dual * 1e8 + 0.5).floor() / 1e8 } else { -cut.dual };
+        let weights: Vec<i32> = (0..vertices).map(|v| cut.pricing_weight_for_graph(graph, v)).collect();
+        let ordered_support = cut.pricing_ordered_support_for_graph(graph);
+        if cut.visit_once && cut.native_kpath_support.is_none() && cut.graph_dependent_memory && !cut.graph_memories.contains_key(&graph) {
+            // coefficient zero. Enumerated paths still use full incidence.
+            let support: Vec<bool> = (0..vertices).map(|v| weights[v] != 0).collect();
+            full_kpath.push(FullKPathInput {
+                ordered_support: cut.native_kpath_support.clone().unwrap_or_else(|| ordered_support.map_or_else(
+                    || (0..vertices).filter(|&v| support[v]).collect(),
+                    |s| s.iter().map(|&(v, _)| v).collect())),
+                dual, vertex_support: support,
+            });
+            continue;
+        }
         let memory = cut.memory_for_graph(graph);
+        if cut.visit_once {
+            let support: Vec<bool> = (0..vertices).map(|v| weights[v] != 0).collect();
+            let memory_vertices: Vec<usize> =
+                (0..vertices).filter(|&v| memory.get(v).copied().unwrap_or(false) && (cut.native_kpath_support.is_some() || !support[v])).collect();
+            kpath.push(LimitedKPathInput {
+                dual,
+                arc_memory: false,
+                support: support.clone(),
+                memory_vertices,
+            });
+            let ordered_support = cut.native_kpath_support.clone().unwrap_or_else(|| match ordered_support {
+                Some(s) => s.iter().map(|&(v, _)| v).collect(),
+                None => (0..vertices).filter(|&v| support[v]).collect(),
+            });
+            full_kpath.push(FullKPathInput {
+                ordered_support,
+                dual,
+                vertex_support: support,
+            });
+            continue;
+        }
         let covering = cut.class == CutClass::Covering;
         let sign = if covering { -1 } else { 1 };
-        let coefficient: Vec<i32> = (0..vertices).map(|v| cut.weights[v] * sign).collect();
+        let coefficient: Vec<i32> = (0..vertices).map(|v| weights[v] * sign).collect();
         let arc_coefficient: BTreeMap<i32, i32> = cut.arc_weights.iter().map(|(&a, &w)| (a, w * sign)).collect();
         limited.push(LimitedInput {
             covering,
             type2: cut.native_type2,
             arc_memory: cut.memory_kind == MemoryKind::Arc,
             denominator: sign * cut.denominator,
-            dual: -cut.dual,
+            dual,
             vertex_coefficient: coefficient.clone(),
             arc_coefficient: arc_coefficient.clone(),
-            memory_vertices: (0..vertices).filter(|&v| memory[v]).collect(),
+            memory_vertices: (0..vertices).filter(|&v| memory.get(v).copied().unwrap_or(false)).collect(),
             memory_arcs: cut.arc_memory_for_graph(graph),
         });
-        let mut ordered_support = match &cut.ordered_support {
+        let mut ordered_support = match ordered_support {
             Some(s) => s.clone(),
             None => {
                 let mut s: Vec<(usize, i32)> = (0..vertices)
-                    .filter(|&v| cut.weights[v] != 0)
-                    .map(|v| (v, cut.weights[v]))
+                    .filter(|&v| weights[v] != 0)
+                    .map(|v| (v, weights[v]))
                     .collect();
                 s.extend(cut.arc_weights.iter().map(|(&a, &w)| (vertices + a as usize, w)));
                 s
@@ -740,10 +982,10 @@ pub fn build_inputs(registry: &CutRegistry, g: &Graph) -> (Vec<LimitedInput>, Ve
             ordered_support,
             denominator: sign * cut.denominator,
             covering,
-            dual: -cut.dual,
+            dual,
             vertex_coefficient: coefficient,
             arc_coefficient,
         });
     }
-    (limited, full)
+    (limited, kpath, full, full_kpath)
 }

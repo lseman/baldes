@@ -18,7 +18,7 @@ pub struct MinCutDigraph {
     active: Vec<i32>,
     is_active: Bits1024,
     labels: Vec<i32>,
-    excess: Vec<f64>,
+    pub excess: Vec<f64>,
     adjacency: Vec<Vec<i32>>,
     pub capacity: Vec<Vec<f64>>,
     residual: Vec<Vec<f64>>,

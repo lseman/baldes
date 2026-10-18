@@ -4,6 +4,8 @@
 //! `native/adapters/RankOneApiAdapter.h` and `src/api/NativeCutCoefficient.h`.
 pub mod bits;
 pub mod capacity;
+pub mod knapsack;
+pub mod kpath;
 pub mod local_search;
 pub mod mincut;
 pub mod pulse;
@@ -51,6 +53,13 @@ pub enum CandidateMode {
 #[derive(Clone, Debug, PartialEq)]
 pub struct RankOneCut {
     pub weights: Vec<i32>,
+    /// Graph-specific physical support; empty retains the legacy vertex mapping.
+    pub graph_support: BTreeMap<i32, Vec<(usize, i32)>>,
+    /// Native k-path pricing reads covering incidence regardless of the
+    /// packing/covering universe selected by separation and coefficients.
+    pub graph_pricing_support: BTreeMap<i32, Vec<(usize, i32)>>,
+    /// Full-memory native grouping uses original set IDs, before expansion.
+    pub native_kpath_support: Option<Vec<usize>>,
     pub memory: Vec<bool>,
     pub graph_dependent_memory: bool,
     pub graph_memories: BTreeMap<i32, Vec<bool>>,
@@ -58,6 +67,7 @@ pub struct RankOneCut {
     pub arc_memory: BTreeSet<i32>,
     pub graph_arc_memories: BTreeMap<i32, BTreeSet<i32>>,
     pub arc_weights: BTreeMap<i32, i32>,
+    pub visit_once: bool,
     pub native_type2: bool,
     pub denominator: i32,
     pub dual: f64,
@@ -69,6 +79,21 @@ pub struct RankOneCut {
     pub ordered_support: Option<Vec<(usize, i32)>>,
 }
 impl RankOneCut {
+    pub fn weight_for_graph(&self, graph: i32, vertex: usize) -> i32 {
+        if self.graph_support.is_empty() { return self.weights.get(vertex).copied().unwrap_or(0); }
+        self.graph_support.get(&graph).and_then(|support| support.binary_search_by_key(&vertex, |&(v, _)| v).ok().map(|i| support[i].1)).unwrap_or(0)
+    }
+    pub fn ordered_support_for_graph(&self, graph: i32) -> Option<&Vec<(usize, i32)>> {
+        if self.graph_support.is_empty() { self.ordered_support.as_ref() } else { self.graph_support.get(&graph) }
+    }
+
+    pub fn pricing_weight_for_graph(&self, graph: i32, vertex: usize) -> i32 {
+        if self.graph_pricing_support.is_empty() { return self.weight_for_graph(graph, vertex); }
+        self.graph_pricing_support.get(&graph).and_then(|support| support.binary_search_by_key(&vertex, |&(v, _)| v).ok().map(|i| support[i].1)).unwrap_or(0)
+    }
+    pub fn pricing_ordered_support_for_graph(&self, graph: i32) -> Option<&Vec<(usize, i32)>> {
+        if self.graph_pricing_support.is_empty() { self.ordered_support_for_graph(graph) } else { self.graph_pricing_support.get(&graph) }
+    }
     pub fn memory_for_graph(&self, graph: i32) -> Vec<bool> {
         if !self.graph_dependent_memory {
             return self.memory.clone();
@@ -163,6 +188,7 @@ pub fn memory_policy(options: &Options) -> Result<MemoryPolicy> {
 #[derive(Clone, Debug)]
 pub struct CutRegistry {
     pub cuts: Vec<RankOneCut>,
+    pub knapsack_cuts: Vec<knapsack::ResourceKnapsackCut>,
     pub retired: BTreeSet<usize>,
     /// Cut indices in pricing order (set_pricing_cut_order); the rest follow.
     pub pricing_order: Vec<usize>,
@@ -177,6 +203,7 @@ impl Default for CutRegistry {
     fn default() -> Self {
         Self {
             cuts: vec![],
+            knapsack_cuts: vec![],
             retired: BTreeSet::new(),
             pricing_order: vec![],
             parameters: SeparationParameters::default(),
@@ -366,6 +393,9 @@ impl CutRegistry {
         for native in generated {
             let mut cut = RankOneCut {
                 weights: vec![0; vertices],
+                graph_support: BTreeMap::new(),
+                graph_pricing_support: BTreeMap::new(),
+                native_kpath_support: None,
                 memory: vec![false; vertices],
                 graph_dependent_memory: true,
                 graph_memories: BTreeMap::new(),
@@ -377,6 +407,7 @@ impl CutRegistry {
                 arc_memory: BTreeSet::new(),
                 graph_arc_memories: BTreeMap::new(),
                 arc_weights: BTreeMap::new(),
+                visit_once: false,
                 native_type2: native.kind == 2,
                 denominator: native.denominator.abs(),
                 dual: 0.,
@@ -414,6 +445,122 @@ impl CutRegistry {
             self.cuts.push(cut);
         }
         Ok(added)
+    }
+    /// Registers a strong k-path cut on `nodes` with the given `rhs` and `dual`.
+    pub fn add_strong_k_path_cut(&mut self, vertices: usize, nodes: &[usize], rhs: i32, dual: f64) -> Result<usize> {
+        if nodes.is_empty() || rhs <= 0 || !dual.is_finite() {
+            return Err(invalid("strong k-path cut parameters"));
+        }
+        let mut weights = vec![0i32; vertices];
+        let mut ordered = Vec::with_capacity(nodes.len());
+        for &v in nodes {
+            if v >= vertices {
+                return Err(invalid("strong k-path cut vertex out of range"));
+            }
+            weights[v] = 1;
+            ordered.push((v, 1));
+        }
+        let id = self.cuts.len() as i32;
+        self.cuts.push(RankOneCut {
+            weights,
+            graph_support: BTreeMap::new(),
+                graph_pricing_support: BTreeMap::new(),
+                native_kpath_support: None,
+            memory: vec![true; vertices],
+            graph_dependent_memory: false,
+            graph_memories: BTreeMap::new(),
+            memory_kind: MemoryKind::Vertex,
+            arc_memory: BTreeSet::new(),
+            graph_arc_memories: BTreeMap::new(),
+            arc_weights: BTreeMap::new(),
+            visit_once: true,
+            native_type2: false,
+            denominator: 2,
+            dual,
+            class: CutClass::Covering,
+            rhs,
+            kind: -1,
+            id,
+            ordered_support: Some(ordered),
+        });
+        Ok(self.cuts.len() - 1)
+    }
+    /// Preserve createCut's graph-specific vertex memory .
+    pub fn register_strong_k_path_cut(
+        &mut self, vertices: usize, graph: i32, cut: &kpath::StrongKPathCut, dual: f64,
+    ) -> Result<usize> {
+        if cut.memory.iter().any(|&v| v >= vertices) {
+            return Err(invalid("strong k-path memory vertex out of range"));
+        }
+        let index = self.add_strong_k_path_cut(vertices, &cut.customers, cut.rhs, dual)?;
+        let registered = &mut self.cuts[index];
+        registered.id = cut.id;
+        registered.memory.fill(false);
+        for &v in &cut.memory { registered.memory[v] = true; }
+        registered.graph_dependent_memory = true;
+        registered.graph_memories.insert(graph, registered.memory.clone());
+        Ok(index)
+    }
+    /// Adapt original set support and graph-specific physical vertex memories
+    /// to solver inputs. Every graph keeps its own support, including aliases
+    /// where several physical vertices belong to one original set.
+    pub fn register_native_k_path_cut(
+        &mut self, graphs: &[kpath::KPathGraph], use_packing_sets: bool,
+        cut: &kpath::NativeKPathCut, dual: f64,
+    ) -> Result<usize> {
+        if !dual.is_finite() || cut.arc_memory {
+            return Err(invalid("native k-path pricing requires finite dual and vertex memory"));
+        }
+        let mut graph_support = BTreeMap::new();
+        let mut graph_pricing_support = BTreeMap::new();
+        let mut graph_memories = BTreeMap::new();
+        let mut max_vertices = 0;
+        for input in graphs {
+            let graph = &input.graph;
+            if graph.id < 0 || graph_support.contains_key(&graph.id) {
+                return Err(invalid("native k-path registration graph ID"));
+            }
+            let mut support = vec![];
+            let mut pricing_support = vec![];
+            let mut vertices = 0;
+            for vertex in &graph.vertices {
+                let v = usize::try_from(vertex.id).map_err(|_| invalid("negative k-path vertex"))?;
+                vertices = vertices.max(v + 1);
+                if vertex.covering_sets.iter().any(|&e| e >= 0 && cut.set_ids.contains(&(e as usize))) {
+                    pricing_support.push((v, 1));
+                }
+                let sets = if use_packing_sets { &vertex.packing_sets } else { &vertex.covering_sets };
+                if sets.first().is_some_and(|&e| e >= 0 && cut.set_ids.contains(&(e as usize))) {
+                    support.push((v, 1));
+                }
+            }
+            support.sort_unstable_by_key(|&(v, _)| v);
+            support.dedup();
+            graph_support.insert(graph.id, support);
+            pricing_support.sort_unstable_by_key(|&(v, _)| v);
+            pricing_support.dedup();
+            graph_pricing_support.insert(graph.id, pricing_support);
+            max_vertices = max_vertices.max(vertices);
+            if let Some(memory) = cut.memory.get(&graph.id) {
+                let mut selected = vec![false; vertices];
+                for &v in memory {
+                    if v >= vertices { return Err(invalid("native k-path memory vertex out of range")); }
+                    selected[v] = true;
+                }
+                graph_memories.insert(graph.id, selected);
+            }
+        }
+        self.cuts.push(RankOneCut {
+            weights: vec![0; max_vertices], graph_support, graph_pricing_support,
+            native_kpath_support: Some(cut.set_ids.clone()),
+            memory: vec![false; max_vertices], graph_dependent_memory: true, graph_memories,
+            memory_kind: MemoryKind::Vertex, arc_memory: BTreeSet::new(),
+            graph_arc_memories: BTreeMap::new(), arc_weights: BTreeMap::new(),
+            visit_once: true, native_type2: false, denominator: 2,
+            dual, class: CutClass::Covering, rhs: cut.rhs, kind: -1, id: cut.id,
+            ordered_support: None,
+        });
+        Ok(self.cuts.len() - 1)
     }
     /// or_rcsp_separate_cuts_default: the option-driven separator, packing
     /// then (with covering sets) covering, starting at the separation phase.
@@ -585,6 +732,43 @@ pub fn coefficient(input: &RankOneCut, graph: i32, route: &[(usize, usize, i32)]
     } else {
         None
     };
+    if input.visit_once {
+        if !enumerated && input.graph_dependent_memory && !input.graph_memories.contains_key(&graph) {
+            return Ok(0);
+        }
+        if !input.arc_weights.is_empty() {
+            return Err(invalid("native strong k-path requires vertex support"));
+        }
+        let mut inside = false;
+        let mut count = 0i32;
+        let mut previous: Option<usize> = None;
+        for &(tail, head, id) in route {
+            if previous.is_some_and(|p| p != tail) {
+                return Err(invalid("cut physical route is not contiguous"));
+            }
+            previous = Some(head);
+            let in_support = input.weight_for_graph(graph, head) != 0;
+            if in_support {
+                if !inside {
+                    if enumerated {
+                        return Ok(1);
+                    }
+                    inside = true;
+                    count += 1;
+                }
+            } else if inside && !enumerated {
+                let kept = match (&vertex_memory, &arc_set) {
+                    (Some(m), _) => m.get(head).copied().unwrap_or(false),
+                    (None, Some(a)) => a.contains(&id),
+                    _ => false,
+                };
+                if !kept {
+                    inside = false;
+                }
+            }
+        }
+        return Ok(count);
+    }
     let packing_like = kind & !2 == 0;
     let (mut state, mut count) = (0i32, 0i32);
     let mut previous: Option<usize> = None;
@@ -615,7 +799,7 @@ pub fn coefficient(input: &RankOneCut, graph: i32, route: &[(usize, usize, i32)]
                 state -= denominator;
             }
         };
-        let w = input.weights.get(head).copied().unwrap_or(0);
+        let w = input.weight_for_graph(graph, head);
         if w != 0 {
             step(sign * w);
         }

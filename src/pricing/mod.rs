@@ -3,7 +3,7 @@ pub mod controller;
 pub mod fixing;
 pub mod phases;
 use crate::core::options::Options;
-use crate::cuts::state::{self, FullInput, LimitedInput};
+use crate::cuts::state::{self, FullInput, FullKPathInput, LimitedInput, LimitedKPathInput};
 use crate::cuts::CutRegistry;
 use crate::enumeration::{self, Enumeration};
 use crate::labeling::engine::{EngineControls, LabelingEngine};
@@ -32,7 +32,13 @@ pub struct Solver {
     /// Registered rank-one cuts and their separator.
     pub cuts: CutRegistry,
     /// Cut inputs the engine was last prepared with.
-    applied_cuts: (Vec<LimitedInput>, Vec<FullInput>),
+    knapsack_pricing: crate::cuts::knapsack::KnapsackPricing,
+    applied_cuts: (
+        Vec<LimitedInput>,
+        Vec<LimitedKPathInput>,
+        Vec<FullInput>,
+        Vec<FullKPathInput>,
+    ),
 }
 impl Solver {
     pub fn new(vertices: usize, resources: usize) -> Result<Self> {
@@ -56,11 +62,15 @@ impl Solver {
             variable_costs: vec![],
             enumeration_snapshot: None,
             cuts: CutRegistry::default(),
-            applied_cuts: (vec![], vec![]),
+            knapsack_pricing: Default::default(),
+            applied_cuts: (vec![], vec![], vec![], vec![]),
         })
     }
     pub fn has_cuts(&self) -> bool {
-        !self.applied_cuts.0.is_empty() || !self.applied_cuts.1.is_empty()
+        self.knapsack_pricing.active || !self.applied_cuts.0.is_empty()
+            || !self.applied_cuts.1.is_empty()
+            || !self.applied_cuts.2.is_empty()
+            || !self.applied_cuts.3.is_empty()
     }
     /// Refreshes the cut inputs. A dual-only change updates the
     /// prepared tables; another change re-prepares them in place. A change
@@ -69,26 +79,46 @@ impl Solver {
     /// depths, fixed arcs and NG memories, but not the round statistics. A
     /// successful enumeration survives; otherwise it is dropped.
     pub fn refresh_cuts(&mut self) -> Result<()> {
+        let mut knapsack = self.knapsack_pricing.clone();
+        let resource_indices = (0..self.graph.resources.len()).map(|r| (r, r)).collect();
+        knapsack.retrieve(&self.cuts.knapsack_cuts, self.graph.graph_id.max(0), &resource_indices)?;
+        if knapsack != self.knapsack_pricing {
+            if let Some(engine) = &mut self.engine {
+                engine.cuts.knapsack = knapsack.clone();
+                engine.half_ready = false;
+                engine.full_ready = false;
+            }
+            self.knapsack_pricing = knapsack;
+        }
         let next = state::build_inputs(&self.cuts, &self.graph);
         if next == self.applied_cuts {
             return Ok(());
         }
-        let without_duals = |(l, f): &(Vec<LimitedInput>, Vec<FullInput>)| {
+        let without_duals = |(l, lk, f, fk): &(
+            Vec<LimitedInput>,
+            Vec<LimitedKPathInput>,
+            Vec<FullInput>,
+            Vec<FullKPathInput>,
+        )| {
             let mut l = l.clone();
+            let mut lk = lk.clone();
             let mut f = f.clone();
+            let mut fk = fk.clone();
             l.iter_mut().for_each(|c| c.dual = 0.);
+            lk.iter_mut().for_each(|c| c.dual = 0.);
             f.iter_mut().for_each(|c| c.dual = 0.);
-            (l, f)
+            fk.iter_mut().for_each(|c| c.dual = 0.);
+            (l, lk, f, fk)
         };
         let only_duals = without_duals(&next) == without_duals(&self.applied_cuts);
         let enumerated = self.enumeration.is_some();
-        let was_extended = !self.applied_cuts.0.is_empty();
-        let needs_extended = !next.0.is_empty();
+        let was_extended = !self.applied_cuts.0.is_empty() || !self.applied_cuts.1.is_empty();
+        let needs_extended = !next.0.is_empty() || !next.1.is_empty();
         if let Some(engine) = &mut self.engine {
             if !enumerated && only_duals && was_extended && needs_extended {
-                engine.update_cut_duals(next.0.clone());
+                engine.update_cut_duals(next.0.clone(), next.1.clone());
             } else {
-                if !engine.load_cuts(&self.graph, next.0.clone()) {
+                if !engine.load_cuts(&self.graph, next.0.clone(), next.1.clone()) {
                     self.engine = None;
                     self.prepared = None;
                     return Err(invalid("rank-one cut memory exceeds the native label words"));
@@ -107,7 +137,12 @@ impl Solver {
     }
     fn new_engine(&self, controls: EngineControls, phase: phases::Phase) -> Result<LabelingEngine> {
         let mut engine = LabelingEngine::prepare(&self.graph, controls, phase)?;
-        if !engine.load_cuts(&self.graph, self.applied_cuts.0.clone()) {
+        engine.cuts.knapsack = self.knapsack_pricing.clone();
+        if !engine.load_cuts(
+            &self.graph,
+            self.applied_cuts.0.clone(),
+            self.applied_cuts.1.clone(),
+        ) {
             return Err(invalid("rank-one cut memory exceeds the native label words"));
         }
         Ok(engine)
@@ -186,6 +221,11 @@ impl Solver {
         self.options = saved_options;
         outcome
     }
+    fn enumerated_kpath_inputs(&self) -> Vec<LimitedKPathInput> {
+        self.applied_cuts.3.iter().map(|cut| LimitedKPathInput {
+            dual: cut.dual, arc_memory: false, support: cut.vertex_support.clone(), memory_vertices: vec![],
+        }).collect()
+    }
     pub fn price_phase(
         &mut self,
         index: usize,
@@ -209,6 +249,7 @@ impl Solver {
         {
             self.restore_arcs();
         }
+        let enumerated_kpath = self.enumerated_kpath_inputs();
         if let Some(universe) = &mut self.enumeration {
             if !phase.exact() {
                 return Ok(PricingResult {
@@ -218,9 +259,13 @@ impl Solver {
                     statistics: Default::default(),
                 });
             }
-            universe
-                .paths
-                .inspect(&self.graph, f64::INFINITY, &self.applied_cuts.0)?;
+            universe.paths.inspect_with_knapsack(
+                &self.graph,
+                f64::INFINITY,
+                &self.applied_cuts.0,
+                &enumerated_kpath,
+                &self.knapsack_pricing,
+            )?;
             let mut routes = universe.paths.routes(&self.graph)?;
             routes.sort_by(|a, b| a.cost.total_cmp(&b.cost));
             routes.truncate(maximum.min(self.controls.max_columns));
@@ -315,8 +360,17 @@ impl Solver {
         if has_cuts {
             let engine = self.engine.as_mut().unwrap();
             let mut full = state::FullPreparation::default();
-            let backward = engine.grid.bidirectional;
-            if !state::prepare_full_memory(&mut engine.cuts.info, &mut full, &self.graph, &self.applied_cuts.1, backward) {
+            // Completion can materialize backward buckets even when pricing
+            // started in forward-only mode. Enumeration uses those buckets.
+            let backward = !engine.consumption_joins && !engine.grid.backward.buckets.is_empty();
+            if !state::prepare_full_memory(
+                &mut engine.cuts.info,
+                &mut full,
+                &self.graph,
+                &self.applied_cuts.2,
+                &self.applied_cuts.3,
+                backward,
+            ) {
                 return Err(incomplete("enumeration cut memory exceeds the native label words"));
             }
             engine.cuts.full = Some(full);
@@ -326,6 +380,7 @@ impl Solver {
         let tables = engine.cuts.full.as_ref().filter(|_| has_cuts).map(|full| enumeration::CutTables {
             info: &engine.cuts.info,
             full,
+            knapsack: &engine.cuts.knapsack,
         });
         let universe = Enumeration::run_with_symmetry(
             &self.graph,
@@ -347,8 +402,12 @@ impl Solver {
         Ok(routes)
     }
     pub fn inspect_enumeration(&mut self, cutoff: f64) -> Result<Option<Vec<crate::Route>>> {
+        self.refresh_cuts()?;
+        let enumerated_kpath = self.enumerated_kpath_inputs();
         if let Some(universe) = &mut self.enumeration {
-            universe.paths.inspect(&self.graph, cutoff, &self.applied_cuts.0)?;
+            universe
+                .paths
+                .inspect_with_knapsack(&self.graph, cutoff, &self.applied_cuts.0, &enumerated_kpath, &self.knapsack_pricing)?;
             return Ok(Some(universe.paths.routes(&self.graph)?));
         }
         Ok(None)

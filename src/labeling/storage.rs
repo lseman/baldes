@@ -28,12 +28,13 @@ pub struct StoredLabel {
     /// Packed limited-memory cut state and its accumulated cost.
     pub cut_words: [u32; LIMITED_WORDS],
     pub additional_cost: f64,
+    pub half_potential: f64,
 }
 impl StoredLabel {
     /// Bucket ordering key, (0.5 potential + additional) + (0 + reduced);
     /// the rank-one potential is zero. Equals the standard key without cuts.
     pub fn key(&self) -> f64 {
-        (0.0 + self.additional_cost) + (0.0 + self.cost)
+        (self.half_potential + self.additional_cost) + (0.0 + self.cost)
     }
 }
 /// The fields dominance reads before the cut words, packed so bucket scans
@@ -188,6 +189,13 @@ pub struct LabelBucket {
     pub archived: Vec<usize>,
     pub next_id: u64,
     pub lower_cost: f64,
+    /// Completion bound including native resource-knapsack dual costs.
+    pub knapsack_lower_cost: f64,
+}
+impl LabelBucket {
+    pub fn completion_bound(&self, knapsack: bool) -> f64 {
+        if knapsack { self.knapsack_lower_cost } else { self.lower_cost }
+    }
 }
 #[derive(Clone, Debug)]
 pub struct LabelStorage {
@@ -206,6 +214,7 @@ impl LabelStorage {
                 (0..n)
                     .map(|_| LabelBucket {
                         lower_cost: 1e12,
+                        knapsack_lower_cost: 1e12,
                         ..Default::default()
                     })
                     .collect()
@@ -236,6 +245,7 @@ impl LabelStorage {
             bucket.archived.clear();
             bucket.next_id = 0;
             bucket.lower_cost = 1e12;
+            bucket.knapsack_lower_cost = 1e12;
         }
         self.crossing.iter_mut().for_each(Vec::clear);
         self.root = None;

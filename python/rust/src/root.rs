@@ -163,6 +163,21 @@ fn _solve_root(
     // All inputs and the result own their storage. Python can run other threads
     // while the Rust solver and its private Clp master execute.
     let started = std::time::Instant::now();
+    // Node snapshots retain an Rc<ClpMaster> and must stay on the solver
+    // thread. Python consumes only the owned result data, which is Send.
+    struct PythonRootOutput {
+        master: baldes::master::column_generation::Output,
+        routes: Vec<baldes::Route>,
+        values: Vec<f64>,
+        duals: Vec<f64>,
+        incumbent: f64,
+        pricing_seconds: f64,
+        solver_seconds: f64,
+        cuts: usize,
+        lp_before_cuts: f64,
+        fixing_calls: usize,
+        enumerated_routes: usize,
+    }
     let output = py
         .allow_threads(move || -> baldes::Result<_> {
             let mut graph = if cvrp {
@@ -191,7 +206,14 @@ fn _solve_root(
                 }
             }
             options.cg.multiplicity = n as f64;
-            root::solve(RootProblem::set_partitioning(graph, n as f64)?, options)
+            let output = root::solve(RootProblem::set_partitioning(graph, n as f64)?, options)?;
+            Ok(PythonRootOutput {
+                master: output.master, routes: output.routes, values: output.values,
+                duals: output.duals, incumbent: output.incumbent,
+                pricing_seconds: output.pricing_seconds, solver_seconds: output.solver_seconds,
+                cuts: output.cuts, lp_before_cuts: output.lp_before_cuts,
+                fixing_calls: output.fixing_calls, enumerated_routes: output.enumerated_routes,
+            })
         })
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
     let data = PyDict::new(py);

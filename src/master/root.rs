@@ -8,6 +8,8 @@ use super::{
 };
 use crate::cuts::FractionalColumn;
 use crate::cuts::capacity::{CapacityCut, CapacityParameters, CapacitySeparator, TimeWindows};
+use crate::cuts::kpath::{KPathGraph, KPathParameters, KPathSeparator, NativeKPathSeparator};
+use crate::cuts::knapsack::{KnapsackColumn, KnapsackParameters, KnapsackRow, ResourceKnapsackSeparator};
 use crate::pricing::Solver;
 use crate::{invalid, Graph, Result, Route};
 use std::cell::RefCell;
@@ -190,6 +192,58 @@ impl CapacityCutConfig {
     }
 }
 #[derive(Clone, Debug)]
+pub struct KPathCutConfig {
+    /// Depot at index 0, customers at indices 1..n; sink is n+1.
+    pub demands: Vec<f64>,
+    pub capacity: f64,
+    pub parameters: KPathParameters,
+    pub time_windows: Option<TimeWindows>,
+}
+impl KPathCutConfig {
+    pub fn new(demands: Vec<f64>, capacity: f64) -> Self {
+        Self {
+            demands,
+            capacity,
+            parameters: KPathParameters::default(),
+            time_windows: None,
+        }
+    }
+    pub fn with_time_windows(mut self, windows: TimeWindows) -> Self {
+        self.time_windows = Some(windows);
+        self
+    }
+}
+/// General native strong k-path separation on original graph/set IDs.
+#[derive(Clone, Debug)]
+pub struct NativeKPathCutConfig {
+    pub graphs: Vec<KPathGraph>,
+    /// Original zero-based packing/covering set order; no depot entry.
+    pub demands: Vec<f64>,
+    pub capacity: f64,
+    pub use_packing_sets: bool,
+    pub two_path_resource: i32,
+    pub parameters: KPathParameters,
+}
+impl NativeKPathCutConfig {
+    pub fn new(graphs: Vec<KPathGraph>, demands: Vec<f64>, capacity: f64, use_packing_sets: bool) -> Self {
+        Self { graphs, demands, capacity, use_packing_sets, two_path_resource: -1, parameters: Default::default() }
+    }
+}
+#[derive(Clone, Debug)]
+enum RootKPathSeparator {
+    Standalone(KPathSeparator),
+    Native { separator: NativeKPathSeparator, graphs: Vec<KPathGraph> },
+}
+/// Original integer resource rows used by RouteLoadKnapsackCutSeparation.
+#[derive(Clone, Debug, Default)]
+pub struct KnapsackCutConfig {
+    pub rows: Vec<KnapsackRow>,
+    pub parameters: KnapsackParameters,
+}
+impl KnapsackCutConfig {
+    pub fn new(rows: Vec<KnapsackRow>) -> Self { Self { rows, parameters: Default::default() } }
+}
+#[derive(Clone, Debug)]
 pub struct RootOptions {
     /// Retain an independently forkable model and active cuts for descendants.
     pub capture_state: bool,
@@ -207,6 +261,9 @@ pub struct RootOptions {
     pub round_reduced_costs: bool,
     pub cuts: CutOptions,
     pub capacity_cuts: Option<CapacityCutConfig>,
+    pub kpath_cuts: Option<KPathCutConfig>,
+    pub native_kpath_cuts: Option<NativeKPathCutConfig>,
+    pub knapsack_cuts: Option<KnapsackCutConfig>,
     /// ColGenSpRelaxationImprovementPriority: separator priority of dynamic
     /// NG strengthening (0 disables it, default). Its mode and caps
     /// are the pricing options RCSPdynamicNGmode, RCSPmaxNGneighbourhoodSize,
@@ -233,6 +290,9 @@ impl Default for RootOptions {
             round_reduced_costs: true,
             cuts: CutOptions::default(),
             capacity_cuts: None,
+            kpath_cuts: None,
+            native_kpath_cuts: None,
+            knapsack_cuts: None,
             relaxation_improvement_priority: 0.,
         }
     }
@@ -240,6 +300,33 @@ impl Default for RootOptions {
 impl RootOptions {
     pub fn with_capacity_cuts(mut self, config: CapacityCutConfig) -> Self {
         self.capacity_cuts = Some(config);
+        self.cg.remove_basic_cuts = true;
+        self.cg.cut_artificial_cost = if self.cg.artificial_cost > 0. { self.cg.artificial_cost / 1.2 } else { 0. };
+        self.cg.tailing_off_counter = 1_000_000;
+        self
+    }
+    pub fn with_kpath_cuts(mut self, config: KPathCutConfig) -> Self {
+        self.kpath_cuts = Some(config);
+        self.native_kpath_cuts = None;
+        self.cg.remove_basic_cuts = true;
+        self.cg.cut_artificial_cost = if self.cg.artificial_cost > 0. {
+            self.cg.artificial_cost / 1.2
+        } else {
+            0.
+        };
+        self.cg.tailing_off_counter = 1_000_000;
+        self
+    }
+    pub fn with_native_kpath_cuts(mut self, config: NativeKPathCutConfig) -> Self {
+        self.native_kpath_cuts = Some(config);
+        self.kpath_cuts = None;
+        self.cg.remove_basic_cuts = true;
+        self.cg.cut_artificial_cost = if self.cg.artificial_cost > 0. { self.cg.artificial_cost / 1.2 } else { 0. };
+        self.cg.tailing_off_counter = 1_000_000;
+        self
+    }
+    pub fn with_knapsack_cuts(mut self, config: KnapsackCutConfig) -> Self {
+        self.knapsack_cuts = Some(config);
         self.cg.remove_basic_cuts = true;
         self.cg.cut_artificial_cost = if self.cg.artificial_cost > 0. { self.cg.artificial_cost / 1.2 } else { 0. };
         self.cg.tailing_off_counter = 1_000_000;
@@ -299,6 +386,7 @@ impl NodeSnapshot {
     pub fn active_cuts(&self) -> usize {
         self.cut.rows.iter().filter(|r|r.is_some()).count()
             + self.cut.capacity_rows.iter().filter(|r|r.is_some()).count()
+            + self.cut.knapsack_rows.iter().filter(|r|r.is_some()).count()
     }
     fn fork(&self, branches: &[(usize,RowSense,f64)], penalty: f64)
         -> Result<(RootProblem,ClpMaster,column_generation::WarmStart)> {
@@ -351,6 +439,10 @@ struct CutState {
     capacity_cuts: Vec<CapacityCut>,
     capacity_rows: Vec<Option<usize>>,
     capacity_arc_entries: Vec<Vec<(usize, f64)>>,
+    kpath_separator: Option<RootKPathSeparator>,
+    kpath_indices: Vec<usize>,
+    knapsack_separator: Option<ResourceKnapsackSeparator>,
+    knapsack_rows: Vec<Option<usize>>,
     /// Current separator priority level: separators at or above it run
     /// every round, lower ones only while nothing at a higher one succeeds.
     level: f64,
@@ -377,6 +469,8 @@ const RANK_ONE_PRIORITY: f64 = 1.;
 #[derive(Clone, Copy, PartialEq)]
 enum Separator {
     Capacity,
+    KPath,
+    Knapsack,
     RankOne,
     Relaxation,
 }
@@ -387,6 +481,12 @@ impl CutState {
         let mut list = vec![];
         if self.capacity_separator.is_some() {
             list.push((self.capacity_priority, Separator::Capacity));
+        }
+        if self.kpath_separator.is_some() {
+            list.push((RANK_ONE_PRIORITY, Separator::KPath));
+        }
+        if self.knapsack_separator.is_some() {
+            list.push((RANK_ONE_PRIORITY, Separator::Knapsack));
         }
         if self.options.enabled {
             list.push((RANK_ONE_PRIORITY, Separator::RankOne));
@@ -399,7 +499,7 @@ impl CutState {
     }
     /// Whether rank-one cuts are at or above the current level.
     fn rank_one_active(&self) -> bool {
-        self.options.enabled && self.level <= RANK_ONE_PRIORITY
+        (self.options.enabled || self.kpath_separator.is_some()) && self.level <= RANK_ONE_PRIORITY
     }
     /// The next lower priority level, if any.
     fn next_level(&self) -> Option<f64> {
@@ -438,6 +538,12 @@ impl State {
         for (cut, row) in self.cut.capacity_cuts.iter().zip(&self.cut.capacity_rows) {
             if let Some(row) = row {
                 let coefficient = cut.coefficient(&customers);
+                if coefficient != 0 { entries.push((*row, coefficient as f64)); }
+            }
+        }
+        for (cut, row) in self.solver.cuts.knapsack_cuts.iter().zip(&self.cut.knapsack_rows) {
+            if let Some(row) = row {
+                let coefficient = cut.coefficient(self.solver.graph.graph_id.max(0), &route.resources);
                 if coefficient != 0 { entries.push((*row, coefficient as f64)); }
             }
         }
@@ -483,6 +589,9 @@ impl State {
     fn reprice(&mut self, problem: &RootProblem, duals: &[f64]) -> Result<f64> {
         let rounded = self.rounded;
         let offset = problem.reprice(&mut self.solver, duals, rounded, &self.cut.capacity_arc_entries)?;
+        for (cut, row) in self.solver.cuts.knapsack_cuts.iter_mut().zip(&self.cut.knapsack_rows) {
+            cut.dual = row.map_or(0., |r| duals[r]);
+        }
         if !self.cut.rows.is_empty() {
             let scaled = |row: usize| (-duals[row] * 1e8 + 0.5).floor();
             let mut order: Vec<usize> = (0..self.cut.rows.len())
@@ -609,6 +718,12 @@ impl<M: LpMaster> Controller<M> for RootController {
             *row = rows[*row].ok_or_else(|| invalid("attempt to remove a base or branch row"))?;
         }
         let mut state = self.state.borrow_mut();
+        for index in 0..state.cut.knapsack_rows.len() {
+            if let Some(row) = state.cut.knapsack_rows[index] {
+                state.cut.knapsack_rows[index] = rows[row];
+                if rows[row].is_none() { state.solver.cuts.knapsack_cuts[index].dual = 0.; }
+            }
+        }
         for row in &mut state.cut.capacity_rows {
             *row = row.and_then(|r| rows[r]);
         }
@@ -655,7 +770,10 @@ impl<M: LpMaster> Controller<M> for RootController {
             // the solver stores the threshold as a float.
             let threshold = state.cut.options.tailing_off_threshold as f32 as f64;
             if gain < threshold - (threshold.abs().max(gain.abs()) * 1e-10 + 1e-6) {
-                if rank_active && !state.solver.cuts.separation_phase(&state.solver.options)?.1 {
+                if state.cut.options.enabled
+                    && state.cut.level <= RANK_ONE_PRIORITY
+                    && !state.solver.cuts.separation_phase(&state.solver.options)?.1
+                {
                     let options = state.solver.options.clone();
                     state.solver.cuts.increase_phase(&options)?;
                 } else {
@@ -720,6 +838,8 @@ impl<M: LpMaster> Controller<M> for RootController {
             }
             let (count, changed) = match separator {
                 Separator::Capacity => (self.separate_capacity(state, &mut rows, &tagged, &fractional)?, false),
+                Separator::KPath => self.separate_kpath(state, master, &mut rows, &tagged, &fractional)?,
+                Separator::Knapsack => (self.separate_knapsack(state, &mut rows, &tagged, &values)?, false),
                 Separator::RankOne => self.separate_rank_one(state, master, &mut rows, &tagged, &fractional)?,
                 Separator::Relaxation => (0, self.improve_relaxation(state, rank_one_in_master, &tagged, &values)?),
             };
@@ -770,6 +890,107 @@ impl RootController {
             added += 1;
         }
         Ok(added)
+    }
+    fn separate_knapsack(
+        &self, state: &mut State, rows: &mut PendingRows,
+        tagged: &[(usize, usize)], values: &[f64],
+    ) -> Result<usize> {
+        let graph = state.solver.graph.graph_id.max(0);
+        let columns: Vec<_> = tagged.iter().filter(|&&(column, _)| values[column] > 1e-9)
+            .map(|&(column, tag)| KnapsackColumn { graph_id: graph,
+                resources: state.routes[tag].resources.clone(), value: values[column] }).collect();
+        let Some(separator) = &mut state.cut.knapsack_separator else { return Ok(0) };
+        let cuts = separator.separate(&columns)?;
+        let count = cuts.len();
+        for cut in cuts {
+            let entries = tagged.iter().filter_map(|&(column, tag)| {
+                let coefficient = cut.coefficient(graph, &state.routes[tag].resources);
+                (coefficient != 0).then_some((column, coefficient as f64))
+            }).collect();
+            let row = rows.push(RowSense::LessEqual, cut.cut.rhs as f64, entries);
+            state.cut.knapsack_rows.push(Some(row));
+            state.solver.cuts.knapsack_cuts.push(cut);
+        }
+        Ok(count)
+    }
+    fn separate_kpath<M: LpMaster>(
+        &self,
+        state: &mut State,
+        master: &mut M,
+        rows: &mut PendingRows,
+        tagged: &[(usize, usize)],
+        fractional: &[FractionalColumn],
+    ) -> Result<(usize, bool)> {
+        let graph_id = state.solver.graph.graph_id.max(0);
+        let mut solutions = vec![];
+        let mut values = vec![];
+        if matches!(state.cut.kpath_separator, Some(RootKPathSeparator::Native { .. })) {
+            for &(column, tag) in tagged {
+                if master.values()[column] <= 1e-9 { continue; }
+                let route = &state.routes[tag];
+                solutions.push(crate::cuts::separation::Solution {
+                    graph_id, enumerated: state.is_enumerated(route), arc_ids: route.arcs.clone(),
+                });
+                values.push(master.values()[column]);
+            }
+        }
+        let Some(separator) = state.cut.kpath_separator.as_mut() else { return Ok((0, false)); };
+        let before = state.solver.cuts.cuts.len();
+        match separator {
+            RootKPathSeparator::Standalone(separator) => {
+                let vertices = state.solver.graph.vertices.len();
+                for cut in separator.separate_fractional(fractional)? {
+                    let index = state.solver.cuts.register_strong_k_path_cut(vertices, graph_id, &cut, 0.)?;
+                    state.cut.kpath_indices.push(index);
+                }
+            }
+            RootKPathSeparator::Native { separator, graphs } => {
+                for cut in separator.separate(&solutions, &values)? {
+                    let index = state.solver.cuts.register_native_k_path_cut(graphs, separator.preparation.use_packing_sets, &cut, 0.)?;
+                    state.cut.kpath_indices.push(index);
+                }
+            }
+        }
+        let after = state.solver.cuts.cuts.len();
+        let graph = state.solver.graph.clone();
+        let mut paths = vec![];
+        for &(_, tag) in tagged {
+            let route = &state.routes[tag];
+            paths.push((
+                state.solver.cuts.route(&graph, &State::customers(route))?,
+                state.is_enumerated(route),
+            ));
+        }
+        for index in before..after {
+            let mut entries = vec![];
+            for (&(column, _), (path, enumerated)) in tagged.iter().zip(&paths) {
+                let c = state.solver.cuts.route_coefficient(&graph, index, path, *enumerated)?;
+                if c != 0 {
+                    entries.push((column, c as f64));
+                }
+            }
+            let cut = &state.solver.cuts.cuts[index];
+            let row = rows.push(RowSense::GreaterEqual, cut.rhs as f64, entries);
+            state.cut.rows.push(Some(row));
+            state.cut.memories.push(cut.memory_for_graph(graph_id));
+        }
+        let mut changed = false;
+        for index in 0..before {
+            let Some(row) = state.cut.rows[index] else {
+                continue;
+            };
+            let memory = state.solver.cuts.cuts[index].memory_for_graph(graph_id);
+            if memory == state.cut.memories[index] {
+                continue;
+            }
+            changed = true;
+            state.cut.memories[index] = memory;
+            for (&(column, _), (path, enumerated)) in tagged.iter().zip(&paths) {
+                let c = state.solver.cuts.route_coefficient(&graph, index, path, *enumerated)?;
+                master.set_coefficient(row, column, c as f64)?;
+            }
+        }
+        Ok((after - before, changed))
     }
     /// New rank-one cuts, and whether existing cut memories changed.
     fn separate_rank_one<M: LpMaster>(
@@ -932,6 +1153,58 @@ fn solve_seeded(problem: RootProblem, mut options: RootOptions,
         if let Some(windows) = config.time_windows { separator.set_time_windows(windows)?; }
         Some(separator)
     } else { None };
+    if saved.is_none() && options.kpath_cuts.is_some() && options.native_kpath_cuts.is_some() {
+        return Err(invalid("select standalone or native k-path configuration"));
+    }
+    let kpath_separator = if saved.is_some() { None } else if let Some(config) = options.native_kpath_cuts.take() {
+        let graph_id = problem.graph.graph_id.max(0);
+        let input = config.graphs.iter().find(|g| g.graph.id == graph_id)
+            .ok_or_else(|| invalid("native k-path configuration has no pricing graph"))?;
+        if input.graph.source != problem.graph.source as i32 || input.graph.sink != problem.graph.sink as i32
+            || input.graph.vertices.iter().any(|v| v.id < 0 || v.id as usize >= problem.graph.vertices.len()) {
+            return Err(invalid("native k-path pricing vertices/terminals differ"));
+        }
+        for arc in &problem.graph.arcs {
+            if !input.graph.arcs.iter().any(|a| a.id == arc.id && a.tail == arc.tail as i32 && a.head == arc.head as i32) {
+                return Err(invalid("native k-path pricing arc incidence differs"));
+            }
+        }
+        let mut separator = NativeKPathSeparator::new(config.use_packing_sets);
+        separator.parameters = config.parameters;
+        separator.prepare(&config.graphs, &config.demands, config.capacity, config.two_path_resource)?;
+        Some(RootKPathSeparator::Native { separator, graphs: config.graphs })
+    } else if let Some(config) = options.kpath_cuts.take() {
+        if problem.graph.source != 0 || problem.graph.sink != config.demands.len()
+            || problem.graph.vertices.len() != config.demands.len() + 1 {
+            return Err(invalid("k-path cuts require depot 0, customers 1..n, sink n+1"));
+        }
+        let mut separator = KPathSeparator::new(config.demands, config.capacity)?;
+        separator.parameters = config.parameters;
+        if let Some(windows) = config.time_windows { separator.set_time_windows(windows)?; }
+        Some(RootKPathSeparator::Standalone(separator))
+    } else { None };
+    let knapsack_separator = if saved.is_some() { None } else if let Some(mut config) = options.knapsack_cuts.take() {
+        let graph = problem.graph.graph_id.max(0);
+        for row in &config.rows {
+            let Some(&(resource, scale)) = row.graph_resources.get(&graph) else {
+                return Err(invalid("knapsack original row has no resource for pricing graph"));
+            };
+            if resource >= problem.graph.resources.len() || !scale.is_finite() || scale <= 0. {
+                return Err(invalid("knapsack original row resource/scaling"));
+            }
+            // the solver applies scale to separation/master coefficients, while
+            // active-dual retrieval retains the integer cut breakpoints.
+        }
+        for (name, value) in &options.pricing_options {
+            match name.as_str() {
+                "RCSPresConsKnapsackCutsMode" => { config.parameters.use_rounding = *value > 0.; config.parameters.max_one_k = value.abs() as i32; }
+                "RCSPresConsKnapsackCutsMaxNumPerRound" => config.parameters.max_cuts_per_round = *value as usize,
+                _ => {}
+            }
+        }
+        crate::cuts::knapsack::KnapsackSeparator::with_parameters(config.parameters.clone())?;
+        Some(ResourceKnapsackSeparator { rows: config.rows, parameters: config.parameters, ..Default::default() })
+    } else { None };
     let arc_count = problem.graph.arcs.len();
     let state = Rc::new(RefCell::new(State {
         solver,
@@ -956,6 +1229,10 @@ fn solve_seeded(problem: RootProblem, mut options: RootOptions,
             capacity_cuts: vec![],
             capacity_rows: vec![],
             capacity_arc_entries: vec![vec![]; arc_count],
+            kpath_separator,
+            kpath_indices: vec![],
+            knapsack_separator,
+            knapsack_rows: vec![],
             level: f64::INFINITY,
             relaxation_priority: options.relaxation_improvement_priority as f64,
             removed_columns: vec![],
@@ -1083,7 +1360,7 @@ fn solve_seeded(problem: RootProblem, mut options: RootOptions,
         incumbent: state.incumbent,
         pricing_seconds: state.pricing_seconds,
         solver_seconds: solve_started.elapsed().as_secs_f64(),
-        cuts: state.solver.cuts.cuts.len() + state.cut.capacity_cuts.len(),
+        cuts: state.solver.cuts.cuts.len() + state.cut.capacity_cuts.len() + state.solver.cuts.knapsack_cuts.len(),
         lp_before_cuts: state.cut.lp_before_cuts,
         fixing_calls: state.fixing_calls,
         enumerated_routes: state.enumerated_routes,

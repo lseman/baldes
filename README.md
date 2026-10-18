@@ -238,10 +238,15 @@ in a pricing-only build. The wheel uses Python's stable ABI for Python 3.9+.
 For local development, `maturin develop --release` installs the mixed package;
 run `python -m pytest python/tests` to test a build with Clp.
 
+Strong k-path and route-load knapsack cuts are available in the Rust root API
+through `with_kpath_cuts` and `with_knapsack_cuts`. The latter takes original
+integer resource rows; it carries load-dependent costs through pricing,
+completion bounds, enumeration, and inherited master rows. See
+[cut integration and binary parity checks](docs/cut-port-parity/README.md).
+
 ## Not in 2.0 yet
 
-Strong k-path root integration, EVRP front ends, tree basis/cut inheritance, and remaining
-1.x Python APIs.
+EVRP front ends, complete the solver tree-trajectory parity, and remaining 1.x Python APIs.
 
 ## TODO
 

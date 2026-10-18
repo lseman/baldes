@@ -1,6 +1,6 @@
 //! Ownership-safe bridge to COIN-OR Clp's C interface. No original solver code
 //! is called: labeling, pricing, stabilization and CG belong to this Rust port.
-use super::{LpMaster, RowSense};
+use crate::master::{LpMaster, RowSense};
 use crate::{incomplete, invalid, Result};
 use std::ffi::c_void;
 use std::ptr::NonNull;
@@ -321,7 +321,7 @@ impl ClpMaster {
     /// and retention ratio 0.66. The normalization divides by the SIGNED RHS
     /// when |rhs| > 1: a slack packing cut with rhs < -1 is retained.
     pub fn cleanup_cut_rows(&self, initial_rows: usize) -> Result<Vec<usize>> {
-        super::lp_master::cleanup_cut_rows(self, initial_rows)
+        crate::master::lp_master::cleanup_cut_rows(self, initial_rows)
     }
     /// Sparse column of the current matrix, sorted by row.
     pub fn column_entries(&self, column: usize) -> Result<Vec<(usize, f64)>> {

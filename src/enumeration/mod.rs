@@ -1,6 +1,8 @@
 //! Full-memory elementary enumeration without cut state. Equivalence classes
 //! compare global element sets and original cost, independently of current duals.
-use crate::cuts::state::{self, CutResourceInfo, FullPreparation, LimitedInput, FULL_WORDS};
+use crate::cuts::state::{
+    self, CutResourceInfo, FullPreparation, LimitedInput, LimitedKPathInput, FULL_WORDS,
+};
 use crate::graph::buckets::BucketGraph;
 use crate::graph::{Graph, ResourceKind};
 use crate::labeling::{extend_resources, Route, EPSILON};
@@ -27,6 +29,7 @@ pub struct Label {
 pub struct CutTables<'a> {
     pub info: &'a CutResourceInfo,
     pub full: &'a FullPreparation,
+    pub knapsack: &'a crate::cuts::knapsack::KnapsackPricing,
 }
 impl<'a> CutTables<'a> {
     fn along_arc(&self, label: &mut Label, forward: bool, arc: usize) {
@@ -45,7 +48,8 @@ impl<'a> CutTables<'a> {
         );
     }
     /// enumeration_labels_can_be_concatenated cost part, at the forward vertex.
-    fn join(&self, f: &Label, b: &Label, cost: f64) -> f64 {
+    fn join(&self, g: &Graph, symmetric: bool, f: &Label, b: &Label, cost: f64) -> f64 {
+        let cost = cost + self.knapsack.join_cost(g, &f.resources, &b.resources, symmetric);
         state::full_memory_concatenation_cost(
             self.info,
             self.full,
@@ -60,6 +64,9 @@ impl Label {
     /// Enumeration bucket key, ((0.5 potential + additional) + reduced) + 0.
     pub fn key(&self) -> f64 {
         ((0.0 + self.cut_cost) + self.reduced_cost) + 0.0
+    }
+    pub fn key_with(&self, potential: f64) -> f64 {
+        ((0.5 * potential + self.cut_cost) + self.reduced_cost) + 0.0
     }
     pub fn add_elements(&mut self, elements: &[usize]) -> bool {
         for &e in elements {
@@ -216,7 +223,19 @@ impl PathStorage {
     }
     /// Path repricing: physical arc costs, then rank-one costs from
     /// physical incidence (no memory).
-    pub fn inspect(&mut self, g: &Graph, cutoff: f64, cuts: &[LimitedInput]) -> Result<usize> {
+    pub fn inspect(
+        &mut self,
+        g: &Graph,
+        cutoff: f64,
+        cuts: &[LimitedInput],
+        kpath: &[LimitedKPathInput],
+    ) -> Result<usize> {
+        self.inspect_with_knapsack(g, cutoff, cuts, kpath, &Default::default())
+    }
+    pub fn inspect_with_knapsack(
+        &mut self, g: &Graph, cutoff: f64, cuts: &[LimitedInput],
+        kpath: &[LimitedKPathInput], knapsack: &crate::cuts::knapsack::KnapsackPricing,
+    ) -> Result<usize> {
         if cutoff.is_nan() {
             return Err(invalid("invalid enumeration inspection cutoff"));
         }
@@ -224,11 +243,20 @@ impl PathStorage {
         for row in &mut self.partitions {
             for path in row.iter_mut() {
                 path.reduced_cost = path.arcs.iter().map(|&a| g.arcs[a].reduced_cost).sum();
-                if !cuts.is_empty() {
+                if !cuts.is_empty() || !kpath.is_empty() {
                     let mut vertices = vec![g.source];
                     vertices.extend(path.arcs.iter().map(|&a| g.arcs[a].head));
                     let ids: Vec<i32> = path.arcs.iter().map(|&a| g.arcs[a].id).collect();
-                    path.reduced_cost = state::enumerated_path_cut_cost(cuts, &vertices, &ids, path.reduced_cost);
+                    path.reduced_cost =
+                        state::enumerated_path_cut_cost(cuts, kpath, &vertices, &ids, path.reduced_cost);
+                }
+                if knapsack.active {
+                    let mut q = [0.; 2];
+                    for r in 0..g.resources.len() { q[r] = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower); }
+                    for &arc in &path.arcs {
+                        q = extend_resources(g, &g.arcs[arc], q, true).ok_or_else(|| invalid("enumerated knapsack resource infeasible"))?;
+                    }
+                    path.reduced_cost += knapsack.cost(&q);
                 }
             }
             row.retain(|p| p.reduced_cost < cutoff);
@@ -387,7 +415,8 @@ impl Enumeration {
                         let mut empty = next.clone();
                         empty.cut_words = [0; FULL_WORDS];
                         empty.cut_cost = 0.;
-                        next.reduced_cost = c.join(&next, &empty, (next.reduced_cost + 0.0) + 0.0);
+                        for r in 0..g.resources.len() { empty.resources[r] = g.vertices[g.sink].bounds[r].upper; }
+                        next.reduced_cost = c.join(g, false, &next, &empty, (next.reduced_cost + 0.0) + 0.0);
                     }
                     if next.reduced_cost > controls.cutoff - EPSILON {
                         continue;
@@ -582,9 +611,9 @@ impl Enumeration {
                         if let Some(c) = &cuts {
                             // The opposite root owns the terminal's cut state.
                             next.reduced_cost = if direction {
-                                c.join(&next, opposite_root, ((next.reduced_cost + 0.0) + 0.0) + 0.0)
+                                c.join(g, consumption, &next, opposite_root, ((next.reduced_cost + 0.0) + 0.0) + 0.0)
                             } else {
-                                c.join(opposite_root, &next, ((0.0 + next.reduced_cost) + 0.0) + 0.0)
+                                c.join(g, consumption, opposite_root, &next, ((0.0 + next.reduced_cost) + 0.0) + 0.0)
                             };
                         }
                         if next
@@ -653,12 +682,18 @@ impl Enumeration {
                 }
             }
         }
+        let label_key = |l: &Label| {
+            l.key_with(
+                cuts.and_then(|c| c.info.vertex_cut_potential.get(l.vertex))
+                    .copied()
+                    .unwrap_or(0.0),
+            )
+        };
         for row in &mut buckets {
             for bucket in row {
                 bucket.sort_by(|&a, &b| {
-                    opposite.arena[a]
-                        .key()
-                        .total_cmp(&opposite.arena[b].key())
+                    label_key(&opposite.arena[a])
+                        .total_cmp(&label_key(&opposite.arena[b]))
                         .then(a.cmp(&b))
                 });
             }
@@ -677,14 +712,14 @@ impl Enumeration {
                 };
                 let mut pending = vec![(k, 0usize)];
                 while let Some((bucket, min)) = pending.pop() {
-                    let key = f.key();
+                    let key = label_key(f);
                     for &id in &buckets[vertex][bucket] {
                         let b = &opposite.arena[id];
-                        if key + b.key() > controls.cutoff - EPSILON {
+                        if key + label_key(b) > controls.cutoff - EPSILON {
                             break;
                         }
                         let cost = match &cuts {
-                            Some(c) => c.join(f, b, ((f.reduced_cost + b.reduced_cost) + 0.0) + 0.0),
+                            Some(c) => c.join(g, consumption, f, b, ((f.reduced_cost + b.reduced_cost) + 0.0) + 0.0),
                             None => f.reduced_cost + b.reduced_cost,
                         };
                         if cost > controls.cutoff - EPSILON {

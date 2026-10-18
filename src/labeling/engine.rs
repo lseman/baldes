@@ -2,7 +2,10 @@
 use super::pool::SolutionPool;
 use super::storage::{HotLabel, InsertionTest, LabelStorage, StoredLabel};
 use super::{extend_resources, Controls, PricingResult, Route, Statistics, EPSILON, NO_ROUTE_COST};
-use crate::cuts::state::{self, CutResourceInfo, FullPreparation, LimitedInput, LimitedPreparation, LIMITED_WORDS};
+use crate::cuts::state::{
+    self, CutResourceInfo, FullPreparation, LimitedInput, LimitedKPathInput, LimitedPreparation,
+    LIMITED_WORDS,
+};
 use crate::graph::buckets::{BucketArc, BucketGraph, BucketId};
 use crate::graph::ng::PreparedNg;
 use crate::graph::{Graph, ResourceKind};
@@ -44,6 +47,8 @@ impl Default for EngineControls {
 #[derive(Clone, Debug, Default)]
 pub struct EngineCuts {
     pub inputs: Vec<LimitedInput>,
+    pub kpath: Vec<LimitedKPathInput>,
+    pub knapsack: crate::cuts::knapsack::KnapsackPricing,
     pub info: CutResourceInfo,
     pub limited: LimitedPreparation,
     /// Full-memory enumeration tables, prepared before an enumeration.
@@ -91,7 +96,7 @@ struct Context<'a> {
 }
 impl<'a> Context<'a> {
     fn has_cuts(&self) -> bool {
-        !self.cuts.inputs.is_empty()
+        !self.cuts.inputs.is_empty() || !self.cuts.kpath.is_empty()
     }
     fn runtime_bidirectional(&self) -> bool {
         self.controls.bidirectional
@@ -121,7 +126,7 @@ impl<'a> Context<'a> {
         if !self.resources_join(g, f, b) {
             return (false, 0.);
         }
-        let cost = (f.cost + b.cost) + 0.0;
+        let cost = (f.cost + b.cost) + self.cuts.knapsack.join_cost(g, &f.resources, &b.resources, self.consumption_joins);
         if f.ng & b.ng != 0 {
             return (false, cost);
         }
@@ -147,7 +152,7 @@ impl<'a> Context<'a> {
     /// the backward root, or the forward one for symmetric joins; backward: the
     /// forward root at the source). The join's result is not tested.
     fn terminal_cost(&self, g: &Graph, forward: bool, label: &StoredLabel) -> f64 {
-        if !self.has_cuts() {
+        if !self.has_cuts() && !self.cuts.knapsack.active {
             return label.cost;
         }
         let root_forward = !forward || self.consumption_joins;
@@ -251,6 +256,12 @@ impl<'a> Context<'a> {
             expanded: false,
             cut_words,
             additional_cost,
+            half_potential: self
+                .cuts
+                .info
+                .vertex_cut_potential
+                .get(vertex)
+                .map_or(0.0, |&p| 0.5 * p),
         }, resources))
     }
     fn resources_join(&self, g: &Graph, f: &StoredLabel, b: &StoredLabel) -> bool {
@@ -643,6 +654,7 @@ impl LabelingEngine {
         let counts = Default::default();
         let result = self.sweep(forward, &mut terminals, &counts).run_direction(g, forward, controls, started);
         insert_terminals(pool, forward, &terminals);
+        if result.is_ok() { self.update_knapsack_bounds(g, forward); }
         result
     }
     /// The forward and backward sweeps of `solve` on two threads. The
@@ -711,6 +723,8 @@ impl LabelingEngine {
         insert_terminals(pool, true, &forward_terminals);
         backward_result?;
         insert_terminals(pool, false, &backward_terminals);
+        self.update_knapsack_bounds(g, true);
+        self.update_knapsack_bounds(g, false);
         Ok((forward_time, backward_time))
     }
     pub fn prepare(g: &Graph, controls: EngineControls, phase: Phase) -> Result<Self> {
@@ -761,34 +775,90 @@ impl LabelingEngine {
         })
     }
     pub fn has_cuts(&self) -> bool {
-        !self.cuts.inputs.is_empty()
+        !self.cuts.inputs.is_empty() || !self.cuts.kpath.is_empty()
     }
     /// Limited-memory cut tables for both directions. False when a vertex
     /// would need more than twenty words. Labels are discarded.
-    pub fn load_cuts(&mut self, g: &Graph, inputs: Vec<LimitedInput>) -> bool {
+    pub fn load_cuts(
+        &mut self,
+        g: &Graph,
+        inputs: Vec<LimitedInput>,
+        kpath: Vec<LimitedKPathInput>,
+    ) -> bool {
         self.half_ready = false;
         self.full_ready = false;
         let mut cuts = EngineCuts {
             inputs,
+            kpath,
+            knapsack: self.cuts.knapsack.clone(),
             ..Default::default()
         };
-        if !cuts.inputs.is_empty() {
-            if !state::prepare_vertices(&mut cuts.info, &mut cuts.limited, g, &cuts.inputs) {
+        if !cuts.inputs.is_empty() || !cuts.kpath.is_empty() {
+            if !state::prepare_vertices(
+                &mut cuts.info,
+                &mut cuts.limited,
+                g,
+                &cuts.inputs,
+                &cuts.kpath,
+            ) {
                 return false;
             }
-            state::prepare_arcs(&mut cuts.info, &mut cuts.limited, g, &cuts.inputs, true);
-            state::prepare_arcs(&mut cuts.info, &mut cuts.limited, g, &cuts.inputs, false);
+            state::prepare_arcs(
+                &mut cuts.info,
+                &mut cuts.limited,
+                g,
+                &cuts.inputs,
+                &cuts.kpath,
+                true,
+            );
+            state::prepare_arcs(
+                &mut cuts.info,
+                &mut cuts.limited,
+                g,
+                &cuts.inputs,
+                &cuts.kpath,
+                false,
+            );
         }
         self.cuts = cuts;
         true
     }
     /// update_lim_mem_duals: same cut rows, new duals. Labels are discarded.
-    pub fn update_cut_duals(&mut self, inputs: Vec<LimitedInput>) {
+    pub fn update_cut_duals(&mut self, inputs: Vec<LimitedInput>, kpath: Vec<LimitedKPathInput>) {
         self.half_ready = false;
         self.full_ready = false;
-        state::update_duals(&mut self.cuts.info, &self.cuts.limited, &inputs, true, true);
+        state::update_duals(
+            &mut self.cuts.info,
+            &self.cuts.limited,
+            &inputs,
+            &kpath,
+            true,
+            true,
+        );
         self.cuts.inputs = inputs;
+        self.cuts.kpath = kpath;
         self.cuts.full = None;
+    }
+    /// updateComplBoundsWithResConsKnapsackCutDuals: preserve the raw
+    /// dominance bounds and rebuild the resource-cost completion bounds.
+    fn update_knapsack_bounds(&mut self, g: &Graph, forward: bool) {
+        if !self.cuts.knapsack.active { return; }
+        let components = self.grid.direction(forward).components.clone();
+        for component in components {
+            for id in component {
+                let bucket = &self.storage(forward).buckets[id.vertex][id.bucket];
+                let mut lower = NO_ROUTE_COST;
+                for &index in &bucket.active {
+                    let label = &self.storage(forward).labels[index];
+                    let cost = label.key() + self.cuts.knapsack.partial_cost(g, &label.resources, forward);
+                    lower = lower.min(cost);
+                }
+                for predecessor in &self.grid.direction(forward).buckets[id.vertex][id.bucket].predecessors {
+                    lower = lower.min(self.storage(forward).buckets[id.vertex][predecessor.bucket.bucket].knapsack_lower_cost);
+                }
+                self.storage_mut(forward).buckets[id.vertex][id.bucket].knapsack_lower_cost = lower;
+            }
+        }
     }
     fn storage(&self, forward: bool) -> &LabelStorage {
         if forward {
@@ -846,6 +916,12 @@ impl LabelingEngine {
             expanded: false,
             cut_words: [0; LIMITED_WORDS],
             additional_cost: 0.,
+            half_potential: self
+                .cuts
+                .info
+                .vertex_cut_potential
+                .get(vertex)
+                .map_or(0.0, |&p| 0.5 * p),
         };
         let mut label = label;
         (label.cut_words, label.additional_cost) = self.root_cut_state(vertex);
@@ -993,11 +1069,11 @@ impl LabelingEngine {
                     else {
                         continue;
                     };
-                    let key = label.key();
+                    let key = label.key() + self.cuts.knapsack.partial_cost(g, &label.resources, true);
                     let mut work = vec![(bucket, 0usize)];
                     while let Some((k, min)) = work.pop() {
                         let row = &self.storage(self.consumption_joins).buckets[internal][k];
-                        if key + row.lower_cost >= cutoff {
+                        if key + row.completion_bound(self.cuts.knapsack.active) >= cutoff {
                             continue;
                         }
                         for &b in &row.active {
@@ -1180,7 +1256,7 @@ impl LabelingEngine {
                             if let Some(l) =
                                 self.extend(g, forward, &arc, &self.storage(forward).labels[id])
                             {
-                                minimum = minimum.min(l.key());
+                                minimum = minimum.min(l.key() + self.cuts.knapsack.partial_cost(g, &l.resources, forward));
                                 extended.push(l);
                             }
                         }
@@ -1202,13 +1278,13 @@ impl LabelingEngine {
                                     target
                                 };
                                 let opposite = &storage.buckets[storage_vertex][bucket];
-                                if minimum + opposite.lower_cost >= threshold {
+                                if minimum + opposite.completion_bound(self.cuts.knapsack.active) >= threshold {
                                     continue;
                                 }
                                 if !contains(&self.grid, &frontier, target, bucket) {
                                     let meeting = if forward { physical.head } else { physical.tail };
                                     'pairs: for l in &extended {
-                                        let key = l.key();
+                                        let key = l.key() + self.cuts.knapsack.partial_cost(g, &l.resources, forward);
                                         for &id in &opposite.active {
                                             let other = &storage.labels[id];
                                             if key + other.key() >= threshold {
@@ -1289,7 +1365,11 @@ impl LabelingEngine {
                     .iter()
                     .map(|p| self.storage(forward).buckets[v][p.bucket.bucket].lower_cost)
                     .fold(NO_ROUTE_COST, f64::min);
+                let knapsack_lower = b.predecessors.iter()
+                    .map(|p| self.storage(forward).buckets[v][p.bucket.bucket].knapsack_lower_cost)
+                    .fold(NO_ROUTE_COST, f64::min);
                 self.storage_mut(forward).buckets[v][k].lower_cost = lower;
+                self.storage_mut(forward).buckets[v][k].knapsack_lower_cost = knapsack_lower;
             }
         }
     }
@@ -1384,11 +1464,11 @@ impl LabelingEngine {
             return false;
         };
         let storage = self.storage(opposite);
-        let key = label.key();
+        let key = label.key() + self.cuts.knapsack.partial_cost(g, &label.resources, forward);
         let mut work = vec![(bucket, 0usize)];
         while let Some((k, min)) = work.pop() {
             let row = &storage.buckets[vertex][k];
-            if key + row.lower_cost >= threshold {
+            if key + row.completion_bound(self.cuts.knapsack.active) >= threshold {
                 continue;
             }
             if !scan {
@@ -1456,6 +1536,12 @@ impl LabelingEngine {
             expanded: false,
             cut_words,
             additional_cost,
+            half_potential: self
+                .cuts
+                .info
+                .vertex_cut_potential
+                .get(label.vertex)
+                .map_or(0.0, |&p| 0.5 * p),
         };
         self.completion_exists(g, forward, &projected, threshold, scan)
     }

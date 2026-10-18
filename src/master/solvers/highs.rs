@@ -4,9 +4,9 @@
 //! bounds [0, 1e12], solutions are read after each optimal solve with values
 //! of magnitude at most the zero tolerance snapped to zero, appending
 //! dual-feasible columns keeps the current solution, and cut cleanup uses the
-//! shared [`super::lp_master::cleanup_cut_rows`]. HiGHS follows its own pivot
+//! shared [`crate::master::lp_master::cleanup_cut_rows`]. HiGHS follows its own pivot
 //! rules, so trajectories differ from Clp's even on identical masters.
-use super::{LpMaster, RowSense};
+use crate::master::{LpMaster, RowSense};
 use crate::{incomplete, invalid, Result};
 use std::ffi::{c_char, c_double, c_void, CString};
 use std::ptr::NonNull;
@@ -395,7 +395,7 @@ impl LpMaster for HighsMaster {
     }
 
     fn cleanup_cut_rows(&self, initial_rows: usize) -> Result<Vec<usize>> {
-        super::lp_master::cleanup_cut_rows(self, initial_rows)
+        crate::master::lp_master::cleanup_cut_rows(self, initial_rows)
     }
 
     fn column_entries(&self, column: usize) -> Result<Vec<(usize, f64)>> {

@@ -25,6 +25,7 @@ fn single_label_phase_replaces_cheaper_prefix_and_requests_expansion() {
         expanded: false,
         cut_words: [0; 20],
         additional_cost: 0.,
+        half_potential: 0.,
     };
     assert!(storage.insert(
         &graph,
