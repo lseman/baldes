@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Branch-and-price tree and node lifecycle Documentation index · Branching ·Enumerated MIP The Rust tree solves a routing set-partitioning master with one pricing graph.It requires n">
+<title>Branch-and-price tree and node lifecycle — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/tree.html">
+<link rel="stylesheet" href="_static/site.css">
+<link rel="stylesheet" href="_static/docs.css">
+<link rel="stylesheet" href="_static/syntax.css">
+<script src="_static/app.js" defer></script>
+<script src="_static/docs.js" defer></script>
+</head>
+<body class="docs-body" data-docs-root="./">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../"><img src="_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html" aria-current="page">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/tree.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="branch-and-price-tree-and-node-lifecycle">Branch-and-price tree and node lifecycle</h1>
+<p><a href="index.html">Documentation index</a> · <a href="branching.html">Branching</a> ·
+<a href="enumerated-mip.html">Enumerated MIP</a></p>
+<p>The Rust tree solves a routing set-partitioning master with one pricing graph.
+It requires nonnegative arc costs and unique public arc IDs. The base rows are
+a fleet upper bound and one equality per customer; the tree validates this
+structure before searching.</p>
+<h2 id="run-a-tree">Run a tree</h2>
+<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span>--tree<span class="w"> </span>--time<span class="w"> </span><span class="m">60</span>
+</code></pre>
+<p><code>--nodes N</code> sets the tree node budget (default 10,000). <code>--json FILE</code> writes
+validated incumbent routes, bounds, statuses, and work counters. Use
+<code>--no-enumeration</code> to disable both reduced-cost fixing and enumeration.</p>
+<p>A complete Rust entry point, requiring <code>clp</code>:</p>
+<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span>
+<span class="w">    </span><span class="n">master</span><span class="p">::{</span><span class="n">root</span><span class="p">::</span><span class="n">RootProblem</span><span class="p">,</span><span class="w"> </span><span class="n">tree</span><span class="p">::{</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">TreeOptions</span><span class="p">}},</span>
+<span class="w">    </span><span class="n">vrptw</span><span class="p">::{</span><span class="n">Instance</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">},</span>
+<span class="p">};</span>
+<span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">time</span><span class="p">::</span><span class="n">Duration</span><span class="p">;</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">baldes</span><span class="p">::</span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Instance</span><span class="p">::</span><span class="n">read</span><span class="p">(</span><span class="s">&quot;instances/R101.txt&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">instance</span><span class="p">.</span><span class="n">truncate</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">graph</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">instance</span><span class="p">.</span><span class="n">graph</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">::</span><span class="nb">None</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">problem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RootProblem</span><span class="p">::</span><span class="n">set_partitioning</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span><span class="w"> </span><span class="n">instance</span><span class="p">.</span><span class="n">vehicles</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">f64</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TreeOptions</span><span class="p">::</span><span class="n">default</span><span class="p">();</span>
+<span class="w">    </span><span class="n">options</span><span class="p">.</span><span class="n">time_limit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Duration</span><span class="p">::</span><span class="n">from_secs</span><span class="p">(</span><span class="mi">60</span><span class="p">);</span>
+<span class="w">    </span><span class="n">options</span><span class="p">.</span><span class="n">root</span><span class="p">.</span><span class="n">cg</span><span class="p">.</span><span class="n">multiplicity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">instance</span><span class="p">.</span><span class="n">customers</span><span class="p">.</span><span class="n">len</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">f64</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tree</span><span class="p">::</span><span class="n">solve</span><span class="p">(</span><span class="n">problem</span><span class="p">,</span><span class="w"> </span><span class="n">options</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}: incumbent={}, bound={}&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="n">result</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">incumbent</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">bound</span><span class="p">);</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</code></pre>
+<p>The CLI tree uses <code>Instance::vehicles</code> as its fleet bound. Root-only CLI and
+<code>Instance::solve_root</code> use the customer count instead. A custom Rust caller
+chooses the bound in <code>RootProblem::set_partitioning</code> and configures the
+column-generation multiplicity separately.</p>
+<h2 id="node-processing">Node processing</h2>
+<p>The search selects a node by its lower bound and evaluates it within the
+remaining global budget. Its main steps are:</p>
+<ol>
+<li>Construct the root master, or fork the solved parent and append the child's
+constraints.</li>
+<li>Run column generation, pricing, cut rounds, and enabled fixing/enumeration.</li>
+<li>Share valid elementary routes with the incumbent heuristic and other nodes.</li>
+<li>Search restricted columns for a feasible integer solution; optionally run
+HiGHS over a complete enumerated universe.</li>
+<li>Close the node when its certified bound meets the incumbent gap, or select
+a branching candidate and create children. Strong trials and diving use
+isolated evaluations.</li>
+</ol>
+<p>Time limits are cooperative across solver operations. A backend call can
+finish after its requested budget. Limits preserve bounds for unfinished nodes.</p>
+<h2 id="what-a-child-inherits">What a child inherits</h2>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Child handling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Clp master</td>
+<td>Deep-copy model, basis, solution, scaling, and simplex state</td>
+</tr>
+<tr>
+<td>Branch and cut rows</td>
+<td>Preserve physical rows and coefficient mappings; append new branch rows</td>
+</tr>
+<tr>
+<td>Existing route columns</td>
+<td>Retain coefficients and upper bounds; retire routes outside the new domain</td>
+</tr>
+<tr>
+<td>Pricing graph</td>
+<td>Carry bucket preparation, fixed bucket arcs, NG state, options, and adaptive state</td>
+</tr>
+<tr>
+<td>Labels</td>
+<td>Rebuild for the child's duals and active branch resources</td>
+</tr>
+<tr>
+<td>Enumeration</td>
+<td>Retain/filter routes where compatible and preserve branch-distinct arc paths</td>
+</tr>
+<tr>
+<td>Sibling state</td>
+<td>Own independent mutable models and pricing state</td>
+</tr>
+</tbody>
+</table>
+<p>When enumeration changes the master to full-memory cut coefficients, existing
+columns are updated as well as new ones. Reusing limited-memory coefficients
+for only part of the enumerated master would change the model.</p>
+<h2 id="root-snapshots-and-manual-inheritance">Root snapshots and manual inheritance</h2>
+<p>Set <code>RootOptions::capture_state = true</code> to retain a solved <code>NodeSnapshot</code> in
+<code>RootOutput::snapshot</code>. The tree arranges snapshot capture for its own nodes.
+Manual callers use <code>root::inherit_branches(parent, additional_branches, options)</code>
+for typed constraints, or <code>root::inherit</code> for arc-flow tuples. Supply only the
+<strong>additional</strong> branches; the parent already contains its ancestor rows.
+To retain the child's snapshot for another generation, enable capture on that
+solve too.</p>
+<p>The snapshot exposes <code>branch_depth()</code>, <code>active_cuts()</code>, and
+<code>enumerated_routes()</code>. A route count alone does not establish completeness;
+the enumerated-MIP adapter separately checks the completion flag.</p>
+<h2 id="incumbents-proofs-and-status">Incumbents, proofs, and status</h2>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Supplies an incumbent?</th>
+<th>Certifies the routing lower bound?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Validated elementary route solution</td>
+<td>Yes</td>
+<td>No, by its objective alone</td>
+</tr>
+<tr>
+<td>Restricted-column integer heuristic</td>
+<td>Yes, after validation</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Exact node pricing</td>
+<td>When the resulting routes form an integer witness</td>
+<td>Yes, through its certified bound</td>
+</tr>
+<tr>
+<td>Heuristic strong trial or dive</td>
+<td>Can find a witness</td>
+<td>No proof for the original node</td>
+</tr>
+<tr>
+<td>Complete enumerated HiGHS MIP</td>
+<td>Yes, after validation</td>
+<td>Only within saved enumeration coverage and for proved outcomes</td>
+</tr>
+</tbody>
+</table>
+<p>A cost-only <code>--upper-bound</code> can assist root fixing, but the tree needs actual
+feasible routes before accepting an incumbent. It does not invent a solution
+from the supplied number.</p>
+<p><code>Optimal</code> means the configured numerical gap is closed. <code>TimeLimit</code>,
+<code>NodeLimit</code>, and <code>Incomplete</code> retain unfinished-node bounds. Check whether a
+finite incumbent and routes are present before treating a limited run as a
+solution. JSON encodes nonfinite numbers as <code>null</code>.</p>
+<p>The restricted-column heuristic uses <code>TreeOptions::mip_node_limit</code> and
+<code>mip_time_limit</code>; CLI <code>--mip-nodes</code> budgets that heuristic. Optional HiGHS node
+MIP has separate controls and counters; see <a href="enumerated-mip.html">Enumerated MIP</a>.</p>
+<h2 id="limits-and-validation">Limits and validation</h2>
+<p>The tree does not yet provide multiple pricing networks, generic node
+preprocessing, or cut callbacks during the integer solve. Python exposes
+root solving; use Rust or the CLI for the tree.</p>
+<ul>
+<li><a href="https://github.com/lseman/baldes/blob/main/src/master/root/mod.rs">Node snapshots and inheritance</a></li>
+<li><a href="https://github.com/lseman/baldes/blob/main/src/master/tree/mod.rs">Tree driver</a></li>
+<li><a href="https://github.com/lseman/baldes/blob/main/tests/node_lifecycle.rs">Lifecycle tests</a>: fixing carry, sibling isolation,
+full-memory updates, grandchildren, and failed setup</li>
+<li><a href="https://github.com/lseman/baldes/blob/main/tests/branch_price.rs">Tree tests</a>: exhaustive route universes, limits,
+feasible witnesses, and branch/cut preservation</li>
+</ul>
+<pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--test<span class="w"> </span>node_lifecycle<span class="w"> </span>--test<span class="w"> </span>branch_price
+</code></pre>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="index.html"><small>Previous guide</small>BALDES documentation <span aria-hidden="true">↗</span></a><a href="branching.html"><small>Next guide</small>Routing branching <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#run-a-tree">Run a tree</a><a class="toc-level-2" href="#node-processing">Node processing</a><a class="toc-level-2" href="#what-a-child-inherits">What a child inherits</a><a class="toc-level-2" href="#root-snapshots-and-manual-inheritance">Root snapshots and manual inheritance</a><a class="toc-level-2" href="#incumbents-proofs-and-status">Incumbents, proofs, and status</a><a class="toc-level-2" href="#limits-and-validation">Limits and validation</a></nav></aside>
+</div>
+</body></html>

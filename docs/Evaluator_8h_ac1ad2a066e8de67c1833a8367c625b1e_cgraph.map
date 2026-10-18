@@ -1,8 +1,0 @@
-<map id="solveTriangular" name="solveTriangular">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,115,55"/>
-<area shape="poly" id="edge3_Node000001_Node000001" title=" " alt="" coords="28,30,22,21,25,11,39,5,60,3,83,5,95,12,93,16,81,10,60,8,40,10,29,15,27,20,32,27"/>
-<area shape="rect" id="Node000002" href="$structSparseSolveTriangular.html#a07a554de8141564a0dc892f7aa04fb2d" title=" " alt="" coords="163,29,339,55"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="115,40,147,40,147,45,115,45"/>
-<area shape="rect" id="Node000003" href="$structSparseSolveTriangular.html#a8d76c106ad12dc8953e6cc99cfd162c2" title=" " alt="" coords="387,22,539,62"/>
-<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="339,40,372,40,372,45,339,45"/>
-</map>

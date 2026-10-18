@@ -1,7 +1,0 @@
-<map id="BNBNode::addConstr" name="BNBNode::addConstr">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,13,151,38"/>
-<area shape="rect" id="Node000002" href="$classMIPProblem.html#a38c9f38202c52c5aad1e0a65ac494b7c" title=" " alt="" coords="199,13,383,38"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="151,23,183,23,183,28,151,28"/>
-<area shape="rect" id="Node000003" href="$classLinearExpression.html#a941cd736bd9e19240abed98b3a000c44" title=" " alt="" coords="431,5,575,46"/>
-<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="384,23,416,23,416,28,384,28"/>
-</map>

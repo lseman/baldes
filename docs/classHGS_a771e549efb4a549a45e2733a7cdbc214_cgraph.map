@@ -1,6 +1,0 @@
-<map id="HGS::run" name="HGS::run">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,80,55"/>
-<area shape="rect" id="Node000002" href="$Definitions_8h.html#a064e59f67e1c74ad38938bd6bd7a9210" title="Prints a formatted heuristic message with a specific color scheme." alt="" coords="128,29,206,55"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="80,40,112,40,112,45,80,45"/>
-<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="145,30,141,21,143,11,152,5,167,3,182,5,191,12,187,16,180,10,167,8,154,10,148,14,146,20,150,28"/>
-</map>

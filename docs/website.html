@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Website and documentation publishing Documentation index · Build and validation The website consists of the handwritten landing page in landing/ and HTMLguides compiled from docs/*">
+<title>Website and documentation publishing — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/website.html">
+<link rel="stylesheet" href="_static/site.css">
+<link rel="stylesheet" href="_static/docs.css">
+<link rel="stylesheet" href="_static/syntax.css">
+<script src="_static/app.js" defer></script>
+<script src="_static/docs.js" defer></script>
+</head>
+<body class="docs-body" data-docs-root="./">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../"><img src="_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html" aria-current="page">Website and documentation publishing</a><a href="testing.html">Build and validation</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/website.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="website-and-documentation-publishing">Website and documentation publishing</h1>
+<p><a href="index.html">Documentation index</a> · <a href="testing.html">Build and validation</a></p>
+<p>The website consists of the handwritten landing page in <code>landing/</code> and HTML
+guides compiled from <code>docs/**/*.md</code>. Markdown files are the documentation source;
+do not edit generated <code>landing/docs/</code> files.</p>
+<h2 id="compile-and-preview">Compile and preview</h2>
+<p>The website build needs Python 3.10 or newer. It does not build the Rust solver.
+Create a separate environment and install the pinned documentation dependencies:</p>
+<pre><code class="language-sh">python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>tools/.venv
+tools/.venv/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>tools/docs-requirements.txt
+tools/.venv/bin/python<span class="w"> </span>tools/compile_docs.py
+tools/.venv/bin/python<span class="w"> </span>-m<span class="w"> </span>http.server<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--directory<span class="w"> </span>landing
+</code></pre>
+<p>Open <code>http://localhost:8000/</code> for the landing page and
+<code>http://localhost:8000/docs/</code> for the guides. Use an HTTP server rather than
+opening HTML files directly, so search can load its local index.</p>
+<p>On Windows, use <code>tools/.venv/Scripts/python.exe</code> instead of the <code>bin/python</code>
+path. Re-run the compiler after changing Markdown, reader styles, or scripts.
+No JavaScript bundler or external search service is required.</p>
+<h2 id="what-the-compiler-does">What the compiler does</h2>
+<ul>
+<li>Compiles <code>README.md</code> to <code>index.html</code> and other Markdown files to matching
+<code>.html</code> paths, including nested directories.</li>
+<li>Builds sidebar navigation from this documentation index's link order,
+followed by any additional guides.</li>
+<li>Renders tables, fenced code with syntax highlighting, heading anchors, an
+on-page contents list, and previous/next guide links.</li>
+<li>Rewrites local Markdown links to generated HTML, validates local links and
+heading fragments, and maps repository source links to GitHub.</li>
+<li>Copies linked local images and writes a section-level search index.</li>
+<li>Escapes embedded HTML in Markdown. The shared page templates supply the
+site's markup; guide authors use Markdown for content.</li>
+<li>Replaces only marked generated output after rendering succeeds, removing
+stale generated pages. A failed build leaves the previous output intact.</li>
+</ul>
+<p>A new guide appears in the reader automatically. Add its link to
+<a href="index.html">the documentation index</a> to choose its navigation position.
+<code>README.md</code> and <code>index.md</code> in the same directory would both produce
+<code>index.html</code>; the compiler rejects that collision.</p>
+<h2 id="custom-destinations">Custom destinations</h2>
+<pre><code class="language-sh">tools/.venv/bin/python<span class="w"> </span>tools/compile_docs.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>/tmp/baldes-docs<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--base-url<span class="w"> </span>https://example.org/baldes/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--repository-url<span class="w"> </span>https://github.com/lseman/baldes
+</code></pre>
+<p><code>--source</code> defaults to the repository's <code>docs/</code> directory. <code>--output</code> defaults
+to <code>landing/docs/</code>. Source and output must be separate directories, neither
+inside the other. Local repository links must resolve within the repository.
+The output includes its own styles and scripts; the Home link expects the
+landing page one level above the documentation root.</p>
+<p>Internal links and assets are relative, so the website works both at <code>/</code> and
+under a project prefix such as <code>/baldes/</code>. <code>--base-url</code> controls canonical
+page URLs; it does not change internal navigation.</p>
+<h2 id="automated-publishing">Automated publishing</h2>
+<p>The <a href="https://github.com/lseman/baldes/blob/main/.github/workflows/landing.yaml">Pages workflow</a> runs on pushes to
+<code>main</code> that change the landing page, documentation, compiler, or its tests and
+dependencies. It installs Python dependencies, runs compiler tests, compiles
+the guides, and publishes <code>landing/</code> to the <code>gh-pages</code> branch. It also supports
+manual dispatch.</p>
+<p>Deployment replaces the published file tree so deleted guides do not remain
+on the website. Generated output is ignored by Git; commit the Markdown,
+compiler, templates/assets, and dependency file instead. Editing files locally
+does not publish them until the workflow runs after a push.</p>
+<h2 id="reader-accessibility">Reader accessibility</h2>
+<p>The page templates use headings, landmarks, and visible form labels to expose
+structure (WCAG 1.3.1). Skip links bypass repeated navigation (2.4.1), and
+interactive elements have visible keyboard focus (2.4.7). The capacity control
+uses a native labeled range input, while search and copy actions announce
+status changes (4.1.2 / 4.1.3). Reduced-motion preferences disable smooth
+scrolling and decorative transitions.</p>
+<h2 id="validate-changes">Validate changes</h2>
+<pre><code class="language-sh">tools/.venv/bin/python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tools<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;test_compile_docs.py&#39;</span>
+tools/.venv/bin/python<span class="w"> </span>tools/compile_docs.py
+</code></pre>
+<p>The tests cover nested navigation, local/source/image links, duplicate anchors,
+tables, code escaping/highlighting, search entries, destination collisions,
+output protection, and rebuilds. For visual changes, also inspect a narrow
+viewport, keyboard focus, search results, code-copy buttons, and the landing
+page's capacity illustration. The illustration groups customers into routes;
+it does not execute the Rust solver or claim optimal routes.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="source-layout.html"><small>Previous guide</small>Source layout <span aria-hidden="true">↗</span></a><a href="testing.html"><small>Next guide</small>Build and validation <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#compile-and-preview">Compile and preview</a><a class="toc-level-2" href="#what-the-compiler-does">What the compiler does</a><a class="toc-level-2" href="#custom-destinations">Custom destinations</a><a class="toc-level-2" href="#automated-publishing">Automated publishing</a><a class="toc-level-2" href="#reader-accessibility">Reader accessibility</a><a class="toc-level-2" href="#validate-changes">Validate changes</a></nav></aside>
+</div>
+</body></html>

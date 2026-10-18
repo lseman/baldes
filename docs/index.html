@@ -1,129 +1,149 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US">
+<!doctype html>
+<html lang="en">
 <head>
-<meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
-<meta http-equiv="X-UA-Compatible" content="IE=11"/>
-<meta name="generator" content="Doxygen 1.18.0"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>BALDES: Main Page</title>
-<link href="tabs.css" rel="stylesheet" type="text/css"/>
-<script type="text/javascript" src="dynsections.js"></script>
-<script type="text/javascript" src="codefolding.js"></script>
-<script type="text/javascript" src="clipboard.js"></script>
-<link href="navtree.css" rel="stylesheet" type="text/css"/>
-<script type="text/javascript" src="navtreedata.js"></script>
-<script type="text/javascript" src="navtree.js"></script>
-<script type="text/javascript" src="cookie.js"></script>
-<link href="search/search.css" rel="stylesheet" type="text/css"/>
-<script type="text/javascript" src="search/searchdata.js"></script>
-<script type="text/javascript" src="search/search.js"></script>
-<link href="doxygen.css" rel="stylesheet" type="text/css" />
-<link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
-<link href="doxygen-awesome-sidebar-only.css" rel="stylesheet" type="text/css"/>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="BALDES documentation Start with the project README for installation, input formats,CLI options, and Python root solving. Commands here run from the repositoryroot. The guides below">
+<title>BALDES documentation — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/index.html">
+<link rel="stylesheet" href="_static/site.css">
+<link rel="stylesheet" href="_static/docs.css">
+<link rel="stylesheet" href="_static/syntax.css">
+<script src="_static/app.js" defer></script>
+<script src="_static/docs.js" defer></script>
 </head>
-<body>
-<div id="top"><!-- do not remove this div, it is closed by doxygen! -->
-<div id="titlearea">
-<table cellspacing="0" cellpadding="0">
- <tbody>
- <tr id="projectrow">
-  <td id="projectalign">
-   <div id="projectname">BALDES
-   </div>
-   <div id="projectbrief">Bucket Graph Labeling Algorithm for Vehicle Routing</div>
-  </td>
- </tr>
- </tbody>
+<body class="docs-body" data-docs-root="./">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../"><img src="_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html" aria-current="page">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/README.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="baldes-documentation">BALDES documentation</h1>
+<p>Start with the <a href="https://github.com/lseman/baldes/blob/main/README.md">project README</a> for installation, input formats,
+CLI options, and Python root solving. Commands here run from the repository
+root. The guides below describe the current Rust implementation.</p>
+<h2 id="guides">Guides</h2>
+<table>
+<thead>
+<tr>
+<th>Guide</th>
+<th>Use it to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="tree.html">Tree and node lifecycle</a></td>
+<td>Run integer routing, understand node inheritance, bounds, limits, and result status</td>
+</tr>
+<tr>
+<td><a href="branching.html">Branching</a></td>
+<td>Choose vehicle-count, Ryan–Foster, or arc-flow branching and understand the single-network assignment limitation</td>
+</tr>
+<tr>
+<td><a href="cuts.html">Cuts</a></td>
+<td>Configure cut families and keep coefficients consistent across pricing, enumeration, and child nodes</td>
+</tr>
+<tr>
+<td><a href="enumerated-mip.html">Enumerated MIP</a></td>
+<td>Enable HiGHS integer solving and interpret its route-count gate and proof coverage</td>
+</tr>
+<tr>
+<td><a href="options.html">BALDES options</a></td>
+<td>Look up supported controls, defaults, types, and scope</td>
+</tr>
+<tr>
+<td><a href="stabilization.html">Stabilization</a></td>
+<td>Configure dual smoothing and understand center updates and pricing retries</td>
+</tr>
+<tr>
+<td><a href="source-layout.html">Source layout</a></td>
+<td>Find the module responsible for a change</td>
+</tr>
+<tr>
+<td><a href="website.html">Website publishing</a></td>
+<td>Compile Markdown to HTML and preview or deploy the site</td>
+</tr>
+<tr>
+<td><a href="testing.html">Build and validation</a></td>
+<td>Select feature combinations and run the relevant checks</td>
+</tr>
+</tbody>
 </table>
+<h2 id="capabilities-and-interfaces">Capabilities and interfaces</h2>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Rust</th>
+<th>CLI</th>
+<th>Python</th>
+<th>Backend</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RCSP pricing and enumeration</td>
+<td>Yes</td>
+<td>Through routing solves</td>
+<td>Low-level <code>Solver</code></td>
+<td>Core Rust</td>
+</tr>
+<tr>
+<td>Routing root relaxation</td>
+<td>Yes</td>
+<td>Default <code>vrptw</code> / <code>cvrp</code> mode</td>
+<td><code>pybaldes.solve_root</code></td>
+<td>Clp</td>
+</tr>
+<tr>
+<td>Branch-and-price tree</td>
+<td>Yes</td>
+<td><code>--tree</code></td>
+<td>Not exposed</td>
+<td>Clp</td>
+</tr>
+<tr>
+<td>Complete enumerated node MIP</td>
+<td>Yes, opt-in</td>
+<td><code>--tree --enumerated-mip</code></td>
+<td>Not exposed</td>
+<td>Clp + HiGHS</td>
+</tr>
+<tr>
+<td>Generic mixed-integer master solve</td>
+<td><code>highs::solve_integer</code></td>
+<td>Not exposed directly</td>
+<td>Not exposed</td>
+<td>HiGHS</td>
+</tr>
+</tbody>
+</table>
+<p>The routing tree currently models <strong>one pricing network</strong>. A network is a
+separate routing subproblem, such as a vehicle type or depot. Forward and
+backward labeling within one graph do not create multiple networks.
+Ryan–Foster branching works with one network. Packing-set assignment rows are
+supported, but useful fractional assignment branching requires multiple
+networks; see <a href="branching.html#packing-set-assignment">Branching</a>.</p>
+<p>Root <code>Optimal</code> means the LP relaxation converged. Tree <code>Optimal</code> means the
+integer routing gap closed within the configured tolerances. A feasible
+restricted-column solution supplies an incumbent; its objective alone does
+not prove a lower bound for the full routing problem.</p>
+<h2 id="keeping-the-guides-current">Keeping the guides current</h2>
+<p>When changing behavior, update the owning guide and its linked source/tests.
+For BALDES options, keep <code>OPTION_TABLE</code> support metadata and the reference table
+in sync. Check documented commands and links rather than treating a historical
+test count as a permanent guarantee.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="tree.html"><small>Next guide</small>Branch-and-price tree and node lifecycle <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#guides">Guides</a><a class="toc-level-2" href="#capabilities-and-interfaces">Capabilities and interfaces</a><a class="toc-level-2" href="#keeping-the-guides-current">Keeping the guides current</a></nav></aside>
 </div>
-<!-- end header part -->
-<!-- Generated by Doxygen 1.18.0 -->
-<script type="text/javascript">
-let searchBox = new SearchBox("searchBox", "search/",'.html');
-</script>
-<script type="text/javascript">
-document.addEventListener('DOMContentLoaded', codefold.init);
-</script>
-<script type="application/json" id="doxygen-config">
-{
-  "relPath": "",
-  "generateTreeView": true,
-  "searchEngine": true,
-  "serverBasedSearch": false,
-  "disableIndex": false,
-  "dynamicMenus": true,
-  "fullSidebar": false
-}
-</script>
-<script type="text/javascript" src="menudata.js"></script>
-<script type="text/javascript" src="menu.js"></script>
-<div id="main-nav-mobile">
-<div class="sm sm-dox"><input id="main-menu-state" type="checkbox"/>
-<label class="main-menu-btn" for="main-menu-state">
-<span class="main-menu-btn-icon"></span> Toggle main menu visibility</label>
-<span id="searchBoxPos1"></span>
-</div>
-</div><!-- main-nav-mobile -->
-<div id="main-nav">
-  <ul class="sm sm-dox" id="main-menu">
-    <li id="searchBoxPos2">
-        <div id="MSearchBox" class="MSearchBoxInactive">
-        <span class="left">
-          <span id="MSearchSelect" class="search-icon"><span class="search-icon-dropdown"></span></span>
-          <input type="text" id="MSearchField" value="" placeholder="Search" accesskey="S"/>
-          </span><span class="right">
-            <a id="MSearchClose" href="javascript:searchBox.CloseResultsWindow()"><div id="MSearchCloseImg" class="close-icon"></div></a>
-          </span>
-        </div>
-    </li>
-  </ul>
-</div><!-- main-nav -->
-</div><!-- top -->
-<div id="side-nav" class="ui-resizable side-nav-resizable">
-  <div id="nav-tree">
-    <div id="nav-tree-contents">
-      <div id="nav-sync" class="sync"></div>
-    </div>
-  </div>
-  <div id="splitbar" class="ui-resizable-handle">
-  </div>
-</div>
-<script type="text/javascript">
-document.addEventListener('DOMContentLoaded',() => { initNavTree('index.html','',''); });
-</script>
-<div id="container">
-<div id="doc-content">
-<!-- window showing the filter options -->
-<div id="MSearchSelectWindow">
-</div>
-
-<!-- iframe showing the search results (closed by default) -->
-<div id="MSearchResultsWindow">
-<div id="MSearchResults">
-<div class="SRPage">
-<div id="SRIndex">
-<div id="SRResults"></div>
-<div class="SRStatus" id="Loading">Loading...</div>
-<div class="SRStatus" id="Searching">Searching...</div>
-<div class="SRStatus" id="NoMatches">No Matches</div>
-</div>
-</div>
-</div>
-</div>
-
-<div class="header">
-  <div class="headertitle"><div class="title">BALDES Documentation</div></div>
-</div><!--header-->
-<div class="contents">
-<a href="doxygen_crawl.html"></a>
-</div><!-- contents -->
-</div><!-- doc-content -->
-</div><!-- container -->
-<!-- start footer part -->
-<div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
-  <ul>
-    <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.18.0 </li>
-  </ul>
-</div>
-</body>
-</html>
+</body></html>

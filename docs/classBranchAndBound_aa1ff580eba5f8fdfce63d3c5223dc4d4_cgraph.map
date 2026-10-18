@@ -1,8 +1,0 @@
-<map id="BranchAndBound::updateGlobalBest" name="BranchAndBound::updateGlobalBest">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,54,237,80"/>
-<area shape="rect" id="Node000002" href="$classBranchAndBound.html#a0d57f6ba3e906c77cfadae558cf8bad5" title=" " alt="" coords="285,5,489,46"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="208,51,269,41,270,47,209,56"/>
-<area shape="rect" id="Node000003" href="$Definitions_8h.html#a086546d06aa565cdd48f436973ebc496" title="Prints an informational message with a specific format." alt="" coords="350,94,424,120"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="211,78,334,97,334,102,211,83"/>
-<area shape="poly" id="edge3_Node000003_Node000003" title=" " alt="" coords="347,98,335,88,338,77,356,70,387,68,427,72,437,79,439,86,434,87,433,82,426,77,387,73,357,75,342,80,340,86,351,94"/>
-</map>

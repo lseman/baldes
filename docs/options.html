@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="BALDES pricing options Documentation index · Cuts ·Enumerated MIP The public option names start with BALDES. The standard build exposes39 supported pricing options. Builds with bot">
+<title>BALDES pricing options — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/options.html">
+<link rel="stylesheet" href="_static/site.css">
+<link rel="stylesheet" href="_static/docs.css">
+<link rel="stylesheet" href="_static/syntax.css">
+<script src="_static/app.js" defer></script>
+<script src="_static/docs.js" defer></script>
+</head>
+<body class="docs-body" data-docs-root="./">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../"><img src="_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html" aria-current="page">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/options.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="baldes-pricing-options">BALDES pricing options</h1>
+<p><a href="index.html">Documentation index</a> · <a href="cuts.html">Cuts</a> ·
+<a href="enumerated-mip.html">Enumerated MIP</a></p>
+<p>The public option names start with <code>BALDES</code>. The standard build exposes
+<strong>39 supported pricing options</strong>. Builds with both <code>clp</code> and <code>highs</code> expose
+<strong>two additional enumerated-MIP controls</strong>. Each option below has a consumer;
+some apply only to a particular operation or a configured cut family.</p>
+<p>Rust exposes the supported metadata through <code>OPTION_TABLE</code> and availability
+through <code>Options::support(name)</code>. Python lists supported names with
+<code>Solver.option_names()</code> and reports scope with <code>Solver.option_support(name)</code>.
+The C option-count/name functions use the same supported table. Listings are
+specific to the features enabled in the build.</p>
+<p>Use <code>Solver::set_option</code> to update a live solver. <code>Options</code> itself is a validated
+option-value container; changing <code>solver.options</code> directly does not synchronize
+controls, phase schedules or engine state. Failed live-solver setters preserve
+the prior option values, controls, phases and prepared engine.</p>
+<h2 id="configuration-and-runtime-overrides">Configuration and runtime overrides</h2>
+<ul>
+<li><code>BALDESlabelDominanceStrategy</code> accepts 0 or 1 and reaches labeling through
+<code>Solver::dominance_mode</code>. The dedicated C strategy setter uses the same
+path, so its value agrees with the named option getter. Full-label fixing
+still selects its required dominance behavior.</li>
+<li><code>BALDESuseCapacityCuts</code> and <code>BALDEScapCutsMaxNumPerRound</code> override an explicitly
+configured root capacity separator and apply after inherited cut state is
+installed. Omitting an override preserves the configuration or parent's
+settings. Enabling the option alone does not create demands or a separator.</li>
+<li><code>BALDEScapacityCutsSeparator</code> selects the available built-in separator for
+nonzero values. Value 0 requests external CVRPSEP, which is unavailable and
+is rejected explicitly. Positive capacity cut limits are required.</li>
+</ul>
+<h2 id="supported-controls">Supported controls</h2>
+<p>Paths below name consumers, not unconditional guarantees. For example, NG
+initialization options are consumed by the explicit C initialization calls;
+<code>vrptw::Instance::graph</code> receives its NG size as an argument. Cut options need
+the corresponding cut family. The staged <code>Solver::price</code> convenience method
+installs its own heuristic column schedule, while <code>price_phase</code> uses the
+configured per-iteration limit. Knapsack root overrides currently apply when
+constructing that separator; changing them in an inherited node does not
+reconfigure its existing separator.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Kind</th>
+<th>Default</th>
+<th>Consumer / scope</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BALDESstopCutGenTimeThresholdInPricing</code></td>
+<td>Double</td>
+<td><code>10.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/controller.rs">src/pricing/controller.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDEShardTimeThresholdInPricing</code></td>
+<td>Double</td>
+<td><code>20.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/mod.rs">src/pricing/mod.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/pricing/solve.rs">src/pricing/solve.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/master/tree/mod.rs">src/master/tree/mod.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESredCostFixingTimeThreshold</code></td>
+<td>Double</td>
+<td><code>100.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/fixing_workflow.rs">src/pricing/fixing_workflow.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/master/root/controller.rs">src/master/root/controller.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESnumberOfBucketsPerVertex</code></td>
+<td>Int</td>
+<td><code>25.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/mod.rs">src/pricing/mod.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/api/options.rs">src/api/options.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESdynamicBucketSteps</code></td>
+<td>Int</td>
+<td><code>1.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/controller.rs">src/pricing/controller.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/pricing/solve.rs">src/pricing/solve.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESuseBidirectionalSearch</code></td>
+<td>Int</td>
+<td><code>2.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/mod.rs">src/pricing/mod.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/api/options.rs">src/api/options.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESapplyReducedCostFixing</code></td>
+<td>Int</td>
+<td><code>1.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/fixing_workflow.rs">src/pricing/fixing_workflow.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESmaxNumOfColsPerIteration</code></td>
+<td>Int</td>
+<td><code>30.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/mod.rs">src/pricing/mod.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/pricing/solve.rs">src/pricing/solve.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESmaxNumOfColsPerExactIteration</code></td>
+<td>Int</td>
+<td><code>150.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/mod.rs">src/pricing/mod.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESmaxNumOfLabelsInEnumeration</code></td>
+<td>Int</td>
+<td><code>1000000.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/fixing_workflow.rs">src/pricing/fixing_workflow.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/pricing/universe.rs">src/pricing/universe.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESmaxNumOfEnumeratedSolutions</code></td>
+<td>Int</td>
+<td><code>1000000.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/fixing_workflow.rs">src/pricing/fixing_workflow.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/pricing/universe.rs">src/pricing/universe.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESinitNGneighbourhoodSize</code></td>
+<td>Int</td>
+<td><code>8.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/api/relaxation.rs">src/api/relaxation.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESmaxNGneighbourhoodSize</code></td>
+<td>Int</td>
+<td><code>0.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/api/relaxation.rs">src/api/relaxation.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/master/root/controller.rs">src/master/root/controller.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESrankOneCutsMaxNumRows</code></td>
+<td>Int</td>
+<td><code>5.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/cuts/registry.rs">src/cuts/registry.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESrankOneCutsMaxNumPerRound</code></td>
+<td>Int</td>
+<td><code>100.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/cuts/registry.rs">src/cuts/registry.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/cuts/kpath/mod.rs">src/cuts/kpath/mod.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESrankOneCutsMemoryType</code></td>
+<td>Int</td>
+<td><code>2.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/cuts/registry.rs">src/cuts/registry.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESrankOneCutsLSnumIterations</code></td>
+<td>Int</td>
+<td><code>1000.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/cuts/registry.rs">src/cuts/registry.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESredCostFixingFalseGap</code></td>
+<td>Double</td>
+<td><code>0.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/fixing_workflow.rs">src/pricing/fixing_workflow.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESmaxNumOfLabelsInHeurEnumeration</code></td>
+<td>Int</td>
+<td><code>0.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/fixing_workflow.rs">src/pricing/fixing_workflow.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDEScheckDominInOtherBuckets</code></td>
+<td>Bool</td>
+<td><code>1.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/mod.rs">src/pricing/mod.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESheurLabelingStrategy</code></td>
+<td>Int</td>
+<td><code>0.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/mod.rs">src/pricing/mod.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESlabelDominanceStrategy</code></td>
+<td>Int</td>
+<td><code>0.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/mod.rs">src/pricing/mod.rs</a>; label dominance mode (0 or 1), shared with the C strategy setter</td>
+</tr>
+<tr>
+<td><code>BALDESdynBuckStepAdjustRatioThreshold</code></td>
+<td>Double</td>
+<td><code>500.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/controller.rs">src/pricing/controller.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESdynBuckStepAdjustNumBuckArcsThreshold</code></td>
+<td>Double</td>
+<td><code>10000.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/controller.rs">src/pricing/controller.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESdynamicNGmode</code></td>
+<td>Int</td>
+<td><code>-1.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/api/relaxation.rs">src/api/relaxation.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/master/root/controller.rs">src/master/root/controller.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESmaxNumOfColumnsInDynamicNG</code></td>
+<td>Int</td>
+<td><code>100.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/api/relaxation.rs">src/api/relaxation.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/master/root/controller.rs">src/master/root/controller.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESmaxCycleSizeInDynamicNG</code></td>
+<td>Int</td>
+<td><code>5.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/api/relaxation.rs">src/api/relaxation.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/master/root/controller.rs">src/master/root/controller.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESmaxNGaverNeighbourhoodSize</code></td>
+<td>Int</td>
+<td><code>0.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/api/relaxation.rs">src/api/relaxation.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/master/root/controller.rs">src/master/root/controller.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESuseCapacityCuts</code></td>
+<td>Bool</td>
+<td><code>1.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/master/root/mod.rs">src/master/root/mod.rs</a>; explicit option overrides a configured capacity separator and is inherited by children</td>
+</tr>
+<tr>
+<td><code>BALDEScapacityCutsSeparator</code></td>
+<td>Int</td>
+<td><code>1.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/mod.rs">src/pricing/mod.rs</a>; accepts the available built-in separator; external CVRPSEP (0) is rejected</td>
+</tr>
+<tr>
+<td><code>BALDEScapCutsMaxNumPerRound</code></td>
+<td>Int</td>
+<td><code>100.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/master/root/mod.rs">src/master/root/mod.rs</a>; explicit per-round override for configured capacity separation, including inherited nodes</td>
+</tr>
+<tr>
+<td><code>BALDESresConsKnapsackCutsMode</code></td>
+<td>Int</td>
+<td><code>-1.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/master/root/mod.rs">src/master/root/mod.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/cuts/knapsack/mod.rs">src/cuts/knapsack/mod.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESresConsKnapsackCutsMaxNumPerRound</code></td>
+<td>Int</td>
+<td><code>100.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/master/root/mod.rs">src/master/root/mod.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/cuts/knapsack/mod.rs">src/cuts/knapsack/mod.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESrankOneCutsArcMemoryType</code></td>
+<td>Int</td>
+<td><code>2.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/cuts/registry.rs">src/cuts/registry.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESrankOneCutsSpDependentMemory</code></td>
+<td>Bool</td>
+<td><code>0.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/cuts/registry.rs">src/cuts/registry.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESrankOneCutsMaxNumTriplets</code></td>
+<td>Int</td>
+<td><code>10000.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/cuts/registry.rs">src/cuts/registry.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESrankOneCutsTypeToSeparate</code></td>
+<td>Int</td>
+<td><code>0.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/cuts/registry.rs">src/cuts/registry.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESuseCovSetsForSepOneRowPackingCuts</code></td>
+<td>Bool</td>
+<td><code>0.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/cuts/registry.rs">src/cuts/registry.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESuseExactComplBoundsInEnumeration</code></td>
+<td>Bool</td>
+<td><code>1.0</code></td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/universe.rs">src/pricing/universe.rs</a></td>
+</tr>
+</tbody>
+</table>
+<p>The two additional consumers with <code>clp,highs</code> are:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Kind</th>
+<th>Default</th>
+<th>Consumer / scope</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BALDESmaxNumOfEnumSolutionsForMIP</code></td>
+<td>Int</td>
+<td><code>10000.0</code></td>
+<td>Normal threshold used to normalize the end-of-node threshold; immediate in-CG MIP handoff is not implemented</td>
+</tr>
+<tr>
+<td><code>BALDESmaxNumOfEnumSolsForEndOfNodeMIP</code></td>
+<td>Int</td>
+<td><code>0.0</code></td>
+<td>End-of-node route-count gate, raised to at least the normal threshold; requires complete enumeration and opt-in HiGHS solving</td>
+</tr>
+</tbody>
+</table>
+<p>These appear in the public option list only when both <code>clp</code> and <code>highs</code> are
+enabled. They apply to opt-in tree MIP solving; see
+<a href="enumerated-mip.html">enumerated integer solving</a>.</p>
+<h2 id="examples-and-verification">Examples and verification</h2>
+<p>Rust exposes metadata independently of constructing a graph:</p>
+<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span><span class="n">core</span><span class="p">::</span><span class="n">options</span><span class="p">::</span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">pricing</span><span class="p">::</span><span class="n">Solver</span><span class="p">};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">baldes</span><span class="p">::</span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">::</span><span class="n">support</span><span class="p">(</span><span class="s">&quot;BALDESlabelDominanceStrategy&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">);</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Solver</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">solver</span><span class="p">.</span><span class="n">set_option</span><span class="p">(</span><span class="s">&quot;BALDESlabelDominanceStrategy&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</code></pre>
+<p>Python exposes the same support query and runtime setter:</p>
+<pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Solver</span>
+
+<span class="n">names</span> <span class="o">=</span> <span class="n">Solver</span><span class="o">.</span><span class="n">option_names</span><span class="p">()</span>
+<span class="n">implemented</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="n">Solver</span><span class="o">.</span><span class="n">option_support</span><span class="p">(</span><span class="s2">&quot;BALDESlabelDominanceStrategy&quot;</span><span class="p">)</span>
+<span class="n">solver</span> <span class="o">=</span> <span class="n">Solver</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s2">&quot;BALDESlabelDominanceStrategy&quot;</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+</code></pre>
+<p>CLI overrides are repeatable:</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--option<span class="w"> </span><span class="nv">BALDESlabelDominanceStrategy</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>--time<span class="w"> </span><span class="m">60</span>
+</code></pre>
+<p><a href="https://github.com/lseman/baldes/blob/main/src/core/options.rs"><code>OPTION_TABLE</code></a> is the source of truth for names,
+types, defaults, and feature-dependent support. It lists only controls supported
+in the current build. Keep this document synchronized when adding a consumer.
+Bool values are numeric zero/one; integer options
+require integral values. Live setters also validate operation-specific modes
+and limits before changing solver state.</p>
+<p><a href="https://github.com/lseman/baldes/blob/main/tests/options.rs">Option tests</a> cover canonical discovery in Rust/C,
+input-alias compatibility, failure atomicity, dominance synchronization, and
+capacity overrides
+in fresh/inherited nodes. Run:</p>
+<pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>--test<span class="w"> </span>options
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--test<span class="w"> </span>options<span class="w"> </span>--test<span class="w"> </span>cli
+</code></pre>
+<p>See <a href="testing.html">Build and validation</a> for the full suite. Separate feature
+builds matter because MIP threshold support changes with the enabled backends.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="enumerated-mip.html"><small>Previous guide</small>Enumerated node MIP with HiGHS <span aria-hidden="true">↗</span></a><a href="stabilization.html"><small>Next guide</small>Dual-price stabilization <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#configuration-and-runtime-overrides">Configuration and runtime overrides</a><a class="toc-level-2" href="#supported-controls">Supported controls</a><a class="toc-level-2" href="#examples-and-verification">Examples and verification</a></nav></aside>
+</div>
+</body></html>

@@ -1,7 +1,0 @@
-<map id="generateExactPermutations" name="generateExactPermutations">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,186,55"/>
-<area shape="poly" id="edge1_Node000001_Node000001" title=" " alt="" coords="56,31,49,21,53,11,69,5,96,3,124,5,139,12,137,17,123,11,95,8,70,10,57,15,54,20,61,27"/>
-<area shape="rect" id="Node000002" href="$Helpers_8h.html#acf8696478b8666472dbbc5267f76fd36" title=" " alt="" coords="234,29,430,55"/>
-<area shape="poly" id="edge2_Node000001_Node000002" title=" " alt="" coords="186,40,218,40,218,45,186,45"/>
-<area shape="poly" id="edge3_Node000002_Node000002" title=" " alt="" coords="293,31,285,21,290,11,306,5,332,3,361,5,375,12,373,17,359,11,332,8,307,10,293,15,290,20,297,27"/>
-</map>

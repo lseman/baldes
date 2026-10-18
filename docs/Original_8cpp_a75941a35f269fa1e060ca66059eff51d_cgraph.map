@@ -1,8 +1,0 @@
-<map id="solve_vrp" name="solve_vrp">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,31,83,56"/>
-<area shape="poly" id="edge3_Node000001_Node000001" title=" " alt="" coords="15,32,9,22,12,12,24,6,44,4,65,7,76,13,73,18,63,12,44,9,26,11,16,16,14,21,19,29"/>
-<area shape="rect" id="Node000002" href="$structInstanceData.html#a8a0f43a637f6846c4a3103f0ec4160bc" title="Retrieves the capacity." alt="" coords="131,5,303,31"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="83,35,115,30,115,36,83,41"/>
-<area shape="rect" id="Node000003" href="$structInstanceData.html#af8952d73a9d4d1c091450ec8802490d3" title="Retrieves the demand value for a given index." alt="" coords="132,55,302,80"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="83,46,117,51,116,56,83,51"/>
-</map>

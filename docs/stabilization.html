@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Dual-price stabilization Documentation index · Tree lifecycle Column generation can repeatedly produce similar master duals and columns.BALDES optionally smooths the dual point sen">
+<title>Dual-price stabilization — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/stabilization.html">
+<link rel="stylesheet" href="_static/site.css">
+<link rel="stylesheet" href="_static/docs.css">
+<link rel="stylesheet" href="_static/syntax.css">
+<script src="_static/app.js" defer></script>
+<script src="_static/docs.js" defer></script>
+</head>
+<body class="docs-body" data-docs-root="./">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../"><img src="_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html" aria-current="page">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/stabilization.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="dual-price-stabilization">Dual-price stabilization</h1>
+<p><a href="index.html">Documentation index</a> · <a href="tree.html">Tree lifecycle</a></p>
+<p>Column generation can repeatedly produce similar master duals and columns.
+BALDES optionally smooths the dual point sent to pricing, using a stored
+center and bounded retries when smoothed pricing finds no fresh columns.
+It is enabled by default in <code>column_generation::Options</code>.</p>
+<p>The implementation is
+<a href="https://github.com/lseman/baldes/blob/main/src/master/stabilization.rs"><code>DualPriceSmoothing</code></a>, integrated by the
+<a href="https://github.com/lseman/baldes/blob/main/src/master/column_generation.rs">column-generation loop</a>. The sections below
+describe the implemented update and retry rules.</p>
+<h2 id="smoothing-weight">Smoothing weight</h2>
+<p>For raw master duals <code>raw</code>, stored <code>center</code>, and an outward point <code>outward</code>:</p>
+<pre><code class="language-text">pricing[i] = (1 - effective_alpha) * outward[i]
+           + effective_alpha * center[i]
+</code></pre>
+<p>By default <code>outward = raw</code>. <strong>Larger alpha means more weight on the center.</strong>
+At alpha zero pricing uses the outward point; at alpha one it uses the center.
+Reducing alpha moves pricing back toward the current master duals.</p>
+<p>After interpolation, a positive dual on a <code>LessEqual</code> row or a negative dual
+on a <code>GreaterEqual</code> row is set to zero when its magnitude exceeds the
+configured tolerance. Equality rows have no such sign restriction.</p>
+<h2 id="parameters">Parameters</h2>
+<p>These are Rust <code>master::stabilization::Parameters</code>, configured through
+<code>RootOptions::cg.smoothing</code> or directly in <code>column_generation::Options</code>.
+They are separate from the named BALDES pricing options.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>alpha_factor</code></td>
+<td><code>1.0</code></td>
+<td>Below 1: use that base alpha and the linear retry rule; otherwise adapt alpha dynamically</td>
+</tr>
+<tr>
+<td><code>initial_alpha</code></td>
+<td><code>0.5</code></td>
+<td>Initial base alpha for the dynamic mode</td>
+</tr>
+<tr>
+<td><code>beta_factor</code></td>
+<td><code>0.0</code></td>
+<td>Zero: use raw outward point; positive: enable the directional construction below</td>
+</tr>
+<tr>
+<td><code>max_updates</code></td>
+<td><code>10</code></td>
+<td>Maximum smoothed retry updates before returning to raw duals</td>
+</tr>
+<tr>
+<td><code>min_gap</code></td>
+<td><code>0.0</code></td>
+<td>Minimum accepted gap, using the comparison tolerance</td>
+</tr>
+<tr>
+<td><code>max_gap</code></td>
+<td><code>0.0</code></td>
+<td>Maximum accepted gap; nonpositive disables the upper gate</td>
+</tr>
+<tr>
+<td><code>minimum_stage</code></td>
+<td><code>0</code></td>
+<td>Minimum stage accepted by <code>after_master</code></td>
+</tr>
+<tr>
+<td><code>tolerance</code></td>
+<td><code>1e-6</code></td>
+<td>General comparison and sign-correction tolerance</td>
+</tr>
+</tbody>
+</table>
+<p>The current column-generation caller passes stage <code>0</code> to <code>after_master</code> and
+passes the actual pricing phase in feedback. Raising <code>minimum_stage</code> above
+zero therefore disables activation in that caller. Its gap argument is the
+master LP value minus the current finite bound, or zero when no finite bound
+is available.</p>
+<h2 id="lifecycle">Lifecycle</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>restart_schedule(phase)</code></td>
+<td>Reset base/effective alpha, retry count, active flag, and center phase; retain the stored center/bound vectors</td>
+</tr>
+<tr>
+<td><code>after_master(...)</code></td>
+<td>Apply a pending center, store raw duals/senses, reset retries, and activate smoothing if the stage/gap/alpha gates allow it</td>
+</tr>
+<tr>
+<td><code>after_pricing(feedback)</code></td>
+<td>Consider a center update, adjust base alpha, and decide whether pricing should retry</td>
+</tr>
+<tr>
+<td><code>after_iteration()</code></td>
+<td>Clear the moved-center marker and return active pricing to raw duals</td>
+</tr>
+<tr>
+<td><code>remap_rows(map)</code></td>
+<td>Compact dual, center, sense, and pending-center vectors after row removal</td>
+</tr>
+</tbody>
+</table>
+<p>The first master iteration uses raw duals. Cut/enumeration transitions restart
+the schedule; row cleanup applies the row map. Removing columns alone does
+not change row coordinates and does not require a center remap.</p>
+<h2 id="pricing-retries-and-alpha-updates">Pricing retries and alpha updates</h2>
+<p>Feedback includes the fresh negative-column count, a subgradient vector,
+Lagrangian value, and pricing phase. In the column-generation driver, the
+subgradient starts at the row RHS and subtracts multiplicity times the best
+acceptable column's coefficients when its reduced-cost magnitude passes the
+numeric test.</p>
+<p>On the first pricing pass in dynamic mode (<code>alpha_factor &gt;= 1</code>):</p>
+<pre><code class="language-text">if no fresh negative columns or angle &gt; 1e-12:
+    alpha -= 0.1
+else if angle &lt; -1e-12 and alpha is below the near-one gate:
+    alpha += 0.1 * (1 - alpha)
+</code></pre>
+<p>The angle threshold is <strong>1e-12</strong>, independently of <code>Parameters::tolerance</code>.
+The near-one gate includes the general tolerance and a relative margin.
+Updating base alpha affects subsequent master iterations; retries update the
+current effective alpha separately.</p>
+<p>If fresh negative columns exist, or smoothing is inactive, <code>after_pricing</code>
+returns false and stops retrying. Otherwise it increments <code>misprices</code> and uses:</p>
+<pre><code class="language-text">dynamic mode: effective_alpha = 2 * effective_alpha - 1
+fixed-base mode: effective_alpha = 1 - misprices * (1 - alpha)
+</code></pre>
+<p>It republishes a smoothed point only while the retry count is at most
+<code>max_updates</code> and effective alpha exceeds the tolerance. When either gate
+fails, it deactivates smoothing and requests a final retry at raw duals.
+“Fixed” describes the base alpha, not an unchanging effective retry weight.</p>
+<h2 id="center-updates">Center updates</h2>
+<p>A nonfinite Lagrangian value is ignored. If the current center phase is less
+than or equal to the feedback phase, a finite center bound is replaced only
+when the new value improves it beyond tolerance. A lower-numbered feedback
+phase can reset the center phase and accept a different bound without that
+same improvement requirement.</p>
+<p>The accepted pricing point and feedback subgradient become a <strong>pending</strong>
+center, installed by the next <code>after_master</code> call. Consequently the stored
+center bound is not unconditionally monotone across phase changes.</p>
+<p>The angle helper computes:</p>
+<pre><code class="language-text">toward = pricing - center
+angle = dot(toward, feedback_subgradient)
+      / (norm(toward) * norm(feedback_subgradient))
+</code></pre>
+<p>The division is unguarded. A zero denominator may yield <code>NaN</code>; comparisons
+with it then fail. This behavior differs from forcing an angle of zero.</p>
+<h2 id="optional-directional-construction">Optional directional construction</h2>
+<p>With positive <code>beta_factor</code>, let <code>d = raw - center</code>, <code>l = norm(d)</code>, and <code>g</code>
+be the stored center subgradient. A negligible <code>l</code> returns raw duals.
+For <code>beta_factor == 1</code>, beta is the cosine between <code>d</code> and <code>g</code>; a negligible
+subgradient also returns raw duals. Otherwise the configured beta is used.
+Beta is clamped to <code>[0, 1]</code> before constructing:</p>
+<pre><code class="language-text">outward = center + (1 - beta) * d - beta * l * g / norm(g)
+</code></pre>
+<p>A negligible subgradient contributes zero to its directional term. When the
+constructed step has norm above <code>1e-12</code>, it is rescaled to length <code>l</code>. This
+changes the outward point before the alpha interpolation.</p>
+<h2 id="configure-or-disable">Configure or disable</h2>
+<p>A complete Rust example, requiring <code>clp</code>:</p>
+<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span><span class="n">master</span><span class="p">::</span><span class="n">root</span><span class="p">::</span><span class="n">RootOptions</span><span class="p">,</span><span class="w"> </span><span class="n">vrptw</span><span class="p">::{</span><span class="n">Instance</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">}};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">baldes</span><span class="p">::</span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Instance</span><span class="p">::</span><span class="n">read</span><span class="p">(</span><span class="s">&quot;instances/R101.txt&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">instance</span><span class="p">.</span><span class="n">truncate</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RootOptions</span><span class="p">::</span><span class="n">default</span><span class="p">();</span>
+<span class="w">    </span><span class="n">options</span><span class="p">.</span><span class="n">cg</span><span class="p">.</span><span class="n">smoothing</span><span class="p">.</span><span class="n">initial_alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.5</span><span class="p">;</span>
+<span class="w">    </span><span class="n">options</span><span class="p">.</span><span class="n">cg</span><span class="p">.</span><span class="n">smoothing</span><span class="p">.</span><span class="n">beta_factor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">options</span><span class="p">.</span><span class="n">cg</span><span class="p">.</span><span class="n">smoothing</span><span class="p">.</span><span class="n">max_updates</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">instance</span><span class="p">.</span><span class="n">solve_root</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">::</span><span class="nb">None</span><span class="p">,</span><span class="w"> </span><span class="n">options</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}: root LP={}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">master</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">master</span><span class="p">.</span><span class="n">lp</span><span class="p">);</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</code></pre>
+<p>Set <code>options.cg.stabilize = false</code> to disable it in Rust. The CLI exposes:</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span>--no-stabilization
+</code></pre>
+<p>Python exposes the enable/disable switch through the public root API:</p>
+<pre><code class="language-python"><span class="kn">import</span><span class="w"> </span><span class="nn">pybaldes</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">pybaldes</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span>
+    <span class="s2">&quot;instances/R101.txt&quot;</span><span class="p">,</span> <span class="n">customers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">stabilize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">lp</span><span class="p">)</span>
+</code></pre>
+<p>The Python root API does not expose the individual smoothing parameters.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="options.html"><small>Previous guide</small>BALDES pricing options <span aria-hidden="true">↗</span></a><a href="source-layout.html"><small>Next guide</small>Source layout <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#smoothing-weight">Smoothing weight</a><a class="toc-level-2" href="#parameters">Parameters</a><a class="toc-level-2" href="#lifecycle">Lifecycle</a><a class="toc-level-2" href="#pricing-retries-and-alpha-updates">Pricing retries and alpha updates</a><a class="toc-level-2" href="#center-updates">Center updates</a><a class="toc-level-2" href="#optional-directional-construction">Optional directional construction</a><a class="toc-level-2" href="#configure-or-disable">Configure or disable</a></nav></aside>
+</div>
+</body></html>

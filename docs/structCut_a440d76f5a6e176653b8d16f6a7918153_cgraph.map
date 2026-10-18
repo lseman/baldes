@@ -1,8 +1,0 @@
-<map id="Cut::Cut" name="Cut::Cut">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,55,73,80"/>
-<area shape="rect" id="Node000002" href="$structCut.html#a8d51b66f1d341e81687465ebb7ccabd2" title=" " alt="" coords="172,29,240,55"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="73,60,156,47,157,52,74,65"/>
-<area shape="rect" id="Node000003" href="$structSRCPermutation.html#a7c2eee29003a81f6c79aeb63729838dd" title=" " alt="" coords="121,79,291,104"/>
-<area shape="poly" id="edge3_Node000001_Node000003" title=" " alt="" coords="74,70,105,74,105,80,73,75"/>
-<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="177,30,172,21,175,11,187,5,206,3,226,5,237,12,234,16,224,10,206,8,188,10,179,15,177,20,182,28"/>
-</map>

@@ -1,6 +1,0 @@
-<map id="VRProblem::detectIntegerMasterSolution" name="VRProblem::detectIntegerMasterSolution">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,175,70"/>
-<area shape="rect" id="Node000002" href="$namespacebaldes_1_1bcp.html#ae3be4aa80ffe75110644174cd57d341b" title=" " alt="" coords="223,29,391,70"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="175,47,207,47,207,52,175,52"/>
-<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="266,29,264,19,271,10,285,5,307,3,330,5,344,11,342,16,329,10,307,8,286,10,274,15,269,21,271,28"/>
-</map>

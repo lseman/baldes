@@ -1,6 +1,0 @@
-<map id="Branching::generateVRPCandidates" name="Branching::generateVRPCandidates">
-<area shape="rect" id="Node000001" title="This function generates VRP candidates based on the selected branching candidates." alt="" coords="5,29,233,55"/>
-<area shape="rect" id="Node000002" href="$classVRPCandidate.html#ae804b3967807029d617d1b81b2e43097" title=" " alt="" coords="281,29,478,55"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="233,40,265,40,265,45,233,45"/>
-<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="337,31,328,21,333,11,351,5,379,3,412,5,428,13,425,17,410,11,379,8,352,10,337,15,333,20,341,27"/>
-</map>

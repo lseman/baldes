@@ -1,9 +1,0 @@
-<map id="Bucket::flush_extra_labels_if_large" name="Bucket::flush_extra_labels_if_large">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,39,136,79"/>
-<area shape="rect" id="Node000002" href="$structBucket.html#a4c2a5a95c9ba69520d553607273e8507" title=" " alt="" coords="189,5,319,46"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="136,45,173,38,174,43,137,50"/>
-<area shape="rect" id="Node000004" href="$structBucket.html#a3238ca04c496167199328631e5a4331d" title=" " alt="" coords="184,71,324,111"/>
-<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="137,68,169,74,168,79,136,73"/>
-<area shape="rect" id="Node000003" href="$structBucket.html#a1082aa37608a1581cfb25be0262272b0" title=" " alt="" coords="372,5,528,46"/>
-<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="320,23,356,23,356,28,320,28"/>
-</map>

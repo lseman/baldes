@@ -1,9 +1,0 @@
-<map id="Bucket::contains" name="Bucket::contains">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,67,123,92"/>
-<area shape="rect" id="Node000002" href="$namespacenumericutils.html#aaadab3c8a1b76df1e09c11ebaa3d1e49" title=" " alt="" coords="171,29,279,55"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="122,63,155,56,156,61,123,69"/>
-<area shape="rect" id="Node000003" href="$namespacenumericutils.html#af55fcfd2b05fe5a20796069445c89aef" title=" " alt="" coords="173,103,277,128"/>
-<area shape="poly" id="edge3_Node000001_Node000003" title=" " alt="" coords="124,90,158,98,157,103,123,95"/>
-<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="197,30,192,21,195,11,207,5,225,3,244,5,255,12,252,16,243,10,225,8,208,10,199,15,197,20,202,28"/>
-<area shape="poly" id="edge4_Node000003_Node000003" title=" " alt="" coords="197,104,192,94,195,84,207,78,225,76,244,79,255,85,252,90,243,84,225,81,208,83,199,88,197,93,202,101"/>
-</map>

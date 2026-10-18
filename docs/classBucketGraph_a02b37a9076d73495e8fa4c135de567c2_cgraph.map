@@ -1,6 +1,0 @@
-<map id="BucketGraph::prepare_src_pricing_state" name="BucketGraph::prepare_src_pricing_state">
-<area shape="rect" id="Node000001" title=" " alt="" coords="5,29,152,70"/>
-<area shape="poly" id="edge2_Node000001_Node000001" title=" " alt="" coords="39,29,37,19,44,10,57,5,79,3,101,5,115,11,112,16,100,10,78,8,59,10,47,15,42,20,44,28"/>
-<area shape="rect" id="Node000002" href="$classCutStorage.html#a5661b2dd9924180da3dd03cc2d63bd2c" title=" " alt="" coords="200,37,374,62"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="152,47,184,47,184,52,152,52"/>
-</map>

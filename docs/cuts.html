@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Routing cuts Documentation index · BALDES options ·Source layout A cut must have consistent coefficients in the master, pricing, retainedroutes, and descendants. The root adapter i">
+<title>Routing cuts — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/cuts.html">
+<link rel="stylesheet" href="_static/site.css">
+<link rel="stylesheet" href="_static/docs.css">
+<link rel="stylesheet" href="_static/syntax.css">
+<script src="_static/app.js" defer></script>
+<script src="_static/docs.js" defer></script>
+</head>
+<body class="docs-body" data-docs-root="./">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../"><img src="_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html" aria-current="page">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/cuts.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="routing-cuts">Routing cuts</h1>
+<p><a href="index.html">Documentation index</a> · <a href="options.html">BALDES options</a> ·
+<a href="source-layout.html">Source layout</a></p>
+<p>A cut must have consistent coefficients in the master, pricing, retained
+routes, and descendants. The root adapter installs cut rows and dual effects;
+node snapshots retain active rows and the pricing state needed to use them.</p>
+<h2 id="available-families">Available families</h2>
+<table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Purpose</th>
+<th>Rust root configuration</th>
+<th>CLI / Python</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Limited-memory rank-one</td>
+<td>Strengthen the customer-cover relaxation</td>
+<td><code>with_rank_one_cuts()</code></td>
+<td><code>--rank1</code> / <code>rank_one_cuts=True</code></td>
+</tr>
+<tr>
+<td>Rounded capacity</td>
+<td>Enforce capacity-derived subset inequalities</td>
+<td><code>with_capacity_cuts(config)</code></td>
+<td><code>--capacity-cuts</code> / <code>capacity_cuts=True</code></td>
+</tr>
+<tr>
+<td>Kohl 2-path</td>
+<td>Use time-window feasibility to strengthen capacity subsets</td>
+<td>Capacity config with time windows</td>
+<td><code>--two-path-cuts</code> / <code>two_path_cuts=True</code></td>
+</tr>
+<tr>
+<td>Strong k-path</td>
+<td>Separate route-count inequalities on customer sets</td>
+<td><code>with_kpath_cuts(config)</code> or <code>with_native_kpath_cuts(config)</code></td>
+<td>Rust API</td>
+</tr>
+<tr>
+<td>Route-load knapsack</td>
+<td>Separate inequalities on integer resource loads</td>
+<td><code>with_knapsack_cuts(config)</code></td>
+<td>Rust API</td>
+</tr>
+</tbody>
+</table>
+<p>All routing root integrations require <code>clp</code>. HiGHS is needed only for the
+optional enumerated integer solve. Cut configuration does not enable that
+solve automatically.</p>
+<h2 id="start-with-capacity-and-rank-one-cuts">Start with capacity and rank-one cuts</h2>
+<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">25</span><span class="w"> </span>--capacity-cuts<span class="w"> </span>--rank1<span class="w"> </span>--time<span class="w"> </span><span class="m">60</span>
+</code></pre>
+<p>A complete Rust example:</p>
+<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span><span class="n">master</span><span class="p">::</span><span class="n">root</span><span class="p">::</span><span class="n">RootOptions</span><span class="p">,</span><span class="w"> </span><span class="n">vrptw</span><span class="p">::{</span><span class="n">Instance</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">}};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">baldes</span><span class="p">::</span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Instance</span><span class="p">::</span><span class="n">read</span><span class="p">(</span><span class="s">&quot;instances/R101.txt&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">instance</span><span class="p">.</span><span class="n">truncate</span><span class="p">(</span><span class="mi">25</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">rounding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Rounding</span><span class="p">::</span><span class="nb">None</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">capacity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">instance</span><span class="p">.</span><span class="n">capacity_cut_config</span><span class="p">(</span><span class="n">rounding</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RootOptions</span><span class="p">::</span><span class="n">default</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="n">with_capacity_cuts</span><span class="p">(</span><span class="n">capacity</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="n">with_rank_one_cuts</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">instance</span><span class="p">.</span><span class="n">solve_root</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="n">rounding</span><span class="p">,</span><span class="w"> </span><span class="n">options</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}: root LP={}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">master</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">master</span><span class="p">.</span><span class="n">lp</span><span class="p">);</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</code></pre>
+<p>Use <code>capacity_cut_config(rounding, true)</code> to attach the instance's ready/due
+windows, service times, and travel matrix for Kohl separation. The CLI/Python
+2-path switch is for VRPTW; CVRP inputs do not supply time windows.</p>
+<p>Capacity/Kohl separation has priority 3 at the root and 1 below it. It shares a
+persistent subset pool. Basic cut rows may be retired by cleanup; reported cut
+counts can therefore exceed the number of rows still active.</p>
+<h2 id="strong-k-path-adapters">Strong k-path adapters</h2>
+<p><code>KPathCutConfig::new(demands, capacity)</code> is the routing convenience adapter.
+Its demand vector uses depot index 0 and customer indices <code>1..n</code>; the split
+sink is <code>n + 1</code>. <code>with_time_windows</code> supplies optional time-window data.</p>
+<p><code>NativeKPathCutConfig</code> accepts explicit graphs, graph IDs, packing/covering
+set incidence, and demands in the original zero-based set order without a
+depot entry. Use it when the convenience adapter does not represent the input
+mapping. <code>with_kpath_cuts</code> and <code>with_native_kpath_cuts</code> select alternative
+adapters; the most recently selected one replaces the other.</p>
+<p>Graph IDs, set IDs, and pricing vertex indices have different roles. Keep
+those mappings explicit when registering cuts. Full-memory enumeration and
+limited-memory pricing can use different coefficient state; the adapter
+updates the master when switching modes.</p>
+<h2 id="route-load-knapsack-and-resource-ids">Route-load knapsack and resource IDs</h2>
+<p><code>KnapsackCutConfig::new(rows)</code> takes integer resource rows from
+<code>cuts::knapsack::KnapsackRow</code>. Separation uses route resource loads, and
+pricing must charge the same load-dependent contribution. Ordinary arc-only
+costs are insufficient for this family.</p>
+<p><code>KnapsackCutConfig::with_resource_indices(map)</code> maps resource IDs in those
+rows to coordinates in the pricing solver. An empty map uses identity
+mapping. For example, an input resource identified as 7 can map to solver
+coordinate 1. This changes the coordinate lookup, while preserving resource
+IDs in the cut associations. The mapping must remain valid through pricing,
+enumeration, and child inheritance.</p>
+<p>Keep rows integer-scaled according to their model semantics. The resource
+map is not a unit conversion. See the mapped-resource and load-dependent
+pricing cases in <a href="https://github.com/lseman/baldes/blob/main/tests/kpath_knapsack.rs">the integration tests</a> for
+complete fixtures.</p>
+<h2 id="configuration-boundaries">Configuration boundaries</h2>
+<p>Named BALDES options do not create model data. Enabling capacity separation
+still requires demands and vehicle capacity; setting a knapsack mode still
+requires resource rows. Explicit capacity enablement and per-round overrides
+are applied after inherited cut state is installed. Knapsack construction
+overrides do not reconfigure an existing inherited separator.</p>
+<p>See <a href="options.html">BALDES options</a> for supported values and setter errors.</p>
+<h2 id="pricing-enumeration-and-integer-solving">Pricing, enumeration, and integer solving</h2>
+<ol>
+<li>Separation creates rows and registers their pricing state.</li>
+<li>Pricing incorporates active cut duals while constructing routes.</li>
+<li>Complete elementary enumeration uses full-memory coefficients, including
+updates to route columns already in the master.</li>
+<li>Child snapshots preserve active rows and cut state. The optional
+<a href="enumerated-mip.html">HiGHS solve</a> rebuilds full-memory route columns against
+every active physical row and omits artificial columns.</li>
+</ol>
+<p>The cut registry and coefficient logic live under <a href="https://github.com/lseman/baldes/tree/main/src/cuts">src/cuts</a>.
+Root scheduling and row remapping live in the
+<a href="https://github.com/lseman/baldes/blob/main/src/master/root/controller.rs">root controller</a>.</p>
+<h2 id="validation">Validation</h2>
+<pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--test<span class="w"> </span>capacity_root<span class="w"> </span>--test<span class="w"> </span>kpath_knapsack
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>--test<span class="w"> </span>highs_mip
+</code></pre>
+<p>The suites cover small exhaustive validity checks, separation violations,
+bidirectional pricing, enumeration repricing, mapped resource IDs, time
+windows, and inherited cut rows. The HiGHS tests exercise complete node
+masters across the existing cut-family configurations.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="branching.html"><small>Previous guide</small>Routing branching <span aria-hidden="true">↗</span></a><a href="enumerated-mip.html"><small>Next guide</small>Enumerated node MIP with HiGHS <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#available-families">Available families</a><a class="toc-level-2" href="#start-with-capacity-and-rank-one-cuts">Start with capacity and rank-one cuts</a><a class="toc-level-2" href="#strong-k-path-adapters">Strong k-path adapters</a><a class="toc-level-2" href="#route-load-knapsack-and-resource-ids">Route-load knapsack and resource IDs</a><a class="toc-level-2" href="#configuration-boundaries">Configuration boundaries</a><a class="toc-level-2" href="#pricing-enumeration-and-integer-solving">Pricing, enumeration, and integer solving</a><a class="toc-level-2" href="#validation">Validation</a></nav></aside>
+</div>
+</body></html>

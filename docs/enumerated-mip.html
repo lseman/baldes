@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Enumerated node MIP with HiGHS Documentation index · Tree lifecycle ·BALDES options BALDES can solve a complete enumerated node master with HiGHS, while keepingClp for column gener">
+<title>Enumerated node MIP with HiGHS — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/enumerated-mip.html">
+<link rel="stylesheet" href="_static/site.css">
+<link rel="stylesheet" href="_static/docs.css">
+<link rel="stylesheet" href="_static/syntax.css">
+<script src="_static/app.js" defer></script>
+<script src="_static/docs.js" defer></script>
+</head>
+<body class="docs-body" data-docs-root="./">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../"><img src="_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html" aria-current="page">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/enumerated-mip.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="enumerated-node-mip-with-highs">Enumerated node MIP with HiGHS</h1>
+<p><a href="index.html">Documentation index</a> · <a href="tree.html">Tree lifecycle</a> ·
+<a href="options.html">BALDES options</a></p>
+<p>BALDES can solve a complete enumerated node master with <strong>HiGHS</strong>, while keeping
+Clp for column generation. The integer solve uses a separate HiGHS instance
+and leaves the source LP, its solution/basis, and sibling snapshots untouched.</p>
+<h2 id="controls-and-api">Controls and API</h2>
+<p>Build and enable the optional tree path:</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span>--tree<span class="w"> </span>--enumerated-mip
+</code></pre>
+<p><code>TreeOptions::enumerated_mip = Some(MipOptions::default())</code> enables the same
+path in Rust. It is disabled by default to preserve the existing tree schedule.
+A build without <code>highs</code> rejects this request explicitly. Disabling enumeration
+leaves no complete universe to send to the MIP solver.</p>
+<p><code>MipOptions</code> defaults to 2,000,000 nodes, 360,000 seconds, and no objective
+cutoff. The tree additionally caps time at 98% of its remaining global budget.
+These budgets are separate from the restricted-column heuristic's
+<code>TreeOptions::mip_node_limit</code> / <code>mip_time_limit</code>.</p>
+<p>For a generic integer model, the <code>highs</code> feature alone is sufficient. This
+complete example builds a two-variable binary master:</p>
+<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::{</span>
+<span class="w">    </span><span class="n">solvers</span><span class="p">::{</span><span class="n">highs</span><span class="p">::{</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">HighsMaster</span><span class="p">},</span><span class="w"> </span><span class="n">mip</span><span class="p">::</span><span class="n">MipOptions</span><span class="p">},</span>
+<span class="w">    </span><span class="n">LpMaster</span><span class="p">,</span><span class="w"> </span><span class="n">RowSense</span><span class="p">,</span>
+<span class="p">};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">baldes</span><span class="p">::</span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">master</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">HighsMaster</span><span class="p">::</span><span class="n">new</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">master</span><span class="p">.</span><span class="n">add_row</span><span class="p">(</span><span class="n">RowSense</span><span class="p">::</span><span class="n">GreaterEqual</span><span class="p">,</span><span class="w"> </span><span class="mf">1.5</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="p">[])</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">_</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="mi">0</span><span class="o">..</span><span class="mi">2</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">col</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">master</span><span class="p">.</span><span class="n">add_column</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="p">[(</span><span class="n">row</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">)])</span><span class="o">?</span><span class="p">;</span>
+<span class="w">        </span><span class="n">master</span><span class="p">.</span><span class="n">set_upper</span><span class="p">(</span><span class="n">col</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">highs</span><span class="p">::</span><span class="n">solve_integer</span><span class="p">(</span><span class="o">&amp;</span><span class="n">master</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">],</span><span class="w"> </span><span class="o">&amp;</span><span class="n">MipOptions</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}: {:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">solution</span><span class="p">);</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</code></pre>
+<p>This copies every current physical row, coefficient, cost, and upper bound
+through <code>LpMaster</code>. Columns have lower bound zero in this interface. Unlisted
+columns remain continuous. Integer values and all row activities are checked
+before returning a feasible witness. Coefficients small enough for HiGHS to
+discard are rejected explicitly instead of silently changing the matrix.</p>
+<p>For a routing snapshot, <code>NodeSnapshot::solve_enumerated_mip</code> prepares the full
+route master and applies the end-of-node route-count gate. It returns <code>None</code>
+if enumeration is incomplete or over the limit. This snapshot API requires
+<code>clp,highs</code>; the generic <code>highs::solve_integer</code> API needs only <code>highs</code>.</p>
+<h2 id="enumeration-gate">Enumeration gate</h2>
+<p>The route universe must be complete and its route count must not exceed the
+configured threshold. Equality and a completed empty universe are accepted.
+<code>BALDESmaxNumOfEnumSolutionsForMIP</code> defaults to 10,000;
+<code>BALDESmaxNumOfEnumSolsForEndOfNodeMIP</code> defaults to zero and is raised to at least
+the normal threshold. An incomplete universe never passes the gate. Setting
+only the end-of-node option to zero does not disable the solve, because the normal threshold still
+raises it. The gate counts retained enumerated routes before adding any
+previously priced elementary witness routes to the integer model.</p>
+<h2 id="preserving-node-semantics">Preserving node semantics</h2>
+<p>The snapshot adapter copies the current physical row order, including base
+rows, inherited typed branches, and every active capacity, rank-one, strong
+k-path and route-load knapsack row. It rebuilds route columns using current
+base/branch coefficients and <strong>full-memory</strong> cut coefficients. It preserves
+existing route upper bounds, including zero bounds. Artificial columns are
+omitted, so finite artificial penalties cannot masquerade as feasibility.</p>
+<p>Previously priced elementary routes are independently reconstructed and
+validated before being retained as possible witnesses. Enumeration can have
+removed a previously found incumbent route at its cutoff; retaining validated
+old routes avoids losing that witness. Every added route still receives every
+branch and active cut row.</p>
+<p><code>EnumeratedMipOutput::coverage_cutoff</code> records the incumbent under which the
+universe was restricted (or the existing 1e12 fallback). A proof about this
+matrix alone cannot exclude solutions above that cutoff. The tree uses at most
+the minimum of the proved MIP bound and that coverage cutoff. It records a
+validated routing witness before closing a gap. Without a witness, a finite
+coverage cutoff cannot establish global infeasibility.</p>
+<h2 id="outcomes">Outcomes</h2>
+<table>
+<thead>
+<tr>
+<th>Outcome</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Optimal</code></td>
+<td>HiGHS proved the integer model optimal and supplied a validated improving witness</td>
+</tr>
+<tr>
+<td><code>Infeasible</code></td>
+<td>HiGHS proved the transferred integer model infeasible; node interpretation still depends on enumeration coverage</td>
+</tr>
+<tr>
+<td><code>ObjectiveCutoff</code></td>
+<td>The proved integer optimum does not improve the caller's cutoff; no feasible incumbent is invented from that cutoff</td>
+</tr>
+<tr>
+<td><code>TimeLimit</code> / <code>NodeLimit</code></td>
+<td>Unfinished solve; any validated improving incumbent is retained, but the tree does not treat the limit as a proof</td>
+</tr>
+<tr>
+<td><code>Incomplete</code></td>
+<td>Other or ambiguous statuses, including unbounded-or-infeasible and unusable witnesses; no node-closing proof</td>
+</tr>
+</tbody>
+</table>
+<p>A finite <code>objective_cutoff</code> filters improving witnesses after solving; it is
+not installed as a HiGHS search cutoff. The source model is copied before
+solving, so a supplied cutoff never substitutes for a feasible incumbent.
+Coefficients with nonzero magnitude at most <code>1e-12</code> are rejected to avoid
+silent matrix changes in HiGHS.</p>
+<p>HiGHS relative and absolute MIP gaps are set to zero. Its model status is
+retained in <code>MipOutput::solver_status</code>, with solution, dual bound, node count,
+simplex iterations, and elapsed time. Tree JSON adds <code>enumerated_mip_calls</code> and
+<code>enumerated_mip_nodes</code>; its existing <code>mip_nodes</code> includes this work too.</p>
+<h2 id="validation-and-remaining-gaps">Validation and remaining gaps</h2>
+<p><code>tests/highs_mip.rs</code> covers generic Clp/HiGHS model transfer, source isolation,
+rows and upper bounds, mixed integrality, infeasibility, cutoffs, zero budgets,
+50 independent exhaustive integer comparisons, threshold boundaries and time
+reserve, and complete snapshot solves across all five existing cut-family
+configurations. Child tests enforce vehicle count, together/apart, arc-flow and
+assignment rows and then re-solve the parent to check isolation. Tree and CLI
+tests exercise opt-in MIP, disabled enumeration, exhausted budgets, and missing
+backend support.</p>
+<p>Run the MIP and command-line checks with both backends:</p>
+<pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>--test<span class="w"> </span>highs_mip<span class="w"> </span>--test<span class="w"> </span>cli
+</code></pre>
+<p>See <a href="testing.html">Build and validation</a> for the full feature matrix and Python
+checks. The implementation lives in the
+<a href="https://github.com/lseman/baldes/blob/main/src/master/solvers/highs/integer.rs">HiGHS model transfer</a>,
+<a href="https://github.com/lseman/baldes/blob/main/src/master/root/integer.rs">snapshot adapter</a>, and
+<a href="https://github.com/lseman/baldes/blob/main/src/master/tree/integer.rs">tree integration</a>.</p>
+<p>BALDES currently runs the optional solve after node evaluation. A handoff
+inside column generation, new cut separation during integer solving, and
+multiple pricing networks remain outside this implementation. Active rows
+are all retained.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="cuts.html"><small>Previous guide</small>Routing cuts <span aria-hidden="true">↗</span></a><a href="options.html"><small>Next guide</small>BALDES pricing options <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#controls-and-api">Controls and API</a><a class="toc-level-2" href="#enumeration-gate">Enumeration gate</a><a class="toc-level-2" href="#preserving-node-semantics">Preserving node semantics</a><a class="toc-level-2" href="#outcomes">Outcomes</a><a class="toc-level-2" href="#validation-and-remaining-gaps">Validation and remaining gaps</a></nav></aside>
+</div>
+</body></html>
