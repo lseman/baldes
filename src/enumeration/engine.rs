@@ -175,6 +175,14 @@ impl Enumeration {
         completion: F,
     ) -> Result<Self> {
         let consumption = !reverse.is_empty();
+        if consumption && !crate::graph::symmetry::reduced_costs_symmetric(g, reverse) {
+            let costs = crate::graph::symmetry::reversal_costs(g, reverse)
+                .ok_or_else(|| invalid("nonconservative reduced costs cannot use symmetric enumeration"))?;
+            let mut transformed = g.clone();
+            for (arc,cost) in transformed.arcs.iter_mut().zip(costs) { arc.reduced_cost=cost; }
+            return Self::run_with_symmetry(&transformed,grid,controls,reverse,cuts,completion);
+        }
+        let depot_mask = crate::graph::symmetry::depot_mask(g);
         if (!consumption && grid.backward.buckets.is_empty()) || grid.resource_slots.is_empty() {
             return Self::run(g, grid, controls, cuts);
         }
@@ -331,16 +339,21 @@ impl Enumeration {
                                 )
                             };
                         }
+                        // Symmetric cost joins use the forward source seed,
+                        // but elementarity still checks the physical terminal.
+                        // Comparing with that source seed would reject every
+                        // forward terminal because the path already owns it.
+                        let terminal_root = &roots[if direction { 1 } else { 0 }];
                         if next
                             .visited
                             .iter()
-                            .zip(&opposite_root.visited)
+                            .zip(&terminal_root.visited)
                             .any(|(a, b)| a & b != 0)
                             || next.reduced_cost > controls.cutoff - EPSILON
                         {
                             continue;
                         }
-                        if !next.add_elements(&g.vertices[opposite_root.vertex].elements) {
+                        if !next.add_elements(&g.vertices[terminal_root.vertex].elements) {
                             continue;
                         }
                         let mut arcs = vec![arc.physical];
@@ -449,14 +462,15 @@ impl Enumeration {
                         if controls
                             .max_route_arcs
                             .is_some_and(|limit| f.hops + b.hops > limit)
-                            || f.visited.iter().zip(&b.visited).any(|(x, y)| x & y != 0)
+                            || f.visited.iter().zip(&b.visited).zip(&depot_mask)
+                                .any(|((x,y),depot)| x & y & if consumption { !depot } else { u64::MAX } != 0)
                         {
                             continue;
                         }
                         if !g.resources.iter().enumerate().all(|(r, kind)| match kind {
                             ResourceKind::Disposable => {
                                 if consumption {
-                                    f.resources[r] + b.resources[r]
+                                    f.resources[r] + b.resources[r] - g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower)
                                         <= g.vertices[g.sink].bounds[r].upper + EPSILON
                                 } else {
                                     f.resources[r] <= b.resources[r] + EPSILON
@@ -498,11 +512,23 @@ impl Enumeration {
                         for (x, y) in visited.iter_mut().zip(&b.visited) {
                             *x |= *y;
                         }
+                        let mut element_hash = f.element_hash.wrapping_add(b.element_hash);
+                        if consumption {
+                            for &e in &g.vertices[g.source].elements {
+                                let e=e as u32;
+                                element_hash=element_hash.wrapping_sub(e.wrapping_mul(e).wrapping_mul(e));
+                            }
+                            for &e in &g.vertices[g.sink].elements {
+                                visited[e/64] |= 1 << (e%64);
+                                let e=e as u32;
+                                element_hash=element_hash.wrapping_add(e.wrapping_mul(e).wrapping_mul(e));
+                            }
+                        }
                         paths.insert(Path {
                             reduced_cost: cost,
                             original_cost: f.original_cost + b.original_cost,
                             visited,
-                            element_hash: f.element_hash.wrapping_add(b.element_hash),
+                            element_hash,
                             arcs,
                         });
                         if paths.len > controls.path_limit {

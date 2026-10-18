@@ -212,7 +212,8 @@ integer-solving paths. `--no-enumeration` leaves no complete universe to solve.
 The current MIP call runs after node evaluation; the native immediate handoff
 inside column generation remains unimplemented.
 
-Node preprocessing propagates original arc-flow bounds, rejects contradictory
+Node preprocessing propagates original arc-flow bounds and inherited capacity
+cut rows, applies transitive Ryan–Foster deductions, rejects contradictory
 nodes, and carries zero-arc fixing into pricing and enumeration. The current
 model is single-network; candidate-history ranking and cut callbacks during
 integer solving remain future work.

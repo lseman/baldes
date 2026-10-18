@@ -31,6 +31,9 @@ pub fn reverse_arcs(g: &Graph) -> Option<Vec<usize>> {
     Some(reverse)
 }
 pub fn consumption_symmetric(g: &Graph, grid: &BucketGraph, reverse: &[usize]) -> bool {
+    if !depot_elements_symmetric(g) || reversal_costs(g, reverse).is_none() {
+        return false;
+    }
     if g.resources.iter().any(|k| *k != ResourceKind::Disposable) {
         return false;
     }
@@ -61,4 +64,103 @@ pub fn consumption_symmetric(g: &Graph, grid: &BucketGraph, reverse: &[usize]) -
         }
     }
     true
+}
+
+/// Forward-prefix reuse also reverses its arc costs. Resource symmetry alone
+/// does not justify reusing a prefix at arbitrary master duals.
+pub fn reduced_costs_symmetric(g: &Graph, reverse: &[usize]) -> bool {
+    reverse.len() == g.arcs.len()
+        && g.arcs.iter().zip(reverse).all(|(a, &r)| {
+            g.arcs
+                .get(r)
+                .is_some_and(|b| a.reduced_cost == b.reduced_cost)
+        })
+}
+
+/// Terminal elements can be exchanged only when they have no internal
+/// membership and the source and sink describe disjoint element sets.
+pub fn depot_elements_symmetric(g: &Graph) -> bool {
+    let source = &g.vertices[g.source].elements;
+    let sink = &g.vertices[g.sink].elements;
+    !source.iter().any(|e| sink.contains(e))
+        && g.vertices.iter().enumerate().all(|(v, data)| {
+            v == g.source
+                || v == g.sink
+                || data
+                    .elements
+                    .iter()
+                    .all(|e| !source.contains(e) && !sink.contains(e))
+        })
+        && g.arcs.iter().all(|a| {
+            a.elements
+                .iter()
+                .all(|e| !source.contains(e) && !sink.contains(e))
+        })
+}
+
+/// Find a vertex potential making opposite arcs have equal reduced cost.
+/// Source and sink share the depot potential, so all complete route costs are
+/// preserved. Nonconservative directional costs cannot use prefix reversal.
+pub fn reversal_costs(g: &Graph, reverse: &[usize]) -> Option<Vec<f64>> {
+    if reverse.len() != g.arcs.len() {
+        return None;
+    }
+    let vertex = |v| if v == g.sink { g.source } else { v };
+    let mut adjacent = vec![vec![]; g.vertices.len()];
+    for (a, &r) in g.arcs.iter().zip(reverse) {
+        let b = g.arcs.get(r)?;
+        let delta = (a.reduced_cost - b.reduced_cost) * 0.5;
+        if !delta.is_finite() {
+            return None;
+        }
+        let (u, v) = (vertex(a.tail), vertex(a.head));
+        adjacent[u].push((v, delta));
+        adjacent[v].push((u, -delta));
+    }
+    let mut potential = vec![None; g.vertices.len()];
+    for root in 0..g.vertices.len() {
+        if potential[root].is_some() {
+            continue;
+        }
+        potential[root] = Some(0.);
+        let mut work = vec![root];
+        while let Some(u) = work.pop() {
+            for &(v, delta) in &adjacent[u] {
+                let next: f64 = potential[u]? + delta;
+                if !next.is_finite() {
+                    return None;
+                }
+                if let Some(old) = potential[v] {
+                    if (old - next).abs() > 1e-10 {
+                        return None;
+                    }
+                } else {
+                    potential[v] = Some(next);
+                    work.push(v);
+                }
+            }
+        }
+    }
+    let mut costs = vec![0.; g.arcs.len()];
+    for (i, a) in g.arcs.iter().enumerate() {
+        let r = reverse[i];
+        if r < i {
+            costs[i] = costs[r];
+        } else {
+            costs[i] = a.reduced_cost + potential[vertex(a.tail)]? - potential[vertex(a.head)]?;
+        }
+    }
+    Some(costs)
+}
+
+pub fn depot_mask(g: &Graph) -> [u64; 16] {
+    let mut mask = [0; 16];
+    for &e in g.vertices[g.source]
+        .elements
+        .iter()
+        .chain(&g.vertices[g.sink].elements)
+    {
+        mask[e / 64] |= 1 << (e % 64);
+    }
+    mask
 }

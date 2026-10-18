@@ -65,6 +65,10 @@ pub fn solve_integer<M: LpMaster>(
     if options.objective_cutoff.is_nan() || options.objective_cutoff == f64::NEG_INFINITY {
         return Err(invalid("MIP cutoff must be finite or positive infinity"));
     }
+    let offset = source.objective_offset();
+    if !offset.is_finite() {
+        return Err(invalid("finite MIP objective offset required"));
+    }
     let (cols, rows) = (source.costs().len(), source.rhs().len());
     let (ncol, nrow, nodes) = (count(cols)?, count(rows)?, count(options.node_limit)?);
     if source.upper().len() != cols || source.senses().len() != rows {
@@ -109,14 +113,14 @@ pub fn solve_integer<M: LpMaster>(
                 RowSense::LessEqual => rhs >= -1e-7,
                 RowSense::GreaterEqual => rhs <= 1e-7,
             });
-        output.bound = if feasible { 0. } else { f64::INFINITY };
+        output.bound = if feasible { offset } else { f64::INFINITY };
         output.status = if !feasible {
             MipStatus::Infeasible
-        } else if options.objective_cutoff <= 0. {
+        } else if options.objective_cutoff <= offset {
             MipStatus::ObjectiveCutoff
         } else {
             output.solution = Some(MipSolution {
-                objective: 0.,
+                objective: offset,
                 values: vec![],
             });
             MipStatus::Optimal
@@ -185,7 +189,7 @@ pub fn solve_integer<M: LpMaster>(
                 count(indices.len())?,
                 1,
                 1,
-                0.,
+                offset,
                 source.costs().as_ptr(),
                 lower.as_ptr(),
                 source.upper().as_ptr(),
@@ -287,12 +291,12 @@ pub fn solve_integer<M: LpMaster>(
             .iter()
             .enumerate()
             .all(|(r, &x)| x.is_finite() && x >= row_lower[r] - 1e-7 && x <= row_upper[r] + 1e-7);
-        let objective: f64 = source
+        let objective: f64 = offset + source
             .costs()
             .iter()
             .zip(&solution)
             .map(|(c, x)| c * x)
-            .sum();
+            .sum::<f64>();
         valid_witness &= objective.is_finite();
         if valid_witness && objective < options.objective_cutoff {
             output.solution = Some(MipSolution {
@@ -318,10 +322,10 @@ pub fn solve_integer<M: LpMaster>(
         }
         // An empty unconstrained zero-column model has a valid empty witness.
         6 if cols == 0 && rows == 0 => {
-            output.bound = 0.;
-            if 0. < options.objective_cutoff {
+            output.bound = offset;
+            if offset < options.objective_cutoff {
                 output.solution = Some(MipSolution {
-                    objective: 0.,
+                    objective: offset,
                     values: vec![],
                 });
                 MipStatus::Optimal

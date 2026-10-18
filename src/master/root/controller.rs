@@ -79,7 +79,10 @@ impl<M: LpMaster> Controller<M> for RootController {
         let fixing_started = std::time::Instant::now();
         let remaining = state.remaining_time()?;
         let saved_time = state.solver.controls.time_limit;
-        let saved_fixing_time = state.solver.options.get("BALDESredCostFixingTimeThreshold")?;
+        let saved_fixing_time = state
+            .solver
+            .options
+            .get("BALDESredCostFixingTimeThreshold")?;
         state.solver.controls.time_limit = saved_time.min(remaining);
         state.solver.options.set(
             "BALDESredCostFixingTimeThreshold",
@@ -244,6 +247,16 @@ impl<M: LpMaster> Controller<M> for RootController {
                 });
             }
         }
+        // Separation sees the complete solution, including fixed routes.
+        // New rows are then shifted once for the residual master below.
+        for (route, quantity) in &self.problem.fixed_routes {
+            fractional.push(FractionalColumn {
+                vertices: State::customers(route),
+                value: f64::from(*quantity),
+                graph_id: -1,
+                enumerated: true,
+            });
+        }
         // Alg4EvalOfNode::addCutToMaster: separators by decreasing priority.
         // Those at or above the level run; a lower one runs, and becomes the
         // level, only while nothing has been added this round.
@@ -304,6 +317,18 @@ impl<M: LpMaster> Controller<M> for RootController {
     }
 }
 impl RootController {
+    fn fixed_rank_one(&self, state: &State, index: usize) -> Result<f64> {
+        self.problem.fixed_sum(|route| {
+            let path = state
+                .solver
+                .cuts
+                .route(&state.solver.graph, &State::customers(route))?;
+            Ok(state
+                .solver
+                .cuts
+                .route_coefficient(&state.solver.graph, index, &path, true)? as f64)
+        })
+    }
     fn separate_capacity(
         &self,
         state: &mut State,
@@ -332,7 +357,11 @@ impl RootController {
             } else {
                 RowSense::LessEqual
             };
-            let row = rows.push(sense, cut.rhs as f64, entries);
+            let rhs = cut.rhs as f64
+                - self
+                    .problem
+                    .fixed_sum(|route| Ok(cut.coefficient(&State::customers(route)) as f64))?;
+            let row = rows.push(sense, rhs, entries);
             for (index, arc) in self.problem.graph.arcs.iter().enumerate() {
                 let u = if arc.tail == self.problem.graph.sink {
                     0
@@ -363,7 +392,7 @@ impl RootController {
         values: &[f64],
     ) -> Result<usize> {
         let graph = state.solver.graph.graph_id.max(0);
-        let columns: Vec<_> = tagged
+        let mut columns: Vec<_> = tagged
             .iter()
             .filter(|&&(column, _)| values[column] > 1e-9)
             .map(|&(column, tag)| KnapsackColumn {
@@ -372,6 +401,16 @@ impl RootController {
                 value: values[column],
             })
             .collect();
+        columns.extend(
+            self.problem
+                .fixed_routes
+                .iter()
+                .map(|(route, quantity)| KnapsackColumn {
+                    graph_id: graph,
+                    resources: route.resources.clone(),
+                    value: f64::from(*quantity),
+                }),
+        );
         let Some(separator) = &mut state.cut.knapsack_separator else {
             return Ok(0);
         };
@@ -388,7 +427,11 @@ impl RootController {
                     (coefficient != 0).then_some((column, coefficient as f64))
                 })
                 .collect();
-            let row = rows.push(RowSense::LessEqual, cut.cut.rhs as f64, entries);
+            let rhs = cut.cut.rhs as f64
+                - self.problem.fixed_sum(|route| {
+                    Ok(state.solver.knapsack_coefficient(&cut, &route.resources) as f64)
+                })?;
+            let row = rows.push(RowSense::LessEqual, rhs, entries);
             state.cut.knapsack_rows.push(Some(row));
             state.solver.cuts.knapsack_cuts.push(cut);
         }
@@ -420,6 +463,19 @@ impl RootController {
                     arc_ids: route.arcs.clone(),
                 });
                 values.push(master.values()[column]);
+            }
+        }
+        if matches!(
+            state.cut.kpath_separator,
+            Some(RootKPathSeparator::Native { .. })
+        ) {
+            for (route, quantity) in &self.problem.fixed_routes {
+                solutions.push(crate::cuts::separation::Solution {
+                    graph_id,
+                    enumerated: true,
+                    arc_ids: route.arcs.clone(),
+                });
+                values.push(f64::from(*quantity));
             }
         }
         let Some(separator) = state.cut.kpath_separator.as_mut() else {
@@ -471,7 +527,8 @@ impl RootController {
                 }
             }
             let cut = &state.solver.cuts.cuts[index];
-            let row = rows.push(RowSense::GreaterEqual, cut.rhs as f64, entries);
+            let rhs = cut.rhs as f64 - self.fixed_rank_one(state, index)?;
+            let row = rows.push(RowSense::GreaterEqual, rhs, entries);
             state.cut.rows.push(Some(row));
             state.cut.memories.push(cut.memory_for_graph(graph_id));
         }
@@ -540,7 +597,8 @@ impl RootController {
             } else {
                 RowSense::LessEqual
             };
-            let row = rows.push(sense, cut.rhs as f64, entries);
+            let rhs = cut.rhs as f64 - self.fixed_rank_one(state, index)?;
+            let row = rows.push(sense, rhs, entries);
             state.cut.rows.push(Some(row));
             state
                 .cut

@@ -94,6 +94,7 @@ pub struct HighsMaster {
     /// Basis status of each row after the last optimal solve.
     row_status: Vec<HighsInt>,
     pub objective: f64,
+    pub objective_offset: f64,
     /// -1 unsolved, 0 optimal, 1 primal infeasible, 2 dual infeasible.
     pub status: i32,
     pub solved: bool,
@@ -118,6 +119,7 @@ impl HighsMaster {
             reduced_costs: vec![],
             row_status: vec![],
             objective: 0.,
+            objective_offset: 0.,
             status: -1,
             solved: false,
             dual_tolerance: 1e-7,
@@ -325,7 +327,7 @@ impl LpMaster for HighsMaster {
             if !self.solved {
                 return false;
             }
-            self.objective = Highs_getObjectiveValue(h);
+            self.objective = Highs_getObjectiveValue(h) + self.objective_offset;
             let (rows, cols) = (self.rhs.len(), self.costs.len());
             self.values = vec![0.; cols];
             self.reduced_costs = vec![0.; cols];
@@ -365,6 +367,7 @@ impl LpMaster for HighsMaster {
     fn objective(&self) -> f64 {
         self.objective
     }
+    fn objective_offset(&self) -> f64 { self.objective_offset }
     fn status(&self) -> i32 {
         self.status
     }

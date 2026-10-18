@@ -25,6 +25,8 @@ pub use integer::{EnumeratedMipOutput, EnumerationMipPolicy};
 mod options;
 mod problem;
 mod preprocessing;
+mod partial;
+pub use partial::{inherit_fixed_routes, FixedRoute};
 use controller::RootController;
 use options::RootKPathSeparator;
 pub use options::{
@@ -35,6 +37,9 @@ pub use problem::{RootProblem, Row};
 
 #[derive(Debug)]
 pub struct RootOutput {
+    /// Routes removed into the fixed part, separate from residual LP columns.
+    pub fixed_routes: Vec<(Route, f64)>,
+    pub fixed_cost: f64,
     pub preprocessing: crate::master::preprocessing::Report,
     pub snapshot: Option<Rc<NodeSnapshot>>,
     pub simplex_iterations: usize,
@@ -108,7 +113,8 @@ impl NodeSnapshot {
             .fold(penalty, f64::max);
         for constraint in branches {
             constraint.validate(&problem)?;
-            let (sense, rhs) = constraint.row();
+            let (sense, mut rhs) = constraint.row();
+            rhs -= problem.fixed_sum(|route| Ok(constraint.coefficient(&problem, route)))?;
             let mut entries = vec![];
             for (c, column) in warm.columns.iter_mut().enumerate() {
                 let Some(column) = column else {
@@ -407,11 +413,26 @@ fn solve_seeded(
     seed: Option<(&NodeSnapshot, ClpMaster, column_generation::WarmStart)>,
 ) -> Result<RootOutput> {
     options.normalize_pricing_options()?;
+    if !problem.fixed_routes.is_empty() {
+        options.cg.multiplicity = problem.rows[0].rhs.max(0.);
+    }
     let solve_started = std::time::Instant::now();
     problem.graph.validate()?;
-    let (preprocessing, arc_bounds) = problem.preprocess()?;
+    let cut_rows = match seed.as_ref() {
+        Some((saved, master, _)) => saved.cut.preprocessing_rows(&problem.graph, master)?,
+        None => vec![],
+    };
+    let new_fixed = seed.as_ref().is_some_and(|(saved, _, _)| {
+        problem.fixed_routes.len() != saved.problem.fixed_routes.len()
+    });
+    let (preprocessing, arc_bounds) = problem.preprocess(&cut_rows)?;
     if preprocessing.infeasible {
-        return Ok(preprocessing::infeasible_output(preprocessing, solve_started));
+        let mut output = preprocessing::infeasible_output(preprocessing, solve_started);
+        output.fixed_cost = problem.fixed_cost();
+        output.fixed_routes = problem.fixed_routes.iter()
+            .map(|(r, q)| (r.clone(), f64::from(*q))).collect();
+        output.inherited_cuts = seed.as_ref().map_or(0, |(saved, _, _)| saved.active_cuts());
+        return Ok(output);
     }
     let (saved, mut master) = if let Some((saved, master, warm)) = seed {
         options.cg.warm_start = Some(warm);
@@ -434,6 +455,11 @@ fn solve_seeded(
         solver.graph = problem.graph.clone();
         solver
     };
+    if new_fixed {
+        // Parent fixing/enumeration may cover only improvements below its old
+        // incumbent. A fixed-node solve starts a fresh complete pricing domain.
+        solver.restore_arcs();
+    }
     // A snapshot may later branch on any arc; same-customer-set orderings
     // must remain distinct in its retained enumeration.
     solver.enumeration_preserve_arc_paths =
@@ -612,7 +638,11 @@ fn solve_seeded(
                 .map(|(i, r)| (r.arcs.clone(), i as i32))
                 .collect()
         }),
-        incumbent: saved.map_or(options.incumbent, |s| options.incumbent.min(s.incumbent)),
+        incumbent: if new_fixed {
+            options.incumbent
+        } else {
+            saved.map_or(options.incumbent, |s| options.incumbent.min(s.incumbent))
+        },
         enumerate: options.enumerate,
         rounded: options.round_reduced_costs,
         previous_fixing_gap: 1e12,
@@ -811,6 +841,9 @@ fn solve_seeded(
         })
     });
     Ok(RootOutput {
+        fixed_cost: problem.fixed_cost(),
+        fixed_routes: problem.fixed_routes.iter()
+            .map(|(r, q)| (r.clone(), f64::from(*q))).collect(),
         preprocessing,
         snapshot,
         simplex_iterations,

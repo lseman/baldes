@@ -72,6 +72,7 @@ pub struct LabelingEngine {
     last_costs: Vec<f64>,
     pending_middle: Option<bool>,
     pub consumption_joins: bool,
+    symmetric_costs: Vec<f64>,
     pub reverse: Vec<usize>,
     extension_checks: Vec<i32>,
     filter_checks: Vec<i32>,
@@ -99,6 +100,7 @@ struct Context<'a> {
     controls: &'a EngineControls,
     phase: Phase,
     consumption_joins: bool,
+    symmetric_costs: &'a [f64],
 }
 impl<'a> Context<'a> {
     fn has_cuts(&self) -> bool {
@@ -173,7 +175,15 @@ impl<'a> Context<'a> {
             return (false, 0.);
         }
         let cost = (f.cost() + b.cost()) + self.cuts.knapsack.join_cost(g, f.resources(), b.resources(), self.consumption_joins);
-        if f.ng() & b.ng() != 0 {
+        let mut overlap = f.ng() & b.ng();
+        if self.consumption_joins {
+            for (bit,e) in self.ng.local_elements[vertex].iter().enumerate() {
+                if g.vertices[g.source].elements.contains(e) || g.vertices[g.sink].elements.contains(e) {
+                    overlap &= !(1 << bit);
+                }
+            }
+        }
+        if overlap != 0 {
             return (false, cost);
         }
         if !self.has_cuts() {
@@ -344,7 +354,7 @@ impl<'a> Context<'a> {
                     bucket,
                 },
                 vertex,
-                cost: physical.reduced_cost + from.cost(),
+                cost: self.symmetric_costs.get(arc.physical).copied().unwrap_or(physical.reduced_cost) + from.cost(),
                 original_cost: physical.cost + from.original_cost(),
                 resources,
                 ng,
@@ -374,7 +384,7 @@ impl<'a> Context<'a> {
         g.resources.iter().enumerate().all(|(r, k)| match k {
                 ResourceKind::Disposable => {
                     if self.consumption_joins {
-                        f.resources()[r] + b.resources()[r]
+                        f.resources()[r] + b.resources()[r] - g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower)
                             <= g.vertices[g.sink].bounds[r].upper + EPSILON
                     } else {
                         f.resources()[r] <= b.resources()[r] + EPSILON
@@ -800,6 +810,7 @@ impl LabelingEngine {
             controls: &self.controls,
             phase: self.phase,
             consumption_joins: self.consumption_joins,
+            symmetric_costs: &self.symmetric_costs,
         }
     }
     fn vertex_step(&self, label: &mut StoredLabel) {
@@ -831,6 +842,7 @@ impl LabelingEngine {
             controls: &self.controls,
             phase: self.phase,
             consumption_joins: self.consumption_joins,
+            symmetric_costs: &self.symmetric_costs,
         };
         let (storage, other) = if forward {
             (&mut self.forward, &self.backward)
@@ -897,6 +909,7 @@ impl LabelingEngine {
             controls: &self.controls,
             phase: self.phase,
             consumption_joins: self.consumption_joins,
+            symmetric_costs: &self.symmetric_costs,
         };
         let vertices = self.extension_checks.len();
         let (mut statistics, mut extension_checks, mut filter_checks) =
@@ -966,6 +979,7 @@ impl LabelingEngine {
             last_costs: vec![],
             pending_middle: self.pending_middle,
             consumption_joins: self.consumption_joins,
+            symmetric_costs: self.symmetric_costs.clone(),
             reverse: self.reverse.clone(),
             extension_checks: vec![0; self.extension_checks.len()],
             filter_checks: vec![0; self.filter_checks.len()],
@@ -1015,6 +1029,7 @@ impl LabelingEngine {
             last_costs: vec![],
             pending_middle: None,
             consumption_joins,
+            symmetric_costs: if consumption_joins { crate::graph::symmetry::reversal_costs(g, &reverse).unwrap() } else { vec![] },
             reverse,
             extension_checks: vec![0; g.vertices.len()],
             filter_checks: vec![0; g.vertices.len()],
@@ -1269,6 +1284,7 @@ impl LabelingEngine {
         }))
     }
     pub fn solve(&mut self, g: &Graph, controls: &Controls) -> Result<PricingResult> {
+        self.ensure_reversal_costs(g)?;
         if controls.max_columns == 0 || controls.max_labels == 0 {
             return Err(invalid("positive pricing limits required"));
         }
@@ -1450,8 +1466,9 @@ impl LabelingEngine {
     }
 }
 impl LabelingEngine {
-    /// Fix only after both complete directional label sets are available at the
-    /// same reduced costs. Cached associations are local to this fixing pass.
+    /// Fix after exact completion at the same reduced costs. Symmetric search
+    /// pairs forward prefixes; ordinary search uses both directions. Cached
+    /// associations are local to this fixing pass.
     pub fn fix_bucket_arcs(
         &mut self,
         g: &Graph,
@@ -1491,6 +1508,20 @@ impl LabelingEngine {
                         } else {
                             physical.tail
                         }];
+                        if self.consumption_joins && physical.head == g.sink {
+                            // The physical terminal has no suffix. Dominated
+                            // prefixes still inherit useful terminal arcs from
+                            // predecessor buckets, even without active labels.
+                            let inherited = cache.initialize(&self.grid, true, source, physical.id, target);
+                            let useful = !inherited.is_empty() || self.forward.buckets[source.vertex][source.bucket]
+                                .active.iter().any(|&id| {
+                                    self.extend(g, true, &arc, self.forward.labels.view(id))
+                                        .is_some_and(|label| self.ctx().terminal_cost(g, true, &label) < threshold)
+                                });
+                            cache.associations.insert((source, physical.id), if useful { vec![0] } else { vec![] });
+                            if !useful { removed.insert(arc.id); }
+                            continue;
+                        }
                         let point = self.grid.direction(forward).corners[source.vertex]
                             [arc.jump.unwrap_or(source.bucket)];
                         let arrival = self
@@ -1818,11 +1849,33 @@ impl LabelingEngine {
 }
 
 impl LabelingEngine {
+    /// Refresh conservative cost potentials after dual changes. Costs with
+    /// nonzero reversal cycles require ordinary directional labeling.
+    fn ensure_reversal_costs(&mut self, g: &Graph) -> Result<()> {
+        if !self.consumption_joins { return Ok(()); }
+        if let Some(costs) = crate::graph::symmetry::reversal_costs(g, &self.reverse) {
+            self.symmetric_costs = costs;
+            return Ok(());
+        }
+        let mut controls = self.controls.clone();
+        controls.use_symmetric_execution = false;
+        let mut rebuilt = Self::prepare(g, controls, self.phase)?;
+        rebuilt.branching = self.branching.clone();
+        rebuilt.forbidden_arcs = self.forbidden_arcs.clone();
+        rebuilt.cuts.knapsack = self.cuts.knapsack.clone();
+        if !rebuilt.load_cuts(g, self.cuts.inputs.clone(), self.cuts.kpath.clone()) {
+            return Err(invalid("cut memory exceeds capacity after symmetry fallback"));
+        }
+        *self = rebuilt;
+        Ok(())
+    }
+
     /// Completion passes rebuild both directional lower-cost tables. Ordinary
     /// pricing only needs the opposite table for joins and must not be used as
     /// a substitute: an unreachable forward cell can still inherit a valid
     /// completion bound from its dominance predecessors.
     pub fn prepare_full_labels(&mut self, g: &Graph, controls: &Controls) -> Result<()> {
+        self.ensure_reversal_costs(g)?;
         if self.costs_unchanged(g) {
             if self.full_ready {
                 return Ok(());

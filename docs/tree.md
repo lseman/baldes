@@ -124,7 +124,9 @@ MIP has separate controls and counters; see [Enumerated MIP](enumerated-mip.md).
 Every root, child, and priced trial runs node preprocessing before column
 generation. A worklist propagates continuous bounds through the original
 arc-flow master rows and flow conservation, including equivalent outgoing
-cover rows. Contradictions certify node infeasibility without LP solving or
+cover rows. Child nodes also propagate active inherited capacity, complement,
+and two-path cut rows using their exact additive arc coefficients and current
+physical row bounds. Retired cut rows are excluded. Contradictions certify node infeasibility without LP solving or
 pricing. Zero upper bounds retire inherited columns and restrict both pricing
 directions and complete enumeration. Positive aggregate lower bounds remain
 enforced by their original master rows; they do not require every route to
@@ -137,11 +139,58 @@ The reusable `master::preprocessing` engine accepts signed sparse rows and
 infinite variable bounds, but callers must supply a complete formulation.
 Applying it to an unfinished restricted-column master would be unsound.
 
-Preprocessing currently covers the single-network routing model.
-Nonlinear Ryan–Foster rules retain their
-existing pricing resources; separator cuts and decomposition-specific
-local/global multiplicity bounds are not propagated by this adapter. There is
-no integer rounding, so propagation preserves the node LP relaxation.
+Ryan–Foster preprocessing closes transitive together groups, excludes arcs
+between apart groups, and fixes all incident arcs of an internally contradictory
+group to zero. Covering and assignment rows then determine whether that group
+is mandatory and the node is infeasible. Pricing resources still enforce the
+complete route-level rules; preprocessing does not replace them.
+
+Preprocessing currently covers the single-network routing model. The bounded
+activity worklist may leave contradictions that require solving the LP.
+Decomposition-wide local/global multiplicity links remain outside this adapter.
+
+## Explicit fixed partial solutions
+
+The Rust API can fix additional integer quantities of physical elementary routes
+in a captured node:
+
+```rust,ignore
+use baldes::master::root::{self, FixedRoute};
+
+let child = root::inherit_fixed_routes(
+    parent_snapshot,
+    &[FixedRoute { arcs: route_arc_ids, quantity: 1 }],
+    options,
+)?;
+```
+
+Quantities must be positive. Paths are reconstructed and checked against graph
+resources and the node's pricing constraints. Calls are cumulative: fixing more
+routes in a returned snapshot retains its existing fixed part. Over-covering a
+customer or violating a later branch produces an infeasible residual node.
+Parents and siblings retain their original row bounds, basis and fixed state.
+
+Base and inherited active cut rows are shifted by each added route contribution.
+The fixed elementary part uses full-memory coefficients for rank-one and strong
+k-path rows; remaining LP columns can retain their valid weaker limited-memory
+coefficients. Separation sees fixed routes alongside residual LP routes, and new
+cut RHS values are shifted once. This also handles capacity/complement and mapped
+resource-knapsack rows. Remaining fleet multiplicity and zero-arc propagation
+apply to the residual routes.
+
+LP objectives, Lagrangian bounds, incumbents and enumerated MIP outcomes include
+the fixed cost. `RootOutput::routes` and `values` retain their residual-column
+meaning. `fixed_routes` and `fixed_cost` expose the fixed part;
+`RootOutput::route_values()` combines it with positive residual route values.
+Check solver status and artificial values before accepting an LP witness.
+Enumerated MIP route values already include fixed routes when a witness exists.
+
+A fresh fixed-route solve discards inherited cutoff-restricted enumeration and
+bucket fixing. It also starts with the caller's incumbent cutoff, because a
+parent incumbent need not satisfy the fixed restriction. Automatic enumeration
+and MIP gates retain their existing behavior; fixing routes does not force an
+integer solve. The API does not choose routes to fix automatically, and currently
+has no CLI or Python entry point.
 
 The tree does not yet provide multiple pricing networks or cut callbacks
 during the integer solve. Python exposes root solving; use Rust or the CLI
@@ -150,9 +199,9 @@ feasible incumbent.
 
 - [Node snapshots and inheritance](../src/master/root/mod.rs)
 - [Tree driver](../src/master/tree/mod.rs)
-- [Lifecycle tests](../tests/node_lifecycle.rs): fixing carry, sibling isolation,
+- [Lifecycle tests](../tests/master/node_lifecycle.rs): fixing carry, sibling isolation,
   full-memory updates, grandchildren, and failed setup
-- [Tree tests](../tests/branch_price.rs): exhaustive route universes, limits,
+- [Tree tests](../tests/master/branch_price.rs): exhaustive route universes, limits,
   feasible witnesses, and branch/cut preservation
 
 ```sh

@@ -226,7 +226,7 @@ pub fn gap_smaller_than_tolerance(dual: f64, primal: f64, absolute: f64, relativ
 }
 
 fn lagrangian<M: LpMaster>(master: &M, duals: &[f64], minimum: f64, multiplicity: f64) -> f64 {
-    let mut value = 0.;
+    let mut value = master.objective_offset();
     for (pi, rhs) in duals.iter().zip(master.rhs().iter()) {
         value += pi * rhs;
     }

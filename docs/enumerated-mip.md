@@ -92,6 +92,11 @@ the minimum of the proved MIP bound and that coverage cutoff. It records a
 validated routing witness before closing a gap. Without a witness, a finite
 coverage cutoff cannot establish global infeasibility.
 
+For snapshots with [fixed partial routes](tree.md#explicit-fixed-partial-solutions),
+the integer model uses residual row bounds and a fixed objective offset. Returned
+bounds and objectives include that offset, and `route_values` includes the fixed
+routes when a witness is available, including a completed empty remainder.
+
 ## Outcomes
 
 | Outcome | Interpretation |
@@ -115,7 +120,7 @@ simplex iterations, and elapsed time. Tree JSON adds `enumerated_mip_calls` and
 
 ## Validation and remaining gaps
 
-`tests/highs_mip.rs` covers generic Clp/HiGHS model transfer, source isolation,
+`tests/master/highs_mip.rs` covers generic Clp/HiGHS model transfer, source isolation,
 rows and upper bounds, mixed integrality, infeasibility, cutoffs, zero budgets,
 50 independent exhaustive integer comparisons, threshold boundaries and time
 reserve, and complete snapshot solves across all five existing cut-family

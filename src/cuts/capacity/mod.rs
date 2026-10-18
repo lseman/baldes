@@ -53,6 +53,8 @@ pub enum CapacityKind {
 /// per undirected edge (a < b).
 #[derive(Clone, Debug, PartialEq)]
 pub struct CapacityCut {
+    /// Creation order within this separator state, retained across rounds.
+    pub id: usize,
     pub customers: Vec<usize>,
     /// Complement form: the set whose internal edges are counted.
     pub other: Vec<usize>,
@@ -203,6 +205,7 @@ struct Graph {
 /// RoundCapCutSeparation state.
 #[derive(Clone)]
 pub struct Separation {
+    statistics: CapacityStatistics,
     params: Params,
     n: usize,
     num_positive_demand: usize,
@@ -367,6 +370,7 @@ impl Separation {
             }
         }
         Ok(Self {
+            statistics: CapacityStatistics::default(),
             params,
             n,
             num_positive_demand,
@@ -1174,6 +1178,7 @@ impl Separation {
     /// separate: rounded flows from the columns, the generators in order, then
     /// stable ranking by violation. Returns (rhs, type, set ids, var weights).
     fn separate(&mut self, columns: &[(Vec<i32>, f64)]) -> Vec<(i32, i32, Vec<usize>, Vec<(i32, f64)>)> {
+        self.statistics.calls += 1;
         let n = self.n;
         if n == 0 {
             return vec![];
@@ -1259,6 +1264,7 @@ impl Separation {
             self.add_to_global_pool(&sorted);
         }
         let count = (self.params.max_num_per_round.max(0) as usize).min(sorted.len());
+        self.statistics.cuts_created += count;
         sorted[..count].iter().map(|c| self.create_cut(c)).collect()
     }
 }
@@ -1367,7 +1373,30 @@ pub struct CapacitySeparator {
     state: Option<(Separation, CapacityParameters, bool)>,
     feasibility: Option<Separation>,
 }
+
+/// Persistent separator-state counters. Reset or a parameter rebuild starts a new state.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CapacityStatistics {
+    /// Successful separation rounds, including rounds producing no cuts.
+    pub calls: usize,
+    /// Cuts returned since this state was prepared (also the next creation ID).
+    pub cuts_created: usize,
+    /// Input columns retained for the most recent round.
+    pub columns: usize,
+    /// Candidate subsets retained across rounds.
+    pub global_subsets: usize,
+}
 impl CapacitySeparator {
+    pub fn statistics(&self) -> CapacityStatistics {
+        self.state.as_ref().map_or_else(
+            CapacityStatistics::default,
+            |(state, _, _)| CapacityStatistics {
+                columns: state.num_columns,
+                global_subsets: state.global_subsets.len(),
+                ..state.statistics
+            },
+        )
+    }
     /// `demands` has n + 1 entries; index 0 (the depot) is ignored.
     pub fn new(mut demands: Vec<f64>, capacity: f64) -> Result<Self> {
         if demands.len() < 2 || demands.len() > 1024 || !capacity.is_finite() || capacity <= 0. {
@@ -1493,11 +1522,13 @@ impl CapacitySeparator {
         let capacity = self.capacity;
         let demands = self.demands.clone();
         let state = self.prepared()?;
+        let first_id = state.statistics.cuts_created;
         let generated = state.separate(&routes);
         let positive = state.num_positive_demand as i32;
         let mut result = vec![];
-        for (rhs, kind, sets, weights) in generated {
+        for (offset, (rhs, kind, sets, weights)) in generated.into_iter().enumerate() {
             let mut cut = CapacityCut {
+                id: first_id + offset,
                 customers: sets.iter().map(|s| s + 1).collect(),
                 other: vec![],
                 kind: CapacityKind::Capacity,

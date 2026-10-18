@@ -113,9 +113,9 @@ See [Tree lifecycle](tree.md) for bound and incumbent handling.
 - [Typed constraints and route coefficients](../src/master/branching.rs)
 - [Candidate generation and history checks](../src/master/tree/candidates.rs)
 - [Ryan–Foster pricing resources](../src/pricing/branching.rs)
-- [Branching tests](../tests/branching.rs): both children, resource limits,
+- [Branching tests](../tests/master/branching.rs): both children, resource limits,
   fresh versus inherited models, and pricing with active cuts
-- [Tree tests](../tests/branch_price.rs): exhaustive small instances, strong
+- [Tree tests](../tests/master/branch_price.rs): exhaustive small instances, strong
   trials, diving, and incomplete-bound handling
 
 ```sh

@@ -103,6 +103,7 @@ impl NodeSnapshot {
         for (&sense, &rhs) in self.master.senses.iter().zip(&self.master.rhs) {
             model.add_row(sense, rhs, &[])?;
         }
+        model.objective_offset = self.problem.fixed_cost();
         let mut upper_by_path: HashMap<Vec<i32>, f64> = HashMap::new();
         for (c, metadata) in self.warm.columns.iter().enumerate() {
             if let Some(column) = metadata {
@@ -152,6 +153,12 @@ impl NodeSnapshot {
             route_columns
                 .into_iter()
                 .filter_map(|(c, r)| (s.values[c] > 0.).then_some((r, s.values[c])))
+                .chain(
+                    self.problem
+                        .fixed_routes
+                        .iter()
+                        .map(|(r, q)| (r.clone(), f64::from(*q))),
+                )
                 .collect()
         });
         Ok(Some(EnumeratedMipOutput {

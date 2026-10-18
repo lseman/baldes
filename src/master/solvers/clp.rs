@@ -33,6 +33,8 @@ extern "C" {
     );
     fn Clp_modifyCoefficient(m: *mut Model, row: i32, column: i32, value: f64, keep: bool);
     fn Clp_chgObjCoefficients(m: *mut Model, costs: *const f64);
+    fn Clp_chgRowLower(m: *mut Model, lower: *const f64);
+    fn Clp_chgRowUpper(m: *mut Model, upper: *const f64);
     fn Clp_chgColumnUpper(m: *mut Model, upper: *const f64);
     fn Clp_deleteRows(m: *mut Model, n: i32, indices: *const i32);
     fn Clp_deleteColumns(m: *mut Model, n: i32, indices: *const i32);
@@ -61,6 +63,8 @@ pub struct ClpMaster {
     pub values: Vec<f64>,
     pub reduced_costs: Vec<f64>,
     pub objective: f64,
+    /// Constant objective contribution, retained by forks and integer transfer.
+    pub objective_offset: f64,
     pub status: i32,
     pub solved: bool,
     pub dual_tolerance: f64,
@@ -80,9 +84,26 @@ impl ClpMaster {
         unsafe { Clp_setLogLevel(model.as_ptr(), 0) };
         Ok(Self { model, rhs:self.rhs.clone(), senses:self.senses.clone(), costs:self.costs.clone(),
             upper:self.upper.clone(), duals:self.duals.clone(), values:self.values.clone(),
-            reduced_costs:self.reduced_costs.clone(), objective:self.objective, status:self.status,
+            reduced_costs:self.reduced_costs.clone(), objective:self.objective, objective_offset:self.objective_offset, status:self.status,
             solved:self.solved, dual_tolerance:self.dual_tolerance, zero_tolerance:self.zero_tolerance,
             simplex_iterations:0 })
+    }
+    /// Replace all current row bounds, preserving row identities and the basis.
+    pub fn set_rhs(&mut self, rhs: &[f64]) -> Result<()> {
+        if rhs.len() != self.rhs.len() || rhs.iter().any(|x| !x.is_finite()) {
+            return Err(invalid("Clp RHS dimensions or values"));
+        }
+        let lower: Vec<_> = rhs.iter().zip(&self.senses).map(|(&b,&s)| if s == RowSense::LessEqual { -f64::MAX } else { b }).collect();
+        let upper: Vec<_> = rhs.iter().zip(&self.senses).map(|(&b,&s)| if s == RowSense::GreaterEqual { f64::MAX } else { b }).collect();
+        // SAFETY: both buffers contain one bound for every live model row;
+        // Clp copies them during these calls and the model is exclusively owned.
+        unsafe {
+            Clp_chgRowLower(self.model.as_ptr(), lower.as_ptr());
+            Clp_chgRowUpper(self.model.as_ptr(), upper.as_ptr());
+        }
+        self.rhs.copy_from_slice(rhs);
+        self.solved = false;
+        Ok(())
     }
     /// Returns a copy of the dual (shadow) prices for each row.
     pub fn duals(&self) -> Vec<f64> { self.duals.clone() }
@@ -107,6 +128,7 @@ impl ClpMaster {
             values: vec![],
             reduced_costs: vec![],
             objective: 0.,
+            objective_offset: 0.,
             status: -1,
             solved: false,
             dual_tolerance: 1e-7,
@@ -266,7 +288,7 @@ impl ClpMaster {
             self.status = Clp_status(self.model.as_ptr());
             self.solved = self.status == 0;
             if self.solved {
-                self.objective = Clp_objectiveValue(self.model.as_ptr());
+                self.objective = Clp_objectiveValue(self.model.as_ptr()) + self.objective_offset;
                 self.duals = if self.rhs.is_empty() {
                     vec![]
                 } else {
@@ -508,6 +530,7 @@ impl LpMaster for ClpMaster {
     fn objective(&self) -> f64 {
         self.objective
     }
+    fn objective_offset(&self) -> f64 { self.objective_offset }
     fn status(&self) -> i32 {
         self.status
     }

@@ -138,7 +138,7 @@ Bool values are numeric zero/one; integer options
 require integral values. Live setters also validate operation-specific modes
 and limits before changing solver state.
 
-[Option tests](../tests/options.rs) cover canonical discovery in Rust/C,
+[Option tests](../tests/api/options.rs) cover canonical discovery in Rust/C,
 input-alias compatibility, failure atomicity, dominance synchronization, and
 capacity overrides
 in fresh/inherited nodes. Run:

@@ -46,6 +46,8 @@ pub trait LpMaster: Sized + 'static {
     fn reduced_costs(&self) -> &[f64];
     /// Objective value of the last solve.
     fn objective(&self) -> f64;
+    /// Constant contribution from variables removed into a fixed solution.
+    fn objective_offset(&self) -> f64 { 0. }
     /// Solver status: 0 optimal, 1 primal infeasible, 2 dual infeasible.
     fn status(&self) -> i32;
     /// Whether the current solution vectors belong to the current model.

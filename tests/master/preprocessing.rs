@@ -292,3 +292,118 @@ fn positive_aggregate_bounds_do_not_filter_unrelated_routes() {
     assert!((result.master.lp - 5.).abs() < 1e-6);
     assert!(result.routes.iter().any(|r| r.arcs == [3, 4]));
 }
+
+#[cfg(feature = "clp")]
+#[test]
+fn inherited_capacity_rows_detect_a_child_contradiction_before_pricing() {
+    use baldes::master::{
+        branching::BranchConstraint,
+        column_generation::Status,
+        root::{self, CapacityCutConfig, RootOptions, RootProblem},
+    };
+    use baldes::vrptw::{Instance, Rounding};
+    let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
+    for complement in [false, true] {
+        let graph = instance.graph(3, Rounding::None).unwrap();
+        let start = graph
+            .arcs
+            .iter()
+            .position(|a| a.tail == graph.source && a.head == 3)
+            .unwrap();
+        let end = graph
+            .arcs
+            .iter()
+            .position(|a| a.tail == 3 && a.head == graph.sink)
+            .unwrap();
+        let problem = RootProblem::set_partitioning(graph, 3.).unwrap();
+        let mut config = CapacityCutConfig::new(vec![0., 1., 1., 1.], 2.);
+        config.parameters.complement_form = complement;
+        let mut options = RootOptions::default().with_capacity_cuts(config);
+        options.capture_state = true;
+        options.enumerate = false;
+        options.cg.stabilize = false;
+        let parent = root::solve(problem, options.clone()).unwrap();
+        let snapshot = parent.snapshot.as_ref().unwrap();
+        assert!(snapshot.active_cuts() > 0);
+        let child = root::inherit_branches(
+            snapshot,
+            &[
+                BranchConstraint::NumberOfVehicles {
+                    graph_id: 0,
+                    sense: LessEqual,
+                    rhs: 1.,
+                },
+                BranchConstraint::ArcFlow {
+                    arc: start,
+                    sense: GreaterEqual,
+                    rhs: 1.,
+                },
+                BranchConstraint::ArcFlow {
+                    arc: end,
+                    sense: GreaterEqual,
+                    rhs: 1.,
+                },
+            ],
+            options.clone(),
+        )
+        .unwrap();
+        assert!(
+            child.preprocessing.infeasible,
+            "complement={complement}: {child:?}"
+        );
+        assert_eq!(child.master.status, Status::Infeasible);
+        assert_eq!(child.master.pricing_calls, 0);
+        assert_eq!(child.simplex_iterations, 0);
+        assert_eq!(child.inherited_cuts, snapshot.active_cuts());
+        // Neither an infeasible child nor its bound propagation mutates the
+        // parent pool, physical rows or a feasible sibling's warm start.
+        let sibling = root::inherit_branches(
+            snapshot,
+            &[BranchConstraint::NumberOfVehicles {
+                graph_id: 0,
+                sense: GreaterEqual,
+                rhs: 2.,
+            }],
+            options.clone(),
+        )
+        .unwrap();
+        assert!(!sibling.preprocessing.infeasible);
+        assert_eq!(sibling.master.status, Status::Optimal);
+        let replay = root::inherit_branches(snapshot, &[], options).unwrap();
+        assert!((replay.master.lp - parent.master.lp).abs() < 1e-7);
+        assert!(snapshot.active_cuts() > 0);
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn transitive_ryan_foster_contradictions_are_preprocessed_without_pricing() {
+    use baldes::master::{
+        branching::BranchConstraint,
+        root::{self, RootOptions, RootProblem},
+    };
+    use baldes::pricing::branching::RyanFosterConstraint;
+    let mut graph = baldes::Graph::new(5, 0).unwrap();
+    graph.elementary = true;
+    for u in 0..4 {
+        for v in 1..5 {
+            if u != v {
+                graph.add_arc(u, v, 1.).unwrap();
+            }
+        }
+    }
+    let mut problem = RootProblem::set_partitioning(graph, 3.).unwrap();
+    for (first, second, together) in [(1, 2, true), (2, 3, true), (1, 3, false)] {
+        problem
+            .branch(BranchConstraint::RyanFoster(RyanFosterConstraint {
+                first,
+                second,
+                together,
+            }))
+            .unwrap();
+    }
+    let result = root::solve(problem, RootOptions::default()).unwrap();
+    assert!(result.preprocessing.infeasible);
+    assert_eq!(result.master.pricing_calls, 0);
+    assert_eq!(result.simplex_iterations, 0);
+}

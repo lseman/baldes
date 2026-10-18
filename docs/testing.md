@@ -36,6 +36,27 @@ The all-feature suite requires both backends. A build without `highs` rejects
 requests for enumerated MIP; a passing default-feature build alone does not
 exercise that path.
 
+## Test organization
+
+Rust integration suites are grouped by area under `tests/`:
+
+| Directory | Coverage |
+| --- | --- |
+| `api/` | C API, CLI, and options |
+| `pricing/` | Labeling, enumeration, fixing, and heuristic scheduling |
+| `cuts/` | Cut separation and root integration |
+| `master/` | Branching, tree/node lifecycle, column generation, preprocessing, and MIP |
+| `hgs/` | Genetic-search driver and end-to-end feasibility |
+| `instances/` | Instance parsing and distance conventions |
+| `verification/` | Cross-component porting regressions and independent oracles |
+
+Each file remains a separate test target, explicitly registered in the root
+`Cargo.toml`. Target names are unchanged: for example,
+`cargo test --test main_pricing` runs `tests/pricing/main_pricing.rs`.
+When adding a suite, place it in the appropriate directory and add a `[[test]]`
+entry with its name and path. Keep unit tests beside their implementation and
+Python integration tests under `python/tests/`.
+
 ## Focused checks
 
 | Area | Integration test targets |
@@ -45,6 +66,7 @@ exercise that path.
 | Capacity/Kohl and strong k-path/knapsack integration | `capacity_root`, `kpath_knapsack` |
 | Supported option discovery, validation, atomic setters | `options` |
 | Model transfer, integer outcomes, complete-node proofs | `highs_mip` |
+| Fixed partial routes, residual rows, cumulative fixing and objective offsets | `partial_solution` |
 | Argument handling and JSON output | `cli` |
 | Input parsing and distance conventions | `cvrplib` |
 

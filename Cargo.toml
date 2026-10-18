@@ -15,6 +15,8 @@ categories = ["algorithms", "science::robotics"]
 keywords = ["vehicle-routing", "rcsp", "branch-cut-and-price", "optimization", "solver"]
 readme = "README.md"
 autobins=false
+# Integration suites are grouped under tests/ and registered below.
+autotests=false
 exclude = [
     "landing/", "pyproject.toml", ".github/",
     # Upstream Clp/CoinUtils extras; build.rs needs only */src, config.h and the licenses.
@@ -58,3 +60,97 @@ panic = "unwind"
 name = "baldes"
 path = "src/bin/baldes.rs"
 required-features = ["clp"]
+
+# API integration tests.
+
+[[test]]
+name = "c_api"
+path = "tests/api/c_api.rs"
+
+[[test]]
+name = "cli"
+path = "tests/api/cli.rs"
+
+[[test]]
+name = "options"
+path = "tests/api/options.rs"
+
+# Pricing integration tests.
+
+[[test]]
+name = "main_pricing"
+path = "tests/pricing/main_pricing.rs"
+
+[[test]]
+name = "fixing_enumeration"
+path = "tests/pricing/fixing_enumeration.rs"
+
+[[test]]
+name = "heuristic_scheduler"
+path = "tests/pricing/heuristic_scheduler.rs"
+
+# Cuts integration tests.
+
+[[test]]
+name = "capacity_root"
+path = "tests/cuts/capacity_root.rs"
+
+[[test]]
+name = "kpath_knapsack"
+path = "tests/cuts/kpath_knapsack.rs"
+
+# Master integration tests.
+
+[[test]]
+name = "branching"
+path = "tests/master/branching.rs"
+
+[[test]]
+name = "branch_price"
+path = "tests/master/branch_price.rs"
+
+[[test]]
+name = "column_cleanup"
+path = "tests/master/column_cleanup.rs"
+
+[[test]]
+name = "highs_mip"
+path = "tests/master/highs_mip.rs"
+
+[[test]]
+name = "node_lifecycle"
+path = "tests/master/node_lifecycle.rs"
+
+[[test]]
+name = "phase_bound"
+path = "tests/master/phase_bound.rs"
+
+[[test]]
+name = "preprocessing"
+path = "tests/master/preprocessing.rs"
+
+# HGS integration tests.
+
+[[test]]
+name = "hgs_driver"
+path = "tests/hgs/hgs_driver.rs"
+
+[[test]]
+name = "hgs_e2e"
+path = "tests/hgs/hgs_e2e.rs"
+
+# Instances integration tests.
+
+[[test]]
+name = "cvrplib"
+path = "tests/instances/cvrplib.rs"
+
+# Verification integration tests.
+
+[[test]]
+name = "porting_verification"
+path = "tests/verification/porting_verification.rs"
+
+[[test]]
+name = "partial_solution"
+path = "tests/master/partial_solution.rs"

@@ -14,6 +14,7 @@ pub struct RootProblem {
     pub route_entries: Vec<(usize, f64)>,
     /// Vertices with a unit covering row: the rank-one cut customers.
     pub customers: Vec<usize>,
+    pub(super) fixed_routes: Vec<(Route, u32)>,
     pub(super) branch_constraints: Vec<(usize, BranchConstraint)>,
     /// Arc id -> first index in `graph.arcs`.
     pub(super) arc_index: std::collections::HashMap<i32, usize>,
@@ -67,6 +68,7 @@ impl RootProblem {
             arc_entries,
             route_entries: vec![],
             customers,
+            fixed_routes: vec![],
             branch_constraints: vec![],
             arc_index,
             row_map,
@@ -86,7 +88,8 @@ impl RootProblem {
     ) -> Result<()> {
         constraint.validate(self)?;
         let logical = self.rows.len();
-        let (sense, rhs) = constraint.row();
+        let (sense, mut rhs) = constraint.row();
+        rhs -= self.fixed_sum(|route| Ok(constraint.coefficient(self, route)))?;
         for a in 0..self.graph.arcs.len() {
             let value = constraint.arc_coefficient(self, a);
             if value != 0. {

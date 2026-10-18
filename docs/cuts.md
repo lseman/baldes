@@ -88,7 +88,7 @@ enumeration, and child inheritance.
 
 Keep rows integer-scaled according to their model semantics. The resource
 map is not a unit conversion. See the mapped-resource and load-dependent
-pricing cases in [the integration tests](../tests/kpath_knapsack.rs) for
+pricing cases in [the integration tests](../tests/cuts/kpath_knapsack.rs) for
 complete fixtures.
 
 ## Configuration boundaries

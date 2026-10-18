@@ -1105,7 +1105,7 @@ impl KnapsackPricing {
         self.cost(&consumption)
     }
     /// Native join consumption: forward + (sink upper - backward), or
-    /// forward + forward for the symmetric consumption search.
+    /// forward + forward - initial usage for symmetric consumption search.
     pub fn join_cost(
         &self,
         g: &crate::Graph,
@@ -1116,7 +1116,7 @@ impl KnapsackPricing {
         let mut consumption = [0.; 2];
         for &r in self.resources.keys() {
             consumption[r] = if symmetric {
-                forward[r] + backward[r]
+                forward[r] + backward[r] - g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower)
             } else {
                 (g.vertices[g.sink].bounds[r].upper - backward[r]) + forward[r]
             };
