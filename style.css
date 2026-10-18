@@ -1049,7 +1049,7 @@ img,svg {
 }
 
 /* Original website palette: near-black surfaces, cyan, and violet.
-   Documentation retains its light reading palette. */
+   Shared across the landing page and compiled documentation. */
 .landing-dark {
   color-scheme: dark;
   --paper: #0b0e11;

@@ -530,10 +530,86 @@
 
 }
 
+.landing-dark.docs-body {
+  background: radial-gradient(ellipse at 85% 10%, #06b6d40d, transparent 42%),
+    radial-gradient(ellipse at 8% 55%, #8b5cf60a, transparent 40%), var(--paper);
+}
+
+.landing-dark .docs-header {
+  background: rgba(11, 14, 17, .97);
+}
+
+.landing-dark .guide-menu nav a:hover {
+  background: #172027;
+}
+
+.landing-dark .guide-menu nav a[aria-current] {
+  background: #13222b;
+  border-left-color: var(--green);
+  color: var(--green);
+}
+
+.landing-dark .doc-search input {
+  background: #090c0f;
+  border-color: #34414d;
+  color: var(--ink);
+}
+
+.landing-dark .doc-search input:focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
+}
+
+.landing-dark .prose a {
+  text-decoration-color: #155e75;
+}
+
+.landing-dark .prose a:hover {
+  color: var(--orange);
+  text-decoration-color: var(--orange);
+}
+
+.landing-dark .prose :not(pre)>code {
+  background: #172027;
+  color: #86ddeb;
+  border: 1px solid #273038;
+}
+
+.landing-dark .prose pre {
+  background: #090c0f;
+  border-color: #34414d;
+  color: var(--ink);
+  box-shadow: 0 18px 50px #0003;
+}
+
+.landing-dark .prose .copy-button {
+  background: #1a2530;
+  border-color: #455b6d;
+  color: #dce7f0;
+}
+
+.landing-dark .prose th {
+  background: #172027;
+}
+
+.landing-dark .prose tr:nth-child(even) {
+  background: #0f1418;
+}
+
+.landing-dark .page-turn a:hover {
+  background: #172027;
+  border-color: var(--green);
+}
+
 @media(prefers-contrast:more) {
   :root {
     --muted:#35483b;
     --line:#8b9a85
+  }
+
+  .landing-dark {
+    --muted:#b0bcc4;
+    --line:#4a5966;
   }
 
   .prose a {
