@@ -66,6 +66,7 @@ pub struct LabelingEngine {
     pub phase: Phase,
     pub ng: PreparedNg,
     pub branching: crate::pricing::branching::RyanFosterResources,
+    pub(crate) forbidden_arcs: Vec<bool>,
     pub half_ready: bool,
     pub full_ready: bool,
     last_costs: Vec<f64>,
@@ -93,6 +94,7 @@ struct Context<'a> {
     grid: &'a BucketGraph,
     ng: &'a PreparedNg,
     branching: &'a crate::pricing::branching::RyanFosterResources,
+    forbidden_arcs: &'a [bool],
     cuts: &'a EngineCuts,
     controls: &'a EngineControls,
     phase: Phase,
@@ -277,7 +279,9 @@ impl<'a> Context<'a> {
         id: usize,
     ) -> Option<(StoredLabel, [f64; 2])> {
         let physical = &g.arcs[arc.physical];
-        if physical.reduced_cost >= NO_ROUTE_COST {
+        if self.forbidden_arcs.get(arc.physical).copied().unwrap_or(false)
+            || physical.reduced_cost >= NO_ROUTE_COST
+        {
             return None;
         }
         // Scalars, not `resources[slot]`: see BucketGraph::coordinate.
@@ -791,6 +795,7 @@ impl LabelingEngine {
             grid: &self.grid,
             ng: &self.ng,
             branching: &self.branching,
+            forbidden_arcs: &self.forbidden_arcs,
             cuts: &self.cuts,
             controls: &self.controls,
             phase: self.phase,
@@ -821,6 +826,7 @@ impl LabelingEngine {
             grid: &self.grid,
             ng: &self.ng,
             branching: &self.branching,
+            forbidden_arcs: &self.forbidden_arcs,
             cuts: &self.cuts,
             controls: &self.controls,
             phase: self.phase,
@@ -886,6 +892,7 @@ impl LabelingEngine {
             grid: &self.grid,
             ng: &self.ng,
             branching: &self.branching,
+            forbidden_arcs: &self.forbidden_arcs,
             cuts: &self.cuts,
             controls: &self.controls,
             phase: self.phase,
@@ -953,6 +960,7 @@ impl LabelingEngine {
             phase: self.phase,
             ng: self.ng.clone(),
             branching: self.branching.clone(),
+            forbidden_arcs: self.forbidden_arcs.clone(),
             half_ready: false,
             full_ready: false,
             last_costs: vec![],
@@ -1001,6 +1009,7 @@ impl LabelingEngine {
             phase,
             ng: PreparedNg::new(g)?,
             branching: crate::pricing::branching::RyanFosterResources::prepare(g, &[])?,
+            forbidden_arcs: vec![],
             half_ready: false,
             full_ready: false,
             last_costs: vec![],

@@ -227,8 +227,10 @@ pub(super) fn choose(
                             output.pricing_calls += result.master.pricing_calls;
                             output.fixing_calls += result.fixing_calls;
                             output.enumerated_routes += result.enumerated_routes;
-                            estimates[side] = result.master.lp;
-                            if result.master.bound.is_finite() {
+                            estimates[side] = result.master.lp.min(1e12);
+                            if result.preprocessing.infeasible {
+                                candidate.bounds[side] = f64::INFINITY;
+                            } else if result.master.bound.is_finite() {
                                 candidate.bounds[side] =
                                     candidate.bounds[side].max(result.master.bound);
                             }

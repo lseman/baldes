@@ -259,21 +259,18 @@ mod routing {
             ] {
                 let child =
                     root::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
+                if matches!(branch, BranchConstraint::PackingSetAssignment { assigned: false, .. }) {
+                    assert!(child.preprocessing.infeasible);
+                    assert_eq!(child.master.status, baldes::master::column_generation::Status::Infeasible);
+                    assert_eq!(child.master.pricing_calls, 0);
+                    assert!(child.snapshot.is_none());
+                    continue;
+                }
                 let child = child.snapshot.unwrap();
                 let mip = child
                     .solve_enumerated_mip(&MipOptions::default())
                     .unwrap()
                     .unwrap();
-                if matches!(
-                    branch,
-                    BranchConstraint::PackingSetAssignment {
-                        assigned: false,
-                        ..
-                    }
-                ) {
-                    assert_eq!(mip.mip.status, MipStatus::Infeasible, "{mip:?}");
-                    continue;
-                }
                 assert_eq!(mip.mip.status, MipStatus::Optimal, "{mip:?}");
                 if matches!(branch, BranchConstraint::NumberOfVehicles { .. }) {
                     assert_eq!(mip.route_values.len(), 3);

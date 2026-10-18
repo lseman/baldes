@@ -8,6 +8,7 @@ pub use solvers::highs;
 pub mod column_generation;
 pub mod lp_master;
 pub mod stabilization;
+pub mod preprocessing;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RowSense {
     Equal,

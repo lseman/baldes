@@ -121,9 +121,32 @@ MIP has separate controls and counters; see [Enumerated MIP](enumerated-mip.md).
 
 ## Limits and validation
 
-The tree does not yet provide multiple pricing networks, generic node
-preprocessing, or cut callbacks during the integer solve. Python exposes
-root solving; use Rust or the CLI for the tree.
+Every root, child, and priced trial runs node preprocessing before column
+generation. A worklist propagates continuous bounds through the original
+arc-flow master rows and flow conservation, including equivalent outgoing
+cover rows. Contradictions certify node infeasibility without LP solving or
+pricing. Zero upper bounds retire inherited columns and restrict both pricing
+directions and complete enumeration. Positive aggregate lower bounds remain
+enforced by their original master rows; they do not require every route to
+contain the arc. Parent and sibling state remains independent.
+
+`RootOutput::preprocessing` reports bound updates, processed rows,
+infeasibility, and whether the bounded worklist reached completion. Reaching
+the work limit keeps valid deductions and continues ordinary node evaluation.
+The reusable `master::preprocessing` engine accepts signed sparse rows and
+infinite variable bounds, but callers must supply a complete formulation.
+Applying it to an unfinished restricted-column master would be unsound.
+
+Preprocessing currently covers the single-network routing model.
+Nonlinear Ryan–Foster rules retain their
+existing pricing resources; separator cuts and decomposition-specific
+local/global multiplicity bounds are not propagated by this adapter. There is
+no integer rounding, so propagation preserves the node LP relaxation.
+
+The tree does not yet provide multiple pricing networks or cut callbacks
+during the integer solve. Python exposes root solving; use Rust or the CLI
+for the tree. `Infeasible` means all nodes were certified closed without a
+feasible incumbent.
 
 - [Node snapshots and inheritance](../src/master/root/mod.rs)
 - [Tree driver](../src/master/tree/mod.rs)

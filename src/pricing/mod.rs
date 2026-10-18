@@ -13,6 +13,7 @@ use std::time::Duration;
 #[derive(Debug)]
 pub struct Solver {
     pub graph: Graph,
+    pub(crate) forbidden_arcs: Vec<bool>,
     pub(crate) ryan_foster: Vec<branching::RyanFosterConstraint>,
     pub controls: Controls,
     pub options: Options,
@@ -50,6 +51,7 @@ impl Solver {
     pub fn new(vertices: usize, resources: usize) -> Result<Self> {
         Ok(Self {
             graph: Graph::new(vertices, resources)?,
+            forbidden_arcs: vec![],
             ryan_foster: vec![],
             controls: Controls::default(),
             options: Options::default(),
@@ -83,6 +85,7 @@ impl Solver {
     pub fn fork_for_node(&self) -> Self {
         Self {
             graph: self.graph.clone(),
+            forbidden_arcs: self.forbidden_arcs.clone(),
             ryan_foster: self.ryan_foster.clone(),
             controls: self.controls.clone(),
             options: self.options.clone(),
@@ -116,6 +119,40 @@ impl Solver {
     }
     pub fn ryan_foster_constraints(&self) -> &[branching::RyanFosterConstraint] {
         &self.ryan_foster
+    }
+    /// Install original arcs fixed to zero at this node. Indices address
+    /// `graph.arcs`, not physical IDs. Descendants inherit the restriction.
+    /// Replacing it with a weaker domain discards the restricted enumeration.
+    pub fn set_forbidden_arcs(&mut self, arcs: Vec<usize>) -> Result<()> {
+        let mut next = vec![false; self.graph.arcs.len()];
+        for a in arcs {
+            *next.get_mut(a).ok_or_else(|| invalid("forbidden arc index"))? = true;
+        }
+        if next == self.forbidden_arcs {
+            return Ok(());
+        }
+        let weaker = self.forbidden_arcs.iter().enumerate()
+            .any(|(a, &b)| b && !next.get(a).copied().unwrap_or(false));
+        if weaker {
+            self.restore_arcs();
+        } else {
+            // New labels must be built in the restricted domain. Existing
+            // reduced-cost bucket fixing remains valid for descendants.
+            if let Some(engine) = &mut self.engine {
+                if engine.consumption_joins {
+                    self.engine = None;
+                    self.prepared = None;
+                } else {
+                    engine.forbidden_arcs = next.clone();
+                    *engine = engine.fork_for_node();
+                }
+            }
+            if let Some(universe) = &mut self.enumeration {
+                universe.paths.retain(|p| p.arcs.iter().all(|&a| !next[a]));
+            }
+        }
+        self.forbidden_arcs = next;
+        Ok(())
     }
     /// Install the current node's complete branch list. Fixed bucket arcs are
     /// valid for descendants; dual-dependent labels and enumeration filters refresh.
@@ -255,7 +292,13 @@ impl Solver {
         Ok(())
     }
     fn new_engine(&self, controls: EngineControls, phase: phases::Phase) -> Result<LabelingEngine> {
+        let mut controls = controls;
+        // A one-sided arc fixing need not preserve reverse-arc symmetry.
+        if self.forbidden_arcs.iter().any(|&b| b) {
+            controls.use_symmetric_execution = false;
+        }
         let mut engine = LabelingEngine::prepare(&self.graph, controls, phase)?;
+        engine.forbidden_arcs = self.forbidden_arcs.clone();
         engine.branching = branching::RyanFosterResources::prepare(&self.graph, &self.ryan_foster)?;
         engine.cuts.knapsack = self.knapsack_pricing.clone();
         if !engine.load_cuts(

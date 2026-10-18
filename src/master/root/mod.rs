@@ -24,6 +24,7 @@ mod integer;
 pub use integer::{EnumeratedMipOutput, EnumerationMipPolicy};
 mod options;
 mod problem;
+mod preprocessing;
 use controller::RootController;
 use options::RootKPathSeparator;
 pub use options::{
@@ -34,6 +35,7 @@ pub use problem::{RootProblem, Row};
 
 #[derive(Debug)]
 pub struct RootOutput {
+    pub preprocessing: crate::master::preprocessing::Report,
     pub snapshot: Option<Rc<NodeSnapshot>>,
     pub simplex_iterations: usize,
     pub inherited_cuts: usize,
@@ -71,7 +73,7 @@ impl std::fmt::Debug for NodeSnapshot {
 }
 impl NodeSnapshot {
     pub fn branch_depth(&self) -> usize {
-        self.problem.rows.len() - self.problem.customers.len() - 1
+        self.problem.branch_constraints.len()
     }
     pub fn active_cuts(&self) -> usize {
         self.cut.rows.iter().filter(|r| r.is_some()).count()
@@ -407,6 +409,10 @@ fn solve_seeded(
     options.normalize_pricing_options()?;
     let solve_started = std::time::Instant::now();
     problem.graph.validate()?;
+    let (preprocessing, arc_bounds) = problem.preprocess()?;
+    if preprocessing.infeasible {
+        return Ok(preprocessing::infeasible_output(preprocessing, solve_started));
+    }
     let (saved, mut master) = if let Some((saved, master, warm)) = seed {
         options.cg.warm_start = Some(warm);
         (Some(saved), master)
@@ -448,6 +454,21 @@ fn solve_seeded(
             })
             .collect(),
     )?;
+    solver.set_forbidden_arcs(arc_bounds.iter().enumerate()
+        .filter_map(|(a, b)| (b.upper <= 0.).then_some(a)).collect())?;
+    if let Some(warm) = options.cg.warm_start.as_ref() {
+        if let Some(saved) = saved {
+            for (c, column) in warm.columns.iter().enumerate() {
+                if let Some(column) = column {
+                    let route = &saved.routes[column.tag as usize];
+                    if route.arcs.iter().any(|&id| problem.arc_position(id)
+                        .is_some_and(|a| arc_bounds[a].upper <= 0.)) {
+                        master.set_upper(c, 0.)?;
+                    }
+                }
+            }
+        }
+    }
     let phase_floor = options.pricing_phase_floor;
     if phase_floor >= solver.phases.len() {
         return Err(invalid("pricing phase floor outside schedule"));
@@ -673,6 +694,8 @@ fn solve_seeded(
             w.columns.iter().flatten().map(|c| c.tag).collect()
         });
     for route in &options.initial_routes {
+        if route.arcs.iter().any(|&id| problem.arc_position(id)
+            .is_some_and(|a| arc_bounds[a].upper <= 0.)) { continue; }
         let mut s = state.borrow_mut();
         if s.solver
             .ryan_foster
@@ -788,6 +811,7 @@ fn solve_seeded(
         })
     });
     Ok(RootOutput {
+        preprocessing,
         snapshot,
         simplex_iterations,
         inherited_cuts,

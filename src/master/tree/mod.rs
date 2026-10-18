@@ -64,6 +64,7 @@ impl Default for TreeOptions {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TreeStatus {
     Optimal,
+    Infeasible,
     TimeLimit,
     NodeLimit,
     Incomplete,
@@ -259,11 +260,11 @@ fn integer_heuristic(
     search.nodes
 }
 fn closed(bound: f64, incumbent: f64, options: &TreeOptions) -> bool {
-    incumbent.is_finite()
+    bound == f64::INFINITY || (incumbent.is_finite()
         && bound
             >= incumbent
                 - options.absolute_gap
-                - options.relative_gap * incumbent.abs().max(bound.abs())
+                - options.relative_gap * incumbent.abs().max(bound.abs()))
 }
 fn branch_problem(problem: &RootProblem, branches: &[Branch]) -> Result<RootProblem> {
     let mut child = problem.clone();
@@ -473,6 +474,9 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
         output.pricing_calls += result.master.pricing_calls;
         output.fixing_calls += result.fixing_calls;
         output.enumerated_routes += result.enumerated_routes;
+        if result.preprocessing.infeasible {
+            continue;
+        }
         // The LP objective may include artificials or come from a heuristic
         // pricing phase. Only the pricing certificate is a node lower bound.
         if result.master.bound.is_finite() {
@@ -622,6 +626,9 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
     if open.is_empty() && output.incumbent.is_finite() {
         output.status = TreeStatus::Optimal;
         output.bound = output.incumbent;
+    } else if open.is_empty() {
+        output.status = TreeStatus::Infeasible;
+        output.bound = f64::INFINITY;
     } else {
         output.bound = open
             .iter()

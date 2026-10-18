@@ -212,8 +212,10 @@ integer-solving paths. `--no-enumeration` leaves no complete universe to solve.
 The current MIP call runs after node evaluation; the native immediate handoff
 inside column generation remains unimplemented.
 
-The current model is single-network. Candidate-history ranking, generic node
-preprocessing, and cut callbacks during integer solving remain future work.
+Node preprocessing propagates original arc-flow bounds, rejects contradictory
+nodes, and carries zero-arc fixing into pricing and enumeration. The current
+model is single-network; candidate-history ranking and cut callbacks during
+integer solving remain future work.
 See the [enumerated MIP guide](docs/enumerated-mip.md) for implementation
 limits. Python currently exposes root LP solving; use Rust or the CLI for
 the tree.
@@ -227,22 +229,6 @@ Clp master and no reduced-cost fixing or enumeration. Times are the solvers' own
 root timers, medians of three runs, each solver running alone on an AMD
 Ryzen 9 9950X. The reference run uses one thread; BALDES runs the forward and backward
 labeling of exact pricing on two threads, so it is timed on one and two cores.
-
-| Instance | Cuts | Root LP | Pricing calls | Cuts added | BaPCod (s) | BALDES 1 core (s) | BALDES 2 cores (s) |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| C101 | none | 828.937 | 82 | 0 | 0.09 | 0.058 | 0.057 |
-| C102 | none | 828.937 | 133 | 0 | 0.39 | 0.38 | 0.36 |
-| C103 | none | 828.065 | 138 | 0 | 1.13 | 1.18 | 1.11 |
-| C201 | none | 591.557 | 98 | 0 | 0.16 | 0.12 | 0.12 |
-| C202 | none | 591.557 | 1257 | 0 | 14.64 | 13.17 | 12.16 |
-| R101 | none | 1636.389 | 95 | 0 | 0.07 | 0.046 | 0.045 |
-| R101 | rank-one | 1641.509 | 121 | 225 | 1.07 | 1.10 | 1.09 |
-| R102 | none | 1472.815 | 145 | 0 | 0.32 | 0.29 | 0.28 |
-| R103 | none | 1211.107 | 220 | 0 | 0.91 | 0.91 | 0.89 |
-| R103 | rank-one | 1213.624 | 289 | 343 | 1.98 | 1.90 | 1.83 |
-| R201 | none | 1140.130 | 364 | 0 | 1.57 | 1.47 | 1.43 |
-| R201 | rank-one | 1147.804 | 636 | 832 | 8.98 | 7.46 | 7.27 |
-| R202 | none | 1020.646 | 470 | 0 | 5.92 | 5.98 | 5.66 |
 
 ![Root relaxation solve time: BALDES vs VRPSolver / BaPCod](docs/benchmark.svg)
 
@@ -340,16 +326,11 @@ inherited branches and active cut families, proof/limit handling, and 50 small
 integer models checked by exhaustive enumeration. Clp-only option and CLI
 checks, HiGHS-only tests, and default/all-feature build checks also passed.
 
-## Not in 2.0 yet
-
-EVRP front ends, heterogeneous fleets/multiple pricing networks, accumulated-resource
-branching, generic node preprocessing, integer-solve cut callbacks,
-and remaining 1.x Python APIs.
-
 ## TODO
 
-- Cumulative resources
-- Pickup and delivery
+- heterogeneous fleets/multiple pricing networks
+- accumulated-resource branching
+- pickup-and-delivery
 
 ## Repository layout
 

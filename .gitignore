@@ -76,6 +76,7 @@ _deps/
 *.log
 
 # Local configuration and credentials
+AGENTS.md
 /.codex/
 /.aws/
 /.env

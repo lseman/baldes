@@ -162,7 +162,8 @@ fn typed_children_match_fresh_models_and_survive_snapshot_setup() {
             .unwrap();
         let forbidden = root::solve(contradictory, options.clone()).unwrap();
         assert!(
-            forbidden.master.pruned_by_bound
+            forbidden.preprocessing.infeasible
+                || forbidden.master.pruned_by_bound
                 || forbidden.master.artificials.iter().any(|&c| forbidden
                     .values
                     .get(c)

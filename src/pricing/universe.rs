@@ -6,6 +6,16 @@ impl Solver {
             self.price_phase(0, 1, false)?;
         }
         self.complete_labels(true)?;
+        // Enumeration traverses bucket arcs directly rather than the pricing
+        // extension routine. Remove fixed arcs after completion/jump rebuilds.
+        if let Some(engine) = &mut self.engine {
+            for direction in [&mut engine.grid.forward, &mut engine.grid.backward] {
+                for bucket in direction.buckets.iter_mut().flatten() {
+                    bucket.arcs.retain(|a| !self.forbidden_arcs.get(a.physical)
+                        .copied().unwrap_or(false));
+                }
+            }
+        }
         let controls = enumeration::Controls {
             cutoff,
             label_limit: self.options.get("BALDESmaxNumOfLabelsInEnumeration")?.max(1.) as usize,
