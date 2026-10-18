@@ -101,3 +101,21 @@ fn tree_branching_mode_is_explicit_and_validated() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("unknown branching mode"));
     std::fs::remove_file(path).unwrap();
 }
+
+#[test]
+fn enumerated_mip_flag_requires_tree_and_uses_the_available_backend() {
+    let path=std::env::temp_dir().join(format!("baldes-enumerated-mip-{}.txt",std::process::id()));
+    std::fs::write(&path,"triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
+    let invalid=command().arg("vrptw").arg(&path).arg("--enumerated-mip").output().unwrap();
+    assert!(!invalid.status.success());assert!(String::from_utf8_lossy(&invalid.stderr).contains("requires --tree"));
+    let json=path.with_extension("json");
+    let result=command().arg("vrptw").arg(&path).args(["--tree","--enumerated-mip","--no-strong-branching","--no-diving","--no-mip-heuristic","--no-stabilization","--json"]).arg(&json).output().unwrap();
+    if cfg!(feature="highs") {
+        assert!(result.status.success(),"{}",String::from_utf8_lossy(&result.stderr));
+        assert!(std::fs::read_to_string(&json).unwrap().contains("\"enumerated_mip_calls\":1"));
+    } else {
+        assert!(!result.status.success());assert!(String::from_utf8_lossy(&result.stderr).contains("requires the highs feature"));
+    }
+    let _=std::fs::remove_file(json);
+    std::fs::remove_file(path).unwrap();
+}

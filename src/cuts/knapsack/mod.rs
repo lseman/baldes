@@ -1016,8 +1016,7 @@ impl ResourceKnapsackSeparator {
     }
 }
 
-/// retrieveActiveRouteLoadKnapCuts / updateResConsKnapCutsCoeffsMap
-/// . Native pricing keys are the integer cut
+/// Pricing keys are the integer cut
 /// breakpoints; scaling is applied by separation and master coefficients.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct KnapsackPricing {
@@ -1037,7 +1036,7 @@ impl KnapsackPricing {
     }
     /// Refresh native cache slots in place. Resource IDs in cut associations
     /// are external IDs; `resource_indices` maps them to solver coordinates.
-    /// a failed retrieval leaves the already processed state.
+    /// A failed retrieval leaves the already processed state.
     pub fn retrieve(
         &mut self,
         cuts: &[ResourceKnapsackCut],

@@ -33,7 +33,8 @@ default = []
 # Clp restricted master and column-generation loop. Builds Clp 1.17.10 and
 # CoinUtils 2.11 from the vendor/ submodules.
 clp = ["dep:cc"]
-# HiGHS restricted master and column-generation loop. Links against the system
+# HiGHS LP backend and integer solving (including optional Clp-tree node MIP).
+# Links against the system
 # HiGHS shared library (libhighs.so) or a vendored copy placed in vendor/highs/.
 highs = ["dep:pkg-config"]
 

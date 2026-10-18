@@ -231,7 +231,7 @@ fn _solve_root(
     field!("cut_rounds", output.master.cut_rounds);
     field!("iterations", output.master.iterations);
     field!("pricing_calls", output.master.pricing_calls);
-    // bcCountCol: generated columns inserted over the run.
+    // Generated columns inserted over the run.
     field!("columns", output.master.inserted_tags.len());
     field!("master_columns", output.master.columns);
     field!("fixing_calls", output.fixing_calls);

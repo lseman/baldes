@@ -1,5 +1,4 @@
-//! Ryan–Foster binary resources recovered from Solver::addRyanAndFosterBranchingConstraint
-//!  and RyanFosterBranching::satisfies .
+//! Ryan–Foster branching constraints enforced with binary resources.
 use crate::{invalid, Graph, Result};
 
 /// A pair of physical customer vertices (the standard routing packing sets).

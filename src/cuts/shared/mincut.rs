@@ -34,7 +34,8 @@ impl MinCutDigraph {
     pub fn new(capacity: Vec<Vec<f64>>) -> Self {
         Self::new_with_terminals(capacity, -1, -1)
     }
-    /// zero capacities that fractional capacity separation later forces.
+    /// Retain all terminal edges, including zero capacities that fractional
+    /// capacity separation later forces.
     pub fn new_with_terminals(capacity: Vec<Vec<f64>>, source: i32, sink: i32) -> Self {
         let n = capacity.len();
         let mut adjacency = vec![vec![]; n];

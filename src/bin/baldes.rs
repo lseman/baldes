@@ -24,6 +24,7 @@ Options:
   --no-mip-heuristic    Disable restricted-master integer search
   --mip-nodes N         Restricted-master integer-search node budget per call
   --no-stabilization    Disable dual stabilization
+  --enumerated-mip      Solve complete enumerated node masters with HiGHS (--tree; highs feature)
   --no-enumeration      Disable reduced-cost fixing and enumeration
   --upper-bound X       Initial incumbent
   --dynamic-ng P        Strengthen NG memories from master cycles at separator
@@ -126,6 +127,7 @@ fn run() -> std::result::Result<(), String> {
                 options.pricing_options.push((name.to_string(), value));
             }
             "--no-enumeration" => options.enumerate = false,
+            "--enumerated-mip" => tree_options.enumerated_mip = Some(Default::default()),
             "--rounding" => {
                 rounding = Some(
                     Rounding::parse(&args.next().ok_or("missing rounding")?).map_err(|e| e.to_string())?,
@@ -191,6 +193,9 @@ fn run() -> std::result::Result<(), String> {
         instance.truncate(n).map_err(|e| e.to_string())?;
     }
     // HGS heuristic path
+    if tree_options.enumerated_mip.is_some() && !tree {
+        return Err("--enumerated-mip requires --tree".into());
+    }
     if kind == "hgs" {
         use baldes::hgs::{HgsOptions, run_hgs};
         if let Some(rounding) = rounding {
@@ -330,7 +335,7 @@ fn run() -> std::result::Result<(), String> {
             && output.incumbent.is_finite()
             && bound > output.incumbent + (bound.abs().max(output.incumbent.abs()) * 1e-10 + 1e-6);
         let lp_value = if cut_off { 1e12 } else { output.master.lp };
-        // "columns" is bcCountCol: generated columns inserted over the
+        // "columns" counts generated columns inserted over the
         // run, including any later removed by the clean-ups. "master_columns" is
         // the final master size, artificials included; "route_columns" the route
         // columns still in it.

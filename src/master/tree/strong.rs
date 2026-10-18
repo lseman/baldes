@@ -1,4 +1,4 @@
-//! phased strong-branching decision rules, adapted to arc-flow
+//! Phased strong-branching decision rules for arc-flow candidates.
 use super::*;
 use crate::master::{clp::ClpMaster, LpMaster};
 

@@ -1,35 +1,51 @@
-# Build outputs (CMake / Ninja)
-cmake-build-debug/
-cmake/
-build/
+# Rust / Cargo (keep Cargo.lock tracked)
+/target/
+
+# Python environments, caches, and packaging
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+*.whl
+/dist/
+/python/build/
+/python/dist/
+
+# Native build outputs (CMake / Ninja)
+/build/
+cmake-build-*/
 CPM_modules/
-CMakeLists.txt.user
+CMakeFiles/
+CMakeScripts/
 CMakeCache.txt
-CMakeFiles
-CMakeScripts
+CMakeLists.txt.user
 CTestTestfile.cmake
-Makefile
 cmake_install.cmake
 install_manifest.txt
 compile_commands.json
 build.ninja
+.ninja_deps
+.ninja_log
 /.cmake/
-/.ninja_deps
-/.ninja_log
-/cmake_install.cmake
-/CMakeCache.txt
-/build.ninja
-/main
-/mip.log
-Testing
-_deps
+Testing/
+_deps/
 
-# Compiled artifacts
+# Compiled objects, libraries, and executables
 *.o
 *.obj
 *.slo
 *.lo
 *.so
+*.so.*
 *.dylib
 *.dll
 *.a
@@ -42,67 +58,42 @@ _deps
 *.pch
 *.exe
 *.out
-*.app
-
-# Prerequisites
+*.app/
 *.d
+/main
 
-# IDE
-.vscode
-.idea
-.gdb_history
-.cache
-
-# Python
-.venv/
-__pycache__/
-savings.py
-
-# Data & notebooks
-*.csv
-*.json
-*.pkl
-*.ipynb
-*.pdf
-*.ilp
-*.mps
-*.lp
-*.bs
-*.cmake
+# Solver dumps and local experiment outputs
+/*.ilp
+/*.mps
+/*.lp
+/*.bs
+/ariadne.db
+/snapshot.bin
+/internal/
+/reports/
+/results/
 *.log
 
-# Reports & examples
-reports/
-# Internal parity notes and tools (Clp/the solver trajectory investigations)
-internal/
-more_examples/
-new_examples/
-testing/
-mtw/
-evrp/
-ambulance/
-repos/
-RouteOpt/
-results/
-
-# Third-party vendored code
-third_party/lkh/
-vrpsolve/
-rapids-cmake
-
-# Generated / local files
-CLAUDE.md
-.codex
-ariadne.db
-snapshot.bin
-*.md
-!README.md
-!CHANGELOG.md
-!/docs/source-layout.md
-
-# OS
-.DS_Store
-
-# Rust build outputs
-/target/
+# Local configuration and credentials
+/.codex/
+/.aws/
+/.env
+/.env.*
+!/.env.example
+!/.env.*.example
+!/.env.template
 /release.sh
+
+# Editors, caches, and operating-system files
+.vscode/
+.idea/
+.cache/
+.gdb_history
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Documentation, source CMake files, datasets, notebooks, and fixtures are
+# intentionally not ignored by file extension.

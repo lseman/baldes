@@ -27,7 +27,7 @@ pub struct CapacityCutConfig {
     pub time_windows: Option<TimeWindows>,
 }
 impl CapacityCutConfig {
-    /// Attach the time resource used by Kohl 2-path separator.
+    /// Attach the time resource used by the Kohl 2-path separator.
     /// These cuts share the capacity family's separation priority and pool.
     pub fn with_time_windows(mut self, windows: TimeWindows) -> Self {
         self.parameters.use_two_path = true;
@@ -135,7 +135,7 @@ pub struct RootOptions {
     /// Retain an independently forkable model and active cuts for descendants.
     pub capture_state: bool,
     /// Node depth: capacity/Kohl priority is 3 at root and 1 below it,
-    /// as in generic capacity-cut registration.
+    /// matching the capacity-cut registration priority.
     pub node_depth: usize,
     /// Lowest pricing phase evaluated (0 for a certified node solve).
     /// Strong-branching heuristic trials may stop above the exact phase.
@@ -152,7 +152,7 @@ pub struct RootOptions {
     pub native_kpath_cuts: Option<NativeKPathCutConfig>,
     pub knapsack_cuts: Option<KnapsackCutConfig>,
     /// ColGenSpRelaxationImprovementPriority: separator priority of dynamic
-    /// NG strengthening (0 disables it, default). Its mode and caps
+    /// NG strengthening (0 disables it by default). Its mode and caps
     /// are the pricing options RCSPdynamicNGmode, RCSPmaxNGneighbourhoodSize,
     /// RCSPmaxNGaverNeighbourhoodSize, RCSPmaxNumOfColumnsInDynamicNG and
     /// RCSPmaxCycleSizeInDynamicNG.
@@ -162,7 +162,7 @@ impl Default for RootOptions {
     fn default() -> Self {
         let mut cg = Options::default();
         cg.artificial_cost = 2.76;
-        // master column clean-up: threshold 10000, keep ratio 0.66.
+        // Master column clean-up: threshold 10000, keep ratio 0.66.
         cg.column_cleanup_threshold = 10000.;
         cg.column_cleanup_ratio = 0.66;
         Self {

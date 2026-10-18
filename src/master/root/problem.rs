@@ -1,5 +1,6 @@
 //! Routing master rows, route coefficients, and reduced costs.
 use super::*;
+use crate::labeling::extend_resources;
 #[derive(Clone, Debug)]
 pub struct Row {
     pub sense: RowSense,
@@ -164,5 +165,45 @@ impl RootProblem {
             .iter()
             .map(|&(r, a)| duals[map[r]] * a)
             .sum::<f64>())
+    }
+}
+
+impl RootProblem {
+    pub(crate) fn elementary_route(&self, ids: &[i32]) -> Option<Route> {
+        let g = &self.graph;
+        let mut at = g.source;
+        let mut nodes = vec![at as i32];
+        let mut visited = HashSet::new();
+        let mut q = [0.; 2];
+        for (r, value) in q.iter_mut().enumerate().take(g.resources.len()) {
+            *value = g.initial[r].unwrap_or(g.vertices[at].bounds[r].lower);
+            if *value < g.vertices[at].bounds[r].lower || *value > g.vertices[at].bounds[r].upper {
+                return None;
+            }
+        }
+        let mut cost = 0.;
+        for &id in ids {
+            let arc = &g.arcs[self.arc_position(id)?];
+            if arc.tail != at || at == g.sink {
+                return None;
+            }
+            q = extend_resources(g, arc, q, true)?;
+            at = arc.head;
+            if at == g.source || (at != g.sink && !visited.insert(at)) {
+                return None;
+            }
+            cost += arc.cost;
+            nodes.push(at as i32);
+        }
+        if at != g.sink || visited.is_empty() {
+            return None;
+        }
+        Some(Route {
+            nodes,
+            arcs: ids.to_vec(),
+            cost,
+            original_cost: cost,
+            resources: q[..g.resources.len()].to_vec(),
+        })
     }
 }

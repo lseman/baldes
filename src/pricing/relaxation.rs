@@ -19,7 +19,7 @@ impl Solver {
             if self.ng_baseline.is_none() {
                 self.ng_baseline = Some(baseline);
             }
-            // the solver grows the live elementarity resource: the bucket graph,
+            // Grow the live elementarity resource: the bucket graph,
             // fixed arcs, half-way point and adaptive depths stay. Only the NG
             // tables, the labels and enumerated paths are invalidated.
             match &mut self.engine {
@@ -37,7 +37,7 @@ impl Solver {
         Ok(counts)
     }
     /// Whether a route (vertices and arc ids in path order) is feasible for
-    /// the current NG relaxation (the solver satisfiesCurrentRelaxation).
+    /// the current NG relaxation.
     pub fn route_satisfies_relaxation(&self, vertices: &[i32], arcs: &[i32]) -> Result<bool> {
         if vertices.len() != arcs.len() + 1 {
             return Err(invalid("route node/arc dimensions"));

@@ -151,7 +151,7 @@ impl DualPriceSmoothing {
         if self.parameters.alpha_factor >= 1. && self.misprices == 0 {
             let tolerance = self.parameters.tolerance;
             // The angle test uses its own native threshold, independently of
-            // the tolerance for bounds and dual values .
+            // the tolerance for bounds and dual values.
             if f.negative_columns == 0 || self.angle > 1e-12 {
                 self.alpha -= 0.1;
             } else if self.angle < -1e-12
@@ -302,7 +302,7 @@ fn cosine(center: &[f64], priced: &[f64], g: &[f64]) -> f64 {
         .enumerate()
         .map(|(i, v)| priced.get(i).copied().unwrap_or(0.) - v)
         .collect();
-    // calculateAngleAtPricingPoint  divides unguarded: a
+    // calculateAngleAtPricingPoint divides unguarded: a
     // round-off step toward the pricing point still yields an angle, and a
     // zero step gives NaN, which then fails both alpha-update comparisons.
     dot(&toward, g) / (norm(g) * norm(&toward))

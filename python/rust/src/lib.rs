@@ -319,7 +319,8 @@ impl Solver {
         .map(|_| ())
     }
 
-    /// Set a solver option by name.  See ``option_names()`` for valid keys.
+    /// Set a solver option. Unsupported options accept only their recovered default;
+    /// see ``option_support(name)`` for availability and scope.
     fn set_option(&mut self, name: &str, value: f64) -> PyResult<()> {
         let cname = CString::new(name)
             .map_err(|_| PyValueError::new_err("option name must not contain null bytes"))?;
@@ -333,6 +334,17 @@ impl Solver {
             .map_err(|_| PyValueError::new_err("option name must not contain null bytes"))?;
         check_rc(unsafe { or_rcsp_get_option(self.ptr.0, cname.as_ptr(), &mut out) })?;
         Ok(out)
+    }
+
+    /// Return (implemented, consumer or unsupported reason) for a recovered option.
+    #[staticmethod]
+    fn option_support(name: &str) -> PyResult<(bool, String)> {
+        use baldes::core::options::{OptionSupport, Options};
+        let support = Options::support(name).map_err(|e| PyValueError::new_err(e.message))?;
+        Ok(match support {
+            OptionSupport::Implemented(consumer) => (true, consumer.to_string()),
+            OptionSupport::Unsupported(reason) => (false, reason.to_string()),
+        })
     }
 
     /// Return the list of recognised option names.

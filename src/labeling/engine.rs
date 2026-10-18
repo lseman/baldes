@@ -972,7 +972,7 @@ impl LabelingEngine {
         storage.buckets[internal][bucket].next_id = 1;
         Ok(())
     }
-    /// getPrevLabelPtr : every predecessor must still be active
+    /// getPrevLabelPtr: every predecessor must still be active
     /// or archived in its bucket. A dominated expanded label that was not
     /// archived is gone, and candidates through it cannot be recorded.
     fn physical_path(&self, forward: bool, mut id: usize) -> Option<Vec<usize>> {
@@ -996,7 +996,7 @@ impl LabelingEngine {
         }
         Some(arcs)
     }
-    /// recordSolution ; `None` when a predecessor is missing.
+    /// recordSolution; `None` when a predecessor is missing.
     fn reconstruct(
         &self,
         g: &Graph,

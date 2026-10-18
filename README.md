@@ -27,22 +27,31 @@ The C++ BALDES 1.x code remains in the git history before the 2.0 commit.
   bidirectional search with a moving half-way point, and symmetric joins.
 - Staged pricing with the native heuristic phase schedule.
 - Reduced-cost fixing on bucket arcs and elementary route enumeration with
-  inspection pricing.
+  inspection pricing at the root and descendant nodes.
 - Limited-memory rank-one (subset-row) cuts: 1- and 3-row separation,
   local-search and tuple-based 4- and 5-row separation, cut memory, and
   limited- and full-memory cut state in pricing and enumeration labels.
 - Dual-price smoothing, and a Clp-backed restricted master with cut rounds,
   basic-cut removal and artificial-column penalties.
-- Rounded capacity and Kohl 2-path cuts, with time-window feasibility checks.
-- An initial best-bound branch-and-price tree with directed arc-flow
-  branching, shared elementary columns and a restricted-master integer heuristic.
+- Rounded capacity and Kohl 2-path cuts, with time-window feasibility checks;
+  strong k-path and route-load knapsack cuts integrated with pricing,
+  enumeration, and inherited master rows.
+- A single-network best-bound branch-and-price tree with Ryan–Foster,
+  vehicle-count and directed arc-flow branching, packing-set assignment rows,
+  shared elementary columns, and a restricted-master integer heuristic.
+- Isolated node snapshots carrying the Clp model/basis, active cuts, branching
+  rows, fixed bucket arcs, pricing state, and retained enumeration.
+- Optional HiGHS MIP solves over complete enumerated node masters, preserving
+  inherited branches, active cuts, and route bounds.
 - Phased strong branching (100 → 3 → 1 candidates), native product and
   tree-depth scores, and bounded strong round-up diving with discrepancy limits.
 - Solomon VRPTW and CVRPLIB CVRP input, HGS heuristic, and root-solve.
 - Dynamic NG strengthening from master cycles at configurable separator priority.
 
 The core solver uses only the Rust standard library. The `clp` feature links
-COIN-OR Clp through its C interface for the restricted master.
+COIN-OR Clp through its C interface for the restricted master. The optional
+`highs` feature adds a HiGHS LP backend and integer solving; the routing tree
+uses Clp for LPs and HiGHS for its optional enumerated MIP.
 
 ## Build
 
@@ -62,6 +71,18 @@ cargo build --release --features clp
 The `clp` feature compiles Clp 1.17.10 and CoinUtils 2.11 from the
 [`vendor/`](vendor/) submodules; a C++14 compiler is needed.
 
+To include HiGHS integer solving, install a HiGHS shared library and build both
+features:
+
+```bash
+cargo build --release --features clp,highs
+```
+
+HiGHS linking searches `HIGHS_DIR/lib`, then `vendor/highs/lib`, then
+`pkg-config` and the system linker path. The C interface currently expects a
+32-bit `HighsInt` build. The `baldes` CLI and routing tree require `clp`;
+`highs` alone provides the library's HiGHS backend and generic MIP API.
+
 ## Run
 
 ```bash
@@ -72,9 +93,9 @@ The `clp` feature compiles Clp 1.17.10 and CoinUtils 2.11 from the
 ```
 
 The first argument selects the instance type: `vrptw` (time windows), `cvrp`
-(capacitated, no time windows), or `hgs` (Hybrid Genetic Search heuristic). Both
-commands read Solomon-format files and CVRPLIB (TSPLIB) `.vrp` files; the format
-is detected from the content. `vrptw` enforces time windows and service times;
+(capacitated, no time windows), or `hgs` (Hybrid Genetic Search heuristic).
+The routing commands read Solomon-format files and CVRPLIB (TSPLIB) `.vrp`
+files; the format is detected from the content. `vrptw` enforces time windows and service times;
 `cvrp` ignores them.
 CVRPLIB instances have no time windows, so they are solved as `cvrp`. They use
 the file's distance convention: TSPLIB `nint` for `EUC_2D`, `ceil` for
@@ -94,6 +115,7 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--tree`, `--nodes N` | branch-and-price; default node limit 10,000 |
 | `--branching MODE` | tree families: `native` (default), `ryan-foster`, `vehicles`, or `arc` |
 | `--no-strong-branching`, `--no-diving` | disable the corresponding tree mechanism |
+| `--enumerated-mip` | optional HiGHS solve over complete enumerated node masters (`--tree`, `clp,highs` features) |
 | `--no-mip-heuristic`, `--mip-nodes N` | disable or budget restricted-master integer search |
 | `--no-enumeration` | no reduced-cost fixing or enumeration |
 | `--upper-bound X` | initial incumbent for fixing |
@@ -101,7 +123,7 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--dynamic-ng P` | strengthen NG memories from master cycles at separator priority P |
 | `--option NAME=VALUE` | set an RCSP pricing option (repeatable) |
 | `--iterations N`, `--time S` | master iteration and time limits |
-| `--json FILE` | write the root result, history and positive routes |
+| `--json FILE` | write results: root LP/history, tree incumbent/bounds/node counters, or HGS solution |
 | `--population-size N` | HGS minimum population size (default: 25) |
 | `--nb-iter N` | HGS iterations without improvement before stopping/restarting |
 | `--seed N` | HGS random seed (default: 0) |
@@ -109,20 +131,100 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 Solomon instances are in [`instances/`](instances/), and a few CVRPLIB ones in
 [`instances/cvrplib/`](instances/cvrplib/).
 
-## Comparison with the solver
+For RCSP settings, see the [option support audit](docs/options.md).
+Unsupported settings accept their default; non-default changes return
+an explicit error. Rust exposes `Options::support(name)`; Python exposes
+`Solver.option_support(name)`. With `clp,highs`, 41 options have
+consumers and 17 remain unsupported; otherwise the counts are 39 and 19.
+Consumers can depend on the operation or configured cut family.
 
-The [branching guide](docs/branching.md) documents Ryan–Foster, vehicle-count,
-and packing-set assignment branches for the single-network tree.
+## Branch-and-price tree
 
-The [node lifecycle audit](docs/node-lifecycle-audit.md) records fork/carry,
-setup and teardown, fixing/enumeration fixes, tests, and remaining parity gaps.
+`--tree` solves the integer routing model with the configured fleet bound. Tree JSON includes validated incumbent routes, a global lower bound,
+node counts, pricing/fixing statistics, MIP work, and status. `Optimal` means
+the requested numerical gap is closed; `TimeLimit`, `NodeLimit`, and
+`Incomplete` retain bounds for unfinished nodes. The cost-only `--upper-bound`
+is a root/fixing option; the tree obtains its incumbent from feasible routes.
 
-Root relaxations of Solomon VRPTW instances (100 customers), BALDES against
-the the solver binary. Both solve the same split-depot graph with unrounded
+The Rust API is `master::tree::solve(problem, TreeOptions)`. Children fork the
+parent's solved Clp model and basis, carry active cuts, branching rows, fixed
+bucket arcs, options and retained enumeration, and rebuild labels for the new
+duals. Siblings own independent state. Fixing and enumeration run below the
+root when enabled; branch-distinct arc paths remain separate.
+
+`--branching native` enables vehicle-count, packing-set assignment,
+Ryan–Foster together/apart, and directed arc-flow families in that adapter order.
+Ryan–Foster is enforced inside pricing and retained enumeration. The current
+model has one pricing network: customer cover equations fix assignment to that
+network, so assignment rows are available but provide no fractional assignment
+candidate. Multiple vehicle types require multi-network modeling.
+
+Strong branching screens 100 candidates with restricted LPs, prices three
+survivors heuristically, then evaluates one with exact pricing. Its product and
+tree-depth scores rank the survivors. Strong round-up diving uses
+priced route-fixing trials with depth, discrepancy, time and node budgets.
+Both mechanisms are enabled by default. Heuristic trial objectives and dive
+bounds do not certify the original node.
+
+The restricted-master integer heuristic searches generated elementary routes
+with its own time/node budgets. Its optimum is not a lower bound for the full
+routing problem. The separate HiGHS path below can certify an enumerated node
+within its saved enumeration coverage.
+
+### HiGHS over enumerated routes
+
+After building with `clp,highs`, enable end-of-node MIP explicitly:
+
+```bash
+./target/release/baldes vrptw instances/R101.txt --customers 10 \
+  --tree --enumerated-mip --time 60 --json tree.json
+```
+
+Or configure it in Rust:
+
+```rust
+use baldes::master::{solvers::mip::MipOptions, tree::TreeOptions};
+
+let options = TreeOptions {
+    enumerated_mip: Some(MipOptions::default()),
+    ..TreeOptions::default()
+};
+```
+
+HiGHS receives an independent integer model with every active branch/cut row,
+full-memory route coefficients, and existing route upper bounds. Artificial
+columns are excluded, and returned route witnesses are validated. The source
+Clp LP and sibling snapshots remain untouched.
+
+The route-count gate requires complete enumeration. Its normal threshold
+(`RCSPmaxNumOfEnumSolutionsForMIP`, default 10,000) raises the end-of-node
+threshold (`RCSPmaxNumOfEnumSolsForEndOfNodeMIP`, default 0) to at least that
+value. `MipOptions` defaults to 2,000,000 nodes and 360,000 seconds, capped in
+the tree at 98% of remaining global time. These budgets are separate from
+`--mip-nodes`, which controls the restricted-column heuristic.
+
+Optimality, infeasibility, objective cutoff, time/node limits, and incomplete
+results remain distinct. A proof over routes restricted by an incumbent is
+used only within that saved coverage. Tree JSON reports
+`enumerated_mip_calls` and `enumerated_mip_nodes`; `mip_nodes` includes both
+integer-solving paths. `--no-enumeration` leaves no complete universe to solve.
+The current MIP call runs after node evaluation; the native immediate handoff
+inside column generation remains unimplemented.
+
+The current model is single-network. Candidate-history ranking, generic node
+preprocessing, and cut callbacks during integer solving remain future work.
+See the [enumerated MIP guide](docs/enumerated-mip.md) for implementation
+limits. Python currently exposes root LP solving; use Rust or the CLI for
+the tree.
+
+## Root benchmarks
+
+Root relaxations of Solomon VRPTW instances (100 customers). Both solvers
+use the same split-depot graph with unrounded
 Euclidean distances, the same NG neighbourhoods (the 8 nearest customers), the
 Clp master and no reduced-cost fixing or enumeration. Times are the solvers' own
 root timers, medians of three runs, each solver running alone on an AMD
-Ryzen 9 9950X. the solver is single-threaded; BALDES runs the forward and backward
+Ryzen 9 9950X. The reference run uses one thread; BALDES runs the forward and backward
 labeling of exact pricing on two threads, so it is timed on one and two cores.
 
 | Instance | Cuts | Root LP | Pricing calls | Cuts added | BaPCod (s) | BALDES 1 core (s) | BALDES 2 cores (s) |
@@ -201,38 +303,9 @@ become `null` in JSON. Cut counts include generated rows later retired.
 These are root LP relaxations; `Optimal` does not certify an integer VRP optimum.
 
 Python root solves enable Kohl with `two_path_cuts=True`. This attaches time
-resource 0, corresponding to generic capacity-cut registration;
+resource 0 for capacity-cut registration;
 ordinary capacity cuts retain the default resource -1. Both use the capacity
 family's priority 3 at root and 1 below it, complement form and persistent subset pool.
-
-### Initial branch-and-price tree
-
-`--tree` solves the integer routing model and respects the instance's vehicle
-limit. Its JSON contains an incumbent with validated routes, a global lower
-bound, node counts and status. `Optimal` means the requested numerical gap is
-closed; `TimeLimit`, `NodeLimit` and `Incomplete` preserve bounds for unfinished
-nodes. The cost-only `--upper-bound` is a root/fixing option; the tree builds
-its incumbent from feasible routes instead. Limits are checked between master
-iterations and during pricing and integer search.
-
-The Rust API is `master::tree::solve(problem, TreeOptions)`. The integer
-heuristic searches the binary set-partitioning model over generated elementary
-routes, with per-call time and node budgets. Its restricted optimum is never
-used as a lower bound. Children price the duals of inherited arc-flow branch
-rows. They rebuild their Clp master and separate cuts anew while sharing
-feasible elementary columns. Strong branching screens 100 candidates with
-restricted LPs, prices three survivors heuristically, then evaluates one with
-exact pricing. Its product and tree-depth score formulas are ported from the
-reference; heuristic scores never certify bounds. Strong round-up diving uses
-priced route-fixing trials with depth, discrepancy, time and node budgets.
-Dive bounds remain private to the heuristic subspace. Both mechanisms are
-enabled by default in the tree and configurable through `TreeOptions`.
-
-Full the solver tree-trajectory parity has not been established. Generator-history
-ranking, basis/cut inheritance and a general-purpose MIP backend remain work;
-the current restricted-master integer search solves the binary routing
-set-partitioning model directly.
-The Python API currently exposes root solving; use Rust or the CLI for the tree.
 
 For pricing alone, build without Clp:
 
@@ -249,12 +322,26 @@ Strong k-path and route-load knapsack cuts are available in the Rust root API
 through `with_kpath_cuts` and `with_knapsack_cuts`. The latter takes original
 integer resource rows; `KnapsackCutConfig::with_resource_indices` maps original
 resource IDs to solver coordinates. Load-dependent costs and that mapping pass
-through pricing, enumeration, and inherited master rows. See
-[cut integration and binary parity checks](docs/cut-port-parity/README.md).
+through pricing, enumeration, and inherited master rows.
+
+## Validation
+
+```bash
+cargo test --workspace --all-features
+cargo check --workspace --all-targets --all-features
+```
+
+These commands require the HiGHS shared library. The latest all-feature
+workspace suite passed **155 tests**, including transfer from Clp to HiGHS,
+inherited branches and active cut families, proof/limit handling, and 50 small
+integer models checked by exhaustive enumeration. Clp-only option and CLI
+checks, HiGHS-only tests, and default/all-feature build checks also passed.
 
 ## Not in 2.0 yet
 
-EVRP front ends, complete the solver tree-trajectory parity, and remaining 1.x Python APIs.
+EVRP front ends, heterogeneous fleets/multiple pricing networks, accumulated-resource
+branching, generic node preprocessing, integer-solve cut callbacks,
+and remaining 1.x Python APIs.
 
 ## TODO
 
@@ -273,7 +360,7 @@ and the cut, pricing, enumeration, master, and tree subfolders.
 | `python/rust/` | Rust/PyO3 extension crate |
 | `python/pybaldes/` | Python package and typed routing API |
 | `python/tests/` | installed-package integration tests |
-| `tools/` | comparison scripts against the C++ reference |
+| `tools/` | pricing comparison utilities |
 | `instances/` | Solomon VRPTW instances; `cvrplib/` holds CVRPLIB samples |
 | `assets/` | logo |
 | `landing/` | project landing page (deployed to GitHub Pages) |

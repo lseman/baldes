@@ -5,20 +5,23 @@
 //! install native binary resources in labeling and filter enumeration.
 //! Each child forks the parent's solved Clp model (with cuts intact) and
 //! carries the cut registry forward; feasible elementary columns are shared
-//! between nodes. Bounds come only from exact pricing, never from the
-//! restricted-master integer heuristic. Phased strong branching and diving
+//! between nodes. Bounds require exact pricing or a proved MIP over complete
+//! enumeration; restricted-master heuristic objectives do not certify nodes.
+//! Phased strong branching and diving
 //! use isolated node evaluations via fork-and-carry.
 use super::{
     column_generation::Status,
     root::{self, RootOptions, RootProblem},
     RowSense,
 };
-use crate::{invalid, labeling::extend_resources, Result, Route};
+use crate::{invalid, Result, Route};
 use std::collections::{BTreeMap, HashSet};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 pub mod candidates;
 mod diving;
+#[cfg(feature = "highs")]
+mod integer;
 pub use super::branching::{BranchConstraint, BranchingOptions};
 pub mod strong;
 pub use diving::DivingOptions;
@@ -33,6 +36,9 @@ pub struct TreeOptions {
     /// Work budget of the binary restricted-master set-partitioning search.
     pub mip_node_limit: usize,
     pub mip_time_limit: Duration,
+    /// Optional HiGHS MIP over complete enumeration (requires `highs`).
+    /// Independent of the restricted-column heuristic and disabled by default.
+    pub enumerated_mip: Option<super::solvers::mip::MipOptions>,
     pub absolute_gap: f64,
     pub relative_gap: f64,
     pub strong_branching: Option<StrongBranchingOptions>,
@@ -47,6 +53,7 @@ impl Default for TreeOptions {
             time_limit: Duration::from_secs(120),
             mip_node_limit: 10000,
             mip_time_limit: Duration::from_millis(100),
+            enumerated_mip: None,
             absolute_gap: 1e-6,
             relative_gap: 1e-9,
             strong_branching: Some(StrongBranchingOptions::default()),
@@ -75,6 +82,8 @@ pub struct TreeOutput {
     /// Sum of retained route counts reported by those evaluations.
     pub enumerated_routes: usize,
     pub mip_nodes: usize,
+    pub enumerated_mip_calls: usize,
+    pub enumerated_mip_nodes: usize,
     pub strong_branching_trials: usize,
     pub diving_nodes: usize,
     pub seconds: f64,
@@ -100,9 +109,9 @@ impl TreeOutput {
                 )
             })
             .collect();
-        format!("{{\"instance\":{:?},\"status\":\"{:?}\",\"incumbent\":{},\"bound\":{},\"nodes\":{},\"open_nodes\":{},\"pricing_calls\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"mip_nodes\":{},\"strong_branching_trials\":{},\"diving_nodes\":{},\"seconds\":{},\"routes\":[{}]}}\n",
+        format!("{{\"instance\":{:?},\"status\":\"{:?}\",\"incumbent\":{},\"bound\":{},\"nodes\":{},\"open_nodes\":{},\"pricing_calls\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"mip_nodes\":{},\"enumerated_mip_calls\":{},\"enumerated_mip_nodes\":{},\"strong_branching_trials\":{},\"diving_nodes\":{},\"seconds\":{},\"routes\":[{}]}}\n",
             name, self.status, number(self.incumbent), number(self.bound), self.nodes,
-            self.open_nodes, self.pricing_calls, self.fixing_calls, self.enumerated_routes, self.mip_nodes, self.strong_branching_trials, self.diving_nodes, self.seconds, routes.join(","))
+            self.open_nodes, self.pricing_calls, self.fixing_calls, self.enumerated_routes, self.mip_nodes, self.enumerated_mip_calls, self.enumerated_mip_nodes, self.strong_branching_trials, self.diving_nodes, self.seconds, routes.join(","))
     }
 }
 type Branch = BranchConstraint;
@@ -135,41 +144,7 @@ impl Pool {
 /// Reconstruct and check every incumbent route, including resources and
 /// repeated customers. Never trust a supplied cost, node list or LP tag alone.
 fn feasible_route(problem: &RootProblem, ids: &[i32]) -> Option<Route> {
-    let g = &problem.graph;
-    let mut at = g.source;
-    let mut nodes = vec![at as i32];
-    let mut visited = HashSet::new();
-    let mut q = [0.; 2];
-    for (r, value) in q.iter_mut().enumerate().take(g.resources.len()) {
-        *value = g.initial[r].unwrap_or(g.vertices[at].bounds[r].lower);
-        if *value < g.vertices[at].bounds[r].lower || *value > g.vertices[at].bounds[r].upper {
-            return None;
-        }
-    }
-    let mut cost = 0.;
-    for &id in ids {
-        let arc = &g.arcs[problem.arc_position(id)?];
-        if arc.tail != at || at == g.sink {
-            return None;
-        }
-        q = extend_resources(g, arc, q, true)?;
-        at = arc.head;
-        if at == g.source || (at != g.sink && !visited.insert(at)) {
-            return None;
-        }
-        cost += arc.cost;
-        nodes.push(at as i32);
-    }
-    if at != g.sink || visited.is_empty() {
-        return None;
-    }
-    Some(Route {
-        nodes,
-        arcs: ids.to_vec(),
-        cost,
-        original_cost: cost,
-        resources: q[..g.resources.len()].to_vec(),
-    })
+    problem.elementary_route(ids)
 }
 struct IntegerSearch<'a> {
     pool: &'a Pool,
@@ -351,6 +326,10 @@ fn evaluate(
 /// may seed incumbents; the cost-only `root.incumbent` is not used without a
 /// feasible witness. Limits preserve the bound of every unfinished node.
 pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
+    #[cfg(not(feature = "highs"))]
+    if options.enumerated_mip.is_some() {
+        return Err(invalid("enumerated MIP requires the highs feature"));
+    }
     let started = Instant::now();
     if !options.absolute_gap.is_finite()
         || options.absolute_gap < 0.
@@ -403,6 +382,8 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
         fixing_calls: 0,
         enumerated_routes: 0,
         mip_nodes: 0,
+        enumerated_mip_calls: 0,
+        enumerated_mip_nodes: 0,
         strong_branching_trials: 0,
         diving_nodes: 0,
         seconds: 0.,
@@ -508,6 +489,15 @@ pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
             &options,
             deadline,
         );
+        #[cfg(feature = "highs")]
+        integer::run(
+            result.snapshot.as_ref(),
+            &problem,
+            &mut node,
+            &options,
+            &mut output,
+            deadline,
+        )?;
         if closed(node.bound, output.incumbent, &options) {
             continue;
         }

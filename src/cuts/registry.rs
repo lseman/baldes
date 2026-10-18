@@ -470,7 +470,7 @@ impl CutRegistry {
         });
         Ok(self.cuts.len() - 1)
     }
-    /// Preserve createCut's graph-specific vertex memory .
+    /// Preserve createCut's graph-specific vertex memory.
     pub fn register_strong_k_path_cut(
         &mut self, vertices: usize, graph: i32, cut: &kpath::StrongKPathCut, dual: f64,
     ) -> Result<usize> {

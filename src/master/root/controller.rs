@@ -187,7 +187,7 @@ impl<M: LpMaster> Controller<M> for RootController {
             if rank_active && stop && state.cut.rounds >= min_rounds {
                 return Ok(0);
             }
-            // the solver stores the threshold as a float.
+            // Store the threshold as a float.
             let threshold = state.cut.options.tailing_off_threshold as f32 as f64;
             if gain < threshold - (threshold.abs().max(gain.abs()) * 1e-10 + 1e-6) {
                 if state.cut.options.enabled
@@ -287,7 +287,7 @@ impl<M: LpMaster> Controller<M> for RootController {
             success |= count > 0 || changed;
         }
         state.cut.level = level;
-        // the solver adds the round's cuts to Clp in one call.
+        // Add the round's cuts to Clp in one call.
         let batch: Vec<_> = rows
             .rows
             .iter()

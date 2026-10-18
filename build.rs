@@ -29,8 +29,7 @@ mod clp {
             ]
             .contains(&stem)
     }
-    /// The bundled Clp of the the solver reference differs from 1.17.10 in two
-    /// places.
+    /// Numerical corrections applied to the bundled Clp 1.17.10 sources.
     const CORRECTIONS: [(&str, &str, &str); 2] = [
         (
             // CoinFactorization::goSparse: 300 < rows < 10000, threshold2 = rows / 2.

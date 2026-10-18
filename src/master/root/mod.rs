@@ -20,6 +20,8 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 mod controller;
+mod integer;
+pub use integer::{EnumeratedMipOutput, EnumerationMipPolicy};
 mod options;
 mod problem;
 use controller::RootController;
@@ -286,51 +288,8 @@ impl State {
         self.cut.enumerated.contains(&arcs)
     }
     fn cut_entries(&self, route: &Route) -> Result<Vec<(usize, f64)>> {
-        let mut entries = vec![];
-        let customers = Self::customers(route);
-        for (cut, row) in self.cut.capacity_cuts.iter().zip(&self.cut.capacity_rows) {
-            if let Some(row) = row {
-                let coefficient = cut.coefficient(&customers);
-                if coefficient != 0 {
-                    entries.push((*row, coefficient as f64));
-                }
-            }
-        }
-        for (cut, row) in self
-            .solver
-            .cuts
-            .knapsack_cuts
-            .iter()
-            .zip(&self.cut.knapsack_rows)
-        {
-            if let Some(row) = row {
-                let coefficient = self.solver.knapsack_coefficient(cut, &route.resources);
-                if coefficient != 0 {
-                    entries.push((*row, coefficient as f64));
-                }
-            }
-        }
-        if self.cut.rows.iter().all(Option::is_none) {
-            return Ok(entries);
-        }
-        let enumerated = self.is_enumerated(route);
-        let path = self
-            .solver
-            .cuts
-            .route(&self.solver.graph, &Self::customers(route))?;
-        for (index, row) in self.cut.rows.iter().enumerate() {
-            let Some(row) = *row else {
-                continue;
-            };
-            let c =
-                self.solver
-                    .cuts
-                    .route_coefficient(&self.solver.graph, index, &path, enumerated)?;
-            if c != 0 {
-                entries.push((row, c as f64));
-            }
-        }
-        Ok(entries)
+        self.cut
+            .entries(&self.solver, route, self.is_enumerated(route))
     }
     fn column(
         &self,
@@ -453,7 +412,7 @@ fn solve_seeded(
     } else {
         (None, ClpMaster::new()?)
     };
-    // the solver leaves Clp's default 1e-7 primal and dual tolerances in place.
+    // Keep Clp's default 1e-7 primal and dual tolerances.
     master.set_tolerances(1e-7, 1e-7)?;
     master.zero_tolerance = 1e-7;
     if saved.is_none() {
@@ -596,7 +555,7 @@ fn solve_seeded(
             if !indices.contains_key(&resource) || !scale.is_finite() || scale <= 0. {
                 return Err(invalid("knapsack original row resource/scaling"));
             }
-            // the solver applies scale to separation/master coefficients, while
+            // Apply scale to separation/master coefficients, while
             // active-dual retrieval retains the integer cut breakpoints.
         }
         for (name, value) in &options.pricing_options {
@@ -683,6 +642,19 @@ fn solve_seeded(
             s.cut.separation_lp = f64::NAN;
             s.cut.lp_before_cuts = f64::NAN;
             s.cut.removed_columns.clear();
+        }
+        // Apply explicit controls after cloning inherited separator state.
+        // Unspecified controls retain the caller's or parent's configuration.
+        if let Some(separator) = s.cut.capacity_separator.as_mut() {
+            for (name, value) in &options.pricing_options {
+                match name.as_str() {
+                    "RCSPuseCapacityCuts" => separator.parameters.enabled = *value != 0.,
+                    "RCSPcapCutsMaxNumPerRound" => {
+                        separator.parameters.max_cuts_per_round = *value as usize
+                    }
+                    _ => {}
+                }
+            }
         }
         s.cut.level = s
             .cut
@@ -832,4 +804,48 @@ fn solve_seeded(
         fixing_calls: state.fixing_calls,
         enumerated_routes: state.enumerated_routes,
     })
+}
+
+impl CutState {
+    fn entries(
+        &self,
+        solver: &Solver,
+        route: &Route,
+        enumerated: bool,
+    ) -> Result<Vec<(usize, f64)>> {
+        let mut entries = vec![];
+        let customers = State::customers(route);
+        for (cut, row) in self.capacity_cuts.iter().zip(&self.capacity_rows) {
+            if let Some(row) = row {
+                let coefficient = cut.coefficient(&customers);
+                if coefficient != 0 {
+                    entries.push((*row, coefficient as f64));
+                }
+            }
+        }
+        for (cut, row) in solver.cuts.knapsack_cuts.iter().zip(&self.knapsack_rows) {
+            if let Some(row) = row {
+                let coefficient = solver.knapsack_coefficient(cut, &route.resources);
+                if coefficient != 0 {
+                    entries.push((*row, coefficient as f64));
+                }
+            }
+        }
+        if self.rows.iter().all(Option::is_none) {
+            return Ok(entries);
+        }
+        let path = solver.cuts.route(&solver.graph, &State::customers(route))?;
+        for (index, row) in self.rows.iter().enumerate() {
+            let Some(row) = *row else {
+                continue;
+            };
+            let c = solver
+                .cuts
+                .route_coefficient(&solver.graph, index, &path, enumerated)?;
+            if c != 0 {
+                entries.push((row, c as f64));
+            }
+        }
+        Ok(entries)
+    }
 }

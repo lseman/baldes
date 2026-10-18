@@ -510,3 +510,6 @@ fn entries_of(entries: &[(usize, f64)], size: usize) -> Result<(Vec<HighsInt>, V
     }
     Ok(accumulated.into_iter().filter(|(_, v)| *v != 0.).map(|(i, v)| (i as HighsInt, v)).unzip())
 }
+
+mod integer;
+pub use integer::solve_integer;

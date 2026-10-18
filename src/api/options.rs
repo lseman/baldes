@@ -174,10 +174,7 @@ pub unsafe extern "C" fn or_rcsp_set_label_dominance_strategy(
     strategy: i32,
 ) -> i32 {
     guard(-1, || {
-        if strategy != 0 && strategy != 1 {
-            return Err(invalid("unsupported label dominance strategy"));
-        }
-        unsafe { solver(p)? }.dominance_mode = strategy;
+        unsafe { solver(p)? }.set_option("RCSPlabelDominanceStrategy", strategy as f64)?;
         Ok(0)
     })
 }

@@ -66,7 +66,7 @@ pub struct ClpMaster {
     pub dual_tolerance: f64,
     pub simplex_iterations: usize,
     /// Primal values and duals with magnitude at most this are read as zero,
-    /// as LpClpInterface::getSol  does with 1e-7.
+    /// using a default tolerance of 1e-7.
     pub zero_tolerance: f64,
 }
 impl ClpMaster {
@@ -122,7 +122,7 @@ impl ClpMaster {
     ) -> Result<usize> {
         Ok(self.add_rows(&[(sense, rhs, entries)])?.start)
     }
-    /// Adds the rows in order with one Clp call, as the solver adds a cut round.
+    /// Adds the rows in order with one Clp call.
     pub fn add_rows(&mut self, rows: &[(RowSense, f64, &[(usize, f64)])]) -> Result<std::ops::Range<usize>> {
         let first = self.rhs.len();
         if rows.is_empty() {
@@ -317,7 +317,7 @@ impl ClpMaster {
         }
         Ok(unsafe { Clp_getRowStatus(self.model.as_ptr(), row as i32) } == 1)
     }
-    /// the solver cleanupRestrictedMastCuts , default threshold 1
+    /// Cut cleanup with default threshold 1
     /// and retention ratio 0.66. The normalization divides by the SIGNED RHS
     /// when |rhs| > 1: a slack packing cut with rhs < -1 is retained.
     pub fn cleanup_cut_rows(&self, initial_rows: usize) -> Result<Vec<usize>> {
@@ -403,7 +403,7 @@ impl ClpMaster {
         }
         let (rm, ri) = mapping(self.rhs.len(), rows)?;
         let (cm, ci) = mapping(self.costs.len(), columns)?;
-        // Empty deletions are skipped: the solver issues none, and a Clp call
+        // Skip empty deletions: a Clp call
         // with no index still resets internal state.
         unsafe {
             if !ri.is_empty() {

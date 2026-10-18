@@ -312,7 +312,7 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
     }
     let mut stage = schedule.len() - 1;
     let mut pass_bound: f64;
-    // the solver Alg4Master +0x28 : phase-local stopping
+    // Phase-local stopping
     // value, including heuristic passes; never expose it as a global bound.
     let mut stage_bound = -1e12_f64;
     let mut round_penalty_updates = 0;
@@ -359,7 +359,7 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
         if options.stabilize {
             smoothing.after_master(&raw, master.senses(), gap, 0, iteration == 1);
         }
-        // earlyCGtermType1  uses the phase value for stage > 0
+        // earlyCGtermType1 uses the phase value for stage > 0
         // and the certified bound for stage zero, before another pricing call.
         let stopping_bound = if stage > 0 { stage_bound } else { out.bound };
         let converged = !positive
@@ -380,9 +380,9 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
         let mut penalties = false;
         if converged && stage > 0 {
             stage -= 1;
-            // eval  clears both values on each phase change.
+            // eval clears both values on each phase change.
             stage_bound = -1e12;
-            // Each phase is a new solveMastLpPrimPh1A2  call,
+            // Each phase is a new solveMastLpPrimPh1A2 call,
             // whose penalty-update count starts at zero.
             round_penalty_updates = 0;
             advanced = true;
@@ -670,7 +670,7 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                 }
                 let previous_rows = master.rhs().len();
                 let added = controller.separate(master, &out.column_tags)?;
-                // the solver adds the cut artificials in one call, then deletes
+                // Add the cut artificials in one call, then delete
                 // the columns a strengthened relaxation forbids.
                 if added > 0 && options.cut_artificial_cost > 0. {
                     let mut artificials: Vec<(usize, f64)> = vec![];
@@ -734,7 +734,7 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
     finish(out, loaded, cut_artificials)
 }
 
-/// Alg4EvalByLagrangianDuality::cleanupRestrictedMastColumns ,
+/// Alg4EvalByLagrangianDuality::cleanupRestrictedMastColumns,
 /// run before pricing. With N generated columns above the threshold, columns
 /// in the primal solution stay; the others are stably sorted by reduced cost
 /// (Double tolerance 1e-10 relative + 1e-6, creation order on ties) and only

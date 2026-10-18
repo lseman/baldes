@@ -39,7 +39,7 @@ impl Default for KPathParameters {
     }
 }
 
-/// cuts per round = RCSPrankOneCutsMaxNumPerRound.
+/// Configure cuts per round from RCSPrankOneCutsMaxNumPerRound.
 pub fn kpath_parameters(options: &Options, mut base: KPathParameters) -> Result<KPathParameters> {
     let per_round = options.get("RCSPrankOneCutsMaxNumPerRound")?;
     if per_round < 1.0 {

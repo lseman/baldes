@@ -1,8 +1,7 @@
-//! Strong round-up diving over elementary route columns. The depth-first
-//! agenda, discrepancy budget and first-solution stopping follow
-//! DivingHeuristic::runDiving ; candidate trials follow
-//! Strong round-up diving. A route is fixed through all its
-//! arc flows, so pricing remains valid without route-specific dual resources.
+//! Strong round-up diving over elementary route columns, with a depth-first
+//! agenda, discrepancy budget, and first-solution stopping. A route is fixed
+//! through all its arc flows, so pricing remains valid without route-specific
+//! dual resources.
 use super::*;
 #[derive(Clone, Debug)]
 pub struct DivingOptions {

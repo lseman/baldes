@@ -35,7 +35,10 @@ column-generation callbacks and separation scheduling.
 `master/tree/mod.rs` owns node processing and the search queue. Its sibling
 `candidates.rs`, `strong.rs`, and `diving.rs` own candidate generation, strong
 branching, and diving. Typed constraints live in `master/branching.rs`.
-LP backends remain under `master/solvers/`.
+LP backends remain under `master/solvers/`. Shared integer result types are in
+`master/solvers/mip.rs`; `master/solvers/highs/integer.rs` transfers complete
+models to HiGHS. `master/root/integer.rs` prepares complete enumerated masters;
+`master/tree/integer.rs` runs the optional end-of-node solve.
 
 Public paths remain `master::root::{RootProblem, RootOptions, NodeSnapshot}`
 and `master::tree::{TreeOptions, BranchingOptions}`.

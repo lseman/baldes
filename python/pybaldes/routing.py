@@ -111,7 +111,7 @@ class RootResult:
     cut_rounds: int
     iterations: int
     pricing_calls: int
-    columns: int  # bcCountCol: route columns added over the run
+    columns: int  # Route columns added over the run
     master_columns: int  # final master size, artificial columns included
     fixing_calls: int
     enumerated_routes: int

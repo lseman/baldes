@@ -752,6 +752,7 @@ pub fn prepare_full_memory(
                     tables[i].push(transition(&f, -1, -1, -1));
                 } else if from && !to {
                     // The native call supplies the word coordinate for BOTH
+                    // destination arguments, not shift.
                     tables[i].push(transition(&f, 1, f.word, f.word));
                 }
             };

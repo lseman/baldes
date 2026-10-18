@@ -270,25 +270,68 @@ impl Solver {
         Ok(engine)
     }
     pub fn set_option(&mut self, name: &str, value: f64) -> Result<()> {
-        let changed = self.options.get(name)? != value;
-        self.options.set(name, value)?;
+        // Validate all fallible conversions before publishing any state changes.
+        let mut next = self.options.clone();
+        next.set(name, value)?;
+        let mut controls = self.controls.clone();
+        let mut next_phases = None;
         match name {
             "RCSPhardTimeThresholdInPricing" => {
-                self.controls.time_limit = if value <= 0. {
+                controls.time_limit = if value <= 0. {
                     Duration::ZERO
                 } else {
                     Duration::try_from_secs_f64(value * 50.)
                         .map_err(|_| invalid("pricing time limit"))?
-                }
+                };
             }
             "RCSPmaxNumOfColsPerExactIteration" => {
                 if value < 1. {
                     return Err(invalid("positive exact column limit required"));
                 }
-                self.controls.max_columns = value as usize;
+                controls.max_columns = value as usize;
             }
-            "RCSPheurLabelingStrategy" => self.phases = phases::initialize(value as i32, &[])?,
+            "RCSPheurLabelingStrategy" => {
+                next_phases = Some(phases::initialize(value as i32, &[])?)
+            }
+            "RCSPlabelDominanceStrategy" if value != 0. && value != 1. => {
+                return Err(invalid("unsupported label dominance strategy"));
+            }
+            "RCSPuseBidirectionalSearch" if !(0. ..=2.).contains(&value) => {
+                return Err(invalid("unsupported bidirectional mode"));
+            }
+            "RCSPdynamicBucketSteps" if value != 0. && value != 1. => {
+                return Err(invalid("dynamic bucket step mode must be 0 or 1"));
+            }
+            "RCSPcapacityCutsSeparator" if value == 0. => {
+                return Err(invalid(
+                    "external CVRPSEP capacity separator is not implemented",
+                ));
+            }
+            "RCSPcapCutsMaxNumPerRound" | "RCSPmaxNumOfColsPerIteration" if value < 1. => {
+                return Err(invalid("positive cut/column limit required"));
+            }
+            "RCSPmaxNumOfEnumSolutionsForMIP" | "RCSPmaxNumOfEnumSolsForEndOfNodeMIP"
+                if value < 0. =>
+            {
+                return Err(invalid("enumerated MIP route limits must be nonnegative"));
+            }
+            "RCSPmaxNumOfLabelsInEnumeration"
+            | "RCSPmaxNumOfLabelsInHeurEnumeration"
+            | "RCSPmaxNumOfEnumeratedSolutions"
+                if value < 0. =>
+            {
+                return Err(invalid("enumeration limits must be nonnegative"));
+            }
             _ => {}
+        }
+        let changed = self.options.get(name)? != value;
+        self.options = next;
+        self.controls = controls;
+        if let Some(phases) = next_phases {
+            self.phases = phases;
+        }
+        if name == "RCSPlabelDominanceStrategy" {
+            self.dominance_mode = value as i32;
         }
         // Runtime budgets and column limits do not change the bucket graph.
         // Keep inherited fixing when a node installs its own work budget.
@@ -330,7 +373,7 @@ impl Solver {
             ..Default::default()
         }
     }
-    /// columnGenerationTerminated  as Alg4EvalByLagrangianDuality
+    /// columnGenerationTerminated as Alg4EvalByLagrangianDuality
     /// calls it after each converged column generation: the statistics form,
     /// then the end-of-round form that applies a pending bucket-step decrease.
     /// Returns the stop-cut-generation flag of the statistics form.

@@ -16,7 +16,7 @@ pub trait LpMaster: Sized + 'static {
     /// index range. Must leave the model as adding them one by one would.
     fn add_rows(&mut self, rows: &[(RowSense, f64, &[(usize, f64)])]) -> Result<std::ops::Range<usize>>;
 
-    /// Add a single variable (column).
+    /// Add a single variable (column), with lower bound zero.
     fn add_column(&mut self, cost: f64, entries: &[(usize, f64)]) -> Result<usize>;
 
     /// Add several columns in one call, in order. Returns their index range.
@@ -64,7 +64,7 @@ pub trait LpMaster: Sized + 'static {
     /// depends on it, so every backend must report the real basis.
     fn row_is_basic(&self, row: usize) -> Result<bool>;
 
-    /// the solver cleanupRestrictedMastCuts: the cut rows (from `initial_rows`
+    /// Cut cleanup: the cut rows (from `initial_rows`
     /// on) to remove, ascending. Backends normally forward to the shared
     /// [`cleanup_cut_rows`].
     fn cleanup_cut_rows(&self, initial_rows: usize) -> Result<Vec<usize>>;
@@ -89,7 +89,7 @@ pub trait LpMaster: Sized + 'static {
     ) -> Result<(Vec<Option<usize>>, Vec<Option<usize>>)>;
 }
 
-/// the solver cleanupRestrictedMastCuts , default threshold 1 and
+/// Cut cleanup with default threshold 1 and
 /// retention ratio 0.66, on any backend. The normalization divides by the
 /// SIGNED RHS when |rhs| > 1: a slack packing cut with rhs < -1 is retained.
 pub fn cleanup_cut_rows<M: LpMaster>(master: &M, initial_rows: usize) -> Result<Vec<usize>> {
