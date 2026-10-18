@@ -146,9 +146,9 @@ See <a href="tree.html">Tree lifecycle</a> for bound and incumbent handling.</p>
 <li><a href="https://github.com/lseman/baldes/blob/main/src/master/branching.rs">Typed constraints and route coefficients</a></li>
 <li><a href="https://github.com/lseman/baldes/blob/main/src/master/tree/candidates.rs">Candidate generation and history checks</a></li>
 <li><a href="https://github.com/lseman/baldes/blob/main/src/pricing/branching.rs">Ryan–Foster pricing resources</a></li>
-<li><a href="https://github.com/lseman/baldes/blob/main/tests/branching.rs">Branching tests</a>: both children, resource limits,
+<li><a href="https://github.com/lseman/baldes/blob/main/tests/master/branching.rs">Branching tests</a>: both children, resource limits,
 fresh versus inherited models, and pricing with active cuts</li>
-<li><a href="https://github.com/lseman/baldes/blob/main/tests/branch_price.rs">Tree tests</a>: exhaustive small instances, strong
+<li><a href="https://github.com/lseman/baldes/blob/main/tests/master/branch_price.rs">Tree tests</a>: exhaustive small instances, strong
 trials, diving, and incomplete-bound handling</li>
 </ul>
 <pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--test<span class="w"> </span>branching<span class="w"> </span>--test<span class="w"> </span>branch_price
