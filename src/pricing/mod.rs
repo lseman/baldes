@@ -270,13 +270,14 @@ impl Solver {
         Ok(engine)
     }
     pub fn set_option(&mut self, name: &str, value: f64) -> Result<()> {
+        let name = crate::core::options::Options::canonical_name(name)?;
         // Validate all fallible conversions before publishing any state changes.
         let mut next = self.options.clone();
         next.set(name, value)?;
         let mut controls = self.controls.clone();
         let mut next_phases = None;
         match name {
-            "RCSPhardTimeThresholdInPricing" => {
+            "BALDEShardTimeThresholdInPricing" => {
                 controls.time_limit = if value <= 0. {
                     Duration::ZERO
                 } else {
@@ -284,40 +285,40 @@ impl Solver {
                         .map_err(|_| invalid("pricing time limit"))?
                 };
             }
-            "RCSPmaxNumOfColsPerExactIteration" => {
+            "BALDESmaxNumOfColsPerExactIteration" => {
                 if value < 1. {
                     return Err(invalid("positive exact column limit required"));
                 }
                 controls.max_columns = value as usize;
             }
-            "RCSPheurLabelingStrategy" => {
+            "BALDESheurLabelingStrategy" => {
                 next_phases = Some(phases::initialize(value as i32, &[])?)
             }
-            "RCSPlabelDominanceStrategy" if value != 0. && value != 1. => {
+            "BALDESlabelDominanceStrategy" if value != 0. && value != 1. => {
                 return Err(invalid("unsupported label dominance strategy"));
             }
-            "RCSPuseBidirectionalSearch" if !(0. ..=2.).contains(&value) => {
+            "BALDESuseBidirectionalSearch" if !(0. ..=2.).contains(&value) => {
                 return Err(invalid("unsupported bidirectional mode"));
             }
-            "RCSPdynamicBucketSteps" if value != 0. && value != 1. => {
+            "BALDESdynamicBucketSteps" if value != 0. && value != 1. => {
                 return Err(invalid("dynamic bucket step mode must be 0 or 1"));
             }
-            "RCSPcapacityCutsSeparator" if value == 0. => {
+            "BALDEScapacityCutsSeparator" if value == 0. => {
                 return Err(invalid(
                     "external CVRPSEP capacity separator is not implemented",
                 ));
             }
-            "RCSPcapCutsMaxNumPerRound" | "RCSPmaxNumOfColsPerIteration" if value < 1. => {
+            "BALDEScapCutsMaxNumPerRound" | "BALDESmaxNumOfColsPerIteration" if value < 1. => {
                 return Err(invalid("positive cut/column limit required"));
             }
-            "RCSPmaxNumOfEnumSolutionsForMIP" | "RCSPmaxNumOfEnumSolsForEndOfNodeMIP"
+            "BALDESmaxNumOfEnumSolutionsForMIP" | "BALDESmaxNumOfEnumSolsForEndOfNodeMIP"
                 if value < 0. =>
             {
                 return Err(invalid("enumerated MIP route limits must be nonnegative"));
             }
-            "RCSPmaxNumOfLabelsInEnumeration"
-            | "RCSPmaxNumOfLabelsInHeurEnumeration"
-            | "RCSPmaxNumOfEnumeratedSolutions"
+            "BALDESmaxNumOfLabelsInEnumeration"
+            | "BALDESmaxNumOfLabelsInHeurEnumeration"
+            | "BALDESmaxNumOfEnumeratedSolutions"
                 if value < 0. =>
             {
                 return Err(invalid("enumeration limits must be nonnegative"));
@@ -330,7 +331,7 @@ impl Solver {
         if let Some(phases) = next_phases {
             self.phases = phases;
         }
-        if name == "RCSPlabelDominanceStrategy" {
+        if name == "BALDESlabelDominanceStrategy" {
             self.dominance_mode = value as i32;
         }
         // Runtime budgets and column limits do not change the bucket graph.
@@ -338,10 +339,10 @@ impl Solver {
         if changed
             && !matches!(
                 name,
-                "RCSPhardTimeThresholdInPricing"
-                    | "RCSPmaxNumOfColsPerExactIteration"
-                    | "RCSPmaxNumOfColsPerIteration"
-                    | "RCSPheurLabelingStrategy"
+                "BALDEShardTimeThresholdInPricing"
+                    | "BALDESmaxNumOfColsPerExactIteration"
+                    | "BALDESmaxNumOfColsPerIteration"
+                    | "BALDESheurLabelingStrategy"
             )
         {
             self.engine = None;
@@ -350,24 +351,24 @@ impl Solver {
     }
     fn engine_controls(&self, exact: bool) -> EngineControls {
         EngineControls {
-            bidirectional: self.options.get("RCSPuseBidirectionalSearch").unwrap_or(2.) != 0.,
-            bidirectional_mode: self.options.get("RCSPuseBidirectionalSearch").unwrap_or(2.) as i32,
+            bidirectional: self.options.get("BALDESuseBidirectionalSearch").unwrap_or(2.) != 0.,
+            bidirectional_mode: self.options.get("BALDESuseBidirectionalSearch").unwrap_or(2.) as i32,
             dominance_mode: self.dominance_mode,
             steps: self.bucket_steps,
             target_buckets: self
                 .options
-                .get("RCSPnumberOfBucketsPerVertex")
+                .get("BALDESnumberOfBucketsPerVertex")
                 .unwrap_or(25.) as i32,
             group_limit: if exact {
                 0
             } else {
                 self.options
-                    .get("RCSPmaxNumOfColsPerIteration")
+                    .get("BALDESmaxNumOfColsPerIteration")
                     .unwrap_or(30.) as i32
             },
             filter_other_buckets: self
                 .options
-                .get("RCSPcheckDominInOtherBuckets")
+                .get("BALDEScheckDominInOtherBuckets")
                 .unwrap_or(1.)
                 != 0.,
             ..Default::default()

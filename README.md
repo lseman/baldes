@@ -121,7 +121,7 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--upper-bound X` | initial incumbent for fixing |
 | `--no-stabilization` | no dual-price smoothing |
 | `--dynamic-ng P` | strengthen NG memories from master cycles at separator priority P |
-| `--option NAME=VALUE` | set an RCSP pricing option (repeatable) |
+| `--option NAME=VALUE` | set a supported BALDES pricing option (repeatable) |
 | `--iterations N`, `--time S` | master iteration and time limits |
 | `--json FILE` | write results: root LP/history, tree incumbent/bounds/node counters, or HGS solution |
 | `--population-size N` | HGS minimum population size (default: 25) |
@@ -131,12 +131,13 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 Solomon instances are in [`instances/`](instances/), and a few CVRPLIB ones in
 [`instances/cvrplib/`](instances/cvrplib/).
 
-For RCSP settings, see the [option support audit](docs/options.md).
-Unsupported settings accept their default; non-default changes return
-an explicit error. Rust exposes `Options::support(name)`; Python exposes
-`Solver.option_support(name)`. With `clp,highs`, 41 options have
-consumers and 17 remain unsupported; otherwise the counts are 39 and 19.
-Consumers can depend on the operation or configured cut family.
+For named pricing controls, see the [BALDES option reference](docs/options.md).
+Public option names start with `BALDES`, for example
+`--option BALDESlabelDominanceStrategy=1`. Rust exposes supported metadata in
+`OPTION_TABLE`; Python exposes `Solver.option_names()` and
+`Solver.option_support(name)`. The public list contains 39 supported controls,
+plus two enumerated-MIP controls when both `clp` and `highs` are enabled.
+Scope can depend on the operation or configured cut family.
 
 ## Branch-and-price tree
 
@@ -197,8 +198,8 @@ columns are excluded, and returned route witnesses are validated. The source
 Clp LP and sibling snapshots remain untouched.
 
 The route-count gate requires complete enumeration. Its normal threshold
-(`RCSPmaxNumOfEnumSolutionsForMIP`, default 10,000) raises the end-of-node
-threshold (`RCSPmaxNumOfEnumSolsForEndOfNodeMIP`, default 0) to at least that
+(`BALDESmaxNumOfEnumSolutionsForMIP`, default 10,000) raises the end-of-node
+threshold (`BALDESmaxNumOfEnumSolsForEndOfNodeMIP`, default 0) to at least that
 value. `MipOptions` defaults to 2,000,000 nodes and 360,000 seconds, capped in
 the tree at 98% of remaining global time. These budgets are separate from
 `--mip-nodes`, which controls the restricted-column heuristic.
@@ -295,7 +296,7 @@ bound, matching the Rust CLI.
 
 Options include `ng`, `reference_ng`, `rounding` (`none`, `nearest`, `tenth`),
 `stabilize`, `reduced_cost_fixing`, `upper_bound`, `max_iterations`,
-`max_cut_rounds`, and a `pricing_options` dictionary of native option values.
+`max_cut_rounds`, and a `pricing_options` dictionary of BALDES option values.
 Disabling reduced-cost fixing also disables enumeration. Results include positive
 LP routes, duals, iteration history, cut/fixing counts, and timers;
 `result.to_dict()` and `result.to_json()` export them. Unknown/infinite values
@@ -332,7 +333,7 @@ cargo check --workspace --all-targets --all-features
 ```
 
 These commands require the HiGHS shared library. The latest all-feature
-workspace suite passed **155 tests**, including transfer from Clp to HiGHS,
+workspace suite passed **158 tests**, including transfer from Clp to HiGHS,
 inherited branches and active cut families, proof/limit handling, and 50 small
 integer models checked by exhaustive enumeration. Clp-only option and CLI
 checks, HiGHS-only tests, and default/all-feature build checks also passed.
@@ -350,8 +351,9 @@ and remaining 1.x Python APIs.
 
 ## Repository layout
 
-See the [source layout guide](docs/source-layout.md) for module responsibilities
-and the cut, pricing, enumeration, master, and tree subfolders.
+See the [documentation index](docs/README.md) for usage and implementation
+guides, and the [source layout guide](docs/source-layout.md) for module
+responsibilities and subfolders.
 
 | Path | Contents |
 | --- | --- |
@@ -363,7 +365,10 @@ and the cut, pricing, enumeration, master, and tree subfolders.
 | `tools/` | pricing comparison utilities |
 | `instances/` | Solomon VRPTW instances; `cvrplib/` holds CVRPLIB samples |
 | `assets/` | logo |
-| `landing/` | project landing page (deployed to GitHub Pages) |
+| `landing/` | landing page and generated documentation website |
+
+Build the website documentation with `tools/compile_docs.py`; see the
+[website publishing guide](docs/website.md) for setup and preview commands.
 
 ## Citation
 

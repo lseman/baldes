@@ -8,8 +8,8 @@ impl Solver {
         self.complete_labels(true)?;
         let controls = enumeration::Controls {
             cutoff,
-            label_limit: self.options.get("RCSPmaxNumOfLabelsInEnumeration")?.max(1.) as usize,
-            path_limit: self.options.get("RCSPmaxNumOfEnumeratedSolutions")?.max(1.) as usize,
+            label_limit: self.options.get("BALDESmaxNumOfLabelsInEnumeration")?.max(1.) as usize,
+            path_limit: self.options.get("BALDESmaxNumOfEnumeratedSolutions")?.max(1.) as usize,
             time_limit: self.controls.time_limit,
             max_route_arcs: self.controls.max_route_arcs,
             preserve_arc_paths: self.enumeration_preserve_arc_paths || !self.ryan_foster.is_empty(),
@@ -39,7 +39,7 @@ impl Solver {
             engine.cuts.full = Some(full);
         }
         let engine = self.engine.as_ref().unwrap();
-        let scan = self.options.get("RCSPuseExactComplBoundsInEnumeration")? != 0.;
+        let scan = self.options.get("BALDESuseExactComplBoundsInEnumeration")? != 0.;
         let tables =
             engine
                 .cuts

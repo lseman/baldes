@@ -29,8 +29,8 @@ Options:
   --upper-bound X       Initial incumbent
   --dynamic-ng P        Strengthen NG memories from master cycles at separator
                         priority P (capacity cuts 3, rank-one 1); see
-                        RCSPdynamicNGmode and RCSPmaxNGneighbourhoodSize
-  --option NAME=VALUE   Set an RCSP pricing option (repeatable)
+                        BALDESdynamicNGmode and BALDESmaxNGneighbourhoodSize
+  --option NAME=VALUE   Set a supported BALDES pricing option (repeatable)
   --iterations N        Master iteration limit
   --time SECONDS        Time limit (BOTH vrptw/cvrp and hgs)
   --json FILE           Write results as JSON (BOTH vrptw/cvrp and hgs)

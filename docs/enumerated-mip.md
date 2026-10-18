@@ -1,9 +1,11 @@
 # Enumerated node MIP with HiGHS
 
+[Documentation index](README.md) · [Tree lifecycle](tree.md) ·
+[BALDES options](options.md)
+
 BALDES can solve a complete enumerated node master with **HiGHS**, while keeping
-Clp for column generation. There is no custom branch-and-bound around Clp.
-The integer solve uses a separate HiGHS instance and leaves the source LP,
-its solution/basis, and sibling snapshots untouched.
+Clp for column generation. The integer solve uses a separate HiGHS instance
+and leaves the source LP, its solution/basis, and sibling snapshots untouched.
 
 ## Controls and API
 
@@ -24,11 +26,26 @@ cutoff. The tree additionally caps time at 98% of its remaining global budget.
 These budgets are separate from the restricted-column heuristic's
 `TreeOptions::mip_node_limit` / `mip_time_limit`.
 
-For an existing LP backend:
+For a generic integer model, the `highs` feature alone is sufficient. This
+complete example builds a two-variable binary master:
 
-```rust,ignore
-use baldes::master::solvers::{highs, mip::MipOptions};
-let result = highs::solve_integer(&master, &integer_column_indices, &MipOptions::default())?;
+```rust
+use baldes::master::{
+    solvers::{highs::{self, HighsMaster}, mip::MipOptions},
+    LpMaster, RowSense,
+};
+
+fn main() -> baldes::Result<()> {
+    let mut master = HighsMaster::new()?;
+    let row = master.add_row(RowSense::GreaterEqual, 1.5, &[])?;
+    for _ in 0..2 {
+        let col = master.add_column(1.0, &[(row, 1.0)])?;
+        master.set_upper(col, 1.0)?;
+    }
+    let result = highs::solve_integer(&master, &[0, 1], &MipOptions::default())?;
+    println!("{:?}: {:?}", result.status, result.solution);
+    Ok(())
+}
 ```
 
 This copies every current physical row, coefficient, cost, and upper bound
@@ -39,15 +56,19 @@ discard are rejected explicitly instead of silently changing the matrix.
 
 For a routing snapshot, `NodeSnapshot::solve_enumerated_mip` prepares the full
 route master and applies the end-of-node route-count gate. It returns `None`
-if enumeration is incomplete or over the limit. It is available with `highs`.
+if enumeration is incomplete or over the limit. This snapshot API requires
+`clp,highs`; the generic `highs::solve_integer` API needs only `highs`.
 
 ## Enumeration gate
 
 The route universe must be complete and its route count must not exceed the
 configured threshold. Equality and a completed empty universe are accepted.
-`RCSPmaxNumOfEnumSolutionsForMIP` defaults to 10,000;
-`RCSPmaxNumOfEnumSolsForEndOfNodeMIP` defaults to zero and is raised to at least
-the normal threshold. An incomplete universe never passes the gate.
+`BALDESmaxNumOfEnumSolutionsForMIP` defaults to 10,000;
+`BALDESmaxNumOfEnumSolsForEndOfNodeMIP` defaults to zero and is raised to at least
+the normal threshold. An incomplete universe never passes the gate. Setting
+only the end-of-node option to zero does not disable the solve, because the normal threshold still
+raises it. The gate counts retained enumerated routes before adding any
+previously priced elementary witness routes to the integer model.
 
 ## Preserving node semantics
 
@@ -81,6 +102,12 @@ coverage cutoff cannot establish global infeasibility.
 | `TimeLimit` / `NodeLimit` | Unfinished solve; any validated improving incumbent is retained, but the tree does not treat the limit as a proof |
 | `Incomplete` | Other or ambiguous statuses, including unbounded-or-infeasible and unusable witnesses; no node-closing proof |
 
+A finite `objective_cutoff` filters improving witnesses after solving; it is
+not installed as a HiGHS search cutoff. The source model is copied before
+solving, so a supplied cutoff never substitutes for a feasible incumbent.
+Coefficients with nonzero magnitude at most `1e-12` are rejected to avoid
+silent matrix changes in HiGHS.
+
 HiGHS relative and absolute MIP gaps are set to zero. Its model status is
 retained in `MipOutput::solver_status`, with solution, dual bound, node count,
 simplex iterations, and elapsed time. Tree JSON adds `enumerated_mip_calls` and
@@ -97,10 +124,17 @@ assignment rows and then re-solve the parent to check isolation. Tree and CLI
 tests exercise opt-in MIP, disabled enumeration, exhausted budgets, and missing
 backend support.
 
-The complete all-feature workspace suite passed **155 tests**, including nine
-HiGHS MIP tests and the CLI test. Default/all-feature build checks passed;
-Clp-only option and CLI checks passed too. HiGHS headers/library used for these
-checks are version 1.15.1.
+Run the MIP and command-line checks with both backends:
+
+```sh
+cargo test --features clp,highs --test highs_mip --test cli
+```
+
+See [Build and validation](testing.md) for the full feature matrix and Python
+checks. The implementation lives in the
+[HiGHS model transfer](../src/master/solvers/highs/integer.rs),
+[snapshot adapter](../src/master/root/integer.rs), and
+[tree integration](../src/master/tree/integer.rs).
 
 BALDES currently runs the optional solve after node evaluation. A handoff
 inside column generation, new cut separation during integer solving, and

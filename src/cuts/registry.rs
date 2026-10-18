@@ -18,7 +18,7 @@ pub enum MemoryKind {
     Vertex,
     Arc,
 }
-/// RCSPrankOneCutsMemoryType: 0 vertex, 1 arc, 2 default copy, 3 all vertices.
+/// BALDESrankOneCutsMemoryType: 0 vertex, 1 arc, 2 default copy, 3 all vertices.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemoryType {
     Vertex = 0,
@@ -155,17 +155,17 @@ pub struct MemoryPolicy {
     pub sp_dependent: bool,
 }
 pub fn memory_policy(options: &Options) -> Result<MemoryPolicy> {
-    let memory_type = match options.get("RCSPrankOneCutsMemoryType")? as i32 {
+    let memory_type = match options.get("BALDESrankOneCutsMemoryType")? as i32 {
         0 => MemoryType::Vertex,
         1 => MemoryType::Arc,
         2 => MemoryType::Default,
         3 => MemoryType::AllVertices,
-        _ => return Err(invalid("RCSPrankOneCutsMemoryType must be 0, 1, 2 or 3")),
+        _ => return Err(invalid("BALDESrankOneCutsMemoryType must be 0, 1, 2 or 3")),
     };
     Ok(MemoryPolicy {
         memory_type,
-        arc_memory_type: options.get("RCSPrankOneCutsArcMemoryType")? as i32,
-        sp_dependent: options.get("RCSPrankOneCutsSpDependentMemory")? != 0.,
+        arc_memory_type: options.get("BALDESrankOneCutsArcMemoryType")? as i32,
+        sp_dependent: options.get("BALDESrankOneCutsSpDependentMemory")? != 0.,
     })
 }
 
@@ -556,8 +556,8 @@ impl CutRegistry {
         customers: &[usize],
         columns: &[FractionalColumn],
     ) -> Result<usize> {
-        let rows = options.get("RCSPrankOneCutsMaxNumRows")?;
-        let triplets = options.get("RCSPrankOneCutsMaxNumTriplets")?;
+        let rows = options.get("BALDESrankOneCutsMaxNumRows")?;
+        let triplets = options.get("BALDESrankOneCutsMaxNumTriplets")?;
         if rows > 3. && triplets < 1. {
             return Err(invalid(
                 "lm-1Rank cuts separator: separation of 4 and 5-rows cuts needs tuple based separation",
@@ -569,15 +569,15 @@ impl CutRegistry {
         if rows < 1. {
             return Err(invalid("lm-1Rank cuts separator: at least one row required"));
         }
-        let per_round = options.get("RCSPrankOneCutsMaxNumPerRound")?;
+        let per_round = options.get("BALDESrankOneCutsMaxNumPerRound")?;
         if per_round < 1. {
             return Err(invalid("lm-1Rank cuts separator: positive cuts per round required"));
         }
-        let raw_iterations = options.get("RCSPrankOneCutsLSnumIterations")?;
+        let raw_iterations = options.get("BALDESrankOneCutsLSnumIterations")?;
         let iterations = raw_iterations.abs();
-        let kind = options.get("RCSPrankOneCutsTypeToSeparate")? as i32;
+        let kind = options.get("BALDESrankOneCutsTypeToSeparate")? as i32;
         if !(0..=2).contains(&kind) {
-            return Err(invalid("RCSPrankOneCutsTypeToSeparate must be 0, 1 or 2"));
+            return Err(invalid("BALDESrankOneCutsTypeToSeparate must be 0, 1 or 2"));
         }
         let policy = memory_policy(options)?;
         let p = &mut self.parameters;
@@ -606,7 +606,7 @@ impl CutRegistry {
             p.start_rank = phase;
             p.arc_memory_type = policy.arc_memory_type;
             p.covering_sets_present = covering || self.covering_sets_present;
-            p.use_covering_sets_for_one_row = options.get("RCSPuseCovSetsForSepOneRowPackingCuts")? != 0.;
+            p.use_covering_sets_for_one_row = options.get("BALDESuseCovSetsForSepOneRowPackingCuts")? != 0.;
             p.sp_dependent_memory = policy.sp_dependent;
             p.graph_id = g.graph_id.max(0);
             p.memory_type = policy.memory_type;
@@ -616,12 +616,12 @@ impl CutRegistry {
     }
     /// or_rcsp_cut_separation_phase: (phase, at maximum).
     pub fn separation_phase(&self, options: &Options) -> Result<(i32, bool)> {
-        let rows = options.get("RCSPrankOneCutsMaxNumRows")? as i32;
+        let rows = options.get("BALDESrankOneCutsMaxNumRows")? as i32;
         let phase = self.separation_phase.min(rows);
         Ok((phase, phase >= rows))
     }
     pub fn increase_phase(&mut self, options: &Options) -> Result<i32> {
-        self.parameters.max_rank = options.get("RCSPrankOneCutsMaxNumRows")? as i32;
+        self.parameters.max_rank = options.get("BALDESrankOneCutsMaxNumRows")? as i32;
         self.increase_separation_phase();
         Ok(self.separation_phase)
     }

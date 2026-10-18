@@ -46,7 +46,7 @@ fn pricing_failure_clears_outputs_and_recovers() {
     // SAFETY: Valid local handles, nul-terminated names and writable buffer slots.
     unsafe {
         let p=or_rcsp_new(2,0);or_rcsp_new_arc(p,0,1,-2.);
-        let name=c"RCSPhardTimeThresholdInPricing";
+        let name=c"BALDEShardTimeThresholdInPricing";
         assert_eq!(or_rcsp_set_option(p,name.as_ptr(),-1.),0);
         let mut out=[ptr::null_mut();2];let mut cost=0.;let mut exact=1;
         assert_eq!(or_rcsp_price_phase(p,0,out.as_mut_ptr(),2,&mut cost,&mut exact),-1);

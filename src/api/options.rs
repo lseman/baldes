@@ -115,7 +115,7 @@ pub unsafe extern "C" fn or_rcsp_set_bidirectional_mode(p: *mut ORECSP, mode: i3
         if !(0..=2).contains(&mode) {
             return Err(invalid("bidirectional mode out of range"));
         }
-        unsafe { solver(p)? }.set_option("RCSPuseBidirectionalSearch", mode as f64)?;
+        unsafe { solver(p)? }.set_option("BALDESuseBidirectionalSearch", mode as f64)?;
         Ok(0)
     })
 }
@@ -142,8 +142,8 @@ pub unsafe extern "C" fn or_rcsp_build_resource_buckets(p: *mut ORECSP, steps: *
         };
         let controls = crate::labeling::engine::EngineControls {
             steps: s.bucket_steps,
-            bidirectional: s.options.get("RCSPuseBidirectionalSearch")? != 0.,
-            target_buckets: s.options.get("RCSPnumberOfBucketsPerVertex")? as i32,
+            bidirectional: s.options.get("BALDESuseBidirectionalSearch")? != 0.,
+            target_buckets: s.options.get("BALDESnumberOfBucketsPerVertex")? as i32,
             ..Default::default()
         };
         s.engine = Some(crate::labeling::engine::LabelingEngine::prepare(
@@ -174,7 +174,7 @@ pub unsafe extern "C" fn or_rcsp_set_label_dominance_strategy(
     strategy: i32,
 ) -> i32 {
     guard(-1, || {
-        unsafe { solver(p)? }.set_option("RCSPlabelDominanceStrategy", strategy as f64)?;
+        unsafe { solver(p)? }.set_option("BALDESlabelDominanceStrategy", strategy as f64)?;
         Ok(0)
     })
 }

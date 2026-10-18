@@ -153,9 +153,9 @@ pub struct RootOptions {
     pub knapsack_cuts: Option<KnapsackCutConfig>,
     /// ColGenSpRelaxationImprovementPriority: separator priority of dynamic
     /// NG strengthening (0 disables it by default). Its mode and caps
-    /// are the pricing options RCSPdynamicNGmode, RCSPmaxNGneighbourhoodSize,
-    /// RCSPmaxNGaverNeighbourhoodSize, RCSPmaxNumOfColumnsInDynamicNG and
-    /// RCSPmaxCycleSizeInDynamicNG.
+    /// are the pricing options BALDESdynamicNGmode, BALDESmaxNGneighbourhoodSize,
+    /// BALDESmaxNGaverNeighbourhoodSize, BALDESmaxNumOfColumnsInDynamicNG and
+    /// BALDESmaxCycleSizeInDynamicNG.
     pub relaxation_improvement_priority: f32,
 }
 impl Default for RootOptions {
@@ -185,6 +185,13 @@ impl Default for RootOptions {
     }
 }
 impl RootOptions {
+    pub(crate) fn normalize_pricing_options(&mut self) -> Result<()> {
+        for (name, _) in &mut self.pricing_options {
+            *name = crate::core::options::Options::canonical_name(name)?.into();
+        }
+        Ok(())
+    }
+
     pub fn with_capacity_cuts(mut self, config: CapacityCutConfig) -> Self {
         self.capacity_cuts = Some(config);
         self.cg.remove_basic_cuts = true;

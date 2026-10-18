@@ -79,10 +79,10 @@ impl<M: LpMaster> Controller<M> for RootController {
         let fixing_started = std::time::Instant::now();
         let remaining = state.remaining_time()?;
         let saved_time = state.solver.controls.time_limit;
-        let saved_fixing_time = state.solver.options.get("RCSPredCostFixingTimeThreshold")?;
+        let saved_fixing_time = state.solver.options.get("BALDESredCostFixingTimeThreshold")?;
         state.solver.controls.time_limit = saved_time.min(remaining);
         state.solver.options.set(
-            "RCSPredCostFixingTimeThreshold",
+            "BALDESredCostFixingTimeThreshold",
             saved_fixing_time.min(remaining.as_secs_f64()),
         )?;
         let fixed = state.solver.run_fixing_enumeration(mode, 0., cutoff);
@@ -90,7 +90,7 @@ impl<M: LpMaster> Controller<M> for RootController {
         state
             .solver
             .options
-            .set("RCSPredCostFixingTimeThreshold", saved_fixing_time)?;
+            .set("BALDESredCostFixingTimeThreshold", saved_fixing_time)?;
         let fixed = fixed?;
         state.pricing_seconds += fixing_started.elapsed().as_secs_f64();
         state.fixing_calls += 1;
@@ -572,7 +572,7 @@ impl RootController {
     /// BcRCSPFunctor::improveCurrentSpRelaxation): strengthen the NG memories
     /// from the cycles of the routes in the LP solution, then mark the master
     /// columns the stronger relaxation forbids for removal. A negative
-    /// RCSPdynamicNGmode only strengthens while no rank-one cut is in the
+    /// BALDESdynamicNGmode only strengthens while no rank-one cut is in the
     /// master (cuts of the current round do not count yet).
     fn improve_relaxation(
         &self,
@@ -582,16 +582,16 @@ impl RootController {
         values: &[f64],
     ) -> Result<bool> {
         let option = |name: &str| state.solver.options.get(name);
-        let mode = option("RCSPdynamicNGmode")? as i32;
+        let mode = option("BALDESdynamicNGmode")? as i32;
         if mode == 0 || (mode < 0 && rank_one_in_master) {
             return Ok(false);
         }
         let controls = crate::graph::relaxation::Controls {
             mode: mode.abs(),
-            max_vertex_size: option("RCSPmaxNGneighbourhoodSize")?.max(0.) as usize,
-            max_average_size: option("RCSPmaxNGaverNeighbourhoodSize")?.max(0.) as usize,
-            max_columns: option("RCSPmaxNumOfColumnsInDynamicNG")?.max(0.) as usize,
-            max_cycle_size: option("RCSPmaxCycleSizeInDynamicNG")? as i32,
+            max_vertex_size: option("BALDESmaxNGneighbourhoodSize")?.max(0.) as usize,
+            max_average_size: option("BALDESmaxNGaverNeighbourhoodSize")?.max(0.) as usize,
+            max_columns: option("BALDESmaxNumOfColumnsInDynamicNG")?.max(0.) as usize,
+            max_cycle_size: option("BALDESmaxCycleSizeInDynamicNG")? as i32,
             mirror: false,
         };
         let paths: Vec<_> = tagged

@@ -1,5 +1,4 @@
-//! Recovered constructor defaults and explicit behavior support.
-//! Unsupported settings remain readable; only their recovered default is accepted.
+//! Supported BALDES pricing options, defaults, and compatibility lookup.
 use crate::{invalid, Result};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OptionKind {
@@ -7,7 +6,7 @@ pub enum OptionKind {
     Double,
     Bool,
 }
-/// Availability of an option's behavior in this port. Implemented options may
+/// Availability of an option's behavior. Implemented options may
 /// require a particular operation or an explicitly configured cut family.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OptionSupport {
@@ -21,360 +20,259 @@ pub struct OptionInfo {
     pub default: f64,
     pub support: OptionSupport,
 }
+/// Supported canonical BALDES options available in this build.
+/// Conditional entries require both LP-tree and integer-solver features.
 pub const OPTION_TABLE: &[OptionInfo] = &[
     OptionInfo {
-        name: "RCSPstopCutGenTimeThresholdInPricing",
+        name: "BALDESstopCutGenTimeThresholdInPricing",
         kind: OptionKind::Double,
         default: 10.0,
         support: OptionSupport::Implemented("src/pricing/controller.rs"),
     },
     OptionInfo {
-        name: "RCSPhardTimeThresholdInPricing",
+        name: "BALDEShardTimeThresholdInPricing",
         kind: OptionKind::Double,
         default: 20.0,
         support: OptionSupport::Implemented("src/pricing/mod.rs; src/pricing/solve.rs; src/master/tree/mod.rs"),
     },
     OptionInfo {
-        name: "RCSPredCostFixingTimeThreshold",
+        name: "BALDESredCostFixingTimeThreshold",
         kind: OptionKind::Double,
         default: 100.0,
         support: OptionSupport::Implemented("src/pricing/fixing_workflow.rs; src/master/root/controller.rs"),
     },
     OptionInfo {
-        name: "RCSPnumberOfBucketsPerVertex",
+        name: "BALDESnumberOfBucketsPerVertex",
         kind: OptionKind::Int,
         default: 25.0,
         support: OptionSupport::Implemented("src/pricing/mod.rs; src/api/options.rs"),
     },
     OptionInfo {
-        name: "RCSPdynamicBucketSteps",
+        name: "BALDESdynamicBucketSteps",
         kind: OptionKind::Int,
         default: 1.0,
         support: OptionSupport::Implemented("src/pricing/controller.rs; src/pricing/solve.rs"),
     },
     OptionInfo {
-        name: "RCSPuseBidirectionalSearch",
+        name: "BALDESuseBidirectionalSearch",
         kind: OptionKind::Int,
         default: 2.0,
         support: OptionSupport::Implemented("src/pricing/mod.rs; src/api/options.rs"),
     },
     OptionInfo {
-        name: "RCSPapplyReducedCostFixing",
+        name: "BALDESapplyReducedCostFixing",
         kind: OptionKind::Int,
         default: 1.0,
         support: OptionSupport::Implemented("src/pricing/fixing_workflow.rs"),
     },
     OptionInfo {
-        name: "RCSPmaxNumOfColsPerIteration",
+        name: "BALDESmaxNumOfColsPerIteration",
         kind: OptionKind::Int,
         default: 30.0,
         support: OptionSupport::Implemented("src/pricing/mod.rs; src/pricing/solve.rs"),
     },
     OptionInfo {
-        name: "RCSPmaxNumOfColsPerExactIteration",
+        name: "BALDESmaxNumOfColsPerExactIteration",
         kind: OptionKind::Int,
         default: 150.0,
         support: OptionSupport::Implemented("src/pricing/mod.rs"),
     },
     OptionInfo {
-        name: "RCSPmaxNumOfLabelsInEnumeration",
+        name: "BALDESmaxNumOfLabelsInEnumeration",
         kind: OptionKind::Int,
         default: 1000000.0,
         support: OptionSupport::Implemented("src/pricing/fixing_workflow.rs; src/pricing/universe.rs"),
     },
     OptionInfo {
-        name: "RCSPmaxNumOfEnumeratedSolutions",
+        name: "BALDESmaxNumOfEnumeratedSolutions",
         kind: OptionKind::Int,
         default: 1000000.0,
         support: OptionSupport::Implemented("src/pricing/fixing_workflow.rs; src/pricing/universe.rs"),
     },
+    #[cfg(all(feature = "clp", feature = "highs"))]
     OptionInfo {
-        name: "RCSPmaxNumOfEnumSolutionsForMIP",
+        name: "BALDESmaxNumOfEnumSolutionsForMIP",
         kind: OptionKind::Int,
         default: 10000.0,
-        support: if cfg!(all(feature = "clp", feature = "highs")) {
-            OptionSupport::Implemented("src/master/root/integer.rs; normal route threshold and normalization of the opt-in end-of-node HiGHS MIP threshold")
-        } else { OptionSupport::Unsupported("enumerated node integer solving requires the clp and highs features") },
+        support: OptionSupport::Implemented("src/master/root/integer.rs; normal route threshold and normalization of the opt-in end-of-node HiGHS MIP threshold"),
     },
+    #[cfg(all(feature = "clp", feature = "highs"))]
     OptionInfo {
-        name: "RCSPmaxNumOfEnumSolsForEndOfNodeMIP",
+        name: "BALDESmaxNumOfEnumSolsForEndOfNodeMIP",
         kind: OptionKind::Int,
         default: 0.0,
-        support: if cfg!(all(feature = "clp", feature = "highs")) {
-            OptionSupport::Implemented("src/master/root/integer.rs; route-count threshold for complete enumerated node HiGHS MIP")
-        } else { OptionSupport::Unsupported("enumerated node integer solving requires the clp and highs features") },
+        support: OptionSupport::Implemented("src/master/root/integer.rs; route-count threshold for complete enumerated node HiGHS MIP"),
     },
     OptionInfo {
-        name: "RCSPinitNGneighbourhoodSize",
+        name: "BALDESinitNGneighbourhoodSize",
         kind: OptionKind::Int,
         default: 8.0,
         support: OptionSupport::Implemented("src/api/relaxation.rs"),
     },
     OptionInfo {
-        name: "RCSPmaxNGneighbourhoodSize",
+        name: "BALDESmaxNGneighbourhoodSize",
         kind: OptionKind::Int,
         default: 0.0,
         support: OptionSupport::Implemented("src/api/relaxation.rs; src/master/root/controller.rs"),
     },
     OptionInfo {
-        name: "RCSPrankOneCutsMaxNumRows",
+        name: "BALDESrankOneCutsMaxNumRows",
         kind: OptionKind::Int,
         default: 5.0,
         support: OptionSupport::Implemented("src/cuts/registry.rs"),
     },
     OptionInfo {
-        name: "RCSPrankOneCutsMaxNumPerRound",
+        name: "BALDESrankOneCutsMaxNumPerRound",
         kind: OptionKind::Int,
         default: 100.0,
         support: OptionSupport::Implemented("src/cuts/registry.rs; src/cuts/kpath/mod.rs"),
     },
     OptionInfo {
-        name: "RCSPrankOneCutsMemoryType",
+        name: "BALDESrankOneCutsMemoryType",
         kind: OptionKind::Int,
         default: 2.0,
         support: OptionSupport::Implemented("src/cuts/registry.rs"),
     },
     OptionInfo {
-        name: "RCSPrankOneCutsLSnumIterations",
+        name: "BALDESrankOneCutsLSnumIterations",
         kind: OptionKind::Int,
         default: 1000.0,
         support: OptionSupport::Implemented("src/cuts/registry.rs"),
     },
     OptionInfo {
-        name: "RCSPallowRoutesWithSameVerticesSet",
-        kind: OptionKind::Bool,
-        default: 1.0,
-        support: OptionSupport::Unsupported("Native route-pool equivalence control is not implemented; node enumeration preserves branch-distinct arc paths"),
-    },
-    OptionInfo {
-        name: "RCSPredCostFixingFalseGap",
+        name: "BALDESredCostFixingFalseGap",
         kind: OptionKind::Double,
         default: 0.0,
         support: OptionSupport::Implemented("src/pricing/fixing_workflow.rs"),
     },
     OptionInfo {
-        name: "RCSPmaxNumOfLabelsInHeurEnumeration",
+        name: "BALDESmaxNumOfLabelsInHeurEnumeration",
         kind: OptionKind::Int,
         default: 0.0,
         support: OptionSupport::Implemented("src/pricing/fixing_workflow.rs"),
     },
     OptionInfo {
-        name: "RCSPuseMetaSolver",
-        kind: OptionKind::Int,
-        default: 0.0,
-        support: OptionSupport::Unsupported("The native MetaSolver is not implemented"),
-    },
-    OptionInfo {
-        name: "RCSPprintLevel",
-        kind: OptionKind::Int,
-        default: -2.0,
-        support: OptionSupport::Unsupported("Native pricing log-level control is not implemented"),
-    },
-    OptionInfo {
-        name: "RCSPcheckDominInOtherBuckets",
+        name: "BALDEScheckDominInOtherBuckets",
         kind: OptionKind::Bool,
         default: 1.0,
         support: OptionSupport::Implemented("src/pricing/mod.rs"),
     },
     OptionInfo {
-        name: "RCSPuseCompletionBoundsInPricing",
-        kind: OptionKind::Int,
-        default: 0.0,
-        support: OptionSupport::Unsupported("Optional completion-bound pruning in ordinary pricing is not implemented"),
-    },
-    OptionInfo {
-        name: "RCSPdomChecksThresholdInPricing",
-        kind: OptionKind::Double,
-        default: 1000000000000000.0,
-        support: OptionSupport::Unsupported("The native dominance-check stopping threshold is not implemented"),
-    },
-    OptionInfo {
-        name: "RCSPheurLabelingStrategy",
+        name: "BALDESheurLabelingStrategy",
         kind: OptionKind::Int,
         default: 0.0,
         support: OptionSupport::Implemented("src/pricing/mod.rs"),
     },
     OptionInfo {
-        name: "RCSPlabelSplitStrategy",
-        kind: OptionKind::Int,
-        default: 0.0,
-        support: OptionSupport::Unsupported("The native configurable label-split strategy is not implemented"),
-    },
-    OptionInfo {
-        name: "RCSPlabelDominanceStrategy",
+        name: "BALDESlabelDominanceStrategy",
         kind: OptionKind::Int,
         default: 0.0,
         support: OptionSupport::Implemented("src/pricing/mod.rs; label dominance mode (0 or 1), shared with the C strategy setter"),
     },
     OptionInfo {
-        name: "RCSPdynBuckStepAdjustRatioThreshold",
+        name: "BALDESdynBuckStepAdjustRatioThreshold",
         kind: OptionKind::Double,
         default: 500.0,
         support: OptionSupport::Implemented("src/pricing/controller.rs"),
     },
     OptionInfo {
-        name: "RCSPdynBuckStepAdjustNumBuckArcsThreshold",
+        name: "BALDESdynBuckStepAdjustNumBuckArcsThreshold",
         kind: OptionKind::Double,
         default: 10000.0,
         support: OptionSupport::Implemented("src/pricing/controller.rs"),
     },
     OptionInfo {
-        name: "RCSPuseComplBoundsInRedCostFixing",
-        kind: OptionKind::Int,
-        default: 2.0,
-        support: OptionSupport::Unsupported("Configurable fixing completion-bound modes are not implemented; the current pairing algorithm is fixed"),
-    },
-    OptionInfo {
-        name: "RCSPuseDSSRInMode",
-        kind: OptionKind::Int,
-        default: 0.0,
-        support: OptionSupport::Unsupported("DSSR reduction is not implemented"),
-    },
-    OptionInfo {
-        name: "RCSPmaxNumOfColumnsInDSSR",
-        kind: OptionKind::Int,
-        default: 100.0,
-        support: OptionSupport::Unsupported("DSSR reduction is not implemented"),
-    },
-    OptionInfo {
-        name: "RCSPmaxCycleSizeInDSSR",
-        kind: OptionKind::Int,
-        default: 5.0,
-        support: OptionSupport::Unsupported("DSSR reduction is not implemented"),
-    },
-    OptionInfo {
-        name: "RCSPdynamicNGmode",
+        name: "BALDESdynamicNGmode",
         kind: OptionKind::Int,
         default: -1.0,
         support: OptionSupport::Implemented("src/api/relaxation.rs; src/master/root/controller.rs"),
     },
     OptionInfo {
-        name: "RCSPprintNGMemories",
-        kind: OptionKind::Bool,
-        default: 0.0,
-        support: OptionSupport::Unsupported("Native NG-memory diagnostic output is not implemented"),
-    },
-    OptionInfo {
-        name: "RCSPmaxNumOfColumnsInDynamicNG",
+        name: "BALDESmaxNumOfColumnsInDynamicNG",
         kind: OptionKind::Int,
         default: 100.0,
         support: OptionSupport::Implemented("src/api/relaxation.rs; src/master/root/controller.rs"),
     },
     OptionInfo {
-        name: "RCSPmaxCycleSizeInDynamicNG",
+        name: "BALDESmaxCycleSizeInDynamicNG",
         kind: OptionKind::Int,
         default: 5.0,
         support: OptionSupport::Implemented("src/api/relaxation.rs; src/master/root/controller.rs"),
     },
     OptionInfo {
-        name: "RCSPmaxNGaverNeighbourhoodSize",
+        name: "BALDESmaxNGaverNeighbourhoodSize",
         kind: OptionKind::Int,
         default: 0.0,
         support: OptionSupport::Implemented("src/api/relaxation.rs; src/master/root/controller.rs"),
     },
     OptionInfo {
-        name: "RCSPuseCapacityCuts",
+        name: "BALDESuseCapacityCuts",
         kind: OptionKind::Bool,
         default: 1.0,
         support: OptionSupport::Implemented("src/master/root/mod.rs; explicit option overrides a configured capacity separator and is inherited by children"),
     },
     OptionInfo {
-        name: "RCSPcapacityCutsSeparator",
+        name: "BALDEScapacityCutsSeparator",
         kind: OptionKind::Int,
         default: 1.0,
         support: OptionSupport::Implemented("src/pricing/mod.rs; accepts the available native separator; external CVRPSEP (0) is rejected"),
     },
     OptionInfo {
-        name: "RCSPcapCutsMaxNumPerRound",
+        name: "BALDEScapCutsMaxNumPerRound",
         kind: OptionKind::Int,
         default: 100.0,
         support: OptionSupport::Implemented("src/master/root/mod.rs; explicit per-round override for configured capacity separation, including inherited nodes"),
     },
     OptionInfo {
-        name: "RCSPresConsKnapsackCutsMode",
+        name: "BALDESresConsKnapsackCutsMode",
         kind: OptionKind::Int,
         default: -1.0,
         support: OptionSupport::Implemented("src/master/root/mod.rs; src/cuts/knapsack/mod.rs"),
     },
     OptionInfo {
-        name: "RCSPresConsKnapsackCutsMaxNumPerRound",
+        name: "BALDESresConsKnapsackCutsMaxNumPerRound",
         kind: OptionKind::Int,
         default: 100.0,
         support: OptionSupport::Implemented("src/master/root/mod.rs; src/cuts/knapsack/mod.rs"),
     },
     OptionInfo {
-        name: "RCSPcliqueCutsMaxNumPerRound",
-        kind: OptionKind::Int,
-        default: 0.0,
-        support: OptionSupport::Unsupported("Clique-cut separation is not implemented"),
-    },
-    OptionInfo {
-        name: "RCSPcliqueCutsMaxSepTime",
-        kind: OptionKind::Double,
-        default: 5.0,
-        support: OptionSupport::Unsupported("Clique-cut separation is not implemented"),
-    },
-    OptionInfo {
-        name: "RCSPrankOneCutsArcMemoryType",
+        name: "BALDESrankOneCutsArcMemoryType",
         kind: OptionKind::Int,
         default: 2.0,
         support: OptionSupport::Implemented("src/cuts/registry.rs"),
     },
     OptionInfo {
-        name: "RCSPrankOneCutsSpDependentMemory",
+        name: "BALDESrankOneCutsSpDependentMemory",
         kind: OptionKind::Bool,
         default: 0.0,
         support: OptionSupport::Implemented("src/cuts/registry.rs"),
     },
     OptionInfo {
-        name: "RCSPrankOneCutsNeighbourhoodSize",
-        kind: OptionKind::Int,
-        default: 16.0,
-        support: OptionSupport::Unsupported("The routing cut adapter has no packing-distance input; native distance-neighbourhood construction is not exposed"),
-    },
-    OptionInfo {
-        name: "RCSPrankOneCutsMaxNumTriplets",
+        name: "BALDESrankOneCutsMaxNumTriplets",
         kind: OptionKind::Int,
         default: 10000.0,
         support: OptionSupport::Implemented("src/cuts/registry.rs"),
     },
     OptionInfo {
-        name: "RCSPrankOneCutsTypeToSeparate",
+        name: "BALDESrankOneCutsTypeToSeparate",
         kind: OptionKind::Int,
         default: 0.0,
         support: OptionSupport::Implemented("src/cuts/registry.rs"),
     },
     OptionInfo {
-        name: "RCSPuseCovSetsForSepOneRowPackingCuts",
+        name: "BALDESuseCovSetsForSepOneRowPackingCuts",
         kind: OptionKind::Bool,
         default: 0.0,
         support: OptionSupport::Implemented("src/cuts/registry.rs"),
     },
     OptionInfo {
-        name: "RCSPuseExactComplBoundsInEnumeration",
+        name: "BALDESuseExactComplBoundsInEnumeration",
         kind: OptionKind::Bool,
         default: 1.0,
         support: OptionSupport::Implemented("src/pricing/universe.rs"),
     },
-    OptionInfo {
-        name: "RCSPmaxGapToRunEnumeration",
-        kind: OptionKind::Double,
-        default: 1.0,
-        support: OptionSupport::Unsupported("The native enumeration-gap trigger is not implemented; the root driver currently uses its fixed relative-gap rule"),
-    },
-    OptionInfo {
-        name: "RCSPuseVertexIdsInEnumeration",
-        kind: OptionKind::Bool,
-        default: 0.0,
-        support: OptionSupport::Unsupported("Configurable vertex-ID enumeration identity is not implemented"),
-    },
-    OptionInfo {
-        name: "RCSPstopRatioForConcatenationInEnum",
-        kind: OptionKind::Double,
-        default: 30.0,
-        support: OptionSupport::Unsupported("The native enumeration concatenation stop-ratio policy is not implemented"),
-    },
 ];
+
 #[derive(Clone, Debug)]
 pub struct Options {
     values: Vec<f64>,
@@ -387,18 +285,41 @@ impl Default for Options {
     }
 }
 impl Options {
+    fn matches(info: &OptionInfo, name: &str) -> bool {
+        info.name == name
+            || name.strip_prefix("RCSP").is_some_and(|suffix| {
+                info.name.strip_prefix("BALDES") == Some(suffix)
+            })
+    }
+
+    fn definition(name: &str) -> Result<&'static OptionInfo> {
+        OPTION_TABLE
+            .iter()
+            .find(|info| Self::matches(info, name))
+            .ok_or_else(|| invalid(format!("unknown BALDES option: {name}")))
+    }
+
+    /// Canonical spelling for a known option, accepting the legacy input prefix.
+    pub fn canonical_name(name: &str) -> Result<&'static str> {
+        Ok(Self::definition(name)?.name)
+    }
+
+    /// Position in the supported public table.
     pub fn index(name: &str) -> Result<usize> {
         OPTION_TABLE
             .iter()
-            .position(|o| o.name == name)
-            .ok_or_else(|| invalid(format!("unknown RCSP option: {name}")))
+            .position(|info| Self::matches(info, name))
+            .ok_or_else(|| invalid(format!("BALDES option is not available in this build: {name}")))
     }
+
     pub fn get(&self, name: &str) -> Result<f64> {
-        Ok(self.values[Self::index(name)?])
+        let info = Self::definition(name)?;
+        Ok(self.values[Self::index(info.name)?])
     }
+
     pub fn set(&mut self, name: &str, value: f64) -> Result<()> {
-        let i = Self::index(name)?;
-        match OPTION_TABLE[i].kind {
+        let info = Self::definition(name)?;
+        match info.kind {
             OptionKind::Bool if value != 0. && value != 1. => {
                 return Err(invalid("boolean option must be 0 or 1"))
             }
@@ -413,19 +334,16 @@ impl Options {
             OptionKind::Double if value.is_nan() => return Err(invalid("option value is NaN")),
             _ => (),
         }
-        if let OptionSupport::Unsupported(reason) = OPTION_TABLE[i].support {
-            if value != OPTION_TABLE[i].default {
-                return Err(invalid(format!("unsupported RCSP option {name}: {reason}; only the recovered default {} is accepted", OPTION_TABLE[i].default)));
-            }
-        }
-        self.values[i] = value;
+        self.values[Self::index(info.name)?] = value;
         Ok(())
     }
-    /// Support and consumer/reason metadata for every recovered option.
+
+    /// Availability for an explicit option query. Listings use OPTION_TABLE.
     pub fn support(name: &str) -> Result<OptionSupport> {
-        Ok(OPTION_TABLE[Self::index(name)?].support)
+        Ok(Self::definition(name)?.support)
     }
+
     pub fn default_of(name: &str) -> Result<f64> {
-        Ok(OPTION_TABLE[Self::index(name)?].default)
+        Ok(Self::definition(name)?.default)
     }
 }

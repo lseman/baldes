@@ -119,3 +119,23 @@ fn enumerated_mip_flag_requires_tree_and_uses_the_available_backend() {
     let _=std::fs::remove_file(json);
     std::fs::remove_file(path).unwrap();
 }
+
+#[test]
+fn canonical_and_legacy_option_names_reach_the_same_root_and_tree_controls() {
+    for prefix in ["BALDES", "RCSP"] {
+        for tree in [false, true] {
+            let mut args = vec!["vrptw".to_owned(), "instances/R101.txt".to_owned(),
+                "--customers".to_owned(), "4".to_owned(), "--time".to_owned(), "10".to_owned(),
+                "--option".to_owned(), format!("{prefix}labelDominanceStrategy=1"),
+                "--option".to_owned(), format!("{prefix}hardTimeThresholdInPricing=1")];
+            if tree { args.push("--tree".to_owned()); }
+            let output = command().args(&args).output().unwrap();
+            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            assert!(String::from_utf8_lossy(&output.stdout).contains("status=Optimal"));
+            args.extend(["--option".to_owned(), format!("{prefix}labelDominanceStrategy=2")]);
+            let invalid = command().args(&args).output().unwrap();
+            assert!(!invalid.status.success());
+            assert!(String::from_utf8_lossy(&invalid.stderr).contains("unsupported label dominance strategy"));
+        }
+    }
+}

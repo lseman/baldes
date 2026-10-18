@@ -11,7 +11,7 @@ impl Solver {
             return Err(invalid("fixing/enumeration arguments"));
         }
         let mut report = fixing::FixingResult::default();
-        if self.options.get("RCSPapplyReducedCostFixing")? == 0. {
+        if self.options.get("BALDESapplyReducedCostFixing")? == 0. {
             return Ok(report);
         }
         self.refresh_cuts()?;
@@ -21,7 +21,7 @@ impl Solver {
             return Ok(report);
         }
         if mode == 0 {
-            let gap = self.options.get("RCSPredCostFixingFalseGap")?;
+            let gap = self.options.get("BALDESredCostFixingFalseGap")?;
             if gap > 1. || (gap < -1. && self.has_cuts()) {
                 cutoff = (cutoff - zero) / gap.abs() + zero;
             }
@@ -31,7 +31,7 @@ impl Solver {
         let outcome = (|| {
             if mode == 0 {
                 self.controls.time_limit = Duration::try_from_secs_f64(
-                    self.options.get("RCSPredCostFixingTimeThreshold")?.max(0.),
+                    self.options.get("BALDESredCostFixingTimeThreshold")?.max(0.),
                 )
                 .map_err(|_| invalid("fixing time threshold"))?;
             }
@@ -44,11 +44,11 @@ impl Solver {
                 return Ok(report);
             }
             let labels = self.options.get(if mode == 0 {
-                "RCSPmaxNumOfLabelsInEnumeration"
+                "BALDESmaxNumOfLabelsInEnumeration"
             } else {
-                "RCSPmaxNumOfLabelsInHeurEnumeration"
+                "BALDESmaxNumOfLabelsInHeurEnumeration"
             })?;
-            let paths = self.options.get("RCSPmaxNumOfEnumeratedSolutions")?;
+            let paths = self.options.get("BALDESmaxNumOfEnumeratedSolutions")?;
             if labels == 0. || paths == 0. {
                 return Ok(report);
             }
@@ -56,7 +56,7 @@ impl Solver {
                 return Err(invalid("negative enumeration limit"));
             }
             self.options
-                .set("RCSPmaxNumOfLabelsInEnumeration", labels)?;
+                .set("BALDESmaxNumOfLabelsInEnumeration", labels)?;
             // Label completion and enumeration share the fixing call's budget.
             if let Some(end) = fixing_deadline {
                 self.controls.time_limit = end.saturating_duration_since(std::time::Instant::now());

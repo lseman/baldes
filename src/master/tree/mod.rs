@@ -302,7 +302,7 @@ fn evaluate(
     if let Some((_, value)) = controls
         .pricing_options
         .iter_mut()
-        .find(|(name, _)| name == "RCSPhardTimeThresholdInPricing")
+        .find(|(name, _)| name == "BALDEShardTimeThresholdInPricing")
     {
         if *value <= 0. || *value > remaining {
             *value = remaining;
@@ -310,7 +310,7 @@ fn evaluate(
     } else {
         controls
             .pricing_options
-            .push(("RCSPhardTimeThresholdInPricing".into(), remaining));
+            .push(("BALDEShardTimeThresholdInPricing".into(), remaining));
     }
     if let Some(parent) = parent {
         let depth = parent.branch_depth();
@@ -325,11 +325,12 @@ fn evaluate(
 /// Solve a standard routing set-partitioning problem. `root.initial_routes`
 /// may seed incumbents; the cost-only `root.incumbent` is not used without a
 /// feasible witness. Limits preserve the bound of every unfinished node.
-pub fn solve(problem: RootProblem, options: TreeOptions) -> Result<TreeOutput> {
+pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutput> {
     #[cfg(not(feature = "highs"))]
     if options.enumerated_mip.is_some() {
         return Err(invalid("enumerated MIP requires the highs feature"));
     }
+    options.root.normalize_pricing_options()?;
     let started = Instant::now();
     if !options.absolute_gap.is_finite()
         || options.absolute_gap < 0.

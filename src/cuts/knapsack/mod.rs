@@ -27,13 +27,13 @@ pub fn knapsack_parameters(
     initial: KnapsackParameters,
 ) -> Result<KnapsackParameters> {
     let mut parameters = initial;
-    let mode = options.get("RCSPresConsKnapsackCutsMode")?;
+    let mode = options.get("BALDESresConsKnapsackCutsMode")?;
     parameters.use_rounding = mode > 0.0;
     parameters.max_one_k = mode.abs() as i32;
-    let per_round = options.get("RCSPresConsKnapsackCutsMaxNumPerRound")?;
+    let per_round = options.get("BALDESresConsKnapsackCutsMaxNumPerRound")?;
     if per_round < 1.0 {
         return Err(invalid(
-            "RCSPresConsKnapsackCutsMaxNumPerRound must be positive",
+            "BALDESresConsKnapsackCutsMaxNumPerRound must be positive",
         ));
     }
     parameters.max_cuts_per_round = per_round as usize;

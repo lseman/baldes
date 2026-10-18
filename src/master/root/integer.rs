@@ -16,8 +16,16 @@ pub struct EnumerationMipPolicy {
 }
 impl EnumerationMipPolicy {
     pub fn from_options(options: &crate::core::options::Options) -> Result<Self> {
-        let normal = options.get("RCSPmaxNumOfEnumSolutionsForMIP")?;
-        let end = options.get("RCSPmaxNumOfEnumSolsForEndOfNodeMIP")?;
+        #[cfg(feature = "highs")]
+        let (normal, end) = (
+            options.get("BALDESmaxNumOfEnumSolutionsForMIP")?,
+            options.get("BALDESmaxNumOfEnumSolsForEndOfNodeMIP")?,
+        );
+        #[cfg(not(feature = "highs"))]
+        let (normal, end): (f64, f64) = {
+            let _ = options;
+            (10_000., 0.)
+        };
         if normal < 0. || end < 0. {
             return Err(invalid("enumerated MIP route limits must be nonnegative"));
         }

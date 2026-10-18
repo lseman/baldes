@@ -98,11 +98,11 @@ pub unsafe extern "C" fn or_rcsp_strengthen_ng(
         }
         let s = unsafe { solver(p)? };
         let controls = crate::graph::relaxation::Controls {
-            mode: s.options.get("RCSPdynamicNGmode")?.abs() as i32,
-            max_vertex_size: s.options.get("RCSPmaxNGneighbourhoodSize")?.max(0.) as usize,
-            max_average_size: s.options.get("RCSPmaxNGaverNeighbourhoodSize")?.max(0.) as usize,
-            max_columns: s.options.get("RCSPmaxNumOfColumnsInDynamicNG")?.max(0.) as usize,
-            max_cycle_size: s.options.get("RCSPmaxCycleSizeInDynamicNG")? as i32,
+            mode: s.options.get("BALDESdynamicNGmode")?.abs() as i32,
+            max_vertex_size: s.options.get("BALDESmaxNGneighbourhoodSize")?.max(0.) as usize,
+            max_average_size: s.options.get("BALDESmaxNGaverNeighbourhoodSize")?.max(0.) as usize,
+            max_columns: s.options.get("BALDESmaxNumOfColumnsInDynamicNG")?.max(0.) as usize,
+            max_cycle_size: s.options.get("BALDESmaxCycleSizeInDynamicNG")? as i32,
             mirror: false,
         };
         let counts = s.strengthen_ng(&paths, &controls)?;
@@ -189,7 +189,7 @@ pub unsafe extern "C" fn or_rcsp_initialize_ng_set_distances(
                     .ok_or_else(|| invalid("NG distance size overflow"))?,
             )?
         };
-        let size = s.options.get("RCSPinitNGneighbourhoodSize")?.max(0.) as usize;
+        let size = s.options.get("BALDESinitNGneighbourhoodSize")?.max(0.) as usize;
         let changed = crate::graph::relaxation::initialize_distances(&mut s.graph, matrix, size)?;
         s.engine = None;
         Ok(changed as i32)
@@ -207,7 +207,7 @@ pub unsafe extern "C" fn or_rcsp_initialize_ng_neighborhoods(
         if matrix.iter().any(|v| v.is_nan()) {
             return Err(invalid("NG distance is NaN"));
         }
-        let size = s.options.get("RCSPinitNGneighbourhoodSize")?.max(0.) as usize;
+        let size = s.options.get("BALDESinitNGneighbourhoodSize")?.max(0.) as usize;
         let mut memories = vec![];
         for v in 0..n {
             let mut order: Vec<_> = (0..n).collect();
@@ -234,12 +234,12 @@ pub unsafe extern "C" fn or_rcsp_initialize_ng_neighborhoods(
 pub unsafe extern "C" fn or_rcsp_ng_neighborhoods_may_grow(p: *const ORECSP) -> i32 {
     guard(-1, || {
         let s = unsafe { solver(p.cast_mut())? };
-        if s.options.get("RCSPdynamicNGmode")?.abs() != 1. {
+        if s.options.get("BALDESdynamicNGmode")?.abs() != 1. {
             return Ok(1);
         }
         let prepared = crate::graph::ng::PreparedNg::new(&s.graph)?;
-        let max = s.options.get("RCSPmaxNGneighbourhoodSize")?.max(0.) as usize;
-        let avg = s.options.get("RCSPmaxNGaverNeighbourhoodSize")?.max(0.) as usize;
+        let max = s.options.get("BALDESmaxNGneighbourhoodSize")?.max(0.) as usize;
+        let avg = s.options.get("BALDESmaxNGaverNeighbourhoodSize")?.max(0.) as usize;
         Ok((prepared.local_elements.iter().any(|row| row.len() < max)
             && prepared.local_elements.iter().map(Vec::len).sum::<usize>() / s.graph.vertices.len()
                 < avg) as i32)

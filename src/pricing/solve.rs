@@ -10,7 +10,7 @@ impl Solver {
         let outcome = (|| {
             for (labels, columns) in [(32, 20usize), (128, 50), (i64::MAX, 100)] {
                 self.options
-                    .set("RCSPmaxNumOfColsPerIteration", columns as f64)?;
+                    .set("BALDESmaxNumOfColsPerIteration", columns as f64)?;
                 self.phases = vec![phases::Phase {
                     check_ng: true,
                     jump_arcs: true,
@@ -95,7 +95,7 @@ impl Solver {
             controls.max_columns
         } else {
             self.options
-                .get("RCSPmaxNumOfColsPerIteration")
+                .get("BALDESmaxNumOfColsPerIteration")
                 .unwrap_or(30.)
                 .max(1.) as usize
         };
@@ -120,7 +120,7 @@ impl Solver {
         self.requires_rollback = false;
         if self.rollback_point_saved {
             controls.time_limit = Duration::try_from_secs_f64(
-                self.options.get("RCSPhardTimeThresholdInPricing")?.max(0.),
+                self.options.get("BALDEShardTimeThresholdInPricing")?.max(0.),
             )
             .map_err(|_| invalid("pricing time limit"))?;
         }
@@ -140,7 +140,7 @@ impl Solver {
                     started.elapsed().as_secs_f64(),
                     result.statistics.dominance_checks,
                     labels,
-                    self.options.get("RCSPdynamicBucketSteps")? != 0.,
+                    self.options.get("BALDESdynamicBucketSteps")? != 0.,
                 );
             }
         }

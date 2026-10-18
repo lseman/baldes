@@ -32,7 +32,7 @@ fn ryan_foster_pricing_and_enumeration_obey_both_children() {
     for mode in [0., 1., 2.] {
         for together in [false, true] {
             let mut s = solver();
-            s.set_option("RCSPuseBidirectionalSearch", mode).unwrap();
+            s.set_option("BALDESuseBidirectionalSearch", mode).unwrap();
             let rule = RyanFosterConstraint {
                 first: 1,
                 second: 2,
@@ -243,7 +243,7 @@ fn randomized_branch_pricing_with_cuts_matches_complete_paths() {
         s.cuts
             .add_strong_k_path_cut(n + 2, &[1, n], 1, -0.5)
             .unwrap();
-        s.set_option("RCSPuseBidirectionalSearch", (case % 3) as f64)
+        s.set_option("BALDESuseBidirectionalSearch", (case % 3) as f64)
             .unwrap();
         fn dfs(
             s: &Solver,

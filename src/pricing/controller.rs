@@ -38,9 +38,9 @@ impl RoundState {
         let average = self.times.iter().sum::<f64>() / self.times.len() as f64;
         let stop = !enumerated
             && !self.times.is_empty()
-            && average > options.get("RCSPstopCutGenTimeThresholdInPricing")?;
+            && average > options.get("BALDESstopCutGenTimeThresholdInPricing")?;
         if flag5 == 0 && low != 1 && !self.dominance_ratios.is_empty() {
-            let mode = options.get("RCSPdynamicBucketSteps")? as i32;
+            let mode = options.get("BALDESdynamicBucketSteps")? as i32;
             if mode != 0 {
                 if mode != 1 {
                     return Err(invalid("dynamic bucket step mode must be 0 or 1"));
@@ -65,8 +65,8 @@ impl RoundState {
                     }
                     count as f64 / g.order.len() as f64
                 });
-                if ratio > options.get("RCSPdynBuckStepAdjustRatioThreshold")?
-                    && arcs < options.get("RCSPdynBuckStepAdjustNumBuckArcsThreshold")?
+                if ratio > options.get("BALDESdynBuckStepAdjustRatioThreshold")?
+                    && arcs < options.get("BALDESdynBuckStepAdjustNumBuckArcsThreshold")?
                 {
                     self.pending_decrease = true;
                 }

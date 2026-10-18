@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="300 100 430 560"><defs>
+            <linearGradient id="logo-bucket" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#111a21" />
+                <stop offset="50%" stop-color="#263845" />
+                <stop offset="73%" stop-color="#5e7d91" />
+                <stop offset="100%" stop-color="#17232c" />
+            </linearGradient>
+            <linearGradient id="logo-metal" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#dceaf1" />
+                <stop offset="30%" stop-color="#ffffff" />
+                <stop offset="55%" stop-color="#8fb2c7" />
+                <stop offset="100%" stop-color="#f7fbfd" />
+            </linearGradient>
+            <linearGradient id="crab-shell" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#ff6a1f" />
+                <stop offset="1" stop-color="#d83f00" />
+            </linearGradient>
+            <g id="claw">
+                <path d="M432 300 Q404 286 386 262" fill="none" stroke="#b33600" stroke-width="16" stroke-linecap="round" />
+                <path d="M386 262 Q352 258 344 226 Q340 204 356 192 Q356 214 372 222 Q368 204 382 190 Q402 204 400 232 Q398 254 386 262 Z"
+                    fill="url(#crab-shell)" stroke="#8f2a00" stroke-width="6" stroke-linejoin="round" />
+            </g>
+            <clipPath id="bucket-opening">
+                <rect x="0" y="0" width="1024" height="322" />
+                <ellipse cx="512" cy="322" rx="138" ry="43" />
+            </clipPath>
+        </defs>
+            <!-- handle -->
+            <path d="M332 315 C342 205 405 137 512 137 C619 137 682 205 692 315"
+                fill="none" stroke="url(#logo-metal)" stroke-width="26" stroke-linecap="round" />
+            <!-- bucket body and rim -->
+            <path d="M363 333 L398 560 Q408 610 512 620 Q616 610 626 560 L661 333 Z"
+                fill="url(#logo-bucket)" stroke="#eef7fb" stroke-width="10" />
+            <ellipse cx="512" cy="328" rx="170" ry="71" fill="#0b1217" stroke="#eef7fb" stroke-width="12" />
+            <ellipse cx="512" cy="322" rx="142" ry="47" fill="#0a1116" stroke="url(#logo-metal)" stroke-width="10" />
+            <!-- crab -->
+            <use href="#claw" />
+            <use href="#claw" transform="translate(1024 0) scale(-1 1)" />
+            <g clip-path="url(#bucket-opening)">
+                <path d="M414 330 Q412 262 468 250 L478 240 L490 252 L502 238 L512 252 L522 238 L534 252 L546 240 L556 250
+                         Q612 262 610 330 Q610 366 512 368 Q414 366 414 330 Z"
+                    fill="url(#crab-shell)" stroke="#8f2a00" stroke-width="7" stroke-linejoin="round" />
+            </g>
+            <path d="M488 262 L480 222 M536 262 L544 222" stroke="#8f2a00" stroke-width="9" stroke-linecap="round" />
+            <circle cx="478" cy="212" r="17" fill="#fbfdfe" stroke="#8f2a00" stroke-width="5" />
+            <circle cx="546" cy="212" r="17" fill="#fbfdfe" stroke="#8f2a00" stroke-width="5" />
+            <circle cx="482" cy="214" r="8" fill="#0f1920" />
+            <circle cx="542" cy="214" r="8" fill="#0f1920" />
+            <path d="M494 306 Q512 320 530 306" fill="none" stroke="#3a1100" stroke-width="6" stroke-linecap="round" />
+            <!-- front of the rim over the crab -->
+            <path d="M370 322 A142 47 0 0 0 654 322" fill="none" stroke="url(#logo-metal)" stroke-width="10" />
+            <path d="M342 328 A170 71 0 0 0 682 328" fill="none" stroke="#eef7fb" stroke-width="12" />
+            </svg>

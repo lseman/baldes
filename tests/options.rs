@@ -1,46 +1,77 @@
-use baldes::core::options::{OptionKind, OptionSupport, Options, OPTION_TABLE};
+use baldes::core::options::{OptionSupport, Options, OPTION_TABLE};
 use baldes::pricing::Solver;
 
 #[test]
-fn recovered_defaults_remain_readable_and_unsupported_overrides_are_atomic() {
+fn public_metadata_lists_only_supported_canonical_names_and_consistent_indices() {
     let mut options = Options::default();
     let mut solver = Solver::new(2, 0).unwrap();
-    assert_eq!(OPTION_TABLE.len(), 58);
-    let mut unsupported = 0;
-    for info in OPTION_TABLE {
+    let expected = if cfg!(all(feature = "clp", feature = "highs")) { 41 } else { 39 };
+    assert_eq!(OPTION_TABLE.len(), expected);
+    let mut names = std::collections::HashSet::new();
+    for (index, info) in OPTION_TABLE.iter().enumerate() {
+        assert!(info.name.starts_with("BALDES"));
+        assert!(names.insert(info.name));
+        assert!(matches!(info.support, OptionSupport::Implemented(_)));
+        assert_eq!(Options::index(info.name).unwrap(), index);
         assert_eq!(options.get(info.name).unwrap(), info.default);
         assert_eq!(Options::default_of(info.name).unwrap(), info.default);
         assert_eq!(Options::support(info.name).unwrap(), info.support);
         options.set(info.name, info.default).unwrap();
         solver.set_option(info.name, info.default).unwrap();
-        if let OptionSupport::Unsupported(reason) = info.support {
-            unsupported += 1;
-            assert!(!reason.is_empty());
-            let changed = if info.kind == OptionKind::Bool {
-                1. - info.default
-            } else {
-                info.default + 1.
-            };
-            for error in [
-                options.set(info.name, changed).unwrap_err(),
-                solver.set_option(info.name, changed).unwrap_err(),
-            ] {
-                assert!(error.message.contains(info.name));
-                assert!(error.message.contains(reason));
-            }
-            assert_eq!(options.get(info.name).unwrap(), info.default);
-            assert_eq!(solver.options.get(info.name).unwrap(), info.default);
-        }
+        let legacy = format!("RCSP{}", info.name.strip_prefix("BALDES").unwrap());
+        assert_eq!(Options::canonical_name(&legacy).unwrap(), info.name);
+        assert_eq!(Options::index(&legacy).unwrap(), index);
+        assert_eq!(options.get(&legacy).unwrap(), info.default);
+        solver.set_option(&legacy, info.default).unwrap();
     }
-    assert_eq!(
-        unsupported,
-        if cfg!(all(feature = "clp", feature = "highs")) {
-            17
-        } else {
-            19
-        }
-    );
     assert!(Options::support("unknown").is_err());
+}
+
+#[test]
+fn unregistered_options_are_rejected_without_changing_supported_values() {
+    let mut options = Options::default();
+    let mut solver = Solver::new(2, 0).unwrap();
+    let name = "BALDESnotARealOption";
+    assert!(Options::support(name).is_err());
+    assert!(Options::canonical_name(name).is_err());
+    assert!(Options::index(name).is_err());
+    assert!(Options::default_of(name).is_err());
+    assert!(options.get(name).is_err());
+    for value in [0., 1.] {
+        assert!(options.set(name, value).unwrap_err().message.contains("unknown BALDES option"));
+        assert!(solver.set_option(name, value).is_err());
+    }
+    for info in OPTION_TABLE {
+        assert_eq!(options.get(info.name).unwrap(), info.default);
+        assert_eq!(solver.options.get(info.name).unwrap(), info.default);
+    }
+    for name in ["BALDESmaxNumOfEnumSolutionsForMIP", "BALDESmaxNumOfEnumSolsForEndOfNodeMIP"] {
+        let enabled = cfg!(all(feature = "clp", feature = "highs"));
+        assert_eq!(Options::index(name).is_ok(), enabled);
+        assert_eq!(Options::support(name).is_ok(), enabled);
+        assert_eq!(options.get(name).is_ok(), enabled);
+    }
+    #[cfg(feature = "clp")]
+    {
+        let policy = baldes::master::root::EnumerationMipPolicy::from_options(&options).unwrap();
+        assert_eq!(policy.normal_route_limit, 10_000);
+        assert_eq!(policy.end_of_node_route_limit, 10_000);
+    }
+}
+
+#[test]
+fn legacy_aliases_share_storage_and_reach_runtime_validation() {
+    let mut options = Options::default();
+    options.set("RCSPnumberOfBucketsPerVertex", 17.).unwrap();
+    assert_eq!(options.get("BALDESnumberOfBucketsPerVertex").unwrap(), 17.);
+    options.set("BALDESnumberOfBucketsPerVertex", 23.).unwrap();
+    assert_eq!(options.get("RCSPnumberOfBucketsPerVertex").unwrap(), 23.);
+    let mut solver = Solver::new(2, 0).unwrap();
+    solver.set_option("RCSPlabelDominanceStrategy", 1.).unwrap();
+    assert_eq!(solver.dominance_mode, 1);
+    assert!(solver.set_option("RCSPlabelDominanceStrategy", 2.).is_err());
+    assert_eq!(solver.dominance_mode, 1);
+    assert_eq!(solver.options.get("BALDESlabelDominanceStrategy").unwrap(), 1.);
 }
 
 #[test]
@@ -56,15 +87,15 @@ fn failed_solver_setters_preserve_options_controls_phases_and_prepared_engine() 
     let time = solver.controls.time_limit;
     let columns = solver.controls.max_columns;
     for (name, value) in [
-        ("RCSPhardTimeThresholdInPricing", f64::MAX),
-        ("RCSPmaxNumOfColsPerExactIteration", 0.),
-        ("RCSPlabelDominanceStrategy", 2.),
-        ("RCSPuseBidirectionalSearch", 3.),
-        ("RCSPdynamicBucketSteps", 2.),
-        ("RCSPcapacityCutsSeparator", 0.),
-        ("RCSPcapCutsMaxNumPerRound", 0.),
-        ("RCSPmaxNumOfLabelsInEnumeration", -1.),
-        ("RCSPmaxNumOfColsPerIteration", 0.),
+        ("BALDEShardTimeThresholdInPricing", f64::MAX),
+        ("BALDESmaxNumOfColsPerExactIteration", 0.),
+        ("BALDESlabelDominanceStrategy", 2.),
+        ("BALDESuseBidirectionalSearch", 3.),
+        ("BALDESdynamicBucketSteps", 2.),
+        ("BALDEScapacityCutsSeparator", 0.),
+        ("BALDEScapCutsMaxNumPerRound", 0.),
+        ("BALDESmaxNumOfLabelsInEnumeration", -1.),
+        ("BALDESmaxNumOfColsPerIteration", 0.),
     ] {
         assert!(solver.set_option(name, value).is_err(), "{name}");
         assert_eq!(
@@ -92,7 +123,7 @@ fn failed_solver_setters_preserve_options_controls_phases_and_prepared_engine() 
 fn named_dominance_option_reaches_labeling_and_the_c_setter_stays_synchronized() {
     let mut solver = Solver::new(2, 0).unwrap();
     solver.graph.add_arc(0, 1, -2.).unwrap();
-    solver.set_option("RCSPlabelDominanceStrategy", 1.).unwrap();
+    solver.set_option("BALDESlabelDominanceStrategy", 1.).unwrap();
     assert_eq!(solver.dominance_mode, 1);
     assert_eq!(
         solver
@@ -109,13 +140,13 @@ fn named_dominance_option_reaches_labeling_and_the_c_setter_stays_synchronized()
         let mut value = -1.;
         assert_eq!(or_rcsp_set_label_dominance_strategy(p, 1), 0);
         assert_eq!(
-            or_rcsp_get_option(p, c"RCSPlabelDominanceStrategy".as_ptr(), &mut value),
+            or_rcsp_get_option(p, c"BALDESlabelDominanceStrategy".as_ptr(), &mut value),
             0
         );
         assert_eq!(value, 1.);
         assert_eq!(or_rcsp_set_label_dominance_strategy(p, 2), -1);
         assert_eq!(
-            or_rcsp_get_option(p, c"RCSPlabelDominanceStrategy".as_ptr(), &mut value),
+            or_rcsp_get_option(p, c"BALDESlabelDominanceStrategy".as_ptr(), &mut value),
             0
         );
         assert_eq!(value, 1.);
@@ -124,32 +155,30 @@ fn named_dominance_option_reaches_labeling_and_the_c_setter_stays_synchronized()
 }
 
 #[test]
-fn c_api_reports_unsupported_changes_without_losing_the_recovered_default() {
+fn c_api_lists_supported_canonical_names_and_accepts_legacy_inputs() {
     use baldes::api::*;
-    use std::ffi::{CStr, CString};
-    // SAFETY: Locally owned handles and valid name/output pointers.
+    use std::ffi::CStr;
+    // SAFETY: Live local handles, static NUL-terminated names and writable outputs.
     unsafe {
-        let p = or_rcsp_new(2, 0);
-        for info in OPTION_TABLE {
-            if let OptionSupport::Unsupported(_) = info.support {
-                let name = CString::new(info.name).unwrap();
-                let changed = if info.kind == OptionKind::Bool {
-                    1. - info.default
-                } else {
-                    info.default + 1.
-                };
-                assert_eq!(or_rcsp_set_option(p, name.as_ptr(), changed), -1);
-                assert!(CStr::from_ptr(or_rcsp_last_error())
-                    .to_str()
-                    .unwrap()
-                    .contains("unsupported RCSP option"));
-                let mut value = f64::NAN;
-                assert_eq!(or_rcsp_get_option(p, name.as_ptr(), &mut value), 0);
-                assert_eq!(value, info.default);
-                assert_eq!(or_rcsp_set_option(p, name.as_ptr(), info.default), 0);
-            }
+        assert_eq!(or_rcsp_option_count() as usize, OPTION_TABLE.len());
+        for (i, info) in OPTION_TABLE.iter().enumerate() {
+            assert_eq!(CStr::from_ptr(or_rcsp_option_name(i as i32)).to_str().unwrap(), info.name);
         }
-        assert_eq!(or_rcsp_option_count(), 58);
+        assert!(or_rcsp_option_name(-1).is_null());
+        assert!(or_rcsp_option_name(OPTION_TABLE.len() as i32).is_null());
+        let p = or_rcsp_new(2, 0);
+        assert_eq!(or_rcsp_set_option(p, c"RCSPlabelDominanceStrategy".as_ptr(), 1.), 0);
+        let mut value = f64::NAN;
+        assert_eq!(or_rcsp_get_option(p, c"BALDESlabelDominanceStrategy".as_ptr(), &mut value), 0);
+        assert_eq!(value, 1.);
+        assert_eq!(or_rcsp_set_option(p, c"BALDESlabelDominanceStrategy".as_ptr(), 0.), 0);
+        assert_eq!(or_rcsp_get_option(p, c"RCSPlabelDominanceStrategy".as_ptr(), &mut value), 0);
+        assert_eq!(value, 0.);
+        assert_eq!(or_rcsp_set_option(p, c"BALDESnotARealOption".as_ptr(), 0.), -1);
+        assert!(CStr::from_ptr(or_rcsp_last_error()).to_str().unwrap().contains("unknown BALDES option"));
+        value = 123.;
+        assert_eq!(or_rcsp_get_option(p, c"BALDESnotARealOption".as_ptr(), &mut value), -1);
+        assert_eq!(value, 123.);
         or_rcsp_delete(p);
     }
 }
@@ -182,7 +211,7 @@ fn capacity_option_controls_separation_in_fresh_and_inherited_nodes() {
         .push(("RCSPuseCapacityCuts".into(), 1.));
     options
         .pricing_options
-        .push(("RCSPcapCutsMaxNumPerRound".into(), 1.));
+        .push(("BALDEScapCutsMaxNumPerRound".into(), 1.));
     let enabled = root::inherit_branches(snapshot, &[], options.clone()).unwrap();
     let fresh = instance.solve_root(8, Rounding::None, options).unwrap();
     assert!(enabled.cuts > 0);
@@ -207,7 +236,7 @@ fn capacity_per_round_option_caps_the_number_of_generated_rows() {
         .unwrap();
     options
         .pricing_options
-        .push(("RCSPcapCutsMaxNumPerRound".into(), 1.));
+        .push(("BALDEScapCutsMaxNumPerRound".into(), 1.));
     let limited = instance.solve_root(8, Rounding::None, options).unwrap();
     assert_eq!(limited.cuts, 1);
     assert!(full.cuts > limited.cuts);

@@ -404,6 +404,7 @@ fn solve_seeded(
     mut options: RootOptions,
     seed: Option<(&NodeSnapshot, ClpMaster, column_generation::WarmStart)>,
 ) -> Result<RootOutput> {
+    options.normalize_pricing_options()?;
     let solve_started = std::time::Instant::now();
     problem.graph.validate()?;
     let (saved, mut master) = if let Some((saved, master, warm)) = seed {
@@ -560,11 +561,11 @@ fn solve_seeded(
         }
         for (name, value) in &options.pricing_options {
             match name.as_str() {
-                "RCSPresConsKnapsackCutsMode" => {
+                "BALDESresConsKnapsackCutsMode" => {
                     config.parameters.use_rounding = *value > 0.;
                     config.parameters.max_one_k = value.abs() as i32;
                 }
-                "RCSPresConsKnapsackCutsMaxNumPerRound" => {
+                "BALDESresConsKnapsackCutsMaxNumPerRound" => {
                     config.parameters.max_cuts_per_round = *value as usize
                 }
                 _ => {}
@@ -648,8 +649,8 @@ fn solve_seeded(
         if let Some(separator) = s.cut.capacity_separator.as_mut() {
             for (name, value) in &options.pricing_options {
                 match name.as_str() {
-                    "RCSPuseCapacityCuts" => separator.parameters.enabled = *value != 0.,
-                    "RCSPcapCutsMaxNumPerRound" => {
+                    "BALDESuseCapacityCuts" => separator.parameters.enabled = *value != 0.,
+                    "BALDEScapCutsMaxNumPerRound" => {
                         separator.parameters.max_cuts_per_round = *value as usize
                     }
                     _ => {}

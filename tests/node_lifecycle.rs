@@ -24,7 +24,7 @@ fn fork_keeps_arc_orderings_and_sibling_enumeration_is_independent() {
     for bidirectional in [0., 1.] {
         let mut parent = ordering_solver();
         parent
-            .set_option("RCSPuseBidirectionalSearch", bidirectional)
+            .set_option("BALDESuseBidirectionalSearch", bidirectional)
             .unwrap();
         parent.enumeration_preserve_arc_paths = true;
         let routes = parent.enumerate(10.).unwrap();
@@ -82,7 +82,7 @@ fn fork_carries_fixing_options_and_rebuilds_dual_dependent_labels() {
     assert!(!engine.half_ready && !engine.full_ready);
     assert!(engine.forward.labels.is_empty() && engine.backward.labels.is_empty());
     child
-        .set_option("RCSPhardTimeThresholdInPricing", 1.)
+        .set_option("BALDEShardTimeThresholdInPricing", 1.)
         .unwrap();
     assert_eq!(
         bucket_arcs(&child),
@@ -200,7 +200,7 @@ fn enumerated_snapshot_survives_siblings_grandchildren_and_failed_setup() {
     let mut invalid_setup = options.clone();
     invalid_setup
         .pricing_options
-        .push(("RCSPmaxNumOfColsPerExactIteration".into(), 0.));
+        .push(("BALDESmaxNumOfColsPerExactIteration".into(), 0.));
     assert!(root::inherit(snapshot, &[(arc, RowSense::LessEqual, 0.)], invalid_setup).is_err());
     let mut expired = options.clone();
     expired.cg.time_limit = std::time::Duration::ZERO;

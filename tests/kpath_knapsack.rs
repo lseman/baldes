@@ -575,32 +575,32 @@ fn knapsack_and_kpath_options_configure_separators() {
     assert_eq!(knap.get_parameter("use_rounding").unwrap(), 0.0);
     assert_eq!(knap.get_parameter("max_one_k").unwrap(), 1.0);
 
-    options.set("RCSPresConsKnapsackCutsMode", 9.0).unwrap();
+    options.set("BALDESresConsKnapsackCutsMode", 9.0).unwrap();
     options
-        .set("RCSPresConsKnapsackCutsMaxNumPerRound", 5.0)
+        .set("BALDESresConsKnapsackCutsMaxNumPerRound", 5.0)
         .unwrap();
     knap.configure(&options).unwrap();
     assert_eq!(knap.get_parameter("use_rounding").unwrap(), 1.0);
     assert_eq!(knap.get_parameter("max_one_k").unwrap(), 9.0);
     assert_eq!(knap.get_parameter("max_cuts_per_round").unwrap(), 5.0);
 
-    options.set("RCSPresConsKnapsackCutsMode", 0.0).unwrap();
+    options.set("BALDESresConsKnapsackCutsMode", 0.0).unwrap();
     knap.configure(&options).unwrap();
     assert_eq!(knap.get_parameter("use_rounding").unwrap(), 0.0);
     assert_eq!(knap.get_parameter("max_one_k").unwrap(), 0.0);
     assert!(knap.separate(&[4, 5], &[1.5, 1.5], 10).unwrap().is_empty());
 
     options
-        .set("RCSPresConsKnapsackCutsMaxNumPerRound", 0.0)
+        .set("BALDESresConsKnapsackCutsMaxNumPerRound", 0.0)
         .unwrap();
     assert!(knapsack_parameters(&options, KnapsackParameters::default()).is_err());
 
     let mut kpath = KPathSeparator::new(vec![0.0, 3.0, 3.0], 4.0).unwrap();
-    options.set("RCSPrankOneCutsMaxNumPerRound", 3.0).unwrap();
+    options.set("BALDESrankOneCutsMaxNumPerRound", 3.0).unwrap();
     kpath.configure(&options).unwrap();
     assert_eq!(kpath.get_parameter("max_cuts_per_round").unwrap(), 3.0);
 
-    options.set("RCSPrankOneCutsMaxNumPerRound", 0.0).unwrap();
+    options.set("BALDESrankOneCutsMaxNumPerRound", 0.0).unwrap();
     assert!(kpath_parameters(&options, KPathParameters::default()).is_err());
 }
 
@@ -901,7 +901,7 @@ fn knapsack_pricing_solver(bidirectional: bool) -> Solver {
     let mut solver = Solver::new(4, 1).unwrap();
     solver
         .set_option(
-            "RCSPuseBidirectionalSearch",
+            "BALDESuseBidirectionalSearch",
             if bidirectional { 1. } else { 0. },
         )
         .unwrap();
@@ -1070,7 +1070,7 @@ fn knapsack_pricing_matches_exhaustive_routes_with_two_resources() {
         let mut solver = Solver::new(6, 2).unwrap();
         solver
             .set_option(
-                "RCSPuseBidirectionalSearch",
+                "BALDESuseBidirectionalSearch",
                 if trial % 2 == 0 { 1. } else { 0. },
             )
             .unwrap();

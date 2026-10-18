@@ -70,6 +70,7 @@ _deps/
 /ariadne.db
 /snapshot.bin
 /internal/
+/internals/
 /reports/
 /results/
 *.log
@@ -97,3 +98,7 @@ Thumbs.db
 
 # Documentation, source CMake files, datasets, notebooks, and fixtures are
 # intentionally not ignored by file extension.
+
+# Generated website documentation
+/landing/docs/
+/landing/.docs-build-*/
