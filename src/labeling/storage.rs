@@ -1,5 +1,21 @@
 //! Per-bucket native insertion with immutable ancestry in an arena. Removing a
 //! dominated active label never destroys a predecessor needed for reconstruction.
+pub use super::arena::LabelArena;
+use super::arena::ArenaRecord;
+/// Keep the plain borrowed path a pointer-sized argument, while moving owned
+/// labels with heap state into the arena after acceptance.
+pub(crate) trait LabelInput {
+    fn label(&self) -> &StoredLabel;
+    fn into_label(self) -> StoredLabel;
+}
+impl LabelInput for StoredLabel {
+    #[inline(always)] fn label(&self) -> &StoredLabel { self }
+    #[inline(always)] fn into_label(self) -> StoredLabel { self }
+}
+impl LabelInput for &StoredLabel {
+    #[inline(always)] fn label(&self) -> &StoredLabel { self }
+    #[inline(always)] fn into_label(self) -> StoredLabel { self.clone() }
+}
 use super::{Statistics, EPSILON};
 use crate::cuts::state::{packed_dominate, DominanceDescriptor, LIMITED_WORDS};
 use crate::graph::buckets::BucketId;
@@ -39,7 +55,7 @@ impl StoredLabel {
     }
 }
 /// The fields dominance reads before the cut words, packed so bucket scans
-/// touch 48 bytes per label instead of the whole `StoredLabel`.
+/// avoid loading the full record. The scalar cache is 56 bytes on 64-bit targets.
 #[derive(Clone, Copy, Debug)]
 pub struct HotLabel {
     pub key: f64,
@@ -203,7 +219,7 @@ impl LabelBucket {
 }
 #[derive(Clone, Debug)]
 pub struct LabelStorage {
-    pub labels: Vec<StoredLabel>,
+    pub labels: LabelArena,
     /// `HotLabel::of(&labels[i])`, kept contiguous so bucket scans stay in cache.
     pub hot: Vec<HotLabel>,
     pub buckets: Vec<Vec<LabelBucket>>,
@@ -226,7 +242,7 @@ impl LabelStorage {
             .collect();
         let crossing = vec![vec![]; buckets.len()];
         Self {
-            labels: vec![],
+            labels: LabelArena::default(),
             hot: vec![],
             buckets,
             crossing,
@@ -261,6 +277,11 @@ impl LabelStorage {
         self.labels.push(label);
         id
     }
+    #[inline(never)]
+    pub(crate) fn retain_for<R: ArenaRecord>(&mut self, mut label: StoredLabel) -> usize {
+        let id = self.labels.len(); label.id = id;
+        self.hot.push(HotLabel::of(&label)); self.labels.push_for::<R>(label); id
+    }
     #[inline]
     pub fn dominates(
         g: &Graph,
@@ -283,9 +304,18 @@ impl LabelStorage {
         )
     }
     /// `dominates` on the packed fields; `words` loads the cut words only
-    /// when the full test reaches them.
+    /// when full dominance reaches a nonempty cut list.
     #[inline(always)]
     pub fn dominates_hot<'w>(
+        g: &Graph, a: &HotLabel, b: &HotLabel, forward: bool, test: InsertionTest,
+        hop_limit: bool, cuts: &[DominanceDescriptor],
+        words: impl FnOnce() -> (&'w [u32; LIMITED_WORDS], &'w [u32; LIMITED_WORDS]),
+    ) -> bool {
+        Self::dominates_hot_slices(g, a, b, forward, test, hop_limit, cuts,
+            || { let (a,b) = words(); (&a[..], &b[..]) })
+    }
+    #[inline(always)]
+    pub(crate) fn dominates_hot_slices<'w>(
         g: &Graph,
         a: &HotLabel,
         b: &HotLabel,
@@ -293,7 +323,7 @@ impl LabelStorage {
         test: InsertionTest,
         hop_limit: bool,
         cuts: &[DominanceDescriptor],
-        words: impl FnOnce() -> (&'w [u32; LIMITED_WORDS], &'w [u32; LIMITED_WORDS]),
+        words: impl FnOnce() -> (&'w [u32], &'w [u32]),
     ) -> bool {
         if hop_limit && a.hops > b.hops {
             return false;
@@ -321,6 +351,9 @@ impl LabelStorage {
                 let mut gap = (a.cost - b.cost) + (a.additional_cost - b.additional_cost);
                 if gap >= EPSILON {
                     return false;
+                }
+                if cuts.is_empty() {
+                    return true;
                 }
                 let (wa, wb) = words();
                 packed_dominate(cuts, wa, wb, &mut gap)
@@ -376,7 +409,7 @@ impl LabelStorage {
         stats: &mut Statistics,
     ) -> bool {
         let candidate = HotLabel::of(&label);
-        self.insert_ref(g, &label, candidate, forward, test, capacity, hop_limit, cuts, stats)
+        self.insert_label::<true, StoredLabel, _>(g, label, candidate, forward, test, capacity, hop_limit, cuts, stats)
     }
     /// `insert` that copies `label` into the arena only when it is kept.
     /// `candidate` is `HotLabel::of(label)`, built by the caller while the
@@ -396,17 +429,17 @@ impl LabelStorage {
         cuts: &[DominanceDescriptor],
         stats: &mut Statistics,
     ) -> bool {
-        self.insert_ref_with_branching::<true>(
+        self.insert_label::<true, StoredLabel, _>(
             g, label, candidate, forward, test, capacity, hop_limit, cuts, stats,
         )
     }
     /// The branch-free specialization is only used by a sweep with no active
     /// branch resources; the public insertion path checks branch state.
     #[inline(always)]
-    pub(crate) fn insert_ref_with_branching<const BRANCHING: bool>(
+    pub(crate) fn insert_label<const BRANCHING: bool, R: ArenaRecord, L: LabelInput>(
         &mut self,
         g: &Graph,
-        label: &StoredLabel,
+        input: L,
         candidate: HotLabel,
         forward: bool,
         test: InsertionTest,
@@ -415,6 +448,7 @@ impl LabelStorage {
         cuts: &[DominanceDescriptor],
         stats: &mut Statistics,
     ) -> bool {
+        let label = input.label();
         let b = label.bucket;
         let labels = &self.labels;
         let bucket = &mut self.buckets[b.vertex][b.bucket];
@@ -425,7 +459,7 @@ impl LabelStorage {
                 if !(bucket.hot.key[0] - EPSILON > candidate.key) {
                     return false;
                 }
-                if labels[previous].expanded {
+                if labels.view(previous).expanded() {
                     bucket.archived.push(previous);
                 }
             }
@@ -433,7 +467,9 @@ impl LabelStorage {
             bucket.next_id += 1;
             bucket.active.clear();
             bucket.hot.truncate(0);
-            let id = self.retain(StoredLabel { local_id, ..label.clone() });
+            let mut kept_label = input.into_label();
+            kept_label.local_id = local_id;
+            let id = self.retain_for::<R>(kept_label);
             let bucket = &mut self.buckets[b.vertex][b.bucket];
             bucket.active.push(id);
             bucket.hot.push(candidate);
@@ -457,8 +493,8 @@ impl LabelStorage {
             stats.dominance_checks += 1;
             let previous = bucket.active[position];
             let hot = bucket.hot.get(position);
-            if (!BRANCHING || labels[previous].branch_state == label.branch_state) && Self::dominates_hot(g, &hot, &candidate, forward, test, hop_limit, cuts, || {
-                (&labels[previous].cut_words, &label.cut_words)
+            if (!BRANCHING || labels.branch_for::<R>(previous) == &label.branch_state) && Self::dominates_hot_slices(g, &hot, &candidate, forward, test, hop_limit, cuts, || {
+                (labels.words_for::<R>(previous), &label.cut_words)
             }) {
                 stats.dominated += 1;
                 return false;
@@ -471,7 +507,9 @@ impl LabelStorage {
         }
         let local_id = bucket.next_id;
         bucket.next_id += 1;
-        let inserted = self.retain(StoredLabel { local_id, ..label.clone() });
+        let mut kept_label = input.into_label();
+            kept_label.local_id = local_id;
+            let inserted = self.retain_for::<R>(kept_label);
         let labels = &self.labels;
         let bucket = &mut self.buckets[b.vertex][b.bucket];
         bucket.active.insert(position, inserted);
@@ -499,13 +537,13 @@ impl LabelStorage {
             read = next + 1;
             let id = bucket.active[next];
             let hot = bucket.hot.get(next);
-            if (!BRANCHING || labels[inserted].branch_state == labels[id].branch_state) && Self::dominates_hot(g, &candidate, &hot, forward, test, hop_limit, cuts, || {
-                (&labels[inserted].cut_words, &labels[id].cut_words)
+            if (!BRANCHING || labels.branch_for::<R>(inserted) == labels.branch_for::<R>(id)) && Self::dominates_hot_slices(g, &candidate, &hot, forward, test, hop_limit, cuts, || {
+                (labels.words_for::<R>(inserted), labels.words_for::<R>(id))
             }) {
                 stats.dominated += 1;
                 // archives(): only the resources(+cost) tests keep dominated
                 // expanded labels reachable for solution recording.
-                if labels[id].expanded
+                if labels.view(id).expanded()
                     && matches!(test, InsertionTest::ResourcesAndCost | InsertionTest::Resources)
                 {
                     bucket.archived.push(id);
@@ -617,4 +655,52 @@ mod tests {
         check!(false, true);
         check!(false, false);
     }
+    #[test]
+    fn empty_cut_dominance_does_not_load_cold_words() {
+        let g = Graph::new(3, 1).unwrap();
+        let mut a = HotLabel { key: 0., cost: -2., additional_cost: 0.,
+            resources: [0.; 2], hops: 1, ng: 0 };
+        let b = HotLabel { cost: -1., ..a };
+        for cost in [-2., -1., -1. + EPSILON, f64::NAN] {
+            a.cost = cost;
+            let mut gap = (a.cost - b.cost) + (a.additional_cost - b.additional_cost);
+            let expected = if gap >= EPSILON { false } else {
+                packed_dominate(&[], &[0; LIMITED_WORDS], &[0; LIMITED_WORDS], &mut gap)
+            };
+            assert_eq!(LabelStorage::dominates_hot(&g, &a, &b, true,
+                InsertionTest::Full, false, &[], || panic!("empty cuts accessed cold state")), expected);
+        }
+        a.cost = -2.;
+        let descriptors = [DominanceDescriptor { mask: 1, word: 0,
+            cost: 2., ..Default::default() }];
+        let mut left = [0; LIMITED_WORDS]; left[0] = 1;
+        let right = [0; LIMITED_WORDS];
+        let called = std::cell::Cell::new(false);
+        assert!(!LabelStorage::dominates_hot(&g, &a, &b, true,
+            InsertionTest::Full, false, &descriptors, || { called.set(true); (&left, &right) }));
+        assert!(called.get());
+    }
+
+    #[test]
+    fn owned_insertion_moves_branch_state_and_borrowed_insertion_clones_on_acceptance() {
+        let graph = Graph::new(3,1).unwrap();
+        let make = || StoredLabel { id:0, local_id:0, bucket:BucketId {vertex:1,bucket:0}, vertex:1,
+            cost:-1., original_cost:2., resources:[0.;2], ng:0,
+            branch_state:Some(Box::new([5;16])), parent:None, arc:None, hops:1, expanded:false,
+            cut_words:[0;LIMITED_WORDS], additional_cost:0., half_potential:0. };
+        let mut owned = LabelStorage::new([1,1,1]);
+        owned.labels.set_word_limit(2); owned.labels.set_mode(false,false);
+        let label = make(); let pointer = label.branch_state.as_deref().unwrap().as_ptr();
+        assert!(owned.insert(&graph,label,true,InsertionTest::Full,10,false,&[],&mut Statistics::default()));
+        assert_eq!(owned.labels.view(0).branch_state().as_deref().unwrap().as_ptr(), pointer);
+        let mut borrowed = LabelStorage::new([1,1,1]);
+        borrowed.labels.set_word_limit(2); borrowed.labels.set_mode(false,false);
+        let label = make(); let pointer = label.branch_state.as_deref().unwrap().as_ptr();
+        assert!(borrowed.insert_ref(&graph,&label,HotLabel::of(&label),true,InsertionTest::Full,10,false,&[],&mut Statistics::default()));
+        let state = borrowed.labels.view(0).branch_state();
+        assert_eq!(state, &label.branch_state);
+        assert_ne!(state.as_deref().unwrap().as_ptr(), pointer);
+        assert_eq!(label.branch_state.as_deref().unwrap().as_ptr(), pointer);
+    }
+
 }

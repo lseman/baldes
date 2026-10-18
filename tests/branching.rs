@@ -293,6 +293,12 @@ fn removing_branch_rebuilds_the_unrestricted_pricing_domain() {
     for mode in [0., 1., 2.] {
         let mut s = solver();
         s.set_option("BALDESuseBidirectionalSearch", mode).unwrap();
+        // Begin with ordinary labels, then activate branch resources on the
+        // same prepared engine before returning to unrestricted pricing.
+        assert_eq!(
+            s.price_phase(0, 150, false).unwrap().minimum_reduced_cost,
+            -7.
+        );
         let c = RyanFosterConstraint {
             first: 1,
             second: 2,

@@ -244,6 +244,8 @@ labeling of exact pricing on two threads, so it is timed on one and two cores.
 | R201 | rank-one | 1147.804 | 636 | 832 | 8.98 | 7.46 | 7.27 |
 | R202 | none | 1020.646 | 470 | 0 | 5.92 | 5.98 | 5.66 |
 
+![Root relaxation solve time: BALDES vs VRPSolver / BaPCod](docs/benchmark.svg)
+
 On C101–C103, C201, C202 and R102, rank-one separation finds no violated cut,
 so those runs equal the ones without cuts.
 

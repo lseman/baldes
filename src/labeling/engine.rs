@@ -1,6 +1,8 @@
-//! Component-ordered forward/backward native no-cut labeling.
+//! Component-ordered forward/backward pricing with typed label storage.
+use super::arena::{ArenaRecord, BranchedLabel, ExtendedLabel, LabelData, LabelRef, OrdinaryLabel, RecordKind};
 use super::pool::SolutionPool;
-use super::storage::{HotLabel, InsertionTest, LabelStorage, StoredLabel};
+
+use super::storage::{HotLabel, InsertionTest, LabelInput, LabelStorage, StoredLabel};
 use super::{extend_resources, Controls, PricingResult, Route, Statistics, EPSILON, NO_ROUTE_COST};
 use crate::cuts::state::{
     self, CutResourceInfo, FullPreparation, LimitedInput, LimitedKPathInput, LimitedPreparation,
@@ -132,12 +134,44 @@ impl<'a> Context<'a> {
     /// Join of two labels at `vertex`: resources, then the
     /// cost (forward + backward reduced cost) + 0, then NG, then the cut join.
     /// The cost is 0 when resources reject and has no cut part when NG does.
-    fn concatenate(&self, g: &Graph, vertex: usize, f: &StoredLabel, b: &StoredLabel) -> (bool, f64) {
-        if !self.branching.joins(&f.branch_state, &b.branch_state) || !self.resources_join(g, f, b) {
+    #[inline(always)]
+    fn concatenate(
+        &self,
+        g: &Graph,
+        vertex: usize,
+        f: LabelRef<'_>,
+        b: LabelRef<'_>,
+    ) -> (bool, f64) {
+        match (f, b) {
+            (LabelRef::Ordinary(f, _), LabelRef::Ordinary(b, _)) => {
+                self.concatenate_records(g, vertex, f, b)
+            }
+            (LabelRef::Extended(f, _), LabelRef::Extended(b, _)) => {
+                self.concatenate_records(g, vertex, f, b)
+            }
+            (LabelRef::Branched(f, _), LabelRef::Branched(b, _)) => {
+                self.concatenate_records(g, vertex, f, b)
+            }
+            (LabelRef::Compact2(f, _), LabelRef::Compact2(b, _)) => {
+                self.concatenate_records(g, vertex, f, b)
+            }
+            (LabelRef::Compact4(f, _), LabelRef::Compact4(b, _)) => {
+                self.concatenate_records(g, vertex, f, b)
+            }
+            (LabelRef::Compact8(f, _), LabelRef::Compact8(b, _)) => {
+                self.concatenate_records(g, vertex, f, b)
+            }
+            (LabelRef::Full(f), LabelRef::Full(b)) => self.concatenate_records(g, vertex, f, b),
+            _ => self.concatenate_records(g, vertex, &f, &b),
+        }
+    }
+    #[inline(always)]
+    fn concatenate_records<F: LabelData, B: LabelData>(&self, g: &Graph, vertex: usize, f: &F, b: &B) -> (bool, f64) {
+        if !self.branching.joins(f.branch_state(), b.branch_state()) || !self.resources_join(g, f, b) {
             return (false, 0.);
         }
-        let cost = (f.cost + b.cost) + self.cuts.knapsack.join_cost(g, &f.resources, &b.resources, self.consumption_joins);
-        if f.ng & b.ng != 0 {
+        let cost = (f.cost() + b.cost()) + self.cuts.knapsack.join_cost(g, f.resources(), b.resources(), self.consumption_joins);
+        if f.ng() & b.ng() != 0 {
             return (false, cost);
         }
         if !self.has_cuts() {
@@ -146,13 +180,13 @@ impl<'a> Context<'a> {
         let cost = state::concatenation_cost(
             &self.cuts.info,
             vertex,
-            (&f.cut_words, f.additional_cost),
-            (&b.cut_words, b.additional_cost),
+            (f.cut_words(), f.additional_cost()),
+            (b.cut_words(), b.additional_cost()),
             cost,
         );
         (true, cost)
     }
-    pub fn join_cost(&self, g: &Graph, vertex: usize, f: &StoredLabel, b: &StoredLabel) -> Option<f64> {
+    pub fn join_cost(&self, g: &Graph, vertex: usize, f: LabelRef<'_>, b: LabelRef<'_>) -> Option<f64> {
         match self.concatenate(g, vertex, f, b) {
             (true, cost) => Some(cost),
             _ => None,
@@ -182,9 +216,9 @@ impl<'a> Context<'a> {
         }
         (root.cut_words, root.additional_cost) = self.root_cut_state(root_vertex);
         if forward {
-            self.concatenate(g, g.sink, label, &root).1
+            self.concatenate(g, g.sink, label.into(), (&root).into()).1
         } else {
-            self.concatenate(g, g.source, &root, label).1
+            self.concatenate(g, g.source, (&root).into(), label.into()).1
         }
     }
     #[inline(always)]
@@ -193,7 +227,7 @@ impl<'a> Context<'a> {
         g: &Graph,
         forward: bool,
         arc: &BucketArc,
-        from: &StoredLabel,
+        from: LabelRef<'_>,
     ) -> Option<StoredLabel> {
         self.extend_resources_kept::<true>(g, forward, arc, from).map(|(label, _)| label)
     }
@@ -206,20 +240,58 @@ impl<'a> Context<'a> {
         g: &Graph,
         forward: bool,
         arc: &BucketArc,
-        from: &StoredLabel,
+        from: LabelRef<'_>,
+    ) -> Option<(StoredLabel, [f64; 2])> {
+        match from {
+            LabelRef::Ordinary(label, id) => self.extend_record::<BRANCHING, _>(g, forward, arc, label, id),
+            LabelRef::Extended(label, id) => self.extend_record::<BRANCHING, _>(g, forward, arc, label, id),
+            LabelRef::Branched(label, id) => self.extend_record::<BRANCHING, _>(g, forward, arc, label, id),
+            LabelRef::Compact2(label, id) => self.extend_record::<BRANCHING, _>(g, forward, arc, label, id),
+            LabelRef::Compact4(label, id) => self.extend_record::<BRANCHING, _>(g, forward, arc, label, id),
+            LabelRef::Compact8(label, id) => self.extend_record::<BRANCHING, _>(g, forward, arc, label, id),
+            LabelRef::Full(label) => self.extend_record::<BRANCHING, _>(g, forward, arc, label, label.id),
+        }
+    }
+    #[inline(always)]
+    fn extend_record<const BRANCHING: bool, L: LabelData>(
+        &self,
+        g: &Graph,
+        forward: bool,
+        arc: &BucketArc,
+        from: &L,
+        id: usize,
+    ) -> Option<(StoredLabel, [f64; 2])> {
+        if self.has_cuts() {
+            self.extend_record_with_cuts::<BRANCHING, true, L>(g, forward, arc, from, id)
+        } else {
+            self.extend_record_with_cuts::<BRANCHING, false, L>(g, forward, arc, from, id)
+        }
+    }
+    #[inline(always)]
+    fn extend_record_with_cuts<const BRANCHING: bool, const CUTS: bool, L: LabelData>(
+        &self,
+        g: &Graph,
+        forward: bool,
+        arc: &BucketArc,
+        from: &L,
+        id: usize,
     ) -> Option<(StoredLabel, [f64; 2])> {
         let physical = &g.arcs[arc.physical];
         if physical.reduced_cost >= NO_ROUTE_COST {
             return None;
         }
         // Scalars, not `resources[slot]`: see BucketGraph::coordinate.
-        let [mut q0, mut q1] = from.resources;
+        let [mut q0, mut q1] = *from.resources();
         if self.phase.jump_arcs {
             if let Some(jump) = arc.jump {
                 let point = self.grid.direction(forward).corners[arc.from.vertex][jump];
                 for (r, &slot) in self.grid.resource_slots.iter().enumerate() {
                     let q = if slot == 0 { &mut q0 } else { &mut q1 };
-                    *q = if forward { q.max(point[r]) } else { q.min(point[r]) };
+                    *q = if forward {
+                        q.max(point[r])
+                    } else {
+                        q.min(point[r])
+                    };
                 }
             }
         }
@@ -229,66 +301,82 @@ impl<'a> Context<'a> {
         } else {
             physical.tail
         };
-        if BRANCHING && !self.branching.can_visit(&from.branch_state, vertex) { return None; }
+        if BRANCHING && !self.branching.can_visit(from.branch_state(), vertex) {
+            return None;
+        }
         let transition = if forward {
             &self.ng.forward[arc.physical]
         } else {
             &self.ng.backward[arc.physical]
         };
-        let ng = transition.extend(from.ng, 0)?;
+        let ng = transition.extend(from.ng(), 0)?;
         let internal = self.grid.internal[vertex];
         let bucket = self
             .grid
             .bucket_id(forward, internal, self.grid.coordinate(resources))?;
-        let mut cut_words = from.cut_words;
-        let mut additional_cost = from.additional_cost;
-        if self.has_cuts() {
+        let mut additional_cost = from.additional_cost();
+        let cut_words = if CUTS {
             let table = if forward {
                 &self.cuts.info.forward
             } else {
                 &self.cuts.info.backward
             };
-            state::change_along_arc(&mut cut_words, &mut additional_cost, &table[arc.physical].ordinary);
-        }
-        Some((StoredLabel {
-            id: 0,
-            local_id: 0,
-            bucket: BucketId {
-                vertex: internal,
-                bucket,
+            state::changed_along_arc(
+                from.cut_words(),
+                &mut additional_cost,
+                &table[arc.physical].ordinary,
+            )
+        } else {
+            let mut words = [0; LIMITED_WORDS];
+            words[..from.cut_words().len()].copy_from_slice(from.cut_words());
+            words
+        };
+        Some((
+            StoredLabel {
+                id: 0,
+                local_id: 0,
+                bucket: BucketId {
+                    vertex: internal,
+                    bucket,
+                },
+                vertex,
+                cost: physical.reduced_cost + from.cost(),
+                original_cost: physical.cost + from.original_cost(),
+                resources,
+                ng,
+                // Like NG state, a crossing label excludes its meeting vertex.
+                branch_state: if BRANCHING {
+                    from.branch_state().clone()
+                } else {
+                    None
+                },
+                parent: Some(id),
+                arc: Some(arc.physical),
+                hops: from.hops() + 1,
+                expanded: false,
+                cut_words,
+                additional_cost,
+                half_potential: self
+                    .cuts
+                    .info
+                    .vertex_cut_potential
+                    .get(vertex)
+                    .map_or(0.0, |&p| 0.5 * p),
             },
-            vertex,
-            cost: physical.reduced_cost + from.cost,
-            original_cost: physical.cost + from.original_cost,
             resources,
-            ng,
-            // Like NG state, a crossing label excludes its meeting vertex.
-            branch_state: if BRANCHING { from.branch_state.clone() } else { None },
-            parent: Some(from.id),
-            arc: Some(arc.physical),
-            hops: from.hops + 1,
-            expanded: false,
-            cut_words,
-            additional_cost,
-            half_potential: self
-                .cuts
-                .info
-                .vertex_cut_potential
-                .get(vertex)
-                .map_or(0.0, |&p| 0.5 * p),
-        }, resources))
+        ))
     }
-    fn resources_join(&self, g: &Graph, f: &StoredLabel, b: &StoredLabel) -> bool {
+    fn resources_join<F: LabelData, B: LabelData>(&self, g: &Graph, f: &F, b: &B) -> bool {
         g.resources.iter().enumerate().all(|(r, k)| match k {
                 ResourceKind::Disposable => {
                     if self.consumption_joins {
-                        f.resources[r] + b.resources[r]
+                        f.resources()[r] + b.resources()[r]
                             <= g.vertices[g.sink].bounds[r].upper + EPSILON
                     } else {
-                        f.resources[r] <= b.resources[r] + EPSILON
+                        f.resources()[r] <= b.resources()[r] + EPSILON
                     }
                 }
-                ResourceKind::Equality => f.resources[r] == b.resources[r],
+                ResourceKind::Equality => f.resources()[r] == b.resources()[r],
             })
     }
 }
@@ -311,14 +399,15 @@ struct Sweep<'a> {
 }
 impl<'a> Sweep<'a> {
     #[inline(always)]
-    fn insert<const BRANCHING: bool>(
+    fn insert<const BRANCHING: bool, R: ArenaRecord, L: LabelInput>(
         &mut self,
         g: &Graph,
         forward: bool,
-        label: &StoredLabel,
+        input: L,
         hot: HotLabel,
         controls: &Controls,
     ) -> bool {
+        let label = input.label();
         let test = if self.ctx.phase.check_ng && self.ctx.controls.dominance_mode == 0 {
             InsertionTest::Full
         } else {
@@ -328,16 +417,17 @@ impl<'a> Sweep<'a> {
         let vertex = label.bucket.vertex;
         let before = self.statistics.dominance_checks;
         let descriptors = self
-            .ctx.cuts
+            .ctx
+            .cuts
             .info
             .vertices
             .get(label.vertex)
             .map_or(&[][..], |v| v.dominance.as_slice());
         let stats = &mut *self.statistics;
         let storage = &mut *self.storage;
-        let inserted = storage.insert_ref_with_branching::<BRANCHING>(
+        let inserted = storage.insert_label::<BRANCHING, R, L>(
             g,
-            label,
+            input,
             hot,
             forward,
             test,
@@ -363,7 +453,7 @@ impl<'a> Sweep<'a> {
         // Only unexpanded labels are filtered; the others stay as they are.
         let storage = &*self.storage;
         let bucket = &storage.buckets[id.vertex][id.bucket];
-        if bucket.active.iter().all(|&i| storage.labels[i].expanded) {
+        if bucket.active.iter().all(|&i| storage.labels.view(i).expanded()) {
             return;
         }
         let active = &bucket.active;
@@ -371,7 +461,7 @@ impl<'a> Sweep<'a> {
         let before = self.statistics.other_dominance_checks;
         let mut work = vec![];
         for &candidate in active {
-            if self.storage.labels[candidate].expanded {
+            if self.storage.labels.view(candidate).expanded() {
                 retained.push(candidate);
                 continue;
             }
@@ -383,12 +473,12 @@ impl<'a> Sweep<'a> {
                 self.statistics.other_bucket_searches += 1;
                 if check {
                     let storage = &*self.storage;
-                    let candidate_label = &storage.labels[candidate];
+                    let candidate_label = storage.labels.view(candidate);
                     let descriptors = self
                         .ctx.cuts
                         .info
                         .vertices
-                        .get(candidate_label.vertex)
+                        .get(candidate_label.vertex())
                         .map_or(&[][..], |v| v.dominance.as_slice());
                     let candidate_hot = &storage.hot[candidate];
                     let bucket = &storage.buckets[id.vertex][k];
@@ -398,7 +488,7 @@ impl<'a> Sweep<'a> {
                             break;
                         }
                         self.statistics.other_dominance_checks += 1;
-                        if (!BRANCHING || storage.labels[other].branch_state == candidate_label.branch_state) && LabelStorage::dominates_hot(
+                        if (!BRANCHING || storage.labels.view(other).branch_state() == candidate_label.branch_state()) && LabelStorage::dominates_hot_slices(
                             g,
                             hot,
                             candidate_hot,
@@ -406,7 +496,7 @@ impl<'a> Sweep<'a> {
                             InsertionTest::Full,
                             controls.max_route_arcs.is_some(),
                             descriptors,
-                            || (&storage.labels[other].cut_words, &candidate_label.cut_words),
+                            || (storage.labels.view(other).cut_words(), candidate_label.cut_words()),
                         ) {
                             dominated = true;
                             break;
@@ -477,6 +567,48 @@ impl<'a> Sweep<'a> {
         controls: &Controls,
         started: Instant,
     ) -> Result<()> {
+        if self.ctx.has_cuts() {
+            self.run_cut_mode::<BRANCHING, FORWARD, true>(g, controls, started)
+        } else {
+            self.run_cut_mode::<BRANCHING, FORWARD, false>(g, controls, started)
+        }
+    }
+    fn run_cut_mode<const BRANCHING: bool, const FORWARD: bool, const CUTS: bool>(
+        &mut self,
+        g: &Graph,
+        controls: &Controls,
+        started: Instant,
+    ) -> Result<()> {
+        match self.storage.labels.kind() {
+            RecordKind::Ordinary => {
+                self.run_records::<BRANCHING, FORWARD, CUTS, OrdinaryLabel>(g, controls, started)
+            }
+            RecordKind::Extended => {
+                self.run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel>(g, controls, started)
+            }
+            RecordKind::Branched => {
+                self.run_records::<BRANCHING, FORWARD, CUTS, BranchedLabel>(g, controls, started)
+            }
+            RecordKind::Compact2 => {
+                self.run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel<2>>(g, controls, started)
+            }
+            RecordKind::Compact4 => {
+                self.run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel<4>>(g, controls, started)
+            }
+            RecordKind::Compact8 => {
+                self.run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel<8>>(g, controls, started)
+            }
+            RecordKind::Full => {
+                self.run_records::<BRANCHING, FORWARD, CUTS, StoredLabel>(g, controls, started)
+            }
+        }
+    }
+    fn run_records<const BRANCHING: bool, const FORWARD: bool, const CUTS: bool, R: ArenaRecord>(
+        &mut self,
+        g: &Graph,
+        controls: &Controls,
+        started: Instant,
+    ) -> Result<()> {
         let forward = FORWARD;
         let ctx = self.ctx;
         let components = &ctx.grid.direction(forward).components;
@@ -502,8 +634,12 @@ impl<'a> Sweep<'a> {
                     // active list is fixed for the whole arc loop.
                     let labels = self.storage.buckets[id.vertex][id.bucket].active.clone();
                     for k in 0..arc_count {
-                        let arc = self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket].arcs[k].clone();
-                        if (!self.ctx.phase.jump_arcs && arc.jump.is_some()) || arc.flags & flags == 0 {
+                        let arc = self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket]
+                            .arcs[k]
+                            .clone();
+                        if (!self.ctx.phase.jump_arcs && arc.jump.is_some())
+                            || arc.flags & flags == 0
+                        {
                             continue;
                         }
                         for &index in &labels {
@@ -516,28 +652,55 @@ impl<'a> Sweep<'a> {
                             if own + self.labels.1.load(Ordering::Relaxed) >= controls.max_labels {
                                 return Err(incomplete("pricing label limit exceeded"));
                             }
-                            let from = &self.storage.labels[index];
-                            if from.expanded
-                                || controls
-                                    .max_route_arcs
-                                    .is_some_and(|limit| from.hops >= limit)
-                            {
-                                continue;
-                            }
-                            let Some((mut label, resources)) =
-                                self.ctx.extend_resources_kept::<BRANCHING>(g, forward, &arc, from)
-                            else {
+                            let (from_vertex, extension) =
+                                if let Some(from) = R::get(&self.storage.labels, index) {
+                                    if from.expanded()
+                                        || controls
+                                            .max_route_arcs
+                                            .is_some_and(|limit| from.hops() >= limit)
+                                    {
+                                        continue;
+                                    }
+                                    (
+                                        from.vertex(),
+                                        self.ctx.extend_record_with_cuts::<BRANCHING, CUTS, _>(
+                                            g,
+                                            forward,
+                                            &arc,
+                                            from,
+                                            from.ancestry_id(index),
+                                        ),
+                                    )
+                                } else {
+                                    let from = self.storage.labels.wide_record(index);
+                                    if from.expanded
+                                        || controls
+                                            .max_route_arcs
+                                            .is_some_and(|limit| from.hops >= limit)
+                                    {
+                                        continue;
+                                    }
+                                    (
+                                        from.vertex,
+                                        self.ctx.extend_record_with_cuts::<BRANCHING, CUTS, _>(
+                                            g, forward, &arc, from, from.id,
+                                        ),
+                                    )
+                                };
+                            let Some((mut label, resources)) = extension else {
                                 continue;
                             };
                             let terminal = label.vertex == if forward { g.sink } else { g.source };
                             if terminal {
-                                if BRANCHING && !self.ctx.branching.accepts(&label.branch_state) { continue; }
+                                if BRANCHING && !self.ctx.branching.accepts(&label.branch_state) {
+                                    continue;
+                                }
                                 if !self.ctx.controls.sink_concatenation {
                                     continue;
                                 }
                                 let cost = self.ctx.terminal_cost(g, forward, &label);
-                                let group = from.vertex;
-                                let target = self.storage.retain(label);
+                                let group = from_vertex;
+                                let target = self.storage.retain_for::<R>(label);
                                 self.terminals.push((group, cost, target));
                                 continue;
                             }
@@ -556,35 +719,46 @@ impl<'a> Sweep<'a> {
                             if flags & side == 0 {
                                 if forward && flags & 2 == 0 {
                                     let v = label.vertex;
-                                    let target = self.storage.retain(label);
+                                    let target = self.storage.retain_for::<R>(label);
                                     self.storage.crossing[v].push(target);
                                 }
                                 continue;
                             }
                             self.ctx.vertex_step_with_branching::<BRANCHING>(&mut label);
-                            let hot = HotLabel { resources, ..HotLabel::of(&label) };
+                            let hot = HotLabel {
+                                resources,
+                                ..HotLabel::of(&label)
+                            };
                             if label.bucket == id {
                                 pending.push((label, hot));
                                 continue;
                             }
-                            let same = self.ctx.grid.direction(forward).buckets[label.bucket.vertex]
-                                [label.bucket.bucket]
+                            let same = self.ctx.grid.direction(forward).buckets
+                                [label.bucket.vertex][label.bucket.bucket]
                                 .component
                                 == self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket]
                                     .component;
-                            if self.insert::<BRANCHING>(g, forward, &label, hot, controls) && same {
+                            let inserted = if BRANCHING {
+                                self.insert::<BRANCHING, R, _>(g, forward, label, hot, controls)
+                            } else {
+                                self.insert::<BRANCHING, R, _>(g, forward, &label, hot, controls)
+                            };
+                            if inserted && same {
                                 repeat = true;
                             }
                         }
                     }
-                    for &index in &self.storage.buckets[id.vertex][id.bucket].active {
-                        if !self.storage.labels[index].expanded {
-                            self.statistics.expanded += 1;
-                        }
-                        self.storage.labels[index].expanded = true;
-                    }
+                    self.statistics.expanded += self
+                        .storage
+                        .labels
+                        .expand(&self.storage.buckets[id.vertex][id.bucket].active);
                     for (label, hot) in pending {
-                        if self.insert::<BRANCHING>(g, forward, &label, hot, controls) {
+                        let inserted = if BRANCHING {
+                            self.insert::<BRANCHING, R, _>(g, forward, label, hot, controls)
+                        } else {
+                            self.insert::<BRANCHING, R, _>(g, forward, &label, hot, controls)
+                        };
+                        if inserted {
                             repeat = true;
                         }
                     }
@@ -599,9 +773,10 @@ impl<'a> Sweep<'a> {
                     .active
                     .first()
                     .map_or(NO_ROUTE_COST, |&i| self.storage.hot[i].key);
-                for p in &self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket].predecessors {
-                    lower = lower
-                        .min(self.storage.buckets[id.vertex][p.bucket.bucket].lower_cost);
+                for p in
+                    &self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket].predecessors
+                {
+                    lower = lower.min(self.storage.buckets[id.vertex][p.bucket.bucket].lower_cost);
                 }
                 self.storage.buckets[id.vertex][id.bucket].lower_cost = lower;
             }
@@ -629,9 +804,9 @@ impl LabelingEngine {
         self.ctx().root_cut_state(vertex)
     }
     pub fn join_cost(&self, g: &Graph, vertex: usize, f: &StoredLabel, b: &StoredLabel) -> Option<f64> {
-        self.ctx().join_cost(g, vertex, f, b)
+        self.ctx().join_cost(g, vertex, f.into(), b.into())
     }
-    fn extend(&self, g: &Graph, forward: bool, arc: &BucketArc, from: &StoredLabel) -> Option<StoredLabel> {
+    fn extend(&self, g: &Graph, forward: bool, arc: &BucketArc, from: LabelRef<'_>) -> Option<StoredLabel> {
         self.ctx().extend(g, forward, arc, from)
     }
     /// A sweep of one direction on this engine's own counters; `other` holds
@@ -667,10 +842,18 @@ impl LabelingEngine {
             labels: (&counts.0, &counts.1),
         }
     }
-    fn insert(&mut self, g: &Graph, forward: bool, label: &StoredLabel, hot: HotLabel, controls: &Controls) -> bool {
+    fn insert(
+        &mut self,
+        g: &Graph,
+        forward: bool,
+        label: &StoredLabel,
+        hot: HotLabel,
+        controls: &Controls,
+    ) -> bool {
         let mut terminals = vec![];
         let counts = Default::default();
-        self.sweep(forward, &mut terminals, &counts).insert::<true>(g, forward, label, hot, controls)
+        self.sweep(forward, &mut terminals, &counts)
+            .insert::<true, StoredLabel, _>(g, forward, label, hot, controls)
     }
     fn run_direction(
         &mut self,
@@ -875,6 +1058,17 @@ impl LabelingEngine {
                 false,
             );
         }
+        let words = cuts
+            .limited
+            .positions
+            .iter()
+            .flatten()
+            .copied()
+            .filter(|&p| p >= 0)
+            .max()
+            .map_or(0, |position| position as usize / 32 + 1);
+        self.forward.labels.set_word_limit(words);
+        self.backward.labels.set_word_limit(words);
         self.cuts = cuts;
         true
     }
@@ -904,8 +1098,8 @@ impl LabelingEngine {
                 let bucket = &self.storage(forward).buckets[id.vertex][id.bucket];
                 let mut lower = NO_ROUTE_COST;
                 for &index in &bucket.active {
-                    let label = &self.storage(forward).labels[index];
-                    let cost = label.key() + self.cuts.knapsack.partial_cost(g, &label.resources, forward);
+                    let label = self.storage(forward).labels.view(index);
+                    let cost = label.key() + self.cuts.knapsack.partial_cost(g, label.resources(), forward);
                     lower = lower.min(cost);
                 }
                 for predecessor in &self.grid.direction(forward).buckets[id.vertex][id.bucket].predecessors {
@@ -997,13 +1191,13 @@ impl LabelingEngine {
         let s = self.storage(forward);
         let mut arcs = vec![];
         loop {
-            let l = &s.labels[id];
-            if let Some(a) = l.arc {
+            let l = s.labels.view(id);
+            if let Some(a) = l.arc() {
                 arcs.push(a);
             }
-            let Some(parent) = l.parent else { break };
-            let p = &s.labels[parent];
-            let bucket = &s.buckets[p.bucket.vertex][p.bucket.bucket];
+            let Some(parent) = l.parent() else { break };
+            let p = s.labels.view(parent);
+            let bucket = &s.buckets[p.bucket().vertex][p.bucket().bucket];
             if !bucket.active.contains(&parent) && !bucket.archived.contains(&parent) {
                 return None;
             }
@@ -1079,6 +1273,10 @@ impl LabelingEngine {
         self.last_costs = g.arcs.iter().map(|a| a.reduced_cost).collect();
         self.forward.reset(self.grid.forward.buckets.iter().map(Vec::len));
         self.backward.reset(self.grid.backward.buckets.iter().map(Vec::len));
+        let ordinary = !self.has_cuts() && self.branching.resources == 0;
+        let branch_only = !self.has_cuts() && self.branching.resources != 0;
+        self.forward.labels.set_mode(ordinary, branch_only);
+        self.backward.labels.set_mode(ordinary, branch_only);
         self.statistics = Statistics::default();
         self.root(g, true)?;
         if self.runtime_bidirectional() && !self.consumption_joins {
@@ -1110,8 +1308,8 @@ impl LabelingEngine {
                 let v = self.grid.order[internal];
                 let mut cutoff = pool.cutoff(v);
                 for &f in &self.forward.crossing[v] {
-                    let label = &self.forward.labels[f];
-                    let mut coordinate = self.grid.coordinate(label.resources);
+                    let label = self.forward.labels.view(f);
+                    let mut coordinate = self.grid.coordinate(*label.resources());
                     if self.consumption_joins {
                         for r in 0..self.grid.dimensions {
                             coordinate[r] = (self.grid.upper[internal][r]
@@ -1125,7 +1323,7 @@ impl LabelingEngine {
                     else {
                         continue;
                     };
-                    let key = label.key() + self.cuts.knapsack.partial_cost(g, &label.resources, true);
+                    let key = label.key() + self.cuts.knapsack.partial_cost(g, label.resources(), true);
                     let mut work = vec![(bucket, 0usize)];
                     while let Some((k, min)) = work.pop() {
                         let row = &self.storage(self.consumption_joins).buckets[internal][k];
@@ -1133,16 +1331,16 @@ impl LabelingEngine {
                             continue;
                         }
                         for &b in &row.active {
-                            let other = &self.storage(self.consumption_joins).labels[b];
+                            let other = self.storage(self.consumption_joins).labels.view(b);
                             if key + other.key() >= cutoff {
                                 break;
                             }
                             concatenation_tests += 1;
-                            if let Some(cost) = self.join_cost(g, v, label, other) {
+                            if let Some(cost) = self.ctx().join_cost(g, v, label, other) {
                                 if cost < cutoff
                                     && controls
                                         .max_route_arcs
-                                        .is_none_or(|limit| label.hops + other.hops <= limit)
+                                        .is_none_or(|limit| label.hops() + other.hops() <= limit)
                                 {
                                     pool.insert(v, cost, 0., (Some(f), Some(b)));
                                     cutoff = pool.cutoff(v);
@@ -1310,7 +1508,7 @@ impl LabelingEngine {
                             &self.storage(forward).buckets[source.vertex][source.bucket].active
                         {
                             if let Some(l) =
-                                self.extend(g, forward, &arc, &self.storage(forward).labels[id])
+                                self.extend(g, forward, &arc, self.storage(forward).labels.view(id))
                             {
                                 minimum = minimum.min(l.key() + self.cuts.knapsack.partial_cost(g, &l.resources, forward));
                                 extended.push(l);
@@ -1342,14 +1540,14 @@ impl LabelingEngine {
                                     'pairs: for l in &extended {
                                         let key = l.key() + self.cuts.knapsack.partial_cost(g, &l.resources, forward);
                                         for &id in &opposite.active {
-                                            let other = &storage.labels[id];
+                                            let other = storage.labels.view(id);
                                             if key + other.key() >= threshold {
                                                 break;
                                             }
                                             let cost = if forward {
-                                                self.join_cost(g, meeting, l, other)
+                                                self.ctx().join_cost(g, meeting, l.into(), other)
                                             } else {
-                                                self.join_cost(g, meeting, other, l)
+                                                self.ctx().join_cost(g, meeting, other, l.into())
                                             };
                                             if cost.is_some_and(|c| c < threshold) {
                                                 update(&self.grid, &mut frontier, target, bucket);
@@ -1459,23 +1657,20 @@ impl LabelingEngine {
             for v in 0..self.forward.crossing.len() {
                 let crossing = self.forward.crossing[v].clone();
                 for id in crossing {
-                    let mut label = self.forward.labels[id].clone();
+                    let mut label = self.forward.labels.view(id).to_owned();
                     self.vertex_step(&mut label);
                     let hot = HotLabel::of(&label);
                     self.insert(g, true, &label, hot, controls);
                 }
             }
-            for label in &mut self.forward.labels {
-                if self.grid.coordinate(label.resources)[0] > self.grid.middle + EPSILON {
-                    label.expanded = false;
-                }
-            }
+            let grid = &self.grid;
+            self.forward.labels.unexpand_where(|resources| {
+                grid.coordinate(resources)[0] > grid.middle + EPSILON
+            });
             let started = Instant::now();
             let mut pool = SolutionPool::new(g.vertices.len(), 1, 0);
             self.run_direction(g, true, controls, started, &mut pool)?;
-            for label in &mut self.backward.labels {
-                label.expanded = false;
-            }
+            self.backward.labels.unexpand_where(|_| true);
             self.run_direction(g, false, controls, started, &mut pool)?;
             self.update_unreachable(true);
             self.update_unreachable(false);
@@ -1509,7 +1704,7 @@ impl LabelingEngine {
         scan: bool,
     ) -> bool {
         let vertex = self.grid.internal[label.vertex];
-        let mut q = self.grid.coordinate(label.resources);
+        let mut q = self.grid.coordinate(*label.resources());
         let opposite = self.consumption_joins || !forward;
         if self.consumption_joins && forward {
             for r in 0..self.grid.dimensions {
@@ -1520,7 +1715,7 @@ impl LabelingEngine {
             return false;
         };
         let storage = self.storage(opposite);
-        let key = label.key() + self.cuts.knapsack.partial_cost(g, &label.resources, forward);
+        let key = label.key() + self.cuts.knapsack.partial_cost(g, label.resources(), forward);
         let mut work = vec![(bucket, 0usize)];
         while let Some((k, min)) = work.pop() {
             let row = &storage.buckets[vertex][k];
@@ -1531,14 +1726,14 @@ impl LabelingEngine {
                 return true;
             }
             for &id in &row.active {
-                let other = &storage.labels[id];
+                let other = storage.labels.view(id);
                 if key + other.key() >= threshold {
                     break;
                 }
                 let cost = if forward {
-                    self.join_cost(g, label.vertex, label, other)
+                    self.ctx().join_cost(g, label.vertex, label.into(), other)
                 } else {
-                    self.join_cost(g, label.vertex, other, label)
+                    self.ctx().join_cost(g, label.vertex, other, label.into())
                 };
                 if cost.is_some_and(|c| threshold > c) {
                     return true;
@@ -1647,6 +1842,10 @@ impl LabelingEngine {
         self.last_costs = g.arcs.iter().map(|a| a.reduced_cost).collect();
         self.forward.reset(self.grid.forward.buckets.iter().map(Vec::len));
         self.backward.reset(self.grid.backward.buckets.iter().map(Vec::len));
+        let ordinary = !self.has_cuts() && self.branching.resources == 0;
+        let branch_only = !self.has_cuts() && self.branching.resources != 0;
+        self.forward.labels.set_mode(ordinary, branch_only);
+        self.backward.labels.set_mode(ordinary, branch_only);
         self.statistics = Statistics::default();
         self.extension_checks.fill(0);
         self.filter_checks.fill(0);

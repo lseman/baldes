@@ -70,6 +70,13 @@ pub fn arithmetic_shift_word(word: u32, shift: i32) -> u32 {
     }
     result
 }
+#[inline(always)]
+fn padded_word(words: &[u32], index: usize) -> u32 {
+    match words.get(index) {
+        Some(&word) => word,
+        None => { assert!(index < LIMITED_WORDS, "cut word exceeds the logical state"); 0 }
+    }
+}
 fn field(word: u32, shift: i32, mask: u32) -> i32 {
     (arithmetic_shift_word(word, shift) & mask) as i32
 }
@@ -97,6 +104,10 @@ fn overflow(remainder: i32, denominator: i32, covering: bool) -> (i32, i32) {
 /// Limited-memory transition along an arc. Output words start from
 /// zero; costs accumulate in descriptor order.
 pub fn change_along_arc(words: &mut [u32; LIMITED_WORDS], additional: &mut f64, transitions: &[ArcTransition]) {
+    *words = changed_along_arc(words, additional, transitions);
+}
+/// Transition from a retained read-only state into a fresh full scratch state.
+pub(crate) fn changed_along_arc(words: &[u32], additional: &mut f64, transitions: &[ArcTransition]) -> [u32; LIMITED_WORDS] {
     let mut result = [0u32; LIMITED_WORDS];
     for t in transitions {
         if t.source_word < 0 && t.increment == 0 {
@@ -105,7 +116,7 @@ pub fn change_along_arc(words: &mut [u32; LIMITED_WORDS], additional: &mut f64, 
         let mut remainder = if t.source_word < 0 {
             0
         } else {
-            field(words[t.source_word as usize], t.source_shift, t.mask)
+            field(padded_word(words, t.source_word as usize), t.source_shift, t.mask)
         };
         if t.increment != 0 {
             remainder = (remainder as u32).wrapping_add(t.increment as u32) as i32;
@@ -120,7 +131,7 @@ pub fn change_along_arc(words: &mut [u32; LIMITED_WORDS], additional: &mut f64, 
             result[t.target_word as usize] |= (remainder as u32) << ((t.target_shift as u32) & 31);
         }
     }
-    *words = result;
+    result
 }
 /// Vertex supports added in place.
 pub fn apply_vertex_support(words: &mut [u32], additional: &mut f64, support: &[VertexSupport]) {
@@ -162,11 +173,12 @@ pub fn change_full_memory_along_arc(words: &mut [u32; FULL_WORDS], additional: &
 }
 
 /// Cut-field dominance. Signed field comparison; the gap is
-/// updated in descriptor order with an early exit.
+/// updated in descriptor order with an early exit. Compact limited-memory
+/// prefixes have an implicit zero suffix up to the twenty-word limit.
 pub fn packed_dominate(descriptors: &[DominanceDescriptor], a: &[u32], b: &[u32], gap: &mut f64) -> bool {
     for f in descriptors {
-        let left = field(a[f.word as usize], f.shift, f.mask);
-        let right = field(b[f.word as usize], f.shift, f.mask);
+        let left = field(padded_word(a, f.word as usize), f.shift, f.mask);
+        let right = field(padded_word(b, f.word as usize), f.shift, f.mask);
         if left <= right {
             continue;
         }
@@ -198,8 +210,8 @@ pub fn concatenation_cost(
         return cost;
     };
     for f in &v.dominance {
-        let a = field(forward.0[f.word as usize], f.shift, f.mask);
-        let b = field(backward.0[f.word as usize], f.shift, f.mask);
+        let a = field(padded_word(forward.0, f.word as usize), f.shift, f.mask);
+        let b = field(padded_word(backward.0, f.word as usize), f.shift, f.mask);
         let sum = (a as u32).wrapping_add(b as u32) as i32;
         if f.subtract_cost {
             if -f.denominator <= sum {
@@ -989,4 +1001,42 @@ pub fn build_inputs(
         });
     }
     (limited, kpath, full, full_kpath)
+}
+
+#[cfg(test)]
+mod compact_prefix_tests {
+    use super::*;
+    #[test]
+    fn omitted_words_match_zero_extended_states_in_all_readers() {
+        let prefix = [1, 0];
+        let mut padded = [0; LIMITED_WORDS]; padded[..2].copy_from_slice(&prefix);
+        let mut other = [0; LIMITED_WORDS]; other[0] = 2; other[18] = 2;
+        let descriptors = vec![
+            DominanceDescriptor { word: 0, mask: 3, denominator: 3, cost: 0.25, ..Default::default() },
+            DominanceDescriptor { word: 18, mask: 3, denominator: 3, cost: 1.25, ..Default::default() },
+        ];
+        for reverse in [false, true] {
+            for initial in [-2., -0.75, -0.1] {
+                let mut full_gap = initial; let mut short_gap = initial;
+                let (a,b,sa,sb): (&[u32],&[u32],&[u32],&[u32]) = if reverse {
+                    (&other, &padded, &other, &prefix)
+                } else { (&padded, &other, &prefix, &other) };
+                assert_eq!(packed_dominate(&descriptors,a,b,&mut full_gap), packed_dominate(&descriptors,sa,sb,&mut short_gap));
+                assert_eq!(full_gap.to_bits(), short_gap.to_bits());
+            }
+        }
+        let mut info = CutResourceInfo::default(); info.vertices.resize_with(1, VertexInfo::default);
+        info.vertices[0].dominance = descriptors;
+        assert_eq!(concatenation_cost(&info,0,(&padded,0.1),(&other,0.2),-4.).to_bits(),
+            concatenation_cost(&info,0,(&prefix,0.1),(&other,0.2),-4.).to_bits());
+        let transitions = [
+            ArcTransition { source_word:18, target_word:19, mask:1, denominator:2, increment:1, overflow_cost:0.5, ..Default::default() },
+            ArcTransition { source_word:0, target_word:0, mask:1, denominator:2, increment:1, overflow_cost:0.5, ..Default::default() },
+        ];
+        let mut full_cost = -0.; let mut short_cost = -0.;
+        let expected = changed_along_arc(&padded,&mut full_cost,&transitions);
+        let actual = changed_along_arc(&prefix,&mut short_cost,&transitions);
+        assert_eq!(actual, expected); assert_eq!(actual[19],1);
+        assert_eq!(full_cost.to_bits(),short_cost.to_bits());
+    }
 }

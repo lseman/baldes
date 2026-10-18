@@ -153,13 +153,13 @@ pub unsafe extern "C" fn or_rcsp_debug_labels(
             return Err(invalid("debug label output capacity"));
         }
         for (index, id) in ids.iter().enumerate() {
-            let l = &storage.labels[*id];
+            let l = storage.labels.view(*id);
             let data = [
-                l.bucket.vertex as f64,
-                l.bucket.bucket as f64,
-                l.cost,
-                l.resources[0],
-                l.resources[1],
+                l.bucket().vertex as f64,
+                l.bucket().bucket as f64,
+                l.cost(),
+                l.resources()[0],
+                l.resources()[1],
             ];
             unsafe {
                 ptr::copy_nonoverlapping(data.as_ptr(), out.add(index * 5), 5);

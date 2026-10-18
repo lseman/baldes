@@ -1,4 +1,5 @@
 //! Forward no-cut labeling with immutable predecessor identities.
+mod arena;
 pub mod engine;
 pub mod pool;
 pub mod storage;
