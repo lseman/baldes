@@ -1,13 +1,16 @@
 # BALDES documentation
 
-Start with the [project README](../README.md) for installation, input formats,
-CLI options, and Python root solving. Commands here run from the repository
+Start with the [project README](../README.md) for installation and quick examples.
+Use the [CLI guide](cli.md) and [Python guide](python.md) for detailed usage. Commands here run from the repository
 root. The guides below describe the current Rust implementation.
 
 ## Guides
 
 | Guide | Use it to |
 | --- | --- |
+| [Command-line usage](cli.md) | Run routing and HGS, interpret output, and look up CLI flags |
+| [Python API](python.md) | Install pybaldes, construct inputs, configure solves, and export results |
+| [Algorithms and references](algorithms.md) | Review solver components and research references |
 | [Build configuration](build.md) | Configure optional backends and compiler options in the terminal menu, then build with Make |
 | [Tree and node lifecycle](tree.md) | Run integer routing, understand node inheritance, bounds, limits, and result status |
 | [Branching](branching.md) | Choose vehicle-count, Ryan–Foster, or arc-flow branching and understand the single-network assignment limitation |

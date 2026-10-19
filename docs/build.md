@@ -1,5 +1,33 @@
 # Configuring and building BALDES
 
+## Direct Cargo builds
+
+Install Rust/Cargo and clone the repository. The core library can be built
+without an external LP backend:
+
+```sh
+cargo build --release
+```
+
+For the CLI and routing master, initialize the vendored dependencies and build
+with Clp. This requires a C++14 compiler:
+
+```sh
+git submodule update --init vendor/Clp vendor/CoinUtils
+cargo build --release --features clp
+./target/release/baldes --help
+```
+
+The `clp` feature builds Clp 1.17.10 and CoinUtils 2.11 from those submodules.
+To also enable the optional HiGHS backend and integer solver, install its
+shared library and use `cargo build --release --features clp,highs`.
+The CLI and routing tree require `clp`; `highs` alone provides the library's
+HiGHS backend and generic MIP API. See below for library discovery details.
+
+Python installation is covered in the [pybaldes guide](python.md).
+
+## Interactive configuration
+
 From the repository root:
 
 ```sh
