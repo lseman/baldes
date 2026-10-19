@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html" aria-current="page">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html" aria-current="page">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/stabilization.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -103,11 +103,17 @@ They are separate from the named BALDES pricing options.</p>
 </tr>
 </tbody>
 </table>
-<p>The current column-generation caller passes stage <code>0</code> to <code>after_master</code> and
-passes the actual pricing phase in feedback. Raising <code>minimum_stage</code> above
-zero therefore disables activation in that caller. Its gap argument is the
-master LP value minus the current finite bound, or zero when no finite bound
-is available.</p>
+<p>The reference stores <code>alpha_factor</code>, <code>beta_factor</code>, <code>min_gap</code> and <code>max_gap</code>
+as single-precision controls. The constructor rounds these fields through <code>f32</code>
+before using them as <code>f64</code>. A factor that rounds to zero disables stabilization.</p>
+<p>The column-generation caller passes the current pricing stage. Its gap compares
+the inherited node lower bound with the best artificial-free restricted-LP
+objective accepted before this solve, using the reference comparison tolerance.
+It tracks these separately from the global integer incumbent. A new cut or
+enumeration round carries the certified lower bound and resets the LP bound.
+Unknown bounds use finite -1e12/+1e12 sentinels; a known lower bound with an
+unknown LP bound therefore gives a gap slightly below one. Warm starts retain
+the parent certificate.</p>
 <h2 id="lifecycle">Lifecycle</h2>
 <table>
 <thead>
@@ -146,8 +152,8 @@ not change row coordinates and does not require a center remap.</p>
 <p>Feedback includes the fresh negative-column count, a subgradient vector,
 Lagrangian value, and pricing phase. In the column-generation driver, the
 subgradient starts at the row RHS and subtracts multiplicity times the best
-acceptable column's coefficients when its reduced-cost magnitude passes the
-numeric test.</p>
+returned acceptable column's coefficients. A near-zero or rounded-zero reduced
+cost does not suppress this contribution.</p>
 <p>On the first pricing pass in dynamic mode (<code>alpha_factor &gt;= 1</code>):</p>
 <pre><code class="language-text">if no fresh negative columns or angle &gt; 1e-12:
     alpha -= 0.1
@@ -157,16 +163,19 @@ else if angle &lt; -1e-12 and alpha is below the near-one gate:
 <p>The angle threshold is <strong>1e-12</strong>, independently of <code>Parameters::tolerance</code>.
 The near-one gate includes the general tolerance and a relative margin.
 Updating base alpha affects subsequent master iterations; retries update the
-current effective alpha separately.</p>
+current effective alpha separately. The angle is calculated only on that first
+adaptive pricing pass and retained during subsequent mispricing retries.</p>
 <p>If fresh negative columns exist, or smoothing is inactive, <code>after_pricing</code>
 returns false and stops retrying. Otherwise it increments <code>misprices</code> and uses:</p>
-<pre><code class="language-text">dynamic mode: effective_alpha = 2 * effective_alpha - 1
+<pre><code class="language-text">dynamic mode: effective_alpha = 1 - 2 * (1 - effective_alpha)
 fixed-base mode: effective_alpha = 1 - misprices * (1 - alpha)
 </code></pre>
 <p>It republishes a smoothed point only while the retry count is at most
 <code>max_updates</code> and effective alpha exceeds the tolerance. When either gate
 fails, it deactivates smoothing and requests a final retry at raw duals.
-“Fixed” describes the base alpha, not an unchanging effective retry weight.</p>
+“Fixed” describes the base alpha, not an unchanging effective retry weight.
+The dynamic formula preserves the compiled reference's floating-point operation
+order; rewriting it as <code>2 * effective_alpha - 1</code> can change the result.</p>
 <h2 id="center-updates">Center updates</h2>
 <p>A nonfinite Lagrangian value is ignored. If the current center phase is less
 than or equal to the feedback phase, a finite center bound is replaced only
@@ -185,15 +194,18 @@ angle = dot(toward, feedback_subgradient)
 with it then fail. This behavior differs from forcing an angle of zero.</p>
 <h2 id="optional-directional-construction">Optional directional construction</h2>
 <p>With positive <code>beta_factor</code>, let <code>d = raw - center</code>, <code>l = norm(d)</code>, and <code>g</code>
-be the stored center subgradient. A negligible <code>l</code> returns raw duals.
+be the stored normalized center subgradient. A negligible <code>l</code> returns raw duals.
 For <code>beta_factor == 1</code>, beta is the cosine between <code>d</code> and <code>g</code>; a negligible
 subgradient also returns raw duals. Otherwise the configured beta is used.
 Beta is clamped to <code>[0, 1]</code> before constructing:</p>
-<pre><code class="language-text">outward = center + (1 - beta) * d - beta * l * g / norm(g)
+<pre><code class="language-text">outward = center + (1 - beta) * d + beta * l * g
 </code></pre>
 <p>A negligible subgradient contributes zero to its directional term. When the
 constructed step has norm above <code>1e-12</code>, it is rescaled to length <code>l</code>. This
-changes the outward point before the alpha interpolation.</p>
+changes the outward point before the alpha interpolation. Mispricing retries use
+the raw outward point. Restart invalidates the automatic direction until a subsequent accepted center
+provides a new normalized subgradient. Retaining the old vector alone does not
+make it valid. The 54-case parameter corpus covers this capacity-row transition.</p>
 <h2 id="configure-or-disable">Configure or disable</h2>
 <p>A complete Rust example, requiring <code>clp</code>:</p>
 <pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span><span class="n">master</span><span class="p">::</span><span class="n">root</span><span class="p">::</span><span class="n">RootOptions</span><span class="p">,</span><span class="w"> </span><span class="n">vrptw</span><span class="p">::{</span><span class="n">Instance</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">}};</span>
@@ -223,6 +235,17 @@ changes the outward point before the alpha interpolation.</p>
 <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">lp</span><span class="p">)</span>
 </code></pre>
 <p>The Python root API does not expose the individual smoothing parameters.</p>
+<p>An unavailable best pricing solution differs from a zero subgradient. Feedback
+carries that availability explicitly; the adaptive angle retains its preceding
+value when a best solution is unavailable, matching the native early return.
+Completed CG rounds use the LP objective accepted within convergence tolerance
+for subsequent stabilization gap bookkeeping, while the published pricing bound
+remains conservative.</p>
+<p>When an unavailable pricing solution accompanies an accepted pending center,
+the center uses raw LP duals. The saved normalized subgradient remains intact;
+the fallback RHS vector does not replace the direction or make it valid.
+Customer-only elementarity IDs and canonical retained-path export order
+preserve ordering through directional enumeration.</p>
 </article>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="options.html"><small>Previous guide</small>BALDES pricing options <span aria-hidden="true">↗</span></a><a href="source-layout.html"><small>Next guide</small>Source layout <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>

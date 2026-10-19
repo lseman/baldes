@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html" aria-current="page">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html" aria-current="page">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/tree.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -132,6 +132,13 @@ for typed constraints, or <code>root::inherit</code> for arc-flow tuples. Supply
 <strong>additional</strong> branches; the parent already contains its ancestor rows.
 To retain the child's snapshot for another generation, enable capture on that
 solve too.</p>
+<p>Snapshots retain both restricted-master columns and the generated column pool,
+including cached columns that have not entered the master. Child branch rows
+and cut cleanup update cached coefficients as well as loaded coefficients.
+Regeneration checks the child's current path restrictions; a cached route is
+not automatically admissible. Manually constructed column-generation
+<code>WarmStart</code> values provide <code>generated_pool</code> in creation order; an empty pool is
+initialized from the loaded columns.</p>
 <p>The snapshot exposes <code>branch_depth()</code>, <code>active_cuts()</code>, and
 <code>enumerated_routes()</code>. A route count alone does not establish completeness;
 the enumerated-MIP adapter separately checks the completion flag.</p>
@@ -246,6 +253,11 @@ has no CLI or Python entry point.</p>
 during the integer solve. Python exposes root solving; use Rust or the CLI
 for the tree. <code>Infeasible</code> means all nodes were certified closed without a
 feasible incumbent.</p>
+<p><code>Optimal</code> uses the configured absolute and relative gap tolerances. The reported
+lower bound retains the minimum node bound across open and tolerance-closed
+subproblems; closing a node does not replace its lower bound with the incumbent.
+The final bound can therefore remain below the incumbent after successful gap
+closure. If the retained bound cannot justify closure, the status is <code>Incomplete</code>.</p>
 <ul>
 <li><a href="https://github.com/lseman/baldes/blob/main/src/master/root/mod.rs">Node snapshots and inheritance</a></li>
 <li><a href="https://github.com/lseman/baldes/blob/main/src/master/tree/mod.rs">Tree driver</a></li>
@@ -256,6 +268,36 @@ feasible witnesses, and branch/cut preservation</li>
 </ul>
 <pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--test<span class="w"> </span>node_lifecycle<span class="w"> </span>--test<span class="w"> </span>branch_price
 </code></pre>
+<p>Vehicle-count upper branches reuse the fleet row when its coefficients match
+the branch. Repeated bounds keep the tighter RHS, while branch depth still
+counts every recorded decision. Fixed route quantities reduce that RHS once.
+A custom fleet row with different coefficients receives a separate branch row.</p>
+<p>The root master receives explicit <code>root.initial_routes</code>. Child masters inherit
+their parent's restricted model and generated column pool. Routes collected
+globally for integer search, including automatic singletons and routes from
+other evaluations, do not preload the child's restricted model. Equal-bound
+child insertion visits the upward branch before its downward sibling. Complete
+tree trace parity remains open.</p>
+<p>For normal tree evaluations, a compatible preceding LP can supply numerical
+state after its trailing branch columns and rows are removed. Exact ordered
+matrix/cost/sense/offset checks precede transfer, and the target node keeps its
+own row and column bounds. Other layouts retain the independent parent fork;
+strong trials and dives remain isolated. Stabilization centers belong to the
+parent, while a tightened vehicle upper bound sets the remaining route
+multiplicity.</p>
+<p>Warm metadata also retains the parent's certified lower bound. Stabilization
+gap gating compares it with the preceding artificial-free restricted-LP bound
+within each CG round. This differs from the global integer incumbent used for
+pruning and enumeration.</p>
+<p>Before mutating cuts, an artificial-free completed pricing round retains a
+checkpoint of the master, route registry, cut/pricing state, stabilization and
+fixing-gap cache. A later pricing timeout that explicitly requests saved-point
+rollback restores that checkpoint and preserves any improved incumbent. Child
+nodes start with a fresh saved-point flag. Unsaved timeouts, label limits and
+other errors still propagate. Recovery uses the saved pricing bound; the
+unfinished cut round's restricted LP objective supplies no new certificate.
+Failed pricing attempts remain included in the recovered node's pricing-call
+count and pricing time, while its bound and warm state come from the checkpoint.</p>
 </article>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="index.html"><small>Previous guide</small>BALDES documentation <span aria-hidden="true">↗</span></a><a href="branching.html"><small>Next guide</small>Routing branching <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>

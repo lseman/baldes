@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html" aria-current="page">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html" aria-current="page">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/source-layout.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -96,6 +96,16 @@ paths such as <code>cuts::state</code> and <code>cuts::separation</code>.</p>
 or inheritance entry points. <code>problem.rs</code> owns rows and route coefficients;
 <code>options.rs</code> owns root and cut-family configuration; <code>controller.rs</code> owns
 column-generation callbacks and separation scheduling.</p>
+<p><a href="https://github.com/lseman/baldes/blob/main/src/master/root/domain.rs">master/root/domain.rs</a> validates unit visit-count
+cover rows, fixed-route residuals and disposable scalar resources before
+collecting a <code>CanonicalCoverRelaxation</code>. This projects feasible integer routes
+onto canonical physical paths; it does not establish completeness of an NG LP
+or authorize cut rows or root bound publication.</p>
+<p><a href="https://github.com/lseman/baldes/blob/main/src/master/root/cover_rows.rs">master/root/cover_rows.rs</a> computes exact
+integer row-activity ranges over residual customer partitions of that domain.
+It relaxes fleet and branch restrictions and has explicit state, work and time
+limits. Passing its range test proves a row valid on those canonical covers;
+resource-schedule projection and original-domain eligibility remain separate.</p>
 <p><a href="https://github.com/lseman/baldes/blob/main/src/master/tree/mod.rs">master/tree/mod.rs</a> owns node processing and the search queue. Its sibling
 <code>candidates.rs</code>, <code>strong.rs</code>, and <code>diving.rs</code> own candidate generation, strong
 branching, and diving. Typed constraints live in <a href="https://github.com/lseman/baldes/blob/main/src/master/branching.rs">master/branching.rs</a>.
@@ -103,6 +113,17 @@ LP backends remain under <code>master/solvers/</code>. Shared integer result typ
 <a href="https://github.com/lseman/baldes/blob/main/src/master/solvers/mip.rs">master/solvers/mip.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/master/solvers/highs/integer.rs">master/solvers/highs/integer.rs</a> transfers complete
 models to HiGHS. <a href="https://github.com/lseman/baldes/blob/main/src/master/root/integer.rs">master/root/integer.rs</a> prepares complete enumerated masters;
 <a href="https://github.com/lseman/baldes/blob/main/src/master/tree/integer.rs">master/tree/integer.rs</a> runs the optional end-of-node solve.</p>
+<p><a href="https://github.com/lseman/baldes/blob/main/src/master/networks.rs">master/networks.rs</a> coordinates fresh roots with
+multiple independent pricing graphs and shared master rows.
+<a href="https://github.com/lseman/baldes/blob/main/src/master/network_bounds.rs">master/network_bounds.rs</a> supplies conservative
+graph-walk bound certificates. See <a href="networks.html">multiple networks</a> for the
+coefficient mapping and current integration limits.</p>
+<p><a href="https://github.com/lseman/baldes/blob/main/src/master/certificates.rs">master/certificates.rs</a> evaluates conservative
+lower bounds for explicit finite matrices using original cost terms and a
+verified total-column-quantity row. It shares directed arithmetic with network
+bounds through <code>master/rounding.rs</code>. A finite-matrix bound applies to an original
+routing domain only after column completeness or excluded-domain coverage and
+row validity have been established separately.</p>
 <p>Public paths remain <code>master::root::{RootProblem, RootOptions, NodeSnapshot}</code>
 and <code>master::tree::{TreeOptions, BranchingOptions}</code>.</p>
 <h2 id="pricing-and-enumeration">Pricing and enumeration</h2>
@@ -111,13 +132,33 @@ preparation, and column-generation round updates. <code>solve.rs</code> runs pri
 <code>universe.rs</code> manages enumeration, inspection, and direct fixing;
 <code>completion.rs</code> completes labels and restores arcs;
 <code>fixing_workflow.rs</code> dispatches native fixing/enumeration modes;
-<code>variable_costs.rs</code> handles variable costs and corrected bounds;
+<code>variable_costs.rs</code> handles variable costs, route-value corrections and raw
+functor repricing. A rounded winning route alone cannot certify the raw minimum:
+the functor uses an independent raw-cost pricing domain, preserving logical
+branch constraints and sharing the call's time budget. Heuristic phases leave
+the lower bound unknown;
 <code>relaxation.rs</code> manages dynamic NG updates and route validation.
 <code>branching.rs</code>, <code>phases.rs</code>, <code>fixing.rs</code>, and <code>controller.rs</code> provide supporting
 resources, phase definitions, fixing result types, and round state.</p>
+<p>If a backward candidate cannot be replayed within forward resource windows,
+<code>pricing/solve.rs</code> rebuilds a forward-only search under the remaining call
+deadline, reloading cuts, branch resources and explicit physical exclusions.
+This recovers the minimum even when the failed candidate displaced valid paths
+from the bounded solution pool.</p>
+<p><code>Route.resource_profile</code> records the source state and the state after every arc.
+Label reconstruction preserves waiting from bucket jumps instead of replacing
+it with earliest arrival. Root column identities include these schedules, so
+equal arc paths with different resource states remain distinct. Code constructing
+<code>Route</code> literals must supply the profile; <code>resources</code> is its final state.</p>
 <p><a href="https://github.com/lseman/baldes/blob/main/src/enumeration/mod.rs">enumeration/mod.rs</a> exports <code>Controls</code>, <code>Enumeration</code>, <code>Label</code>, <code>CutTables</code>,
 <code>Storage</code>, <code>Path</code>, and <code>PathStorage</code>. Their implementation files are
 <code>controls.rs</code>, <code>engine.rs</code>, <code>label.rs</code>, <code>storage.rs</code>, and <code>paths.rs</code>.</p>
+<p><a href="https://github.com/lseman/baldes/blob/main/src/enumeration/domain.rs">enumeration/domain.rs</a> exports
+<code>CompleteCanonicalPaths</code>, a bounded collector of physical vertex-simple paths
+under canonical forward scalar-resource extension. It preserves parallel arc
+identity and borrows the graph. Budget exhaustion discards the partial result.
+It keeps one earliest resource profile per path; callers must establish any
+equivalence to all routing columns or alternative schedules separately.</p>
 <h2 id="c-api-and-instances">C API and instances</h2>
 <p>C API implementation modules are private; public functions and ABI types are
 re-exported through <code>api</code>. Shared handle validation and error handling stay in
@@ -129,6 +170,12 @@ adapter. Public paths such as <code>vrptw::Instance</code> remain unchanged.</p>
 exports at its existing facade when needed. Keep numerical and branching
 behavior changes separate from file organization so each diff remains
 reviewable.</p>
+<p><a href="https://github.com/lseman/baldes/blob/main/src/enumeration/frontier.rs">enumeration/frontier.rs</a> records cached candidate
+costs rejected during enumeration, ordered join breaks, and completion rejections.
+These are observations from that run's cost epoch, preserved by pricing forks;
+retained-path repricing does not update them. Representative pruning and symmetric
+cost transformations are marked explicitly. The observations alone do not certify
+an original-domain lower bound or account for a previously restricted bucket grid.</p>
 </article>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="stabilization.html"><small>Previous guide</small>Dual-price stabilization <span aria-hidden="true">↗</span></a><a href="website.html"><small>Next guide</small>Website and documentation publishing <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
