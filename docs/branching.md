@@ -15,8 +15,11 @@ unit customer coverage with equality rows.
 | `--branching vehicles` | Vehicle count, then arc-flow fallback |
 | `--branching ryan-foster` | Ryan–Foster, then arc-flow fallback |
 | `--branching arc` | Arc flow |
+| `--branching cluster` | Cluster boundary/pair variables with arc-flow candidates |
+| `--branching resource` | Accumulated-resource splits with arc-flow candidates |
+| `--branching hybrid` | Vehicle count, then combined native/new candidates |
 
-The selector uses the first enabled family with fractional candidates. Within
+In native mode, the selector uses the first enabled family with fractional candidates. Within
 an applicable family it orders candidates by closeness of the fractional part
 to 0.5, with stable ties. Phased strong branching then evaluates candidates
 when enabled. These are adapter priorities, not a combined ranking across all
@@ -120,4 +123,90 @@ See [Tree lifecycle](tree.md) for bound and incumbent handling.
 
 ```sh
 cargo test --features clp --test branching --test branch_price
+```
+
+## Cluster branching
+
+`--branching cluster` enables the cluster variables of Silva, Uchoa and
+Subramanian, *Cluster Branching for Vehicle Routing Problems* (2024),
+Sections 3 and 4.1 ([local paper](../papers/L_2024_2___Cluster_branching.pdf),
+PDF pages 8–12). For a customer cluster `C`, the boundary variable counts
+entries from outside `C`, equivalent to half the undirected cutset flow on a
+complete depot-to-depot route. For disjoint clusters `C,D`, the pair variable
+counts arc traversals in either direction between them. Both variables are
+integer in an integer routing solution. Children impose floor/ceiling bounds
+on their fractional LP values. The split source/sink form one depot cluster.
+
+Coefficients are additive over physical arcs, including repeated crossings.
+Branch duals therefore use the existing arc-cost pricing path, without extra
+label resources. Arc-flow candidates remain available because cluster
+variables alone do not ensure an integral directed solution.
+
+`ClusterBranchingOptions::partition` accepts a partition of every customer
+exactly once. Otherwise a deterministic customer MST is cut at edges strictly
+above `mean + theta * standard_deviation`; `theta` defaults to 1. Distances use
+the cheaper physical arc in either direction. This matches geometric distances
+on symmetric routing graphs; for asymmetric/sparse graphs it is a heuristic
+similarity measure. A disconnected customer graph supplies no automatic
+customer clusters. The partition is constructed once per tree. Other clustering
+methods and the paper's full computational experiment are not implemented.
+
+## Accumulated-resource branching
+
+`--branching resource` adds schedule candidates, retaining arc-flow fallback.
+A constraint identifies a **public arc ID**, a resource coordinate, a threshold,
+and a side. It restricts the resource at that arc's head **after consumption and
+waiting** to `<= threshold` or `>= threshold`. Equality belongs to both children;
+there is no gap between their schedule domains. This is a continuous resource
+split, not a floor/ceiling split of the resource value. Other routes need not
+use the selected arc. An empty window intersection forbids that arc.
+
+The implementation tightens the physical arc's resource window. Existing
+forward/backward extensions, resource replay and enumeration enforce it.
+Inherited columns also receive a nonnegative violation row, so an old schedule
+cannot satisfy the new master solely because its arc path is still present.
+Resource-domain changes discard inherited labels/enumeration before repricing;
+parent and sibling graphs remain independent. Original resource limits remain
+in effect. The existing requirement for backward equality resources to have a
+fixed sink window still applies.
+
+Candidates split distinct observed resource profiles on arcs with unit LP
+flow. They use the midpoint of the observed minimum and maximum; ordinary
+fractional arcs retain arc-flow candidates. This is an initial selection rule,
+not a reproduction of VRPSolver's separator or a measured performance claim.
+The C add/clear accumulated-resource APIs now install and restore actual window
+restrictions instead of marking the feature unsupported. The Rust pricing API
+exposes `AccumulatedResourceBranch` and the add/clear methods on `Solver`.
+
+`--branching hybrid` enables both new families alongside the native families.
+Vehicle count keeps its first priority; remaining enabled aggregate families
+and arc-flow candidates compete in the existing phased strong branching.
+`native` remains the default, with both new families disabled.
+
+## Branch evaluation history
+
+`--branch-history` records finite strong-trial and completed node evaluations
+in `TreeOutput::branch_history`, and exports them in JSON as `branch_evaluations`.
+Each record identifies the constraint, depth, evaluation kind, parent bound,
+child estimate, fractional branching distance and elapsed time. Restricted-LP,
+heuristic-pricing, exact-pricing and ordinary-node observations remain separate.
+Timed-out/unfinished exact trials and sentinel/infinite values do not supply
+pseudo-cost observations. Restricted-LP observations remain explicitly labeled
+as estimates and may reflect artificial penalties.
+
+For each variable and direction, history averages objective gain divided by
+branching distance. With the default two observations per direction in one
+stage, it can rank a candidate by the product of predicted child gains. At
+non-root nodes, half of the first strong-branching phase's budget is reserved
+for candidates ranked by history; the remainder follows fractional order.
+Without strong branching, reliable history can order candidates directly.
+Missing history retains the existing order. More complete observation stages
+are preferred when both directions have enough samples. History is per solve,
+starts empty, and never supplies a pruning bound or marks a node infeasible.
+It is opt-in and does not change the default selection policy.
+
+```sh
+cargo run --release --features clp --bin baldes -- \
+  vrptw instances/R101.txt --customers 10 --tree \
+  --branching hybrid --branch-history --time 60 --json /tmp/tree.json
 ```

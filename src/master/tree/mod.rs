@@ -20,6 +20,9 @@ use std::collections::{BTreeMap, HashSet};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 pub mod candidates;
+pub mod clusters;
+pub mod history;
+pub use history::{BranchEvaluationHistory, BranchHistoryOptions};
 mod diving;
 #[cfg(feature = "highs")]
 mod integer;
@@ -43,6 +46,7 @@ pub struct TreeOptions {
     pub absolute_gap: f64,
     pub relative_gap: f64,
     pub strong_branching: Option<StrongBranchingOptions>,
+    pub branch_history: Option<BranchHistoryOptions>,
     pub diving: Option<DivingOptions>,
 }
 impl Default for TreeOptions {
@@ -58,6 +62,7 @@ impl Default for TreeOptions {
             absolute_gap: 1e-6,
             relative_gap: 1e-9,
             strong_branching: Some(StrongBranchingOptions::default()),
+            branch_history: None,
             diving: Some(DivingOptions::default()),
         }
     }
@@ -89,6 +94,7 @@ pub struct TreeOutput {
     pub enumerated_mip_calls: usize,
     pub enumerated_mip_nodes: usize,
     pub strong_branching_trials: usize,
+    pub branch_history: BranchEvaluationHistory,
     pub diving_nodes: usize,
     pub seconds: f64,
 }
@@ -113,15 +119,16 @@ impl TreeOutput {
                 )
             })
             .collect();
-        format!("{{\"instance\":{:?},\"status\":\"{:?}\",\"incumbent\":{},\"bound\":{},\"bound_mode\":\"{}\",\"numerical_bound\":{},\"certified_bound\":{},\"nodes\":{},\"open_nodes\":{},\"pricing_calls\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"mip_nodes\":{},\"enumerated_mip_calls\":{},\"enumerated_mip_nodes\":{},\"strong_branching_trials\":{},\"diving_nodes\":{},\"seconds\":{},\"routes\":[{}]}}\n",
+        format!("{{\"instance\":{:?},\"status\":\"{:?}\",\"incumbent\":{},\"bound\":{},\"bound_mode\":\"{}\",\"numerical_bound\":{},\"certified_bound\":{},\"nodes\":{},\"open_nodes\":{},\"pricing_calls\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"mip_nodes\":{},\"enumerated_mip_calls\":{},\"enumerated_mip_nodes\":{},\"strong_branching_trials\":{},\"diving_nodes\":{},\"branch_history_ranked\":{},\"branch_evaluations\":[{}],\"seconds\":{},\"routes\":[{}]}}\n",
             name, self.status, number(self.incumbent), number(self.bound), self.bound_mode.as_str(),
             if self.bound_mode == root::BoundMode::Numerical { number(self.bound) } else { "null".into() },
             if self.bound_mode == root::BoundMode::Certified { number(self.bound) } else { "null".into() }, self.nodes,
-            self.open_nodes, self.pricing_calls, self.fixing_calls, self.enumerated_routes, self.mip_nodes, self.enumerated_mip_calls, self.enumerated_mip_nodes, self.strong_branching_trials, self.diving_nodes, self.seconds, routes.join(","))
+            self.open_nodes, self.pricing_calls, self.fixing_calls, self.enumerated_routes, self.mip_nodes, self.enumerated_mip_calls, self.enumerated_mip_nodes, self.strong_branching_trials, self.diving_nodes, self.branch_history.ranked_candidates, self.branch_history.to_json(), self.seconds, routes.join(","))
     }
 }
 type Branch = BranchConstraint;
 struct Node {
+    observation: Option<(candidates::BranchCandidate, usize, f64)>,
     branches: Vec<Branch>,
     bound: f64,
     parent: Option<Rc<root::NodeSnapshot>>,
@@ -393,6 +400,14 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
     {
         return Err(invalid("tree requires a routing set-partitioning master with nonnegative costs and unique arc ids"));
     }
+    // Resolve and validate the partition once for the whole tree.
+    let mut options = options;
+    if let Some(config) = &mut options.branching.clusters {
+        config.partition = Some(clusters::partition(&problem, config)?);
+    }
+    if options.branch_history.as_ref().is_some_and(|c| c.minimum_observations == 0) {
+        return Err(invalid("branch history requires positive observation count"));
+    }
     let deadline = started + options.time_limit;
     let mut output = TreeOutput {
         bound_mode: options.root.bound_mode,
@@ -409,6 +424,7 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
         enumerated_mip_calls: 0,
         enumerated_mip_nodes: 0,
         strong_branching_trials: 0,
+        branch_history: Default::default(),
         diving_nodes: 0,
         seconds: 0.,
     };
@@ -444,6 +460,7 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
         deadline,
     );
     let mut open = vec![Node {
+        observation: None,
         branches: vec![],
         bound: 0.,
         parent: None,
@@ -505,6 +522,15 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
             Err(error) => return Err(error),
         };
         output.nodes += 1;
+        if options.branch_history.is_some() && result.master.status == Status::Optimal
+            && !result.master.pruned_by_bound && !result.preprocessing.infeasible
+            && result.master.artificials.iter().all(|&c| result.values.get(c).copied().unwrap_or(0.) <= 1e-6)
+        {
+            if let Some((candidate, side, parent_bound)) = &node.observation {
+                output.branch_history.record(candidate, *side, node.branches.len().saturating_sub(1),
+                    history::EvaluationKind::NodePricing, *parent_bound, result.master.lp, result.solver_seconds);
+            }
+        }
         if let Some(snapshot) = &result.snapshot {
             previous = Some(snapshot.clone());
         }
@@ -597,10 +623,11 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
             deadline,
         )?;
         if let Some((candidate, bounds)) = branch {
-            for (side, constraint) in [(1, candidate.up), (0, candidate.down)] {
+            for (side, constraint) in [(1, candidate.up.clone()), (0, candidate.down.clone())] {
                 let mut branches = node.branches.clone();
                 branches.push(constraint);
                 open.push(Node {
+                    observation: options.branch_history.as_ref().map(|_| (candidate.clone(), side, node.bound)),
                     branches,
                     bound: bounds[side],
                     parent: parent_snapshot.clone(),

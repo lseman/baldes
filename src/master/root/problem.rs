@@ -126,9 +126,21 @@ impl RootProblem {
         physical: usize,
     ) -> Result<()> {
         constraint.validate(self)?;
+        // An empty intersection forbids this optional arc, rather than the
+        // whole node. Express it as an additive zero-flow row for propagation.
+        let constraint = if let BranchConstraint::AccumulatedResource(c) = &constraint {
+            if c.window(&self.graph)?.is_none() {
+                BranchConstraint::ArcFlow { arc: self.arc_position(c.arc).unwrap(), sense: RowSense::LessEqual, rhs: 0. }
+            } else { constraint }
+        } else { constraint };
         let logical = self.rows.len();
         let (sense, mut rhs) = constraint.row();
         rhs -= self.fixed_sum(|route| Ok(constraint.coefficient(self, route)))?;
+        if let BranchConstraint::AccumulatedResource(c) = &constraint {
+            let window = c.window(&self.graph)?.expect("nonempty resource branch");
+            self.graph.arc_mut(c.arc)?.bounds[c.resource] = Some(window);
+        }
+
         for a in 0..self.graph.arcs.len() {
             let value = constraint.arc_coefficient(self, a);
             if value != 0. {
@@ -140,7 +152,7 @@ impl RootProblem {
         self.branch_constraints.push((logical, constraint));
         Ok(())
     }
-    pub(super) fn base_entries(&self, route: &Route) -> Result<Vec<(usize, f64)>> {
+    pub(crate) fn base_entries(&self, route: &Route) -> Result<Vec<(usize, f64)>> {
         let map = self.row_map.borrow();
         let mut coefficients = std::collections::BTreeMap::new();
         for &(r, a) in &self.route_entries {
@@ -155,7 +167,7 @@ impl RootProblem {
             }
         }
         for (r, c) in &self.branch_constraints {
-            if matches!(c, BranchConstraint::RyanFoster(_)) {
+            if c.nonlinear() {
                 let value = c.coefficient(self, route);
                 if value != 0. {
                     *coefficients.entry(map[*r]).or_insert(0.) += value;

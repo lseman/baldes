@@ -30,7 +30,8 @@ pub struct Solver {
     pub round: controller::RoundState,
     pub maximum_variable_id: Option<usize>,
     pub dominance_mode: i32,
-    pub accumulated_branches: usize,
+    accumulated_branches: Vec<branching::AccumulatedResourceBranch>,
+    accumulated_original_bounds: Vec<(i32, usize, Option<crate::graph::Window>, bool)>,
     ng_baseline: Option<(Vec<Vec<usize>>, Vec<Vec<usize>>)>,
     pub variable_costs: Vec<f64>,
     enumeration_snapshot: Option<Graph>,
@@ -67,7 +68,8 @@ impl Solver {
             round: controller::RoundState::default(),
             maximum_variable_id: None,
             dominance_mode: 0,
-            accumulated_branches: 0,
+            accumulated_branches: vec![],
+            accumulated_original_bounds: vec![],
             ng_baseline: None,
             variable_costs: vec![],
             enumeration_snapshot: None,
@@ -125,7 +127,8 @@ impl Solver {
             round: self.round.clone(),
             maximum_variable_id: self.maximum_variable_id,
             dominance_mode: self.dominance_mode,
-            accumulated_branches: self.accumulated_branches,
+            accumulated_branches: self.accumulated_branches.clone(),
+            accumulated_original_bounds: self.accumulated_original_bounds.clone(),
             ng_baseline: self.ng_baseline.clone(),
             variable_costs: self.variable_costs.clone(),
             enumeration_snapshot: if keep_cost_state {
@@ -138,6 +141,42 @@ impl Solver {
             knapsack_pricing: self.knapsack_pricing.clone(),
             applied_cuts: self.applied_cuts.clone(),
         }
+    }
+    pub fn accumulated_resource_branches(&self) -> &[branching::AccumulatedResourceBranch] {
+        &self.accumulated_branches
+    }
+    /// Install a head-resource window in the physical graph. The existing
+    /// forward/backward extension, joins, replay and enumeration enforce it.
+    pub fn add_accumulated_resource_branch(
+        &mut self, constraint: branching::AccumulatedResourceBranch,
+    ) -> Result<usize> {
+        let window = constraint.window(&self.graph)?;
+        let original = self.graph.arc_mut(constraint.arc)?.bounds[constraint.resource];
+        let position = self.graph.arcs.iter().position(|a| a.id == constraint.arc).unwrap();
+        let forbidden = self.forbidden_arcs.get(position).copied().unwrap_or(false);
+        self.accumulated_original_bounds.push((constraint.arc, constraint.resource, original, forbidden));
+        if let Some(window) = window {
+            self.graph.arc_mut(constraint.arc)?.bounds[constraint.resource] = Some(window);
+        } else {
+            self.forbidden_arcs.resize(self.graph.arcs.len(), false);
+            self.forbidden_arcs[position] = true;
+        }
+        let id = self.accumulated_branches.len();
+        self.accumulated_branches.push(constraint);
+        self.restore_arcs();
+        Ok(id)
+    }
+    pub fn clear_accumulated_resource_branches(&mut self) -> Result<()> {
+        for &(arc, resource, window, forbidden) in self.accumulated_original_bounds.iter().rev() {
+            self.graph.arc_mut(arc)?.bounds[resource] = window;
+            if let Some(position) = self.graph.arcs.iter().position(|a| a.id == arc) {
+                if let Some(flag) = self.forbidden_arcs.get_mut(position) { *flag = forbidden; }
+            }
+        }
+        self.accumulated_original_bounds.clear();
+        self.accumulated_branches.clear();
+        self.restore_arcs();
+        Ok(())
     }
     pub fn ryan_foster_constraints(&self) -> &[branching::RyanFosterConstraint] {
         &self.ryan_foster

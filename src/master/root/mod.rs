@@ -525,6 +525,16 @@ fn solve_seeded(
         solver.graph = problem.graph.clone();
         solver
     };
+    // Resource branches change the physical head windows. Rebuild labels and
+    // enumeration before using inherited cost-dependent state in that domain.
+    let mut resource_domain_changed = false;
+    for (arc, original) in solver.graph.arcs.iter_mut().zip(&problem.graph.arcs) {
+        if arc.bounds != original.bounds {
+            arc.bounds = original.bounds;
+            resource_domain_changed = true;
+        }
+    }
+    if resource_domain_changed { solver.restore_arcs(); }
     solver.rollback_point_saved = false;
     solver.requires_rollback = false;
     if new_fixed {

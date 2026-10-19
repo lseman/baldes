@@ -60,7 +60,17 @@ pub fn candidates_with_history(
             }];
         }
     }
-    let mut candidates = vec![];
+    let mut candidates = if let Some(config) = &options.clusters {
+        // Tree solve validates and prepares this partition once. Direct callers
+        // can call clusters::partition first to diagnose invalid partitions.
+        let groups = super::clusters::partition(problem, config).unwrap_or_default();
+        super::clusters::candidates(problem, result, &groups)
+    } else { vec![] };
+    if options.accumulated_resource {
+        candidates.extend(resource_candidates(problem, &routes, history));
+    }
+    let aggregate_candidates = !candidates.is_empty();
+
     if options.packing_set_assignment {
         for &vertex in &problem.customers {
             let value = routes
@@ -83,7 +93,7 @@ pub fn candidates_with_history(
                 });
             }
         }
-        if !candidates.is_empty() {
+        if !candidates.is_empty() && !aggregate_candidates {
             order(&mut candidates);
             return candidates;
         }
@@ -135,7 +145,7 @@ pub fn candidates_with_history(
                 }
             }
         }
-        if !candidates.is_empty() {
+        if !candidates.is_empty() && !aggregate_candidates {
             order(&mut candidates);
             return candidates;
         }
@@ -164,5 +174,44 @@ pub fn candidates_with_history(
         }
     }
     order(&mut candidates);
+    candidates
+}
+
+/// Split the observed head-resource schedules of an arc with unit LP flow.
+/// Fractional arc flows remain handled by the ordinary arc-flow fallback.
+fn resource_candidates(
+    problem: &RootProblem, routes: &[(&crate::Route, f64)], history: &[BranchConstraint],
+) -> Vec<BranchCandidate> {
+    use crate::pricing::branching::AccumulatedResourceBranch;
+    let mut observations = BTreeMap::<(usize, usize), Vec<(f64, f64)>>::new();
+    for &(route, value) in routes {
+        for (i, &id) in route.arcs.iter().enumerate() {
+            let Some(arc) = problem.arc_position(id) else { continue; };
+            for resource in 0..problem.graph.resources.len() {
+                if let Some(&q) = route.resource_profile.get(i + 1).and_then(|q| q.get(resource)) {
+                    if q.is_finite() { observations.entry((arc, resource)).or_default().push((q, value)); }
+                }
+            }
+        }
+    }
+    let mut candidates = vec![];
+    for ((arc, resource), mut samples) in observations {
+        if (samples.iter().map(|x| x.1).sum::<f64>() - 1.).abs() > 1e-6 { continue; }
+        samples.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let (low, high) = (samples.first().unwrap().0, samples.last().unwrap().0);
+        let threshold = low * 0.5 + high * 0.5;
+        if threshold <= low || threshold >= high { continue; }
+        let id = problem.graph.arcs[arc].id;
+        if history.iter().any(|c| matches!(c, BranchConstraint::AccumulatedResource(b)
+            if b.arc == id && b.resource == resource && b.threshold == threshold)) { continue; }
+        let up = AccumulatedResourceBranch { arc: id, resource, threshold, upper: true };
+        let down = AccumulatedResourceBranch { upper: false, ..up };
+        if !matches!(up.window(&problem.graph), Ok(Some(_))) || !matches!(down.window(&problem.graph), Ok(Some(_))) { continue; }
+        let value: f64 = samples.iter().filter(|x| x.0 > threshold).map(|x| x.1).sum();
+        if value > 1e-6 && value < 1. - 1e-6 {
+            candidates.push(BranchCandidate { down: BranchConstraint::AccumulatedResource(down),
+                up: BranchConstraint::AccumulatedResource(up), value });
+        }
+    }
     candidates
 }

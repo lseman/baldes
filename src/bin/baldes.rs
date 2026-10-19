@@ -18,7 +18,8 @@ Options:
   --two-path-cuts        Enable capacity and Kohl 2-path cuts using time windows
   --tree                Run branch-and-price with a restricted-master MIP heuristic
   --nodes N             Tree node limit (default: 10000)
-  --branching MODE      native (default), ryan-foster, vehicles or arc
+  --branching MODE      native (default), vehicles, ryan-foster, arc, cluster, resource, hybrid
+  --branch-history      Record branch evaluations and use reliable pseudo-costs
   --no-strong-branching  Use fractionality instead of phased strong branching
   --no-diving           Disable strong diving in the tree
   --no-mip-heuristic    Disable restricted-master integer search
@@ -178,11 +179,15 @@ fn run() -> std::result::Result<(), String> {
                 tree_options.branching=match args.next().ok_or("missing branching mode")?.as_str() {
                     "native"=>BranchingOptions::default(),
                     "arc"=>BranchingOptions::arc_flow_only(),
+                    "cluster"=>BranchingOptions { clusters:Some(Default::default()), ..BranchingOptions::arc_flow_only() },
+                    "resource"=>BranchingOptions { accumulated_resource:true, ..BranchingOptions::arc_flow_only() },
+                    "hybrid"=>BranchingOptions { clusters:Some(Default::default()), accumulated_resource:true, ..BranchingOptions::default() },
                     "ryan-foster"=>BranchingOptions {ryan_foster:true,..BranchingOptions::arc_flow_only()},
                     "vehicles"=>BranchingOptions {number_of_vehicles:true,..BranchingOptions::arc_flow_only()},
                     mode=>return Err(format!("unknown branching mode: {mode}")),
                 };
             }
+            "--branch-history" => tree_options.branch_history = Some(Default::default()),
             "--no-strong-branching" => tree_options.strong_branching = None,
             "--no-diving" => tree_options.diving = None,
             "--no-mip-heuristic" => tree_options.mip_node_limit = 0,

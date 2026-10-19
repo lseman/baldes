@@ -201,7 +201,7 @@ pub(super) fn validated_upper(
             }
         }
         for (row, constraint) in &problem.branch_constraints {
-            if matches!(constraint, BranchConstraint::RyanFoster(_)) {
+            if constraint.nonlinear() {
                 let coefficient = constraint.coefficient(problem, route);
                 if coefficient != 0. {
                     return None;

@@ -144,26 +144,10 @@ fn restricted_value(
         master.add_row(row.sense, row.rhs, &[])?;
     }
     for route in &pool.routes {
-        let mut entries = BTreeMap::new();
-        for &id in &route.arcs {
-            for &(r, a) in &child.arc_entries[child.arc_position(id).unwrap()] {
-                *entries.entry(r).or_insert(0.) += a;
-            }
-        }
-        for &(r, a) in &child.route_entries {
-            *entries.entry(r).or_insert(0.) += a;
-        }
-        for (offset, branch) in branches.iter().enumerate() {
-            if matches!(branch, BranchConstraint::RyanFoster(_)) {
-                let value = branch.coefficient(problem, route);
-                if value != 0. {
-                    entries.insert(problem.rows.len() + offset, value);
-                }
-            }
-        }
+        let entries = child.base_entries(route)?;
         master.add_column(
             route.original_cost,
-            &entries.into_iter().collect::<Vec<_>>(),
+            &entries,
         )?;
     }
     for (r, row) in child.rows.iter().enumerate() {
@@ -192,6 +176,14 @@ pub(super) fn choose(
     output: &mut TreeOutput,
     deadline: Instant,
 ) -> Result<Option<(super::candidates::BranchCandidate, [f64; 2])>> {
+    let mut supplied = supplied;
+    if !node.branches.is_empty() {
+        if let Some(history) = &options.branch_history {
+            let limit = options.strong_branching.as_ref()
+                .map_or(supplied.len().saturating_mul(2), |strong| strong.phases.first().map_or(0, |p| p.candidates));
+            output.branch_history.prioritize(&mut supplied, limit, history);
+        }
+    }
     let mut candidates: Vec<_> = supplied
         .into_iter()
         .enumerate()
@@ -222,9 +214,12 @@ pub(super) fn choose(
                 }
                 let mut branches = node.branches.clone();
                 branches.push(constraint);
+                let trial_started = Instant::now();
+                let mut observation = None;
                 output.strong_branching_trials += 1;
                 if phase.restricted_master_only {
                     estimates[side] = restricted_value(parent, problem, &branches, pool, options)?;
+                    observation = Some(history::EvaluationKind::RestrictedMaster);
                 } else {
                     let result = evaluate(
                         parent,
@@ -245,6 +240,13 @@ pub(super) fn choose(
                             output.fixing_calls += result.fixing_calls;
                             output.enumerated_routes += result.enumerated_routes;
                             estimates[side] = result.master.lp.min(1e12);
+                            if result.master.artificials.iter().all(|&c| result.values.get(c).copied().unwrap_or(0.) <= 1e-6) {
+                                if result.master.status == Status::Optimal && !result.master.pruned_by_bound && phase.pricing_phase_floor == 0 {
+                                    observation = Some(history::EvaluationKind::ExactPricing);
+                                } else if phase.pricing_phase_floor > 0 {
+                                    observation = Some(history::EvaluationKind::HeuristicPricing);
+                                }
+                            }
                             if result.preprocessing.infeasible {
                                 candidate.bounds[side] = f64::INFINITY;
                             } else if result.master.bound.is_finite() {
@@ -265,6 +267,12 @@ pub(super) fn choose(
                         }
                         Err(e) if budget_error(&e) => {}
                         Err(e) => return Err(e),
+                    }
+                }
+                if options.branch_history.is_some() {
+                    if let Some(kind) = observation {
+                        output.branch_history.record(&candidate.branch, side, node.branches.len(), kind,
+                            node.bound, estimates[side], trial_started.elapsed().as_secs_f64());
                     }
                 }
             }

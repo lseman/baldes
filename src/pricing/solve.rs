@@ -45,11 +45,7 @@ impl Solver {
         maximum: usize,
         negative_only: bool,
     ) -> Result<PricingResult> {
-        if self.accumulated_branches > 0 {
-            return Err(invalid(
-                "native pricing has no accumulated resource branches",
-            ));
-        }
+
         let phase = *self
             .phases
             .get(index)

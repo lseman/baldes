@@ -2,11 +2,7 @@
 use super::*;
 impl Solver {
     pub fn complete_labels(&mut self, enforce_time_limit: bool) -> Result<()> {
-        if self.accumulated_branches > 0 {
-            return Err(invalid(
-                "native pricing has no accumulated resource branches",
-            ));
-        }
+
         let exact = phases::Phase {
             check_ng: true,
             jump_arcs: true,

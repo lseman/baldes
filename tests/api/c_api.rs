@@ -173,3 +173,35 @@ fn functor_empty_calls_preserve_the_baseline_without_claiming_heuristic_exactnes
         or_rcsp_delete(p);
     }
 }
+
+#[test]
+fn accumulated_resource_c_api_installs_restrictions_and_clear_restores_them() {
+    // SAFETY: The solver and output buffers are local; returned routes are
+    // released once and no call retains references into a freed handle.
+    unsafe {
+        let solver = or_rcsp_new(4, 1);
+        for v in 0..4 { assert_eq!(or_rcsp_set_vertex_bounds(solver, v, 0, 0., 5.), 0); }
+        let restricted = or_rcsp_new_arc(solver, 0, 1, -5.);
+        or_rcsp_set_arc_consumption(solver, restricted, 0, 1., 1.);
+        or_rcsp_new_arc(solver, 1, 3, 0.);
+        let other = or_rcsp_new_arc(solver, 0, 2, -2.);
+        or_rcsp_set_arc_consumption(solver, other, 0, 1., 1.);
+        or_rcsp_new_arc(solver, 2, 3, 0.);
+        assert_eq!(or_rcsp_add_accumulated_resource_branch(solver, restricted, 0, 0., 0), 0);
+        let mut routes = [ptr::null_mut(); 10];
+        let (mut cost, mut exact) = (0., 0);
+        let count = or_rcsp_price_phase(solver, 0, routes.as_mut_ptr(), 10, &mut cost, &mut exact);
+        for route in &routes[..count.max(0) as usize] {
+            let mut n = 0;
+            let nodes = or_solution_get_nodes(*route, &mut n);
+            assert_eq!(std::slice::from_raw_parts(nodes, n as usize), [0, 2, 3]);
+        }
+        assert!(count > 0); assert_eq!(cost, -2.); assert_eq!(exact, 1);
+        for route in &routes[..count as usize] { or_solution_delete(*route); }
+        assert_eq!(or_rcsp_clear_accumulated_resource_branches(solver), 0);
+        let count = or_rcsp_price_phase(solver, 0, routes.as_mut_ptr(), 10, &mut cost, &mut exact);
+        assert!(count >= 2); assert_eq!(cost, -5.);
+        for route in &routes[..count as usize] { or_solution_delete(*route); }
+        or_rcsp_delete(solver);
+    }
+}

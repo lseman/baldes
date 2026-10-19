@@ -93,6 +93,7 @@ impl Enumeration {
                 let mut q = next.resources;
                 if let Some(jump) = arc.jump {
                     for (r, &slot) in grid.resource_slots.iter().enumerate() {
+                        if g.resources[slot] == ResourceKind::Equality { continue; }
                         q[slot] = q[slot].max(grid.forward.corners[v][jump][r]);
                     }
                 }
@@ -296,6 +297,7 @@ impl Enumeration {
                     let mut q = next.resources;
                     if let Some(jump) = arc.jump {
                         for (r, &slot) in grid.resource_slots.iter().enumerate() {
+                            if g.resources[slot] == ResourceKind::Equality { continue; }
                             let value = grid.direction(direction).corners[v][jump][r];
                             q[slot] = if direction {
                                 q[slot].max(value)
@@ -333,6 +335,13 @@ impl Enumeration {
                         }
                     }
                     if terminal {
+                        // Reaching the source window is insufficient for an
+                        // equality resource: the suffix must reach the actual
+                        // initial value, not another value in that window.
+                        if !direction && g.resources.iter().enumerate().any(|(r, kind)|
+                            *kind == ResourceKind::Equality && next.resources[r] != roots[0].resources[r]) {
+                            continue;
+                        }
                         if let Some(c) = &cuts {
                             // The opposite root owns the terminal's cut state.
                             next.reduced_cost = if direction {

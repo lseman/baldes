@@ -39,7 +39,7 @@ impl RootProblem {
         // Nonlinear Ryan–Foster coefficients cannot be represented as arc
         // activities. Their resource implementation remains authoritative.
         for &(r, ref branch) in &self.branch_constraints {
-            if matches!(branch, BranchConstraint::RyanFoster(_)) {
+            if branch.nonlinear() {
                 rows[r].entries.clear();
                 // A negative residual RHS certifies that the fixed part
                 // already violated this nonnegative violation row.

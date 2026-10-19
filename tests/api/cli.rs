@@ -146,7 +146,7 @@ fn tree_and_kohl_controls_reach_integer_solve_and_reject_cvrp_time_resource() {
 fn tree_branching_mode_is_explicit_and_validated() {
     let path=std::env::temp_dir().join(format!("baldes-branching-cli-{}.txt",std::process::id()));
     std::fs::write(&path,"triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
-    for mode in ["native","vehicles","ryan-foster","arc"] {
+    for mode in ["native","vehicles","ryan-foster","arc","cluster","resource","hybrid"] {
         let output=command().arg("vrptw").arg(&path).args(["--tree","--branching",mode,"--no-stabilization"]).output().unwrap();
         assert!(output.status.success(),"{mode}: {}",String::from_utf8_lossy(&output.stderr));
         assert!(String::from_utf8_lossy(&output.stdout).contains("Optimal"));

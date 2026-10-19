@@ -301,6 +301,9 @@ impl<'a> Context<'a> {
             if let Some(jump) = arc.jump {
                 let point = self.grid.direction(forward).corners[arc.from.vertex][jump];
                 for (r, &slot) in self.grid.resource_slots.iter().enumerate() {
+                    // A bucket jump may wait only on disposable resources.
+                    // Equality coordinates must preserve physical accumulation.
+                    if g.resources[slot] == ResourceKind::Equality { continue; }
                     let q = if slot == 0 { &mut q0 } else { &mut q1 };
                     *q = if forward {
                         q.max(point[r])

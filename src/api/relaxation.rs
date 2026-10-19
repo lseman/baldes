@@ -337,10 +337,9 @@ pub unsafe extern "C" fn or_rcsp_add_accumulated_resource_branch(
         if !threshold.is_finite() || (upper != 0 && upper != 1) {
             return Err(invalid("accumulated branch input"));
         }
-        s.graph.arc_mut(arc)?;
-        let id = s.accumulated_branches;
-        s.accumulated_branches += 1;
-        s.restore_arcs();
+        let id = s.add_accumulated_resource_branch(crate::pricing::branching::AccumulatedResourceBranch {
+            arc, resource: r as usize, threshold, upper: upper != 0,
+        })?;
         Ok(id as i32)
     })
 }
@@ -348,8 +347,7 @@ pub unsafe extern "C" fn or_rcsp_add_accumulated_resource_branch(
 pub unsafe extern "C" fn or_rcsp_clear_accumulated_resource_branches(p: *mut ORECSP) -> i32 {
     guard(-1, || {
         let s = unsafe { solver(p)? };
-        s.accumulated_branches = 0;
-        s.restore_arcs();
+        s.clear_accumulated_resource_branches()?;
         Ok(0)
     })
 }
