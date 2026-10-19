@@ -59,16 +59,82 @@ mod clp {
                 // upstream Clp implements the deep model/basis copy.
                 let mut text = fs::read_to_string(&*file).unwrap();
                 text.push_str(r#"
+// Preserve allocation metadata without casting a matrix to a derived object.
+struct BaldesPackedCapacity : CoinPackedMatrix {
+  static CoinBigIndex elements(const CoinPackedMatrix &matrix) {
+    return matrix.* &BaldesPackedCapacity::maxSize_;
+  }
+};
 extern "C" Clp_Simplex *baldes_clp_clone(const Clp_Simplex *source) {
   Clp_Simplex *copy = NULL;
   try {
     copy = Clp_newModel();
     *copy->model_ = *source->model_;
+    // Upstream cloning compacts packed matrices. Layout and spare capacity
+    // affect which numerical kernel runs after a later column insertion.
+    ClpPackedMatrix *destination = dynamic_cast<ClpPackedMatrix *>(copy->model_->clpMatrix());
+    const ClpPackedMatrix *original = dynamic_cast<const ClpPackedMatrix *>(source->model_->clpMatrix());
+    if (destination && original) {
+      const CoinPackedMatrix &matrix = *original->getPackedMatrix();
+      CoinPackedMatrix retained(matrix.isColOrdered(), 0.0, 0.0);
+      retained.reserve(matrix.getMaxMajorDim(), BaldesPackedCapacity::elements(matrix));
+      retained.copyReuseArrays(matrix);
+      destination->getPackedMatrix()->swap(retained);
+      destination->checkGaps();
+    }
     return copy;
   } catch (...) {
     if (copy) Clp_deleteModel(copy);
     return NULL;
   }
+}
+#include <algorithm>
+#include "CoinTime.hpp"
+// Deadline setters add the current clock, including setDblParam. Preserve
+// absolute deadlines through a base member pointer, without a derived cast.
+struct BaldesClpDeadlines : ClpModel {
+  static double *parameters(ClpModel &model) {
+    return model.* &BaldesClpDeadlines::dblParam_;
+  }
+};
+struct BaldesScopedSolveLimits {
+  ClpSimplex &model;
+  int iterations;
+  double cpu, wall;
+  explicit BaldesScopedSolveLimits(ClpSimplex &m, int limit, double seconds)
+    : model(m), iterations(m.maximumIterations()) {
+    double *parameters = BaldesClpDeadlines::parameters(model);
+    cpu = parameters[ClpMaxSeconds];
+    wall = parameters[ClpMaxWallSeconds];
+    const double deadline = CoinWallclockTime() + seconds;
+    parameters[ClpMaxWallSeconds] = wall >= 0.0 ? std::min(wall, deadline) : deadline;
+    model.setMaximumIterations(std::min(iterations, limit));
+  }
+  ~BaldesScopedSolveLimits() {
+    model.setMaximumIterations(iterations);
+    double *parameters = BaldesClpDeadlines::parameters(model);
+    parameters[ClpMaxSeconds] = cpu;
+    parameters[ClpMaxWallSeconds] = wall;
+  }
+  BaldesScopedSolveLimits(const BaldesScopedSolveLimits &) = delete;
+  BaldesScopedSolveLimits &operator=(const BaldesScopedSolveLimits &) = delete;
+};
+extern "C" int baldes_clp_dual_limited(Clp_Simplex *model, int iterations, double seconds) {
+  if (!model || iterations < 0 || !std::isfinite(seconds) || seconds < 0.0) return -1;
+  try {
+    BaldesScopedSolveLimits limits(*model->model_, iterations, seconds);
+    Clp_dual(model, 0);
+    return 0;
+  } catch (...) {
+    model->model_->setProblemStatus(4);
+    return -1;
+  }
+}
+extern "C" void baldes_clp_solve_limits(Clp_Simplex *model, double *values) {
+  const double *parameters = BaldesClpDeadlines::parameters(*model->model_);
+  values[0] = model->model_->maximumIterations();
+  values[1] = parameters[ClpMaxSeconds];
+  values[2] = parameters[ClpMaxWallSeconds];
 }
 "#);
                 let copy = patched.join(name);

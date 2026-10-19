@@ -145,11 +145,11 @@ path = "tests/hgs/hgs_e2e.rs"
 name = "cvrplib"
 path = "tests/instances/cvrplib.rs"
 
-# Verification integration tests.
+# Independent pricing regression tests.
 
 [[test]]
-name = "porting_verification"
-path = "tests/verification/porting_verification.rs"
+name = "porting_regressions"
+path = "tests/pricing/porting_regressions.rs"
 
 [[test]]
 name = "partial_solution"

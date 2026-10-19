@@ -105,3 +105,8 @@ Thumbs.db
 # Generated website documentation
 /landing/docs/
 /landing/.docs-build-*/
+
+# External compiled-reference verification lives outside this repository.
+/tests/verification/
+/src/labeling/engine/
+/examples/verify_*.rs
