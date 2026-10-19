@@ -283,6 +283,14 @@ pub trait Controller<M> {
     fn refresh_generated_columns(&mut self, _pool: &mut [Column]) -> Result<()> {
         Ok(())
     }
+    /// Synchronize cached columns using the refreshed loaded metadata where
+    /// the controller can establish identity. The default preserves callbacks
+    /// that need to update every cached column themselves.
+    fn synchronize_generated_columns(
+        &mut self, pool: &mut [Column], _loaded: &[Option<Column>],
+    ) -> Result<()> {
+        self.refresh_generated_columns(pool)
+    }
     /// Refresh the generated column pool after successful enumeration. A
     /// representative universe need not contain every admissible cached path.
     fn regenerate_enumerated_columns(
@@ -313,6 +321,11 @@ pub trait Controller<M> {
     /// Retain a completed feasible pricing round before cut mutations.
     fn save_pricing_checkpoint(&mut self, _master: &M, _output: &Output) -> Result<()> {
         Ok(())
+    }
+    /// Transfer the completed checkpoint when its owner can retain it without
+    /// copying the generated pool again. Existing borrowed callbacks still run.
+    fn store_pricing_checkpoint(&mut self, master: &M, output: Output) -> Result<()> {
+        self.save_pricing_checkpoint(master, &output)
     }
     /// Whether a separator is installed.
     fn separates(&self) -> bool {
@@ -1029,7 +1042,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     pool.clone(), smoothing.clone(),
                 )?;
                 checkpoint.status = Status::Optimal;
-                controller.save_pricing_checkpoint(master, &checkpoint)?;
+                controller.store_pricing_checkpoint(master, checkpoint)?;
             }
             let mut stop_cuts = !controller.separates() || out.cut_rounds >= options.max_cut_rounds;
             if !stop_cuts && separated_once {
@@ -1046,6 +1059,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             }
             lp_at_separation = out.lp;
             if !stop_cuts {
+                let mut rows_remapped = false;
                 // A pass closed by its existing bound has not run pricing.
                 // Keep its solved model; cleanup is enabled by a completed
                 // exact pricing pass, not merely by entering separation.
@@ -1062,6 +1076,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                         .map(|&(_, c)| c)
                         .collect();
                     if !rows.is_empty() {
+                        rows_remapped = true;
                         let (row_map, map) = master.remove_cuts(&rows, &columns)?;
                         loaded = loaded
                             .into_iter()
@@ -1098,6 +1113,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 }
                 let previous_rows = master.rhs().len();
                 let added = controller.separate(master, &out.column_tags)?;
+                let coefficients_changed = added > 0 || master.rhs().len() != previous_rows
+                    || !master.solved();
                 // Add the cut artificials in one call, then delete
                 // the columns a strengthened relaxation forbids.
                 if added > 0 && options.cut_artificial_cost > 0. {
@@ -1153,9 +1170,17 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                         column.entries = master.column_entries(index)?;
                     }
                 }
-                controller.refresh_generated_columns(&mut pool)?;
-                seen = loaded.iter().flatten().map(Column::signature).collect();
-                pool_seen = pool.iter().map(Column::signature).collect();
+                if coefficients_changed {
+                    controller.synchronize_generated_columns(&mut pool, &loaded)?;
+                }
+                if coefficients_changed || rows_remapped || !removed.is_empty()
+                    || loaded.iter().flatten().any(|column| column.identity.is_empty())
+                {
+                    seen = loaded.iter().flatten().map(Column::signature).collect();
+                }
+                if coefficients_changed || rows_remapped {
+                    pool_seen = pool.iter().map(Column::signature).collect();
+                }
                 if added > 0 {
                     out.cut_rounds += 1;
                     round_penalty_updates = 0;

@@ -345,8 +345,10 @@ impl State {
             entries,
             acceptable: true,
             tag,
-            // Preserve both ordered arcs and the recorded resource schedule.
-            identity: route.identity(),
+            // Registration assigns a stable node-local tag using the full
+            // ordered arc path and resource schedule. Pool membership needs
+            // only that interned identity, not another copy of the schedule.
+            identity: format!("route:{tag}"),
         })
     }
     /// cache_costs: arc reduced costs and the rounded cut duals, active cuts
@@ -389,7 +391,7 @@ impl State {
         Ok(offset)
     }
 }
-/// Tag of `route`, the index of the first registered route with its arcs.
+/// Stable tag of the first route with this ordered arc path and resource schedule.
 fn register(state: &mut State, route: &Route) -> Result<i32> {
     let identity = route.identity();
     if let Some(&tag) = state.route_tags.get(&identity) {

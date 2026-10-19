@@ -125,6 +125,9 @@ pub(super) fn columns(
         .into_iter()
         .map(|(route, mut column)| {
             column.tag = register(state, &route)?;
+            // Validation used a provisional tag without mutating the cache.
+            // Publish the registered identity only after that transaction.
+            column.identity = format!("route:{}", column.tag);
             Ok(column)
         })
         .collect()

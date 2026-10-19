@@ -84,6 +84,78 @@ numerical fallback, both tree modes, and mode changes through node snapshots.
 Raw results, the frozen binary, source patch and scripts are retained locally in
 `results/bound-modes-20261019/`.
 
+## Faster packing-cut coefficients
+
+A subsequent numerical-mode optimization gives dense vertex-memory packing
+cuts a simpler coefficient loop and borrows arc-memory sets in the general
+path. Memory resets, route contiguity checks and coefficient rules are retained.
+The same 13 workloads were compared against the preceding numerical-default
+binary on two physical cores, with alternating sequential trials, one warm-up
+and three measured runs per binary. Rust remains at release optimization level
+3 with thin LTO; the bundled Clp/CoinUtils libraries remain at `-O2`.
+
+| Workload | Before | After |
+| --- | ---: | ---: |
+| R101, rank-one enabled | 1.1561 s | 1.1513 s |
+| R103, rank-one enabled | 1.9253 s | 1.8997 s |
+| R201, rank-one enabled | 8.0167 s | 7.7689 s |
+| Geometric mean, all 13 | 0.8347 s | 0.8311 s |
+
+The measured reduction is 3.1% on R201 with rank-one cuts and 1.3% on R103
+with rank-one cuts; the overall reduction is only 0.4%. These results support
+a targeted improvement in cut evaluation, not a general pricing or LP speedup.
+Every non-timing JSON field matches exactly across all 104 runs. The full Rust
+test suite and 46 Python tests pass, including a new exhaustive coefficient
+comparison against the general implementation. A separate `-O3` LP-library
+experiment slowed C202 by 4.7% and was rejected. Frozen binaries, raw outputs,
+profiles, validation logs and the paired benchmark script are retained locally
+in `results/numerical-speed-20261019/`.
+
+## Master bookkeeping and column identities
+
+The remaining R201 rank-one slowdown was reduced by removing repeated work in
+the master driver. Loaded columns reuse their refreshed integer cut incidence
+instead of evaluating every cut again for their cached copies. Original base
+and branch coefficients are preserved; scaled knapsack cuts and unloaded
+columns retain reconstruction. Sorted, unique sparse input bypasses redundant
+tree accumulation, while duplicate/unsorted input keeps its existing sum order
+and validation.
+
+Checkpoint output moves into its owner instead of copying the warm pool twice.
+The immutable, append-only route store needs only a saved prefix length for
+rollback. Terminal separation avoids redundant checkpoint and pool work.
+Column keys now use registered route tags; full ordered paths and resource
+schedules still determine registration. Fractional LP vectors are rejected
+before constructing exact incumbent sums; accepted integer witnesses retain
+their original resource, row and objective validation.
+
+The same 13 chart cases were compared against the preceding numerical build
+on two cores, with one warm-up and three measured runs per binary/case,
+alternating order and sequential execution. A fresh saved-binary comparison
+and a three-binary one-core check also cover R201 rank-one. Medians in seconds:
+
+| Workload | Before | After | Saved October 18 binary, measured today |
+| --- | ---: | ---: | ---: |
+| R201 rank-one, two cores | 7.7510 | 7.2050 | 7.1290 |
+| R201 rank-one, one core | 7.8650 | 7.3365 | 7.2691 |
+| R103 rank-one, two cores | 1.9013 | 1.8307 | — |
+| Geometric mean, 13 two-core cases | 0.8296 | 0.8060 | — |
+
+R201 rank-one takes 7.0% less time on two cores and 6.7% less on one core;
+the two-core suite geometric mean falls 2.8%. This returns R201 near the
+original plot's 7.27s/two-core and 7.46s/one-core times, although the freshly
+measured saved binary remains about 1% faster. No claim of identical
+performance to that executable is made.
+
+All 120 runs pass comparison checks. The 112 before/after CLI JSON outputs
+match exactly outside timers; eight historical runs match histories, routes,
+work counts and LP objectives within `1e-7`. The old binary differs slightly
+in incumbent rounding and lacks explicit bound-mode metadata. Rust tests,
+workspace checks and all 46 Python tests pass. No numerical tolerance, pricing
+heuristic, certificate policy or native build setting changes. Frozen binaries,
+patches, raw outputs, scripts and validation logs are retained locally in
+`results/r201-master-fix-20261019/`.
+
 ## HiGHS master reuse
 
 Local measurement on October 19, 2026: AMD Ryzen 9 9950X, Rust 1.97.1,

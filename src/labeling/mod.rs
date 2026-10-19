@@ -55,12 +55,15 @@ pub struct Route {
 impl Route {
     pub(crate) fn identity(&self) -> String {
         use std::fmt::Write;
-        let mut identity = self
-            .arcs
-            .iter()
-            .map(i32::to_string)
-            .collect::<Vec<_>>()
-            .join(",");
+        let capacity = self.resource_profile.iter().fold(
+            self.arcs.len().saturating_mul(12),
+            |size, state| size.saturating_add(1).saturating_add(state.len().saturating_mul(17)),
+        );
+        let mut identity = String::with_capacity(capacity);
+        for (i, arc) in self.arcs.iter().enumerate() {
+            if i != 0 { identity.push(','); }
+            write!(&mut identity, "{arc}").unwrap();
+        }
         for state in &self.resource_profile {
             identity.push('|');
             for &value in state {
@@ -70,6 +73,31 @@ impl Route {
             }
         }
         identity
+    }
+}
+#[cfg(test)]
+mod identity_tests {
+    use super::*;
+    #[test]
+    fn reserved_identity_preserves_arc_and_schedule_encoding() {
+        use std::fmt::Write;
+        for arcs in [vec![], vec![0], vec![i32::MIN, i32::MAX, -1, 10]] {
+            for resource_profile in [vec![], vec![vec![]],
+                vec![vec![-0., 0., 1., -1., f64::from_bits(1), f64::INFINITY,
+                    f64::from_bits(0x7ff8000000000012)]]] {
+                let route = Route { nodes: vec![], arcs: arcs.clone(), cost: 0., original_cost: 0.,
+                    resources: vec![], resource_profile };
+                let mut expected = arcs.iter().map(i32::to_string).collect::<Vec<_>>().join(",");
+                for state in &route.resource_profile {
+                    expected.push('|');
+                    for &value in state {
+                        let bits = if value == 0. { 0 } else { value.to_bits() };
+                        write!(&mut expected, "{bits:016x},").unwrap();
+                    }
+                }
+                assert_eq!(route.identity(), expected);
+            }
+        }
     }
 }
 #[derive(Clone, Debug, Default)]

@@ -172,17 +172,19 @@ pub(super) fn validated_upper(
     if tags.len() != values.len() {
         return None;
     }
+    // Most LP solutions are fractional. Reject the whole vector before
+    // allocating exact row sums or validating any of its integral routes.
+    if values.iter().any(|&value| {
+        let quantity = value.round();
+        !value.is_finite() || (value - quantity).abs() > 1e-6
+            || quantity < 0. || quantity > 9_007_199_254_740_992.
+    }) {
+        return None;
+    }
     let mut rows: Vec<_> = problem.rows.iter().map(|_| ExactSum::default()).collect();
     let mut objective = ExactSum::default();
     for (&tag, &value) in tags.iter().zip(values) {
         let quantity = value.round();
-        if !value.is_finite()
-            || (value - quantity).abs() > 1e-6
-            || quantity < 0.
-            || quantity > 9_007_199_254_740_992.
-        {
-            return None;
-        }
         if quantity == 0. {
             continue;
         }

@@ -925,6 +925,23 @@ impl LpMaster for ClpMaster {
 }
 
 fn entries_of(entries: &[(usize, f64)], size: usize) -> Result<(Vec<i32>, Vec<f64>)> {
+    // Routing columns and separated rows already have sorted, unique indices.
+    // Validate and copy them directly instead of allocating a tree to sort
+    // and accumulate an incidence that is already canonical.
+    if entries.windows(2).all(|pair| pair[0].0 < pair[1].0) {
+        let mut ids = Vec::with_capacity(entries.len());
+        let mut values = Vec::with_capacity(entries.len());
+        for &(id, value) in entries {
+            if id >= size || id > i32::MAX as usize || !value.is_finite() {
+                return Err(invalid("sparse master entry"));
+            }
+            if value != 0. {
+                ids.push(id as i32);
+                values.push(value);
+            }
+        }
+        return Ok((ids, values));
+    }
     let mut accumulated = std::collections::BTreeMap::new();
     for &(id, value) in entries {
         if id >= size || id > i32::MAX as usize || !value.is_finite() {
@@ -943,6 +960,34 @@ fn entries_of(entries: &[(usize, f64)], size: usize) -> Result<(Vec<i32>, Vec<f6
 #[cfg(test)]
 mod continuation_tests {
     use super::*;
+
+    #[test]
+    fn canonical_sparse_entries_match_tree_accumulation() {
+        fn reference(entries: &[(usize, f64)]) -> (Vec<i32>, Vec<f64>) {
+            let mut sums = std::collections::BTreeMap::new();
+            for &(id, value) in entries { *sums.entry(id).or_insert(0.) += value; }
+            sums.into_iter().filter(|&(_, value)| value != 0.)
+                .map(|(id, value)| (id as i32, value)).unzip()
+        }
+        for code in 0..6561usize {
+            let mut digits = code;
+            let mut entries = vec![];
+            for _ in 0..4 {
+                entries.push((digits % 3, [-1e16, 1., 1e16][digits / 3 % 3]));
+                digits /= 9;
+            }
+            assert_eq!(entries_of(&entries, 3).unwrap(), reference(&entries));
+        }
+        for mask in 0..16 {
+            let entries: Vec<_> = (0..4).filter(|id| mask & (1 << id) != 0)
+                .map(|id| (id, [-0., 1e-30, -2., 1e100][id])).collect();
+            assert_eq!(entries_of(&entries, 4).unwrap(), reference(&entries));
+        }
+        for entries in [vec![(4, 1.)], vec![(usize::MAX, 1.)], vec![(0, f64::NAN)],
+            vec![(0, f64::INFINITY)], vec![(1, 1.), (0, f64::NEG_INFINITY)]] {
+            assert!(entries_of(&entries, 4).is_err());
+        }
+    }
 
     #[test]
     fn clone_preserves_sparse_layout_through_column_insertion() {

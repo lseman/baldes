@@ -1,7 +1,12 @@
 //! Column-generation callbacks and cut separation scheduling.
 use super::*;
 pub(super) struct PricingCheckpoint {
-    pub(super) snapshot: Rc<NodeSnapshot>,
+    master: ClpMaster,
+    row_map: Vec<usize>,
+    cut: CutState,
+    pricing: Solver,
+    incumbent: f64,
+    route_count: usize,
     output: Output,
     previous_fixing_gap: f64,
     enumerated_routes: usize,
@@ -12,6 +17,237 @@ pub(super) struct RootController {
     pub(super) checkpoint: Option<PricingCheckpoint>,
     pub(super) certificate_search: super::certificate::SearchCache,
 }
+
+fn separation_gap_closed(value: f64, incumbent: f64) -> bool {
+    if !incumbent.is_finite() { return false; }
+    let gap = incumbent - value;
+    gap <= value.abs().max(incumbent.abs()) * 1e-10 + 1e-6
+        || gap / incumbent.abs() <= 1e-9
+}
+
+/// Reuse the refreshed integer cut incidence of loaded routes. Base/branch
+/// coefficients stay in their original representation, including tiny values
+/// the LP backend may have dropped. Routing tags are local to this node.
+fn synchronize_pool(
+    pool: &mut [Column],
+    loaded: &[Option<Column>],
+    route_count: usize,
+    base_rows: &[bool],
+    mut refresh: impl FnMut(&mut Column) -> Result<()>,
+) -> Result<()> {
+    let mut by_tag = vec![None; route_count];
+    for current in loaded.iter().flatten() {
+        if let Some(slot) = usize::try_from(current.tag)
+            .ok()
+            .and_then(|tag| by_tag.get_mut(tag))
+        {
+            *slot = Some(current);
+        }
+    }
+    let is_base = |row: usize| base_rows.get(row).copied().unwrap_or(false);
+    for column in pool {
+        if let Some(current) = usize::try_from(column.tag)
+            .ok()
+            .and_then(|tag| by_tag.get(tag))
+            .and_then(|c| *c)
+            .filter(|c| c.identity == column.identity && c.cost == column.cost)
+        {
+            column.entries.retain(|&(row, _)| is_base(row));
+            column.entries.extend(
+                current
+                    .entries
+                    .iter()
+                    .copied()
+                    .filter(|&(row, value)| !is_base(row) && value != 0.),
+            );
+            column.entries.sort_by_key(|&(row, _)| row);
+        } else {
+            refresh(column)?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod synchronization_tests {
+    use super::*;
+
+    fn column(tag: i32) -> Column {
+        Column {
+            tag,
+            cost: 10.,
+            reduced_cost: -1.,
+            acceptable: true,
+            identity: format!("route-{tag}"),
+            entries: vec![(0, 1.), (1, 9.), (2, 1e-30)],
+        }
+    }
+
+    #[test]
+    fn loaded_cut_incidence_preserves_original_base_rows_and_refreshes_unloaded_routes() {
+        let mut current = column(0);
+        current.entries = vec![(0, 1.), (1, 0.), (3, 4.)];
+        let loaded = vec![Some(current.clone()), None];
+        let mut stale_identity = column(0);
+        stale_identity.identity = "different route".into();
+        let mut stale_cost = column(0);
+        stale_cost.cost = 11.;
+        let mut pool = vec![column(0), column(1), stale_identity, stale_cost];
+        let mut refreshed = vec![];
+        synchronize_pool(&mut pool, &loaded, 2, &[true, false, true], |c| {
+            refreshed.push(c.identity.clone());
+            c.entries = vec![(7, 2.)];
+            Ok(())
+        })
+        .unwrap();
+        // Row 2 is a branch row added after cuts; keep its original tiny
+        // coefficient even if the LP dropped it. Row 1's zero is omitted.
+        assert_eq!(pool[0].entries, vec![(0, 1.), (2, 1e-30), (3, 4.)]);
+        assert_eq!(pool[0].reduced_cost, -1.);
+        assert_eq!(refreshed, vec!["route-1", "different route", "route-0"]);
+        assert!(pool[1..].iter().all(|c| c.entries == vec![(7, 2.)]));
+        pool[0].entries[0].1 = 8.;
+        assert_eq!(loaded[0].as_ref().unwrap().entries, current.entries);
+    }
+
+    #[test]
+    fn invalid_route_tags_do_not_bypass_refresh_validation() {
+        for tag in [-1, 10] {
+            let mut pool = vec![column(tag)];
+            let loaded = vec![Some(column(tag))];
+            let result = synchronize_pool(&mut pool, &loaded, 2, &[], |_| {
+                Err(invalid("cached route tag"))
+            });
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn owned_checkpoint_restores_warm_pool_rows_and_routes_after_pricing_timeout() {
+        let mut graph = Graph::new(3, 1).unwrap();
+        for v in 0..3 {
+            graph.set_bounds(v, 0, 0., 10.).unwrap();
+        }
+        graph.add_arc(0, 1, 1.).unwrap();
+        graph.add_arc(1, 2, 1.).unwrap();
+        let problem = RootProblem::set_partitioning(graph, 1.).unwrap();
+        let mut options = RootOptions::default();
+        options.capture_state = true;
+        options.enumerate = false;
+        let result = super::super::solve(problem, options).unwrap();
+        let snapshot = result.snapshot.as_ref().unwrap();
+        let state = Rc::new(RefCell::new(State {
+            solver: snapshot.pricing.fork_for_node(),
+            routes: snapshot.routes.clone(),
+            route_tags: snapshot
+                .routes
+                .iter()
+                .enumerate()
+                .map(|(i, route)| (route.identity(), i as i32))
+                .collect(),
+            incumbent: snapshot.incumbent,
+            enumerate: false,
+            rounded: true,
+            previous_fixing_gap: 42.,
+            deadline: None,
+            pricing_seconds: 0.,
+            cut: snapshot.cut.clone(),
+            fixing_calls: 0,
+            enumerated_routes: 7,
+        }));
+        let problem = Rc::new(snapshot.problem.clone());
+        let mut controller = RootController {
+            problem: problem.clone(),
+            state: state.clone(),
+            checkpoint: None,
+            certificate_search: Default::default(),
+        };
+        let expected_warm = format!("{:?}", result.master.warm_start);
+        struct Legacy { refreshed: bool, saved: bool }
+        impl Controller<ClpMaster> for Legacy {
+            fn refresh_generated_columns(&mut self, _: &mut [Column]) -> Result<()> {
+                self.refreshed = true;
+                Ok(())
+            }
+            fn save_pricing_checkpoint(&mut self, _: &ClpMaster, _: &Output) -> Result<()> {
+                self.saved = true;
+                Ok(())
+            }
+        }
+        let mut legacy = Legacy { refreshed: false, saved: false };
+        legacy.synchronize_generated_columns(&mut [], &[]).unwrap();
+        legacy.store_pricing_checkpoint(&snapshot.master, result.master.clone()).unwrap();
+        assert!(legacy.refreshed && legacy.saved);
+        controller
+            .store_pricing_checkpoint(&snapshot.master, result.master)
+            .unwrap();
+        assert!(state.borrow().solver.rollback_point_saved);
+        let previous_calls = controller.checkpoint.as_ref().unwrap().output.pricing_calls;
+        let mut terminal = controller.checkpoint.as_ref().unwrap().output.clone();
+        terminal.pricing_calls += 1;
+        state.borrow_mut().incumbent = snapshot.master.objective();
+        controller.store_pricing_checkpoint(&snapshot.master, terminal).unwrap();
+        assert_eq!(controller.checkpoint.as_ref().unwrap().output.pricing_calls, previous_calls);
+        {
+            let mut changed = state.borrow_mut();
+            let mut abandoned = changed.routes[0].clone();
+            for profile in abandoned.resource_profile.iter_mut().skip(1) {
+                for value in profile { *value += 0.25; }
+            }
+            for value in &mut abandoned.resources { *value += 0.25; }
+            register(&mut changed, &abandoned).unwrap();
+            changed.cut.rows.push(Some(999));
+            changed.solver.requires_rollback = true;
+            changed.previous_fixing_gap = 99.;
+            changed.enumerated_routes = 0;
+        }
+        problem.row_map.borrow_mut().reverse();
+        let (master, output) = controller
+            .recover_pricing_timeout(crate::incomplete("pricing time limit"))
+            .unwrap();
+        assert_eq!(master.costs, snapshot.master.costs);
+        assert_eq!(master.rhs, snapshot.master.rhs);
+        assert_eq!(master.values, snapshot.master.values);
+        assert_eq!(format!("{:?}", output.warm_start), expected_warm);
+        assert_eq!(
+            *problem.row_map.borrow(),
+            *snapshot.problem.row_map.borrow()
+        );
+        let restored = state.borrow();
+        assert_eq!(
+            format!("{:?}", restored.routes),
+            format!("{:?}", snapshot.routes)
+        );
+        assert_eq!(restored.cut.rows, snapshot.cut.rows);
+        assert_eq!(restored.previous_fixing_gap, 42.);
+        assert_eq!(restored.enumerated_routes, 7);
+        assert!(!restored.solver.requires_rollback);
+        drop(restored);
+        // The restored registry must still distinguish schedules before
+        // assigning their short column identities.
+        let mut restored = state.borrow_mut();
+        let original = restored.routes[0].clone();
+        let original_tag = register(&mut restored, &original).unwrap();
+        let mut waited = original.clone();
+        for profile in waited.resource_profile.iter_mut().skip(1) {
+            for value in profile { *value += 0.25; }
+        }
+        for value in &mut waited.resources { *value += 0.25; }
+        let waited_tag = register(&mut restored, &waited).unwrap();
+        assert_ne!(original_tag, waited_tag);
+        assert_eq!(waited_tag as usize + 1, restored.routes.len());
+        assert_eq!(register(&mut restored, &waited).unwrap(), waited_tag);
+        let first = restored.column(&problem, &original, &master.duals, original_tag).unwrap();
+        let second = restored.column(&problem, &waited, &master.duals, waited_tag).unwrap();
+        assert_ne!(first.identity, second.identity);
+        assert_eq!(first.identity, format!("route:{original_tag}"));
+        assert_eq!(first.entries, second.entries);
+        let mut signed_zero = original.clone();
+        signed_zero.resource_profile[0][0] = -0.;
+        assert_eq!(register(&mut restored, &signed_zero).unwrap(), original_tag);
+    }
+}
+
 impl Controller<ClpMaster> for RootController {
     fn restore_feasible_columns(&mut self, duals: &[f64]) -> Result<Vec<Column>> {
         super::restoration::columns(&self.problem, &mut self.state.borrow_mut(), duals)
@@ -23,27 +259,37 @@ impl Controller<ClpMaster> for RootController {
         Ok(Some(bound.unwrap_or(f64::NEG_INFINITY)))
     }
     fn save_pricing_checkpoint(&mut self, master: &ClpMaster, output: &Output) -> Result<()> {
+        self.store_pricing_checkpoint(master, output.clone())
+    }
+    fn store_pricing_checkpoint(&mut self, master: &ClpMaster, output: Output) -> Result<()> {
         let mut state = self.state.borrow_mut();
+        // Separation returns without changing the formulation at a closed
+        // incumbent gap. Keep the previous rollback point; no new pricing
+        // transaction can start from this terminal point.
+        if self.checkpoint.is_some() && separation_gap_closed(master.objective(), state.incumbent) {
+            return Ok(());
+        }
         let mut pricing = state.solver.fork_for_node();
         pricing.rollback_point_saved = false;
         pricing.requires_rollback = false;
-        let snapshot = Rc::new(NodeSnapshot {
+        self.checkpoint = Some(PricingCheckpoint {
             master: master.try_clone()?,
-            problem: (*self.problem).clone(),
+            row_map: self.problem.row_map.borrow().clone(),
             cut: state.cut.clone(),
             pricing,
             incumbent: state.incumbent,
-            routes: state.routes.clone(),
-            warm: output.warm_start.clone(),
-        });
-        self.checkpoint = Some(PricingCheckpoint {
-            snapshot, output: output.clone(),
+            // Routes are immutable after registration and only appended.
+            // Rollback therefore needs a prefix length, not a deep copy of
+            // every resource schedule in the route store.
+            route_count: state.routes.len(),
+            output,
             previous_fixing_gap: state.previous_fixing_gap,
             enumerated_routes: state.enumerated_routes,
         });
         state.solver.rollback_point_saved = true;
         Ok(())
     }
+
     fn unstabilized_rows(&self) -> Vec<usize> {
         let map = self.problem.row_map.borrow();
         std::iter::once(map[0])
@@ -90,6 +336,31 @@ impl Controller<ClpMaster> for RootController {
         }
         Ok(())
     }
+    fn synchronize_generated_columns(
+        &mut self,
+        pool: &mut [Column],
+        loaded: &[Option<Column>],
+    ) -> Result<()> {
+        let state = self.state.borrow();
+        // Scaled knapsack coefficients need not survive the backend's small
+        // element threshold. Reconstruct them from their original scales.
+        if state.cut.knapsack_rows.iter().any(Option::is_some) {
+            drop(state);
+            return self.refresh_generated_columns(pool);
+        }
+        let route_count = state.routes.len();
+        drop(state);
+        let map = self.problem.row_map.borrow();
+        let mut base_rows = vec![false; map.iter().max().map_or(0, |r| r + 1)];
+        for &row in map.iter() {
+            base_rows[row] = true;
+        }
+        drop(map);
+        synchronize_pool(pool, loaded, route_count, &base_rows, |column| {
+            self.refresh_generated_columns(std::slice::from_mut(column))
+        })
+    }
+
     fn enumerated_universe(&mut self, duals: &[f64], bound: f64) -> Result<Option<Vec<Column>>> {
         let mut state = self.state.borrow_mut();
         if !state.enumerate || !bound.is_finite() {
@@ -336,13 +607,8 @@ impl Controller<ClpMaster> for RootController {
         state.cut.separation_lp = value;
         // Each cut round first checks gapSmallerThanTol: separation stops once
         // the bound reaches the incumbent (absolute 1e-6, relative 1e-9).
-        if state.incumbent.is_finite() {
-            let gap = state.incumbent - value;
-            if gap <= value.abs().max(state.incumbent.abs()) * 1e-10 + 1e-6
-                || gap / state.incumbent.abs() <= 1e-9
-            {
-                return Ok(0);
-            }
+        if separation_gap_closed(value, state.incumbent) {
+            return Ok(0);
         }
         let values = master.values().to_vec();
         let tagged: Vec<(usize, usize)> = tags
@@ -446,20 +712,21 @@ impl RootController {
         let Some(checkpoint) = &self.checkpoint else {
             return Err(error);
         };
-        let snapshot = &checkpoint.snapshot;
+        if self.state.borrow().routes.len() < checkpoint.route_count {
+            return Err(error);
+        }
         // Clone before replacing any state so a failed allocation cannot partially restore it.
-        let master = snapshot.master.try_clone()?;
-        let pricing = snapshot.pricing.fork_for_node();
+        let master = checkpoint.master.try_clone()?;
+        let pricing = checkpoint.pricing.fork_for_node();
         let mut state = self.state.borrow_mut();
-        state.incumbent = state.incumbent.min(snapshot.incumbent);
-        state.cut = snapshot.cut.clone();
+        state.incumbent = state.incumbent.min(checkpoint.incumbent);
+        state.cut = checkpoint.cut.clone();
         state.solver = pricing;
-        state.routes = snapshot.routes.clone();
+        state.routes.truncate(checkpoint.route_count);
         state.previous_fixing_gap = checkpoint.previous_fixing_gap;
         state.enumerated_routes = checkpoint.enumerated_routes;
-        state.route_tags = state.routes.iter().enumerate()
-            .map(|(i, route)| (route.identity(), i as i32)).collect();
-        *self.problem.row_map.borrow_mut() = snapshot.problem.row_map.borrow().clone();
+        state.route_tags.retain(|_, tag| *tag >= 0 && (*tag as usize) < checkpoint.route_count);
+        *self.problem.row_map.borrow_mut() = checkpoint.row_map.clone();
         Ok((master, checkpoint.output.clone()))
     }
     fn fixed_rank_one(&self, state: &State, index: usize) -> Result<f64> {
