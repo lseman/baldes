@@ -65,7 +65,9 @@ pub(super) fn record_solution(
     {
         return false;
     }
-    let cost = routes.iter().map(|r| r.original_cost).sum::<f64>();
+    let Some(cost) = problem.unit_route_incumbent(&routes) else {
+        return false;
+    };
     if cost < output.incumbent {
         output.incumbent = cost;
         output.routes = routes;
@@ -152,6 +154,7 @@ pub(super) fn run(
             output.diving_nodes += 1;
             match evaluate(
                 dive.result.snapshot.as_ref(),
+                None,
                 problem,
                 &branches,
                 pool,

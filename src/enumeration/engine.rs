@@ -6,6 +6,7 @@ pub struct Enumeration {
     pub paths: PathStorage,
     pub completed: bool,
     pub generated: usize,
+    pub pruning: PruningFrontier,
 }
 impl Enumeration {
     /// Abort without publishing a partial universe. Existing successful path
@@ -22,6 +23,7 @@ impl Enumeration {
         }
         let mut labels = Storage::new(controls.partitions)?;
         labels.preserve_arc_paths = controls.preserve_arc_paths;
+        let mut pruning = PruningFrontier::for_run(controls.preserve_arc_paths);
         let mut paths = PathStorage::new(controls.partitions)?;
         paths.preserve_arc_paths = controls.preserve_arc_paths;
         let started = Instant::now();
@@ -119,6 +121,7 @@ impl Enumeration {
                             c.join(g, false, &next, &empty, (next.reduced_cost + 0.0) + 0.0);
                     }
                     if next.reduced_cost > controls.cutoff - EPSILON {
+                        pruning.terminal(next.reduced_cost);
                         continue;
                     }
                     let mut arcs = vec![arc.physical];
@@ -152,6 +155,7 @@ impl Enumeration {
             paths,
             completed: true,
             generated,
+            pruning,
         })
     }
 }
@@ -180,7 +184,9 @@ impl Enumeration {
                 .ok_or_else(|| invalid("nonconservative reduced costs cannot use symmetric enumeration"))?;
             let mut transformed = g.clone();
             for (arc,cost) in transformed.arcs.iter_mut().zip(costs) { arc.reduced_cost=cost; }
-            return Self::run_with_symmetry(&transformed,grid,controls,reverse,cuts,completion);
+            let mut result = Self::run_with_symmetry(&transformed,grid,controls,reverse,cuts,completion)?;
+            result.pruning.symmetry_transformed = true;
+            return Ok(result);
         }
         let depot_mask = crate::graph::symmetry::depot_mask(g);
         if (!consumption && grid.backward.buckets.is_empty()) || grid.resource_slots.is_empty() {
@@ -195,6 +201,7 @@ impl Enumeration {
         let mut backward = Storage::new(controls.partitions)?;
         forward.preserve_arc_paths = controls.preserve_arc_paths;
         backward.preserve_arc_paths = controls.preserve_arc_paths;
+        let mut pruning = PruningFrontier::for_run(controls.preserve_arc_paths);
         let mut paths = PathStorage::new(controls.partitions)?;
         paths.preserve_arc_paths = controls.preserve_arc_paths;
         let mut crossing = vec![vec![]; g.vertices.len()];
@@ -306,11 +313,18 @@ impl Enumeration {
                     }
                     let terminal = next.vertex == if direction { g.sink } else { g.source };
                     if !terminal {
+                        // Do not project an already non-elementary prefix into
+                        // completion. Keep the candidate vertex out of the NG
+                        // projection until the callback has accepted it.
+                        if !next.can_add_elements(&g.vertices[next.vertex].elements) {
+                            continue;
+                        }
                         let before = grid.coordinate(q)[0] <= grid.middle + EPSILON;
                         if !direction && before {
                             continue;
                         }
                         if !completion(direction, &next) {
+                            pruning.completion_rejections += 1;
                             continue;
                         }
                         if direction && !before {
@@ -349,8 +363,11 @@ impl Enumeration {
                             .iter()
                             .zip(&terminal_root.visited)
                             .any(|(a, b)| a & b != 0)
-                            || next.reduced_cost > controls.cutoff - EPSILON
                         {
+                            continue;
+                        }
+                        if next.reduced_cost > controls.cutoff - EPSILON {
+                            pruning.terminal(next.reduced_cost);
                             continue;
                         }
                         if !next.add_elements(&g.vertices[terminal_root.vertex].elements) {
@@ -417,6 +434,16 @@ impl Enumeration {
                     .unwrap_or(0.0),
             )
         };
+        // A full-memory join can reduce the sum of the label keys. Include
+        // every possible negative field correction before pruning the sorted
+        // opposite labels; otherwise improving cut contributions lose routes.
+        let minimum_cut_join = cuts.map_or(0., |c| {
+            c.full
+                .fields
+                .iter()
+                .map(|f| (if f.covering { -f.cost } else { f.cost }).min(0.))
+                .sum::<f64>()
+        });
         for row in &mut buckets {
             for bucket in row {
                 bucket.sort_by(|&a, &b| {
@@ -443,7 +470,9 @@ impl Enumeration {
                     let key = label_key(f);
                     for &id in &buckets[vertex][bucket] {
                         let b = &opposite.arena[id];
-                        if key + label_key(b) > controls.cutoff - EPSILON {
+                        let ordered_bound = key + label_key(b) + minimum_cut_join;
+                        if ordered_bound > controls.cutoff - EPSILON {
+                            pruning.ordered(ordered_bound);
                             break;
                         }
                         let cost = match &cuts {
@@ -457,6 +486,7 @@ impl Enumeration {
                             None => f.reduced_cost + b.reduced_cost,
                         };
                         if cost > controls.cutoff - EPSILON {
+                            pruning.joined(cost);
                             continue;
                         }
                         if controls
@@ -556,6 +586,7 @@ impl Enumeration {
             paths,
             completed: true,
             generated,
+            pruning,
         })
     }
 }

@@ -246,6 +246,9 @@ pub(super) fn infeasible_output(report: Report, started: std::time::Instant) -> 
             pruned_by_bound: false,
             cut_rounds: 0,
             warm_start: column_generation::WarmStart {
+                bound: f64::NEG_INFINITY,
+                stabilization: None,
+                generated_pool: vec![],
                 columns: vec![],
                 artificials: vec![],
                 cut_artificials: vec![],

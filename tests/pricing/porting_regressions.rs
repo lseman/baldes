@@ -1,4 +1,4 @@
-//! Independent checks for the verification backlog in PORTING.md.
+//! Independent pricing and enumeration regression checks.
 use baldes::{pricing::Solver, Graph, Route};
 use std::collections::BTreeMap;
 

@@ -20,19 +20,26 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 mod controller;
+mod domain;
+pub use domain::{CanonicalCoverRelaxation, ConservativeCoverRelaxation, CoverDomainFailure};
+mod cover_rows;
+pub use cover_rows::{CoverRowAudit, CoverRowFailure, CoverRowLimits, CoverRowRange};
+mod incumbent;
+#[cfg(test)]
+mod checkpoint_tests;
 mod integer;
 pub use integer::{EnumeratedMipOutput, EnumerationMipPolicy};
 mod options;
-mod problem;
-mod preprocessing;
 mod partial;
-pub use partial::{inherit_fixed_routes, FixedRoute};
+mod preprocessing;
+mod problem;
 use controller::RootController;
 use options::RootKPathSeparator;
 pub use options::{
     CapacityCutConfig, CutOptions, KPathCutConfig, KnapsackCutConfig, NativeKPathCutConfig,
     RootOptions,
 };
+pub use partial::{inherit_fixed_routes, FixedRoute};
 pub use problem::{RootProblem, Row};
 
 #[derive(Debug)]
@@ -113,6 +120,12 @@ impl NodeSnapshot {
             .fold(penalty, f64::max);
         for constraint in branches {
             constraint.validate(&problem)?;
+            if problem.tighten_vehicle_upper(constraint)? {
+                let mut rhs = master.rhs.clone();
+                rhs[problem.row_map.borrow()[0]] = problem.rows[0].rhs;
+                master.set_rhs(&rhs)?;
+                continue;
+            }
             let (sense, mut rhs) = constraint.row();
             rhs -= problem.fixed_sum(|route| Ok(constraint.coefficient(&problem, route)))?;
             let mut entries = vec![];
@@ -131,6 +144,13 @@ impl NodeSnapshot {
                 let coefficient = constraint.coefficient(&problem, route);
                 if coefficient != 0. {
                     entries.push((c, coefficient));
+                    column.entries.push((master.rhs.len(), coefficient));
+                }
+            }
+            for column in &mut warm.generated_pool {
+                let route = &self.routes[column.tag as usize];
+                let coefficient = constraint.coefficient(&problem, route);
+                if coefficient != 0. {
                     column.entries.push((master.rhs.len(), coefficient));
                 }
             }
@@ -260,7 +280,7 @@ struct State {
     solver: Solver,
     routes: Vec<Route>,
     /// Arc sequence -> tag of each entry in `routes`.
-    route_tags: std::collections::HashMap<Vec<i32>, i32>,
+    route_tags: std::collections::HashMap<String, i32>,
     incumbent: f64,
     enumerate: bool,
     rounded: bool,
@@ -320,15 +340,8 @@ impl State {
             entries,
             acceptable: true,
             tag,
-            // The route's arcs in path order: NG routes with the same arcs in
-            // another order (a cycle traversed in reverse) are distinct columns,
-            // and can have different rank-one coefficients.
-            identity: route
-                .arcs
-                .iter()
-                .map(i32::to_string)
-                .collect::<Vec<_>>()
-                .join(","),
+            // Preserve both ordered arcs and the recorded resource schedule.
+            identity: route.identity(),
         })
     }
     /// cache_costs: arc reduced costs and the rounded cut duals, active cuts
@@ -373,12 +386,13 @@ impl State {
 }
 /// Tag of `route`, the index of the first registered route with its arcs.
 fn register(state: &mut State, route: &Route) -> Result<i32> {
-    if let Some(&tag) = state.route_tags.get(&route.arcs) {
+    let identity = route.identity();
+    if let Some(&tag) = state.route_tags.get(&identity) {
         return Ok(tag);
     }
     let id = i32::try_from(state.routes.len()).map_err(|_| invalid("route tag overflow"))?;
     state.routes.push(route.clone());
-    state.route_tags.insert(route.arcs.clone(), id);
+    state.route_tags.insert(identity, id);
     Ok(id)
 }
 pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutput> {
@@ -399,12 +413,36 @@ pub fn inherit(
 pub fn inherit_branches(
     parent: &NodeSnapshot,
     branches: &[BranchConstraint],
+    options: RootOptions,
+) -> Result<RootOutput> {
+    inherit_with_history(parent, branches, None, options)
+}
+pub(crate) fn inherit_with_history(
+    parent: &NodeSnapshot,
+    branches: &[BranchConstraint],
+    previous: Option<&NodeSnapshot>,
     mut options: RootOptions,
 ) -> Result<RootOutput> {
     options.node_depth = options
         .node_depth
         .max(parent.branch_depth() + branches.len());
-    let (problem, master, warm) = parent.fork(branches, options.cg.artificial_cost)?;
+    let (problem, mut master, warm) = parent.fork(branches, options.cg.artificial_cost)?;
+    // Penalty escalation belongs to an evaluation, not to the inherited node.
+    // Start each child with the configured penalty, including cut artificials.
+    for &column in &warm.artificials {
+        master.set_cost(column, options.cg.artificial_cost)?;
+    }
+    if let Some(previous) = previous {
+        // Restore costs on a copy before checking compatibility, retaining the
+        // preceding sibling's simplex state when only its penalties changed.
+        let mut continued = previous.master.try_clone()?;
+        for &column in &warm.artificials {
+            if column < continued.costs.len() {
+                continued.set_cost(column, master.costs[column])?;
+            }
+        }
+        master.continue_from(&continued)?;
+    }
     solve_seeded(problem, options, Some((parent, master, warm)))
 }
 fn solve_seeded(
@@ -413,7 +451,18 @@ fn solve_seeded(
     seed: Option<(&NodeSnapshot, ClpMaster, column_generation::WarmStart)>,
 ) -> Result<RootOutput> {
     options.normalize_pricing_options()?;
-    if !problem.fixed_routes.is_empty() {
+    if !problem.fixed_routes.is_empty()
+        || problem.branch_constraints.iter().any(|(row, branch)| {
+            *row == 0
+                && matches!(
+                    branch,
+                    BranchConstraint::NumberOfVehicles {
+                        sense: RowSense::LessEqual,
+                        ..
+                    }
+                )
+        })
+    {
         options.cg.multiplicity = problem.rows[0].rhs.max(0.);
     }
     let solve_started = std::time::Instant::now();
@@ -429,8 +478,11 @@ fn solve_seeded(
     if preprocessing.infeasible {
         let mut output = preprocessing::infeasible_output(preprocessing, solve_started);
         output.fixed_cost = problem.fixed_cost();
-        output.fixed_routes = problem.fixed_routes.iter()
-            .map(|(r, q)| (r.clone(), f64::from(*q))).collect();
+        output.fixed_routes = problem
+            .fixed_routes
+            .iter()
+            .map(|(r, q)| (r.clone(), f64::from(*q)))
+            .collect();
         output.inherited_cuts = seed.as_ref().map_or(0, |(saved, _, _)| saved.active_cuts());
         return Ok(output);
     }
@@ -455,6 +507,8 @@ fn solve_seeded(
         solver.graph = problem.graph.clone();
         solver
     };
+    solver.rollback_point_saved = false;
+    solver.requires_rollback = false;
     if new_fixed {
         // Parent fixing/enumeration may cover only improvements below its old
         // incumbent. A fixed-node solve starts a fresh complete pricing domain.
@@ -480,15 +534,23 @@ fn solve_seeded(
             })
             .collect(),
     )?;
-    solver.set_forbidden_arcs(arc_bounds.iter().enumerate()
-        .filter_map(|(a, b)| (b.upper <= 0.).then_some(a)).collect())?;
+    solver.set_forbidden_arcs(
+        arc_bounds
+            .iter()
+            .enumerate()
+            .filter_map(|(a, b)| (b.upper <= 0.).then_some(a))
+            .collect(),
+    )?;
     if let Some(warm) = options.cg.warm_start.as_ref() {
         if let Some(saved) = saved {
             for (c, column) in warm.columns.iter().enumerate() {
                 if let Some(column) = column {
                     let route = &saved.routes[column.tag as usize];
-                    if route.arcs.iter().any(|&id| problem.arc_position(id)
-                        .is_some_and(|a| arc_bounds[a].upper <= 0.)) {
+                    if route.arcs.iter().any(|&id| {
+                        problem
+                            .arc_position(id)
+                            .is_some_and(|a| arc_bounds[a].upper <= 0.)
+                    }) {
                         master.set_upper(c, 0.)?;
                     }
                 }
@@ -635,7 +697,7 @@ fn solve_seeded(
             s.routes
                 .iter()
                 .enumerate()
-                .map(|(i, r)| (r.arcs.clone(), i as i32))
+                .map(|(i, r)| (r.identity(), i as i32))
                 .collect()
         }),
         incumbent: if new_fixed {
@@ -724,8 +786,13 @@ fn solve_seeded(
             w.columns.iter().flatten().map(|c| c.tag).collect()
         });
     for route in &options.initial_routes {
-        if route.arcs.iter().any(|&id| problem.arc_position(id)
-            .is_some_and(|a| arc_bounds[a].upper <= 0.)) { continue; }
+        if route.arcs.iter().any(|&id| {
+            problem
+                .arc_position(id)
+                .is_some_and(|a| arc_bounds[a].upper <= 0.)
+        }) {
+            continue;
+        }
         let mut s = state.borrow_mut();
         if s.solver
             .ryan_foster
@@ -750,6 +817,7 @@ fn solve_seeded(
     let mut controller = RootController {
         problem: problem.clone(),
         state: state.clone(),
+        checkpoint: None,
     };
     let initial_rows = options
         .cg
@@ -758,7 +826,15 @@ fn solve_seeded(
         .map_or(problem.rows.len(), |w| w.initial_rows);
     let capture_state = options.capture_state;
     let inherited_cuts = saved.map_or(0, |s| s.active_cuts());
-    let mut output = column_generation::optimize::<ClpMaster, _, _>(
+    let mut pricing_attempts = 0;
+    if let Some(deadline) = state.borrow().deadline {
+        // Preparation has already consumed part of the root budget. CG and
+        // each backend solve must share the pricing callback's same deadline.
+        options.cg.time_limit = options.cg.time_limit.min(
+            deadline.saturating_duration_since(std::time::Instant::now()),
+        );
+    }
+    let optimized = column_generation::optimize::<ClpMaster, _, _>(
         &mut master,
         &schedule,
         |phase, duals| {
@@ -770,11 +846,18 @@ fn solve_seeded(
             let remaining = state.remaining_time()?;
             let saved_time = state.solver.controls.time_limit;
             state.solver.controls.time_limit = saved_time.min(remaining);
+            pricing_attempts += 1;
             let result = state
                 .solver
                 .price_phase(phase + phase_floor, maximum, false);
             state.solver.controls.time_limit = saved_time;
-            let result = result?;
+            let result = match result {
+                Ok(result) => result,
+                Err(error) => {
+                    state.pricing_seconds += pricing_started.elapsed().as_secs_f64();
+                    return Err(error);
+                }
+            };
             let mut columns = vec![];
             let mut minimum = result.minimum_reduced_cost + offset;
             let mut corrected = 0.;
@@ -822,7 +905,16 @@ fn solve_seeded(
         },
         &mut controller,
         options.cg,
-    )?;
+    );
+    let mut output = match optimized {
+        Ok(output) => output,
+        Err(error) => {
+            let (restored, mut output) = controller.recover_pricing_timeout(error)?;
+            master = restored;
+            output.pricing_calls = pricing_attempts;
+            output
+        }
+    };
     output.warm_start.initial_rows = initial_rows;
     let state = state.borrow();
     // Extract values, duals and simplex iterations before moving master into snapshot.
@@ -842,8 +934,11 @@ fn solve_seeded(
     });
     Ok(RootOutput {
         fixed_cost: problem.fixed_cost(),
-        fixed_routes: problem.fixed_routes.iter()
-            .map(|(r, q)| (r.clone(), f64::from(*q))).collect(),
+        fixed_routes: problem
+            .fixed_routes
+            .iter()
+            .map(|(r, q)| (r.clone(), f64::from(*q)))
+            .collect(),
         preprocessing,
         snapshot,
         simplex_iterations,

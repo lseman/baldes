@@ -1,5 +1,8 @@
 //! Completed route storage and equivalence classes.
 use super::*;
+// Native retained-path export uses this hash domain; dominance storage can
+// choose a smaller partition count independently.
+const EXPORT_PARTITIONS: u32 = 2_000_000;
 #[derive(Clone, Debug)]
 pub struct Path {
     pub reduced_cost: f64,
@@ -16,6 +19,10 @@ pub struct PathStorage {
     /// Arc-flow branching distinguishes orderings of the same customer set.
     pub(super) preserve_arc_paths: bool,
     arc_identities: HashSet<Vec<usize>>,
+    export_partitions: Vec<u32>,
+    export_ranks: std::collections::HashMap<u32, usize>,
+    path_order: std::collections::HashMap<Vec<usize>, usize>,
+    next_path: usize,
 }
 impl PathStorage {
     pub fn new(partitions: usize) -> Result<Self> {
@@ -28,14 +35,26 @@ impl PathStorage {
             checks: 0,
             preserve_arc_paths: false,
             arc_identities: HashSet::new(),
+            export_partitions: vec![],
+            export_ranks: std::collections::HashMap::new(),
+            path_order: std::collections::HashMap::new(),
+            next_path: 0,
         })
     }
     pub fn insert(&mut self, path: Path) -> bool {
+        let export_partition = path.element_hash % EXPORT_PARTITIONS;
+        if !self.export_ranks.contains_key(&export_partition) {
+            self.export_ranks
+                .insert(export_partition, self.export_partitions.len());
+            self.export_partitions.push(export_partition);
+        }
         let partition = path.element_hash as usize % self.partitions.len();
         if self.preserve_arc_paths {
             if !self.arc_identities.insert(path.arcs.clone()) {
                 return false;
             }
+            self.path_order.insert(path.arcs.clone(), self.next_path);
+            self.next_path += 1;
             self.partitions[partition].push(path);
             self.len += 1;
             return true;
@@ -53,10 +72,17 @@ impl PathStorage {
         let before = row.len();
         row.retain(|p| {
             self.checks += 1;
-            p.visited != path.visited
+            if p.visited == path.visited {
+                self.path_order.remove(&p.arcs);
+                false
+            } else {
+                true
+            }
         });
         self.len -= before - row.len();
         let at = row.partition_point(|p| p.original_cost <= path.original_cost + EPSILON);
+        self.path_order.insert(path.arcs.clone(), self.next_path);
+        self.next_path += 1;
         row.insert(at, path);
         self.len += 1;
         true
@@ -114,6 +140,7 @@ impl PathStorage {
             row.retain(|p| p.reduced_cost < cutoff);
         }
         self.len = self.partitions.iter().map(Vec::len).sum();
+        self.retain_path_order();
         if self.preserve_arc_paths {
             self.arc_identities = self
                 .partitions
@@ -129,6 +156,7 @@ impl PathStorage {
             partition.retain(&mut keep);
         }
         self.len = self.partitions.iter().map(Vec::len).sum();
+        self.retain_path_order();
         if self.preserve_arc_paths {
             self.arc_identities = self
                 .partitions
@@ -139,18 +167,33 @@ impl PathStorage {
         }
     }
     pub fn routes(&self, g: &Graph) -> Result<Vec<Route>> {
+        // Native export visits hash partitions in activation order, then
+        // their candidates in original-cost insertion order. Dominance may
+        // use fewer physical partitions without changing this path index.
+        let mut paths: Vec<_> = self.partitions.iter().flatten().collect();
+        paths.sort_unstable_by_key(|path| self.path_order[&path.arcs]);
+        let mut ordered: Vec<Vec<&Path>> = vec![vec![]; self.export_partitions.len()];
+        for path in paths {
+            let partition = self.export_ranks[&(path.element_hash % EXPORT_PARTITIONS)];
+            let row = &mut ordered[partition];
+            let position = row
+                .partition_point(|previous| previous.original_cost <= path.original_cost + EPSILON);
+            row.insert(position, path);
+        }
         let mut result = vec![];
-        for path in self.partitions.iter().flatten() {
+        for path in ordered.into_iter().flatten() {
             let mut q = [0.; 2];
             for r in 0..g.resources.len() {
                 q[r] = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower);
             }
             let mut nodes = vec![g.source as i32];
+            let mut resource_profile = vec![q[..g.resources.len()].to_vec()];
             for &id in &path.arcs {
                 let a = &g.arcs[id];
                 q = extend_resources(g, a, q, true)
                     .ok_or_else(|| invalid("enumerated route is no longer resource feasible"))?;
                 nodes.push(a.head as i32);
+                resource_profile.push(q[..g.resources.len()].to_vec());
             }
             result.push(Route {
                 nodes,
@@ -158,8 +201,66 @@ impl PathStorage {
                 cost: path.reduced_cost,
                 original_cost: path.original_cost,
                 resources: q[..g.resources.len()].to_vec(),
+                resource_profile,
             });
         }
         Ok(result)
+    }
+    fn retain_path_order(&mut self) {
+        let live: HashSet<_> = self
+            .partitions
+            .iter()
+            .flatten()
+            .map(|path| path.arcs.as_slice())
+            .collect();
+        self.path_order
+            .retain(|arcs, _| live.contains(arcs.as_slice()));
+    }
+}
+
+#[cfg(test)]
+mod order_tests {
+    use super::*;
+
+    #[test]
+    fn export_order_survives_partition_tuning_replacement_retention_and_forks() {
+        let mut graph = Graph::new(4, 1).unwrap();
+        for (tail, head, cost) in [(0, 1, 1.), (1, 3, 1.), (0, 2, 2.), (2, 3, 2.), (1, 2, 1.)] {
+            graph.add_arc(tail, head, cost).unwrap();
+        }
+        for count in [1, 8] {
+            let mut storage = PathStorage::new(count).unwrap();
+            let make = |arcs: Vec<usize>, hash, visited, cost| {
+                let mut bits = [0; 16];
+                bits[0] = visited;
+                Path {
+                    arcs,
+                    element_hash: hash,
+                    visited: bits,
+                    original_cost: cost,
+                    reduced_cost: cost,
+                }
+            };
+            storage.insert(make(vec![0, 1], 1, 2, 2.));
+            storage.insert(make(vec![2, 3], 0, 1, 4.));
+            storage.insert(make(vec![0, 4, 3], 1, 3, 4.));
+            let paths = |s: &PathStorage| {
+                s.routes(&graph)
+                    .unwrap()
+                    .into_iter()
+                    .map(|r| r.arcs)
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(paths(&storage), [vec![0, 1], vec![0, 4, 3], vec![2, 3]]);
+            let mut child = storage.clone();
+            child.retain(|p| p.arcs != [0, 1]);
+            assert_eq!(paths(&child), [vec![0, 4, 3], vec![2, 3]]);
+            assert!(child.insert(make(vec![0, 4, 3], 1, 3, 3.5)));
+            assert_eq!(paths(&child), [vec![0, 4, 3], vec![2, 3]]);
+            assert_eq!(paths(&storage).len(), 3);
+            child.inspect(&graph, 3., &[], &[]).unwrap();
+            assert!(paths(&child).is_empty());
+            assert!(child.path_order.is_empty());
+        }
     }
 }

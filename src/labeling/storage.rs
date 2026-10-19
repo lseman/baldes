@@ -16,7 +16,7 @@ impl LabelInput for &StoredLabel {
     #[inline(always)] fn label(&self) -> &StoredLabel { self }
     #[inline(always)] fn into_label(self) -> StoredLabel { self.clone() }
 }
-use super::{Statistics, EPSILON};
+use super::{equality_resource_dominates, Statistics, EPSILON};
 use crate::cuts::state::{packed_dominate, DominanceDescriptor, LIMITED_WORDS};
 use crate::graph::buckets::BucketId;
 use crate::graph::{Graph, ResourceKind};
@@ -165,7 +165,7 @@ impl HotColumns {
             for (r, x) in [r0, r1].into_iter().enumerate().take(RESOURCES) {
                 let candidate = if r == 0 { candidate_r0 } else { candidate_r1 };
                 let (a, b) = if PREFIX { (x, candidate) } else { (candidate, x) };
-                pass &= if FORWARD { a <= b + EPSILON } else { b <= a + EPSILON };
+                pass &= if FORWARD { a <= b + EPSILON } else { b - EPSILON <= a };
             }
             if NG {
                 let (a, b) = if PREFIX { (ng, candidate_ng) } else { (candidate_ng, ng) };
@@ -333,10 +333,10 @@ impl LabelStorage {
                 if forward {
                     a.resources[r] <= b.resources[r] + EPSILON
                 } else {
-                    b.resources[r] <= a.resources[r] + EPSILON
+                    b.resources[r] - EPSILON <= a.resources[r]
                 }
             }
-            ResourceKind::Equality => (a.resources[r] - b.resources[r]).abs() <= EPSILON,
+            ResourceKind::Equality => equality_resource_dominates(a.resources[r], b.resources[r]),
         }) {
             return false;
         }
@@ -655,6 +655,162 @@ mod tests {
         check!(false, true);
         check!(false, false);
     }
+    #[test]
+    fn backward_disposable_dominance_subtracts_before_comparing() {
+        let graph = Graph::new(3, 1).unwrap();
+        let a = HotLabel {
+            key: -1.,
+            cost: -1.,
+            additional_cost: 0.,
+            resources: [-EPSILON, 0.],
+            hops: 1,
+            ng: 0,
+        };
+        let b = HotLabel {
+            resources: [f64::from_bits(1), 0.],
+            ..a
+        };
+        assert!(LabelStorage::dominates_hot(
+            &graph,
+            &a,
+            &b,
+            false,
+            InsertionTest::Resources,
+            false,
+            &[],
+            || panic!("unexpected cut state")
+        ));
+        let mut prefix = HotColumns::default();
+        let mut suffix = HotColumns::default();
+        for i in 0..9 {
+            prefix.push(if i == 8 {
+                a
+            } else {
+                HotLabel {
+                    resources: [-100., 0.],
+                    ..a
+                }
+            });
+            suffix.push(if i == 8 {
+                b
+            } else {
+                HotLabel {
+                    resources: [100., 0.],
+                    ..b
+                }
+            });
+        }
+        assert_eq!(
+            prefix.next_candidate::<true, false, 1, false>(0, 0., b.resources[0], 0., 0),
+            8
+        );
+        assert_eq!(
+            suffix.next_candidate::<false, false, 1, false>(0, 0., a.resources[0], 0., 0),
+            8
+        );
+    }
+
+    #[test]
+    fn equality_dominance_retains_binary_interval_endpoints() {
+        let mut graph = Graph::new(3, 1).unwrap();
+        graph.resources[0] = ResourceKind::Equality;
+        let make = |resource, cost| StoredLabel {
+            id: 0,
+            local_id: 0,
+            bucket: BucketId {
+                vertex: 1,
+                bucket: 0,
+            },
+            vertex: 1,
+            cost,
+            original_cost: cost,
+            resources: [resource, 0.],
+            ng: 0,
+            branch_state: None,
+            parent: None,
+            arc: None,
+            hops: 1,
+            expanded: true,
+            cut_words: [0; LIMITED_WORDS],
+            additional_cost: 0.,
+            half_potential: 0.,
+        };
+        for forward in [true, false] {
+            for test in [
+                InsertionTest::Full,
+                InsertionTest::ResourcesAndCost,
+                InsertionTest::ResourcesAndNg,
+                InsertionTest::Resources,
+            ] {
+                // These three pairs are accepted by the binary, but rejected
+                // by abs(a-b) <= EPSILON because subtraction rounds differently.
+                for (a, b) in [
+                    (1., 1. - EPSILON),
+                    (1e6, 1e6 - EPSILON),
+                    (1e6, 1e6 + EPSILON),
+                ] {
+                    let mut storage = LabelStorage::new([1, 1, 1]);
+                    let mut stats = Statistics::default();
+                    assert!(storage.insert(
+                        &graph,
+                        make(a, -1.),
+                        forward,
+                        test,
+                        10,
+                        false,
+                        &[],
+                        &mut stats
+                    ));
+                    assert!(
+                        !storage.insert(
+                            &graph,
+                            make(b, 0.),
+                            forward,
+                            test,
+                            10,
+                            false,
+                            &[],
+                            &mut stats
+                        ),
+                        "forward={forward} test={test:?} a={a} b={b}"
+                    );
+                    assert_eq!(storage.buckets[1][0].active.len(), 1);
+                    assert_eq!(storage.buckets[1][0].next_id, 1);
+
+                    // Exercise removal as well as rejection, and the archive
+                    // path for already expanded resource-only predecessors.
+                    let mut storage = LabelStorage::new([1, 1, 1]);
+                    assert!(storage.insert(
+                        &graph,
+                        make(b, 0.),
+                        forward,
+                        test,
+                        10,
+                        false,
+                        &[],
+                        &mut stats
+                    ));
+                    assert!(storage.insert(
+                        &graph,
+                        make(a, -1.),
+                        forward,
+                        test,
+                        10,
+                        false,
+                        &[],
+                        &mut stats
+                    ));
+                    assert_eq!(storage.buckets[1][0].active.len(), 1);
+                    let archived = matches!(
+                        test,
+                        InsertionTest::ResourcesAndCost | InsertionTest::Resources
+                    );
+                    assert_eq!(storage.buckets[1][0].archived.len(), usize::from(archived));
+                }
+            }
+        }
+    }
+
     #[test]
     fn empty_cut_dominance_does_not_load_cold_words() {
         let g = Graph::new(3, 1).unwrap();

@@ -1,13 +1,19 @@
 //! Ownership-safe bridge to COIN-OR Clp's C interface. No original solver code
 //! is called: labeling, pricing, stabilization and CG belong to this Rust port.
-use crate::master::{LpMaster, RowSense};
+use crate::master::{LpMaster, LpSolveOutcome, RowSense};
 use crate::{incomplete, invalid, Result};
 use std::ffi::c_void;
 use std::ptr::NonNull;
+use std::time::{Duration, Instant};
 type Model = c_void;
 extern "C" {
     fn Clp_newModel() -> *mut Model;
     fn baldes_clp_clone(m: *const Model) -> *mut Model;
+    fn baldes_clp_dual_limited(m: *mut Model, iterations: i32, seconds: f64) -> i32;
+    #[cfg(test)]
+    fn baldes_clp_solve_limits(m: *mut Model, values: *mut f64);
+    #[cfg(test)]
+    fn Clp_setMaximumSeconds(m: *mut Model, seconds: f64);
     fn Clp_numberIterations(m: *mut Model) -> i32;
     fn Clp_deleteModel(m: *mut Model);
     fn Clp_setLogLevel(m: *mut Model, level: i32);
@@ -40,6 +46,7 @@ extern "C" {
     fn Clp_deleteColumns(m: *mut Model, n: i32, indices: *const i32);
     fn Clp_dual(m: *mut Model, values_pass: i32) -> i32;
     fn Clp_status(m: *mut Model) -> i32;
+    fn Clp_secondaryStatus(m: *mut Model) -> i32;
     fn Clp_objectiveValue(m: *mut Model) -> f64;
     fn Clp_dualRowSolution(m: *mut Model) -> *const f64;
     fn Clp_primalColumnSolution(m: *mut Model) -> *const f64;
@@ -51,6 +58,15 @@ extern "C" {
     fn Clp_getVectorLengths(m: *mut Model) -> *const i32;
     fn Clp_getIndices(m: *mut Model) -> *const i32;
     fn Clp_getElements(m: *mut Model) -> *const f64;
+}
+/// Outcome for this LP only; it is not an original routing-domain certificate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClpSolveOutcome {
+    Optimal,
+    PrimalInfeasible,
+    DualInfeasible,
+    Stopped,
+    Failed,
 }
 #[derive(Debug)]
 pub struct ClpMaster {
@@ -74,6 +90,50 @@ pub struct ClpMaster {
     pub zero_tolerance: f64,
 }
 impl ClpMaster {
+    /// Reuse a preceding solve when deleting its trailing rows/columns gives
+    /// this exact ordered matrix and costs. Bounds remain those of this model.
+    /// Returns false without changing either model when they do not match.
+    pub(crate) fn continue_from(&mut self, previous: &Self) -> Result<bool> {
+        let rows = self.rhs.len();
+        let columns = self.costs.len();
+        if previous.rhs.len() < rows
+            || previous.costs.len() < columns
+            || previous.costs[..columns] != self.costs
+            || previous.senses[..rows] != self.senses
+            || previous.objective_offset != self.objective_offset
+        {
+            return Ok(false);
+        }
+        for column in 0..columns {
+            let retained: Vec<_> = previous
+                .column_entries(column)?
+                .into_iter()
+                .filter(|&(row, _)| row < rows)
+                .collect();
+            if retained != self.column_entries(column)? {
+                return Ok(false);
+            }
+        }
+        let mut continued = previous.try_clone()?;
+        // Native node restoration deletes branch artificials before rows.
+        let removed_columns: Vec<_> = (columns..previous.costs.len()).collect();
+        let removed_rows: Vec<_> = (rows..previous.rhs.len()).collect();
+        continued.remove(&[], &removed_columns)?;
+        continued.remove(&removed_rows, &[])?;
+        continued.duals.truncate(rows);
+        continued.values.truncate(columns);
+        continued.reduced_costs.truncate(columns);
+        continued.set_rhs(&self.rhs)?;
+        for column in 0..columns {
+            if continued.upper[column] != self.upper[column] {
+                continued.set_upper(column, self.upper[column])?;
+            }
+        }
+        continued.zero_tolerance = self.zero_tolerance;
+        continued.set_tolerances(1e-7, self.dual_tolerance)?;
+        *self = continued;
+        Ok(true)
+    }
     /// Fork the model through Clp's deep-copy operation, retaining its basis,
     /// primal/dual solution, scaling and simplex state. The fork owns all data.
     pub fn try_clone(&self) -> Result<Self> {
@@ -281,9 +341,46 @@ impl ClpMaster {
         Ok(())
     }
     pub fn solve(&mut self) -> bool {
+        // SAFETY: The model is exclusively borrowed and owned by this handle.
+        unsafe { Clp_dual(self.model.as_ptr(), 0); }
+        self.read_solution()
+    }
+    /// Cooperatively limit one LP solve by elapsed wall time and simplex pivots.
+    /// Existing stricter backend limits remain effective and are restored
+    /// exactly. Only `Optimal` marks the cached solution as solved; other
+    /// outcomes do not validate the cached primal/dual arrays for this call.
+    pub fn solve_limited(&mut self, iterations: usize, time_limit: Duration) -> Result<ClpSolveOutcome> {
+        let iterations = i32::try_from(iterations).map_err(|_| invalid("Clp iteration limit"))?;
+        let started = Instant::now();
+        if iterations == 0 || time_limit.is_zero() {
+            self.status = 3;
+            self.solved = false;
+            return Ok(ClpSolveOutcome::Stopped);
+        }
+        // SAFETY: The native scope guard restores this owned model's limits
+        // before returning, including on caught C++ exceptions.
+        let failed = unsafe { baldes_clp_dual_limited(self.model.as_ptr(), iterations, time_limit.as_secs_f64()) } != 0;
+        if failed {
+            self.status = 4;
+            self.solved = false;
+            return Ok(ClpSolveOutcome::Failed);
+        }
+        self.read_solution();
+        if started.elapsed() >= time_limit {
+            self.status = 3;
+            self.solved = false;
+        }
+        Ok(match self.status {
+            0 => ClpSolveOutcome::Optimal,
+            1 => ClpSolveOutcome::PrimalInfeasible,
+            2 => ClpSolveOutcome::DualInfeasible,
+            3 => ClpSolveOutcome::Stopped,
+            _ => ClpSolveOutcome::Failed,
+        })
+    }
+    fn read_solution(&mut self) -> bool {
         // SAFETY: All returned arrays are owned by this model. Copy before further mutation.
         unsafe {
-            Clp_dual(self.model.as_ptr(), 0);
             self.simplex_iterations += Clp_numberIterations(self.model.as_ptr()).max(0) as usize;
             self.status = Clp_status(self.model.as_ptr());
             self.solved = self.status == 0;
@@ -518,6 +615,23 @@ impl LpMaster for ClpMaster {
         Self::solve(self)
     }
 
+    fn solve_with_time_limit(&mut self, remaining: Duration) -> Result<LpSolveOutcome> {
+        let started = Instant::now();
+        Ok(match self.solve_limited(i32::MAX as usize, remaining)? {
+            ClpSolveOutcome::Optimal => LpSolveOutcome::Optimal,
+            ClpSolveOutcome::PrimalInfeasible => LpSolveOutcome::PrimalInfeasible,
+            ClpSolveOutcome::DualInfeasible => LpSolveOutcome::DualInfeasible,
+            ClpSolveOutcome::Failed => LpSolveOutcome::Failed,
+            ClpSolveOutcome::Stopped => {
+                // SAFETY: live, exclusively borrowed model. Clp secondary
+                // status 9 identifies a time stop rather than an iteration stop.
+                if remaining.is_zero() || started.elapsed() >= remaining
+                    || unsafe { Clp_secondaryStatus(self.model.as_ptr()) } == 9
+                { LpSolveOutcome::TimeLimit } else { LpSolveOutcome::IterationLimit }
+            }
+        })
+    }
+
     fn duals(&self) -> &[f64] {
         &self.duals
     }
@@ -588,4 +702,205 @@ fn entries_of(entries: &[(usize, f64)], size: usize) -> Result<(Vec<i32>, Vec<f6
         .map(|(i, v)| (i as i32, v))
         .unzip();
     Ok((ids, values))
+}
+
+#[cfg(test)]
+mod continuation_tests {
+    use super::*;
+
+    #[test]
+    fn clone_preserves_sparse_layout_through_column_insertion() {
+        fn layout(master: &ClpMaster) -> (Vec<i32>, Vec<i32>) {
+            // SAFETY: live Clp models expose n+1 starts and n column lengths;
+            // both buffers are copied before the model can be mutated.
+            unsafe {
+                let model = master.model.as_ptr();
+                (
+                    std::slice::from_raw_parts(Clp_getVectorStarts(model), master.costs.len() + 1)
+                        .to_vec(),
+                    std::slice::from_raw_parts(Clp_getVectorLengths(model), master.costs.len())
+                        .to_vec(),
+                )
+            }
+        }
+        let mut master = ClpMaster::new().unwrap();
+        for _ in 0..3 {
+            master.add_row(RowSense::Equal, 1., &[]).unwrap();
+        }
+        for cost in [1., 2., 3.] {
+            master
+                .add_column(cost, &[(0, 1.), (1, 1.), (2, 1.)])
+                .unwrap();
+        }
+        master.remove(&[], &[1]).unwrap();
+        let before = layout(&master);
+        assert!(before.0.last().unwrap() > &before.1.iter().sum());
+        let mut copied = master.try_clone().unwrap();
+        assert_eq!(layout(&copied), before);
+        for model in [&mut master, &mut copied] {
+            model.add_column(4., &[(0, 1.)]).unwrap();
+        }
+        assert_eq!(layout(&copied), layout(&master));
+        assert!(master.solve() && copied.solve());
+        assert_eq!(master.objective, 1.);
+        assert_eq!(copied.values(), master.values());
+        copied.set_cost(0, 5.).unwrap();
+        assert!(copied.solve());
+        assert_eq!(copied.objective, 3.);
+        assert_eq!(master.costs[0], 1.);
+        assert_eq!(master.objective, 1.);
+    }
+
+    fn base() -> ClpMaster {
+        let mut master = ClpMaster::new().unwrap();
+        master.add_row(RowSense::Equal, 1., &[]).unwrap();
+        master.add_column(2., &[(0, 1.)]).unwrap();
+        assert!(master.solve());
+        master
+    }
+
+    fn limits(master: &ClpMaster) -> [f64; 3] {
+        let mut values = [0.; 3];
+        // SAFETY: The native getter writes exactly three values for this model.
+        unsafe { baldes_clp_solve_limits(master.model.as_ptr(), values.as_mut_ptr()); }
+        values
+    }
+
+    #[test]
+    fn limited_solve_preserves_absolute_deadlines_and_can_resume() {
+        let mut master = base();
+        // SAFETY: This exclusively owned model accepts a relative CPU limit.
+        unsafe { Clp_setMaximumSeconds(master.model.as_ptr(), 60.); }
+        let before = limits(&master);
+        for (iterations, time) in [(0, Duration::from_secs(60)), (1000, Duration::ZERO), (1000, Duration::from_nanos(1))] {
+            assert_eq!(master.solve_limited(iterations, time).unwrap(), ClpSolveOutcome::Stopped);
+            assert!(!master.solved);
+            assert_eq!(master.status, 3);
+            assert_eq!(limits(&master), before);
+            assert!(master.solve());
+            assert_eq!(master.objective, 2.);
+        }
+        let status = master.status;
+        assert!(master.solve_limited(usize::MAX, Duration::from_secs(60)).is_err());
+        assert_eq!(master.status, status);
+        assert!(master.solved);
+        assert_eq!(limits(&master), before);
+    }
+
+    #[test]
+    fn iteration_stopped_model_is_not_an_infeasibility_certificate() {
+        let mut master = ClpMaster::new().unwrap();
+        for _ in 0..128 { master.add_row(RowSense::Equal, 1., &[]).unwrap(); }
+        for row in 0..128 { master.add_column(1., &[(row, 1.)]).unwrap(); }
+        let before = limits(&master);
+        assert_eq!(master.solve_limited(1, Duration::from_secs(60)).unwrap(), ClpSolveOutcome::Stopped);
+        assert_eq!(master.status, 3);
+        assert!(!master.solved);
+        assert_eq!(limits(&master), before);
+        assert!(master.solve());
+        assert_eq!(master.objective, 128.);
+        assert!(master.values.iter().all(|&value| value == 1.));
+    }
+
+    #[test]
+    fn cg_time_stop_preserves_bound_and_does_not_price() {
+        use crate::master::column_generation::{self as cg, NoController};
+        let mut master = ClpMaster::new().unwrap();
+        for _ in 0..128 { master.add_row(RowSense::Equal, 1., &[]).unwrap(); }
+        for row in 0..128 { master.add_column(1., &[(row, 1.)]).unwrap(); }
+        // SAFETY: expire the CPU budget of this exclusively owned model.
+        unsafe { Clp_setMaximumSeconds(master.model.as_ptr(), 0.); }
+        let before = limits(&master);
+        let mut options = cg::Options::default(); options.stabilize = false;
+        let output = cg::optimize(&mut master, &[], |_, _| -> Result<cg::Answer> { panic!("stopped LP must not price"); }, &mut NoController, options).unwrap();
+        assert_eq!(output.status, cg::Status::TimeLimit);
+        assert_eq!(output.bound, f64::NEG_INFINITY);
+        assert_eq!(output.pricing_calls, 0);
+        assert!(!master.solved);
+        assert_eq!(limits(&master), before);
+        // SAFETY: remove the explicit test budget before resuming the model.
+        unsafe { Clp_setMaximumSeconds(master.model.as_ptr(), -1.); }
+        assert!(master.solve());
+        assert_eq!(master.objective, 128.);
+    }
+
+    #[test]
+    fn limited_solve_distinguishes_backend_infeasibility_statuses() {
+        let mut infeasible = ClpMaster::new().unwrap();
+        infeasible.add_row(RowSense::Equal, 1., &[]).unwrap();
+        assert_eq!(infeasible.solve_limited(1000, Duration::from_secs(60)).unwrap(), ClpSolveOutcome::PrimalInfeasible);
+        let mut dual_infeasible = ClpMaster::new().unwrap();
+        let column = dual_infeasible.add_column(-1., &[]).unwrap();
+        // Columns default to the finite upper bound 1e12. Explicitly use
+        // Clp's infinity convention for this backend-status fixture.
+        dual_infeasible.set_upper(column, f64::MAX).unwrap();
+        assert_eq!(dual_infeasible.solve_limited(1000, Duration::from_secs(60)).unwrap(), ClpSolveOutcome::DualInfeasible);
+        let mut optimal = base();
+        assert_eq!(optimal.solve_limited(1000, Duration::from_secs(60)).unwrap(), ClpSolveOutcome::Optimal);
+        assert!(optimal.solved);
+    }
+
+    #[test]
+    fn continuation_restores_target_bounds_and_keeps_the_source_owned() {
+        let mut previous = base();
+        previous
+            .add_row(RowSense::GreaterEqual, 0., &[(0, 1.)])
+            .unwrap();
+        previous.add_column(10., &[(1, 1.)]).unwrap();
+        assert!(previous.solve());
+        let previous_values = previous.values.clone();
+        let mut target = base();
+        target.set_rhs(&[2.]).unwrap();
+        target.set_upper(0, 3.).unwrap();
+        assert!(target.continue_from(&previous).unwrap());
+        assert_eq!(target.rhs, [2.]);
+        assert_eq!(target.upper, [3.]);
+        assert_eq!(target.values.len(), 1);
+        assert_eq!(target.duals.len(), 1);
+        assert!(!target.solved);
+        assert!(target.solve());
+        assert_eq!(target.objective, 4.);
+        assert_eq!(previous.rhs, [1., 0.]);
+        assert_eq!(previous.costs, [2., 10.]);
+        assert_eq!(previous.values, previous_values);
+        assert!(previous.solved);
+    }
+
+    #[test]
+    fn continuation_rejects_a_different_model_without_mutation() {
+        let previous = base();
+        for change in 0..4 {
+            let mut target = base();
+            match change {
+                0 => target.set_cost(0, 3.).unwrap(),
+                1 => target.set_coefficient(0, 0, 2.).unwrap(),
+                2 => {
+                    target.add_column(3., &[(0, 1.)]).unwrap();
+                }
+                _ => {
+                    target.add_row(RowSense::LessEqual, 5., &[(0, 1.)]).unwrap();
+                }
+            }
+            let before = (
+                target.rhs.clone(),
+                target.costs.clone(),
+                target.column_entries(0).unwrap(),
+                target.solved,
+                target.values.clone(),
+            );
+            assert!(!target.continue_from(&previous).unwrap());
+            assert_eq!(
+                before,
+                (
+                    target.rhs.clone(),
+                    target.costs.clone(),
+                    target.column_entries(0).unwrap(),
+                    target.solved,
+                    target.values.clone()
+                )
+            );
+        }
+        assert_eq!(previous.objective, 2.);
+        assert!(previous.solved);
+    }
 }

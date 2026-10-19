@@ -49,9 +49,11 @@ pub(super) fn run(
         {
             return Err(invalid("enumerated MIP routing witness"));
         }
-        if cost < output.incumbent {
-            output.incumbent = cost;
-            output.routes = routes;
+        if let Some(upper) = problem.unit_route_incumbent(&routes) {
+            if upper < output.incumbent {
+                output.incumbent = upper;
+                output.routes = routes;
+            }
         }
     }
     if matches!(

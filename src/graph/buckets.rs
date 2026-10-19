@@ -64,7 +64,7 @@ pub struct BucketGraph {
     pub internal: Vec<usize>,
     pub arc_order: Vec<usize>,
 }
-fn gcd(mut a: i32, mut b: i32) -> i32 {
+fn gcd(mut a: i64, mut b: i64) -> i64 {
     while b != 0 {
         let r = a % b;
         a = b;
@@ -224,25 +224,28 @@ impl BucketGraph {
         {
             return Ok(());
         }
-        let mut unit = [1_000_000_000i32; 2];
+        let mut unit = [1_000_000_000i64; 2];
+        // Keep scaled integers exact in both the conversion and the later
+        // conversion back to f64. Large resource windows need not fit i32.
+        const MAX_EXACT_INTEGER: f64 = 9_007_199_254_740_992.;
         for v in 0..self.order.len() {
             for r in 0..self.dimensions {
                 for x in [self.lower[v][r], self.upper[v][r]] {
                     let scaled = (10000. * x).ceil();
-                    if !scaled.is_finite() || scaled < i32::MIN as f64 || scaled > i32::MAX as f64 {
+                    if !scaled.is_finite() || scaled.abs() > MAX_EXACT_INTEGER {
                         return Err(invalid("bucket grid unit overflows integer domain"));
                     }
-                    unit[r] = gcd(unit[r], scaled as i32);
+                    unit[r] = gcd(unit[r], scaled as i64);
                 }
             }
         }
         for a in &self.consumption {
             for r in 0..self.dimensions {
                 let scaled = (10000. * a[r]).ceil();
-                if !scaled.is_finite() || scaled < i32::MIN as f64 || scaled > i32::MAX as f64 {
+                if !scaled.is_finite() || scaled.abs() > MAX_EXACT_INTEGER {
                     return Err(invalid("arc grid unit overflows integer domain"));
                 }
-                unit[r] = gcd(unit[r], scaled as i32);
+                unit[r] = gcd(unit[r], scaled as i64);
             }
         }
         let last = self.order.len() - 1;
@@ -1138,6 +1141,28 @@ fn floor_isize(x: f64) -> isize {
 #[cfg(test)]
 mod tests {
     use super::floor_isize;
+
+    #[test]
+    fn automatic_grid_supports_large_resource_windows() {
+        use super::{BucketGraph, Graph};
+        let mut graph = Graph::new(3, 1).unwrap();
+        for vertex in 0..3 {
+            graph.set_bounds(vertex, 0, 0., 100_000_000.).unwrap();
+        }
+        for (tail, head) in [(0, 1), (1, 2)] {
+            let arc = graph.add_arc(tail, head, 0.).unwrap();
+            graph.arc_mut(arc).unwrap().consumption[0] = 1_000_000.;
+        }
+        let automatic = BucketGraph::prepare(&graph, [0.; 2], 100, true).unwrap();
+        assert_eq!(automatic.step[0], 1_000_000.);
+        let explicit = BucketGraph::prepare(&graph, [1_000_000.; 2], 100, true).unwrap();
+        for forward in [true, false] {
+            assert_eq!(automatic.direction(forward).corners, explicit.direction(forward).corners);
+            assert_eq!(automatic.direction(forward).current_arcs, explicit.direction(forward).current_arcs);
+        }
+        graph.set_bounds(1, 0, 0., 1e13).unwrap();
+        assert!(BucketGraph::prepare(&graph, [0.; 2], 100, true).is_err());
+    }
 
     #[test]
     fn bucket_floor_matches_standard_floor_at_numeric_boundaries() {

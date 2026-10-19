@@ -28,6 +28,8 @@ impl Default for Parameters {
 #[derive(Clone, Debug)]
 pub struct Feedback {
     pub negative_columns: usize,
+    /// Whether the pricing oracle supplied a best solution for this gradient.
+    pub subgradient_available: bool,
     pub subgradient: Vec<f64>,
     pub lagrangian: f64,
     pub phase: i32,
@@ -47,8 +49,12 @@ pub struct DualPriceSmoothing {
     pub pricing: Vec<f64>,
     raw: Vec<f64>,
     subgradient: Vec<f64>,
+    directional_available: bool,
+    angle_center: Vec<f64>,
     senses: Vec<RowSense>,
     next_center: Option<(Vec<f64>, Vec<f64>)>,
+    next_gradient_available: bool,
+    excluded_rows: Vec<usize>,
 }
 impl Default for DualPriceSmoothing {
     fn default() -> Self {
@@ -56,7 +62,13 @@ impl Default for DualPriceSmoothing {
     }
 }
 impl DualPriceSmoothing {
-    pub fn new(parameters: Parameters) -> Self {
+    pub fn new(mut parameters: Parameters) -> Self {
+        // These named control parameters are stored as floats by the compiled
+        // reference, then widened when used in stabilization arithmetic.
+        parameters.alpha_factor = parameters.alpha_factor as f32 as f64;
+        parameters.beta_factor = parameters.beta_factor as f32 as f64;
+        parameters.min_gap = parameters.min_gap as f32 as f64;
+        parameters.max_gap = parameters.max_gap as f32 as f64;
         let alpha = if parameters.alpha_factor < 1. {
             parameters.alpha_factor
         } else {
@@ -76,9 +88,24 @@ impl DualPriceSmoothing {
             pricing: vec![],
             raw: vec![],
             subgradient: vec![],
+            directional_available: false,
+            angle_center: vec![],
             senses: vec![],
             next_center: None,
+            next_gradient_available: false,
+            excluded_rows: vec![],
         }
+    }
+    pub(crate) fn inherit_center(&mut self, previous: &Self, phase: i32) {
+        self.center = previous
+            .next_center
+            .as_ref()
+            .map_or_else(|| previous.center.clone(), |(center, _)| center.clone());
+        self.center_bound = previous.center_bound;
+        self.center_phase = phase;
+    }
+    pub(crate) fn exclude_rows(&mut self, rows: Vec<usize>) {
+        self.excluded_rows = rows;
     }
     pub fn restart_schedule(&mut self, phase: i32) {
         self.alpha = if self.parameters.alpha_factor < 1. {
@@ -86,7 +113,8 @@ impl DualPriceSmoothing {
         } else {
             self.parameters.initial_alpha
         };
-        self.effective_alpha = self.alpha;
+        self.effective_alpha = 0.;
+        self.directional_available = false;
         self.misprices = 0;
         self.active = false;
         self.center_phase = phase;
@@ -104,7 +132,13 @@ impl DualPriceSmoothing {
         compact(&mut self.raw, map);
         compact(&mut self.pricing, map);
         compact(&mut self.subgradient, map);
+        compact(&mut self.angle_center, map);
         compact(&mut self.senses, map);
+        self.excluded_rows = self
+            .excluded_rows
+            .iter()
+            .filter_map(|&r| map.get(r).copied().flatten())
+            .collect();
         if let Some((c, g)) = &mut self.next_center {
             compact(c, map);
             compact(g, map);
@@ -120,7 +154,7 @@ impl DualPriceSmoothing {
     ) {
         if let Some((c, mut g)) = self.next_center.take() {
             self.center = c;
-            if self.parameters.beta_factor > 0. {
+            if self.parameters.beta_factor > 0. && self.next_gradient_available {
                 normalize(&mut g);
                 self.subgradient = g;
             }
@@ -128,27 +162,50 @@ impl DualPriceSmoothing {
         self.raw = raw.to_vec();
         self.senses = senses.to_vec();
         self.center.resize(raw.len(), 0.);
+        self.angle_center.resize(raw.len(), 0.);
+        if stage >= self.parameters.minimum_stage {
+            self.angle_center.clone_from(&self.center);
+        }
         self.active = false;
         self.misprices = 0;
-        self.effective_alpha = self.alpha;
         self.pricing = raw.to_vec();
         if initial {
             self.effective_alpha = 0.;
             return;
         }
-        if stage < self.parameters.minimum_stage
-            || !self.gap_accepts(gap)
-            || self.alpha <= self.parameters.tolerance
-        {
+        if stage < self.parameters.minimum_stage {
             return;
         }
-        self.publish(self.effective_alpha);
+        self.effective_alpha = self.alpha;
+        if !self.gap_accepts(gap) || self.alpha <= self.parameters.tolerance {
+            return;
+        }
+        self.publish(self.effective_alpha, true);
         self.active = true;
     }
     pub fn after_pricing(&mut self, f: &Feedback) -> bool {
         self.consider_center(f);
-        self.angle = cosine(&self.center, &self.pricing, &f.subgradient);
         if self.parameters.alpha_factor >= 1. && self.misprices == 0 {
+            // The reference calculates the angle only for the first pricing
+            // attempt in the adaptive schedule, retaining it during retries.
+            let center = if self.angle_center.len() == self.center.len() {
+                &self.angle_center
+            } else {
+                &self.center
+            };
+            let mut pricing = self.pricing.clone();
+            let mut gradient = f.subgradient.clone();
+            for &row in &self.excluded_rows {
+                if let Some(value) = pricing.get_mut(row) {
+                    *value = center.get(row).copied().unwrap_or(0.);
+                }
+                if let Some(value) = gradient.get_mut(row) {
+                    *value = 0.;
+                }
+            }
+            if f.subgradient_available {
+                self.angle = cosine(center, &pricing, &gradient);
+            }
             let tolerance = self.parameters.tolerance;
             // The angle test uses its own native threshold, independently of
             // the tolerance for bounds and dual values.
@@ -165,14 +222,14 @@ impl DualPriceSmoothing {
         }
         self.misprices += 1;
         self.effective_alpha = if self.parameters.alpha_factor >= 1. {
-            2. * self.effective_alpha - 1.
+            1. - 2. * (1. - self.effective_alpha)
         } else {
             1. - self.misprices as f64 * (1. - self.alpha)
         };
         if self.misprices <= self.parameters.max_updates
             && self.effective_alpha > self.parameters.tolerance
         {
-            self.publish(self.effective_alpha);
+            self.publish(self.effective_alpha, false);
             return true;
         }
         self.active = false;
@@ -191,8 +248,8 @@ impl DualPriceSmoothing {
             || !greater(gap, self.parameters.max_gap, self.parameters.tolerance))
             && !greater(self.parameters.min_gap, gap, self.parameters.tolerance)
     }
-    fn publish(&mut self, alpha: f64) {
-        let outward = if self.parameters.beta_factor > 0. {
+    fn publish(&mut self, alpha: f64, directional: bool) {
+        let outward = if directional && self.parameters.beta_factor > 0. {
             self.directional_point()
         } else {
             self.raw.clone()
@@ -209,6 +266,11 @@ impl DualPriceSmoothing {
                 *pi = 0.;
             }
         }
+        for &row in &self.excluded_rows {
+            if let Some(value) = self.pricing.get_mut(row) {
+                *value = self.raw[row];
+            }
+        }
     }
     fn directional_point(&self) -> Vec<f64> {
         let mut out = self.raw.clone();
@@ -216,7 +278,13 @@ impl DualPriceSmoothing {
             .raw
             .iter()
             .enumerate()
-            .map(|(i, v)| v - self.center.get(i).copied().unwrap_or(0.))
+            .map(|(i, v)| {
+                if self.excluded_rows.contains(&i) {
+                    0.
+                } else {
+                    v - self.center.get(i).copied().unwrap_or(0.)
+                }
+            })
             .collect();
         let length = norm(&diff);
         if length <= self.parameters.tolerance {
@@ -225,30 +293,38 @@ impl DualPriceSmoothing {
         let sub_norm = norm(&self.subgradient);
         let mut beta = self.parameters.beta_factor;
         if beta == 1. {
-            if sub_norm <= 1e-12 {
+            // Restarting the schedule invalidates the automatic direction,
+            // even though the previous normalized vector remains stored.
+            if !self.directional_available || sub_norm <= 1e-12 {
                 return out;
             }
-            beta = dot(&diff, &self.subgradient) / (length * sub_norm);
+            let toward: Vec<_> = diff.iter().map(|value| value / length).collect();
+            beta = dot(&toward, &self.subgradient);
         }
         beta = beta.clamp(0., 1.);
         for (i, v) in out.iter_mut().enumerate() {
-            let component = if sub_norm > 1e-12 {
-                self.subgradient.get(i).copied().unwrap_or(0.) / sub_norm
-            } else {
-                0.
-            };
-            *v = self.center.get(i).copied().unwrap_or(0.) + (1. - beta) * diff[i]
-                - beta * length * component;
+            if greater(beta, 0., self.parameters.tolerance) {
+                let component = self.subgradient.get(i).copied().unwrap_or(0.);
+                let direction = (component * length) * beta;
+                let straight = diff[i] * (1. - beta);
+                *v = (direction + straight) + self.center.get(i).copied().unwrap_or(0.);
+            }
         }
         let step: Vec<_> = out
             .iter()
             .enumerate()
-            .map(|(i, v)| v - self.center.get(i).copied().unwrap_or(0.))
+            .map(|(i, v)| {
+                if self.excluded_rows.contains(&i) {
+                    0.
+                } else {
+                    v - self.center.get(i).copied().unwrap_or(0.)
+                }
+            })
             .collect();
         let step_norm = norm(&step);
         if step_norm > 1e-12 {
             for (i, v) in out.iter_mut().enumerate() {
-                *v = self.center.get(i).copied().unwrap_or(0.) + step[i] * (length / step_norm);
+                *v = (step[i] / step_norm) * length + self.center.get(i).copied().unwrap_or(0.);
             }
         }
         out
@@ -267,11 +343,29 @@ impl DualPriceSmoothing {
             self.center_phase = f.phase;
         }
         self.center_bound = f.lagrangian;
-        let mut c = self.pricing.clone();
+        // Without a best pricing solution the reference keeps its normalized
+        // subgradient and accepts the raw master point as the next center.
+        let mut c = if f.subgradient_available {
+            self.pricing.clone()
+        } else {
+            self.raw.clone()
+        };
         c.resize(self.raw.len().max(c.len()), 0.);
         let mut g = f.subgradient.clone();
         g.resize(c.len(), 0.);
+        for &row in &self.excluded_rows {
+            if let Some(value) = c.get_mut(row) {
+                *value = 0.;
+            }
+            if let Some(value) = g.get_mut(row) {
+                *value = 0.;
+            }
+        }
         self.next_center = Some((c, g));
+        self.next_gradient_available = f.subgradient_available;
+        if f.subgradient_available {
+            self.directional_available = true;
+        }
         self.center_moved = true;
     }
 }
@@ -313,12 +407,188 @@ mod tests {
     use super::*;
 
     #[test]
+    fn unavailable_solution_moves_to_raw_center_without_replacing_direction() {
+        let mut smoothing = DualPriceSmoothing::new(Parameters {
+            beta_factor: 0.5,
+            ..Parameters::default()
+        });
+        smoothing.center = vec![0., 0.];
+        smoothing.raw = vec![2., 3.];
+        smoothing.pricing = vec![1., 1.];
+        smoothing.subgradient = vec![0.6, 0.8];
+        smoothing.after_pricing(&Feedback {
+            negative_columns: 0,
+            subgradient_available: false,
+            subgradient: vec![1., 1.],
+            lagrangian: 100.,
+            phase: 0,
+        });
+        smoothing.after_master(&[3., 4.], &[RowSense::Equal; 2], 1., 0, false);
+        assert_eq!(smoothing.center, [2., 3.]);
+        assert_eq!(smoothing.subgradient, [0.6, 0.8]);
+        assert!(!smoothing.directional_available);
+    }
+
+    #[test]
+    fn unavailable_pricing_solution_retains_the_previous_angle() {
+        for previous in [0.25, f64::NAN] {
+            let mut smoothing = DualPriceSmoothing::new(Parameters::default());
+            smoothing.angle = previous;
+            smoothing.center = vec![0., 0.];
+            smoothing.pricing = vec![1., -1.];
+            smoothing.after_pricing(&Feedback {
+                negative_columns: 0,
+                subgradient_available: false,
+                subgradient: vec![1., 1.],
+                lagrangian: f64::NEG_INFINITY,
+                phase: 0,
+            });
+            assert!(smoothing.angle == previous || smoothing.angle.is_nan() && previous.is_nan());
+            assert_eq!(smoothing.alpha, 0.4);
+        }
+    }
+
+
+    #[test]
+    fn directional_point_matches_compiled_r101_pricing_point() {
+        let mut smoothing = DualPriceSmoothing::new(Parameters {
+            beta_factor: 0.5,
+            ..Parameters::default()
+        });
+        smoothing.center = vec![0., 2.76, 2.76, 2.76, 2.76, 2.76];
+        smoothing.raw = vec![0., 5.52, 5.52, 5.52, 5.52, 5.52];
+        smoothing.subgradient = vec![
+            0.,
+            -0.8944271909999159,
+            0.22360679774997896,
+            0.22360679774997896,
+            0.22360679774997896,
+            0.22360679774997896,
+        ];
+        smoothing.senses = vec![
+            RowSense::LessEqual,
+            RowSense::Equal,
+            RowSense::Equal,
+            RowSense::Equal,
+            RowSense::Equal,
+            RowSense::Equal,
+        ];
+        smoothing.publish(0.4, true);
+        assert_eq!(
+            smoothing.pricing,
+            vec![
+                0.,
+                1.5890311703550772,
+                4.5164532444673835,
+                4.5164532444673835,
+                4.5164532444673835,
+                4.5164532444673835
+            ]
+        );
+    }
+
+    #[test]
+    fn automatic_direction_is_invalidated_before_pending_center_installation() {
+        // Fractional three-customer workflow, first pricing after a capacity
+        // row: the reference retains its old vector but clears its validity.
+        let mut smoothing = DualPriceSmoothing::new(Parameters {
+            beta_factor: 1.,
+            ..Parameters::default()
+        });
+        smoothing.pricing = vec![
+            0.,
+            1.7071067811865475,
+            1.7071067811865475,
+            1.7071067811865475,
+        ];
+        smoothing.raw = smoothing.pricing.clone();
+        smoothing.after_pricing(&Feedback {
+            subgradient_available: true,
+            negative_columns: 0,
+            subgradient: vec![0., -2., -2., 1.],
+            lagrangian: 5.121320343559642,
+            phase: 0,
+        });
+        smoothing.restart_schedule(2);
+        smoothing.after_master(
+            &[
+                0.,
+                1.414213562373095,
+                1.414213562373095,
+                1.414213562373095,
+                -0.5857864376269051,
+            ],
+            &[
+                RowSense::LessEqual,
+                RowSense::Equal,
+                RowSense::Equal,
+                RowSense::Equal,
+                RowSense::LessEqual,
+            ],
+            1.,
+            2,
+            false,
+        );
+        assert_eq!(
+            smoothing.pricing,
+            vec![
+                0.,
+                1.5606601717798212,
+                1.5606601717798212,
+                1.5606601717798212,
+                -0.29289321881345254
+            ]
+        );
+    }
+
+    #[test]
+    fn mispricing_retry_retains_the_first_angle() {
+        let mut smoothing = DualPriceSmoothing::default();
+        smoothing.center = vec![0.];
+        smoothing.pricing = vec![1.];
+        smoothing.active = true;
+        let mut feedback = Feedback {
+            subgradient_available: true,
+            negative_columns: 0,
+            subgradient: vec![1.],
+            lagrangian: f64::NEG_INFINITY,
+            phase: 0,
+        };
+        assert!(smoothing.after_pricing(&feedback));
+        assert_eq!(smoothing.angle, 1.);
+        assert_eq!(smoothing.misprices, 1);
+        feedback.subgradient = vec![-1.];
+        assert!(!smoothing.after_pricing(&feedback));
+        assert_eq!(smoothing.angle, 1.);
+    }
+
+    #[test]
+    fn effective_alpha_preserves_compiled_operation_order() {
+        let mut smoothing = DualPriceSmoothing::default();
+        smoothing.alpha = 0.09000000000000002;
+        smoothing.effective_alpha = smoothing.alpha;
+        smoothing.center = vec![0.];
+        smoothing.pricing = vec![1.];
+        smoothing.active = true;
+        assert!(smoothing.after_pricing(&Feedback {
+            subgradient_available: true,
+            negative_columns: 0,
+            subgradient: vec![1.],
+            lagrangian: f64::NEG_INFINITY,
+            phase: 0,
+        }));
+        // R101/5 pricing call 11, directly observed in the compiled reference.
+        assert_eq!(smoothing.effective_alpha, -0.8199999999999998);
+    }
+
+    #[test]
     fn angle_threshold_is_independent_of_bound_tolerance() {
         for (angle, expected_alpha) in [(2e-12, 0.4), (-2e-12, 0.55), (5e-13, 0.5), (-5e-13, 0.5)] {
             let mut smoothing = DualPriceSmoothing::default();
             smoothing.center = vec![0., 0.];
             smoothing.pricing = vec![1., 0.];
             assert!(!smoothing.after_pricing(&Feedback {
+                subgradient_available: true,
                 negative_columns: 1,
                 subgradient: vec![angle, 1.],
                 lagrangian: f64::NEG_INFINITY,

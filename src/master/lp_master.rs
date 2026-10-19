@@ -6,6 +6,20 @@
 //! them per column and per row, so they must not copy.
 use super::RowSense;
 use crate::{invalid, Result};
+use std::time::Duration;
+
+/// Outcome for the current LP, independent of backend-specific status numbers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LpSolveOutcome {
+    Optimal,
+    PrimalInfeasible,
+    DualInfeasible,
+    TimeLimit,
+    IterationLimit,
+    Stopped,
+    Unknown,
+    Failed,
+}
 
 /// The operations the column generation algorithm needs from an LP backend.
 pub trait LpMaster: Sized + 'static {
@@ -38,6 +52,22 @@ pub trait LpMaster: Sized + 'static {
     /// Solve the current LP. Returns `true` on an optimal solution.
     fn solve(&mut self) -> bool;
 
+    /// Solve within a remaining wall-time budget. Backends override this to
+    /// enforce the budget during solving; the compatibility default checks
+    /// zero budgets only. Only Optimal authorizes new solution vectors.
+    fn solve_with_time_limit(&mut self, remaining: Duration) -> Result<LpSolveOutcome> {
+        if remaining.is_zero() { return Ok(LpSolveOutcome::TimeLimit); }
+        Ok(if self.solve() { LpSolveOutcome::Optimal } else {
+            match self.status() {
+                1 => LpSolveOutcome::PrimalInfeasible,
+                2 => LpSolveOutcome::DualInfeasible,
+                3 => LpSolveOutcome::Stopped,
+                4 => LpSolveOutcome::Failed,
+                _ => LpSolveOutcome::Unknown,
+            }
+        })
+    }
+
     /// Row duals of the last optimal solve.
     fn duals(&self) -> &[f64];
     /// Column values of the last optimal solve.
@@ -48,7 +78,8 @@ pub trait LpMaster: Sized + 'static {
     fn objective(&self) -> f64;
     /// Constant contribution from variables removed into a fixed solution.
     fn objective_offset(&self) -> f64 { 0. }
-    /// Solver status: 0 optimal, 1 primal infeasible, 2 dual infeasible.
+    /// Normalized status: 0 optimal, 1 primal infeasible, 2 dual infeasible,
+    /// 3 stopped, 4 failed; other values mean unknown.
     fn status(&self) -> i32;
     /// Whether the current solution vectors belong to the current model.
     fn solved(&self) -> bool;

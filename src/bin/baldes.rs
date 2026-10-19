@@ -279,7 +279,9 @@ fn run() -> std::result::Result<(), String> {
                 ids
             };
             neighbours.sort_unstable();
-            graph.set_ng(v, &neighbours).map_err(|e| e.to_string())?;
+            let elements: Vec<_> = neighbours.iter()
+                .flat_map(|&vertex| graph.vertices[vertex].elements.iter().copied()).collect();
+            graph.set_ng(v, &elements).map_err(|e| e.to_string())?;
         }
     }
     options.cg.multiplicity = n as f64;

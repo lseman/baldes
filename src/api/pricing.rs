@@ -193,6 +193,11 @@ pub unsafe extern "C" fn or_rcsp_cache_variable_costs(
         Ok(0)
     })
 }
+/// Return raw variable-cost candidates and pricing bounds. Variable-cost
+/// validation shares the pricing budget and may require a second sweep over
+/// the domain before cost-dependent fixing. A heuristic phase leaves the lower
+/// bound unknown (negative infinity). Empty calls use `zero` as the upper
+/// baseline and, for an exact phase, the lower baseline.
 #[no_mangle]
 pub unsafe extern "C" fn or_rcsp_price_functor_phase(
     p: *mut ORECSP,
@@ -243,7 +248,7 @@ pub unsafe extern "C" fn or_rcsp_price_functor_phase(
         if index < 0 {
             return Ok(0);
         }
-        let result = match s.price_phase(index as usize, maximum, false) {
+        let result = match s.price_functor_phase(index as usize, maximum) {
             Ok(r) => r,
             Err(_) => {
                 unsafe {
@@ -252,10 +257,20 @@ pub unsafe extern "C" fn or_rcsp_price_functor_phase(
                 return Ok(0);
             }
         };
-        let bound = if let Some(first) = result.columns.first() {
-            s.corrected_bound(result.minimum_reduced_cost, first)?
+        let upper_bound = result
+            .columns
+            .iter()
+            .map(|route| route.cost)
+            .reduce(f64::min)
+            .unwrap_or(zero);
+        let lower_bound = if result.exact {
+            if result.columns.is_empty() {
+                zero
+            } else {
+                result.minimum_reduced_cost
+            }
         } else {
-            zero
+            f64::NEG_INFINITY
         };
         let count = result.columns.len();
         for (slot, route) in slots.iter_mut().zip(result.columns) {
@@ -265,8 +280,8 @@ pub unsafe extern "C" fn or_rcsp_price_functor_phase(
             }));
         }
         unsafe {
-            *lower = bound;
-            *upper = bound;
+            *lower = lower_bound;
+            *upper = upper_bound;
             *state = 0;
             *column_count = count as i32;
         }

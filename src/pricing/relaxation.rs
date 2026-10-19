@@ -6,6 +6,9 @@ impl Solver {
         paths: &[crate::graph::relaxation::FractionalPath],
         controls: &crate::graph::relaxation::Controls,
     ) -> Result<crate::graph::relaxation::Counts> {
+        // Updating NG tables may mark the graph as prepared below. Discard a
+        // grid built before unrelated resource/topology edits first.
+        self.invalidate_changed_graph();
         let baseline = (
             self.graph
                 .vertices

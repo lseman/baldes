@@ -55,13 +55,6 @@ impl Solver {
             .get(index)
             .ok_or_else(|| invalid("pricing phase out of range"))?;
         self.refresh_cuts()?;
-        if self
-            .enumeration_snapshot
-            .as_ref()
-            .is_some_and(|snapshot| !snapshot.same_topology(&self.graph))
-        {
-            self.restore_arcs();
-        }
         let enumerated_kpath = self.enumerated_kpath_inputs();
         if let Some(universe) = &mut self.enumeration {
             if !phase.exact() {
@@ -80,7 +73,7 @@ impl Solver {
                 &self.knapsack_pricing,
             )?;
             let mut routes = universe.paths.routes(&self.graph)?;
-            routes.sort_by(|a, b| a.cost.total_cmp(&b.cost));
+            routes.sort_by(|a, b| enumerated_cost_order(a.cost, b.cost));
             routes.truncate(maximum.min(self.controls.max_columns));
             let minimum = routes.first().map_or(1e12, |r| r.cost);
             return Ok(PricingResult {
@@ -101,6 +94,8 @@ impl Solver {
         };
         controls.max_columns = maximum.min(limit);
         controls.negative_only = negative_only;
+        let call_time_limit = self.pricing_time_limit()?;
+        let started = std::time::Instant::now();
         let engine_controls = self.engine_controls(phase.exact());
         let reuse = self
             .prepared
@@ -118,14 +113,35 @@ impl Solver {
         engine.phase = phase;
         engine.controls = engine_controls;
         self.requires_rollback = false;
-        if self.rollback_point_saved {
-            controls.time_limit = Duration::try_from_secs_f64(
-                self.options.get("BALDEShardTimeThresholdInPricing")?.max(0.),
-            )
-            .map_err(|_| invalid("pricing time limit"))?;
+        controls.time_limit = call_time_limit.saturating_sub(started.elapsed());
+        let mut answer = engine.solve(&self.graph, &controls);
+        if engine.controls.bidirectional
+            && answer.as_ref().is_err_and(|error| {
+                error.kind == crate::core::error::ErrorKind::Runtime
+                    && error.message == crate::labeling::engine::RESOURCE_REPLAY_MISMATCH
+            })
+        {
+            // Reverse subtraction can accept a boundary path whose forward
+            // additions exceed a window by one ulp. The candidate may also
+            // have displaced valid paths in the bounded pool: discarding it
+            // alone cannot establish the minimum. Rebuild the full forward
+            // search, retaining logical cuts/branches and physical exclusions.
+            let mut forward = engine.controls.clone();
+            forward.bidirectional = false;
+            forward.use_symmetric_execution = false;
+            match self.new_engine(forward, phase) {
+                Ok(mut retry) => {
+                    controls.time_limit = call_time_limit.saturating_sub(started.elapsed());
+                    answer = retry.solve(&self.graph, &controls);
+                    engine = retry;
+                }
+                Err(error) => answer = Err(error),
+            }
         }
-        let started = std::time::Instant::now();
-        let answer = engine.solve(&self.graph, &controls);
+        if answer.is_err() {
+            engine.half_ready = false;
+            engine.full_ready = false;
+        }
         if let Ok(result) = &answer {
             if phase.exact() {
                 let labels = engine
@@ -153,5 +169,68 @@ impl Solver {
                 self.rollback_point_saved && error.message.contains("time limit");
         }
         answer
+    }
+}
+
+fn enumerated_cost_order(left: f64, right: f64) -> std::cmp::Ordering {
+    // Native cost/index pairs treat the two signed zeros as equal. Stable
+    // sorting then retains the canonical exported path index for ties.
+    left.partial_cmp(&right)
+        .unwrap_or(std::cmp::Ordering::Equal)
+}
+
+#[cfg(test)]
+mod resource_boundary_tests {
+    use super::*;
+    fn boundary(alternative: bool) -> Solver {
+        let mut s = Solver::new(if alternative { 4 } else { 3 }, 1).unwrap();
+        let upper = f64::from_bits(1f64.to_bits() - 1);
+        s.graph.initial[0] = Some(0.);
+        for v in 0..s.graph.vertices.len() {
+            s.graph.set_bounds(v, 0, 0., upper).unwrap();
+        }
+        let sink = s.graph.sink;
+        let mut arcs = vec![(0, 1, 0.7, -2.), (1, sink, 0.3, -2.)];
+        if alternative {
+            arcs.extend([(0, 2, 0.2, -1.), (2, sink, 0.2, -1.)]);
+        }
+        for (u, v, consumption, cost) in arcs {
+            let id = s.graph.add_arc(u, v, cost).unwrap();
+            s.graph.arc_mut(id).unwrap().consumption[0] = consumption;
+        }
+        s
+    }
+    #[test]
+    fn reverse_only_boundary_path_retries_and_graph_changes_restore_normal_search() {
+        let mut s = boundary(false);
+        let result = s.price(1, false).unwrap();
+        assert!(result.exact && result.columns.is_empty());
+        assert!(!s.engine.as_ref().unwrap().controls.bidirectional);
+        for v in 0..s.graph.vertices.len() {
+            s.graph.set_bounds(v, 0, 0., 1.).unwrap();
+        }
+        let result = s.price(1, false).unwrap();
+        assert!(result.exact);
+        assert_eq!(result.columns[0].arcs, [0, 1]);
+        assert!(s.engine.as_ref().unwrap().controls.bidirectional);
+    }
+    #[test]
+    fn retry_recovers_displaced_valid_paths_and_preserves_physical_exclusions() {
+        let mut s = boundary(true);
+        let result = s.price(1, false).unwrap();
+        assert!(result.exact);
+        assert_eq!(result.columns.len(), 1);
+        assert_eq!(result.columns[0].arcs, [2, 3]);
+        assert_eq!(result.minimum_reduced_cost, -2.);
+        assert!(!s.engine.as_ref().unwrap().controls.bidirectional);
+        s.forbidden_arcs = vec![false, false, true, false];
+        let result = s.price(1, false).unwrap();
+        assert!(result.exact && result.columns.is_empty());
+        s.controls.time_limit = std::time::Duration::ZERO;
+        let error = s.price(1, false).unwrap_err();
+        assert_eq!(error.kind, crate::core::error::ErrorKind::Runtime);
+        assert!(error.message.contains("time limit"));
+        let engine = s.engine.as_ref().unwrap();
+        assert!(!engine.half_ready && !engine.full_ready);
     }
 }

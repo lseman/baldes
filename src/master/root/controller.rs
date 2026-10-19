@@ -1,55 +1,84 @@
 //! Column-generation callbacks and cut separation scheduling.
 use super::*;
+pub(super) struct PricingCheckpoint {
+    pub(super) snapshot: Rc<NodeSnapshot>,
+    output: Output,
+    previous_fixing_gap: f64,
+    enumerated_routes: usize,
+}
 pub(super) struct RootController {
     pub(super) problem: Rc<RootProblem>,
     pub(super) state: Rc<RefCell<State>>,
+    pub(super) checkpoint: Option<PricingCheckpoint>,
 }
-impl<M: LpMaster> Controller<M> for RootController {
+impl Controller<ClpMaster> for RootController {
+    fn save_pricing_checkpoint(&mut self, master: &ClpMaster, output: &Output) -> Result<()> {
+        let mut state = self.state.borrow_mut();
+        let mut pricing = state.solver.fork_for_node();
+        pricing.rollback_point_saved = false;
+        pricing.requires_rollback = false;
+        let snapshot = Rc::new(NodeSnapshot {
+            master: master.try_clone()?,
+            problem: (*self.problem).clone(),
+            cut: state.cut.clone(),
+            pricing,
+            incumbent: state.incumbent,
+            routes: state.routes.clone(),
+            warm: output.warm_start.clone(),
+        });
+        self.checkpoint = Some(PricingCheckpoint {
+            snapshot, output: output.clone(),
+            previous_fixing_gap: state.previous_fixing_gap,
+            enumerated_routes: state.enumerated_routes,
+        });
+        state.solver.rollback_point_saved = true;
+        Ok(())
+    }
+    fn unstabilized_rows(&self) -> Vec<usize> {
+        let map = self.problem.row_map.borrow();
+        std::iter::once(map[0])
+            .chain(
+                self.problem
+                    .branch_constraints
+                    .iter()
+                    .filter_map(|(row, constraint)| {
+                        matches!(constraint, BranchConstraint::NumberOfVehicles { .. })
+                            .then_some(map[*row])
+                    }),
+            )
+            .collect()
+    }
     fn protected_rows(&self) -> Vec<usize> {
         self.problem.row_map.borrow().clone()
     }
-    fn master_solved(&mut self, master: &M, tags: &[i32], artificials: &[usize]) -> Result<()> {
+    fn master_solved(&mut self, master: &ClpMaster, tags: &[i32], artificials: &[usize]) -> Result<()> {
         if artificials.iter().any(|&i| master.values()[i] > 1e-6) {
             return Ok(());
         }
-        if master
-            .values()
-            .iter()
-            .all(|x| (*x - x.round()).abs() <= 1e-6)
-            && tags
-                .iter()
-                .zip(master.values())
-                .all(|(&tag, &x)| tag >= 0 || x <= 1e-6)
-        {
-            let mut state = self.state.borrow_mut();
-            for (&tag, &value) in tags.iter().zip(master.values()) {
-                if tag < 0 || value <= 1e-6 {
-                    continue;
-                }
-                let route = &state.routes[tag as usize];
-                if self.problem.branch_constraints.iter().any(|(_, c)| {
-                    matches!(c, BranchConstraint::RyanFoster(_))
-                        && c.coefficient(&self.problem, route) != 0.
-                }) {
-                    return Ok(());
-                }
-                let customers = &route.nodes[1..route.nodes.len() - 1];
-                if customers
-                    .iter()
-                    .copied()
-                    .collect::<std::collections::BTreeSet<_>>()
-                    .len()
-                    != customers.len()
-                {
-                    return Ok(());
-                }
-            }
-            state.incumbent = state.incumbent.min(master.objective());
+        let mut state = self.state.borrow_mut();
+        if let Some(upper) = super::incumbent::validated_upper(
+            &self.problem, &state.routes, tags, &master.values(),
+        ) {
+            state.incumbent = state.incumbent.min(upper);
         }
         Ok(())
     }
     fn incumbent(&self) -> f64 {
         self.state.borrow().incumbent
+    }
+    fn refresh_generated_columns(&mut self, pool: &mut [Column]) -> Result<()> {
+        let state = self.state.borrow();
+        for column in pool {
+            let route = state
+                .routes
+                .get(usize::try_from(column.tag).map_err(|_| invalid("cached route tag"))?)
+                .ok_or_else(|| invalid("cached route tag"))?;
+            let mut entries = self.problem.base_entries(route)?;
+            entries.extend(state.cut_entries(route)?);
+            entries.sort_by_key(|&(row, _)| row);
+            column.entries = entries;
+        }
+        Ok(())
     }
     fn enumerated_universe(&mut self, duals: &[f64], bound: f64) -> Result<Option<Vec<Column>>> {
         let mut state = self.state.borrow_mut();
@@ -123,6 +152,83 @@ impl<M: LpMaster> Controller<M> for RootController {
         }
         Ok(Some(columns))
     }
+    fn regenerate_enumerated_columns(
+        &mut self,
+        pool: &[Column],
+        duals: &[f64],
+        bound: f64,
+        _universe: &[Column],
+    ) -> Result<Vec<Column>> {
+        let mut state = self.state.borrow_mut();
+        let graph = &state.solver.graph;
+        let ng = crate::graph::ng::PreparedNg::new(graph)?;
+        let upper = if state.incumbent.is_finite() {
+            state.incumbent
+        } else {
+            1e12
+        };
+        let gap = upper - bound;
+        let mut retained = vec![];
+        for column in pool {
+            let Some(route) = usize::try_from(column.tag)
+                .ok()
+                .and_then(|tag| state.routes.get(tag))
+            else {
+                continue;
+            };
+            if state.solver.ryan_foster.iter().any(|rule| {
+                !rule.satisfied_by(route.nodes.iter().map(|&v| v as usize))
+                    || !rule.elementary_on_pair(route.nodes.iter().map(|&v| v as usize))
+            }) {
+                continue;
+            }
+            let mut memory = ng.vertex_bits[graph.source];
+            let mut vertex = graph.source;
+            let mut proper = true;
+            for &id in &route.arcs {
+                let Some(physical) = graph.arcs.iter().position(|a| a.id == id) else {
+                    proper = false;
+                    break;
+                };
+                let arc = &graph.arcs[physical];
+                if state
+                    .solver
+                    .forbidden_arcs
+                    .get(physical)
+                    .copied()
+                    .unwrap_or(false)
+                {
+                    proper = false;
+                    break;
+                }
+                let next = ng.forward[physical].extend(memory, ng.vertex_bits[arc.head]);
+                if arc.tail != vertex || next.is_none() {
+                    proper = false;
+                    break;
+                }
+                memory = next.unwrap();
+                vertex = arc.head;
+            }
+            if proper && vertex == graph.sink {
+                let refreshed = state.column(&self.problem, route, duals, column.tag)?;
+                let rc = refreshed.reduced_cost;
+                if rc < gap - (gap.abs().max(rc.abs()) * 1e-10 + 1e-6) {
+                    retained.push((column.tag, route.clone()));
+                }
+            }
+        }
+        // The regenerated columns use the enumeration coefficient contract,
+        // including admissible cached paths other than the representatives.
+        for (_, route) in &retained {
+            let mut arcs = route.arcs.clone();
+            arcs.sort_unstable();
+            state.cut.enumerated.insert(arcs);
+        }
+        retained
+            .iter()
+            .map(|(tag, route)| state.column(&self.problem, route, duals, *tag))
+            .collect()
+    }
     fn remap_rows(&mut self, rows: &[Option<usize>]) -> Result<()> {
         for row in self.problem.row_map.borrow_mut().iter_mut() {
             *row = rows[*row].ok_or_else(|| invalid("attempt to remove a base or branch row"))?;
@@ -159,7 +265,7 @@ impl<M: LpMaster> Controller<M> for RootController {
     fn separates(&self) -> bool {
         !self.state.borrow().cut.separators().is_empty()
     }
-    fn separate(&mut self, master: &mut M, tags: &[i32]) -> Result<usize> {
+    fn separate(&mut self, master: &mut ClpMaster, tags: &[i32]) -> Result<usize> {
         let mut state = self.state.borrow_mut();
         let state = &mut *state;
         let value = master.objective();
@@ -317,6 +423,35 @@ impl<M: LpMaster> Controller<M> for RootController {
     }
 }
 impl RootController {
+    /// Recover only an engine timeout that explicitly requests saved-point rollback.
+    pub(super) fn recover_pricing_timeout(
+        &mut self, error: crate::core::error::OrError,
+    ) -> Result<(ClpMaster, Output)> {
+        if error.kind != crate::core::error::ErrorKind::Runtime
+            || !error.message.contains("time limit")
+            || !self.state.borrow().solver.requires_rollback
+        {
+            return Err(error);
+        }
+        let Some(checkpoint) = &self.checkpoint else {
+            return Err(error);
+        };
+        let snapshot = &checkpoint.snapshot;
+        // Clone before replacing any state so a failed allocation cannot partially restore it.
+        let master = snapshot.master.try_clone()?;
+        let pricing = snapshot.pricing.fork_for_node();
+        let mut state = self.state.borrow_mut();
+        state.incumbent = state.incumbent.min(snapshot.incumbent);
+        state.cut = snapshot.cut.clone();
+        state.solver = pricing;
+        state.routes = snapshot.routes.clone();
+        state.previous_fixing_gap = checkpoint.previous_fixing_gap;
+        state.enumerated_routes = checkpoint.enumerated_routes;
+        state.route_tags = state.routes.iter().enumerate()
+            .map(|(i, route)| (route.identity(), i as i32)).collect();
+        *self.problem.row_map.borrow_mut() = snapshot.problem.row_map.borrow().clone();
+        Ok((master, checkpoint.output.clone()))
+    }
     fn fixed_rank_one(&self, state: &State, index: usize) -> Result<f64> {
         self.problem.fixed_sum(|route| {
             let path = state

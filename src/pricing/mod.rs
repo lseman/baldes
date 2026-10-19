@@ -83,6 +83,11 @@ impl Solver {
     /// `enumeration_preserve_arc_paths` before enumeration for arc-flow branching.
     #[must_use]
     pub fn fork_for_node(&self) -> Self {
+        self.fork_pricing(true)
+    }
+    /// Drop cost-dependent working state without copying potentially large
+    /// retained path stores. Logical graph and branch restrictions still copy.
+    fn fork_pricing(&self, keep_cost_state: bool) -> Self {
         Self {
             graph: self.graph.clone(),
             forbidden_arcs: self.forbidden_arcs.clone(),
@@ -90,17 +95,30 @@ impl Solver {
             controls: self.controls.clone(),
             options: self.options.clone(),
             phases: self.phases.clone(),
-            engine: self.engine.as_ref().map(LabelingEngine::fork_for_node),
-            enumeration: self.enumeration.as_ref().map(|e| Enumeration {
-                labels: enumeration::Storage::new(e.labels.partitions.len()).unwrap(),
-                paths: e.paths.clone(),
-                completed: e.completed,
-                generated: e.generated,
-            }),
+            engine: if keep_cost_state {
+                self.engine.as_ref().map(LabelingEngine::fork_for_node)
+            } else {
+                None
+            },
+            enumeration: if keep_cost_state {
+                self.enumeration.as_ref().map(|e| Enumeration {
+                    labels: enumeration::Storage::new(e.labels.partitions.len()).unwrap(),
+                    paths: e.paths.clone(),
+                    completed: e.completed,
+                    generated: e.generated,
+                    pruning: e.pruning.clone(),
+                })
+            } else {
+                None
+            },
             enumeration_preserve_arc_paths: self.enumeration_preserve_arc_paths
                 || !self.ryan_foster.is_empty(),
             cutoff: self.cutoff,
-            prepared: self.prepared.clone(),
+            prepared: if keep_cost_state {
+                self.prepared.clone()
+            } else {
+                None
+            },
             bucket_steps: self.bucket_steps,
             rollback_point_saved: self.rollback_point_saved,
             requires_rollback: false,
@@ -110,7 +128,11 @@ impl Solver {
             accumulated_branches: self.accumulated_branches,
             ng_baseline: self.ng_baseline.clone(),
             variable_costs: self.variable_costs.clone(),
-            enumeration_snapshot: self.enumeration_snapshot.clone(),
+            enumeration_snapshot: if keep_cost_state {
+                self.enumeration_snapshot.clone()
+            } else {
+                None
+            },
             cuts: self.cuts.clone(),
             knapsack_resource_indices: self.knapsack_resource_indices.clone(),
             knapsack_pricing: self.knapsack_pricing.clone(),
@@ -221,6 +243,7 @@ impl Solver {
     /// depths, fixed arcs and NG memories, but not the round statistics. A
     /// successful enumeration survives; otherwise it is dropped.
     pub fn refresh_cuts(&mut self) -> Result<()> {
+        self.invalidate_changed_graph();
         let mut knapsack = self.knapsack_pricing.clone();
         let resource_indices = self.knapsack_indices();
         if resource_indices
@@ -392,6 +415,19 @@ impl Solver {
         }
         Ok(())
     }
+    /// The native hard threshold is scaled by fifty until a rollback point
+    /// exists. An explicit caller budget remains an upper limit in either mode.
+    fn pricing_time_limit(&self) -> Result<Duration> {
+        let factor = if self.rollback_point_saved { 1. } else { 50. };
+        let seconds = self
+            .options
+            .get("BALDEShardTimeThresholdInPricing")?
+            .max(0.) * factor;
+        if seconds >= self.controls.time_limit.as_secs_f64() {
+            return Ok(self.controls.time_limit);
+        }
+        Duration::try_from_secs_f64(seconds).map_err(|_| invalid("pricing time limit"))
+    }
     fn engine_controls(&self, exact: bool) -> EngineControls {
         EngineControls {
             bidirectional: self.options.get("BALDESuseBidirectionalSearch").unwrap_or(2.) != 0.,
@@ -441,6 +477,19 @@ impl Solver {
     }
 }
 impl Solver {
+    /// Resource and topology edits invalidate both completion labels and paths.
+    /// Reduced costs are deliberately excluded by `same_topology`.
+    fn invalidate_changed_graph(&mut self) {
+        if self
+            .prepared
+            .as_ref()
+            .into_iter()
+            .chain(self.enumeration_snapshot.as_ref())
+            .any(|snapshot| !snapshot.same_topology(&self.graph))
+        {
+            self.restore_arcs();
+        }
+    }
     fn topology(&self) -> Graph {
         let mut graph = self.graph.clone();
         for a in &mut graph.arcs {

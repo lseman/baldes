@@ -152,10 +152,12 @@ fn restricted_value(
         for &(r, a) in &child.route_entries {
             *entries.entry(r).or_insert(0.) += a;
         }
-        for (offset,branch) in branches.iter().enumerate() {
-            if matches!(branch,BranchConstraint::RyanFoster(_)) {
-                let value=branch.coefficient(problem,route);
-                if value!=0. {entries.insert(problem.rows.len()+offset,value);}
+        for (offset, branch) in branches.iter().enumerate() {
+            if matches!(branch, BranchConstraint::RyanFoster(_)) {
+                let value = branch.coefficient(problem, route);
+                if value != 0. {
+                    entries.insert(problem.rows.len() + offset, value);
+                }
             }
         }
         master.add_column(
@@ -189,8 +191,16 @@ pub(super) fn choose(
     output: &mut TreeOutput,
     deadline: Instant,
 ) -> Result<Option<(super::candidates::BranchCandidate, [f64; 2])>> {
-    let mut candidates: Vec<_> = supplied.into_iter().enumerate().map(|(order,branch)|
-        Candidate {branch,order,score:0.,bounds:[node.bound;2]}).collect();
+    let mut candidates: Vec<_> = supplied
+        .into_iter()
+        .enumerate()
+        .map(|(order, branch)| Candidate {
+            branch,
+            order,
+            score: 0.,
+            bounds: [node.bound; 2],
+        })
+        .collect();
     let Some(config) = &options.strong_branching else {
         return Ok(candidates.first().map(|c| (c.branch.clone(), c.bounds)));
     };
@@ -202,8 +212,13 @@ pub(super) fn choose(
         }
         for candidate in &mut candidates {
             let mut estimates = [node.bound; 2];
-            for (side,constraint) in [candidate.branch.down.clone(),candidate.branch.up.clone()].into_iter().enumerate() {
-                if Instant::now() >= end {break;}
+            for (side, constraint) in [candidate.branch.down.clone(), candidate.branch.up.clone()]
+                .into_iter()
+                .enumerate()
+            {
+                if Instant::now() >= end {
+                    break;
+                }
                 let mut branches = node.branches.clone();
                 branches.push(constraint);
                 output.strong_branching_trials += 1;
@@ -212,6 +227,7 @@ pub(super) fn choose(
                 } else {
                     let result = evaluate(
                         parent,
+                        None,
                         problem,
                         &branches,
                         pool,

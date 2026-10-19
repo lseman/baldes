@@ -309,7 +309,9 @@ mod routing {
         options.strong_branching = None;
         options.diving = None;
         options.enumerated_mip = Some(MipOptions::default());
-        options.mip_node_limit = 0;
+        // Automatic enumeration needs a finite incumbent gap. Keep the
+        // feasible-witness heuristic enabled instead of relying on implicit
+        // singleton columns in the root master.
         let result = tree::solve(problem.clone(), options.clone()).unwrap();
         assert_eq!(result.status, TreeStatus::Optimal, "{result:?}");
         assert!(result.enumerated_mip_calls > 0, "{result:?}");

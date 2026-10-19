@@ -79,7 +79,46 @@ impl RootProblem {
     }
     /// Add a branch to a fresh problem before constructing its master.
     pub fn branch(&mut self, constraint: BranchConstraint) -> Result<()> {
+        constraint.validate(self)?;
+        if self.tighten_vehicle_upper(&constraint)? {
+            return Ok(());
+        }
         self.append_constraint(constraint, self.rows.len())
+    }
+    /// A matching vehicle upper bound is a bound change on the fleet row.
+    /// Keep its branch history without adding another copy of its coefficients.
+    pub(super) fn tighten_vehicle_upper(&mut self, constraint: &BranchConstraint) -> Result<bool> {
+        let BranchConstraint::NumberOfVehicles {
+            sense: RowSense::LessEqual,
+            rhs,
+            ..
+        } = constraint
+        else {
+            return Ok(false);
+        };
+        if self
+            .rows
+            .first()
+            .map_or(true, |row| row.sense != RowSense::LessEqual)
+            || self
+                .route_entries
+                .iter()
+                .any(|&(row, value)| row == 0 && value != 0.)
+            || self.arc_entries.iter().enumerate().any(|(arc, entries)| {
+                entries
+                    .iter()
+                    .filter(|&&(row, _)| row == 0)
+                    .map(|&(_, value)| value)
+                    .sum::<f64>()
+                    != constraint.arc_coefficient(self, arc)
+            })
+        {
+            return Ok(false);
+        }
+        let residual = rhs - self.fixed_sum(|route| Ok(constraint.coefficient(self, route)))?;
+        self.rows[0].rhs = self.rows[0].rhs.min(residual);
+        self.branch_constraints.push((0, constraint.clone()));
+        Ok(true)
     }
     pub(crate) fn append_constraint(
         &mut self,
@@ -184,6 +223,7 @@ impl RootProblem {
                 return None;
             }
         }
+        let mut resource_profile = vec![q[..g.resources.len()].to_vec()];
         let mut cost = 0.;
         for &id in ids {
             let arc = &g.arcs[self.arc_position(id)?];
@@ -197,6 +237,7 @@ impl RootProblem {
             }
             cost += arc.cost;
             nodes.push(at as i32);
+            resource_profile.push(q[..g.resources.len()].to_vec());
         }
         if at != g.sink || visited.is_empty() {
             return None;
@@ -207,6 +248,7 @@ impl RootProblem {
             cost,
             original_cost: cost,
             resources: q[..g.resources.len()].to_vec(),
+            resource_profile,
         })
     }
 }

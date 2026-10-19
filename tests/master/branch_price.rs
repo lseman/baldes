@@ -23,6 +23,45 @@ fn options() -> TreeOptions {
     }
 }
 #[test]
+fn integer_heuristic_incumbent_bounds_the_original_arc_sum() {
+    let mut graph = baldes::Graph::new(3, 1).unwrap();
+    for vertex in 0..3 {
+        graph.set_bounds(vertex, 0, 0., 10.).unwrap();
+    }
+    graph.add_arc(0, 1, 1e16).unwrap();
+    graph.add_arc(1, 2, 1.).unwrap();
+    let problem = RootProblem::set_partitioning(graph, 1.).unwrap();
+    let mut controls = options();
+    controls.node_limit = 0;
+    let output = tree::solve(problem, controls).unwrap();
+    // The exact original sum is 10^16 + 1, between adjacent doubles.
+    // An ordinary route-cost sum rounds down and is not an upper bound.
+    assert_eq!(output.incumbent, f64::from_bits(1e16f64.to_bits() + 1));
+    assert_eq!(output.routes.len(), 1);
+    assert_eq!(output.status, TreeStatus::NodeLimit);
+}
+#[test]
+fn tolerance_closed_tree_keeps_its_lower_certificate() {
+    let mut graph = baldes::Graph::new(4, 1).unwrap();
+    for vertex in 0..4 {
+        graph.set_bounds(vertex, 0, 0., 10.).unwrap();
+    }
+    for (tail, head, cost) in [(0, 1, 0.), (1, 3, 1.), (0, 2, 0.), (2, 3, 1.), (1, 2, 0.)] {
+        graph.add_arc(tail, head, cost).unwrap();
+    }
+    let problem = RootProblem::set_partitioning(graph, 2.).unwrap();
+    let mut controls = options();
+    controls.absolute_gap = 3.;
+    controls.relative_gap = 0.;
+    let output = tree::solve(problem, controls).unwrap();
+    // Initial singleton heuristic costs 2. The unpriced pair route costs 1.
+    // Closing at the requested gap cannot turn that incumbent into a lower bound.
+    assert_eq!(output.status, TreeStatus::Optimal);
+    assert_eq!(output.nodes, 0);
+    assert_eq!(output.incumbent, 2.);
+    assert_eq!(output.bound, 0.);
+}
+#[test]
 fn tree_closes_fractional_root_with_and_without_integer_heuristic() {
     let instance = triangle();
     for (mip, fleet) in [(0, 2.), (0, 3.), (10000, 2.), (10000, 3.)] {
@@ -38,7 +77,7 @@ fn tree_closes_fractional_root_with_and_without_integer_heuristic() {
             "must branch rather than certify a restricted MIP optimum"
         );
         assert!((out.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6, "{out:?}");
-        assert_eq!(out.bound, out.incumbent);
+        assert_eq!(out.bound, 4. + 2f64.sqrt());
         assert_eq!(out.open_nodes, 0);
         assert!(out.routes.len() as f64 <= fleet);
         let mut visited: Vec<_> = out
@@ -165,7 +204,7 @@ fn strong_branching_solves_with_certified_child_bounds() {
     assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");
     assert!(out.strong_branching_trials > 0);
     assert!((out.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6);
-    assert_eq!(out.bound, out.incumbent);
+    assert_eq!(out.bound, 4. + 2f64.sqrt());
 }
 
 #[test]

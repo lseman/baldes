@@ -157,6 +157,44 @@ mod tests {
         (problem, options, pair, single)
     }
     #[test]
+    fn vehicle_upper_bound_and_fixed_route_subtraction_commute() {
+        let (problem, options, pair, _) = fixture(0);
+        let graph_id = problem.graph.graph_id.max(0);
+        let parent = solve(problem, options.clone()).unwrap();
+        let parent = parent.snapshot.as_ref().unwrap();
+        let branch = BranchConstraint::NumberOfVehicles {
+            graph_id,
+            sense: RowSense::LessEqual,
+            rhs: 2.,
+        };
+        let fixed = [FixedRoute {
+            arcs: pair,
+            quantity: 1,
+        }];
+        let branched = inherit_branches(parent, &[branch.clone()], options.clone()).unwrap();
+        let (after_branch, master, _) = residual_fork(
+            branched.snapshot.as_ref().unwrap(),
+            &fixed,
+            options.cg.artificial_cost,
+        )
+        .unwrap();
+        assert_eq!(after_branch.rows[0].rhs, 1.);
+        assert_eq!(master.rhs[0], 1.);
+        assert_eq!(master.rhs.len(), 4);
+        let partial = inherit_fixed_routes(parent, &fixed, options.clone()).unwrap();
+        let (after_fixing, master, _) = partial
+            .snapshot
+            .as_ref()
+            .unwrap()
+            .fork(&[branch], options.cg.artificial_cost)
+            .unwrap();
+        assert_eq!(after_fixing.rows[0].rhs, 1.);
+        assert_eq!(master.rhs[0], 1.);
+        assert_eq!(master.rhs.len(), 4);
+        assert_eq!(parent.master.rhs[0], 3.);
+        assert_eq!(parent.branch_depth(), 0);
+    }
+    #[test]
     fn fixed_cut_contributions_shift_physical_rows_once_and_leave_the_parent_intact() {
         for family in 1..5 {
             let (problem, options, pair, _) = fixture(family);

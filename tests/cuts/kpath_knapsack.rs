@@ -609,6 +609,244 @@ fn knapsack_and_kpath_options_configure_separators() {
 // ============================================================================
 
 #[test]
+fn exhaustive_mixed_cut_lifecycle_preserves_enumerated_routes() {
+    use baldes::cuts::CutClass;
+
+    // Deliberately independent of cut preparation, route reconstruction and
+    // coefficient helpers: enumerate every elementary path by DFS.
+    fn paths(g: &Graph, v: usize, seen: u32, path: &mut Vec<i32>, out: &mut Vec<Vec<i32>>) {
+        if v == g.sink {
+            out.push(path.clone());
+            return;
+        }
+        for a in g.arcs.iter().filter(|a| a.tail == v) {
+            if seen & (1 << a.head) != 0 {
+                continue;
+            }
+            path.push(a.id);
+            paths(g, a.head, seen | (1 << a.head), path, out);
+            path.pop();
+        }
+    }
+
+    for covering in [false, true] {
+        for scan in [0., 1.] {
+            for cyclic in [false, true] {
+                let mut solver = Solver::new(6, 1).unwrap();
+                solver.graph.elementary = true;
+                solver.enumeration_preserve_arc_paths = true;
+                for v in 0..6 {
+                    solver.graph.set_bounds(v, 0, 0., 5.).unwrap();
+                }
+                for tail in 0..5 {
+                    for head in 1..6 {
+                        if head == tail || (!cyclic && head < tail) {
+                            continue;
+                        }
+                        let id = (tail * 19 + head * 3) as i32;
+                        solver
+                            .graph
+                            .add_arc_with_id(id, tail, head, head.abs_diff(tail) as f64 * 0.25)
+                            .unwrap();
+                        solver.graph.arc_mut(id).unwrap().consumption[0] = 1.;
+                    }
+                }
+                solver
+                    .options
+                    .set("BALDESuseExactComplBoundsInEnumeration", scan)
+                    .unwrap();
+                // Build two rank-one rows with identical support and one k-path.
+                for dual in [-0.25, -0.5] {
+                    let i = solver
+                        .cuts
+                        .add_strong_k_path_cut(6, &[1, 2, 3], 1, dual)
+                        .unwrap();
+                    let row = &mut solver.cuts.cuts[i];
+                    row.visit_once = false;
+                    row.denominator = 3;
+                    row.class = if covering {
+                        CutClass::Covering
+                    } else {
+                        CutClass::Packing
+                    };
+                }
+                solver
+                    .cuts
+                    .add_strong_k_path_cut(6, &[1, 3], 1, -0.75)
+                    .unwrap();
+                let original = solver.cuts.cuts.clone();
+                let mut all_paths = vec![];
+                paths(&solver.graph, 0, 1, &mut vec![], &mut all_paths);
+                assert_eq!(all_paths.len(), if cyclic { 65 } else { 16 });
+
+                for stage in 0..7 {
+                    match stage {
+                        1 => {
+                            for row in &mut solver.cuts.cuts {
+                                row.dual *= if row.class == CutClass::Covering {
+                                    -2.
+                                } else {
+                                    2.
+                                };
+                            }
+                        }
+                        2 => {
+                            solver.cuts.cuts.reverse();
+                            for arc in &mut solver.graph.arcs {
+                                arc.reduced_cost += 0.25;
+                            }
+                        }
+                        3 => {
+                            let row = solver.cuts.cuts.iter_mut().find(|r| !r.visit_once).unwrap();
+                            row.weights[3] = 0;
+                            row.ordered_support = Some(vec![(1, 1), (2, 1)]);
+                        }
+                        4 => solver.cuts.retire(1),
+                        5 => {
+                            solver.cuts.retired.clear();
+                            solver.cuts.cuts = original.clone();
+                        }
+                        6 => solver.cuts.cuts.clear(),
+                        _ => {}
+                    }
+                    let mut expected = BTreeMap::new();
+                    for ids in &all_paths {
+                        let arcs: Vec<_> = ids
+                            .iter()
+                            .map(|id| solver.graph.arcs.iter().find(|a| a.id == *id).unwrap())
+                            .collect();
+                        let mut cost: f64 = arcs.iter().map(|a| a.reduced_cost).sum();
+                        let physical: Vec<_> =
+                            arcs.iter().map(|a| (a.tail, a.head, a.id)).collect();
+                        for (i, row) in solver.cuts.cuts.iter().enumerate() {
+                            if solver.cuts.retired.contains(&i) {
+                                continue;
+                            }
+                            let sum: i32 = arcs.iter().map(|a| row.weights[a.head]).sum();
+                            let coefficient = if row.visit_once {
+                                i32::from(sum > 0)
+                            } else if row.class == CutClass::Covering {
+                                (sum + row.denominator - 1) / row.denominator
+                            } else {
+                                sum / row.denominator
+                            };
+                            assert_eq!(
+                                solver
+                                    .cuts
+                                    .route_coefficient(&solver.graph, i, &physical, true)
+                                    .unwrap(),
+                                coefficient
+                            );
+                            cost -= row.dual * coefficient as f64;
+                        }
+                        expected.insert(ids.clone(), cost);
+                    }
+                    // Stage zero runs actual pricing. Later stages first exercise
+                    // repricing of the retained complete universe.
+                    let priced = solver.price_phase(0, 100, false).unwrap();
+                    assert!(priced.exact);
+                    assert_eq!(
+                        priced.minimum_reduced_cost,
+                        expected.values().copied().min_by(f64::total_cmp).unwrap()
+                    );
+                    if stage > 0 {
+                        let actual: BTreeMap<_, _> = priced
+                            .columns
+                            .iter()
+                            .map(|r| (r.arcs.clone(), r.cost))
+                            .collect();
+                        assert_eq!(
+                            actual, expected,
+                            "retained stage {stage}, covering={covering}, scan={scan}"
+                        );
+                    }
+                    let routes = solver.enumerate(100.).unwrap();
+                    let actual: BTreeMap<_, _> = routes
+                        .iter()
+                        .map(|r| {
+                            let mut nodes = vec![0];
+                            for id in &r.arcs {
+                                let a = solver.graph.arcs.iter().find(|a| a.id == *id).unwrap();
+                                assert_eq!(*nodes.last().unwrap(), a.tail);
+                                nodes.push(a.head);
+                            }
+                            assert_eq!(
+                                r.nodes,
+                                nodes.iter().map(|&v| v as i32).collect::<Vec<_>>()
+                            );
+                            (r.arcs.clone(), r.cost)
+                        })
+                        .collect();
+                    assert_eq!(routes.len(), actual.len());
+                    assert_eq!(
+                        actual, expected,
+                        "enumeration stage {stage}, covering={covering}, scan={scan}"
+                    );
+                    // Strict cutoff at an exactly representable cost, including
+                    // repricing a retained universe and building a new one.
+                    for cutoff in [2., 3., 4.] {
+                        // Inspection removes paths, so restore the full universe
+                        // before testing a different cutoff.
+                        solver.enumerate(100.).unwrap();
+                        let below: BTreeMap<_, _> = expected
+                            .iter()
+                            .filter(|(_, cost)| **cost < cutoff)
+                            .map(|(path, cost)| (path.clone(), *cost))
+                            .collect();
+                        let inspected = solver.inspect_enumeration(cutoff).unwrap().unwrap();
+                        assert_eq!(
+                            inspected
+                                .iter()
+                                .map(|r| (r.arcs.clone(), r.cost))
+                                .collect::<BTreeMap<_, _>>(),
+                            below
+                        );
+                        let filtered = solver.enumerate(cutoff).unwrap();
+                        assert_eq!(
+                            filtered
+                                .iter()
+                                .map(|r| (r.arcs.clone(), r.cost))
+                                .collect::<BTreeMap<_, _>>(),
+                            below
+                        );
+                    }
+                    // Discard all cached state and compare fresh pricing and
+                    // enumeration with the same oracle, then retain the universe
+                    // for the next lifecycle mutation.
+                    solver.restore_arcs();
+                    let fresh = solver.price_phase(0, 100, false).unwrap();
+                    assert!(fresh.exact);
+                    assert_eq!(
+                        fresh.minimum_reduced_cost,
+                        expected.values().copied().min_by(f64::total_cmp).unwrap(),
+                        "fresh stage {stage}, covering={covering}, scan={scan}, cyclic={cyclic}"
+                    );
+                    let duals: Vec<_> = solver.cuts.cuts.iter().map(|row| row.dual).collect();
+                    for row in &mut solver.cuts.cuts {
+                        row.dual *= 2.;
+                    }
+                    solver.refresh_cuts().unwrap();
+                    for (row, dual) in solver.cuts.cuts.iter_mut().zip(duals) {
+                        row.dual = dual;
+                    }
+                    let updated = solver.price_phase(0, 100, false).unwrap();
+                    assert!(updated.exact);
+                    assert_eq!(updated.minimum_reduced_cost, fresh.minimum_reduced_cost);
+                    let rebuilt = solver.enumerate(100.).unwrap();
+                    assert_eq!(
+                        rebuilt
+                            .iter()
+                            .map(|r| (r.arcs.clone(), r.cost))
+                            .collect::<BTreeMap<_, _>>(),
+                        expected
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn enumeration_reprices_current_arc_and_strong_k_path_duals() {
     for covering in [false, true] {
         let mut solver = Solver::new(4, 0).unwrap();

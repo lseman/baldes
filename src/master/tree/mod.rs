@@ -148,6 +148,7 @@ fn feasible_route(problem: &RootProblem, ids: &[i32]) -> Option<Route> {
     problem.elementary_route(ids)
 }
 struct IntegerSearch<'a> {
+    problem: &'a RootProblem,
     pool: &'a Pool,
     by_customer: Vec<Vec<usize>>,
     customers: &'a [usize],
@@ -185,12 +186,17 @@ impl IntegerSearch<'_> {
             }
         }
         let Some(v) = selected else {
-            *self.best = cost;
-            *self.solution = self
+            let routes = self
                 .chosen
                 .iter()
                 .map(|&r| self.pool.routes[r].clone())
-                .collect();
+                .collect::<Vec<_>>();
+            if let Some(upper) = self.problem.unit_route_incumbent(&routes) {
+                if upper < *self.best {
+                    *self.best = upper;
+                    *self.solution = routes;
+                }
+            }
             return;
         };
         if self.chosen.len() >= self.fleet {
@@ -244,6 +250,7 @@ fn integer_heuristic(
         });
     }
     let mut search = IntegerSearch {
+        problem,
         pool,
         by_customer,
         customers: &problem.customers,
@@ -260,16 +267,17 @@ fn integer_heuristic(
     search.nodes
 }
 fn closed(bound: f64, incumbent: f64, options: &TreeOptions) -> bool {
-    bound == f64::INFINITY || (incumbent.is_finite()
-        && bound
-            >= incumbent
-                - options.absolute_gap
-                - options.relative_gap * incumbent.abs().max(bound.abs()))
+    bound == f64::INFINITY
+        || (incumbent.is_finite()
+            && bound
+                >= incumbent
+                    - options.absolute_gap
+                    - options.relative_gap * incumbent.abs().max(bound.abs()))
 }
 fn branch_problem(problem: &RootProblem, branches: &[Branch]) -> Result<RootProblem> {
     let mut child = problem.clone();
     for branch in branches {
-        child.append_constraint(branch.clone(), child.rows.len())?;
+        child.branch(branch.clone())?;
     }
     Ok(child)
 }
@@ -278,9 +286,10 @@ fn budget_error(error: &crate::core::error::OrError) -> bool {
 }
 fn evaluate(
     parent: Option<&Rc<root::NodeSnapshot>>,
+    previous: Option<&root::NodeSnapshot>,
     problem: &RootProblem,
     branches: &[Branch],
-    pool: &Pool,
+    _pool: &Pool,
     options: &TreeOptions,
     incumbent: f64,
     deadline: Instant,
@@ -295,7 +304,13 @@ fn evaluate(
     controls.cg.max_iterations = max_iterations;
     controls.cg.time_limit = deadline.saturating_duration_since(Instant::now());
     controls.cg.multiplicity = problem.customers.len() as f64;
-    controls.initial_routes = pool.routes.clone();
+    // Explicit seeds enter the root. Child masters inherit their own snapshot;
+    // the global integer pool does not preload routes from other evaluations.
+    controls.initial_routes = if parent.is_some() {
+        vec![]
+    } else {
+        options.root.initial_routes.clone()
+    };
     controls.incumbent = incumbent;
     controls.enumerate = options.root.enumerate && floor == 0;
     // Bound trial pricing by its own remaining time as well as the CG limit.
@@ -318,7 +333,7 @@ fn evaluate(
         if depth > branches.len() {
             return Err(invalid("parent branch depth exceeds child branches"));
         }
-        root::inherit_branches(parent, &branches[depth..], controls)
+        root::inherit_with_history(parent, &branches[depth..], previous, controls)
     } else {
         root::solve(branch_problem(problem, branches)?, controls)
     }
@@ -427,9 +442,20 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
         parent: None,
     }];
     let mut unresolved = vec![];
+    // Tolerance closure does not strengthen a node's lower certificate to
+    // the incumbent. These leaves still contribute to the global minimum.
+    let mut closed_bound = f64::INFINITY;
+    let mut previous = None::<Rc<root::NodeSnapshot>>;
     while !open.is_empty() {
         // Discard only nodes whose certified bound closes the global gap.
-        open.retain(|n| !closed(n.bound, output.incumbent, &options));
+        open.retain(|n| {
+            if closed(n.bound, output.incumbent, &options) {
+                closed_bound = closed_bound.min(n.bound);
+                false
+            } else {
+                true
+            }
+        });
         if open.is_empty() {
             break;
         }
@@ -448,6 +474,7 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
         let parent_ref = node.parent.as_ref();
         let result = match evaluate(
             parent_ref,
+            previous.as_deref(),
             &problem,
             &node.branches,
             &pool,
@@ -471,6 +498,9 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
             Err(error) => return Err(error),
         };
         output.nodes += 1;
+        if let Some(snapshot) = &result.snapshot {
+            previous = Some(snapshot.clone());
+        }
         output.pricing_calls += result.master.pricing_calls;
         output.fixing_calls += result.fixing_calls;
         output.enumerated_routes += result.enumerated_routes;
@@ -504,6 +534,7 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
             deadline,
         )?;
         if closed(node.bound, output.incumbent, &options) {
+            closed_bound = closed_bound.min(node.bound);
             continue;
         }
         if result.master.status != Status::Optimal
@@ -544,6 +575,7 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
             deadline,
         )?;
         if closed(node.bound, output.incumbent, &options) {
+            closed_bound = closed_bound.min(node.bound);
             continue;
         }
         let branch = strong::choose(
@@ -557,7 +589,7 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
             deadline,
         )?;
         if let Some((candidate, bounds)) = branch {
-            for (side, constraint) in [candidate.down, candidate.up].into_iter().enumerate() {
+            for (side, constraint) in [(1, candidate.up), (0, candidate.down)] {
                 let mut branches = node.branches.clone();
                 branches.push(constraint);
                 open.push(Node {
@@ -604,7 +636,7 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
                     cover[v as usize] += 1;
                 }
             }
-            let cost = routes.iter().map(|r| r.original_cost).sum::<f64>();
+            let cost = problem.unit_route_incumbent(&routes).unwrap_or(f64::INFINITY);
             if problem.customers.iter().all(|&v| cover[v] == 1)
                 && routes.len() as f64 <= problem.rows[0].rhs
                 && cost < output.incumbent
@@ -614,18 +646,37 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
             }
             if !closed(node.bound, output.incumbent, &options) {
                 unresolved.push(node);
+            } else {
+                closed_bound = closed_bound.min(node.bound);
             }
         }
     }
-    unresolved.retain(|n| !closed(n.bound, output.incumbent, &options));
+    unresolved.retain(|n| {
+        if closed(n.bound, output.incumbent, &options) {
+            closed_bound = closed_bound.min(n.bound);
+            false
+        } else {
+            true
+        }
+    });
     if open.is_empty() && !unresolved.is_empty() {
         output.status = TreeStatus::Incomplete;
     }
     open.extend(unresolved);
     output.open_nodes = open.len();
     if open.is_empty() && output.incumbent.is_finite() {
-        output.status = TreeStatus::Optimal;
-        output.bound = output.incumbent;
+        output.bound = if closed_bound.is_finite() {
+            closed_bound.min(output.incumbent)
+        } else {
+            // Routing costs are nonnegative; no finite leaf certificate was
+            // retained. An incumbent alone cannot strengthen this baseline.
+            0.
+        };
+        output.status = if closed(output.bound, output.incumbent, &options) {
+            TreeStatus::Optimal
+        } else {
+            TreeStatus::Incomplete
+        };
     } else if open.is_empty() {
         output.status = TreeStatus::Infeasible;
         output.bound = f64::INFINITY;
@@ -633,8 +684,86 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
         output.bound = open
             .iter()
             .map(|n| n.bound)
-            .fold(output.incumbent, f64::min);
+            .fold(closed_bound.min(output.incumbent), f64::min);
     }
     output.seconds = started.elapsed().as_secs_f64();
     Ok(output)
+}
+
+#[cfg(test)]
+mod pool_tests {
+    use super::*;
+
+    #[test]
+    fn global_integer_pool_does_not_preload_child_masters() {
+        let instance = crate::vrptw::Instance::parse("one\nVEHICLE\nNUMBER CAPACITY\n1 1\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n").unwrap();
+        let problem = RootProblem::set_partitioning(
+            instance.graph(1, crate::vrptw::Rounding::None).unwrap(),
+            1.,
+        )
+        .unwrap();
+        let mut options = TreeOptions::default();
+        options.root.capture_state = true;
+        options.root.enumerate = false;
+        options.root.cg.time_limit = Duration::ZERO;
+        let root = root::solve(problem.clone(), options.root.clone()).unwrap();
+        let parent = root.snapshot.unwrap();
+        let arcs: Vec<_> = problem.graph.arcs.iter().map(|arc| arc.id).collect();
+        assert_eq!(arcs.len(), 2);
+        let mut pool = Pool {
+            routes: vec![],
+            customers: vec![],
+            seen: HashSet::new(),
+        };
+        pool.add(&problem, &arcs);
+        assert_eq!(pool.routes.len(), 1);
+        let child = evaluate(
+            Some(&parent),
+            None,
+            &problem,
+            &[],
+            &pool,
+            &options,
+            f64::INFINITY,
+            Instant::now(),
+            1,
+            0,
+            true,
+        )
+        .unwrap();
+        assert!(child.routes.is_empty());
+        options.root.initial_routes = pool.routes.clone();
+        let seeded = evaluate(
+            Some(&parent),
+            None,
+            &problem,
+            &[],
+            &pool,
+            &options,
+            f64::INFINITY,
+            Instant::now(),
+            1,
+            0,
+            true,
+        )
+        .unwrap();
+        assert!(seeded.routes.is_empty());
+        let fresh = evaluate(
+            None,
+            None,
+            &problem,
+            &[],
+            &pool,
+            &options,
+            f64::INFINITY,
+            Instant::now(),
+            1,
+            0,
+            true,
+        )
+        .unwrap();
+        assert_eq!(fresh.routes.len(), 1);
+        assert_eq!(fresh.routes[0].arcs, arcs);
+        assert!(root.routes.is_empty());
+    }
 }

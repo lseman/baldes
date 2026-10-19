@@ -6,10 +6,11 @@
 //! dual-feasible columns keeps the current solution, and cut cleanup uses the
 //! shared [`crate::master::lp_master::cleanup_cut_rows`]. HiGHS follows its own pivot
 //! rules, so trajectories differ from Clp's even on identical masters.
-use crate::master::{LpMaster, RowSense};
+use crate::master::{LpMaster, LpSolveOutcome, RowSense};
 use crate::{incomplete, invalid, Result};
 use std::ffi::{c_char, c_double, c_void, CString};
 use std::ptr::NonNull;
+use std::time::{Duration, Instant};
 
 /// `HighsInt` of the default (32-bit) HiGHS build.
 type HighsInt = i32;
@@ -20,6 +21,12 @@ extern "C" {
     fn Highs_run(highs: *mut c_void) -> HighsInt;
     fn Highs_setBoolOptionValue(highs: *mut c_void, option: *const c_char, value: HighsInt) -> HighsInt;
     fn Highs_setDoubleOptionValue(highs: *mut c_void, option: *const c_char, value: c_double) -> HighsInt;
+    fn Highs_getDoubleOptionValue(highs: *const c_void, option: *const c_char, value: *mut f64) -> HighsInt;
+    fn Highs_getRunTime(highs: *const c_void) -> f64;
+    #[cfg(test)]
+    fn Highs_setIntOptionValue(highs: *mut c_void, option: *const c_char, value: HighsInt) -> HighsInt;
+    #[cfg(test)]
+    fn Highs_setStringOptionValue(highs: *mut c_void, option: *const c_char, value: *const c_char) -> HighsInt;
     fn Highs_getInfinity(highs: *const c_void) -> c_double;
     fn Highs_addRow(
         highs: *mut c_void,
@@ -77,7 +84,32 @@ const MODEL_OPTIMAL: HighsInt = 7;
 const MODEL_INFEASIBLE: HighsInt = 8;
 const MODEL_UNBOUNDED_OR_INFEASIBLE: HighsInt = 9;
 const MODEL_UNBOUNDED: HighsInt = 10;
+const MODEL_TIME_LIMIT: HighsInt = 13;
+const MODEL_ITERATION_LIMIT: HighsInt = 14;
 const BASIS_BASIC: HighsInt = 1;
+
+struct ScopedTimeLimit {
+    highs: NonNull<c_void>,
+    previous: f64,
+    active: bool,
+}
+impl ScopedTimeLimit {
+    fn restore(&mut self) -> Result<()> {
+        // SAFETY: this private guard is scoped within the owned model's borrow.
+        let status = unsafe { Highs_setDoubleOptionValue(self.highs.as_ptr(), b"time_limit\0".as_ptr().cast(), self.previous) };
+        HighsMaster::check(status, "restore time_limit")?;
+        self.active = false;
+        Ok(())
+    }
+}
+impl Drop for ScopedTimeLimit {
+    fn drop(&mut self) {
+        if self.active {
+            // SAFETY: the model outlives this local guard, including unwinding.
+            unsafe { Highs_setDoubleOptionValue(self.highs.as_ptr(), b"time_limit\0".as_ptr().cast(), self.previous); }
+        }
+    }
+}
 /// Column upper bound, as the Clp master (columns carry 1e12).
 const COLUMN_UPPER: f64 = 1e12;
 
@@ -309,18 +341,39 @@ impl LpMaster for HighsMaster {
     }
 
     fn solve(&mut self) -> bool {
+        if self.costs.is_empty() {
+            // No variable can satisfy a nonzero required activity. Do not
+            // interpret a backend "empty model" status as feasibility.
+            let feasible = self.senses.iter().zip(&self.rhs).all(|(sense, &rhs)| match sense {
+                RowSense::Equal => rhs == 0.,
+                RowSense::LessEqual => rhs >= 0.,
+                RowSense::GreaterEqual => rhs <= 0.,
+            });
+            self.status = if feasible { 0 } else { 1 };
+            self.solved = feasible;
+            if feasible {
+                self.objective = self.objective_offset;
+                self.values.clear();
+                self.reduced_costs.clear();
+                self.duals = vec![0.; self.rhs.len()];
+                self.row_status = vec![BASIS_BASIC; self.rhs.len()];
+            }
+            return feasible;
+        }
         let h = self.highs.as_ptr();
         // SAFETY: live handle; the buffers below have the model's dimensions.
         unsafe {
             if Highs_run(h) == STATUS_ERROR {
-                self.status = -1;
+                self.status = 4;
                 self.solved = false;
                 return false;
             }
             self.status = match Highs_getModelStatus(h) {
                 MODEL_OPTIMAL => 0,
                 MODEL_INFEASIBLE => 1,
-                MODEL_UNBOUNDED | MODEL_UNBOUNDED_OR_INFEASIBLE => 2,
+                MODEL_UNBOUNDED => 2,
+                MODEL_TIME_LIMIT | MODEL_ITERATION_LIMIT => 3,
+                MODEL_UNBOUNDED_OR_INFEASIBLE => -1,
                 _ => -1,
             };
             self.solved = self.status == 0;
@@ -353,6 +406,59 @@ impl LpMaster for HighsMaster {
             }
         }
         true
+    }
+
+    fn solve_with_time_limit(&mut self, remaining: Duration) -> Result<LpSolveOutcome> {
+        let started = Instant::now();
+        if remaining.is_zero() {
+            self.status = 3;
+            self.solved = false;
+            return Ok(LpSolveOutcome::TimeLimit);
+        }
+        let mut previous = 0.;
+        // SAFETY: live handle; option getter writes one double. HiGHS run time
+        // is cumulative across Highs_run calls, as is its time_limit option.
+        let runtime = unsafe {
+            Self::check(Highs_getDoubleOptionValue(self.highs.as_ptr(), b"time_limit\0".as_ptr().cast(), &mut previous), "get time_limit")?;
+            Highs_getRunTime(self.highs.as_ptr())
+        };
+        if !runtime.is_finite() || runtime < 0. || previous.is_nan() || previous < 0. {
+            return Err(invalid("HiGHS time budget"));
+        }
+        if previous <= runtime {
+            self.status = 3;
+            self.solved = false;
+            return Ok(LpSolveOutcome::TimeLimit);
+        }
+        self.set_double("time_limit", previous.min(runtime + remaining.as_secs_f64()))?;
+        let mut guard = ScopedTimeLimit { highs: self.highs, previous, active: true };
+        let solved = self.solve();
+        if let Err(error) = guard.restore() {
+            self.status = 4;
+            self.solved = false;
+            return Err(error);
+        }
+        if started.elapsed() >= remaining {
+            self.status = 3;
+            self.solved = false;
+            return Ok(LpSolveOutcome::TimeLimit);
+        }
+        Ok(if solved { LpSolveOutcome::Optimal } else {
+            match self.status {
+                1 => LpSolveOutcome::PrimalInfeasible,
+                2 => LpSolveOutcome::DualInfeasible,
+                3 => {
+                    // SAFETY: live model; only inspect a successfully returned stop.
+                    match unsafe { Highs_getModelStatus(self.highs.as_ptr()) } {
+                        MODEL_TIME_LIMIT => LpSolveOutcome::TimeLimit,
+                        MODEL_ITERATION_LIMIT => LpSolveOutcome::IterationLimit,
+                        _ => LpSolveOutcome::Stopped,
+                    }
+                }
+                4 => LpSolveOutcome::Failed,
+                _ => LpSolveOutcome::Unknown,
+            }
+        })
     }
 
     fn duals(&self) -> &[f64] {
@@ -516,3 +622,89 @@ fn entries_of(entries: &[(usize, f64)], size: usize) -> Result<(Vec<HighsInt>, V
 
 mod integer;
 pub use integer::solve_integer;
+
+#[cfg(test)]
+mod limit_tests {
+    use super::*;
+    use crate::master::column_generation::{self as cg, NoController};
+
+    fn time_limit(master: &HighsMaster) -> f64 {
+        let mut value = 0.;
+        // SAFETY: live model and valid output scalar / NUL-terminated option.
+        unsafe { HighsMaster::check(Highs_getDoubleOptionValue(master.highs.as_ptr(), b"time_limit\0".as_ptr().cast(), &mut value), "get time_limit").unwrap(); }
+        value
+    }
+    fn model() -> HighsMaster {
+        let mut master = HighsMaster::new().unwrap();
+        master.add_row(RowSense::Equal, 1., &[]).unwrap();
+        master.add_column(2., &[(0, 1.)]).unwrap();
+        master
+    }
+    #[test]
+    fn scoped_time_budget_restores_options_and_resumes() {
+        let mut master = model();
+        master.set_double("time_limit", 3600.).unwrap();
+        for duration in [Duration::from_secs(60), Duration::ZERO, Duration::from_nanos(1)] {
+            let outcome = master.solve_with_time_limit(duration).unwrap();
+            assert_eq!(outcome, if duration == Duration::from_secs(60) { LpSolveOutcome::Optimal } else { LpSolveOutcome::TimeLimit });
+            assert_eq!(time_limit(&master), 3600.);
+            if outcome != LpSolveOutcome::Optimal { assert!(!master.solved); }
+            assert!(master.solve());
+            assert_eq!(master.objective, 2.);
+        }
+    }
+    #[test]
+    fn cg_backend_limits_do_not_report_infeasibility_or_call_pricing() {
+        for iteration_stop in [false, true] {
+            let mut master = HighsMaster::new().unwrap();
+            for _ in 0..128 { master.add_row(RowSense::Equal, 1., &[]).unwrap(); }
+            for row in 0..128 { master.add_column(1., &[(row, 1.)]).unwrap(); }
+            if iteration_stop {
+                // SAFETY: live handle and NUL-terminated option strings.
+                unsafe {
+                    HighsMaster::check(Highs_setStringOptionValue(master.highs.as_ptr(), b"presolve\0".as_ptr().cast(), b"off\0".as_ptr().cast()), "presolve").unwrap();
+                    HighsMaster::check(Highs_setStringOptionValue(master.highs.as_ptr(), b"solver\0".as_ptr().cast(), b"simplex\0".as_ptr().cast()), "solver").unwrap();
+                    HighsMaster::check(Highs_setIntOptionValue(master.highs.as_ptr(), b"simplex_iteration_limit\0".as_ptr().cast(), 0), "simplex_iteration_limit").unwrap();
+                }
+            } else { master.set_double("time_limit", 0.).unwrap(); }
+            let mut options = cg::Options::default(); options.stabilize = false;
+            let output = cg::optimize(&mut master, &[], |_, _| -> Result<cg::Answer> { panic!("stopped LP must not invoke pricing"); }, &mut NoController, options).unwrap();
+            assert_eq!(output.status, if iteration_stop { cg::Status::IterationLimit } else { cg::Status::TimeLimit });
+            assert_eq!(output.pricing_calls, 0);
+            assert_eq!(output.bound, f64::NEG_INFINITY);
+            assert!(!master.solved);
+        }
+    }
+    #[test]
+    fn empty_master_checks_its_required_row_activity() {
+        for (rhs, expected) in [(0., LpSolveOutcome::Optimal), (1., LpSolveOutcome::PrimalInfeasible)] {
+            let mut master = HighsMaster::new().unwrap();
+            master.add_row(RowSense::Equal, rhs, &[]).unwrap();
+            assert_eq!(master.solve_with_time_limit(Duration::from_secs(60)).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn cg_stop_after_column_insertion_keeps_the_last_certificate() {
+        struct StopNext;
+        impl cg::Controller<HighsMaster> for StopNext {
+            fn master_solved(&mut self, master: &HighsMaster, _: &[i32], _: &[usize]) -> Result<()> {
+                master.set_double("time_limit", 0.)
+            }
+        }
+        let mut master = model();
+        let mut options = cg::Options::default(); options.stabilize = false;
+        let output = cg::optimize(&mut master, &[], |_, duals| {
+            Ok(cg::Answer {
+                columns: vec![cg::Column { cost: 1., reduced_cost: 1.-duals[0], entries: vec![(0,1.)], acceptable: true, tag: 0, identity: "improving".into() }],
+                minimum: 1.-duals[0], exact: true, bound_minimum: None,
+            })
+        }, &mut StopNext, options).unwrap();
+        assert_eq!(output.status, cg::Status::TimeLimit);
+        assert_eq!(output.pricing_calls, 1);
+        assert_eq!(output.bound, 1.);
+        assert_eq!(output.lp, 2.);
+        assert_eq!(output.history.len(), 1);
+        assert!(!master.solved);
+    }
+}

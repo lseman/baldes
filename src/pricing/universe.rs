@@ -11,20 +11,31 @@ impl Solver {
         if let Some(engine) = &mut self.engine {
             for direction in [&mut engine.grid.forward, &mut engine.grid.backward] {
                 for bucket in direction.buckets.iter_mut().flatten() {
-                    bucket.arcs.retain(|a| !self.forbidden_arcs.get(a.physical)
-                        .copied().unwrap_or(false));
+                    bucket.arcs.retain(|a| {
+                        !self
+                            .forbidden_arcs
+                            .get(a.physical)
+                            .copied()
+                            .unwrap_or(false)
+                    });
                 }
             }
         }
         let controls = enumeration::Controls {
             cutoff,
-            label_limit: self.options.get("BALDESmaxNumOfLabelsInEnumeration")?.max(1.) as usize,
-            path_limit: self.options.get("BALDESmaxNumOfEnumeratedSolutions")?.max(1.) as usize,
+            label_limit: self
+                .options
+                .get("BALDESmaxNumOfLabelsInEnumeration")?
+                .max(1.) as usize,
+            path_limit: self
+                .options
+                .get("BALDESmaxNumOfEnumeratedSolutions")?
+                .max(1.) as usize,
             time_limit: self.controls.time_limit,
             max_route_arcs: self.controls.max_route_arcs,
             preserve_arc_paths: self.enumeration_preserve_arc_paths || !self.ryan_foster.is_empty(),
-            // One hash partition,
-            // so stored paths keep the native insertion order.
+            // Dominance needs only one working partition. Path export tracks
+            // native hash activation and candidate order independently.
             partitions: 1,
         };
         let has_cuts = self.has_cuts();

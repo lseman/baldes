@@ -109,7 +109,8 @@ fn enumerated_mip_flag_requires_tree_and_uses_the_available_backend() {
     let invalid=command().arg("vrptw").arg(&path).arg("--enumerated-mip").output().unwrap();
     assert!(!invalid.status.success());assert!(String::from_utf8_lossy(&invalid.stderr).contains("requires --tree"));
     let json=path.with_extension("json");
-    let result=command().arg("vrptw").arg(&path).args(["--tree","--enumerated-mip","--no-strong-branching","--no-diving","--no-mip-heuristic","--no-stabilization","--json"]).arg(&json).output().unwrap();
+    // A finite witness from the heuristic triggers automatic enumeration.
+    let result=command().arg("vrptw").arg(&path).args(["--tree","--enumerated-mip","--no-strong-branching","--no-diving","--no-stabilization","--json"]).arg(&json).output().unwrap();
     if cfg!(feature="highs") {
         assert!(result.status.success(),"{}",String::from_utf8_lossy(&result.stderr));
         assert!(std::fs::read_to_string(&json).unwrap().contains("\"enumerated_mip_calls\":1"));

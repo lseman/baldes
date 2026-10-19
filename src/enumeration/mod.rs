@@ -11,13 +11,20 @@ use std::collections::HashSet;
 use std::time::Instant;
 
 mod controls;
+mod domain;
 mod engine;
+mod frontier;
 mod label;
 mod paths;
 mod storage;
 
 pub use controls::Controls;
+pub use domain::{
+    CanonicalPath, CompleteCanonicalPaths, CompleteResourceRelaxation, PathDomainFailure,
+    PathDomainLimits, RelaxedResourcePath,
+};
 pub use engine::Enumeration;
+pub use frontier::PruningFrontier;
 pub use label::{CutTables, Label};
 pub use paths::{Path, PathStorage};
 pub use storage::Storage;

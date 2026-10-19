@@ -15,6 +15,10 @@ use crate::pricing::phases::Phase;
 use crate::{incomplete, invalid, Result};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
+#[cfg(test)]
+#[path = "profile_tests.rs"]
+mod profile_tests;
+pub(crate) const RESOURCE_REPLAY_MISMATCH: &str = "reconstructed route violates resource windows";
 #[derive(Clone, Debug)]
 pub struct EngineControls {
     pub bidirectional: bool,
@@ -390,7 +394,9 @@ impl<'a> Context<'a> {
                         f.resources()[r] <= b.resources()[r] + EPSILON
                     }
                 }
-                ResourceKind::Equality => f.resources()[r] == b.resources()[r],
+                // Consumption-mode concatenation checks only disposable
+                // resources; equality resources are checked in value mode.
+                ResourceKind::Equality => self.consumption_joins || f.resources()[r] == b.resources()[r],
             })
     }
 }
@@ -422,10 +428,11 @@ impl<'a> Sweep<'a> {
         controls: &Controls,
     ) -> bool {
         let label = input.label();
-        let test = if self.ctx.phase.check_ng && self.ctx.controls.dominance_mode == 0 {
-            InsertionTest::Full
-        } else {
-            InsertionTest::ResourcesAndCost
+        let test = match (self.ctx.phase.check_ng, self.ctx.controls.dominance_mode == 1) {
+            (true, false) => InsertionTest::Full,
+            (true, true) => InsertionTest::ResourcesAndNg,
+            (false, false) => InsertionTest::ResourcesAndCost,
+            (false, true) => InsertionTest::Resources,
         };
         let capacity = self.ctx.phase.labels_per_bucket as usize;
         let vertex = label.bucket.vertex;
@@ -1065,6 +1072,33 @@ impl LabelingEngine {
             ) {
                 return false;
             }
+            // The recorded preparation contract omits negative vertex
+            // increments. Covering rows use those increments, so install
+            // them for actual pricing and retain their owners for dual updates.
+            for (row, input) in cuts.inputs.iter().enumerate() {
+                for (vertex, &increment) in input.vertex_coefficient.iter().enumerate() {
+                    if increment >= 0 {
+                        continue;
+                    }
+                    let Some(slot) = cuts.limited.dominance_cut[vertex]
+                        .iter()
+                        .position(|&owner| owner == row)
+                    else {
+                        continue;
+                    };
+                    let field = cuts.info.vertices[vertex].dominance[slot];
+                    cuts.info.vertices[vertex].support.push(state::VertexSupport {
+                        mask: field.mask,
+                        denominator: field.denominator,
+                        word: field.word,
+                        shift: field.shift,
+                        increment,
+                        covering: input.covering,
+                        cost: input.dual,
+                    });
+                    cuts.limited.support_cut[vertex].push(row);
+                }
+            }
             state::prepare_arcs(
                 &mut cuts.info,
                 &mut cuts.limited,
@@ -1261,14 +1295,28 @@ impl LabelingEngine {
         for r in 0..g.resources.len() {
             q[r] = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower);
         }
+        let mut prefix_states = vec![];
+        let mut current = pair.0;
+        while let Some(id) = current {
+            let label = self.forward.labels.view(id);
+            prefix_states.push(*label.resources());
+            current = label.parent();
+        }
+        prefix_states.reverse();
+        let mut resource_profile = vec![q[..g.resources.len()].to_vec()];
         let mut original_cost = 0.;
-        for &index in &arcs {
+        for (position, &index) in arcs.iter().enumerate() {
             let a = &g.arcs[index];
             if nodes.last().copied() != Some(a.tail as i32) {
                 return Err(invalid("broken labeling predecessor chain"));
             }
-            q = extend_resources(g, a, q, true)
-                .ok_or_else(|| invalid("reconstructed route violates resource windows"))?;
+            let extended = extend_resources(g, a, q, true)
+                .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
+            // Forward labels retain waiting imposed by jump arcs. Replaying
+            // their arcs at earliest arrival would collapse distinct schedules.
+            // Continue the backward suffix from the actual forward state.
+            q = prefix_states.get(position + 1).copied().unwrap_or(extended);
+            resource_profile.push(q[..g.resources.len()].to_vec());
             nodes.push(a.head as i32);
             original_cost += a.cost;
         }
@@ -1281,6 +1329,7 @@ impl LabelingEngine {
             cost,
             original_cost,
             resources: q[..g.resources.len()].to_vec(),
+            resource_profile,
         }))
     }
     pub fn solve(&mut self, g: &Graph, controls: &Controls) -> Result<PricingResult> {
@@ -1308,6 +1357,9 @@ impl LabelingEngine {
             self.root(g, false)?;
         }
         let started = Instant::now();
+        if controls.time_limit.is_zero() {
+            return Err(incomplete("pricing hard time limit exceeded"));
+        }
         let mut pool = SolutionPool::new(
             g.vertices.len(),
             controls.max_columns,
@@ -1320,6 +1372,11 @@ impl LabelingEngine {
         } else {
             self.run_direction(g, true, controls, started, &mut pool)?;
             self.statistics.forward_time = started.elapsed().as_secs_f64();
+        }
+        // Small heuristic sweeps may perform fewer than 64 extensions and
+        // have no concatenation pass. They still consume the call deadline.
+        if started.elapsed() >= controls.time_limit {
+            return Err(incomplete("pricing hard time limit exceeded"));
         }
         let mut concatenation_tests = 0;
         if self.runtime_bidirectional() {
@@ -1482,6 +1539,7 @@ impl LabelingEngine {
             return Err(invalid("finite fixing threshold required"));
         }
         let mut report = FixingReport::default();
+        let mut concatenation_tests = 0;
         for forward in [true, false] {
             if self.consumption_joins && !forward {
                 continue;
@@ -1558,11 +1616,7 @@ impl LabelingEngine {
                             cache.initialize(&self.grid, forward, source, physical.id, target);
                         if !extended.is_empty() {
                             let mut work = vec![(arrival, 0usize)];
-                            let mut seen = std::collections::BTreeSet::new();
                             while let Some((bucket, min)) = work.pop() {
-                                if !seen.insert((bucket, min)) {
-                                    continue;
-                                }
                                 let storage = self.storage(self.consumption_joins || !forward);
                                 let storage_vertex = if self.consumption_joins
                                     && target + 1 == self.grid.order.len()
@@ -1584,6 +1638,7 @@ impl LabelingEngine {
                                             if key + other.key() >= threshold {
                                                 break;
                                             }
+                                            concatenation_tests += 1;
                                             let cost = if forward {
                                                 self.ctx().join_cost(g, meeting, l.into(), other)
                                             } else {
@@ -1634,6 +1689,7 @@ impl LabelingEngine {
                 report.eliminated_backward = removed.len();
             }
         }
+        self.statistics.concatenation_tests += concatenation_tests;
         if report.eliminated_forward + report.eliminated_backward > 0 {
             self.grid.regenerate_jumps(g, true);
             if !self.consumption_joins {
@@ -1800,6 +1856,17 @@ impl LabelingEngine {
         scan: bool,
     ) -> bool {
         if self.branching.resources != 0 { return true; }
+        // Pricing completion bounds use limited-memory states. Negative
+        // full-memory charges or covering join corrections can improve a
+        // continuation beyond those bounds. Until a bound on that improvement
+        // is available, retain the label.
+        if self.cuts.full.as_ref().is_some_and(|full| {
+            full.fields
+                .iter()
+                .any(|field| field.cost < 0. || field.covering)
+        }) {
+            return true;
+        }
         let mut ng = 0;
         for (bit, &e) in self.ng.local_elements[label.vertex].iter().enumerate() {
             if label.visited[e / 64] & (1u64 << (e % 64)) != 0 {

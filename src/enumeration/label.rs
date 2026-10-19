@@ -30,11 +30,25 @@ impl<'a> CutTables<'a> {
         } else {
             &self.info.backward
         };
-        state::change_full_memory_along_arc(
-            &mut label.cut_words,
-            &mut label.cut_cost,
-            &table[arc].full_memory,
-        );
+        for record in &table[arc].full_memory {
+            let mut transition = *record;
+            // Preparation retains the observed binary descriptor layout. Its
+            // k-path exit descriptor uses the word index as the destination
+            // bit shift, which can overwrite a neighboring rank-one field.
+            // Enumeration must preserve the visitation bit in its own field.
+            if transition.covering
+                && transition.denominator == -2
+                && transition.increment == 1
+                && transition.target_word >= 0
+            {
+                transition.target_shift = transition.source_shift;
+            }
+            state::change_full_memory_along_arc(
+                &mut label.cut_words,
+                &mut label.cut_cost,
+                std::slice::from_ref(&transition),
+            );
+        }
     }
     pub(super) fn to_vertex(&self, label: &mut Label) {
         state::apply_vertex_support(
@@ -66,6 +80,22 @@ impl Label {
     }
     pub fn key_with(&self, potential: f64) -> f64 {
         ((0.5 * potential + self.cut_cost) + self.reduced_cost) + 0.0
+    }
+    /// Test vertex elementarity without adding it to the completion projection.
+    pub(crate) fn can_add_elements(&self, elements: &[usize]) -> bool {
+        let mut visited = self.visited;
+        for &element in elements {
+            if element >= 1024 {
+                return false;
+            }
+            let bit = 1u64 << (element % 64);
+            let word = &mut visited[element / 64];
+            if *word & bit != 0 {
+                return false;
+            }
+            *word |= bit;
+        }
+        true
     }
     pub fn add_elements(&mut self, elements: &[usize]) -> bool {
         for &e in elements {

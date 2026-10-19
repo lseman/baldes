@@ -11,6 +11,12 @@ use std::time::{Duration, Instant};
 
 pub const EPSILON: f64 = 1e-6;
 pub const NO_ROUTE_COST: f64 = 1e12;
+/// Equality-resource dominance uses rounded interval endpoints. Subtracting
+/// the states first (`abs(a-b)`) changes decisions at representable boundaries.
+#[inline(always)]
+pub(crate) fn equality_resource_dominates(a: f64, b: f64) -> bool {
+    b - EPSILON <= a && a <= b + EPSILON
+}
 #[derive(Clone, Debug)]
 pub struct Controls {
     pub max_labels: usize,
@@ -42,6 +48,29 @@ pub struct Route {
     pub cost: f64,
     pub original_cost: f64,
     pub resources: Vec<f64>,
+    /// Resource states at the source and after each arc, including waiting
+    /// introduced by bucket jumps. Distinct schedules can share an arc path.
+    pub resource_profile: Vec<Vec<f64>>,
+}
+impl Route {
+    pub(crate) fn identity(&self) -> String {
+        use std::fmt::Write;
+        let mut identity = self
+            .arcs
+            .iter()
+            .map(i32::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
+        for state in &self.resource_profile {
+            identity.push('|');
+            for &value in state {
+                // Native vector ordering treats signed zeros as equal.
+                let bits = if value == 0. { 0 } else { value.to_bits() };
+                write!(&mut identity, "{bits:016x},").unwrap();
+            }
+        }
+        identity
+    }
 }
 #[derive(Clone, Debug, Default)]
 pub struct Statistics {
@@ -190,21 +219,22 @@ fn dominates(g: &Graph, a: &Label, b: &Label, hop_limit: bool) -> bool {
     }
     g.resources.iter().enumerate().all(|(r, k)| match k {
         ResourceKind::Disposable => a.resources[r] <= b.resources[r] + EPSILON,
-        ResourceKind::Equality => {
-            a.resources[r] <= b.resources[r] + EPSILON && b.resources[r] - EPSILON <= a.resources[r]
-        }
+        ResourceKind::Equality => equality_resource_dominates(a.resources[r], b.resources[r]),
     })
 }
 fn reconstruct(g: &Graph, labels: &[Label], terminal: &Label) -> Route {
     let mut arcs = vec![];
+    let mut resource_profile = vec![];
     let mut next = Some(terminal);
     while let Some(l) = next {
+        resource_profile.push(l.resources[..g.resources.len()].to_vec());
         if let Some(a) = l.arc {
             arcs.push(a);
         }
         next = l.parent.map(|id| &labels[id]);
     }
     arcs.reverse();
+    resource_profile.reverse();
     let mut nodes = vec![g.source as i32];
     for &a in &arcs {
         nodes.push(g.arcs[a].head as i32);
@@ -215,6 +245,7 @@ fn reconstruct(g: &Graph, labels: &[Label], terminal: &Label) -> Route {
         cost: terminal.cost,
         original_cost: terminal.original_cost,
         resources: terminal.resources[..g.resources.len()].to_vec(),
+        resource_profile,
     }
 }
 

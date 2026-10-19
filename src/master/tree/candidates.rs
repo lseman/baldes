@@ -32,8 +32,11 @@ pub fn candidates_with_history(
     options: &BranchingOptions,
     history: &[BranchConstraint],
 ) -> Vec<BranchCandidate> {
-    let routes: Vec<_> = result.route_values().into_iter()
-        .filter(|(_, value)| *value > 1e-6).collect();
+    let routes: Vec<_> = result
+        .route_values()
+        .into_iter()
+        .filter(|(_, value)| *value > 1e-6)
+        .collect();
     let graph_id = problem.graph.graph_id.max(0);
     if options.number_of_vehicles {
         let value = routes

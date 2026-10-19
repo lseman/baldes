@@ -29,6 +29,11 @@ impl Instance {
         let n = self.customers.len() - 1;
         let sink = n + 1;
         let mut graph = Graph::new(n + 2, 2)?;
+        // Packing/elementarity IDs belong to customers, not physical vertices.
+        // The depots do not occupy an elementarity set.
+        for customer in 1..=n {
+            graph.add_elementarity_set(&[customer])?;
+        }
         let mut add = |u: usize, v: usize| -> Result<()> {
             let i = if u == sink { 0 } else { u };
             let j = if v == sink { 0 } else { v };
@@ -79,7 +84,12 @@ impl Instance {
                     .then(a.cmp(&b))
             });
             order.truncate(ng_size.min(n + 2));
-            graph.set_ng(v, &order)?;
+            let elements: Vec<_> = order
+                .into_iter()
+                .filter(|&vertex| vertex > 0 && vertex <= n)
+                .map(|vertex| vertex - 1)
+                .collect();
+            graph.set_ng(v, &elements)?;
         }
         graph.initial[0] = Some(if time_windows {
             self.customers[0].ready * scale
@@ -87,5 +97,29 @@ impl Instance {
             0.
         });
         Ok(graph)
+    }
+}
+
+#[cfg(test)]
+mod elementarity_tests {
+    use super::*;
+    #[test]
+    fn routing_elementarity_uses_customer_ids_and_omits_depots() {
+        let mut instance = Instance::read("instances/R201.txt").unwrap();
+        instance.truncate(10).unwrap();
+        for graph in [
+            instance.graph(12, Rounding::None).unwrap(),
+            instance.capacity_graph(12, Rounding::None).unwrap(),
+        ] {
+            assert_eq!(graph.element_count, 10);
+            assert!(graph.vertices[graph.source].elements.is_empty());
+            assert!(graph.vertices[graph.sink].elements.is_empty());
+            for customer in 1..=10 {
+                assert_eq!(graph.vertices[customer].elements, [customer - 1]);
+            }
+            for vertex in &graph.vertices {
+                assert_eq!(vertex.memory, (0..10).collect::<Vec<_>>());
+            }
+        }
     }
 }
