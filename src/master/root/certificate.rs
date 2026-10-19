@@ -6,6 +6,133 @@ use crate::master::certificates::{Column as ProofColumn, FiniteMaster};
 use crate::master::clp::ClpSolveOutcome;
 use std::time::{Duration, Instant};
 
+/// Scoped to one immutable original problem, never inherited by child nodes.
+/// A deterministic domain failure cannot be repaired by new duals or cuts.
+/// Keep the work budget so an increased budget can still retry the search.
+#[derive(Default)]
+pub(super) struct SearchCache {
+    failed_domain_limits: std::cell::Cell<Option<(usize, usize, usize)>>,
+    #[cfg(test)]
+    attempts: std::cell::Cell<usize>,
+}
+impl SearchCache {
+    fn collect<'a>(
+        &self,
+        problem: &'a RootProblem,
+        limits: PathDomainLimits,
+    ) -> Option<ConservativeCoverRelaxation<'a>> {
+        use super::domain::CoverDomainFailure;
+        use crate::enumeration::PathDomainFailure;
+        if self
+            .failed_domain_limits
+            .get()
+            .is_some_and(|(work, paths, arcs)| {
+                limits.max_work <= work
+                    && limits.max_paths <= paths
+                    && limits.max_stored_arcs <= arcs
+            })
+        {
+            return None;
+        }
+        #[cfg(test)]
+        self.attempts.set(self.attempts.get() + 1);
+        match ConservativeCoverRelaxation::collect(problem, limits) {
+            Ok(domain) => Some(domain),
+            Err(failure) => {
+                // A transient deadline/allocation failure is deliberately retried.
+                if !matches!(
+                    failure,
+                    CoverDomainFailure::Paths(
+                        PathDomainFailure::TimeLimit | PathDomainFailure::Allocation
+                    )
+                ) {
+                    self.failed_domain_limits.set(Some((
+                        limits.max_work,
+                        limits.max_paths,
+                        limits.max_stored_arcs,
+                    )));
+                }
+                None
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod search_tests {
+    use super::*;
+
+    fn problem() -> RootProblem {
+        let mut graph = crate::Graph::new(4, 0).unwrap();
+        for (tail, head) in [(0, 1), (0, 2), (1, 2), (2, 1), (1, 3), (2, 3)] {
+            graph.add_arc(tail, head, 1.).unwrap();
+        }
+        RootProblem::set_partitioning(graph, 2.).unwrap()
+    }
+
+    #[test]
+    fn deterministic_domain_failures_are_not_repeated_but_larger_budgets_retry() {
+        let problem = problem();
+        let generous = PathDomainLimits {
+            deadline: None,
+            ..PathDomainLimits::default()
+        };
+        let domain = ConservativeCoverRelaxation::collect(&problem, generous).unwrap();
+        let exact = PathDomainLimits {
+            max_paths: domain.paths().paths().len(),
+            max_stored_arcs: domain.paths().stored_arcs(),
+            max_work: domain.work_used(),
+            deadline: None,
+        };
+        for insufficient in [
+            PathDomainLimits {
+                max_work: exact.max_work - 1,
+                ..exact
+            },
+            PathDomainLimits {
+                max_paths: exact.max_paths - 1,
+                ..exact
+            },
+            PathDomainLimits {
+                max_stored_arcs: exact.max_stored_arcs - 1,
+                ..exact
+            },
+        ] {
+            let cache = SearchCache::default();
+            assert!(cache.collect(&problem, insufficient).is_none());
+            assert_eq!(cache.attempts.get(), 1);
+            assert!(cache.collect(&problem, insufficient).is_none());
+            assert_eq!(cache.attempts.get(), 1);
+            let recovered = cache.collect(&problem, exact).unwrap();
+            assert_eq!(cache.attempts.get(), 2);
+            assert_eq!(recovered.paths().paths().len(), exact.max_paths);
+            assert_eq!(recovered.work_used(), exact.max_work);
+        }
+    }
+
+    #[test]
+    fn expired_deadline_does_not_poison_a_later_certificate_attempt() {
+        let problem = problem();
+        let cache = SearchCache::default();
+        let limits = PathDomainLimits {
+            deadline: Some(Instant::now()),
+            ..PathDomainLimits::default()
+        };
+        assert!(cache.collect(&problem, limits).is_none());
+        assert!(cache.failed_domain_limits.get().is_none());
+        assert!(cache
+            .collect(
+                &problem,
+                PathDomainLimits {
+                    deadline: None,
+                    ..limits
+                }
+            )
+            .is_some());
+        assert_eq!(cache.attempts.get(), 2);
+    }
+}
+
 struct Budget {
     deadline: Instant,
     work: usize,
@@ -28,7 +155,12 @@ impl Budget {
 
 /// Unknown on unsupported geometry, exhausted budget, or incomplete proof.
 /// No parent model, pricing cache, or primal witness is changed here.
-pub(super) fn lower_bound(problem: &RootProblem, state: &State, master: &ClpMaster) -> Option<f64> {
+pub(super) fn lower_bound(
+    problem: &RootProblem,
+    state: &State,
+    master: &ClpMaster,
+    cache: &SearchCache,
+) -> Option<f64> {
     let now = Instant::now();
     let deadline = now
         .checked_add(Duration::from_millis(250))?
@@ -74,7 +206,7 @@ pub(super) fn lower_bound(problem: &RootProblem, state: &State, master: &ClpMast
             }
         }
     }
-    let domain = ConservativeCoverRelaxation::collect(
+    let domain = cache.collect(
         problem,
         PathDomainLimits {
             max_paths: 10_000,
@@ -82,8 +214,7 @@ pub(super) fn lower_bound(problem: &RootProblem, state: &State, master: &ClpMast
             max_work: budget.work,
             deadline: Some(deadline),
         },
-    )
-    .ok()?;
+    )?;
     budget.spend(domain.work_used())?;
     let mut costs = Vec::new();
     let mut entries = Vec::new();

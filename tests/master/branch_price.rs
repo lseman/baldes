@@ -1,7 +1,7 @@
 #![cfg(feature = "clp")]
 use baldes::{
     master::{
-        root::{RootOptions, RootProblem},
+        root::{BoundMode, RootOptions, RootProblem},
         tree::{self, TreeOptions, TreeStatus},
     },
     inputs::{Instance, Rounding},
@@ -51,6 +51,7 @@ fn tolerance_closed_tree_keeps_its_lower_certificate() {
     }
     let problem = RootProblem::set_partitioning(graph, 2.).unwrap();
     let mut controls = options();
+    controls.root.bound_mode = BoundMode::Certified;
     controls.absolute_gap = 3.;
     controls.relative_gap = 0.;
     let output = tree::solve(problem, controls).unwrap();
@@ -172,23 +173,21 @@ fn small_trees_agree_with_exhaustive_elementary_route_universe() {
         }
         let instance = Instance::parse(&text).unwrap();
         let exact = exhaustive(&instance);
-        let problem =
-            RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), n as f64)
-                .unwrap();
-        let mut advanced = options();
-        advanced.strong_branching = Some(Default::default());
-        advanced.diving = Some(Default::default());
-        let out = tree::solve(problem, advanced).unwrap();
-        assert_eq!(
-            out.status,
-            TreeStatus::Optimal,
-            "n={n} capacity={capacity}: {out:?}"
-        );
-        assert!(
-            (out.incumbent - exact).abs() < 1e-5,
-            "n={n} capacity={capacity}: {} != {exact}",
-            out.incumbent
-        );
+        for mode in [BoundMode::Numerical, BoundMode::Certified] {
+            let problem =
+                RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), n as f64)
+                    .unwrap();
+            let mut advanced = options();
+            advanced.root.bound_mode = mode;
+            advanced.strong_branching = Some(Default::default());
+            advanced.diving = Some(Default::default());
+            let out = tree::solve(problem, advanced).unwrap();
+            assert_eq!(out.bound_mode, mode);
+            assert_eq!(out.status, TreeStatus::Optimal, "n={n} capacity={capacity} mode={mode:?}: {out:?}");
+            assert!((out.incumbent - exact).abs() < 1e-5,
+                "n={n} capacity={capacity} mode={mode:?}: {} != {exact}", out.incumbent);
+            assert!(out.bound <= exact + 1e-7, "{out:?}, exact={exact}");
+        }
     }
 }
 
@@ -199,6 +198,7 @@ fn strong_branching_solves_with_certified_child_bounds() {
     let problem =
         RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 2.).unwrap();
     let mut controls = options();
+    controls.root.bound_mode = BoundMode::Certified;
     controls.strong_branching = Some(StrongBranchingOptions::default());
     let out = tree::solve(problem, controls).unwrap();
     assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");

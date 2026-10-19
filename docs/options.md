@@ -199,7 +199,7 @@ budget before control returns. Numerical failures are reported as errors.
 
 During column generation, IPM uses the bound-driven accuracy rule from
 Munari and Gondzio (2013), Section 3.1, Algorithm 1
-([paper](../papers/munari.pdf), p. 2029). It starts with `epsilon = 0.5`, then
+(Munari and Gondzio (2013), p. 2029). It starts with `epsilon = 0.5`, then
 uses `epsilon = min(1, gap / 10)` with a numerical floor of `1e-9`, where
 `gap = max(0, UB - LB) / (1 + abs(UB))`. `UB` is the best artificial-free
 restricted-master primal objective; `LB` comes only from exact LP pricing.

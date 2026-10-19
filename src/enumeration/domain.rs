@@ -175,11 +175,19 @@ struct CollectedPaths<'g, P> {
 struct Budget {
     remaining: usize,
     deadline: Option<Instant>,
+    until_clock_check: usize,
 }
 impl Budget {
     fn spend(&mut self, work: usize) -> Result<(), PathDomainFailure> {
-        if self.deadline.is_some_and(|end| Instant::now() >= end) {
-            return Err(PathDomainFailure::TimeLimit);
+        // Collection is cooperatively timed. Poll once per small batch of
+        // work, and always at explicit validation/completion checkpoints.
+        if work == 0 || work >= self.until_clock_check {
+            if self.deadline.is_some_and(|end| Instant::now() >= end) {
+                return Err(PathDomainFailure::TimeLimit);
+            }
+            self.until_clock_check = 64;
+        } else {
+            self.until_clock_check -= work;
         }
         self.remaining = self
             .remaining
@@ -211,6 +219,7 @@ fn collect_paths<'g, P>(
     let mut budget = Budget {
         remaining: limits.max_work,
         deadline: limits.deadline,
+        until_clock_check: 0,
     };
     budget.spend(
         graph
@@ -240,6 +249,23 @@ fn collect_paths<'g, P>(
         }
     }
     let n = graph.vertices.len();
+    // Retain physical arc positions and their original order, including
+    // parallel arcs. A DFS frame must scan only its outgoing arcs, rather
+    // than the entire graph at every vertex of every partial path.
+    budget.spend(
+        n.checked_add(graph.arcs.len())
+            .ok_or(PathDomainFailure::WorkLimit)?,
+    )?;
+    let mut outgoing = Vec::new();
+    reserve(&mut outgoing, n)?;
+    outgoing.resize_with(n, Vec::new);
+    for (position, arc) in graph.arcs.iter().enumerate() {
+        outgoing[arc.tail]
+            .try_reserve(1)
+            .map_err(|_| PathDomainFailure::Allocation)?;
+        outgoing[arc.tail].push(position);
+    }
+    budget.spend(0)?;
     let mut visited = vec![];
     reserve(&mut visited, n)?;
     visited.resize(n, false);
@@ -256,7 +282,7 @@ fn collect_paths<'g, P>(
     while !stack.is_empty() {
         budget.spend(1)?;
         let frame = stack.last_mut().unwrap();
-        if frame.next_arc == graph.arcs.len() {
+        if frame.next_arc == outgoing[frame.vertex].len() {
             let frame = stack.pop().unwrap();
             visited[frame.vertex] = false;
             if !stack.is_empty() {
@@ -264,10 +290,10 @@ fn collect_paths<'g, P>(
             }
             continue;
         }
-        let physical = frame.next_arc;
+        let physical = outgoing[frame.vertex][frame.next_arc];
         frame.next_arc += 1;
         let arc = &graph.arcs[physical];
-        if arc.tail != frame.vertex || visited[arc.head] {
+        if visited[arc.head] {
             continue;
         }
         let Some(resources) = extend(graph, arc, frame.resources)? else {
@@ -483,6 +509,31 @@ mod tests {
             CompleteCanonicalPaths::collect(&graph, limits()).unwrap_err(),
             PathDomainFailure::InvalidGraph
         );
+    }
+
+    #[test]
+    fn sparse_path_search_does_not_rescan_unrelated_arcs() {
+        let mut graph = Graph::new(80, 0).unwrap();
+        graph.add_arc(0, 1, 1.).unwrap();
+        graph.add_arc(1, 79, 1.).unwrap();
+        for tail in 2..79 {
+            for head in 2..79 {
+                if tail != head {
+                    graph.add_arc(tail, head, 1.).unwrap();
+                }
+            }
+        }
+        // Validation and adjacency construction are linear in graph size.
+        // The reachable DFS has only two arcs, despite the dense unreachable
+        // component. A full-graph scan at each frame exceeds this budget.
+        let limits = PathDomainLimits {
+            max_work: 2 * (graph.vertices.len() + graph.arcs.len()) + 16,
+            deadline: None,
+            ..limits()
+        };
+        let domain = CompleteCanonicalPaths::collect(&graph, limits).unwrap();
+        assert_eq!(domain.paths().len(), 1);
+        assert_eq!(domain.paths()[0].arc_positions(), &[0, 1]);
     }
 
     fn chain(consumption: &[f64], upper: f64) -> Graph {

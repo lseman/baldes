@@ -26,6 +26,61 @@ fn help_and_invalid_instance_types() {
 }
 
 #[test]
+fn bound_mode_is_explicit_in_root_and_tree_json() {
+    let path = std::env::temp_dir().join(format!("baldes-bound-mode-{}.txt", std::process::id()));
+    std::fs::write(&path, "tiny\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n").unwrap();
+    for tree in [false, true] {
+        for mode in [None, Some("numerical"), Some("certified")] {
+            let json = path.with_extension(format!("{tree}-{}.json", mode.unwrap_or("default")));
+            let mut cmd = command();
+            cmd.arg("vrptw")
+                .arg(&path)
+                .args(["--no-stabilization", "--no-enumeration", "--json"])
+                .arg(&json);
+            if tree {
+                cmd.args(["--tree", "--no-strong-branching", "--no-diving"]);
+            }
+            if let Some(mode) = mode {
+                cmd.args(["--bound-mode", mode]);
+            }
+            let result = cmd.output().unwrap();
+            assert!(
+                result.status.success(),
+                "{}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            let data = std::fs::read_to_string(&json).unwrap();
+            let expected = mode.unwrap_or("numerical");
+            assert!(
+                data.contains(&format!("\"bound_mode\":\"{expected}\"")),
+                "{data}"
+            );
+            assert!(
+                String::from_utf8_lossy(&result.stdout).contains(&format!("bound_mode={expected}"))
+            );
+            assert!(data.contains("\"numerical_bound\":"), "{data}");
+            if expected == "numerical" {
+                assert!(data.contains("\"certified_bound\":null"), "{data}");
+            } else {
+                assert!(!data.contains("\"certified_bound\":null"), "{data}");
+            }
+            std::fs::remove_file(json).unwrap();
+        }
+    }
+    for flags in [vec!["--bound-mode"], vec!["--bound-mode", "invalid"]] {
+        let result = command()
+            .arg("vrptw")
+            .arg(&path)
+            .args(flags)
+            .output()
+            .unwrap();
+        assert!(!result.status.success());
+        assert!(String::from_utf8_lossy(&result.stderr).contains("bound mode"));
+    }
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
 fn cvrp_ignores_time_windows_while_vrptw_enforces_them() {
     let path = std::env::temp_dir().join(format!("baldes-cli-{}.txt", std::process::id()));
     // Each customer is reachable individually, but the time windows prevent a

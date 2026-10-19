@@ -37,6 +37,24 @@ def test_package_identity():
     assert pybaldes.has_clp
 
 
+def test_bound_modes_keep_numerical_estimates_separate_from_certificates():
+    numerical = solve_root(triangle(), reduced_cost_fixing=False, stabilize=False)
+    certified = solve_root(triangle(), bound_mode="certified", reduced_cost_fixing=False, stabilize=False)
+    assert numerical.bound_mode == "numerical"
+    assert numerical.bound == numerical.numerical_bound
+    assert numerical.certified_bound == -math.inf
+    assert json.loads(numerical.to_json())["certified_bound"] is None
+    assert certified.bound_mode == "certified"
+    assert math.isfinite(certified.certified_bound)
+    assert certified.bound == certified.certified_bound
+    assert certified.numerical_bound == pytest.approx(numerical.numerical_bound)
+    assert certified.lp == pytest.approx(numerical.lp)
+    assert_routes(numerical, 3, 2)
+    assert_routes(certified, 3, 2)
+    with pytest.raises(ValueError, match="bound mode"):
+        solve_root(triangle(), bound_mode="invalid")
+
+
 @pytest.mark.parametrize("problem_type", ["vrptw", "cvrp"])
 @pytest.mark.parametrize("rank_one_cuts,fixing", [(False, False), (True, False), (False, True), (True, True)])
 def test_capacity_root(problem_type, rank_one_cuts, fixing):

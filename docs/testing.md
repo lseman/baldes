@@ -151,7 +151,8 @@ original cost cancellation, fixed objective terms and unproved multiplicity
 rows. Unsupported or overflowing arithmetic returns an unknown bound. These
 checks do not establish completeness of a routing column universe.
 
-The root controller combines conservative disposable-resource path coverage,
+In explicit certified mode (`RootOptions::bound_mode = BoundMode::Certified`),
+the root controller combines conservative disposable-resource path coverage,
 residual cover-row proofs and finite-matrix numerical bounds before publishing
 a lower certificate. The transaction shares the root deadline, with an
 additional 250 ms cap, ten million logical work units, 10,000 paths and one million
@@ -161,6 +162,14 @@ hard heap/CPU caps. Failure leaves the bound unknown; the ordinary pricing
 estimate is not substituted. Node tests cover interruption, omission of
 unproved rows and parent-model isolation. General resource kinds and arbitrary
 fractional fixed-row shifts remain unsupported by this certificate.
+
+Numerical mode is the default and skips that certificate transaction. It keeps
+exact pricing and route-feasibility checks, and labels its bounds as numerical.
+Tests verify that numerical mode never invokes certification, unknown
+certificates cannot authorize strict pruning, and warm starts preserve bound
+provenance when changing modes. Certified mode attempts proof at closing exact
+passes or when the current master objective suggests the incumbent gap can
+close, rather than on every improving exact batch.
 
 Weighted packing rows can use an exact additive envelope instead of partition
 DP: every path must satisfy `denominator * coefficient <= customer weight sum`.

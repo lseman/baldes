@@ -44,6 +44,7 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--upper-bound X` | initial incumbent for fixing |
 | `--no-stabilization` | no dual-price smoothing |
 | `--master MODE` | `clp` (default), `highs` (requires HiGHS), or native `ipm`; IPM disables stabilization |
+| `--bound-mode MODE` | `numerical` (default) uses pricing bounds with tolerances; `certified` requires independent original-domain bound validation |
 | `--hgs-time S` | positive HGS search budget before routing solve; separate from `--time` |
 | `--hgs-columns MODE` | `best` plan (default), `all` distinct feasible routes, or `N` cheapest new routes |
 | `--dynamic-ng P` | strengthen NG memories from master cycles at separator priority P |
@@ -63,11 +64,23 @@ integer routing gap closed within the configured tolerances. HGS supplies
 feasible solutions without an optimality proof. Root LP route values can be
 fractional, and NG routes can revisit customers.
 
+Normal root and tree solves use numerical bounds and skip the full certificate
+search. Use `--bound-mode certified` for independently validated bounds. That
+mode attempts validation when an exact pass can close pricing or the incumbent
+gap; failure leaves its selected bound unknown. Route-feasibility checks and
+exact pricing remain enabled in both modes.
+
+JSON reports `bound_mode`, the selected `bound`, and separate `numerical_bound`
+and `certified_bound` fields. An unknown bound is `null`. A numerical estimate
+never substitutes for an unknown certified bound. A tree result labels the
+guarantee of its global bound; it does not report a global numerical estimate
+in certified mode. Root results retain both estimates when available.
+
 Solomon instances are in [`instances/`](../instances/), and a few CVRPLIB ones in
 [`instances/cvrplib/`](../instances/cvrplib/).
 
 Enable `--verbose` for an aligned progress table with the restricted-master
-objective, certified lower bound, incumbent, gap, reduced cost, column counts,
+objective, selected lower bound, incumbent, gap, reduced cost, column counts,
 pricing phase, and elapsed time. Use `--log-interval 5` for more frequent output.
 
 For advanced routing, see the [branch-and-price tree guide](tree.md) and

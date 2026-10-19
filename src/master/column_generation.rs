@@ -97,11 +97,39 @@ impl IpmAccuracy {
     }
 }
 
+/// Which lower bound authorizes pruning and gap closure.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BoundMode {
+    /// Exact pricing with floating-point costs and configured tolerances.
+    #[default]
+    Numerical,
+    /// Only a controller-validated bound; failed certification stays unknown.
+    Certified,
+}
+impl BoundMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Numerical => "numerical",
+            Self::Certified => "certified",
+        }
+    }
+    pub fn parse(value: &str) -> Result<Self> {
+        match value {
+            "numerical" => Ok(Self::Numerical),
+            "certified" => Ok(Self::Certified),
+            _ => Err(invalid("bound mode must be numerical or certified")),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct WarmStart {
-    /// Certified lower bound inherited by restrictions of this node.
+    /// Selected lower bound inherited by restrictions of this node.
     /// Negative infinity denotes an unknown bound.
     pub bound: f64,
+    pub bound_mode: BoundMode,
+    pub numerical_bound: f64,
+    pub certified_bound: f64,
     /// Accepted parent center; node schedules restart independently.
     pub stabilization: Option<DualPriceSmoothing>,
     /// Generated columns in creation order, including those outside the
@@ -115,6 +143,7 @@ pub struct WarmStart {
 
 #[derive(Clone, Debug)]
 pub struct Options {
+    pub bound_mode: BoundMode,
     /// Progress table on stderr every N iterations; None keeps CG silent.
     pub log_interval: Option<usize>,
     /// Metadata of an already populated, solved master. No duplicate base
@@ -152,6 +181,7 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            bound_mode: BoundMode::Numerical,
             log_interval: None,
             warm_start: None,
             smoothing: Parameters::default(),
@@ -183,9 +213,14 @@ impl Default for Options {
 pub struct Output {
     pub status: Status,
     pub lp: f64,
-    /// Controller-certified lower bound for the target problem. A certificate
-    /// for its integer domain can exceed this restricted master's LP value.
+    /// Selected bound; its guarantee is identified by `bound_mode`.
     pub bound: f64,
+    pub bound_mode: BoundMode,
+    /// Numerical estimate from exact pricing, never an original-domain proof.
+    pub numerical_bound: f64,
+    /// Controller-validated bound, or negative infinity when unknown. An
+    /// integer-domain certificate may exceed the pricing LP's objective.
+    pub certified_bound: f64,
     pub iterations: usize,
     pub pricing_calls: usize,
     pub columns: usize,
@@ -202,13 +237,14 @@ pub struct Output {
 /// The controller owns incumbent tracking and the pricing route universe.
 pub trait Controller<M> {
     /// Optional Lagrangian estimate for the most recent batch at these prices.
-    /// Only exact batches publish a certified bound. Multiple pricing domains
+    /// Only exact batches publish a numerical bound. Multiple pricing domains
     /// can contribute different multiplicities.
     fn pricing_bound(&self, _master: &M, _duals: &[f64]) -> Result<Option<f64>> {
         Ok(None)
     }
-    /// Override publication of an exact batch's estimate with a conservative
-    /// certificate. Negative infinity means its lower bound is still unknown.
+    /// Validate a conservative bound when an exact pass may close pricing or
+    /// the incumbent gap. None/negative infinity means unknown, never fallback
+    /// to a numerical estimate in certified mode.
     /// This may certify the original integer domain; it is not an LP pricing
     /// convergence estimate, including when inherited through a warm start.
     fn certified_pricing_bound(&self, _master: &M, _duals: &[f64]) -> Result<Option<f64>> {
@@ -235,8 +271,8 @@ pub trait Controller<M> {
     /// Optional original-model feasible columns after exact pricing leaves
     /// positive artificials. These columns do not certify a bound or prove
     /// infeasibility. The controller must validate their original constraints.
-    /// Recovery from restricted pricing requires an original-domain publication
-    /// certificate; a restricted oracle's scalar estimate is insufficient.
+    /// In certified mode, recovery from restricted pricing still requires an
+    /// original-domain publication certificate; an oracle estimate is insufficient.
     fn restore_feasible_columns(&mut self, _duals: &[f64]) -> Result<Vec<Column>> {
         Ok(vec![])
     }
@@ -336,6 +372,16 @@ fn master_reduced_cost(column: &Column, duals: &[f64]) -> f64 {
     value
 }
 
+fn publish_certificate(out: &mut Output, candidate: Option<f64>) -> Result<()> {
+    let bound = candidate.unwrap_or(f64::NEG_INFINITY);
+    if !bound.is_finite() && bound != f64::NEG_INFINITY {
+        return Err(invalid("invalid certified pricing lower bound"));
+    }
+    out.certified_bound = out.certified_bound.max(bound);
+    out.bound = out.certified_bound;
+    Ok(())
+}
+
 fn optimality_gap(primal: f64, dual: f64) -> f64 {
     if primal.abs() <= 1e-6 && dual.abs() <= 1e-6 {
         0.
@@ -394,6 +440,12 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     smoothing.exclude_rows(controller.unstabilized_rows());
     if let Some(warm) = &options.warm_start {
         if (!warm.bound.is_finite() && warm.bound != f64::NEG_INFINITY)
+            || [warm.numerical_bound, warm.certified_bound].iter()
+                .any(|b| !b.is_finite() && *b != f64::NEG_INFINITY)
+            || warm.bound != match warm.bound_mode {
+                BoundMode::Numerical => warm.numerical_bound,
+                BoundMode::Certified => warm.certified_bound,
+            }
             || warm.columns.len() != master.costs().len()
             || warm.initial_rows > master.rhs().len()
             || warm.artificials.iter().any(|&c| c >= master.costs().len())
@@ -411,10 +463,14 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             return Err(invalid("warm master metadata dimensions"));
         }
     }
-    let inherited_bound = options
-        .warm_start
-        .as_ref()
-        .map_or(f64::NEG_INFINITY, |w| w.bound);
+    let inherited_numerical = options.warm_start.as_ref()
+        .map_or(f64::NEG_INFINITY, |w| w.numerical_bound);
+    let inherited_certified = options.warm_start.as_ref()
+        .map_or(f64::NEG_INFINITY, |w| w.certified_bound);
+    let inherited_bound = match options.bound_mode {
+        BoundMode::Numerical => inherited_numerical,
+        BoundMode::Certified => inherited_certified,
+    };
     // The published certificate may cover the original integer domain through
     // a stronger relaxation than the pricing LP. Keep its convergence estimate
     // separate: an integer bound cannot prove that LP pricing is exhausted.
@@ -454,7 +510,10 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     let mut out = Output {
         status: Status::IterationLimit,
         lp: 0.,
-        bound: f64::NEG_INFINITY,
+        bound: inherited_bound,
+        bound_mode: options.bound_mode,
+        numerical_bound: inherited_numerical,
+        certified_bound: inherited_certified,
         iterations: 0,
         pricing_calls: 0,
         columns: master.costs().len(),
@@ -473,6 +532,9 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         cut_rounds: 0,
         warm_start: WarmStart {
             bound: f64::NEG_INFINITY,
+            bound_mode: options.bound_mode,
+            numerical_bound: f64::NEG_INFINITY,
+            certified_bound: f64::NEG_INFINITY,
             stabilization: None,
             generated_pool: vec![],
             columns: vec![],
@@ -521,7 +583,10 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                   pool: Vec<Column>,
                   smoothing: DualPriceSmoothing| {
         out.warm_start = WarmStart {
-            bound: out.bound.max(inherited_bound),
+            bound: out.bound,
+            bound_mode: out.bound_mode,
+            numerical_bound: out.numerical_bound,
+            certified_bound: out.certified_bound,
             stabilization: stabilize.then_some(smoothing),
             generated_pool: pool,
             columns: loaded,
@@ -686,12 +751,25 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 if answer.exact {
                     pricing_estimate = pricing_estimate.max(pass_bound);
                     ipm_accuracy.lower = ipm_accuracy.lower.max(pass_bound);
-                    let certified = controller.certified_pricing_bound(master, &current)?
-                        .unwrap_or(pass_bound);
-                    if !certified.is_finite() && certified != f64::NEG_INFINITY {
-                        return Err(invalid("invalid certified pricing lower bound"));
+                    out.numerical_bound = out.numerical_bound.max(pass_bound);
+                    if options.bound_mode == BoundMode::Certified {
+                        let incumbent = controller.incumbent();
+                        // Certify a closing pricing pass, or when the current
+                        // master point suggests the incumbent gap can close.
+                        // A numerical bound only schedules this attempt; it
+                        // never authorizes pruning in certified mode.
+                        if fresh == 0 || (incumbent.is_finite()
+                            && gap_smaller_than_tolerance(out.lp, incumbent,
+                                options.gap_absolute, options.gap_relative))
+                        {
+                            publish_certificate(&mut out,
+                                controller.certified_pricing_bound(master, &current)?)?;
+                        }
                     }
-                    if certified > out.bound { out.bound = certified; }
+                    out.bound = match options.bound_mode {
+                        BoundMode::Numerical => out.numerical_bound,
+                        BoundMode::Certified => out.certified_bound,
+                    };
                 }
                 exact = answer.exact;
                 answer_phase = stage;
@@ -805,10 +883,19 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             stabilization_gap: gap,
             master_gap_tolerance: if accurate { None } else { requested_gap },
         });
+        // A previous exact bound can close this LP without another oracle
+        // call. Certified mode must validate this closing point as well.
+        if converged && exact && options.bound_mode == BoundMode::Certified {
+            publish_certificate(&mut out, controller.certified_pricing_bound(master, &raw)?)?;
+        }
         if options.log_interval.is_some() {
             progress.iteration(out.history.last().unwrap(), out.bound, controller.incumbent());
         }
-        if !converged
+        // An exhausted numerical exact pass completes the ordinary LP/cut
+        // workflow below. Reserve an early cutoff for a still-improving LP
+        // or a separately validated integer-domain certificate.
+        if !converged && !positive
+            && (out.bound_mode == BoundMode::Certified || fresh > 0)
             && controller.incumbent().is_finite()
             && out.bound.is_finite()
             && gap_smaller_than_tolerance(
@@ -831,6 +918,10 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             // the incumbent. A bound on that restricted problem may exceed
             // the incumbent; the original problem's global bound cannot.
             out.bound = out.bound.min(controller.incumbent());
+            match out.bound_mode {
+                BoundMode::Numerical => out.numerical_bound = out.bound,
+                BoundMode::Certified => out.certified_bound = out.bound,
+            }
             return finish(out, loaded, cut_artificials, pool, smoothing);
         }
         if penalties {
@@ -1117,6 +1208,10 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     // an LP point or interpreting exhausted artificial penalties.
                     out.columns = master.costs().len();
                     pricing_estimate = f64::NEG_INFINITY;
+                    out.numerical_bound = inherited_numerical;
+                    if out.bound_mode == BoundMode::Numerical {
+                        out.bound = out.numerical_bound;
+                    }
                     ipm_accuracy = IpmAccuracy::new();
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
                     stage = schedule.len() - 1;

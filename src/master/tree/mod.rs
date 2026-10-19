@@ -5,8 +5,9 @@
 //! install native binary resources in labeling and filter enumeration.
 //! Each child forks the parent's solved Clp model (with cuts intact) and
 //! carries the cut registry forward; feasible elementary columns are shared
-//! between nodes. Bounds require exact pricing or a proved MIP over complete
-//! enumeration; restricted-master heuristic objectives do not certify nodes.
+//! between nodes. Numerical bounds use exact pricing with solver tolerances;
+//! certified mode requires independent bound validation. Restricted-master
+//! heuristic objectives never supply node lower bounds.
 //! Phased strong branching and diving
 //! use isolated node evaluations via fork-and-carry.
 use super::{
@@ -71,6 +72,8 @@ pub enum TreeStatus {
 }
 #[derive(Debug)]
 pub struct TreeOutput {
+    /// Defines the guarantee of `bound` and any gap-based termination.
+    pub bound_mode: root::BoundMode,
     pub status: TreeStatus,
     pub incumbent: f64,
     pub bound: f64,
@@ -110,8 +113,10 @@ impl TreeOutput {
                 )
             })
             .collect();
-        format!("{{\"instance\":{:?},\"status\":\"{:?}\",\"incumbent\":{},\"bound\":{},\"nodes\":{},\"open_nodes\":{},\"pricing_calls\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"mip_nodes\":{},\"enumerated_mip_calls\":{},\"enumerated_mip_nodes\":{},\"strong_branching_trials\":{},\"diving_nodes\":{},\"seconds\":{},\"routes\":[{}]}}\n",
-            name, self.status, number(self.incumbent), number(self.bound), self.nodes,
+        format!("{{\"instance\":{:?},\"status\":\"{:?}\",\"incumbent\":{},\"bound\":{},\"bound_mode\":\"{}\",\"numerical_bound\":{},\"certified_bound\":{},\"nodes\":{},\"open_nodes\":{},\"pricing_calls\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"mip_nodes\":{},\"enumerated_mip_calls\":{},\"enumerated_mip_nodes\":{},\"strong_branching_trials\":{},\"diving_nodes\":{},\"seconds\":{},\"routes\":[{}]}}\n",
+            name, self.status, number(self.incumbent), number(self.bound), self.bound_mode.as_str(),
+            if self.bound_mode == root::BoundMode::Numerical { number(self.bound) } else { "null".into() },
+            if self.bound_mode == root::BoundMode::Certified { number(self.bound) } else { "null".into() }, self.nodes,
             self.open_nodes, self.pricing_calls, self.fixing_calls, self.enumerated_routes, self.mip_nodes, self.enumerated_mip_calls, self.enumerated_mip_nodes, self.strong_branching_trials, self.diving_nodes, self.seconds, routes.join(","))
     }
 }
@@ -390,6 +395,7 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
     }
     let deadline = started + options.time_limit;
     let mut output = TreeOutput {
+        bound_mode: options.root.bound_mode,
         status: TreeStatus::NodeLimit,
         incumbent: f64::INFINITY,
         bound: 0.,
@@ -448,7 +454,7 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
     let mut closed_bound = f64::INFINITY;
     let mut previous = None::<Rc<root::NodeSnapshot>>;
     while !open.is_empty() {
-        // Discard only nodes whose certified bound closes the global gap.
+        // Discard only nodes whose selected bound closes the global gap.
         open.retain(|n| {
             if closed(n.bound, output.incumbent, &options) {
                 closed_bound = closed_bound.min(n.bound);
@@ -509,7 +515,8 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
             continue;
         }
         // The LP objective may include artificials or come from a heuristic
-        // pricing phase. Only the pricing certificate is a node lower bound.
+        // pricing phase. Only the selected bound is a node lower bound:
+        // numerical estimates never enter certified-mode node evaluations.
         if result.master.bound.is_finite() {
             node.bound = node.bound.max(result.master.bound);
         }

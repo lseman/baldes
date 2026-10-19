@@ -132,6 +132,9 @@ impl KnapsackCutConfig {
 }
 #[derive(Clone, Debug)]
 pub struct RootOptions {
+    /// Numerical pricing bounds by default; certified mode requires an
+    /// independent original-domain bound before pruning or gap closure.
+    pub bound_mode: BoundMode,
     /// IPM solves automatically disable dual stabilization.
     pub master_solver: MasterSolver,
     /// Retain an independently forkable model and active cuts for descendants.
@@ -172,6 +175,7 @@ impl Default for RootOptions {
         cg.column_cleanup_ratio = 0.66;
         Self {
             master_solver: MasterSolver::Clp,
+            bound_mode: BoundMode::Numerical,
             capture_state: false,
             node_depth: 0,
             pricing_phase_floor: 0,

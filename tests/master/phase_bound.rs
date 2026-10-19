@@ -7,6 +7,275 @@ use baldes::master::{
 };
 
 #[test]
+fn numerical_mode_skips_certification_and_certified_mode_requests_only_a_closing_pass() {
+    use column_generation::{BoundMode, Controller};
+    use std::cell::Cell;
+    struct Proof {
+        calls: Cell<usize>,
+    }
+    impl Controller<ClpMaster> for Proof {
+        fn certified_pricing_bound(&self, _: &ClpMaster, _: &[f64]) -> baldes::Result<Option<f64>> {
+            self.calls.set(self.calls.get() + 1);
+            Ok(Some(1.))
+        }
+    }
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let mut master = ClpMaster::new().unwrap();
+        master.add_row(RowSense::Equal, 1., &[]).unwrap();
+        master.add_column(2., &[(0, 1.)]).unwrap();
+        let mut proof = Proof {
+            calls: Cell::new(0),
+        };
+        let mut calls = 0;
+        let exact = [baldes::pricing::phases::Phase {
+            check_ng: true,
+            jump_arcs: true,
+            labels_per_bucket: i64::MAX,
+        }];
+        let out = column_generation::optimize(
+            &mut master,
+            &exact,
+            |_, duals| {
+                calls += 1;
+                let rc = 1. - duals[0];
+                Ok(Answer {
+                    columns: if calls == 1 {
+                        vec![Column {
+                            cost: 1.,
+                            reduced_cost: rc,
+                            entries: vec![(0, 1.)],
+                            tag: 1,
+                            identity: "cheaper".into(),
+                            acceptable: true,
+                        }]
+                    } else {
+                        vec![]
+                    },
+                    minimum: rc,
+                    exact: true,
+                    bound_minimum: None,
+                })
+            },
+            &mut proof,
+            Options {
+                bound_mode: mode,
+                stabilize: false,
+                ..Options::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(out.status, Status::Optimal);
+        assert_eq!(out.lp, 1.);
+        assert_eq!(
+            calls, 1,
+            "the preceding exact bound closes the next LP without repricing"
+        );
+        assert_eq!(out.bound_mode, mode);
+        assert_eq!(out.numerical_bound, 1.);
+        assert_eq!(out.bound, 1.);
+        assert_eq!(proof.calls.get(), usize::from(mode == BoundMode::Certified));
+        assert_eq!(
+            out.certified_bound,
+            if mode == BoundMode::Certified {
+                1.
+            } else {
+                f64::NEG_INFINITY
+            }
+        );
+    }
+}
+
+#[test]
+fn numerical_warm_bounds_never_authorize_certified_pruning() {
+    use column_generation::{BoundMode, Controller};
+    struct Unknown;
+    impl Controller<ClpMaster> for Unknown {
+        fn incumbent(&self) -> f64 {
+            1.
+        }
+        // None explicitly means that no independent certificate is available.
+    }
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, 1., &[]).unwrap();
+    master.add_column(1., &[(0, 1.)]).unwrap();
+    let parent = column_generation::optimize(
+        &mut master,
+        &[],
+        |_, _| {
+            Ok(Answer {
+                columns: vec![],
+                minimum: 0.,
+                exact: true,
+                bound_minimum: None,
+            })
+        },
+        &mut NoController,
+        Options {
+            stabilize: false,
+            ..Options::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(parent.bound, 1.);
+    assert_eq!(parent.certified_bound, f64::NEG_INFINITY);
+    let child = column_generation::optimize(
+        &mut master,
+        &[],
+        |_, _| {
+            Ok(Answer {
+                columns: vec![],
+                minimum: 0.,
+                exact: true,
+                bound_minimum: None,
+            })
+        },
+        &mut Unknown,
+        Options {
+            bound_mode: BoundMode::Certified,
+            stabilize: false,
+            warm_start: Some(parent.warm_start),
+            ..Options::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(child.status, Status::Optimal);
+    assert_eq!(child.lp, 1.);
+    assert_eq!(child.numerical_bound, 1.);
+    assert_eq!(child.bound, f64::NEG_INFINITY);
+    assert_eq!(child.certified_bound, f64::NEG_INFINITY);
+    assert!(!child.pruned_by_bound);
+    assert_eq!(child.warm_start.bound_mode, BoundMode::Certified);
+    assert_eq!(child.warm_start.bound, f64::NEG_INFINITY);
+}
+
+#[test]
+fn root_snapshots_and_tree_modes_do_not_promote_an_unsupported_certificate() {
+    use baldes::{
+        graph::ResourceKind,
+        master::{
+            root::{self, BoundMode, RootOptions, RootProblem},
+            tree::{self, TreeOptions, TreeStatus},
+        },
+        Graph,
+    };
+    let mut graph = Graph::new(3, 1).unwrap();
+    graph.resources[0] = ResourceKind::Equality;
+    for vertex in 0..3 {
+        graph.set_bounds(vertex, 0, 0., 10.).unwrap();
+    }
+    graph.set_bounds(2, 0, 0., 0.).unwrap();
+    graph.add_arc(0, 1, 1.).unwrap();
+    graph.add_arc(1, 2, 1.).unwrap();
+    let problem = RootProblem::set_partitioning(graph, 1.).unwrap();
+    let mut options = RootOptions::default();
+    options.capture_state = true;
+    options.enumerate = false;
+    options.cg.stabilize = false;
+    let parent = root::solve(problem.clone(), options.clone()).unwrap();
+    assert_eq!(parent.master.bound, 2.);
+    let snapshot = parent.snapshot.as_ref().unwrap();
+    assert_eq!(snapshot.bound_mode(), BoundMode::Numerical);
+    options.bound_mode = BoundMode::Certified;
+    let child = root::inherit_branches(snapshot, &[], options.clone()).unwrap();
+    assert_eq!(child.master.lp, parent.master.lp);
+    assert_eq!(child.master.numerical_bound, 2.);
+    assert_eq!(child.master.bound, f64::NEG_INFINITY);
+    assert!(!child.master.pruned_by_bound);
+    assert_eq!(
+        child.snapshot.as_ref().unwrap().bound_mode(),
+        BoundMode::Certified
+    );
+    for (mode, status) in [
+        (BoundMode::Numerical, TreeStatus::Optimal),
+        (BoundMode::Certified, TreeStatus::Incomplete),
+    ] {
+        options.bound_mode = mode;
+        let out = tree::solve(
+            problem.clone(),
+            TreeOptions {
+                root: options.clone(),
+                mip_node_limit: 0,
+                strong_branching: None,
+                diving: None,
+                ..TreeOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(out.bound_mode, mode);
+        assert_eq!(out.status, status, "{out:?}");
+        assert_eq!(out.incumbent, 2.);
+        assert_eq!(
+            out.bound,
+            if mode == BoundMode::Numerical { 2. } else { 0. }
+        );
+    }
+}
+
+#[test]
+fn certified_pruning_uses_the_independent_bound_and_preserves_its_mode_in_warm_starts() {
+    use column_generation::{BoundMode, Controller};
+    struct Proof;
+    impl Controller<ClpMaster> for Proof {
+        fn incumbent(&self) -> f64 {
+            1.
+        }
+        fn certified_pricing_bound(&self, _: &ClpMaster, _: &[f64]) -> baldes::Result<Option<f64>> {
+            Ok(Some(1.))
+        }
+    }
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, 1., &[]).unwrap();
+    master.add_column(1., &[(0, 1.)]).unwrap();
+    let out = column_generation::optimize(
+        &mut master,
+        &[],
+        |_, _| {
+            Ok(Answer {
+                columns: vec![],
+                minimum: -0.5,
+                exact: true,
+                bound_minimum: None,
+            })
+        },
+        &mut Proof,
+        Options {
+            bound_mode: BoundMode::Certified,
+            stabilize: false,
+            ..Options::default()
+        },
+    )
+    .unwrap();
+    assert!(out.pruned_by_bound);
+    assert_eq!(out.bound, 1.);
+    assert_eq!(out.certified_bound, 1.);
+    assert_eq!(out.numerical_bound, 0.5);
+    let resumed = column_generation::optimize(
+        &mut master,
+        &[],
+        |_, _| {
+            Ok(Answer {
+                columns: vec![],
+                minimum: -0.5,
+                exact: true,
+                bound_minimum: None,
+            })
+        },
+        &mut NoController,
+        Options {
+            bound_mode: BoundMode::Numerical,
+            stabilize: false,
+            max_iterations: 1,
+            warm_start: Some(out.warm_start),
+            ..Options::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(resumed.bound_mode, BoundMode::Numerical);
+    assert_eq!(resumed.bound, 0.5);
+    assert_eq!(resumed.certified_bound, 1.);
+}
+
+#[test]
 fn original_feasible_columns_can_recover_an_exhausted_penalized_master() {
     use baldes::Result;
     use column_generation::Controller;
@@ -86,6 +355,7 @@ fn large_original_routes_recover_before_a_rank_cut_certificate_closes_the_root()
     };
     let instance=Instance::parse("large triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100000000 0\n1 1000000 0 1 0 100000000 0\n2 0 1000000 1 0 100000000 0\n3 1000000 1000000 1 0 100000000 0\n").unwrap();
     let mut options = RootOptions::default().with_rank_one_cuts();
+    options.bound_mode = baldes::master::root::BoundMode::Certified;
     options.incumbent = upper;
     let output = instance.solve_root(5, Rounding::None, options).unwrap();
     assert_eq!(output.master.status, Status::Optimal);
@@ -114,10 +384,14 @@ fn an_integer_certificate_does_not_terminate_fractional_lp_pricing() {
         master.add_row(RowSense::Equal, 1., &[]).unwrap();
         master.add_column(1., &[(0, 1.)]).unwrap();
         let mut options = Options::default();
+        options.bound_mode = column_generation::BoundMode::Certified;
         options.stabilize = false;
         if warm {
             options.warm_start = Some(column_generation::WarmStart {
                 bound: 1.,
+                bound_mode: column_generation::BoundMode::Certified,
+                numerical_bound: f64::NEG_INFINITY,
+                certified_bound: 1.,
                 stabilization: None,
                 generated_pool: vec![],
                 columns: vec![Some(Column {

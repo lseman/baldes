@@ -105,6 +105,9 @@ class RootResult:
     status: str
     lp: float
     bound: float
+    bound_mode: str
+    numerical_bound: float
+    certified_bound: float
     lp_before_cuts: float
     incumbent: float
     cuts: int
@@ -154,6 +157,7 @@ def solve_root(
     rank_one_cuts: bool = False,
     stabilize: bool = True,
     master_solver: str = "clp",
+    bound_mode: str = "numerical",
     verbose: bool = False,
     log_interval: int = 10,
     hgs_time: Optional[float] = None,
@@ -185,6 +189,10 @@ def solve_root(
     Disabling reduced_cost_fixing also disables route enumeration. Cut counts
     include generated rows that were later retired. These are root relaxations:
     status 'Optimal' does not mean an optimal integer routing solution.
+    bound_mode='numerical' uses floating-point pricing bounds by default.
+    'certified' requires independent bound validation; an unknown certificate
+    leaves bound/certified_bound at negative infinity. numerical_bound is
+    reported separately and never substitutes for a missing certificate.
     """
     if not _core.has_clp:
         raise RuntimeError("root solving requires pybaldes built with the clp feature")
@@ -198,7 +206,7 @@ def solve_root(
         instance.name, instance.vehicles, instance.capacity, rows, distances, problem_type,
         ng, reference_ng, rounding or instance.rounding, capacity_cuts, rank_one_cuts, stabilize,
         reduced_cost_fixing, upper_bound, time_limit, max_iterations,
-        max_cut_rounds, dict(pricing_options or {}), two_path_cuts, master_solver, hgs_time, str(hgs_columns), hgs_seed, verbose, log_interval,
+        max_cut_rounds, dict(pricing_options or {}), two_path_cuts, master_solver, hgs_time, str(hgs_columns), hgs_seed, verbose, log_interval, bound_mode,
     )
     data["duals"] = tuple(data["duals"])
     data["routes"] = tuple(

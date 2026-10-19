@@ -37,6 +37,7 @@ mod preprocessing;
 mod problem;
 use controller::RootController;
 use options::RootKPathSeparator;
+pub use column_generation::BoundMode;
 pub use options::{
     CapacityCutConfig, CutOptions, KPathCutConfig, KnapsackCutConfig, NativeKPathCutConfig,
     RootOptions,
@@ -86,6 +87,7 @@ impl std::fmt::Debug for NodeSnapshot {
     }
 }
 impl NodeSnapshot {
+    pub fn bound_mode(&self) -> BoundMode { self.warm.bound_mode }
     pub fn master_solver(&self) -> MasterSolver { self.master.solver() }
     pub fn branch_depth(&self) -> usize {
         self.problem.branch_constraints.len()
@@ -453,6 +455,7 @@ fn solve_seeded(
     mut options: RootOptions,
     seed: Option<(&NodeSnapshot, ClpMaster, column_generation::WarmStart)>,
 ) -> Result<RootOutput> {
+    options.cg.bound_mode = options.bound_mode;
     options.master_solver.ensure_available()?;
     options.normalize_pricing_options()?;
     if options.master_solver == MasterSolver::Ipm {
@@ -484,7 +487,7 @@ fn solve_seeded(
     });
     let (preprocessing, arc_bounds) = problem.preprocess(&cut_rows)?;
     if preprocessing.infeasible {
-        let mut output = preprocessing::infeasible_output(preprocessing, solve_started);
+        let mut output = preprocessing::infeasible_output(preprocessing, solve_started, options.bound_mode);
         output.fixed_cost = problem.fixed_cost();
         output.fixed_routes = problem
             .fixed_routes
@@ -502,8 +505,8 @@ fn solve_seeded(
     };
     master.set_solver(options.master_solver);
     if options.cg.log_interval.is_some() {
-        crate::log_err!("  Master: {:?} | Node depth: {} | Stabilization: {}",
-            options.master_solver, options.node_depth, if options.cg.stabilize && options.cg.smoothing.alpha_factor > 0. { "on" } else { "off" });
+        crate::log_err!("  Master: {:?} | Node depth: {} | Stabilization: {} | Bound mode: {}",
+            options.master_solver, options.node_depth, if options.cg.stabilize && options.cg.smoothing.alpha_factor > 0. { "on" } else { "off" }, options.bound_mode.as_str());
     }
     // Keep Clp's default 1e-7 primal and dual tolerances.
     master.set_tolerances(1e-7, 1e-7)?;
@@ -831,6 +834,7 @@ fn solve_seeded(
         problem: problem.clone(),
         state: state.clone(),
         checkpoint: None,
+        certificate_search: certificate::SearchCache::default(),
     };
     let initial_rows = options
         .cg

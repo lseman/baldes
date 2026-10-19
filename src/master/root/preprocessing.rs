@@ -224,7 +224,7 @@ impl CutState {
     }
 }
 
-pub(super) fn infeasible_output(report: Report, started: std::time::Instant) -> RootOutput {
+pub(super) fn infeasible_output(report: Report, started: std::time::Instant, bound_mode: BoundMode) -> RootOutput {
     RootOutput {
         fixed_routes: vec![],
         fixed_cost: 0.,
@@ -235,6 +235,9 @@ pub(super) fn infeasible_output(report: Report, started: std::time::Instant) -> 
             status: column_generation::Status::Infeasible,
             lp: f64::INFINITY,
             bound: f64::INFINITY,
+            bound_mode,
+            numerical_bound: f64::INFINITY,
+            certified_bound: f64::INFINITY,
             iterations: 0,
             pricing_calls: 0,
             columns: 0,
@@ -247,6 +250,9 @@ pub(super) fn infeasible_output(report: Report, started: std::time::Instant) -> 
             cut_rounds: 0,
             warm_start: column_generation::WarmStart {
                 bound: f64::NEG_INFINITY,
+                bound_mode,
+                numerical_bound: f64::NEG_INFINITY,
+                certified_bound: f64::NEG_INFINITY,
                 stabilization: None,
                 generated_pool: vec![],
                 columns: vec![],

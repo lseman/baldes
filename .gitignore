@@ -71,6 +71,7 @@ _deps/
 /snapshot.bin
 /tools/
 /PORTING.md
+/VRPSOLVER_GAPS.md
 /internal/
 /internals/
 /reports/

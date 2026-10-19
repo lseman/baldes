@@ -574,6 +574,9 @@ fn cut_cleanup_remaps_loaded_and_uninserted_pool_rows_before_resume() {
     master.add_column(known.cost, &known.entries).unwrap();
     let warm = WarmStart {
         bound: f64::NEG_INFINITY,
+        bound_mode: cg::BoundMode::Numerical,
+        numerical_bound: f64::NEG_INFINITY,
+        certified_bound: f64::NEG_INFINITY,
         stabilization: None,
         columns: vec![Some(known.clone())],
         generated_pool: vec![known, cached],

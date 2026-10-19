@@ -180,7 +180,7 @@ fn restricted_value(
         1e12
     })
 }
-/// Return a chosen candidate and its certified child bounds. Restricted LP
+/// Return a chosen candidate and its selected-mode child bounds. Restricted LP
 /// objectives and heuristic pricing values affect scores only.
 pub(super) fn choose(
     parent: Option<&Rc<root::NodeSnapshot>>,

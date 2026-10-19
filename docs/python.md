@@ -65,11 +65,20 @@ These are root LP relaxations; `Optimal` does not certify an integer VRP optimum
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `master_solver` | `"clp"` | Select `"clp"`, native `"ipm"`, or `"highs"` (requires its build feature); IPM disables stabilization |
+| `bound_mode` | `"numerical"` | Use numerical pricing bounds, or `"certified"` for independent original-domain bound validation |
 | `verbose` | `False` | Print column-generation progress to stderr |
 | `log_interval` | `10` | Positive iteration interval for progress when verbose |
 | `hgs_time` | `None` | Positive HGS search budget in seconds before the root solve, separate from `time_limit` |
 | `hgs_columns` | `"best"` | Seed the best plan, `"all"` validated encountered routes, or a positive integer of cheapest new routes |
 | `hgs_seed` | `0` | Random seed for HGS seeding |
+
+`result.bound_mode` identifies the selected `result.bound` guarantee.
+`result.numerical_bound` and `result.certified_bound` are separate: unknown
+certificates remain negative infinity (`null` in JSON), even when a numerical
+estimate is finite. Normal mode skips certificate searches; exact pricing and
+route-feasibility validation remain enabled. Certified mode requests a bound
+when pricing or the incumbent gap may close. Failure never promotes the
+numerical estimate to a certificate.
 
 For example, seed a native IPM root solve with HGS and log progress:
 

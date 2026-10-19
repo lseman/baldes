@@ -59,12 +59,21 @@ remaining global budget. Its main steps are:
 3. Share valid elementary routes with the incumbent heuristic and other nodes.
 4. Search restricted columns for a feasible integer solution; optionally run
    HiGHS over a complete enumerated universe.
-5. Close the node when its certified bound meets the incumbent gap, or select
+5. Close the node when its selected bound meets the incumbent gap, or select
    a branching candidate and create children. Strong trials and diving use
    isolated evaluations.
 
 Time limits are cooperative across solver operations. A backend call can
 finish after its requested budget. Limits preserve bounds for unfinished nodes.
+
+`options.root.bound_mode` selects `BoundMode::Numerical` by default, or
+`BoundMode::Certified` for independent original-domain validation. The CLI
+equivalent is `--bound-mode numerical|certified`. Numerical bounds authorize
+ordinary pruning within the configured tolerances. Certified mode never uses
+a numerical estimate to close a node: an unsuccessful certificate attempt
+leaves the bound unknown. `TreeOutput::bound_mode` and JSON label the bound
+and the guarantee of gap-based termination. Warm starts retain the two bounds
+separately, so changing modes cannot promote a parent's numerical estimate.
 
 ## What a child inherits
 
@@ -100,7 +109,7 @@ not automatically admissible. Manually constructed column-generation
 `WarmStart` values provide `generated_pool` in creation order; an empty pool is
 initialized from the loaded columns.
 
-The snapshot exposes `branch_depth()`, `active_cuts()`, and
+The snapshot exposes `bound_mode()`, `branch_depth()`, `active_cuts()`, and
 `enumerated_routes()`. A route count alone does not establish completeness;
 the enumerated-MIP adapter separately checks the completion flag.
 
@@ -110,7 +119,7 @@ the enumerated-MIP adapter separately checks the completion flag.
 | --- | --- | --- |
 | Validated elementary route solution | Yes | No, by its objective alone |
 | Restricted-column integer heuristic | Yes, after validation | No |
-| Exact node pricing | When the resulting routes form an integer witness | Yes, through its certified bound |
+| Exact node pricing | When the resulting routes form an integer witness | Numerical estimate in normal mode; independent certificate required in certified mode |
 | Heuristic strong trial or dive | Can find a witness | No proof for the original node |
 | Complete enumerated HiGHS MIP | Yes, after validation | Only within saved enumeration coverage and for proved outcomes |
 
@@ -202,8 +211,8 @@ has no CLI or Python entry point.
 
 The tree does not yet provide multiple pricing networks or cut callbacks
 during the integer solve. Python exposes root solving; use Rust or the CLI
-for the tree. `Infeasible` means all nodes were certified closed without a
-feasible incumbent.
+for the tree. `Infeasible` means all nodes were closed without a feasible
+incumbent, under the selected bound mode and solver tolerances.
 
 `Optimal` uses the configured absolute and relative gap tolerances. The reported
 lower bound retains the minimum node bound across open and tolerance-closed
@@ -242,8 +251,9 @@ strong trials and dives remain isolated. Stabilization centers belong to the
 parent, while a tightened vehicle upper bound sets the remaining route
 multiplicity.
 
-Warm metadata also retains the parent's certified lower bound. Stabilization
-gap gating compares it with the preceding artificial-free restricted-LP bound
+Warm metadata retains the parent's numerical and certified lower bounds
+separately. Stabilization gap gating compares the selected inherited bound
+with the preceding artificial-free restricted-LP bound
 within each CG round. This differs from the global integer incumbent used for
 pruning and enumeration.
 

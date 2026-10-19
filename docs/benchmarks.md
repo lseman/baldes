@@ -15,6 +15,75 @@ labeling of exact pricing on two threads, so it is timed on one and two cores.
 On C101–C103, C201, C202 and R102, rank-one separation finds no violated cut,
 so those runs equal the ones without cuts.
 
+## Original-domain certificate search regression
+
+An October 19, 2026 rerun found a regression introduced with conservative
+original-domain certificates in commit `9631e9d`. Every exact pricing call could
+repeat a bounded search of the same immutable path domain. On C202, temporary
+instrumentation measured 90 unsuccessful certificate attempts consuming 13.30 s
+of a 26.56 s root solve. The collector scanned the entire graph's arc list at
+each DFS frame and polled the clock for every scan.
+
+The collector now builds ordered outgoing arc lists and polls its cooperative
+deadline in batches of at most 64 work units, with explicit validation and
+completion checks. A cache scoped to one root/node solve remembers deterministic
+domain failures at their work, path and storage limits. New duals or cuts cannot
+complete that same domain within smaller limits. Larger limits may retry;
+deadline and allocation failures are retried. Child solves start fresh caches.
+An incomplete search still supplies no certificate.
+
+The same 13 workloads above were run sequentially on the same Ryzen 9 9950X,
+with Clp, reference-compatible NG size 8, unrounded distances, enumeration
+disabled, default stabilization, release optimization level 3 and thin LTO.
+One warm-up precedes three measured runs per workload/core configuration.
+Two-core medians, in seconds:
+
+| Workload | Regressed build | Fixed build | Original chart |
+| --- | ---: | ---: | ---: |
+| C101 | 0.368 | 0.068 | 0.057 |
+| C202 | 25.722 | 12.463 | 12.160 |
+| R101 | 0.358 | 0.054 | 0.045 |
+| R201, rank-one enabled | 15.597 | 7.987 | 7.270 |
+| Geometric mean, all 13 | 2.276 | 0.842 | 0.786 |
+
+This fixes the main regression: the two-core geometric mean improves by 2.70×,
+removing about 96% of the added time relative to the rounded chart values.
+The fixed build remains about 7% above the chart overall; these measurements
+do not establish identical performance to the older binary. Each of the 104
+fixed-build runs finishes with root CG status `Optimal`, and every non-timing
+JSON field matches the corresponding pre-fix workload, including full history,
+routes, objectives, cuts, iterations and pricing calls.
+
+Local scripts, frozen binaries, source patch, individual outputs, profiles and
+validation logs are retained in `results/root-speed-fix-20261019/`; the pre-fix
+suite is in `results/root-rerun-20261019/`. These are ignored local artifacts.
+
+## Numerical and certified bound modes
+
+Normal root and tree solves now default to numerical bounds and skip the full
+certificate transaction. `--bound-mode certified` selects independent bound
+validation, attempted at closing pricing passes or when the master objective
+suggests the incumbent gap can close. Results label the selected mode and keep
+numerical estimates separate from certificates; unsuccessful validation leaves
+the certified bound unknown.
+
+An October 19 rerun used the same 13 chart workloads, Clp and two physical cores
+on the same Ryzen 9 9950X. Trials alternated modes sequentially, with one warm-up
+and three measured runs per case/mode. The numerical flag was omitted to verify
+the default. The geometric mean of case medians was 0.834 s in numerical mode
+and 0.842 s in certified mode. The times are close after the earlier failed-search
+cache fix; this change primarily makes computation and bound guarantees explicit.
+
+All 104 runs finish with root CG status `Optimal`. Every JSON field except
+timers and bound metadata matches the preceding certificate-cache build,
+including LP objectives, full histories, routes, cuts and pricing counts.
+All 13 certified-mode workloads retain unknown certified bounds within their
+search limits: these times do not measure successful large-instance proofs.
+Separate small-instance tests cover successful certification, failure without
+numerical fallback, both tree modes, and mode changes through node snapshots.
+Raw results, the frozen binary, source patch and scripts are retained locally in
+`results/bound-modes-20261019/`.
+
 ## HiGHS master reuse
 
 Local measurement on October 19, 2026: AMD Ryzen 9 9950X, Rust 1.97.1,

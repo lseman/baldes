@@ -24,6 +24,7 @@ Options:
   --no-mip-heuristic    Disable restricted-master integer search
   --mip-nodes N         Restricted-master integer-search node budget per call
   --master MODE         clp (default), highs, or ipm (disables stabilization)
+  --bound-mode MODE     numerical (default) or certified (independent bound validation)
   --hgs-time SECONDS    Run HGS before root/tree solve for this search budget
   --hgs-columns MODE    best (default), all, or N cheapest feasible HGS routes
   --no-stabilization    Disable dual stabilization
@@ -93,6 +94,9 @@ fn run() -> std::result::Result<(), String> {
                 options.cg.log_interval = Some(interval);
             }
             "--reference-ng" => reference_ng = true,
+            "--bound-mode" => options.bound_mode = baldes::master::root::BoundMode::parse(
+                &args.next().ok_or("missing bound mode")?
+            ).map_err(|e| e.to_string())?,
             "--json" => json_path = Some(args.next().ok_or("missing JSON path")?),
             "--customers" => {
                 customers = Some(
@@ -333,8 +337,8 @@ fn run() -> std::result::Result<(), String> {
         tree_options.root = options;
         let result = baldes::master::tree::solve(problem, tree_options).map_err(|e| e.to_string())?;
         if let Some(path) = json_path { std::fs::write(path, result.to_json(&instance.name)).map_err(|e| e.to_string())?; }
-        println!("instance={} status={:?} incumbent={} bound={} nodes={} pricing_calls={}",
-            instance.name, result.status, result.incumbent, result.bound, result.nodes, result.pricing_calls);
+        println!("instance={} status={:?} incumbent={} bound={} nodes={} pricing_calls={} bound_mode={}",
+            instance.name, result.status, result.incumbent, result.bound, result.nodes, result.pricing_calls, result.bound_mode.as_str());
         for route in &result.routes { println!("cost={} nodes={:?}", route.original_cost, route.nodes); }
         return Ok(());
     }
@@ -386,11 +390,11 @@ fn run() -> std::result::Result<(), String> {
             .iter()
             .filter(|&&t| t >= 0)
             .count();
-        let json=format!("{{\"instance\":{:?},\"status\":\"{}\",\"lp\":{},\"cuts\":{},\"cut_rounds\":{},\"lp_before_cuts\":{},\"route_columns\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"incumbent\":{},\"bound\":{},\"iterations\":{},\"pricing_calls\":{},\"columns\":{},\"master_columns\":{},\"seconds\":{},\"pricing_seconds\":{},\"master_seconds\":{},\"history\":[{}],\"routes\":[{}]}}\n",instance.name,if cut_off {"Cutoff".to_string()} else {format!("{:?}",output.master.status)},number(lp_value),output.cuts,output.master.cut_rounds,number(output.lp_before_cuts),route_columns,output.fixing_calls,output.enumerated_routes,number(output.incumbent),number(output.master.bound),output.master.iterations,output.master.pricing_calls,output.master.inserted_tags.len(),output.master.columns,seconds,output.pricing_seconds,output.solver_seconds-output.pricing_seconds,history.join(","),routes.join(","));
+        let json=format!("{{\"instance\":{:?},\"status\":\"{}\",\"lp\":{},\"cuts\":{},\"cut_rounds\":{},\"lp_before_cuts\":{},\"route_columns\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"incumbent\":{},\"bound\":{},\"bound_mode\":\"{}\",\"numerical_bound\":{},\"certified_bound\":{},\"iterations\":{},\"pricing_calls\":{},\"columns\":{},\"master_columns\":{},\"seconds\":{},\"pricing_seconds\":{},\"master_seconds\":{},\"history\":[{}],\"routes\":[{}]}}\n",instance.name,if cut_off {"Cutoff".to_string()} else {format!("{:?}",output.master.status)},number(lp_value),output.cuts,output.master.cut_rounds,number(output.lp_before_cuts),route_columns,output.fixing_calls,output.enumerated_routes,number(output.incumbent),number(output.master.bound),output.master.bound_mode.as_str(),number(output.master.numerical_bound),number(output.master.certified_bound),output.master.iterations,output.master.pricing_calls,output.master.inserted_tags.len(),output.master.columns,seconds,output.pricing_seconds,output.solver_seconds-output.pricing_seconds,history.join(","),routes.join(","));
         std::fs::write(path, json).map_err(|e| e.to_string())?;
     }
     println!(
-        "instance={} status={:?} lp={:.12} bound={:.12} solves={} pricing_calls={} columns={} master_columns={} cuts={} cut_rounds={}",
+        "instance={} status={:?} lp={:.12} bound={:.12} solves={} pricing_calls={} columns={} master_columns={} cuts={} cut_rounds={} bound_mode={}",
         instance.name,
         output.master.status,
         output.master.lp,
@@ -400,7 +404,8 @@ fn run() -> std::result::Result<(), String> {
         output.master.inserted_tags.len(),
         output.master.columns,
         output.cuts,
-        output.master.cut_rounds
+        output.master.cut_rounds,
+        output.master.bound_mode.as_str()
     );
     for (&tag, &value) in output.master.column_tags.iter().zip(&output.values) {
         if tag >= 0 && value > 1e-6 {
