@@ -92,6 +92,14 @@ for typed constraints, or `root::inherit` for arc-flow tuples. Supply only the
 To retain the child's snapshot for another generation, enable capture on that
 solve too.
 
+Snapshots retain both restricted-master columns and the generated column pool,
+including cached columns that have not entered the master. Child branch rows
+and cut cleanup update cached coefficients as well as loaded coefficients.
+Regeneration checks the child's current path restrictions; a cached route is
+not automatically admissible. Manually constructed column-generation
+`WarmStart` values provide `generated_pool` in creation order; an empty pool is
+initialized from the loaded columns.
+
 The snapshot exposes `branch_depth()`, `active_cuts()`, and
 `enumerated_routes()`. A route count alone does not establish completeness;
 the enumerated-MIP adapter separately checks the completion flag.
@@ -197,6 +205,12 @@ during the integer solve. Python exposes root solving; use Rust or the CLI
 for the tree. `Infeasible` means all nodes were certified closed without a
 feasible incumbent.
 
+`Optimal` uses the configured absolute and relative gap tolerances. The reported
+lower bound retains the minimum node bound across open and tolerance-closed
+subproblems; closing a node does not replace its lower bound with the incumbent.
+The final bound can therefore remain below the incumbent after successful gap
+closure. If the retained bound cannot justify closure, the status is `Incomplete`.
+
 - [Node snapshots and inheritance](../src/master/root/mod.rs)
 - [Tree driver](../src/master/tree/mod.rs)
 - [Lifecycle tests](../tests/master/node_lifecycle.rs): fixing carry, sibling isolation,
@@ -207,3 +221,38 @@ feasible incumbent.
 ```sh
 cargo test --features clp --test node_lifecycle --test branch_price
 ```
+
+Vehicle-count upper branches reuse the fleet row when its coefficients match
+the branch. Repeated bounds keep the tighter RHS, while branch depth still
+counts every recorded decision. Fixed route quantities reduce that RHS once.
+A custom fleet row with different coefficients receives a separate branch row.
+
+The root master receives explicit `root.initial_routes`. Child masters inherit
+their parent's restricted model and generated column pool. Routes collected
+globally for integer search, including automatic singletons and routes from
+other evaluations, do not preload the child's restricted model. Equal-bound
+child insertion visits the upward branch before its downward sibling. Complete
+tree trace parity remains open.
+
+For normal tree evaluations, a compatible preceding LP can supply numerical
+state after its trailing branch columns and rows are removed. Exact ordered
+matrix/cost/sense/offset checks precede transfer, and the target node keeps its
+own row and column bounds. Other layouts retain the independent parent fork;
+strong trials and dives remain isolated. Stabilization centers belong to the
+parent, while a tightened vehicle upper bound sets the remaining route
+multiplicity.
+
+Warm metadata also retains the parent's certified lower bound. Stabilization
+gap gating compares it with the preceding artificial-free restricted-LP bound
+within each CG round. This differs from the global integer incumbent used for
+pruning and enumeration.
+
+Before mutating cuts, an artificial-free completed pricing round retains a
+checkpoint of the master, route registry, cut/pricing state, stabilization and
+fixing-gap cache. A later pricing timeout that explicitly requests saved-point
+rollback restores that checkpoint and preserves any improved incumbent. Child
+nodes start with a fresh saved-point flag. Unsaved timeouts, label limits and
+other errors still propagate. Recovery uses the saved pricing bound; the
+unfinished cut round's restricted LP objective supplies no new certificate.
+Failed pricing attempts remain included in the recovered node's pricing-call
+count and pricing time, while its bound and warm state come from the checkpoint.

@@ -86,6 +86,12 @@ reconfigure its existing separator.
 | `BALDESuseCovSetsForSepOneRowPackingCuts` | Bool | `0.0` | [src/cuts/registry.rs](../src/cuts/registry.rs) |
 | `BALDESuseExactComplBoundsInEnumeration` | Bool | `1.0` | [src/pricing/universe.rs](../src/pricing/universe.rs) |
 
+`BALDEShardTimeThresholdInPricing` is measured in seconds. Pricing uses fifty
+times this threshold before a rollback point is saved and the threshold itself
+afterward. The explicit `Controls::time_limit` remains a cap in either case.
+Zero disallows a labeling sweep; cached inspection can complete without one.
+Raw variable-cost validation shares the effective budget with cached pricing.
+
 The two additional consumers with `clp,highs` are:
 
 | Option | Kind | Default | Consumer / scope |

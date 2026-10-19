@@ -34,6 +34,18 @@ or inheritance entry points. `problem.rs` owns rows and route coefficients;
 `options.rs` owns root and cut-family configuration; `controller.rs` owns
 column-generation callbacks and separation scheduling.
 
+[master/root/domain.rs](../src/master/root/domain.rs) validates unit visit-count
+cover rows, fixed-route residuals and disposable scalar resources before
+collecting a `CanonicalCoverRelaxation`. This projects feasible integer routes
+onto canonical physical paths; it does not establish completeness of an NG LP
+or authorize cut rows or root bound publication.
+
+[master/root/cover_rows.rs](../src/master/root/cover_rows.rs) computes exact
+integer row-activity ranges over residual customer partitions of that domain.
+It relaxes fleet and branch restrictions and has explicit state, work and time
+limits. Passing its range test proves a row valid on those canonical covers;
+resource-schedule projection and original-domain eligibility remain separate.
+
 [master/tree/mod.rs](../src/master/tree/mod.rs) owns node processing and the search queue. Its sibling
 `candidates.rs`, `strong.rs`, and `diving.rs` own candidate generation, strong
 branching, and diving. Typed constraints live in [master/branching.rs](../src/master/branching.rs).
@@ -41,6 +53,19 @@ LP backends remain under `master/solvers/`. Shared integer result types are in
 [master/solvers/mip.rs](../src/master/solvers/mip.rs); [master/solvers/highs/integer.rs](../src/master/solvers/highs/integer.rs) transfers complete
 models to HiGHS. [master/root/integer.rs](../src/master/root/integer.rs) prepares complete enumerated masters;
 [master/tree/integer.rs](../src/master/tree/integer.rs) runs the optional end-of-node solve.
+
+[master/networks.rs](../src/master/networks.rs) coordinates fresh roots with
+multiple independent pricing graphs and shared master rows.
+[master/network_bounds.rs](../src/master/network_bounds.rs) supplies conservative
+graph-walk bound certificates. See [multiple networks](networks.md) for the
+coefficient mapping and current integration limits.
+
+[master/certificates.rs](../src/master/certificates.rs) evaluates conservative
+lower bounds for explicit finite matrices using original cost terms and a
+verified total-column-quantity row. It shares directed arithmetic with network
+bounds through `master/rounding.rs`. A finite-matrix bound applies to an original
+routing domain only after column completeness or excluded-domain coverage and
+row validity have been established separately.
 
 Public paths remain `master::root::{RootProblem, RootOptions, NodeSnapshot}`
 and `master::tree::{TreeOptions, BranchingOptions}`.
@@ -52,14 +77,37 @@ preparation, and column-generation round updates. `solve.rs` runs pricing phases
 `universe.rs` manages enumeration, inspection, and direct fixing;
 `completion.rs` completes labels and restores arcs;
 `fixing_workflow.rs` dispatches native fixing/enumeration modes;
-`variable_costs.rs` handles variable costs and corrected bounds;
+`variable_costs.rs` handles variable costs, route-value corrections and raw
+functor repricing. A rounded winning route alone cannot certify the raw minimum:
+the functor uses an independent raw-cost pricing domain, preserving logical
+branch constraints and sharing the call's time budget. Heuristic phases leave
+the lower bound unknown;
 `relaxation.rs` manages dynamic NG updates and route validation.
 `branching.rs`, `phases.rs`, `fixing.rs`, and `controller.rs` provide supporting
 resources, phase definitions, fixing result types, and round state.
 
+If a backward candidate cannot be replayed within forward resource windows,
+`pricing/solve.rs` rebuilds a forward-only search under the remaining call
+deadline, reloading cuts, branch resources and explicit physical exclusions.
+This recovers the minimum even when the failed candidate displaced valid paths
+from the bounded solution pool.
+
+`Route.resource_profile` records the source state and the state after every arc.
+Label reconstruction preserves waiting from bucket jumps instead of replacing
+it with earliest arrival. Root column identities include these schedules, so
+equal arc paths with different resource states remain distinct. Code constructing
+`Route` literals must supply the profile; `resources` is its final state.
+
 [enumeration/mod.rs](../src/enumeration/mod.rs) exports `Controls`, `Enumeration`, `Label`, `CutTables`,
 `Storage`, `Path`, and `PathStorage`. Their implementation files are
 `controls.rs`, `engine.rs`, `label.rs`, `storage.rs`, and `paths.rs`.
+
+[enumeration/domain.rs](../src/enumeration/domain.rs) exports
+`CompleteCanonicalPaths`, a bounded collector of physical vertex-simple paths
+under canonical forward scalar-resource extension. It preserves parallel arc
+identity and borrows the graph. Budget exhaustion discards the partial result.
+It keeps one earliest resource profile per path; callers must establish any
+equivalence to all routing columns or alternative schedules separately.
 
 ## C API and instances
 
@@ -75,3 +123,10 @@ For new code, place routines with the component that owns their state and add
 exports at its existing facade when needed. Keep numerical and branching
 behavior changes separate from file organization so each diff remains
 reviewable.
+
+[enumeration/frontier.rs](../src/enumeration/frontier.rs) records cached candidate
+costs rejected during enumeration, ordered join breaks, and completion rejections.
+These are observations from that run's cost epoch, preserved by pricing forks;
+retained-path repricing does not update them. Representative pruning and symmetric
+cost transformations are marked explicitly. The observations alone do not certify
+an original-domain lower bound or account for a previously restricted bucket grid.

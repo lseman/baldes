@@ -48,10 +48,10 @@ Rust integration suites are grouped by area under `tests/`:
 | `master/` | Branching, tree/node lifecycle, column generation, preprocessing, and MIP |
 | `hgs/` | Genetic-search driver and end-to-end feasibility |
 | `instances/` | Instance parsing and distance conventions |
-| `verification/` | Cross-component porting regressions and independent oracles |
+| `pricing/porting_regressions.rs` | Independent pricing and enumeration checks |
 
 Each file remains a separate test target, explicitly registered in the root
-`Cargo.toml`. Target names are unchanged: for example,
+`Cargo.toml`. For example,
 `cargo test --test main_pricing` runs `tests/pricing/main_pricing.rs`.
 When adding a suite, place it in the appropriate directory and add a `[[test]]`
 entry with its name and path. Keep unit tests beside their implementation and
@@ -105,8 +105,64 @@ Lifecycle tests verify parent/sibling isolation and inherited branch/cut rows.
 MIP tests distinguish feasible witnesses from proof outcomes and check that
 limits do not certify an unfinished node.
 
+Column-generation tests also check artificial-penalty exhaustion. Exact pricing
+with positive artificials proves optimality only for the penalized master;
+exhausting the penalty-update budget returns `Stalled`. It does not prove the
+original model infeasible. Increasing that budget can recover a feasible real
+solution, but callers must still inspect status and solution feasibility.
+
+Root incumbent checks round approximately integral route quantities, validate
+the resulting logical row activities, and evaluate an upper bound from original
+arc costs. The numerical LP objective alone is not accepted as an integer
+incumbent. Arithmetic overflow leaves the candidate unaccepted.
+
+CG passes its remaining wall-time budget to both Clp and HiGHS through
+`LpMaster::solve_with_time_limit`. Root preparation, CG and pricing share the
+same root deadline. Auxiliary Clp callers can also use `solve_limited` with an
+explicit iteration budget. Limits are cooperative and scoped to the call;
+previous backend limits are restored. Typed stop outcomes are distinct from LP
+infeasibility, and cached arrays from a stopped call do not authorize a new
+solution or certificate. Custom LP backends must override the compatibility
+method to enforce their own in-solve deadline.
+
+Finite-matrix certificate tests cover fractional quantities, invalid dual signs,
+original cost cancellation, fixed objective terms and unproved multiplicity
+rows. Unsupported or overflowing arithmetic returns an unknown bound. These
+checks do not establish completeness of a routing column universe.
+
+Canonical path collector unit tests cover cycles, parallel arcs, waiting,
+equality resources, direct terminal arcs, malformed input and exact budget
+boundaries. A compile-fail example checks that a completed domain cannot outlive
+mutation of its borrowed graph. The collector covers canonical profiles only;
+its completion type alone does not certify an original routing master.
+
+Cover-relaxation eligibility checks additionally exercise cyclic graphs,
+fractional cover coefficients, unsupported resource kinds, fixed-route residual
+mismatches and a shared work/deadline budget. Extra paths excluded by other
+constraints may remain in this relaxation. Cut validity and schedule-dependent
+row domination still require separate checks before using a matrix certificate.
+
+Cover-row audit tests verify exact partition extrema, rejection of a row that
+excludes a cover, empty versus impossible residual covers, fractional RHS
+comparisons and state/work/deadline limits. Integer row sums use `i128`.
+Failure returns no partial range; a failed relaxed-cover test alone does not
+prove invalidity under additional fleet or branch restrictions.
+
+Resource-boundary regressions cover backward subtraction accepting a path whose
+forward additions exceed a window by one ulp. Pricing retries with a fresh
+forward-only engine using the remaining call deadline, recovering valid paths
+displaced in a bounded candidate pool. Checks cover physical exclusions,
+topology changes, zero-time stops and an unresolved root without an incumbent.
+Forward binary64 replay can also reject a path that satisfies exact-real sums
+of its input consumptions. These checks establish forward consistency; original
+resource-domain certificates need conservative coverage of arithmetic boundaries.
+
 Passing these checks establishes the cases exercised by the suite. Benchmark
 timings depend on the instance, graph conventions, enabled cuts, backend, and
 hardware. Preserve that configuration when reporting a performance change.
 For documentation-only edits, verify local links, API examples, command flags,
 and option tables without treating a full solver rerun as necessary.
+
+Compiled-reference parity tests, binary adapters, fixtures, and tracing tools are
+maintained in a separate local workbench outside this Git checkout. They are not
+required by Cargo builds or the regular test suite.
