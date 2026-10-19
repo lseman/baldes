@@ -202,7 +202,9 @@ fn _solve_root(
                         ids
                     };
                     neighbors.sort_unstable();
-                    graph.set_ng(v, &neighbors)?;
+                    let elements: Vec<_> = neighbors.iter()
+                        .flat_map(|&vertex| graph.vertices[vertex].elements.iter().copied()).collect();
+                    graph.set_ng(v, &elements)?;
                 }
             }
             options.cg.multiplicity = n as f64;
