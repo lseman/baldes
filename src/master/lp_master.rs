@@ -12,6 +12,8 @@ use std::time::Duration;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LpSolveOutcome {
     Optimal,
+    /// Feasible interior point accepted at a relaxed optimality tolerance.
+    Suboptimal,
     PrimalInfeasible,
     DualInfeasible,
     TimeLimit,
@@ -54,7 +56,8 @@ pub trait LpMaster: Sized + 'static {
 
     /// Solve within a remaining wall-time budget. Backends override this to
     /// enforce the budget during solving; the compatibility default checks
-    /// zero budgets only. Only Optimal authorizes new solution vectors.
+    /// zero budgets only. Only Optimal authorizes new solution vectors here;
+    /// solve_for_column_generation also permits Suboptimal pricing points.
     fn solve_with_time_limit(&mut self, remaining: Duration) -> Result<LpSolveOutcome> {
         if remaining.is_zero() { return Ok(LpSolveOutcome::TimeLimit); }
         Ok(if self.solve() { LpSolveOutcome::Optimal } else {
@@ -68,11 +71,20 @@ pub trait LpMaster: Sized + 'static {
         })
     }
 
-    /// Row duals of the last optimal solve.
+    /// Pricing may use a feasible, suboptimal interior point. `None` requests
+    /// an accurate solve, required before declaring column generation complete.
+    /// Simplex backends keep their usual solve and return Optimal.
+    fn solve_for_column_generation(
+        &mut self, remaining: Duration, _gap_tolerance: Option<f64>,
+    ) -> Result<LpSolveOutcome> {
+        self.solve_with_time_limit(remaining)
+    }
+
+    /// Row duals of the last successful optimal or suboptimal solve.
     fn duals(&self) -> &[f64];
-    /// Column values of the last optimal solve.
+    /// Column values of the last successful optimal or suboptimal solve.
     fn values(&self) -> &[f64];
-    /// Column reduced costs of the last optimal solve.
+    /// Column reduced costs of the last successful optimal or suboptimal solve.
     fn reduced_costs(&self) -> &[f64];
     /// Objective value of the last solve.
     fn objective(&self) -> f64;
@@ -94,7 +106,8 @@ pub trait LpMaster: Sized + 'static {
     fn upper(&self) -> &[f64];
 
     /// Whether a row's slack is basic in the current basis. Cut cleanup
-    /// depends on it, so every backend must report the real basis.
+    /// depends on it. Backends without a simplex basis return false to retain
+    /// the row rather than inventing a basis status.
     fn row_is_basic(&self, row: usize) -> Result<bool>;
 
     /// Cut cleanup: the cut rows (from `initial_rows`

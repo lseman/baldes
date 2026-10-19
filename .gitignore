@@ -75,6 +75,7 @@ _deps/
 /internals/
 /reports/
 /results/
+/papers/
 *.log
 
 # Local configuration and credentials

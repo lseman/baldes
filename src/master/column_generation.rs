@@ -74,6 +74,27 @@ pub struct Iteration {
     pub pricing_calls: usize,
     /// Gap supplied to stabilization before this iteration's LP is accepted.
     pub stabilization_gap: f64,
+    /// Requested IPM relative optimality tolerance; None for accurate solves.
+    pub master_gap_tolerance: Option<f64>,
+}
+
+/// Munari--Gondzio, Algorithm 1: bounds for the continuous master, distinct
+/// from integer incumbents and certificates for stronger pricing domains.
+struct IpmAccuracy {
+    lower: f64,
+    upper: f64,
+}
+
+impl IpmAccuracy {
+    fn new() -> Self { Self { lower: f64::NEG_INFINITY, upper: f64::INFINITY } }
+
+    fn tolerance(&self) -> f64 {
+        if !self.lower.is_finite() || !self.upper.is_finite() { return 0.5; }
+        // epsilon_max = 1, degree of optimality D = 10. A numerical floor
+        // avoids requesting a gap below the accurate master's precision.
+        (((self.upper - self.lower).max(0.) / (1. + self.upper.abs())) / 10.)
+            .clamp(1e-9, 1.)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -94,6 +115,8 @@ pub struct WarmStart {
 
 #[derive(Clone, Debug)]
 pub struct Options {
+    /// Progress table on stderr every N iterations; None keeps CG silent.
+    pub log_interval: Option<usize>,
     /// Metadata of an already populated, solved master. No duplicate base
     /// artificials are added when resuming a node.
     pub warm_start: Option<WarmStart>,
@@ -129,6 +152,7 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            log_interval: None,
             warm_start: None,
             smoothing: Parameters::default(),
             stabilize: true,
@@ -328,9 +352,27 @@ fn optimality_gap(primal: f64, dual: f64) -> f64 {
 pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller<M>>(
     master: &mut M,
     supplied: &[Phase],
+    price: P,
+    controller: &mut C,
+    options: Options,
+) -> Result<Output> {
+    if options.log_interval == Some(0) {
+        return Err(invalid("CG log interval must be positive"));
+    }
+    let logging = options.log_interval.is_some();
+    let mut progress = super::progress::ProgressLog::new(options.log_interval);
+    let result = optimize_inner(master, supplied, price, controller, options, &mut progress);
+    if logging { progress.finish(&result, controller.incumbent()); }
+    result
+}
+
+fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Controller<M>>(
+    master: &mut M,
+    supplied: &[Phase],
     mut price: P,
     controller: &mut C,
     options: Options,
+    progress: &mut super::progress::ProgressLog,
 ) -> Result<Output> {
     let schedule = phases::initialize(0, supplied)?;
     if !options.multiplicity.is_finite() || options.multiplicity < 0. || options.max_iterations == 0
@@ -377,6 +419,8 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
     // a stronger relaxation than the pricing LP. Keep its convergence estimate
     // separate: an integer bound cannot prove that LP pricing is exhausted.
     let mut pricing_estimate = f64::NEG_INFINITY;
+    let mut ipm_accuracy = IpmAccuracy::new();
+    let mut accurate_next = false;
     let mut round_lower_bound = if inherited_bound.is_finite() {
         inherited_bound
     } else {
@@ -492,8 +536,12 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
             out.status = Status::TimeLimit;
             return finish(out, loaded, cut_artificials, pool, smoothing);
         }
-        let outcome = master.solve_with_time_limit(options.time_limit.saturating_sub(started.elapsed()))?;
-        if outcome != LpSolveOutcome::Optimal {
+        let requested_gap = (!accurate_next).then(|| ipm_accuracy.tolerance());
+        let outcome = master.solve_for_column_generation(
+            options.time_limit.saturating_sub(started.elapsed()), requested_gap,
+        )?;
+        let accurate = outcome == LpSolveOutcome::Optimal;
+        if !accurate && outcome != LpSolveOutcome::Suboptimal {
             out.status = match outcome {
                 LpSolveOutcome::PrimalInfeasible => Status::Infeasible,
                 LpSolveOutcome::DualInfeasible => Status::Unbounded,
@@ -510,6 +558,7 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
         out.iterations = iteration;
         let raw = master.duals().to_vec();
         let positive = out.artificials.iter().any(|&i| master.values()[i] > 1e-6);
+        if !positive { ipm_accuracy.upper = ipm_accuracy.upper.min(out.lp); }
         controller.master_solved(master, &out.column_tags, &out.artificials)?;
         // Stabilization compares this round's inherited lower bound with
         // its preceding artificial-free restricted-LP objective. The global
@@ -531,7 +580,7 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
         // earlyCGtermType1 uses the phase value for stage > 0
         // and the LP pricing estimate for stage zero, before another call.
         let stopping_bound = if stage > 0 { stage_bound } else { pricing_estimate };
-        let converged = !positive
+        let converged = accurate && !positive
             && stopping_bound.is_finite()
             && gap_smaller_than_tolerance(
                 stopping_bound,
@@ -636,6 +685,7 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                 }
                 if answer.exact {
                     pricing_estimate = pricing_estimate.max(pass_bound);
+                    ipm_accuracy.lower = ipm_accuracy.lower.max(pass_bound);
                     let certified = controller.certified_pricing_bound(master, &current)?
                         .unwrap_or(pass_bound);
                     if !certified.is_finite() && certified != f64::NEG_INFINITY {
@@ -753,7 +803,11 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
             phase: answer_phase,
             pricing_calls: out.pricing_calls,
             stabilization_gap: gap,
+            master_gap_tolerance: if accurate { None } else { requested_gap },
         });
+        if options.log_interval.is_some() {
+            progress.iteration(out.history.last().unwrap(), out.bound, controller.incumbent());
+        }
         if !converged
             && controller.incumbent().is_finite()
             && out.bound.is_finite()
@@ -764,6 +818,13 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                 options.gap_relative,
             )
         {
+            if !accurate {
+                // The integer certificate may close the node while this
+                // interior point is still suboptimal. Finalize its LP point
+                // before publishing a completed node or capturing its state.
+                accurate_next = true;
+                continue;
+            }
             out.status = Status::Optimal;
             out.pruned_by_bound = true;
             // Fixing/enumeration can retain only routes capable of improving
@@ -778,8 +839,17 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
             }
             out.penalty_updates += 1;
             round_penalty_updates += 1;
+            ipm_accuracy = IpmAccuracy::new();
             continue;
         }
+        if fresh == 0 && exact && !accurate {
+            // No improving column at a suboptimal RMP point is not an LP
+            // optimality proof. Re-solve accurately and repeat exact pricing
+            // before separation, snapshots, enumeration, or termination.
+            accurate_next = true;
+            continue;
+        }
+        accurate_next = false;
         if fresh == 0 && exact {
             if !positive && !converged {
                 if let Some(universe) = controller.enumerated_universe(&raw, out.bound)? {
@@ -855,6 +925,7 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                         }
                     }
                     round_primal_bound = 1e12;
+                    ipm_accuracy = IpmAccuracy::new();
                     stage = schedule.len() - 1;
                     stage_bound = -1e12;
                     round_penalty_updates = 0;
@@ -1015,6 +1086,8 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                         }
                     }
                     round_primal_bound = 1e12;
+                    // New rows invalidate the old primal upper bound.
+                    ipm_accuracy = IpmAccuracy::new();
                     separated_once = true;
                     stage = schedule.len() - 1;
                     stage_bound = -1e12;
@@ -1044,6 +1117,7 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                     // an LP point or interpreting exhausted artificial penalties.
                     out.columns = master.costs().len();
                     pricing_estimate = f64::NEG_INFINITY;
+                    ipm_accuracy = IpmAccuracy::new();
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
                     stage = schedule.len() - 1;
                     stage_bound = -1e12;

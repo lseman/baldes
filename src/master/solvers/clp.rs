@@ -68,9 +68,33 @@ pub enum ClpSolveOutcome {
     Stopped,
     Failed,
 }
+/// Algorithm used for restricted-master LP solves. Clp retains the mutable
+/// matrix and snapshot storage; IPM and HiGHS compute their own solutions.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MasterSolver {
+    #[default]
+    Clp,
+    Ipm,
+    Highs,
+}
+
+impl MasterSolver {
+    pub fn ensure_available(self) -> Result<()> {
+        if self == Self::Highs && !cfg!(feature = "highs") {
+            return Err(invalid("HiGHS master requires the highs build feature (build with clp,highs)"));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub struct ClpMaster {
     model: NonNull<Model>,
+    solver: MasterSolver,
+    highs_row_basic: Vec<bool>,
+    #[cfg(feature = "highs")]
+    highs_backend: Option<super::highs::HighsMaster>,
+    primal_tolerance: f64,
     pub rhs: Vec<f64>,
     pub senses: Vec<RowSense>,
     pub costs: Vec<f64>,
@@ -90,6 +114,30 @@ pub struct ClpMaster {
     pub zero_tolerance: f64,
 }
 impl ClpMaster {
+    pub fn solver(&self) -> MasterSolver { self.solver }
+    /// Changing algorithms invalidates the cached solution.
+    pub fn set_solver(&mut self, solver: MasterSolver) {
+        if self.solver != solver {
+            self.solved = false; self.highs_row_basic.clear();
+            #[cfg(feature = "highs")]
+            { self.highs_backend = None; }
+        }
+        self.solver = solver;
+    }
+    /// Mutations mirror into an existing HiGHS model, preserving its basis.
+    /// On a mirror error discard that backend: the canonical model is retained
+    /// and a subsequent solve can reconstruct it without using stale state.
+    #[cfg(feature = "highs")]
+    fn edit_highs(&mut self, edit: impl FnOnce(&mut super::highs::HighsMaster) -> Result<()>) -> Result<()> {
+        if let Some(mut backend) = self.highs_backend.take() {
+            if let Err(error) = edit(&mut backend) {
+                self.solved = false;
+                return Err(error);
+            }
+            self.highs_backend = Some(backend);
+        }
+        Ok(())
+    }
     /// Reuse a preceding solve when deleting its trailing rows/columns gives
     /// this exact ordered matrix and costs. Bounds remain those of this model.
     /// Returns false without changing either model when they do not match.
@@ -129,6 +177,7 @@ impl ClpMaster {
                 continued.set_upper(column, self.upper[column])?;
             }
         }
+        continued.solver = self.solver;
         continued.zero_tolerance = self.zero_tolerance;
         continued.set_tolerances(1e-7, self.dual_tolerance)?;
         *self = continued;
@@ -137,12 +186,16 @@ impl ClpMaster {
     /// Fork the model through Clp's deep-copy operation, retaining its basis,
     /// primal/dual solution, scaling and simplex state. The fork owns all data.
     pub fn try_clone(&self) -> Result<Self> {
+        #[cfg(feature = "highs")]
+        let highs_backend = self.highs_backend.as_ref().map(|backend| backend.try_clone()).transpose()?;
         // SAFETY: source stays alive and is not mutated; the C++ bridge returns
         // an independently owned Clp wrapper, released by this type's Drop.
         let model = NonNull::new(unsafe { baldes_clp_clone(self.model.as_ptr()) })
             .ok_or_else(|| incomplete("Clp model copy failed"))?;
         unsafe { Clp_setLogLevel(model.as_ptr(), 0) };
-        Ok(Self { model, rhs:self.rhs.clone(), senses:self.senses.clone(), costs:self.costs.clone(),
+        Ok(Self { model, solver:self.solver,
+            #[cfg(feature = "highs")] highs_backend,
+            primal_tolerance:self.primal_tolerance, highs_row_basic:self.highs_row_basic.clone(), rhs:self.rhs.clone(), senses:self.senses.clone(), costs:self.costs.clone(),
             upper:self.upper.clone(), duals:self.duals.clone(), values:self.values.clone(),
             reduced_costs:self.reduced_costs.clone(), objective:self.objective, objective_offset:self.objective_offset, status:self.status,
             solved:self.solved, dual_tolerance:self.dual_tolerance, zero_tolerance:self.zero_tolerance,
@@ -162,6 +215,8 @@ impl ClpMaster {
             Clp_chgRowUpper(self.model.as_ptr(), upper.as_ptr());
         }
         self.rhs.copy_from_slice(rhs);
+        #[cfg(feature = "highs")]
+        self.edit_highs(|backend| backend.set_rhs(rhs))?;
         self.solved = false;
         Ok(())
     }
@@ -180,6 +235,10 @@ impl ClpMaster {
         }
         Ok(Self {
             model,
+            solver: MasterSolver::Clp,
+            highs_row_basic: vec![],
+            #[cfg(feature = "highs")] highs_backend: None,
+            primal_tolerance: 1e-7,
             rhs: vec![],
             senses: vec![],
             costs: vec![],
@@ -240,6 +299,8 @@ impl ClpMaster {
             self.senses.push(sense);
         }
         self.solved = false;
+        #[cfg(feature = "highs")]
+        self.edit_highs(|backend| backend.add_rows(rows).map(|_| ()))?;
         Ok(first..self.rhs.len())
     }
     pub fn add_column(&mut self, cost: f64, entries: &[(usize, f64)]) -> Result<usize> {
@@ -295,6 +356,8 @@ impl ClpMaster {
         self.upper.extend(&upper);
         self.solved = preserve;
         self.values.resize(self.values.len() + preserved, 0.);
+        #[cfg(feature = "highs")]
+        self.edit_highs(|backend| backend.add_columns(columns).map(|_| ()))?;
         Ok(first..self.costs.len())
     }
     pub fn set_coefficient(&mut self, row: usize, column: usize, value: f64) -> Result<()> {
@@ -304,6 +367,8 @@ impl ClpMaster {
         unsafe {
             Clp_modifyCoefficient(self.model.as_ptr(), row as i32, column as i32, value, true);
         }
+        #[cfg(feature = "highs")]
+        self.edit_highs(|backend| backend.set_coefficient(row, column, value))?;
         self.solved = false;
         Ok(())
     }
@@ -315,6 +380,8 @@ impl ClpMaster {
         unsafe {
             Clp_chgObjCoefficients(self.model.as_ptr(), self.costs.as_ptr());
         }
+        #[cfg(feature = "highs")]
+        self.edit_highs(|backend| backend.set_cost(column, cost))?;
         self.solved = false;
         Ok(())
     }
@@ -326,6 +393,8 @@ impl ClpMaster {
         unsafe {
             Clp_chgColumnUpper(self.model.as_ptr(), self.upper.as_ptr());
         }
+        #[cfg(feature = "highs")]
+        self.edit_highs(|backend| backend.set_upper(column, upper))?;
         self.solved = false;
         Ok(())
     }
@@ -338,9 +407,18 @@ impl ClpMaster {
             Clp_setDualTolerance(self.model.as_ptr(), dual);
         }
         self.dual_tolerance = dual;
+        self.primal_tolerance = primal;
+        #[cfg(feature = "highs")]
+        self.edit_highs(|backend| backend.set_tolerances(primal, dual))?;
         Ok(())
     }
     pub fn solve(&mut self) -> bool {
+        if self.solver == MasterSolver::Highs {
+            return matches!(self.solve_highs(i32::MAX as usize, Duration::MAX), Ok(LpSolveOutcome::Optimal));
+        }
+        if self.solver == MasterSolver::Ipm {
+            return matches!(self.solve_ipm(500, Duration::MAX, None), Ok(ClpSolveOutcome::Optimal));
+        }
         // SAFETY: The model is exclusively borrowed and owned by this handle.
         unsafe { Clp_dual(self.model.as_ptr(), 0); }
         self.read_solution()
@@ -350,6 +428,18 @@ impl ClpMaster {
     /// exactly. Only `Optimal` marks the cached solution as solved; other
     /// outcomes do not validate the cached primal/dual arrays for this call.
     pub fn solve_limited(&mut self, iterations: usize, time_limit: Duration) -> Result<ClpSolveOutcome> {
+        if self.solver == MasterSolver::Highs {
+            return Ok(match self.solve_highs(iterations, time_limit)? {
+                LpSolveOutcome::Optimal => ClpSolveOutcome::Optimal,
+                LpSolveOutcome::PrimalInfeasible => ClpSolveOutcome::PrimalInfeasible,
+                LpSolveOutcome::DualInfeasible => ClpSolveOutcome::DualInfeasible,
+                LpSolveOutcome::TimeLimit | LpSolveOutcome::IterationLimit | LpSolveOutcome::Stopped => ClpSolveOutcome::Stopped,
+                _ => ClpSolveOutcome::Failed,
+            });
+        }
+        if self.solver == MasterSolver::Ipm {
+            return self.solve_ipm(iterations.min(500), time_limit, None);
+        }
         let iterations = i32::try_from(iterations).map_err(|_| invalid("Clp iteration limit"))?;
         let started = Instant::now();
         if iterations == 0 || time_limit.is_zero() {
@@ -376,6 +466,119 @@ impl ClpMaster {
             2 => ClpSolveOutcome::DualInfeasible,
             3 => ClpSolveOutcome::Stopped,
             _ => ClpSolveOutcome::Failed,
+        })
+    }
+    fn solve_highs(&mut self, iterations: usize, remaining: Duration) -> Result<LpSolveOutcome> {
+        self.solved = false;
+        self.status = 4;
+        self.highs_row_basic.clear();
+        self.solver.ensure_available()?;
+        if remaining.is_zero() || iterations == 0 {
+            self.status = 3;
+            return Ok(if remaining.is_zero() { LpSolveOutcome::TimeLimit } else { LpSolveOutcome::IterationLimit });
+        }
+        #[cfg(feature = "highs")]
+        {
+            let started = Instant::now();
+            if self.highs_backend.is_none() {
+                let mut backend = super::highs::HighsMaster::new()?;
+                backend.set_tolerances(self.primal_tolerance, self.dual_tolerance)?;
+                let rows = self.senses.iter().zip(&self.rhs).map(|(&sense,&rhs)| (sense,rhs,&[][..])).collect::<Vec<_>>();
+                backend.add_rows(&rows)?;
+                let columns = (0..self.costs.len()).map(|j| self.column_entries(j)).collect::<Result<Vec<_>>>()?;
+                let batch = self.costs.iter().zip(&columns).map(|(&cost, entries)| (cost,entries.as_slice())).collect::<Vec<_>>();
+                backend.add_columns(&batch)?;
+                for (column, &upper) in self.upper.iter().enumerate() {
+                    if backend.upper[column] != upper { backend.set_upper(column, upper)?; }
+                }
+                self.highs_backend = Some(backend);
+            }
+            let backend = self.highs_backend.as_mut().unwrap();
+            backend.set_lp_iteration_limit(iterations)?;
+            let reuse_solution = backend.solved
+                && backend.reduced_costs.len() == self.costs.len()
+                && backend.values.len() == self.costs.len()
+                && backend.duals.len() == self.rhs.len()
+                && backend.zero_tolerance == self.zero_tolerance
+                && backend.objective_offset == self.objective_offset;
+            backend.zero_tolerance = self.zero_tolerance;
+            backend.objective_offset = self.objective_offset;
+            let budget = remaining.saturating_sub(started.elapsed());
+            let outcome = if budget.is_zero() { LpSolveOutcome::TimeLimit }
+                else if reuse_solution { LpSolveOutcome::Optimal }
+                else { backend.solve_with_time_limit(budget)? };
+            self.status = match outcome {
+                LpSolveOutcome::Optimal => 0, LpSolveOutcome::PrimalInfeasible => 1,
+                LpSolveOutcome::DualInfeasible => 2,
+                LpSolveOutcome::TimeLimit | LpSolveOutcome::IterationLimit | LpSolveOutcome::Stopped => 3,
+                _ => 4,
+            };
+            if outcome == LpSolveOutcome::Optimal {
+                if !reuse_solution {
+                    self.simplex_iterations = self.simplex_iterations.saturating_add(backend.simplex_iterations()?);
+                }
+                self.highs_row_basic = (0..self.rhs.len()).map(|r| backend.row_is_basic(r)).collect::<Result<Vec<_>>>()?;
+                self.objective = backend.objective;
+                self.values.clone_from(&backend.values);
+                self.duals.clone_from(&backend.duals);
+                self.reduced_costs.clone_from(&backend.reduced_costs);
+                self.solved = true;
+            }
+            Ok(outcome)
+        }
+        #[cfg(not(feature = "highs"))]
+        unreachable!("availability checked above")
+    }
+    fn solve_ipm(&mut self, iterations: usize, time_limit: Duration, gap_tolerance: Option<f64>) -> Result<ClpSolveOutcome> {
+        self.solved = false;
+        self.status = 4;
+        if iterations == 0 || time_limit.is_zero() {
+            self.status = 3;
+            return Ok(ClpSolveOutcome::Stopped);
+        }
+        let started = Instant::now();
+        let mut entries = Vec::new();
+        for column in 0..self.costs.len() {
+            for (row, value) in self.column_entries(column)? {
+                entries.push((row, column, value));
+            }
+        }
+        let model = crate::ipm::ModelData {
+            a: crate::ipm::SparseMatrix::from_triplets(self.rhs.len(), self.costs.len(), &entries)
+                .map_err(|e| incomplete(e.to_string()))?,
+            b: self.rhs.clone(), c: self.costs.clone(), lower: vec![0.; self.costs.len()],
+            upper: self.upper.clone(),
+            sense: self.senses.iter().map(|s| match s {
+                RowSense::Equal => crate::ipm::Sense::Equal,
+                RowSense::LessEqual => crate::ipm::Sense::LessEqual,
+                RowSense::GreaterEqual => crate::ipm::Sense::GreaterEqual,
+            }).collect(),
+        };
+        let solution = crate::ipm::solve(&model, &crate::ipm::Options {
+            tolerance: 1e-9, gap_tolerance, max_iterations: iterations,
+            time_limit: Some(time_limit.saturating_sub(started.elapsed())),
+            ..Default::default()
+        }).map_err(|e| incomplete(format!("IPM master: {e}")))?;
+        self.status = match solution.status {
+            crate::ipm::Status::Optimal => 0,
+            crate::ipm::Status::Infeasible => 1,
+            crate::ipm::Status::Unbounded => 2,
+            _ => 3,
+        };
+        if started.elapsed() >= time_limit { self.status = 3; }
+        if self.status == 0 {
+            self.objective = solution.objective + self.objective_offset;
+            self.values = solution.primal;
+            self.duals = solution.dual;
+            self.reduced_costs = (0..self.costs.len()).map(|j| {
+                self.column_entries(j).map(|entries| self.costs[j] - entries.iter()
+                    .map(|&(r, a)| a * self.duals[r]).sum::<f64>())
+            }).collect::<Result<Vec<_>>>()?;
+            self.solved = true;
+        }
+        Ok(match self.status {
+            0 => ClpSolveOutcome::Optimal, 1 => ClpSolveOutcome::PrimalInfeasible,
+            2 => ClpSolveOutcome::DualInfeasible, _ => ClpSolveOutcome::Stopped,
         })
     }
     fn read_solution(&mut self) -> bool {
@@ -433,6 +636,10 @@ impl ClpMaster {
     pub fn row_is_basic(&self, row: usize) -> Result<bool> {
         if row >= self.rhs.len() {
             return Err(invalid("master row index"));
+        }
+        if self.solver == MasterSolver::Ipm { return Ok(false); }
+        if self.solver == MasterSolver::Highs {
+            return self.highs_row_basic.get(row).copied().ok_or_else(|| invalid("HiGHS basis requires a solved master"));
         }
         Ok(unsafe { Clp_getRowStatus(self.model.as_ptr(), row as i32) } == 1)
     }
@@ -532,6 +739,10 @@ impl ClpMaster {
                 Clp_deleteColumns(self.model.as_ptr(), ci.len() as i32, ci.as_ptr());
             }
         }
+        #[cfg(feature = "highs")]
+        self.edit_highs(|backend| backend.remove(rows, columns).map(|_| ()))?;
+        self.highs_row_basic = self.highs_row_basic.iter().zip(&rm)
+            .filter_map(|(&value, mapped)| mapped.map(|_| value)).collect();
         self.rhs = self
             .rhs
             .iter()
@@ -615,7 +826,32 @@ impl LpMaster for ClpMaster {
         Self::solve(self)
     }
 
+    fn solve_for_column_generation(
+        &mut self, remaining: Duration, gap_tolerance: Option<f64>,
+    ) -> Result<LpSolveOutcome> {
+        if self.solver != MasterSolver::Ipm || gap_tolerance.is_none() {
+            return self.solve_with_time_limit(remaining);
+        }
+        let started = Instant::now();
+        Ok(match self.solve_ipm(500, remaining, gap_tolerance)? {
+            ClpSolveOutcome::Optimal => LpSolveOutcome::Suboptimal,
+            ClpSolveOutcome::PrimalInfeasible => LpSolveOutcome::PrimalInfeasible,
+            ClpSolveOutcome::DualInfeasible => LpSolveOutcome::DualInfeasible,
+            ClpSolveOutcome::Failed => LpSolveOutcome::Failed,
+            ClpSolveOutcome::Stopped => {
+                if remaining.is_zero() || started.elapsed() >= remaining {
+                    LpSolveOutcome::TimeLimit
+                } else {
+                    LpSolveOutcome::IterationLimit
+                }
+            }
+        })
+    }
+
     fn solve_with_time_limit(&mut self, remaining: Duration) -> Result<LpSolveOutcome> {
+        if self.solver == MasterSolver::Highs {
+            return self.solve_highs(i32::MAX as usize, remaining);
+        }
         let started = Instant::now();
         Ok(match self.solve_limited(i32::MAX as usize, remaining)? {
             ClpSolveOutcome::Optimal => LpSolveOutcome::Optimal,
@@ -626,7 +862,7 @@ impl LpMaster for ClpMaster {
                 // SAFETY: live, exclusively borrowed model. Clp secondary
                 // status 9 identifies a time stop rather than an iteration stop.
                 if remaining.is_zero() || started.elapsed() >= remaining
-                    || unsafe { Clp_secondaryStatus(self.model.as_ptr()) } == 9
+                    || (self.solver == MasterSolver::Clp && unsafe { Clp_secondaryStatus(self.model.as_ptr()) } == 9)
                 { LpSolveOutcome::TimeLimit } else { LpSolveOutcome::IterationLimit }
             }
         })
@@ -902,5 +1138,71 @@ mod continuation_tests {
         }
         assert_eq!(previous.objective, 2.);
         assert!(previous.solved);
+    }
+}
+
+#[cfg(all(test, feature = "highs"))]
+mod highs_warm_tests {
+    use super::*;
+    fn compare_cold(master: &ClpMaster) {
+        let mut cold = ClpMaster::new().unwrap();
+        cold.set_solver(MasterSolver::Highs);
+        for (&sense,&rhs) in master.senses.iter().zip(&master.rhs) {
+            cold.add_row(sense,rhs,&[]).unwrap();
+        }
+        for (j,&cost) in master.costs.iter().enumerate() {
+            cold.add_column(cost,&master.column_entries(j).unwrap()).unwrap();
+            cold.set_upper(j,master.upper[j]).unwrap();
+        }
+        cold.objective_offset=master.objective_offset;
+        assert!(cold.solve());
+        assert!((cold.objective-master.objective).abs()<1e-8);
+    }
+    #[test]
+    fn persistent_highs_reuses_basis_across_edits_and_independent_forks() {
+        let mut master=ClpMaster::new().unwrap();
+        master.set_solver(MasterSolver::Highs);
+        master.add_row(RowSense::Equal,1.,&[]).unwrap();
+        master.add_column(3.,&[(0,1.)]).unwrap();
+        master.add_column(1.,&[(0,1.)]).unwrap();
+        assert!(master.solve());
+        let identity=master.highs_backend.as_ref().unwrap().native_identity();
+        assert!(master.solve());
+        assert_eq!(master.highs_backend.as_ref().unwrap().native_identity(),identity);
+        assert_eq!(master.highs_backend.as_ref().unwrap().simplex_iterations().unwrap(),0);
+        let mut fork=master.try_clone().unwrap();
+        assert_ne!(fork.highs_backend.as_ref().unwrap().native_identity(),identity);
+        // Force a native solve of the identical LP, rather than serving its
+        // copied solution cache, to verify the installed basis itself.
+        fork.set_cost(0,3.).unwrap();
+        assert!(fork.solve());
+        assert_eq!(fork.highs_backend.as_ref().unwrap().simplex_iterations().unwrap(),0);
+        master.add_column(0.5,&[(0,1.)]).unwrap();
+        assert!(master.solve());
+        assert_eq!(master.highs_backend.as_ref().unwrap().native_identity(),identity);
+        assert!((master.objective-0.5).abs()<1e-8);
+        assert!((fork.objective-1.).abs()<1e-8);
+        master.add_row(RowSense::GreaterEqual,0.25,&[(0,1.)]).unwrap();
+        assert!(master.solve());
+        compare_cold(&master);
+        master.set_rhs(&[1.,0.5]).unwrap();
+        master.set_upper(2,0.25).unwrap();
+        master.set_cost(0,5.).unwrap();
+        master.set_coefficient(1,1,1.).unwrap();
+        let mut edited_fork=master.try_clone().unwrap();
+        assert!(master.solve());
+        assert!(edited_fork.solve());
+        assert!((edited_fork.objective-master.objective).abs()<1e-8);
+        compare_cold(&master);
+        master.remove_cuts(&[1],&[0]).unwrap();
+        assert!(master.solve());
+        compare_cold(&master);
+        assert_eq!(master.highs_backend.as_ref().unwrap().native_identity(),identity);
+        assert_eq!(master.solve_with_time_limit(Duration::ZERO).unwrap(),LpSolveOutcome::TimeLimit);
+        assert!(!master.solved);
+        let previous_pivots = master.simplex_iterations;
+        assert!(master.solve());
+        assert_eq!(master.highs_backend.as_ref().unwrap().native_identity(),identity);
+        assert_eq!(master.simplex_iterations,previous_pivots);
     }
 }

@@ -300,9 +300,9 @@ impl<'a, 'p> Genetic<'a, 'p> {
             let earliest = clients[client].earliest_arrival;
             let latest = clients[client].latest_arrival;
             // (cost, route, position); the first minimum wins, as std::min_element.
-            let mut best_feasible: Option<(i32, usize, usize)> = None;
-            let mut best_any: Option<(i32, usize, usize)> = None;
-            let mut consider = |cost: i32, route: usize, position: usize, feasible: bool| {
+            let mut best_feasible: Option<(f64, usize, usize)> = None;
+            let mut best_any: Option<(f64, usize, usize)> = None;
+            let mut consider = |cost: f64, route: usize, position: usize, feasible: bool| {
                 if best_any.map_or(true, |b| cost < b.0) {
                     best_any = Some((cost, route, position));
                 }

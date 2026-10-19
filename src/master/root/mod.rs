@@ -2,6 +2,7 @@
 //! limited-memory rank-one cuts. Cut handling follows the C++ reference
 //! driver `_solve_root_clp` of `python/src/openrscp/vrptw.py`.
 use super::branching::BranchConstraint;
+pub use crate::master::solvers::clp::MasterSolver;
 use super::{
     clp::ClpMaster,
     column_generation::{self, Answer, Column, Controller, LpMaster, Options, Output},
@@ -27,6 +28,7 @@ pub use domain::{CanonicalCoverRelaxation, ConservativeCoverRelaxation, CoverDom
 mod cover_rows;
 pub use cover_rows::{CoverRowAudit, CoverRowFailure, CoverRowLimits, CoverRowRange, WeightedCoverRowAudit};
 mod incumbent;
+pub(crate) use incumbent::exact_route_feasible;
 mod integer;
 pub use integer::{EnumeratedMipOutput, EnumerationMipPolicy};
 mod options;
@@ -84,6 +86,7 @@ impl std::fmt::Debug for NodeSnapshot {
     }
 }
 impl NodeSnapshot {
+    pub fn master_solver(&self) -> MasterSolver { self.master.solver() }
     pub fn branch_depth(&self) -> usize {
         self.problem.branch_constraints.len()
     }
@@ -450,7 +453,12 @@ fn solve_seeded(
     mut options: RootOptions,
     seed: Option<(&NodeSnapshot, ClpMaster, column_generation::WarmStart)>,
 ) -> Result<RootOutput> {
+    options.master_solver.ensure_available()?;
     options.normalize_pricing_options()?;
+    if options.master_solver == MasterSolver::Ipm {
+        options.cg.stabilize = false;
+        options.cg.smoothing.initial_alpha = 0.;
+    }
     if !problem.fixed_routes.is_empty()
         || problem.branch_constraints.iter().any(|(row, branch)| {
             *row == 0
@@ -492,6 +500,11 @@ fn solve_seeded(
     } else {
         (None, ClpMaster::new()?)
     };
+    master.set_solver(options.master_solver);
+    if options.cg.log_interval.is_some() {
+        crate::log_err!("  Master: {:?} | Node depth: {} | Stabilization: {}",
+            options.master_solver, options.node_depth, if options.cg.stabilize && options.cg.smoothing.alpha_factor > 0. { "on" } else { "off" });
+    }
     // Keep Clp's default 1e-7 primal and dual tolerances.
     master.set_tolerances(1e-7, 1e-7)?;
     master.zero_tolerance = 1e-7;

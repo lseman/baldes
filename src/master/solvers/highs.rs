@@ -5,7 +5,9 @@
 //! of magnitude at most the zero tolerance snapped to zero, appending
 //! dual-feasible columns keeps the current solution, and cut cleanup uses the
 //! shared [`crate::master::lp_master::cleanup_cut_rows`]. HiGHS follows its own pivot
-//! rules, so trajectories differ from Clp's even on identical masters.
+//! rules, so trajectories differ from Clp's even on identical masters. Native
+//! models retain their basis across edits; `try_clone` installs an independent
+//! copy of that basis in a child model.
 use crate::master::{LpMaster, LpSolveOutcome, RowSense};
 use crate::{incomplete, invalid, Result};
 use std::ffi::{c_char, c_double, c_void, CString};
@@ -19,23 +21,18 @@ extern "C" {
     fn Highs_create() -> *mut c_void;
     fn Highs_destroy(highs: *mut c_void);
     fn Highs_run(highs: *mut c_void) -> HighsInt;
+    fn Highs_clearSolver(highs: *mut c_void) -> HighsInt;
     fn Highs_setBoolOptionValue(highs: *mut c_void, option: *const c_char, value: HighsInt) -> HighsInt;
     fn Highs_setDoubleOptionValue(highs: *mut c_void, option: *const c_char, value: c_double) -> HighsInt;
     fn Highs_getDoubleOptionValue(highs: *const c_void, option: *const c_char, value: *mut f64) -> HighsInt;
     fn Highs_getRunTime(highs: *const c_void) -> f64;
-    #[cfg(test)]
     fn Highs_setIntOptionValue(highs: *mut c_void, option: *const c_char, value: HighsInt) -> HighsInt;
     #[cfg(test)]
     fn Highs_setStringOptionValue(highs: *mut c_void, option: *const c_char, value: *const c_char) -> HighsInt;
     fn Highs_getInfinity(highs: *const c_void) -> c_double;
-    fn Highs_addRow(
-        highs: *mut c_void,
-        lower: c_double,
-        upper: c_double,
-        num_new_nz: HighsInt,
-        index: *const HighsInt,
-        value: *const c_double,
-    ) -> HighsInt;
+    #[allow(clippy::too_many_arguments)]
+    fn Highs_addRows(highs: *mut c_void, num_new_row: HighsInt, lower: *const f64, upper: *const f64,
+        num_new_nz: HighsInt, starts: *const HighsInt, index: *const HighsInt, value: *const f64) -> HighsInt;
     #[allow(clippy::too_many_arguments)]
     fn Highs_addCols(
         highs: *mut c_void,
@@ -54,6 +51,9 @@ extern "C" {
     fn Highs_deleteRowsBySet(highs: *mut c_void, num_set_entries: HighsInt, set: *const HighsInt) -> HighsInt;
     fn Highs_deleteColsBySet(highs: *mut c_void, num_set_entries: HighsInt, set: *const HighsInt) -> HighsInt;
     fn Highs_getModelStatus(highs: *const c_void) -> HighsInt;
+    fn Highs_getIntInfoValue(highs: *const c_void, info: *const c_char, value: *mut HighsInt) -> HighsInt;
+    fn Highs_setBasis(highs: *mut c_void, col_status: *const HighsInt, row_status: *const HighsInt) -> HighsInt;
+    fn Highs_changeRowsBoundsByRange(highs: *mut c_void, from_row: HighsInt, to_row: HighsInt, lower: *const f64, upper: *const f64) -> HighsInt;
     fn Highs_getObjectiveValue(highs: *const c_void) -> c_double;
     fn Highs_getSolution(
         highs: *const c_void,
@@ -81,11 +81,13 @@ extern "C" {
 
 const STATUS_ERROR: HighsInt = -1;
 const MODEL_OPTIMAL: HighsInt = 7;
+const MODEL_SOLVE_ERROR: HighsInt = 4;
 const MODEL_INFEASIBLE: HighsInt = 8;
 const MODEL_UNBOUNDED_OR_INFEASIBLE: HighsInt = 9;
 const MODEL_UNBOUNDED: HighsInt = 10;
 const MODEL_TIME_LIMIT: HighsInt = 13;
 const MODEL_ITERATION_LIMIT: HighsInt = 14;
+const MODEL_UNKNOWN: HighsInt = 15;
 const BASIS_BASIC: HighsInt = 1;
 
 struct ScopedTimeLimit {
@@ -125,6 +127,10 @@ pub struct HighsMaster {
     pub reduced_costs: Vec<f64>,
     /// Basis status of each row after the last optimal solve.
     row_status: Vec<HighsInt>,
+    row_values: Vec<f64>,
+    col_status: Vec<HighsInt>,
+    primal_tolerance: f64,
+    iteration_limit: Option<usize>,
     pub objective: f64,
     pub objective_offset: f64,
     /// -1 unsolved, 0 optimal, 1 primal infeasible, 2 dual infeasible.
@@ -150,6 +156,10 @@ impl HighsMaster {
             values: vec![],
             reduced_costs: vec![],
             row_status: vec![],
+            row_values: vec![],
+            col_status: vec![],
+            primal_tolerance: 1e-7,
+            iteration_limit: None,
             objective: 0.,
             objective_offset: 0.,
             status: -1,
@@ -158,7 +168,111 @@ impl HighsMaster {
             zero_tolerance: 0.,
         };
         master.set_bool("output_flag", false)?;
+        // Adding columns preserves primal feasibility but can invalidate dual
+        // feasibility; adding cuts or changing bounds can do the reverse.
+        // Let simplex choose the direction from the retained basis instead of
+        // HiGHS's default of always using dual simplex.
+        // SAFETY: live owned handle and a static NUL-terminated option name.
+        unsafe {
+            Self::check(Highs_setIntOptionValue(
+                highs.as_ptr(), b"simplex_strategy\0".as_ptr().cast(), 0,
+            ), "set adaptive simplex strategy")?;
+        }
         Ok(master)
+    }
+    /// Independently copy the model and install its current native basis.
+    /// Native factorization storage is private to each instance; the child
+    /// refactorizes this basis once, then reuses its own solver state.
+    pub fn try_clone(&self) -> Result<Self> {
+        let mut copy = Self::new()?;
+        copy.set_tolerances(self.primal_tolerance, self.dual_tolerance)?;
+        let rows = self.senses.iter().zip(&self.rhs).map(|(&s,&b)| (s,b,&[][..])).collect::<Vec<_>>();
+        copy.add_rows(&rows)?;
+        let count = self.costs.len();
+        if count > 0 {
+            let mut num_col = 0;
+            let mut nnz = 0;
+            let mut costs = vec![0.;count];
+            let mut lower = vec![0.;count];
+            let mut upper = vec![0.;count];
+            // SAFETY: first call sizes the sparse matrix, second fills arrays
+            // of that size. The destination copies the complete CSC in one call.
+            unsafe {
+                Self::check(Highs_getColsByRange(self.highs.as_ptr(),0,count as HighsInt-1,
+                    &mut num_col,costs.as_mut_ptr(),lower.as_mut_ptr(),upper.as_mut_ptr(),&mut nnz,
+                    std::ptr::null_mut(),std::ptr::null_mut(),std::ptr::null_mut()),"size clone columns")?;
+                if nnz < 0 || num_col != count as HighsInt { return Err(incomplete("HiGHS clone matrix dimensions")); }
+                let mut starts = vec![0;count+1];
+                let mut index = vec![0;nnz as usize];
+                let mut values = vec![0.;nnz as usize];
+                Self::check(Highs_getColsByRange(self.highs.as_ptr(),0,count as HighsInt-1,
+                    &mut num_col,costs.as_mut_ptr(),lower.as_mut_ptr(),upper.as_mut_ptr(),&mut nnz,
+                    starts.as_mut_ptr(),index.as_mut_ptr(),values.as_mut_ptr()),"copy clone columns")?;
+                starts[count] = nnz;
+                Self::check(Highs_addCols(copy.highs.as_ptr(),count as HighsInt, costs.as_ptr(),lower.as_ptr(),upper.as_ptr(),
+                    nnz,starts.as_ptr(),index.as_ptr(),values.as_ptr()),"add clone columns")?;
+            }
+            copy.costs.clone_from(&self.costs);
+            copy.upper.clone_from(&self.upper);
+        }
+        // Query the current basis directly: edits may invalidate solution info
+        // while retaining a valid (possibly infeasible) simplex warm basis.
+        let mut columns = vec![0; self.costs.len()];
+        let mut rows = vec![0; self.rhs.len()];
+        // SAFETY: source is borrowed, destination independently owns its basis.
+        unsafe {
+            if Highs_getBasis(self.highs.as_ptr(), columns.as_mut_ptr(), rows.as_mut_ptr()) == 0 {
+                Self::check(Highs_setBasis(copy.highs.as_ptr(), columns.as_ptr(), rows.as_ptr()), "setBasis for clone")?;
+            }
+        }
+        copy.values.clone_from(&self.values);
+        copy.duals.clone_from(&self.duals);
+        copy.reduced_costs.clone_from(&self.reduced_costs);
+        copy.row_status.clone_from(&self.row_status);
+        copy.col_status.clone_from(&self.col_status);
+        copy.objective = self.objective;
+        copy.objective_offset = self.objective_offset;
+        copy.zero_tolerance = self.zero_tolerance;
+        copy.status = self.status;
+        copy.solved = self.solved;
+        Ok(copy)
+    }
+    /// Replace RHS values without rebuilding the model or discarding the basis.
+    pub fn set_rhs(&mut self, rhs: &[f64]) -> Result<()> {
+        if rhs.len() != self.rhs.len() || rhs.iter().any(|v| !v.is_finite()) {
+            return Err(invalid("HiGHS RHS dimensions or values"));
+        }
+        if rhs == self.rhs { return Ok(()); }
+        let infinity = self.infinity();
+        let lower: Vec<_> = rhs.iter().zip(&self.senses).map(|(&b,&s)| if s == RowSense::LessEqual {-infinity} else {b}).collect();
+        let upper: Vec<_> = rhs.iter().zip(&self.senses).map(|(&b,&s)| if s == RowSense::GreaterEqual {infinity} else {b}).collect();
+        if !rhs.is_empty() {
+            // SAFETY: one lower/upper bound for every native row; HiGHS copies.
+            unsafe { Self::check(Highs_changeRowsBoundsByRange(self.highs.as_ptr(), 0, (rhs.len()-1) as HighsInt, lower.as_ptr(), upper.as_ptr()), "changeRowsBoundsByRange")?; }
+        }
+        self.rhs.copy_from_slice(rhs);
+        self.solved = false;
+        Ok(())
+    }
+    #[cfg(test)]
+    pub(crate) fn native_identity(&self) -> usize { self.highs.as_ptr() as usize }
+    /// Simplex pivots from the most recent native solve.
+    pub fn simplex_iterations(&self) -> Result<usize> {
+        let mut count = 0;
+        // SAFETY: live instance and one integer output.
+        unsafe { Self::check(Highs_getIntInfoValue(self.highs.as_ptr(), b"simplex_iteration_count\0".as_ptr().cast(), &mut count), "simplex_iteration_count")?; }
+        usize::try_from(count).map_err(|_| incomplete("negative HiGHS iteration count"))
+    }
+    pub(crate) fn set_lp_iteration_limit(&mut self, iterations: usize) -> Result<()> {
+        if self.iteration_limit == Some(iterations) { return Ok(()); }
+        let limit = i32::try_from(iterations).map_err(|_| invalid("HiGHS iteration limit"))?;
+        // SAFETY: live owned handle and static NUL-terminated option names.
+        unsafe {
+            Self::check(Highs_setIntOptionValue(self.highs.as_ptr(), b"simplex_iteration_limit\0".as_ptr().cast(), limit), "simplex_iteration_limit")?;
+            Self::check(Highs_setIntOptionValue(self.highs.as_ptr(), b"ipm_iteration_limit\0".as_ptr().cast(), limit), "ipm_iteration_limit")?;
+        }
+        self.iteration_limit = Some(iterations);
+        Ok(())
     }
     fn set_bool(&self, name: &str, value: bool) -> Result<()> {
         let name_c = CString::new(name).map_err(|_| invalid("HiGHS option name"))?;
@@ -200,37 +314,31 @@ impl Drop for HighsMaster {
 
 impl LpMaster for HighsMaster {
     fn add_row(&mut self, sense: RowSense, rhs: f64, entries: &[(usize, f64)]) -> Result<usize> {
-        if !rhs.is_finite() {
-            return Err(invalid("finite row RHS required"));
-        }
-        let (indices, values) = entries_of(entries, self.costs.len())?;
-        let infinity = self.infinity();
-        let lower = if sense == RowSense::LessEqual { -infinity } else { rhs };
-        let upper = if sense == RowSense::GreaterEqual { infinity } else { rhs };
-        // SAFETY: arrays hold `indices.len()` entries; HiGHS copies them.
-        let rc = unsafe {
-            Highs_addRow(
-                self.highs.as_ptr(),
-                lower,
-                upper,
-                indices.len() as HighsInt,
-                indices.as_ptr(),
-                values.as_ptr(),
-            )
-        };
-        Self::check(rc, "addRow")?;
-        let id = self.rhs.len();
-        self.rhs.push(rhs);
-        self.senses.push(sense);
-        self.solved = false;
-        Ok(id)
+        Ok(self.add_rows(&[(sense,rhs,entries)])?.start)
     }
 
     fn add_rows(&mut self, rows: &[(RowSense, f64, &[(usize, f64)])]) -> Result<std::ops::Range<usize>> {
         let first = self.rhs.len();
-        for &(sense, rhs, entries) in rows {
-            self.add_row(sense, rhs, entries)?;
+        if rows.is_empty() { return Ok(first..first); }
+        let infinity = self.infinity();
+        let mut lower = Vec::with_capacity(rows.len());
+        let mut upper = Vec::with_capacity(rows.len());
+        let mut starts = vec![0];
+        let mut indices = vec![];
+        let mut values = vec![];
+        for &(sense,rhs,entries) in rows {
+            if !rhs.is_finite() { return Err(invalid("finite row RHS required")); }
+            let (i,v) = entries_of(entries,self.costs.len())?;
+            lower.push(if sense == RowSense::LessEqual {-infinity} else {rhs});
+            upper.push(if sense == RowSense::GreaterEqual {infinity} else {rhs});
+            indices.extend(i); values.extend(v); starts.push(indices.len() as HighsInt);
         }
+        // SAFETY: buffers contain all row bounds and declared sparse entries;
+        // HiGHS copies them without invalidating the surviving basis columns.
+        unsafe { Self::check(Highs_addRows(self.highs.as_ptr(),rows.len() as HighsInt,lower.as_ptr(),upper.as_ptr(),
+            indices.len() as HighsInt,starts.as_ptr(),indices.as_ptr(),values.as_ptr()),"addRows")?; }
+        for &(sense,rhs,_) in rows { self.senses.push(sense); self.rhs.push(rhs); }
+        self.solved = false;
         Ok(first..self.rhs.len())
     }
 
@@ -336,6 +444,8 @@ impl LpMaster for HighsMaster {
         }
         self.set_double("primal_feasibility_tolerance", primal)?;
         self.set_double("dual_feasibility_tolerance", dual)?;
+        if self.primal_tolerance != primal || self.dual_tolerance != dual { self.solved = false; }
+        self.primal_tolerance = primal;
         self.dual_tolerance = dual;
         Ok(())
     }
@@ -363,7 +473,17 @@ impl LpMaster for HighsMaster {
         let h = self.highs.as_ptr();
         // SAFETY: live handle; the buffers below have the model's dimensions.
         unsafe {
-            if Highs_run(h) == STATUS_ERROR {
+            let mut result = Highs_run(h);
+            if matches!(Highs_getModelStatus(h), MODEL_SOLVE_ERROR | MODEL_UNKNOWN) {
+                // A retained simplex basis can fail numerically after column
+                // edits even though a cold solve of the same LP succeeds.
+                // Retry once, discarding only solver state. Options (including
+                // the cumulative time limit) and the model stay unchanged.
+                if Highs_clearSolver(h) != STATUS_ERROR {
+                    result = Highs_run(h);
+                }
+            }
+            if result == STATUS_ERROR {
                 self.status = 4;
                 self.solved = false;
                 return false;
@@ -382,20 +502,20 @@ impl LpMaster for HighsMaster {
             }
             self.objective = Highs_getObjectiveValue(h) + self.objective_offset;
             let (rows, cols) = (self.rhs.len(), self.costs.len());
-            self.values = vec![0.; cols];
-            self.reduced_costs = vec![0.; cols];
-            self.duals = vec![0.; rows];
-            let mut row_values = vec![0.; rows];
+            self.values.resize(cols, 0.);
+            self.reduced_costs.resize(cols, 0.);
+            self.duals.resize(rows, 0.);
+            self.row_values.resize(rows, 0.);
             Highs_getSolution(
                 h,
                 self.values.as_mut_ptr(),
                 self.reduced_costs.as_mut_ptr(),
-                row_values.as_mut_ptr(),
+                self.row_values.as_mut_ptr(),
                 self.duals.as_mut_ptr(),
             );
-            let mut col_status = vec![0; cols];
-            self.row_status = vec![0; rows];
-            Highs_getBasis(h, col_status.as_mut_ptr(), self.row_status.as_mut_ptr());
+            self.col_status.resize(cols, 0);
+            self.row_status.resize(rows, 0);
+            Highs_getBasis(h, self.col_status.as_mut_ptr(), self.row_status.as_mut_ptr());
         }
         let tolerance = self.zero_tolerance;
         if tolerance > 0. {

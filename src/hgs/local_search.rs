@@ -6,7 +6,7 @@
 //! - **2-opt / 2-opt***: Reverse segments within or between routes
 //! - **Constructive heuristics**: Seed-based and sweep construction
 
-use std::cmp::{max, min};
+use std::cmp::max;
 
 use crate::hgs::circle_sector::CircleSector;
 use crate::hgs::individual::SortableF64;
@@ -19,11 +19,11 @@ use crate::hgs::params::MY_EPSILON;
 pub struct TimeWindowData {
     pub first_node_index: i32,
     pub last_node_index: i32,
-    pub duration: i32,
-    pub time_warp: i32,
-    pub earliest_arrival: i32,
-    pub latest_arrival: i32,
-    pub latest_release_time: i32,
+    pub duration: f64,
+    pub time_warp: f64,
+    pub earliest_arrival: f64,
+    pub latest_arrival: f64,
+    pub latest_release_time: f64,
 }
 
 impl TimeWindowData {
@@ -34,7 +34,7 @@ impl TimeWindowData {
             first_node_index: node_idx,
             last_node_index: node_idx,
             duration: cli.service_duration,
-            time_warp: 0,
+            time_warp: 0.,
             earliest_arrival: cli.earliest_arrival,
             latest_arrival: cli.latest_arrival,
             latest_release_time: cli.release_time,
@@ -48,17 +48,17 @@ impl TimeWindowData {
             .get(tw1.last_node_index as usize, tw2.first_node_index as usize);
         let delta_duration = delta_cost;
         let delta = tw1.duration - tw1.time_warp + delta_duration;
-        let delta_wait_time = max(0, tw2.earliest_arrival - delta - tw1.latest_arrival);
-        let delta_time_warp = max(0, tw1.earliest_arrival + delta - tw2.latest_arrival);
+        let delta_wait_time = (tw2.earliest_arrival - delta - tw1.latest_arrival).max(0.);
+        let delta_time_warp = (tw1.earliest_arrival + delta - tw2.latest_arrival).max(0.);
 
         TimeWindowData {
             first_node_index: tw1.first_node_index,
             last_node_index: tw2.last_node_index,
             duration: tw1.duration + tw2.duration + delta_duration + delta_wait_time,
             time_warp: tw1.time_warp + tw2.time_warp + delta_time_warp,
-            earliest_arrival: max(tw2.earliest_arrival - delta, tw1.earliest_arrival) - delta_wait_time,
-            latest_arrival: min(tw2.latest_arrival - delta, tw1.latest_arrival) + delta_time_warp,
-            latest_release_time: max(tw1.latest_release_time, tw2.latest_release_time),
+            earliest_arrival: (tw2.earliest_arrival - delta).max(tw1.earliest_arrival) - delta_wait_time,
+            latest_arrival: (tw2.latest_arrival - delta).min(tw1.latest_arrival) + delta_time_warp,
+            latest_release_time: tw1.latest_release_time.max(tw2.latest_release_time),
         }
     }
 }
@@ -71,9 +71,9 @@ pub struct HGSRoute {
     pub when_last_modified: i32,
     pub when_last_tested_large_nb: i32,
     pub is_delta_removel_tw_outdated: bool,
-    pub duration: i32,
+    pub duration: f64,
     pub load: i32,
-    pub reversal_distance: i32,
+    pub reversal_distance: f64,
     pub tw_data: TimeWindowData,
     pub penalty: f64,
     pub polar_angle_barycenter: f64,
@@ -91,10 +91,10 @@ pub struct Node {
     pub prev: i32,
     pub route_idx: i32,
     pub cumulated_load: i32,
-    pub cumulated_time: i32,
-    pub cumulated_reversal_distance: i32,
-    pub delta_removal: i32,
-    pub delta_removal_tw: i32,
+    pub cumulated_time: f64,
+    pub cumulated_reversal_distance: f64,
+    pub delta_removal: f64,
+    pub delta_removal_tw: f64,
     pub tw_data: TimeWindowData,
     pub prefix_tw_data: TimeWindowData,
     pub postfix_tw_data: TimeWindowData,
@@ -110,7 +110,7 @@ pub struct Node {
 pub struct NodeToInsert {
     pub client_idx: i32,
     pub load: i32,
-    pub service_duration: i32,
+    pub service_duration: f64,
     pub angle_from_depot: f64,
     pub tw_data: TimeWindowData,
 }
@@ -119,7 +119,7 @@ pub struct NodeToInsert {
 #[derive(Clone, Debug, Default)]
 pub struct ThreeBestInsert {
     pub when_last_calculated: i32,
-    pub best_cost: [i32; 3],
+    pub best_cost: [f64; 3],
     pub best_location: [i32; 3],
 }
 
@@ -127,19 +127,19 @@ impl ThreeBestInsert {
     pub fn new() -> Self {
         Self {
             when_last_calculated: -1,
-            best_cost: [i32::MAX, i32::MAX, i32::MAX],
+            best_cost: [f64::INFINITY; 3],
             best_location: [-1, -1, -1],
         }
     }
 
     /// Forget the stored positions, keeping `when_last_calculated`.
     pub fn reset(&mut self) {
-        self.best_cost = [i32::MAX; 3];
+        self.best_cost = [f64::INFINITY; 3];
         self.best_location = [-1; 3];
     }
 
     /// Keep `location` if its cost is among the three best.
-    pub fn compare_and_add(&mut self, cost: i32, location: i32) {
+    pub fn compare_and_add(&mut self, cost: f64, location: i32) {
         if cost >= self.best_cost[2] {
             return;
         }
@@ -281,7 +281,7 @@ impl<'p> HGSLocalSearch<'p> {
     #[inline(always)]
     fn penalty_time_windows(&self, tw_data: &TimeWindowData) -> f64 {
         if matches!(self.params.problem_type, ProblemType::Vrptw | ProblemType::Evrp) {
-            (tw_data.time_warp + max(0, tw_data.latest_release_time - tw_data.latest_arrival)) as f64
+            (tw_data.time_warp + (tw_data.latest_release_time - tw_data.latest_arrival).max(0.)) as f64
                 * self.penalty_time_warp_ls
         } else {
             0.0
@@ -363,16 +363,16 @@ impl<'p> HGSLocalSearch<'p> {
 
         let mut myplace = 0i32;
         let mut myload = 0i32;
-        let mut mytime = 0i32;
-        let mut my_reversal_distance = 0i32;
+        let mut mytime = 0_f64;
+        let mut my_reversal_distance = 0_f64;
         // HGS accumulates the scaled coordinates in ints, truncating each sum.
         let mut cumulated_x = 0i32;
         let mut cumulated_y = 0i32;
 
         self.nodes[depot_s].position = 0;
         self.nodes[depot_s].cumulated_load = 0;
-        self.nodes[depot_s].cumulated_time = 0;
-        self.nodes[depot_s].cumulated_reversal_distance = 0;
+        self.nodes[depot_s].cumulated_time = 0.;
+        self.nodes[depot_s].cumulated_reversal_distance = 0.;
 
         let mut mynode = depot_s;
         let mut first_it = true;
@@ -531,8 +531,8 @@ impl<'p> HGSLocalSearch<'p> {
         let depot_tw = TimeWindowData {
             first_node_index: 0,
             last_node_index: 0,
-            duration: 0,
-            time_warp: 0,
+            duration: 0.,
+            time_warp: 0.,
             earliest_arrival: self.params.cli[0].earliest_arrival,
             latest_arrival: self.params.cli[0].latest_arrival,
             latest_release_time: self.params.cli[0].release_time,
@@ -549,7 +549,7 @@ impl<'p> HGSLocalSearch<'p> {
                 first_node_index: i as i32,
                 last_node_index: i as i32,
                 duration: self.params.cli[i].service_duration,
-                time_warp: 0,
+                time_warp: 0.,
                 earliest_arrival: self.params.cli[i].earliest_arrival,
                 latest_arrival: self.params.cli[i].latest_arrival,
                 latest_release_time: self.params.cli[i].release_time,
@@ -642,7 +642,7 @@ impl<'p> HGSLocalSearch<'p> {
     #[inline(always)]
     fn route_has_tw_violation(&self, r: usize) -> bool {
         matches!(self.params.problem_type, ProblemType::Vrptw | ProblemType::Evrp)
-            && self.routes[r].tw_data.time_warp > 0
+            && self.routes[r].tw_data.time_warp > MY_EPSILON
     }
 
     #[inline(always)]
@@ -1662,7 +1662,7 @@ impl<'p> HGSLocalSearch<'p> {
         clients
     }
 
-    fn cost(&self, a: usize, b: usize) -> i32 {
+    fn cost(&self, a: usize, b: usize) -> f64 {
         self.params.time_cost.get(self.nodes[a].cour as usize, self.nodes[b].cour as usize)
     }
 
@@ -1727,9 +1727,9 @@ impl<'p> HGSLocalSearch<'p> {
                     &self.nodes[next].postfix_tw_data,
                     self.params,
                 );
-                // HGS adds the double penalty to the int cost, then truncates.
+                // Keep fractional time-window penalties in the insertion cost.
                 self.nodes[u].delta_removal_tw =
-                    (removal as f64 + self.delta_penalty_time_windows(&tw, &route1_tw)) as i32;
+                    removal + self.delta_penalty_time_windows(&tw, &route1_tw);
             }
             let cour = self.nodes[u].cour as usize;
             let when = if with_tw {
@@ -1751,7 +1751,7 @@ impl<'p> HGSLocalSearch<'p> {
                         &ls.nodes[u].tw_data,
                         &ls.nodes[v_next].postfix_tw_data,
                     ]);
-                    delta = (delta as f64 + ls.delta_penalty_time_windows(&tw, &route2_tw)) as i32;
+                    delta += ls.delta_penalty_time_windows(&tw, &route2_tw);
                 }
                 delta
             };
@@ -1776,7 +1776,7 @@ impl<'p> HGSLocalSearch<'p> {
     /// Cheapest insertion of `u` into the route of `v` once `v` is removed:
     /// one of the three preprocessed positions not adjacent to `v`, or `v`'s
     /// own place. Returns the cost and the node to insert after.
-    fn cheapest_insert_simult_removal(&self, u: usize, v: usize, with_tw: bool) -> (i32, usize) {
+    fn cheapest_insert_simult_removal(&self, u: usize, v: usize, with_tw: bool) -> (f64, usize) {
         let r_v = self.nodes[v].route_idx as usize;
         let cour = self.nodes[u].cour as usize;
         let best = if with_tw {
@@ -1806,7 +1806,7 @@ impl<'p> HGSLocalSearch<'p> {
                 &self.nodes[u].tw_data,
                 &self.nodes[v_next].postfix_tw_data,
             ]);
-            delta = (delta as f64 + self.delta_penalty_time_windows(&tw, &self.routes[r_v].tw_data)) as i32;
+            delta += self.delta_penalty_time_windows(&tw, &self.routes[r_v].tw_data);
         }
         if !found || delta < cost {
             (delta, v_prev)
@@ -1950,8 +1950,8 @@ impl<'p> HGSLocalSearch<'p> {
         let depot_tw = TimeWindowData {
             first_node_index: 0,
             last_node_index: 0,
-            duration: 0,
-            time_warp: 0,
+            duration: 0.,
+            time_warp: 0.,
             earliest_arrival: self.params.cli[0].earliest_arrival,
             latest_arrival: self.params.cli[0].latest_arrival,
             latest_release_time: self.params.cli[0].release_time,
@@ -1967,7 +1967,7 @@ impl<'p> HGSLocalSearch<'p> {
                 first_node_index: i as i32,
                 last_node_index: i as i32,
                 duration: self.params.cli[i].service_duration,
-                time_warp: 0,
+                time_warp: 0.,
                 earliest_arrival: self.params.cli[i].earliest_arrival,
                 latest_arrival: self.params.cli[i].latest_arrival,
                 latest_release_time: self.params.cli[i].release_time,
@@ -2058,14 +2058,14 @@ impl<'p> HGSLocalSearch<'p> {
             for &idx in indices {
                 let tw_dur = nodes_to_insert[idx].tw_data.latest_arrival
                     - nodes_to_insert[idx].tw_data.earliest_arrival;
-                if (tw_dur as i64) * 2 > depot_opening as i64 {
+                if tw_dur * 2. > depot_opening {
                     long_tw_indices.push(idx);
                 } else {
                     short_tw_indices.push(idx);
                 }
             }
 
-            short_tw_indices.sort_by_key(|&idx| nodes_to_insert[idx].tw_data.latest_arrival);
+            short_tw_indices.sort_by(|&a, &b| nodes_to_insert[a].tw_data.latest_arrival.total_cmp(&nodes_to_insert[b].tw_data.latest_arrival));
 
             let mut prev = depot_s;
             for idx in short_tw_indices {
@@ -2179,7 +2179,7 @@ impl<'p> HGSLocalSearch<'p> {
                             self.params,
                         );
 
-                        if merged_all.time_warp <= tolerated_time_warp {
+                        if merged_all.time_warp <= f64::from(tolerated_time_warp) {
                             let prev_cour = self.nodes[prev].cour as usize;
                             let next_cour = self.nodes[next].cour as usize;
                             let cost = (self.params.time_cost.get(prev_cour, cand)

@@ -17,6 +17,7 @@ root. The guides below describe the current Rust implementation.
 | [Stabilization](stabilization.md) | Configure dual smoothing and understand center updates and pricing retries |
 | [Source layout](source-layout.md) | Find the module responsible for a change |
 | [Website publishing](website.md) | Compile Markdown to HTML and preview or deploy the site |
+| [Root benchmarks](benchmarks.md) | Review root relaxation timings and benchmark configuration |
 | [Build and validation](testing.md) | Select feature combinations and run the relevant checks |
 
 ## Capabilities and interfaces
@@ -24,8 +25,8 @@ root. The guides below describe the current Rust implementation.
 | Operation | Rust | CLI | Python | Backend |
 | --- | --- | --- | --- | --- |
 | RCSP pricing and enumeration | Yes | Through routing solves | Low-level `Solver` | Core Rust |
-| Routing root relaxation | Yes | Default `vrptw` / `cvrp` mode | `pybaldes.solve_root` | Clp |
-| Branch-and-price tree | Yes | `--tree` | Not exposed | Clp |
+| Routing root relaxation | Yes | Default `vrptw` / `cvrp` mode | `pybaldes.solve_root` | Clp model store; Clp/IPM/optional HiGHS solves |
+| Branch-and-price tree | Yes | `--tree` | Not exposed | Clp model store; Clp/IPM/optional HiGHS solves |
 | Complete enumerated node MIP | Yes, opt-in | `--tree --enumerated-mip` | Not exposed | Clp + HiGHS |
 | Generic mixed-integer master solve | `highs::solve_integer` | Not exposed directly | Not exposed | HiGHS |
 

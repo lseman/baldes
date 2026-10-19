@@ -96,3 +96,8 @@ mod graph;
 mod parsing;
 #[cfg(feature = "clp")]
 mod root;
+
+#[cfg(feature = "clp")]
+mod hgs;
+#[cfg(feature = "clp")]
+pub use hgs::{HgsColumns, HgsSeedSummary, HgsWarmStart};

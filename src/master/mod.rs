@@ -6,6 +6,7 @@ pub use solvers::clp;
 #[cfg(feature = "highs")]
 pub use solvers::highs;
 pub mod column_generation;
+mod progress;
 pub mod certificates;
 pub(crate) mod rounding;
 pub mod lp_master;

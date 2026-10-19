@@ -33,7 +33,7 @@ fn _read_instance(py: Python<'_>, path: PathBuf) -> PyResult<Py<PyDict>> {
 
 #[cfg(feature = "clp")]
 #[pyfunction]
-#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false))]
+#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false, master_solver="clp", hgs_time=None, hgs_columns="best", hgs_seed=0, verbose=false, log_interval=10))]
 #[allow(clippy::too_many_arguments)]
 fn _solve_root(
     py: Python<'_>,
@@ -56,6 +56,12 @@ fn _solve_root(
     max_cut_rounds: Option<usize>,
     pricing_options: std::collections::BTreeMap<String, f64>,
     two_path_cuts: bool,
+    master_solver: &str,
+    hgs_time: Option<f64>,
+    hgs_columns: &str,
+    hgs_seed: i32,
+    verbose: bool,
+    log_interval: usize,
 ) -> PyResult<Py<PyDict>> {
     use baldes::master::root::{self, RootOptions, RootProblem};
     use baldes::inputs::{Customer, Rounding};
@@ -143,6 +149,23 @@ fn _solve_root(
         distances,
     };
     let mut options = RootOptions::default();
+    if log_interval == 0 { return Err(PyValueError::new_err("log_interval must be positive")); }
+    options.cg.log_interval = verbose.then_some(log_interval);
+    options.master_solver = match master_solver {
+        "clp" => root::MasterSolver::Clp,
+        "ipm" => root::MasterSolver::Ipm,
+        "highs" => root::MasterSolver::Highs,
+        _ => return Err(PyValueError::new_err("master_solver must be 'clp', 'highs', or 'ipm'")),
+    };
+    options.master_solver.ensure_available().map_err(|e|PyValueError::new_err(e.to_string()))?;
+    let columns = baldes::inputs::HgsColumns::parse(hgs_columns)
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let warm = hgs_time.map(|seconds| {
+        let time_limit = std::time::Duration::try_from_secs_f64(seconds)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        if time_limit.is_zero() { return Err(PyValueError::new_err("hgs_time must be positive")); }
+        Ok(baldes::inputs::HgsWarmStart { time_limit, columns, seed: hgs_seed })
+    }).transpose()?;
     options.cg.stabilize = stabilize;
     options.cg.max_iterations = max_iterations;
     options.cg.time_limit = std::time::Duration::try_from_secs_f64(time_limit)
@@ -208,7 +231,11 @@ fn _solve_root(
                 }
             }
             options.cg.multiplicity = n as f64;
-            let output = root::solve(RootProblem::set_partitioning(graph, n as f64)?, options)?;
+            let problem = RootProblem::set_partitioning(graph, n as f64)?;
+            if let Some(warm) = warm {
+                instance.seed_hgs(&problem, rounding, &mut options, &warm)?;
+            }
+            let output = root::solve(problem, options)?;
             Ok(PythonRootOutput {
                 master: output.master, routes: output.routes, values: output.values,
                 duals: output.duals, incumbent: output.incumbent,

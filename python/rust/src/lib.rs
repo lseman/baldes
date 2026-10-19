@@ -534,6 +534,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Route>()?;
     m.add_class::<Phase>()?;
     m.add("has_clp", cfg!(feature = "clp"))?;
+    m.add("has_highs", cfg!(feature = "highs"))?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     root::register(m)?;
     Ok(())

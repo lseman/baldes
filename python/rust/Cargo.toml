@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 [features]
 default = ["clp"]
 clp = ["baldes/clp"]
+highs = ["baldes/highs"]
 
 [dependencies]
 baldes = { path = "../.." }

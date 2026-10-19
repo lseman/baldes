@@ -164,3 +164,48 @@ def test_kohl_time_resource_closes_r101_root_gap():
 def test_kohl_rejects_cvrp_without_time_resource():
     with pytest.raises(ValueError, match='time windows'):
         solve_root(triangle(), problem_type='cvrp', two_path_cuts=True)
+
+@pytest.mark.parametrize("columns", ["best", "all", 1])
+def test_hgs_columns_and_ipm_master(columns):
+    result = solve_root(
+        triangle(), rank_one_cuts=True, reduced_cost_fixing=False,
+        master_solver="ipm", hgs_time=0.03, hgs_columns=columns, hgs_seed=7,
+    )
+    assert result.status == "Optimal"
+    assert result.lp == pytest.approx(4 + math.sqrt(2), abs=1e-6)
+    assert all(step.alpha == 0 for step in result.history)
+    assert_routes(result, 3, 2)
+
+
+@pytest.mark.parametrize("options", [
+    {"master_solver": "wrong"}, {"hgs_columns": "wrong"},
+    {"hgs_columns": 0}, {"hgs_columns": -1}, {"hgs_columns": 1.5},
+    {"hgs_time": 0}, {"hgs_time": -1}, {"hgs_time": math.nan},
+])
+def test_invalid_hgs_and_master_options(options):
+    with pytest.raises(ValueError):
+        solve_root(triangle(), **options)
+
+
+def test_cg_progress_is_opt_in_and_goes_to_stderr(capfd):
+    quiet = solve_root(triangle(), reduced_cost_fixing=False)
+    assert "COLUMN GENERATION" not in capfd.readouterr().err
+    logged = solve_root(triangle(), reduced_cost_fixing=False, verbose=True, log_interval=1)
+    captured = capfd.readouterr()
+    assert "COLUMN GENERATION" in captured.err
+    assert "RMP obj" in captured.err and "CG Optimal" in captured.err
+    assert "COLUMN GENERATION" not in captured.out
+    assert logged.lp == pytest.approx(quiet.lp)
+    with pytest.raises(ValueError, match="positive"):
+        solve_root(triangle(), log_interval=0)
+
+
+def test_highs_master_selection_respects_the_build_features():
+    if pybaldes.has_highs:
+        result = solve_root(triangle(), master_solver="highs", rank_one_cuts=True, reduced_cost_fixing=False)
+        assert result.status == "Optimal"
+        assert result.lp == pytest.approx(4 + math.sqrt(2), abs=1e-6)
+        assert_routes(result, 3, 2)
+    else:
+        with pytest.raises(ValueError, match="highs build feature"):
+            solve_root(triangle(), master_solver="highs")

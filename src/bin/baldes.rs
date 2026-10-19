@@ -23,6 +23,9 @@ Options:
   --no-diving           Disable strong diving in the tree
   --no-mip-heuristic    Disable restricted-master integer search
   --mip-nodes N         Restricted-master integer-search node budget per call
+  --master MODE         clp (default), highs, or ipm (disables stabilization)
+  --hgs-time SECONDS    Run HGS before root/tree solve for this search budget
+  --hgs-columns MODE    best (default), all, or N cheapest feasible HGS routes
   --no-stabilization    Disable dual stabilization
   --enumerated-mip      Solve complete enumerated node masters with HiGHS (--tree; highs feature)
   --no-enumeration      Disable reduced-cost fixing and enumeration
@@ -31,6 +34,8 @@ Options:
                         priority P (capacity cuts 3, rank-one 1); see
                         BALDESdynamicNGmode and BALDESmaxNGneighbourhoodSize
   --option NAME=VALUE   Set a supported BALDES pricing option (repeatable)
+  -v, --verbose, --log  Show solver progress (every 10 CG iterations)
+  --log-interval N      Show progress every N CG iterations (enables logging)
   --iterations N        Master iteration limit
   --time SECONDS        Time limit (BOTH vrptw/cvrp and hgs)
   --json FILE           Write results as JSON (BOTH vrptw/cvrp and hgs)
@@ -73,11 +78,19 @@ fn run() -> std::result::Result<(), String> {
     let mut hgs_pop_size: Option<u32> = None;
     let mut hgs_nb_iter: Option<u32> = None;
     let mut hgs_seed = 0;
+    let mut hgs_time = None;
+    let mut hgs_columns = baldes::inputs::HgsColumns::Best;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" | "-h" => {
                 println!("{HELP}");
                 return Ok(());
+            }
+            "--verbose" | "--log" | "-v" => { options.cg.log_interval.get_or_insert(10); }
+            "--log-interval" => {
+                let interval = args.next().ok_or("missing log interval")?.parse::<usize>().map_err(|e|e.to_string())?;
+                if interval == 0 { return Err("log interval must be positive".into()); }
+                options.cg.log_interval = Some(interval);
             }
             "--reference-ng" => reference_ng = true,
             "--json" => json_path = Some(args.next().ok_or("missing JSON path")?),
@@ -112,6 +125,25 @@ fn run() -> std::result::Result<(), String> {
                 )
                 .map_err(|e| e.to_string())?
             }
+            "--master" => options.master_solver = match args.next().ok_or("missing master mode")?.as_str() {
+                "clp" => baldes::master::root::MasterSolver::Clp,
+                "ipm" => baldes::master::root::MasterSolver::Ipm,
+                "highs" => {
+                    let solver = baldes::master::root::MasterSolver::Highs;
+                    solver.ensure_available().map_err(|e|e.to_string())?;
+                    solver
+                }
+                mode => return Err(format!("unknown master mode: {mode}")),
+            },
+            "--hgs-time" => {
+                let seconds = args.next().ok_or("missing HGS time")?.parse::<f64>().map_err(|e|e.to_string())?;
+                let duration = std::time::Duration::try_from_secs_f64(seconds).map_err(|e|e.to_string())?;
+                if duration.is_zero() { return Err("HGS time must be positive".into()); }
+                hgs_time = Some(duration);
+            }
+            "--hgs-columns" => hgs_columns = baldes::inputs::HgsColumns::parse(
+                &args.next().ok_or("missing HGS columns mode")?
+            ).map_err(|e|e.to_string())?,
             "--no-stabilization" => options.cg.stabilize = false,
             "--dynamic-ng" => {
                 options.relaxation_improvement_priority = args
@@ -211,7 +243,7 @@ fn run() -> std::result::Result<(), String> {
             nb_iter: hgs_nb_iter.unwrap_or(20000),
             population_size: hgs_pop_size.unwrap_or(25),
             seed: hgs_seed,
-            verbose: true,
+            verbose: options.cg.log_interval.is_some(),
         };
         let started = std::time::Instant::now();
         let result = run_hgs(&instance, &opts).map_err(|e| e.to_string())?;
@@ -288,6 +320,13 @@ fn run() -> std::result::Result<(), String> {
     let fleet = if tree { instance.vehicles as f64 } else { n as f64 };
     let problem = baldes::master::root::RootProblem::set_partitioning(graph, fleet)
         .map_err(|e| e.to_string())?;
+    if let Some(time_limit) = hgs_time {
+        let summary = instance.seed_hgs(&problem, rounding, &mut options, &baldes::inputs::HgsWarmStart {
+            time_limit, columns: hgs_columns, seed: hgs_seed,
+        }).map_err(|e| e.to_string())?;
+        eprintln!("HGS seed: columns={} rejected={} incumbent={:?} seconds={:.3}",
+            summary.inserted_columns, summary.rejected_columns, summary.incumbent, summary.elapsed_secs);
+    }
     if tree {
         tree_options.node_limit = node_limit;
         tree_options.time_limit = options.cg.time_limit;

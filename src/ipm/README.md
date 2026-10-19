@@ -45,7 +45,15 @@ and original row multipliers are returned. Multipliers use the convention
 `c - Aᵀy` for reduced costs: `<=` row multipliers are nonpositive, and `>=`
 row multipliers are nonnegative.
 
-`Options` controls tolerance, iteration limit, backend and Ruiz scaling passes.
+`Options` controls tolerance, iteration limit, backend, Ruiz scaling passes, and
+an optional cooperative wall-time budget. `Status::TimeLimit` preserves the
+distinction from iteration exhaustion; budgets are checked between Newton
+iterations, so a factorization can finish after the deadline.
+`gap_tolerance: Some(epsilon)` independently relaxes optimality using
+`abs(primal - dual) / (1 + abs(primal))`; primal and dual feasibility still use
+`tolerance`. The default `None` retains the original stopping rule. The routing
+IPM master chooses epsilon from LP bounds during column generation, following
+Munari and Gondzio (2013), Algorithm 1; see [master options](../../docs/options.md).
 `SolverType::{HiPO, NormalEquations, Auto}` selects the backend; HiPO is the
 default. `SparseSolver`, `HiPOLDLT`, and `NormalEqLDLT` also expose the linear
 systems independently. Construct a new solver when matrix values or its pattern

@@ -1,26 +1,20 @@
 use baldes::hgs::driver::{run_hgs, HgsOptions};
 use baldes::inputs::Instance;
 
-/// Check the HGS routes: every customer once, capacity, and time windows in
-/// HGS's metric (coordinates and times scaled by 10, distances truncated).
+/// Check every customer once, capacity and time windows in the selected metric.
 fn assert_feasible(instance: &Instance, routes: &[Vec<usize>]) {
     let customers = &instance.customers;
     let mut visits = vec![0; customers.len()];
-    let scaled = |v: f64| (v * 10.0) as i64;
-    let travel = |a: usize, b: usize| {
-        let (dx, dy) = (customers[a].x * 10.0 - customers[b].x * 10.0, customers[a].y * 10.0 - customers[b].y * 10.0);
-        (dx * dx + dy * dy).sqrt() as i64
-    };
     assert!(routes.len() <= instance.vehicles, "{} routes", routes.len());
     for route in routes {
         let load: f64 = route.iter().map(|&c| customers[c].demand).sum();
         assert!(load <= instance.capacity, "route {route:?} carries {load}");
-        let (mut time, mut previous) = (0, 0);
+        let (mut time, mut previous) = (0_f64, 0);
         for &c in route.iter().chain(std::iter::once(&0)) {
             visits[c] += 1;
-            time = (time + travel(previous, c)).max(scaled(customers[c].ready));
-            assert!(time <= scaled(customers[c].due), "late at {c} in {route:?}");
-            time += scaled(customers[c].service);
+            time = (time + instance.distance(previous, c, instance.rounding)).max(customers[c].ready);
+            assert!(time <= customers[c].due + 1e-6, "late at {c} in {route:?}");
+            time += customers[c].service;
             previous = c;
         }
     }

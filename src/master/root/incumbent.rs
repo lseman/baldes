@@ -87,7 +87,7 @@ impl ExactSum {
 
 /// Exact-real scalar feasibility of a nonempty physically elementary path.
 /// Stored floating resource profiles are not used as feasibility proofs.
-pub(super) fn exact_route_feasible(problem: &RootProblem, route: &Route) -> Option<()> {
+pub(crate) fn exact_route_feasible(problem: &RootProblem, route: &Route) -> Option<()> {
     use crate::graph::ResourceKind;
     use std::cmp::Ordering::{Greater, Less};
     let g = &problem.graph;

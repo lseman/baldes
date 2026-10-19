@@ -5,7 +5,7 @@
 #[derive(Clone, Debug)]
 pub struct Matrix {
     cols: usize,
-    data: Vec<i32>,
+    data: Vec<f64>,
 }
 
 impl Matrix {
@@ -13,7 +13,7 @@ impl Matrix {
     pub fn new(dimension: usize) -> Self {
         Self {
             cols: dimension,
-            data: vec![0; dimension * dimension],
+            data: vec![0.; dimension * dimension],
         }
     }
 
@@ -25,31 +25,31 @@ impl Matrix {
 
     /// Set value at `(row, col)`.
     #[inline]
-    pub fn set(&mut self, row: usize, col: usize, val: i32) {
-        self.data[self.cols * row + col] = val;
+    pub fn set(&mut self, row: usize, col: usize, val: impl Into<f64>) {
+        self.data[self.cols * row + col] = val.into();
     }
 
     /// Get value at `(row, col)`.
     #[inline]
-    pub fn get(&self, row: usize, col: usize) -> i32 {
+    pub fn get(&self, row: usize, col: usize) -> f64 {
         self.data[self.cols * row + col]
     }
 
     /// Row slice (read-only).
     #[inline]
-    pub fn row(&self, row: usize) -> &[i32] {
+    pub fn row(&self, row: usize) -> &[f64] {
         &self.data[self.cols * row..self.cols * row + self.cols]
     }
 
     /// Mutable row slice.
     #[inline]
-    pub fn row_mut(&mut self, row: usize) -> &mut [i32] {
+    pub fn row_mut(&mut self, row: usize) -> &mut [f64] {
         &mut self.data[self.cols * row..self.cols * row + self.cols]
     }
 }
 
 impl std::ops::Index<(usize, usize)> for Matrix {
-    type Output = i32;
+    type Output = f64;
 
     fn index(&self, (row, col): (usize, usize)) -> &Self::Output {
         &self.data[self.cols * row + col]
@@ -69,12 +69,12 @@ mod tests {
     #[test]
     fn create_and_access() {
         let mut m = Matrix::new(3);
-        assert_eq!(m.get(0, 0), 0);
+        assert_eq!(m.get(0, 0), 0.);
         m.set(1, 2, 42);
-        assert_eq!(m.get(1, 2), 42);
-        assert_eq!(m[(1, 2)], 42);
-        m[(1, 2)] = 99;
-        assert_eq!(m.get(1, 2), 99);
+        assert_eq!(m.get(1, 2), 42.);
+        assert_eq!(m[(1, 2)], 42.);
+        m[(1, 2)] = 99.;
+        assert_eq!(m.get(1, 2), 99.);
     }
 
     #[test]
@@ -83,6 +83,6 @@ mod tests {
         m.set(0, 0, 1);
         m.set(0, 1, 2);
         m.set(0, 2, 3);
-        assert_eq!(m.row(0), &[1, 2, 3]);
+        assert_eq!(m.row(0), &[1., 2., 3.]);
     }
 }

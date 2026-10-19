@@ -138,6 +138,7 @@ fn restricted_value(
     }
     let child = branch_problem(problem, branches)?;
     let mut master = ClpMaster::new()?;
+    master.set_solver(options.root.master_solver);
     master.set_tolerances(1e-7, 1e-7)?;
     for row in &child.rows {
         master.add_row(row.sense, row.rhs, &[])?;

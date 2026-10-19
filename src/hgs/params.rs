@@ -6,7 +6,7 @@ use std::cell::Cell;
 use std::fmt;
 use std::time::Instant;
 
-use crate::inputs::{Instance, Rounding};
+use crate::inputs::Instance;
 
 use super::circle_sector::CircleSector;
 use super::matrix::Matrix;
@@ -15,8 +15,8 @@ use super::matrix::Matrix;
 pub const MY_EPSILON: f64 = 1e-5;
 
 /// Latest time used for clients without a time window. Time-window merges
-/// add and subtract several times, so i32::MAX would overflow.
-pub const HORIZON: i32 = 1_000_000_000;
+/// use a finite horizon to keep unconstrained-window merges well defined.
+pub const HORIZON: f64 = 1_000_000_000.;
 
 /// Problem type identifier.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,13 +35,13 @@ impl Default for ProblemType {
 /// A single time window.
 #[derive(Clone, Copy, Debug)]
 pub struct TimeWindow {
-    pub earliest: i32,
-    pub latest: i32,
+    pub earliest: f64,
+    pub latest: f64,
 }
 
 impl TimeWindow {
-    pub fn new(earliest: i32, latest: i32) -> Self {
-        Self { earliest, latest }
+    pub fn new(earliest: impl Into<f64>, latest: impl Into<f64>) -> Self {
+        Self { earliest: earliest.into(), latest: latest.into() }
     }
 }
 
@@ -56,15 +56,15 @@ pub struct Client {
     /// Y coordinate (scaled ×10).
     pub coord_y: f64,
     /// Service duration (scaled ×10).
-    pub service_duration: i32,
+    pub service_duration: f64,
     /// Demand.
     pub demand: i32,
     /// Earliest arrival time (scaled ×10).
-    pub earliest_arrival: i32,
+    pub earliest_arrival: f64,
     /// Latest arrival time (scaled ×10).
-    pub latest_arrival: i32,
+    pub latest_arrival: f64,
     /// Release time (route cannot depart before this).
-    pub release_time: i32,
+    pub release_time: f64,
     /// Polar angle around depot in [0, 65535].
     pub polar_angle: u16,
     /// Multiple time windows (empty for standard VRPTW).
@@ -79,11 +79,11 @@ impl Default for Client {
             cust_num: 0,
             coord_x: 0.0,
             coord_y: 0.0,
-            service_duration: 0,
+            service_duration: 0.,
             demand: 0,
-            earliest_arrival: 0,
+            earliest_arrival: 0.,
             latest_arrival: HORIZON,
-            release_time: 0,
+            release_time: 0.,
             polar_angle: 0,
             time_windows: Vec::new(),
             n_tw: 0,
@@ -342,11 +342,11 @@ pub struct Params {
     pub is_explicit_distance_matrix: bool,
     pub nb_clients: i32,          // excluding depot
     pub nb_vehicles: i32,
-    pub duration_limit: i32,
+    pub duration_limit: f64,
     pub vehicle_capacity: i32,
     pub total_demand: i32,
     pub max_demand: i32,
-    pub max_dist: i32,
+    pub max_dist: f64,
     /// Clients including depot at index 0.
     pub cli: Vec<Client>,
     /// Distance/time matrix (including depot).
@@ -392,9 +392,9 @@ pub struct InstanceData {
 
 impl Params {
     /// Create Params from a BALDES Instance. Coordinates, times and explicit
-    /// distances are scaled by 10 and truncated, as in HGS-VRPTW.
+    /// distances retain full precision in internally scaled units (×10).
     pub fn from_instance(instance: &Instance) -> Self {
-        let scale = |value: f64| (value * 10.0) as i32;
+        let scale = |value: f64| value * 10.0;
         let mut has_time_windows = false;
         let cli = instance
             .customers
@@ -414,21 +414,18 @@ impl Params {
                 }
             })
             .collect();
-        // Explicit or rounded distances (CVRPLIB) are used as given; unrounded
-        // Solomon distances are truncated to tenths from the coordinates.
+        // Use exactly the selected instance metric; tenths are opt-in.
         let n = instance.customers.len();
-        let distances = (instance.distances.is_some() || instance.rounding != Rounding::None).then(|| {
-            (0..n)
-                .map(|i| (0..n).map(|j| (instance.distance(i, j, instance.rounding) * 10.0).round()).collect())
-                .collect::<Vec<Vec<f64>>>()
-        });
+        let distances = (0..n)
+            .map(|i| (0..n).map(|j| instance.distance(i, j, instance.rounding) * 10.0).collect())
+            .collect::<Vec<Vec<f64>>>();
         let problem_type = if has_time_windows { ProblemType::Vrptw } else { ProblemType::Cvrp };
         let mut params = Self::build(
             cli,
             instance.vehicles as i32,
             instance.capacity as i32,
             problem_type,
-            distances.as_ref(),
+            Some(&distances),
         );
         params.instance_name = instance.name.clone();
         params
@@ -442,10 +439,10 @@ impl Params {
                 cust_num: i as i32,
                 coord_x: data.x_coord[i] * 10.0,
                 coord_y: data.y_coord[i] * 10.0,
-                service_duration: data.service_time[i],
+                service_duration: f64::from(data.service_time[i]),
                 demand: data.demand[i],
-                earliest_arrival: data.window_open[i],
-                latest_arrival: data.window_close[i].min(HORIZON),
+                earliest_arrival: f64::from(data.window_open[i]),
+                latest_arrival: f64::from(data.window_close[i]).min(HORIZON),
                 time_windows: if data.n_tw[i] > 0 {
                     data.time_windows[i].iter().map(|&(e, l)| TimeWindow::new(e, l)).collect()
                 } else {
@@ -487,16 +484,16 @@ impl Params {
         };
 
         let mut time_cost = Matrix::new(n);
-        let mut max_dist = 0;
+        let mut max_dist = 0_f64;
         for i in 0..n {
             for j in 0..n {
                 let cost = if i == j {
-                    0
+                    0.
                 } else if let Some(distances) = distances {
-                    distances[i][j] as i32
+                    distances[i][j]
                 } else {
                     let (dx, dy) = (cli[i].coord_x - cli[j].coord_x, cli[i].coord_y - cli[j].coord_y);
-                    (dx * dx + dy * dy).sqrt() as i32
+                    (dx * dx + dy * dy).sqrt()
                 };
                 time_cost.set(i, j, cost);
                 max_dist = max_dist.max(cost);
@@ -509,11 +506,11 @@ impl Params {
         let mut order_proximities = vec![Vec::new(); n];
         for i in 1..n {
             for j in (1..n).filter(|&j| j != i) {
-                let t = time_cost.get(i, j) as i64;
+                let t = time_cost.get(i, j);
                 let (a, b) = (&cli[i], &cli[j]);
                 let orient = |a: &Client, b: &Client| {
-                    let wait = (b.earliest_arrival as i64 - t - a.service_duration as i64 - a.latest_arrival as i64).max(0);
-                    let warp = (a.earliest_arrival as i64 + a.service_duration as i64 + t - b.latest_arrival as i64).max(0);
+                    let wait = (b.earliest_arrival - t - a.service_duration - a.latest_arrival).max(0.);
+                    let warp = (a.earliest_arrival + a.service_duration + t - b.latest_arrival).max(0.);
                     weight_wait * wait as f64 + weight_warp * warp as f64
                 };
                 order_proximities[i].push((t as f64 + orient(a, b).min(orient(b, a)), j as i32));
@@ -551,7 +548,7 @@ impl Params {
             is_explicit_distance_matrix: distances.is_some(),
             nb_clients,
             nb_vehicles,
-            duration_limit: i32::MAX,
+            duration_limit: f64::MAX,
             vehicle_capacity,
             total_demand,
             max_demand,
@@ -617,7 +614,7 @@ impl Params {
     /// 
     /// This implements the penalty adaptation scheme from Vidal 2012.
     pub fn update_penalties(&mut self, num_feasible: usize, num_infeasible: usize, 
-                           best_capacity_excess: i32, best_time_warp: i32) {
+                           best_capacity_excess: i32, best_time_warp: f64) {
         let total = num_feasible + num_infeasible;
         if total == 0 {
             return;
@@ -633,9 +630,9 @@ impl Params {
         }
 
         // Adapt time warp penalty
-        if best_time_warp > 0 {
+        if best_time_warp > MY_EPSILON {
             self.penalty_time_warp.set(self.penalty_time_warp.get() * 1.5);
-        } else if best_time_warp == 0 && ratio_feasible > self.config.target_feasible {
+        } else if best_time_warp <= MY_EPSILON && ratio_feasible > self.config.target_feasible {
             self.penalty_time_warp.set(self.penalty_time_warp.get() / 1.5);
         }
 
@@ -735,7 +732,7 @@ mod tests {
         let mut params = Params::from_instance(&instance);
         
         let old_cap = params.penalty_capacity.get();
-        params.update_penalties(0, 10, 5, 0); // infeasible due to capacity
+        params.update_penalties(0, 10, 5, 0.); // infeasible due to capacity
         
         assert!(params.penalty_capacity.get() > old_cap, 
                 "capacity penalty should increase when there's excess load");
@@ -748,7 +745,7 @@ mod tests {
         
         let old_cap = params.penalty_capacity.get();
         // All feasible, above target ratio → decrease penalty
-        params.update_penalties(10, 0, 0, 0);
+        params.update_penalties(10, 0, 0, 0.);
         
         assert!(params.penalty_capacity.get() < old_cap, 
                 "capacity penalty should decrease when all solutions are feasible");

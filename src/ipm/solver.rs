@@ -3,7 +3,12 @@ use super::{dot, finite, norm, Error, ModelData, Result, SolverType, SparseSolve
 
 #[derive(Debug, Clone)]
 pub struct Options {
+    /// Cooperative wall-time budget, checked between Newton iterations.
+    pub time_limit: Option<std::time::Duration>,
     pub tolerance: f64,
+    /// Optional optimality tolerance, independent of primal/dual feasibility.
+    /// Uses |primal - dual| / (1 + |primal|), as in primal-dual CG.
+    pub gap_tolerance: Option<f64>,
     pub max_iterations: usize,
     pub solver: SolverType,
     /// Ruiz equilibration passes on the standard-form matrix (zero disables).
@@ -12,7 +17,9 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            time_limit: None,
             tolerance: 1e-8,
+            gap_tolerance: None,
             max_iterations: 500,
             solver: SolverType::HiPO,
             scaling_iterations: 5,
@@ -24,6 +31,7 @@ impl Default for Options {
 pub enum Status {
     Optimal,
     IterationLimit,
+    TimeLimit,
     Infeasible,
     Unbounded,
 }
@@ -329,11 +337,15 @@ fn certificate(f: &StandardForm, q: &Point, tol: f64) -> Option<(Status, Vec<f64
 /// `Optimal` requires primal feasibility, dual feasibility and a relative gap
 /// below tolerance. Numerical failures are returned as errors.
 pub fn solve(model: &ModelData, options: &Options) -> Result<Solution> {
+    if options.gap_tolerance.is_some_and(|gap| !gap.is_finite() || gap <= 0. || gap > 1.) {
+        return Err(Error::InvalidInput("gap tolerance must be finite and in (0, 1]".into()));
+    }
     if !options.tolerance.is_finite() || options.tolerance <= 0. || options.tolerance >= 1. {
         return Err(Error::InvalidInput(
             "tolerance must be finite and between zero and one".into(),
         ));
     }
+    let started = std::time::Instant::now();
     let mut f = model.standard_form()?;
     let (row_scale, col_scale) = scale(&mut f, options.scaling_iterations)?;
     let unscaled_cost_norm =
@@ -364,6 +376,10 @@ pub fn solve(model: &ModelData, options: &Options) -> Result<Solution> {
     let mut metrics = (f64::INFINITY, f64::INFINITY, f64::INFINITY);
     for k in 0..=options.max_iterations {
         iterations = k;
+        if options.time_limit.is_some_and(|limit| started.elapsed() >= limit) {
+            status = Status::TimeLimit;
+            break;
+        }
         let r = residual(&f, &q);
         let ubnorm = f.upper.iter().fold(0.0_f64, |v, (_, u)| v.max(u.abs()));
         let dual_obj = dot(&f.b, &q.y) - bound_dot(&f, &q.w);
@@ -389,7 +405,13 @@ pub fn solve(model: &ModelData, options: &Options) -> Result<Solution> {
             })
             .collect();
         let original_p = primal_residual(model, &original);
-        if metrics.0 <= tol && original_p <= tol && metrics.1 <= tol && metrics.2 <= tol {
+        if options.gap_tolerance.is_some() {
+            // Recovery includes objective contributions from shifted/fixed variables.
+            metrics.2 = (dot(&f.c, &q.x) - dual_obj).abs()
+                / (q.tau * (1. + dot(&model.c, &original).abs()));
+        }
+        if metrics.0 <= tol && original_p <= tol && metrics.1 <= tol
+            && metrics.2 <= options.gap_tolerance.unwrap_or(tol) {
             status = Status::Optimal;
             break;
         }

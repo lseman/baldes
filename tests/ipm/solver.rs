@@ -413,3 +413,34 @@ fn seeded_sparse_kkt_residuals() {
         }
     }
 }
+
+#[test]
+fn cooperative_time_limit_is_distinct_from_iteration_exhaustion() {
+    let m = model(&[&[1.]], &[1.], &[1.], &[0.], &[2.], &[Sense::Equal]);
+    let result = solve(&m, &Options {
+        time_limit: Some(std::time::Duration::ZERO), ..Default::default()
+    }).unwrap();
+    assert_eq!(result.status, Status::TimeLimit);
+    assert_eq!(result.iterations, 0);
+}
+
+#[test]
+fn relaxed_optimality_keeps_primal_and_dual_feasibility_tight() {
+    let m = model(&[&[1., 1., 1.]], &[1.], &[1., 2., 8.], &[0.; 3],
+        &[f64::INFINITY; 3], &[Sense::Equal]);
+    let tight = solve(&m, &Options { tolerance: 1e-9, ..Default::default() }).unwrap();
+    let loose = solve(&m, &Options {
+        tolerance: 1e-9, gap_tolerance: Some(0.5), ..Default::default()
+    }).unwrap();
+    assert_eq!(loose.status, Status::Optimal);
+    assert!(loose.primal_residual <= 1e-9, "{loose:?}");
+    assert!(loose.dual_residual <= 1e-9, "{loose:?}");
+    assert!(loose.relative_gap <= 0.5);
+    assert!(loose.iterations < tight.iterations, "loose={loose:?}, tight={tight:?}");
+    assert!(loose.relative_gap > 1e-9, "{loose:?}");
+    for invalid in [0., -1., 1.1, f64::NAN, f64::INFINITY] {
+        assert!(solve(&m, &Options {
+            gap_tolerance: Some(invalid), ..Default::default()
+        }).is_err());
+    }
+}

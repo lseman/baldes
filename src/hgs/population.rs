@@ -16,6 +16,7 @@ use crate::hgs::params::MY_EPSILON;
 /// penalty management, and MDM pattern mining.
 pub struct Population<'p> {
     params: &'p Params,
+    pub(crate) collected_routes: Option<std::collections::BTreeSet<Vec<usize>>>,
 
     /// Feasible subpopulation (pool), ordered by increasing penalized cost.
     pub feasible: SubPop<'p>,
@@ -65,6 +66,7 @@ impl<'p> Population<'p> {
 
         Population {
             params,
+            collected_routes: None,
             feasible: Vec::new(),
             infeasible: Vec::new(),
             last_feas_load,
@@ -256,11 +258,14 @@ impl<'p> Population<'p> {
 
     /// Add an individual to the population. Returns true if it improves the restart best.
     pub fn add_individual(&mut self, indiv: &Individual<'p>, update_feasible: bool) -> bool {
+        if let Some(routes) = self.collected_routes.as_mut() {
+            routes.extend(indiv.chrom_r.iter().filter(|r| !r.is_empty()).cloned());
+        }
         if update_feasible {
             self.last_feas_load
                 .push_back(indiv.my_cost_sol.capacity_excess == 0);
             self.last_feas_tw
-                .push_back(indiv.my_cost_sol.time_warp == 0);
+                .push_back(indiv.my_cost_sol.time_warp <= MY_EPSILON);
             self.last_feas_load.pop_front();
             self.last_feas_tw.pop_front();
         }
@@ -507,7 +512,7 @@ impl<'p> Population<'p> {
         local_search: &mut HGSLocalSearch<'p>,
     ) {
         if self.params.verbose {
-            println!("----- RESET: CREATING A NEW POPULATION -----");
+            crate::log_err!("  HGS restart | Creating a new population");
         }
         self.feasible.clear();
         self.infeasible.clear();
@@ -517,34 +522,25 @@ impl<'p> Population<'p> {
         self.generate_population(split, local_search);
     }
 
-    /// Print the population state, as HGS printState.
+    /// Print one aligned solver progress row. Negative iterations denote initialization.
     pub fn print_state(&self, nb_iter: i32, nb_iter_non_prod: i32) {
         if !self.params.verbose {
             return;
         }
-        let pool = |pop: &SubPop<'p>, name: &str| match pop.first() {
-            Some(best) => format!(
-                "{name} {} {:.2} {:.2}",
-                pop.len(),
-                best.my_cost_sol.penalized_cost,
-                self.get_average_cost(pop)
-            ),
-            None => format!("NO-{}", name.to_uppercase()),
-        };
-        let fraction = |list: &VecDeque<bool>| list.iter().filter(|&&f| f).count() as f64 / list.len() as f64;
-        println!(
-            "| It {:6} {:6} | T(s) {:.2} | {} | {} | Div {:.2} {:.2} | Feas {:.2} {:.2} | Pen {:.2} {:.2} |",
-            nb_iter,
-            nb_iter_non_prod,
+        let cost = |value: Option<f64>| value.filter(|v| v.is_finite())
+            .map_or_else(|| "--".into(), |v| format!("{:.5}", v / 10.));
+        let best = self.get_best_found().filter(|i| i.is_feasible);
+        let iteration = if nb_iter < 0 { "init".into() } else { nb_iter.to_string() };
+        let stall = if nb_iter_non_prod < 0 { "--".into() } else { nb_iter_non_prod.to_string() };
+        crate::log_err!(
+            "{:>6} {:>7} {:>13} {:>6} {:>6} {:>6} {:>13} {:>13} {:>8.2}",
+            iteration, stall,
+            cost(best.map(|i| f64::from(i.my_cost_sol.distance))),
+            best.map_or_else(|| "--".into(), |i| i.chrom_r.iter().filter(|r| !r.is_empty()).count().to_string()),
+            self.feasible.len(), self.infeasible.len(),
+            cost(self.feasible.first().map(|i| i.my_cost_sol.penalized_cost)),
+            cost(self.infeasible.first().map(|i| i.my_cost_sol.penalized_cost)),
             self.params.elapsed_secs(),
-            pool(&self.feasible, "Feas"),
-            pool(&self.infeasible, "Inf"),
-            self.get_diversity(&self.feasible),
-            self.get_diversity(&self.infeasible),
-            fraction(&self.last_feas_load),
-            fraction(&self.last_feas_tw),
-            self.params.penalty_capacity.get(),
-            self.params.penalty_time_warp.get(),
         );
     }
 
@@ -598,7 +594,7 @@ impl<'p> Population<'p> {
             return;
         }
         if self.params.verbose {
-            println!("----- MINING PATTERNS FROM MDM ELITE SET -----");
+            crate::log_err!("  HGS restart | Mining elite patterns");
         }
         let nb_nodes = self.params.nb_clients as usize + 1;
         let transactions: Vec<std::collections::BTreeSet<usize>> = self

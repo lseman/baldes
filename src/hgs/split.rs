@@ -16,13 +16,13 @@ struct ClientSplit {
     /// Demand of the client.
     demand: i32,
     /// Service duration at this client.
-    service_time: i32,
+    service_time: f64,
     /// Distance from depot to this client.
-    d0_x: i32,
+    d0_x: f64,
     /// Distance from this client back to depot.
-    dx_0: i32,
+    dx_0: f64,
     /// Distance from this client to the next in the giant tour.
-    dnext: i32,
+    dnext: f64,
 }
 
 /// A lightweight deque implementation for the O(n) split algorithm.
@@ -117,11 +117,11 @@ pub struct Split<'p> {
     /// Pred[k][i] = predecessor of client i when k routes are used.
     pred: Vec<Vec<usize>>,
     /// Cumulative distance from depot through the tour.
-    sum_distance: Vec<i32>,
+    sum_distance: Vec<f64>,
     /// Cumulative demand.
     sum_load: Vec<i32>,
     /// Cumulative service time.
-    sum_service: Vec<i32>,
+    sum_service: Vec<f64>,
 }
 
 impl<'p> Split<'p> {
@@ -136,9 +136,9 @@ impl<'p> Split<'p> {
             cli_split: vec![ClientSplit::default(); nb_clients + 1],
             potential: vec![vec![1e30_f64; nb_clients + 1]; nb_vehicles + 1],
             pred: vec![vec![0usize; nb_clients + 1]; nb_vehicles + 1],
-            sum_distance: vec![0; nb_clients + 1],
+            sum_distance: vec![0.; nb_clients + 1],
             sum_load: vec![0; nb_clients + 1],
-            sum_service: vec![0; nb_clients + 1],
+            sum_service: vec![0.; nb_clients + 1],
         }
     }
 
@@ -165,7 +165,7 @@ impl<'p> Split<'p> {
                 let next_idx = indiv.chrom_t[i];
                 self.cli_split[i].dnext = self.params.time_cost.get(chrom_idx, next_idx);
             } else {
-                self.cli_split[i].dnext = i32::MIN;
+                self.cli_split[i].dnext = f64::NEG_INFINITY;
             }
 
             self.sum_load[i] = self.sum_load[i - 1] + self.cli_split[i].demand;
@@ -199,8 +199,8 @@ impl<'p> Split<'p> {
             // O(n * B) algorithm for duration-constrained problems.
             for i in 0..self.params.nb_clients as usize {
                 let mut load = 0i32;
-                let mut distance = 0i32;
-                let mut _service_duration = 0i32;
+                let mut distance = 0_f64;
+                let mut _service_duration = 0_f64;
                 let cumulative_cost = self.potential[0][i];
 
                 for j in (i + 1)..=self.params.nb_clients as usize {
@@ -298,8 +298,8 @@ impl<'p> Split<'p> {
                     }
 
                     let mut load = 0i32;
-                    let mut _service_duration = 0i32;
-                    let mut distance = 0i32;
+                    let mut _service_duration = 0_f64;
+                    let mut distance = 0_f64;
                     let cumulative_cost = self.potential[k][i];
 
                     for j in (i + 1)..=self.params.nb_clients as usize {

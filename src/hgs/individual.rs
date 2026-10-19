@@ -6,6 +6,8 @@
 //! - Predecessor/successor maps for fast arc queries
 //! - Cost, feasibility, and fitness information
 
+use crate::hgs::params::MY_EPSILON;
+
 use std::collections::BTreeSet;
 use std::cmp::Ordering;
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
@@ -54,13 +56,13 @@ pub struct CostSol {
     /// Number of active routes
     pub nb_routes: usize,
     /// Total travel distance across all routes
-    pub distance: i32,
+    pub distance: f64,
     /// Total capacity excess across all routes
     pub capacity_excess: i32,
     /// Total wait time across all routes
-    pub wait_time: i32,
+    pub wait_time: f64,
     /// Total time warp across all routes
-    pub time_warp: i32,
+    pub time_warp: f64,
     /// Whether the solution is feasible (no capacity or time-warp violations)
     pub is_feasible: bool,
 }
@@ -345,7 +347,7 @@ impl<'p> Individual<'p> {
         for i in 1..=nb_clients {
             if !in_route[i] {
                 let mut best_route: Option<usize> = None;
-                let mut best_cost = i32::MAX;
+                let mut best_cost = f64::INFINITY;
 
                 for (r, route) in chrom_r.iter().enumerate() {
                     if !route.is_empty() {
@@ -459,13 +461,13 @@ impl<'p> Individual<'p> {
         let nb_vehicles = self.nb_vehicles.min(self.chrom_r.len());
 
         // Precompute time-cost cache for each route.
-        let mut time_cost_cache: Vec<Vec<i32>> = Vec::with_capacity(nb_vehicles);
+        let mut time_cost_cache: Vec<Vec<f64>> = Vec::with_capacity(nb_vehicles);
         for r in 0..nb_vehicles {
             if self.chrom_r[r].is_empty() {
                 time_cost_cache.push(Vec::new());
                 continue;
             }
-            let mut cache = vec![0; self.chrom_r[r].len()];
+            let mut cache = vec![0.; self.chrom_r[r].len()];
             cache[0] = self.params.time_cost.get(0, self.chrom_r[r][0]);
             for i in 1..self.chrom_r[r].len() {
                 cache[i] = self.params.time_cost.get(self.chrom_r[r][i - 1], self.chrom_r[r][i]);
@@ -492,8 +494,8 @@ impl<'p> Individual<'p> {
             let mut load = self.params.cli[route[0]].demand;
             let mut _service = self.params.cli[route[0]].service_duration;
             let mut time = latest_release_time + distance;
-            let mut wait_time = 0i32;
-            let mut time_warp = 0i32;
+            let mut wait_time = 0_f64;
+            let mut time_warp = 0_f64;
 
             // Handle time windows for first customer.
             if self.params.cli[route[0]].n_tw > 0 {
@@ -566,7 +568,7 @@ impl<'p> Individual<'p> {
             + cost_sol.time_warp as f64 * self.params.penalty_time_warp.get()
             + cost_sol.wait_time as f64 * self.params.penalty_wait_time;
 
-        cost_sol.is_feasible = cost_sol.capacity_excess == 0 && cost_sol.time_warp == 0;
+        cost_sol.is_feasible = cost_sol.capacity_excess == 0 && cost_sol.time_warp <= MY_EPSILON;
 
         let is_feasible = cost_sol.is_feasible;
         self.my_cost_sol = cost_sol;
@@ -575,11 +577,11 @@ impl<'p> Individual<'p> {
 
     /// Adjust time based on multiple time windows.
     fn adjust_to_time_window(
-        time: i32,
+        time: f64,
         time_windows: &[TimeWindow],
-        wait_time: &mut i32,
-        time_warp: &mut i32,
-    ) -> i32 {
+        wait_time: &mut f64,
+        time_warp: &mut f64,
+    ) -> f64 {
         for window in time_windows {
             if time < window.earliest {
                 *wait_time += window.earliest - time;
@@ -780,7 +782,7 @@ mod tests {
         let indiv = Individual::from_string(&params, "1 0 2 3 4 0");
 
         assert!(indiv.my_cost_sol.nb_routes >= 1);
-        assert!(indiv.my_cost_sol.distance > 0);
+        assert!(indiv.my_cost_sol.distance > 0.);
     }
 
     #[test]

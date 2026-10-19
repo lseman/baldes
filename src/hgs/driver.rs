@@ -32,6 +32,9 @@ impl Default for HgsOptions {
 pub struct HgsResult {
     /// Best feasible route plan (excluding depot 0).
     pub routes: Vec<Vec<usize>>,
+    /// Distinct encountered routes, populated only by `run_hgs_collecting_routes`.
+    /// These candidates still require validation against the target graph.
+    pub columns: Vec<Vec<usize>>,
     /// Distance of `routes` with the instance's own rounding (None if no
     /// feasible solution was found).
     pub best_cost: Option<f64>,
@@ -43,6 +46,20 @@ pub struct HgsResult {
 
 /// Run HGS on a VRPTW/CVRP instance and return the best solution found.
 pub fn run_hgs(instance: &Instance, options: &HgsOptions) -> std::result::Result<HgsResult, String> {
+    run(instance, options, false)
+}
+
+/// Run HGS and retain all distinct routes passed through population insertion,
+/// including routes from individuals later discarded or replaced at restart.
+pub fn run_hgs_collecting_routes(instance: &Instance, options: &HgsOptions) -> std::result::Result<HgsResult, String> {
+    run(instance, options, true)
+}
+
+fn run(instance: &Instance, options: &HgsOptions, collect: bool) -> std::result::Result<HgsResult, String> {
+    if !options.time_limit.is_finite() || options.time_limit < 0. || options.population_size == 0
+        || options.population_size > i32::MAX as u32 || options.nb_iter == 0 || options.nb_iter > i32::MAX as u32 {
+        return Err("invalid HGS time, population size or iteration limit".into());
+    }
     if instance.customers.len() < 2 {
         return Err("HGS needs at least one customer".into());
     }
@@ -55,9 +72,21 @@ pub fn run_hgs(instance: &Instance, options: &HgsOptions) -> std::result::Result
     params.reset_clock();
     let params = params;
 
+    if options.verbose {
+        crate::log_err!("\n  BALDES | HYBRID GENETIC SEARCH");
+        crate::log_err!("  Instance: {} | Customers: {} | Population: {} | Seed: {}",
+            instance.name, instance.customers.len() - 1, options.population_size, options.seed);
+        crate::log_err!("  Distance rounding: {:?}", instance.rounding);
+        crate::log_err!("  Time limit: {}s | Stall limit: {}", options.time_limit, options.nb_iter);
+        crate::log_err!("{}", "─".repeat(96));
+        crate::log_err!("{:>6} {:>7} {:>13} {:>6} {:>6} {:>6} {:>13} {:>13} {:>8}",
+            "Iter", "Stall", "Incumbent", "Routes", "Feas", "Infeas", "Best feas", "Best infeas", "Time(s)");
+        crate::log_err!("{}", "─".repeat(96));
+    }
     let mut split = Split::new(&params);
     let mut local_search = HGSLocalSearch::new(&params);
     let mut population = Population::new(&params);
+    if collect { population.collected_routes = Some(Default::default()); }
     population.generate_population(&mut split, &mut local_search);
     Genetic::new(&params, &mut split, &mut local_search).run(&mut population, options.nb_iter as usize);
 
@@ -79,8 +108,17 @@ pub fn run_hgs(instance: &Instance, options: &HgsOptions) -> std::result::Result
         }
         None => (Vec::new(), None),
     };
+    if options.verbose {
+        population.print_state(population.nb_generations as i32, -1);
+        crate::log_err!("{}", "─".repeat(96));
+        crate::log_err!("  HGS {} | {} generations | {} routes | Cost {} | {:.2}s\n",
+            if best_cost.is_some() { "Feasible" } else { "No feasible solution" },
+            population.nb_generations, routes.len(),
+            best_cost.map_or_else(|| "--".into(), |c: f64| format!("{c:.5}")), params.elapsed_secs());
+    }
     Ok(HgsResult {
         routes,
+        columns: population.collected_routes.take().map_or_else(Vec::new, |r| r.into_iter().collect()),
         best_cost,
         generations: population.nb_generations,
         elapsed_secs: params.elapsed_secs(),

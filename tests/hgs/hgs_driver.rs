@@ -56,3 +56,57 @@ fn test_hgs_cvrp_runs() {
         assert!(result.best_cost.is_none(), "Empty routes means infeasible");
     }
 }
+
+fn fractional_instance() -> Instance {
+    Instance {
+        name: "fractional".into(),
+        vehicles: 1,
+        capacity: 1.,
+        customers: vec![
+            Customer { x: 0., y: 0., demand: 0., ready: 0., due: 10., service: 0. },
+            Customer { x: 1., y: 1., demand: 1., ready: 0., due: 1.41, service: 0.013 },
+        ],
+        rounding: baldes::inputs::Rounding::None,
+        distances: None,
+    }
+}
+
+#[test]
+fn hgs_uses_unrounded_distances_unless_tenths_are_requested() {
+    use baldes::hgs::Params;
+    use baldes::inputs::Rounding;
+    let mut instance = fractional_instance();
+    let params = Params::from_instance(&instance);
+    assert!((params.time_cost.get(0, 1) / 10. - 2_f64.sqrt()).abs() < 1e-12);
+    assert!((params.cli[1].latest_arrival / 10. - 1.41).abs() < 1e-12);
+    assert!((params.cli[1].service_duration / 10. - 0.013).abs() < 1e-12);
+    let options = HgsOptions { time_limit: 0., nb_iter: 1, population_size: 2, ..Default::default() };
+    // 1.414... cannot meet a 1.41 deadline. The old implicit tenths metric
+    // accepted this route while reporting its unrounded distance afterward.
+    assert!(run_hgs(&instance, &options).unwrap().best_cost.is_none());
+    instance.rounding = Rounding::Tenth;
+    let result = run_hgs(&instance, &options).unwrap();
+    assert_eq!(result.routes, vec![vec![1]]);
+    assert!((result.best_cost.unwrap() - 2.8).abs() < 1e-12);
+}
+
+#[test]
+fn hgs_retains_fractional_explicit_matrix_costs_and_search_costs() {
+    use baldes::hgs::{Individual, Params};
+    let mut instance = fractional_instance();
+    instance.customers[1].due = 5.;
+    // Explicit matrices define the metric even if rounding is requested.
+    instance.rounding = baldes::inputs::Rounding::Tenth;
+    instance.distances = Some(vec![vec![0., 1.23456], vec![2.34567, 0.]]);
+    let params = Params::from_instance(&instance);
+    assert!((params.time_cost.get(0, 1) / 10. - 1.23456).abs() < 1e-12);
+    assert!((params.time_cost.get(1, 0) / 10. - 2.34567).abs() < 1e-12);
+    let mut individual = Individual::new_empty(&params);
+    individual.chrom_r[0] = vec![1];
+    individual.evaluate_complete_cost();
+    assert!(individual.is_feasible);
+    let expected = 1.23456 + 2.34567;
+    assert!((individual.my_cost_sol.distance / 10. - expected).abs() < 1e-12);
+    let result = run_hgs(&instance, &HgsOptions { time_limit: 0., nb_iter: 1, population_size: 2, ..Default::default() }).unwrap();
+    assert!((result.best_cost.unwrap() - expected).abs() < 1e-12);
+}

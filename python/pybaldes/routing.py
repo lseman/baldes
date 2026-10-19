@@ -153,6 +153,12 @@ def solve_root(
     two_path_cuts: bool = False,
     rank_one_cuts: bool = False,
     stabilize: bool = True,
+    master_solver: str = "clp",
+    verbose: bool = False,
+    log_interval: int = 10,
+    hgs_time: Optional[float] = None,
+    hgs_columns: Union[str, int] = "best",
+    hgs_seed: int = 0,
     reduced_cost_fixing: bool = True,
     upper_bound: float = math.inf,
     time_limit: float = 120.0,
@@ -166,6 +172,13 @@ def solve_root(
     service times. Distances follow the instance's convention by default
     (unrounded for Solomon, TSPLIB nint for CVRPLIB EUC_2D); rounding accepts
     'none', 'nearest', 'tenth' and 'ceil'.
+    verbose=True prints a CG progress table to stderr every log_interval iterations.
+    master_solver='highs' selects HiGHS (requires a build with its feature);
+    master_solver='ipm' uses native IPM and disables stabilization. hgs_time
+    gives HGS a separate positive search budget before column generation;
+    hgs_columns='best' seeds the best feasible plan, 'all' seeds all distinct
+    encountered routes that pass target-graph feasibility checks. A positive integer
+    selects up to that many cheapest new routes by original route cost.
     Capacity cuts use complement form; rank-one cuts use limited memory.
     two_path_cuts attaches the time resource for Kohl separation and enables
     the capacity family. It requires problem_type='vrptw'.
@@ -185,7 +198,7 @@ def solve_root(
         instance.name, instance.vehicles, instance.capacity, rows, distances, problem_type,
         ng, reference_ng, rounding or instance.rounding, capacity_cuts, rank_one_cuts, stabilize,
         reduced_cost_fixing, upper_bound, time_limit, max_iterations,
-        max_cut_rounds, dict(pricing_options or {}), two_path_cuts,
+        max_cut_rounds, dict(pricing_options or {}), two_path_cuts, master_solver, hgs_time, str(hgs_columns), hgs_seed, verbose, log_interval,
     )
     data["duals"] = tuple(data["duals"])
     data["routes"] = tuple(

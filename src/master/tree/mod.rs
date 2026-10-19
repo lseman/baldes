@@ -346,6 +346,7 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
     if options.enumerated_mip.is_some() {
         return Err(invalid("enumerated MIP requires the highs feature"));
     }
+    options.root.master_solver.ensure_available()?;
     options.root.normalize_pricing_options()?;
     let started = Instant::now();
     if !options.absolute_gap.is_finite()

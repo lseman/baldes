@@ -140,3 +140,96 @@ fn canonical_and_legacy_option_names_reach_the_same_root_and_tree_controls() {
         }
     }
 }
+
+#[test]
+fn hgs_warm_start_and_ipm_flags_reach_the_routing_master() {
+    let path = std::env::temp_dir().join(format!("baldes-ipm-hgs-{}.txt",std::process::id()));
+    std::fs::write(&path,"tiny\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n").unwrap();
+    for columns in ["best", "all", "1"] {
+        let output = command().arg("vrptw").arg(&path)
+            .args(["--master","ipm","--hgs-time","0.03","--hgs-columns",columns,"--no-enumeration","--time","5"])
+            .output().unwrap();
+        assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
+        let stdout=String::from_utf8_lossy(&output.stdout);
+        let lp: f64=stdout.split_whitespace().find_map(|w|w.strip_prefix("lp=")).unwrap().parse().unwrap();
+        assert!((lp-(2.+2_f64.sqrt())).abs()<1e-6,"{stdout}");
+        assert!(String::from_utf8_lossy(&output.stderr).contains("HGS seed: columns="));
+    }
+    for flags in [vec!["--master","wrong"],vec!["--hgs-columns","wrong"],vec!["--hgs-columns","0"],vec!["--hgs-time","0"],vec!["--hgs-time","NaN"]] {
+        assert!(!command().arg("vrptw").arg(&path).args(flags).output().unwrap().status.success());
+    }
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn cg_progress_is_opt_in_periodic_and_separate_from_results() {
+    let base = ["vrptw", "instances/R101.txt", "--customers", "5", "--no-enumeration", "--no-stabilization", "--time", "5"];
+    let quiet = command().args(base).output().unwrap();
+    assert!(quiet.status.success());
+    assert!(!String::from_utf8_lossy(&quiet.stderr).contains("COLUMN GENERATION"));
+    let logged = command().args(base).args(["--log-interval","2"]).output().unwrap();
+    assert!(logged.status.success(),"{}",String::from_utf8_lossy(&logged.stderr));
+    let log = String::from_utf8_lossy(&logged.stderr);
+    assert!(log.contains("BALDES | COLUMN GENERATION"));
+    assert!(log.contains("RMP obj") && log.contains("Lower bound") && log.contains("CG Optimal"));
+    assert!(!String::from_utf8_lossy(&logged.stdout).contains("COLUMN GENERATION"));
+    let iterations: Vec<usize> = log.lines().filter_map(|line|line.split_whitespace().next()?.parse().ok()).collect();
+    assert!(iterations.len() >= 3,"{log}");
+    assert_eq!(iterations[0],1);
+    assert!(iterations[1..iterations.len()-1].iter().all(|n|n%2==0),"{log}");
+    let lp = |bytes: &[u8]| String::from_utf8_lossy(bytes).split_whitespace()
+        .find_map(|s|s.strip_prefix("lp=")).unwrap().parse::<f64>().unwrap();
+    assert_eq!(lp(&logged.stdout),lp(&quiet.stdout));
+    for alias in ["--verbose", "--log", "-v"] {
+        let output = command().args(base).arg(alias).output().unwrap();
+        assert!(output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("COLUMN GENERATION"));
+    }
+    assert!(!command().args(base).args(["--log-interval","0"]).output().unwrap().status.success());
+}
+
+#[test]
+fn highs_master_selection_respects_the_build_features() {
+    let result=command().args(["vrptw","instances/R101.txt","--customers","5","--master","highs","--no-enumeration","--time","5","--log"]).output().unwrap();
+    let stderr=String::from_utf8_lossy(&result.stderr);
+    if cfg!(feature="highs") {
+        assert!(result.status.success(),"{stderr}");
+        assert!(stderr.contains("Master: Highs"),"{stderr}");
+        assert!(String::from_utf8_lossy(&result.stdout).contains("status=Optimal"));
+    } else {
+        assert!(!result.status.success());
+        assert!(stderr.contains("highs build feature"),"{stderr}");
+    }
+}
+
+#[test]
+fn hgs_solver_log_precedes_column_generation_and_preserves_stdout() {
+    let output = command().args([
+        "vrptw", "instances/R101.txt", "--customers", "5", "--hgs-time", "0.05",
+        "--no-enumeration", "--time", "5", "--log",
+    ]).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let log = String::from_utf8_lossy(&output.stderr);
+    let hgs = log.find("BALDES | HYBRID GENETIC SEARCH").expect("HGS banner");
+    let finish = log.find("HGS Feasible").expect("HGS summary");
+    let cg = log.find("BALDES | COLUMN GENERATION").expect("CG banner");
+    assert!(hgs < finish && finish < cg, "{log}");
+    assert!(log.contains("Incumbent") && log.contains("Best infeas"), "{log}");
+    assert!(!log.contains("| It "), "{log}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("instance="));
+    assert!(!stdout.contains("HYBRID GENETIC SEARCH"));
+
+    let quiet = command().args([
+        "hgs", "instances/R101.txt", "--customers", "5", "--time", "0.05",
+    ]).output().unwrap();
+    assert!(quiet.status.success());
+    assert!(!String::from_utf8_lossy(&quiet.stderr).contains("HYBRID GENETIC SEARCH"));
+
+    let standalone = command().args([
+        "hgs", "instances/R101.txt", "--customers", "5", "--time", "0.05", "--log",
+    ]).output().unwrap();
+    assert!(standalone.status.success());
+    assert!(String::from_utf8_lossy(&standalone.stderr).contains("HGS Feasible"));
+    assert!(!String::from_utf8_lossy(&standalone.stdout).contains("Best infeas"));
+}
