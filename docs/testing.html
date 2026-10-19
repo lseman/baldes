@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html" aria-current="page">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="cli.html">Command-line usage</a><a href="python.html">Python: pybaldes</a><a href="algorithms.html">Algorithms and references</a><a href="build.html">Configuring and building BALDES</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="benchmarks.html">Root benchmarks</a><a href="testing.html" aria-current="page">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/testing.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -122,9 +122,20 @@ exercise that path.</p>
 <code>Cargo.toml</code>. For example,
 <code>cargo test --test main_pricing</code> runs <code>tests/pricing/main_pricing.rs</code>.
 When adding a suite, place it in the appropriate directory and add a <code>[[test]]</code>
-entry with its name and path. Keep unit tests beside their implementation and
-Python integration tests under <code>python/tests/</code>.</p>
+entry with its name and path. Small inline unit tests remain beside their
+implementation; Python integration tests live under <code>python/tests/</code>. Standalone
+network, root checkpoint, labeling profile, and arena test modules live outside
+this checkout in <code>../baldes-verification/overlays/unit/</code>. Run them with:</p>
+<pre><code class="language-sh">python<span class="w"> </span>../baldes-verification/run.py<span class="w"> </span>--<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--lib<span class="w"> </span>--all-features
+</code></pre>
+<p>The workbench runner attaches these private modules to its source snapshot.
+Normal Cargo builds and integration tests do not require the workbench.</p>
 <h2 id="focused-checks">Focused checks</h2>
+<p>The native interior-point solver is tested without optional LP backends:</p>
+<pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--test<span class="w"> </span>ipm
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--lib<span class="w"> </span>ipm::
+cargo<span class="w"> </span>run<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--example<span class="w"> </span>ipm
+</code></pre>
 <table>
 <thead>
 <tr>
@@ -198,7 +209,11 @@ solution, but callers must still inspect status and solution feasibility.</p>
 <p>Root incumbent checks round approximately integral route quantities, validate
 the resulting logical row activities, and evaluate an upper bound from original
 arc costs. The numerical LP objective alone is not accepted as an integer
-incumbent. Arithmetic overflow leaves the candidate unaccepted.</p>
+incumbent. Arithmetic overflow leaves the candidate unaccepted.
+Scalar resource checks accumulate original consumptions exactly, apply disposable
+waiting or equality semantics, and compare exact states with vertex/arc windows.
+They also recheck fixed routes and match recorded nodes to the physical arc
+chain. Stored floating resource profiles do not prove witness feasibility.</p>
 <p>CG passes its remaining wall-time budget to both Clp and HiGHS through
 <code>LpMaster::solve_with_time_limit</code>. Root preparation, CG and pricing share the
 same root deadline. Auxiliary Clp callers can also use <code>solve_limited</code> with an
@@ -211,6 +226,47 @@ method to enforce their own in-solve deadline.</p>
 original cost cancellation, fixed objective terms and unproved multiplicity
 rows. Unsupported or overflowing arithmetic returns an unknown bound. These
 checks do not establish completeness of a routing column universe.</p>
+<p>In explicit certified mode (<code>RootOptions::bound_mode = BoundMode::Certified</code>),
+the root controller combines conservative disposable-resource path coverage,
+residual cover-row proofs and finite-matrix numerical bounds before publishing
+a lower certificate. The transaction shares the root deadline, with an
+additional 250 ms cap, ten million logical work units, 10,000 paths and one million
+stored arc/coefficient positions. Row DP has at most 65,536 states and the
+auxiliary LP has at most 10,000 iterations. Limits are cooperative rather than
+hard heap/CPU caps. Failure leaves the bound unknown; the ordinary pricing
+estimate is not substituted. Node tests cover interruption, omission of
+unproved rows and parent-model isolation. General resource kinds and arbitrary
+fractional fixed-row shifts remain unsupported by this certificate.</p>
+<p>Numerical mode is the default and skips that certificate transaction. It keeps
+exact pricing and route-feasibility checks, and labels its bounds as numerical.
+Tests verify that numerical mode never invokes certification, unknown
+certificates cannot authorize strict pruning, and warm starts preserve bound
+provenance when changing modes. Certified mode attempts proof at closing exact
+passes or when the current master objective suggests the incumbent gap can
+close, rather than on every improving exact batch.</p>
+<p>Weighted packing rows can use an exact additive envelope instead of partition
+DP: every path must satisfy <code>denominator * coefficient &lt;= customer weight sum</code>.
+An integer residual cover then has row activity at most the floor of its total
+remaining weight divided by the denominator. The proof checks actual path
+coefficients, signed weights, fixed residual covers and interruption. Other
+rows retain the general partition audit. Sparse row extraction avoids scanning
+the entire matrix once per cut.</p>
+<p>CG keeps its LP pricing convergence estimate separate from the published
+integer-domain certificate, including for warm starts. A bound on integer
+solutions can exceed the pricing LP optimum. The independent fractional-cover
+regression checks that such a bound does not skip improving LP columns.</p>
+<p>If exact pricing exhausts the allowed artificial penalties, the routing
+controller can restore bounded original columns before returning <code>Stalled</code>.
+Each candidate passes physical, exact-resource and vertex-elementarity replay;
+relaxation resource bounds are not route witnesses. Recovery adds columns and
+re-solves the master before accepting its point. Incomplete recovery leaves the
+node unknown. Arc-element descriptors currently decline this optional recovery.
+Normal regressions cover a large-cost routing case, exhausted penalties,
+ineligible columns and deadline interruption without route-cache mutation.</p>
+<p>A finite caller-supplied <code>RootOptions::incumbent</code> is an assumed upper bound.
+Its scalar value is not a validated route witness; callers must supply a
+conservative upper bound on the original objective. Automatically discovered
+incumbents use the exact checks described above.</p>
 <p>Canonical path collector unit tests cover cycles, parallel arcs, waiting,
 equality resources, direct terminal arcs, malformed input and exact budget
 boundaries. A compile-fail example checks that a completed domain cannot outlive
@@ -233,7 +289,10 @@ displaced in a bounded candidate pool. Checks cover physical exclusions,
 topology changes, zero-time stops and an unresolved root without an incumbent.
 Forward binary64 replay can also reject a path that satisfies exact-real sums
 of its input consumptions. These checks establish forward consistency; original
-resource-domain certificates need conservative coverage of arithmetic boundaries.</p>
+resource-domain certificates need conservative coverage of arithmetic boundaries.
+The conservative collector has a separate exact-real coverage test, including
+an exactly representable sum that nearest/even accumulation rejects. A retained
+boundary path also passes the integer row audit and a finite-matrix bound check.</p>
 <p>Passing these checks establishes the cases exercised by the suite. Benchmark
 timings depend on the instance, graph conventions, enabled cuts, backend, and
 hardware. Preserve that configuration when reporting a performance change.
@@ -243,7 +302,7 @@ and option tables without treating a full solver rerun as necessary.</p>
 maintained in a separate local workbench outside this Git checkout. They are not
 required by Cargo builds or the regular test suite.</p>
 </article>
-<nav class="page-turn" aria-label="Adjacent guides"><a href="website.html"><small>Previous guide</small>Website and documentation publishing <span aria-hidden="true">↗</span></a><a href="networks.html"><small>Next guide</small>Shared master with multiple pricing networks <span aria-hidden="true">↗</span></a></nav>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="benchmarks.html"><small>Previous guide</small>Root benchmarks <span aria-hidden="true">↗</span></a><a href="networks.html"><small>Next guide</small>Shared master with multiple pricing networks <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
 <aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#build-matrix">Build matrix</a><a class="toc-level-2" href="#full-rust-checks">Full Rust checks</a><a class="toc-level-2" href="#test-organization">Test organization</a><a class="toc-level-2" href="#focused-checks">Focused checks</a><a class="toc-level-2" href="#python">Python</a><a class="toc-level-2" href="#what-the-checks-establish">What the checks establish</a></nav></aside>

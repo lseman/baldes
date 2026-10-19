@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html" aria-current="page">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="cli.html">Command-line usage</a><a href="python.html">Python: pybaldes</a><a href="algorithms.html">Algorithms and references</a><a href="build.html">Configuring and building BALDES</a><a href="tree.html" aria-current="page">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="benchmarks.html">Root benchmarks</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/tree.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -44,7 +44,7 @@ validated incumbent routes, bounds, statuses, and work counters. Use
 <p>A complete Rust entry point, requiring <code>clp</code>:</p>
 <pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span>
 <span class="w">    </span><span class="n">master</span><span class="p">::{</span><span class="n">root</span><span class="p">::</span><span class="n">RootProblem</span><span class="p">,</span><span class="w"> </span><span class="n">tree</span><span class="p">::{</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">TreeOptions</span><span class="p">}},</span>
-<span class="w">    </span><span class="n">vrptw</span><span class="p">::{</span><span class="n">Instance</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">},</span>
+<span class="w">    </span><span class="n">inputs</span><span class="p">::{</span><span class="n">Instance</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">},</span>
 <span class="p">};</span>
 <span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">time</span><span class="p">::</span><span class="n">Duration</span><span class="p">;</span>
 
@@ -76,12 +76,20 @@ constraints.</li>
 <li>Share valid elementary routes with the incumbent heuristic and other nodes.</li>
 <li>Search restricted columns for a feasible integer solution; optionally run
 HiGHS over a complete enumerated universe.</li>
-<li>Close the node when its certified bound meets the incumbent gap, or select
+<li>Close the node when its selected bound meets the incumbent gap, or select
 a branching candidate and create children. Strong trials and diving use
 isolated evaluations.</li>
 </ol>
 <p>Time limits are cooperative across solver operations. A backend call can
 finish after its requested budget. Limits preserve bounds for unfinished nodes.</p>
+<p><code>options.root.bound_mode</code> selects <code>BoundMode::Numerical</code> by default, or
+<code>BoundMode::Certified</code> for independent original-domain validation. The CLI
+equivalent is <code>--bound-mode numerical|certified</code>. Numerical bounds authorize
+ordinary pruning within the configured tolerances. Certified mode never uses
+a numerical estimate to close a node: an unsuccessful certificate attempt
+leaves the bound unknown. <code>TreeOutput::bound_mode</code> and JSON label the bound
+and the guarantee of gap-based termination. Warm starts retain the two bounds
+separately, so changing modes cannot promote a parent's numerical estimate.</p>
 <h2 id="what-a-child-inherits">What a child inherits</h2>
 <table>
 <thead>
@@ -139,7 +147,7 @@ Regeneration checks the child's current path restrictions; a cached route is
 not automatically admissible. Manually constructed column-generation
 <code>WarmStart</code> values provide <code>generated_pool</code> in creation order; an empty pool is
 initialized from the loaded columns.</p>
-<p>The snapshot exposes <code>branch_depth()</code>, <code>active_cuts()</code>, and
+<p>The snapshot exposes <code>bound_mode()</code>, <code>branch_depth()</code>, <code>active_cuts()</code>, and
 <code>enumerated_routes()</code>. A route count alone does not establish completeness;
 the enumerated-MIP adapter separately checks the completion flag.</p>
 <h2 id="incumbents-proofs-and-status">Incumbents, proofs, and status</h2>
@@ -165,7 +173,7 @@ the enumerated-MIP adapter separately checks the completion flag.</p>
 <tr>
 <td>Exact node pricing</td>
 <td>When the resulting routes form an integer witness</td>
-<td>Yes, through its certified bound</td>
+<td>Numerical estimate in normal mode; independent certificate required in certified mode</td>
 </tr>
 <tr>
 <td>Heuristic strong trial or dive</td>
@@ -251,8 +259,8 @@ integer solve. The API does not choose routes to fix automatically, and currentl
 has no CLI or Python entry point.</p>
 <p>The tree does not yet provide multiple pricing networks or cut callbacks
 during the integer solve. Python exposes root solving; use Rust or the CLI
-for the tree. <code>Infeasible</code> means all nodes were certified closed without a
-feasible incumbent.</p>
+for the tree. <code>Infeasible</code> means all nodes were closed without a feasible
+incumbent, under the selected bound mode and solver tolerances.</p>
 <p><code>Optimal</code> uses the configured absolute and relative gap tolerances. The reported
 lower bound retains the minimum node bound across open and tolerance-closed
 subproblems; closing a node does not replace its lower bound with the incumbent.
@@ -285,8 +293,9 @@ own row and column bounds. Other layouts retain the independent parent fork;
 strong trials and dives remain isolated. Stabilization centers belong to the
 parent, while a tightened vehicle upper bound sets the remaining route
 multiplicity.</p>
-<p>Warm metadata also retains the parent's certified lower bound. Stabilization
-gap gating compares it with the preceding artificial-free restricted-LP bound
+<p>Warm metadata retains the parent's numerical and certified lower bounds
+separately. Stabilization gap gating compares the selected inherited bound
+with the preceding artificial-free restricted-LP bound
 within each CG round. This differs from the global integer incumbent used for
 pruning and enumeration.</p>
 <p>Before mutating cuts, an artificial-free completed pricing round retains a
@@ -299,7 +308,7 @@ unfinished cut round's restricted LP objective supplies no new certificate.
 Failed pricing attempts remain included in the recovered node's pricing-call
 count and pricing time, while its bound and warm state come from the checkpoint.</p>
 </article>
-<nav class="page-turn" aria-label="Adjacent guides"><a href="index.html"><small>Previous guide</small>BALDES documentation <span aria-hidden="true">↗</span></a><a href="branching.html"><small>Next guide</small>Routing branching <span aria-hidden="true">↗</span></a></nav>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="build.html"><small>Previous guide</small>Configuring and building BALDES <span aria-hidden="true">↗</span></a><a href="branching.html"><small>Next guide</small>Routing branching <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
 <aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#run-a-tree">Run a tree</a><a class="toc-level-2" href="#node-processing">Node processing</a><a class="toc-level-2" href="#what-a-child-inherits">What a child inherits</a><a class="toc-level-2" href="#root-snapshots-and-manual-inheritance">Root snapshots and manual inheritance</a><a class="toc-level-2" href="#incumbents-proofs-and-status">Incumbents, proofs, and status</a><a class="toc-level-2" href="#limits-and-validation">Limits and validation</a><a class="toc-level-2" href="#explicit-fixed-partial-solutions">Explicit fixed partial solutions</a></nav></aside>

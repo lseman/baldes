@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="BALDES documentation Start with the project README for installation, input formats,CLI options, and Python root solving. Commands here run from the repositoryroot. The guides below">
+<meta name="description" content="BALDES documentation Start with the project README for installation and quick examples.Use the CLI guide and Python guide for detailed usage. Commands here run from the repositoryr">
 <meta name="theme-color" content="#0b0e11">
 <title>BALDES documentation — BALDES docs</title>
 <link rel="canonical" href="https://laioseman.com/baldes/docs/index.html">
@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html" aria-current="page">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html" aria-current="page">Overview</a><a href="cli.html">Command-line usage</a><a href="python.html">Python: pybaldes</a><a href="algorithms.html">Algorithms and references</a><a href="build.html">Configuring and building BALDES</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="benchmarks.html">Root benchmarks</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/README.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -28,8 +28,8 @@
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="baldes-documentation">BALDES documentation</h1>
-<p>Start with the <a href="https://github.com/lseman/baldes/blob/main/README.md">project README</a> for installation, input formats,
-CLI options, and Python root solving. Commands here run from the repository
+<p>Start with the <a href="https://github.com/lseman/baldes/blob/main/README.md">project README</a> for installation and quick examples.
+Use the <a href="cli.html">CLI guide</a> and <a href="python.html">Python guide</a> for detailed usage. Commands here run from the repository
 root. The guides below describe the current Rust implementation.</p>
 <h2 id="guides">Guides</h2>
 <table>
@@ -40,6 +40,22 @@ root. The guides below describe the current Rust implementation.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><a href="cli.html">Command-line usage</a></td>
+<td>Run routing and HGS, interpret output, and look up CLI flags</td>
+</tr>
+<tr>
+<td><a href="python.html">Python API</a></td>
+<td>Install pybaldes, construct inputs, configure solves, and export results</td>
+</tr>
+<tr>
+<td><a href="algorithms.html">Algorithms and references</a></td>
+<td>Review solver components and research references</td>
+</tr>
+<tr>
+<td><a href="build.html">Build configuration</a></td>
+<td>Configure optional backends and compiler options in the terminal menu, then build with Make</td>
+</tr>
 <tr>
 <td><a href="tree.html">Tree and node lifecycle</a></td>
 <td>Run integer routing, understand node inheritance, bounds, limits, and result status</td>
@@ -73,6 +89,10 @@ root. The guides below describe the current Rust implementation.</p>
 <td>Compile Markdown to HTML and preview or deploy the site</td>
 </tr>
 <tr>
+<td><a href="benchmarks.html">Root benchmarks</a></td>
+<td>Review root relaxation timings and benchmark configuration</td>
+</tr>
+<tr>
 <td><a href="testing.html">Build and validation</a></td>
 <td>Select feature combinations and run the relevant checks</td>
 </tr>
@@ -102,14 +122,14 @@ root. The guides below describe the current Rust implementation.</p>
 <td>Yes</td>
 <td>Default <code>vrptw</code> / <code>cvrp</code> mode</td>
 <td><code>pybaldes.solve_root</code></td>
-<td>Clp</td>
+<td>Clp model store; Clp/IPM/optional HiGHS solves</td>
 </tr>
 <tr>
 <td>Branch-and-price tree</td>
 <td>Yes</td>
 <td><code>--tree</code></td>
 <td>Not exposed</td>
-<td>Clp</td>
+<td>Clp model store; Clp/IPM/optional HiGHS solves</td>
 </tr>
 <tr>
 <td>Complete enumerated node MIP</td>
@@ -143,7 +163,7 @@ For BALDES options, keep <code>OPTION_TABLE</code> support metadata and the refe
 in sync. Check documented commands and links rather than treating a historical
 test count as a permanent guarantee.</p>
 </article>
-<nav class="page-turn" aria-label="Adjacent guides"><a href="tree.html"><small>Next guide</small>Branch-and-price tree and node lifecycle <span aria-hidden="true">↗</span></a></nav>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="cli.html"><small>Next guide</small>Command-line usage <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
 <aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#guides">Guides</a><a class="toc-level-2" href="#capabilities-and-interfaces">Capabilities and interfaces</a><a class="toc-level-2" href="#keeping-the-guides-current">Keeping the guides current</a></nav></aside>

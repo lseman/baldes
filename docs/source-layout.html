@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html" aria-current="page">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="cli.html">Command-line usage</a><a href="python.html">Python: pybaldes</a><a href="algorithms.html">Algorithms and references</a><a href="build.html">Configuring and building BALDES</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html" aria-current="page">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="benchmarks.html">Root benchmarks</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/source-layout.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -57,6 +57,10 @@ Existing Rust import paths and C symbols remain available.</p>
 <td>Graph representation, buckets, NG preparation, relaxation, and symmetry</td>
 </tr>
 <tr>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/ipm/README.md">src/ipm/</a></td>
+<td>Native interior-point LP solver, HiPO augmented factorization, and normal equations</td>
+</tr>
+<tr>
 <td><a href="https://github.com/lseman/baldes/tree/main/src/labeling">src/labeling/</a></td>
 <td>Labeling engine, label storage, and route pool</td>
 </tr>
@@ -77,7 +81,7 @@ Existing Rust import paths and C symbols remain available.</p>
 <td>Hybrid genetic search: individuals, split, local search, genetic operators, population, and driver</td>
 </tr>
 <tr>
-<td><a href="https://github.com/lseman/baldes/tree/main/src/vrptw">src/vrptw/</a></td>
+<td><a href="https://github.com/lseman/baldes/tree/main/src/inputs">src/inputs/</a></td>
 <td>Solomon/CVRPLIB instances, parsing, graph construction, and optional root adapter</td>
 </tr>
 <tr>
@@ -96,16 +100,35 @@ paths such as <code>cuts::state</code> and <code>cuts::separation</code>.</p>
 or inheritance entry points. <code>problem.rs</code> owns rows and route coefficients;
 <code>options.rs</code> owns root and cut-family configuration; <code>controller.rs</code> owns
 column-generation callbacks and separation scheduling.</p>
+<p><a href="https://github.com/lseman/baldes/blob/main/src/master/root/incumbent.rs">master/root/incumbent.rs</a> validates integer
+route quantities, exact original row activities and scalar resource feasibility,
+then evaluates an objective upper bound from original arc costs. Physical arc
+chains determine the resource checks; recorded nodes must agree with them.</p>
 <p><a href="https://github.com/lseman/baldes/blob/main/src/master/root/domain.rs">master/root/domain.rs</a> validates unit visit-count
 cover rows, fixed-route residuals and disposable scalar resources before
 collecting a <code>CanonicalCoverRelaxation</code>. This projects feasible integer routes
 onto canonical physical paths; it does not establish completeness of an NG LP
-or authorize cut rows or root bound publication.</p>
+or authorize cut rows or root bound publication.
+<code>ConservativeCoverRelaxation</code> uses downward resource bounds to cover exact-real
+feasible paths, including arithmetic boundaries missed by strict forward replay.
+Its states describe a relaxation and cannot serve as integer route witnesses.</p>
+<p><a href="https://github.com/lseman/baldes/blob/main/src/master/root/certificate.rs">master/root/certificate.rs</a> publishes root
+bounds for eligible unit-cover models. It restores conservative physical paths,
+proves optional rows over residual integer partitions, obtains auxiliary LP
+duals, and checks them against raw original costs and coefficients with directed
+arithmetic. Unsupported models or exhausted budgets return an unknown bound.
+Auxiliary slacks supply duals but never enter the certified matrix.</p>
+<p><a href="https://github.com/lseman/baldes/blob/main/src/master/root/restoration.rs">master/root/restoration.rs</a> recovers bounded,
+validated original columns when exhausted pricing leaves positive artificials.
+It replays physical paths, exact resources and vertex elementarity before
+registration; generic CG then re-solves rather than inferring infeasibility.</p>
 <p><a href="https://github.com/lseman/baldes/blob/main/src/master/root/cover_rows.rs">master/root/cover_rows.rs</a> computes exact
 integer row-activity ranges over residual customer partitions of that domain.
 It relaxes fleet and branch restrictions and has explicit state, work and time
 limits. Passing its range test proves a row valid on those canonical covers;
-resource-schedule projection and original-domain eligibility remain separate.</p>
+resource-schedule projection and original-domain eligibility remain separate.
+Its additive-weight upper proof checks every auxiliary path and uses exact
+integer cover conservation to validate weighted packing rows without subset DP.</p>
 <p><a href="https://github.com/lseman/baldes/blob/main/src/master/tree/mod.rs">master/tree/mod.rs</a> owns node processing and the search queue. Its sibling
 <code>candidates.rs</code>, <code>strong.rs</code>, and <code>diving.rs</code> own candidate generation, strong
 branching, and diving. Typed constraints live in <a href="https://github.com/lseman/baldes/blob/main/src/master/branching.rs">master/branching.rs</a>.
@@ -159,13 +182,20 @@ under canonical forward scalar-resource extension. It preserves parallel arc
 identity and borrows the graph. Budget exhaustion discards the partial result.
 It keeps one earliest resource profile per path; callers must establish any
 equivalence to all routing columns or alternative schedules separately.</p>
+<p><code>CompleteResourceRelaxation</code> shares the bounded physical-path search while
+using directed additions for disposable resources. Its <code>RelaxedResourcePath</code>
+values provide resource lower bounds; extra infeasible paths may remain.
+Unsupported resource kinds and arithmetic failures return an explicit failure.</p>
 <h2 id="c-api-and-instances">C API and instances</h2>
 <p>C API implementation modules are private; public functions and ABI types are
 re-exported through <code>api</code>. Shared handle validation and error handling stay in
 <a href="https://github.com/lseman/baldes/blob/main/src/api/mod.rs">api/mod.rs</a>. Symbol names and calling conventions are unchanged.</p>
-<p><a href="https://github.com/lseman/baldes/blob/main/src/vrptw/mod.rs">vrptw/mod.rs</a> owns <code>Customer</code>, <code>Instance</code>, and <code>Rounding</code>; <code>parsing.rs</code> reads
+<p><a href="https://github.com/lseman/baldes/blob/main/src/inputs/mod.rs">inputs/mod.rs</a> owns <code>Customer</code>, <code>Instance</code>, and <code>Rounding</code>; <code>parsing.rs</code> reads
 instances; <code>graph.rs</code> builds pricing graphs; <code>root.rs</code> provides the optional Clp
-adapter. Public paths such as <code>vrptw::Instance</code> remain unchanged.</p>
+adapter. The public path is <code>inputs::Instance</code>.</p>
+<p>Standalone network, root checkpoint, labeling profile, and arena test modules
+live in the sibling <code>baldes-verification/overlays/unit/</code> directory. Its runner
+attaches them to an isolated source snapshot; production builds need no external files.</p>
 <p>For new code, place routines with the component that owns their state and add
 exports at its existing facade when needed. Keep numerical and branching
 behavior changes separate from file organization so each diff remains

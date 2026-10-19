@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html" aria-current="page">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="cli.html">Command-line usage</a><a href="python.html">Python: pybaldes</a><a href="algorithms.html">Algorithms and references</a><a href="build.html">Configuring and building BALDES</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html" aria-current="page">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="benchmarks.html">Root benchmarks</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/options.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -60,7 +60,7 @@ is rejected explicitly. Positive capacity cut limits are required.</li>
 <h2 id="supported-controls">Supported controls</h2>
 <p>Paths below name consumers, not unconditional guarantees. For example, NG
 initialization options are consumed by the explicit C initialization calls;
-<code>vrptw::Instance::graph</code> receives its NG size as an argument. Cut options need
+<code>inputs::Instance::graph</code> receives its NG size as an argument. Cut options need
 the corresponding cut family. The staged <code>Solver::price</code> convenience method
 installs its own heuristic column schedule, while <code>price_phase</code> uses the
 configured per-iteration limit. Knapsack root overrides currently apply when
@@ -384,10 +384,123 @@ cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span
 </code></pre>
 <p>See <a href="testing.html">Build and validation</a> for the full suite. Separate feature
 builds matter because MIP threshold support changes with the enabled backends.</p>
+<h2 id="hgs-initial-columns-and-master-backends">HGS initial columns and master backends</h2>
+<p>Run HGS for a separate, positive search budget before solving the root or tree:</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>cvrp<span class="w"> </span>instances/cvrplib/E-n22-k4.vrp<span class="w"> </span>--hgs-time<span class="w"> </span><span class="m">10</span><span class="w"> </span>--hgs-columns<span class="w"> </span>all<span class="w"> </span>--tree
+</code></pre>
+<p><code>--hgs-columns best</code> (default) inserts routes from the best feasible HGS solution.
+<code>all</code> retains distinct routes seen during population insertion, including those
+later discarded or lost at a restart. A positive integer such as
+<code>--hgs-columns 100</code> inserts up to 100 cheapest new feasible routes, ranked by
+original arc-cost sum, with arc IDs breaking ties. Validation and deduplication
+happen before ranking; routes already supplied as initial columns do not consume
+this quota.
+If fewer routes are available, all available routes are inserted. This ranking
+uses route cost, not reduced cost or whole-solution quality. Every candidate
+is replayed against the actual graph, using its resource bounds and arc costs;
+HGS's integer demands do not establish original-model feasibility. HGS uses the
+instance's distance convention, with full-precision unrounded distances for
+Solomon instances by default. <code>--rounding tenth</code> explicitly enables truncated
+tenths in both HGS and the target graph; <code>--rounding none</code> keeps unrounded
+distances. Explicit distance matrices retain their supplied precision. A complete best plan
+supplies an incumbent only after original-model validation. <code>--seed</code> controls
+the random seed. HGS runs before the solver's <code>--time</code> budget starts; its search
+limit is cooperative, checked between HGS operations. Keeping all encountered
+routes uses more memory than keeping only the best plan.</p>
+<p>Select native IPM for restricted-master solves with <code>--master ipm</code>. This
+selection automatically disables dual stabilization, including at descendant
+nodes. The default remains <code>--master clp</code>. IPM solves are rebuilt from the
+current sparse matrix and return their own primal values, duals, and reduced
+costs. Clp still stores the mutable model and snapshots, so the routing driver
+continues to require the <code>clp</code> build feature. Basis-dependent cut retirement is
+skipped for IPM; it has no simplex basis. The separate conservative-bound
+certificate routine retains its bounded auxiliary Clp solve. IPM time limits are cooperative,
+checked between Newton iterations; a factorization may exceed the remaining
+budget before control returns. Numerical failures are reported as errors.</p>
+<p>During column generation, IPM uses the bound-driven accuracy rule from
+Munari and Gondzio (2013), Section 3.1, Algorithm 1
+(Munari and Gondzio (2013), p. 2029). It starts with <code>epsilon = 0.5</code>, then
+uses <code>epsilon = min(1, gap / 10)</code> with a numerical floor of <code>1e-9</code>, where
+<code>gap = max(0, UB - LB) / (1 + abs(UB))</code>. <code>UB</code> is the best artificial-free
+restricted-master primal objective; <code>LB</code> comes only from exact LP pricing.
+Integer incumbents, heuristic pricing estimates, and stronger integer-domain
+certificates do not control IPM accuracy. New cuts reset these accuracy bounds.
+Only the optimality gap is relaxed; primal and dual feasibility remain at
+<code>1e-9</code>. Exhausted pricing triggers an accurate master solve and another pricing
+check before separation or completion. Standalone master solves and strong
+branching retain accurate solves. The requested tolerance is available as
+<code>master_gap_tolerance</code> in Rust's column-generation iteration history.</p>
+<p>This implements the paper's adaptive master accuracy. IPM still rebuilds each
+restricted master; the stored-interior-iterate warm starts in Section 3.4 and
+early cut generation in Algorithm 2 are not implemented by this option.</p>
+<p>Select HiGHS for restricted-master LP solves with <code>--master highs</code>:</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,highs
+./target/release/baldes<span class="w"> </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">25</span><span class="w"> </span>--master<span class="w"> </span>highs<span class="w"> </span>--log
+</code></pre>
+<p>HiGHS preserves the requested stabilization setting; use <code>--no-stabilization</code>
+to turn it off. The native HiGHS instance persists across LP solves. Row/column
+insertion, cost and coefficient edits, RHS/bound changes, and cleanup update
+that instance directly, retaining its basis and reusable simplex state. The
+adapter also reuses solution buffers, batches row/column insertion, and serves
+an unchanged optimal LP from its cache without another native solve.</p>
+<p>Node forks copy the sparse matrix in bulk and install the source's current
+native basis into an independent HiGHS instance. A child refactorizes its own
+basis once; siblings never share mutable solver state. Solutions, reduced costs,
+and cut-cleanup basis statuses come from HiGHS. A failed mirrored edit discards
+the cached backend, so a later solve reconstructs it from the canonical model
+rather than using a partially synchronized instance.
+Clp remains the matrix/snapshot store and the backend for the separate bounded
+certificate auxiliary LP. Selecting HiGHS without the <code>highs</code> build feature
+returns an explicit error. Enable HiGHS in <code>make config</code> when building with Make.</p>
+<p>Python accepts <code>master_solver=&quot;highs&quot;</code>; build its extension with the <code>highs</code>
+feature (for example, <code>maturin develop --release --features highs</code>).
+<code>pybaldes.has_highs</code> reports whether that build feature is available.</p>
+<p>In Rust, set <code>RootOptions::master_solver</code> to <code>MasterSolver::Highs</code> or
+<code>MasterSolver::Ipm</code>. For HGS seeding,
+call <code>instance.seed_hgs(&amp;problem, rounding, &amp;mut options, &amp;HgsWarmStart { ... })</code>
+before passing those options to <code>root::solve</code> or <code>TreeOptions::root</code>. The types
+<code>HgsWarmStart</code> and <code>HgsColumns::{Best, All, Top(n)}</code> are exported by <code>baldes::inputs</code>.
+The returned summary reports inserted/rejected columns and any validated
+incumbent. Existing initial columns are retained and duplicates are skipped.</p>
+<p>Python exposes the same root options:</p>
+<pre><code class="language-python"><span class="n">result</span> <span class="o">=</span> <span class="n">pybaldes</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span>
+    <span class="s2">&quot;instances/cvrplib/E-n22-k4.vrp&quot;</span><span class="p">,</span> <span class="n">problem_type</span><span class="o">=</span><span class="s2">&quot;cvrp&quot;</span><span class="p">,</span>
+    <span class="n">hgs_time</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span> <span class="n">hgs_columns</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">hgs_seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">master_solver</span><span class="o">=</span><span class="s2">&quot;ipm&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre>
+<h2 id="terminal-progress">Terminal progress</h2>
+<p>Routing solves are quiet by default. <code>--verbose</code>, <code>-v</code>, or <code>--log</code> enables an
+aligned column-generation table on stderr. It prints iteration 1, every tenth
+iteration, and the final state, followed by the CG status and work totals.
+<code>--log-interval N</code> enables the same log with a positive custom interval.
+The interval applies to each CG solve, including descendant nodes and tree
+trials. Each node reports its depth, master algorithm, and stabilization mode.</p>
+<pre><code class="language-sh">./target/release/baldes<span class="w"> </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">25</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--hgs-time<span class="w"> </span><span class="m">2</span><span class="w"> </span>--hgs-columns<span class="w"> </span><span class="m">100</span><span class="w"> </span>--master<span class="w"> </span>ipm<span class="w"> </span>--verbose
+</code></pre>
+<p><code>RMP obj</code> is the restricted-master objective and may include artificial columns;
+it is not a feasible routing objective or a global lower bound. <code>Lower bound</code>
+is the separately certified bound. <code>Incumbent</code> is the current objective upper
+bound; a caller-supplied root upper bound still carries its feasibility
+assumption. <code>Gap %</code> is <code>100 * max(0, incumbent - bound) / max(1, abs(incumbent))</code>.
+Unknown or nonfinite values appear as <code>--</code>. <code>Min RC</code> is the latest pricing
+minimum, <code>+Cols</code> counts inserted columns in that iteration, <code>Cols</code> is the current
+master size including artificials, and <code>Phase</code> is the pricing phase. Time is
+elapsed wall time within the current CG call. A CG <code>Optimal</code> status does not
+by itself certify an integer routing optimum.</p>
+<p>The logger adds no color escapes or cursor control, so redirected logs remain
+readable. stdout summaries and <code>--json</code> files retain their result formats.
+Standalone <code>hgs --verbose</code> uses the same HGS progress table; during warm starts,
+that table and its summary appear before the column-generation log.</p>
+<p>Rust callers set <code>options.cg.log_interval = Some(10)</code> (or the generic CG
+<code>Options::log_interval</code>). Python callers use <code>verbose=True, log_interval=10</code>.
+Python's interval defaults to 10 and must be positive; <code>verbose=False</code> keeps
+CG silent.</p>
 </article>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="enumerated-mip.html"><small>Previous guide</small>Enumerated node MIP with HiGHS <span aria-hidden="true">↗</span></a><a href="stabilization.html"><small>Next guide</small>Dual-price stabilization <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#configuration-and-runtime-overrides">Configuration and runtime overrides</a><a class="toc-level-2" href="#supported-controls">Supported controls</a><a class="toc-level-2" href="#examples-and-verification">Examples and verification</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#configuration-and-runtime-overrides">Configuration and runtime overrides</a><a class="toc-level-2" href="#supported-controls">Supported controls</a><a class="toc-level-2" href="#examples-and-verification">Examples and verification</a><a class="toc-level-2" href="#hgs-initial-columns-and-master-backends">HGS initial columns and master backends</a><a class="toc-level-2" href="#terminal-progress">Terminal progress</a></nav></aside>
 </div>
 </body></html>

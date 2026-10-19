@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Command-line usage Documentation index · Build configuration · Python Commands below run from the repository root after building with --features clp. The first argument selects the">
+<meta name="theme-color" content="#0b0e11">
+<title>Command-line usage — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/cli.html">
+<link rel="icon" href="_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="_static/site.css">
+<link rel="stylesheet" href="_static/docs.css">
+<link rel="stylesheet" href="_static/syntax.css">
+<script src="_static/app.js" defer></script>
+<script src="_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="./">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../"><img src="_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="cli.html" aria-current="page">Command-line usage</a><a href="python.html">Python: pybaldes</a><a href="algorithms.html">Algorithms and references</a><a href="build.html">Configuring and building BALDES</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="benchmarks.html">Root benchmarks</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/cli.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="command-line-usage">Command-line usage</h1>
+<p><a href="index.html">Documentation index</a> · <a href="build.html">Build configuration</a> · <a href="python.html">Python</a></p>
+<p>Commands below run from the repository root after building with <code>--features clp</code>.</p>
+<pre><code class="language-bash">./target/release/baldes<span class="w"> </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">25</span><span class="w"> </span>--rank1
+./target/release/baldes<span class="w"> </span>cvrp<span class="w"> </span>instances/cvrplib/A-n32-k5.vrp<span class="w"> </span>--capacity-cuts
+./target/release/baldes<span class="w"> </span>hgs<span class="w"> </span>instances/R101.txt<span class="w"> </span>--population-size<span class="w"> </span><span class="m">50</span><span class="w"> </span>--nb-iter<span class="w"> </span><span class="m">5000</span>
+</code></pre>
+<p>The first argument selects the instance type: <code>vrptw</code> (time windows), <code>cvrp</code>
+(capacitated, no time windows), or <code>hgs</code> (Hybrid Genetic Search heuristic).
+The routing commands read Solomon-format files and CVRPLIB (TSPLIB) <code>.vrp</code>
+files; the format is detected from the content. <code>vrptw</code> enforces time windows and service times;
+<code>cvrp</code> ignores them.
+CVRPLIB instances have no time windows, so they are solved as <code>cvrp</code>. They use
+the file's distance convention: TSPLIB <code>nint</code> for <code>EUC_2D</code>, <code>ceil</code> for
+<code>CEIL_2D</code>, or the explicit <code>EDGE_WEIGHT_SECTION</code> (full or triangular). As for
+Solomon files, the root fleet bound is the customer count. Route-length limits (<code>DISTANCE</code>) and service times are not supported. Run
+<code>./target/release/baldes --help</code> for usage.</p>
+<h2 id="options">Options</h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--customers N</code></td>
+<td>keep the first N customers</td>
+</tr>
+<tr>
+<td><code>--ng N</code></td>
+<td>NG neighbourhood size (default 8)</td>
+</tr>
+<tr>
+<td><code>--reference-ng</code></td>
+<td>the N nearest customers, ties by index (the comparison setup)</td>
+</tr>
+<tr>
+<td><code>--rounding MODE</code></td>
+<td>distances <code>none</code>, <code>nearest</code>, <code>tenth</code> or <code>ceil</code> (default: the file's convention)</td>
+</tr>
+<tr>
+<td><code>--rank1</code></td>
+<td>separate limited-memory rank-one cuts</td>
+</tr>
+<tr>
+<td><code>--capacity</code> / <code>--capacity-cuts</code></td>
+<td>separate native rounded capacity cuts in the Clp root master</td>
+</tr>
+<tr>
+<td><code>--two-path-cuts</code></td>
+<td>enable capacity cuts with Kohl's time resource attached (VRPTW only)</td>
+</tr>
+<tr>
+<td><code>--tree</code></td>
+<td>run branch-and-price for integer routing</td>
+</tr>
+<tr>
+<td><code>--nodes N</code></td>
+<td>tree node limit (default 10,000)</td>
+</tr>
+<tr>
+<td><code>--branching MODE</code></td>
+<td><code>native</code> (default), <code>ryan-foster</code>, <code>vehicles</code>, or <code>arc</code></td>
+</tr>
+<tr>
+<td><code>--no-strong-branching</code></td>
+<td>use fractionality instead of phased strong branching</td>
+</tr>
+<tr>
+<td><code>--no-diving</code></td>
+<td>disable strong diving</td>
+</tr>
+<tr>
+<td><code>--no-mip-heuristic</code></td>
+<td>disable restricted-master integer search</td>
+</tr>
+<tr>
+<td><code>--mip-nodes N</code></td>
+<td>node budget per restricted-master integer-search call</td>
+</tr>
+<tr>
+<td><code>--enumerated-mip</code></td>
+<td>solve complete enumerated node masters with HiGHS; requires <code>--tree</code> and the <code>highs</code> feature</td>
+</tr>
+<tr>
+<td><code>--no-enumeration</code></td>
+<td>no reduced-cost fixing or enumeration</td>
+</tr>
+<tr>
+<td><code>--upper-bound X</code></td>
+<td>initial incumbent for fixing</td>
+</tr>
+<tr>
+<td><code>--no-stabilization</code></td>
+<td>no dual-price smoothing</td>
+</tr>
+<tr>
+<td><code>--master MODE</code></td>
+<td><code>clp</code> (default), <code>highs</code> (requires HiGHS), or native <code>ipm</code>; IPM disables stabilization</td>
+</tr>
+<tr>
+<td><code>--bound-mode MODE</code></td>
+<td><code>numerical</code> (default) uses pricing bounds with tolerances; <code>certified</code> requires independent original-domain bound validation</td>
+</tr>
+<tr>
+<td><code>--hgs-time S</code></td>
+<td>positive HGS search budget before routing solve; separate from <code>--time</code></td>
+</tr>
+<tr>
+<td><code>--hgs-columns MODE</code></td>
+<td><code>best</code> plan (default), <code>all</code> distinct feasible routes, or <code>N</code> cheapest new routes</td>
+</tr>
+<tr>
+<td><code>--dynamic-ng P</code></td>
+<td>strengthen NG memories from master cycles at separator priority P</td>
+</tr>
+<tr>
+<td><code>--option NAME=VALUE</code></td>
+<td>set a supported BALDES pricing option (repeatable)</td>
+</tr>
+<tr>
+<td><code>--verbose</code>, <code>-v</code>, <code>--log</code></td>
+<td>solver progress table on stderr, every 10 CG iterations</td>
+</tr>
+<tr>
+<td><code>--log-interval N</code></td>
+<td>enable progress every N CG iterations; N must be positive</td>
+</tr>
+<tr>
+<td><code>--iterations N</code></td>
+<td>master iteration limit</td>
+</tr>
+<tr>
+<td><code>--time S</code></td>
+<td>routing solve or standalone HGS time limit in seconds</td>
+</tr>
+<tr>
+<td><code>--json FILE</code></td>
+<td>write root LP/history or HGS solution results</td>
+</tr>
+<tr>
+<td><code>--population-size N</code></td>
+<td>HGS minimum population size (default: 25)</td>
+</tr>
+<tr>
+<td><code>--nb-iter N</code></td>
+<td>HGS iterations without improvement before stopping/restarting</td>
+</tr>
+<tr>
+<td><code>--seed N</code></td>
+<td>HGS random seed (default: 0)</td>
+</tr>
+<tr>
+<td><code>--help</code>, <code>-h</code></td>
+<td>show all CLI options, including tree controls</td>
+</tr>
+</tbody>
+</table>
+<p>Root <code>Optimal</code> means the LP relaxation converged; tree <code>Optimal</code> means the
+integer routing gap closed within the configured tolerances. HGS supplies
+feasible solutions without an optimality proof. Root LP route values can be
+fractional, and NG routes can revisit customers.</p>
+<p>Normal root and tree solves use numerical bounds and skip the full certificate
+search. Use <code>--bound-mode certified</code> for independently validated bounds. That
+mode attempts validation when an exact pass can close pricing or the incumbent
+gap; failure leaves its selected bound unknown. Route-feasibility checks and
+exact pricing remain enabled in both modes.</p>
+<p>JSON reports <code>bound_mode</code>, the selected <code>bound</code>, and separate <code>numerical_bound</code>
+and <code>certified_bound</code> fields. An unknown bound is <code>null</code>. A numerical estimate
+never substitutes for an unknown certified bound. A tree result labels the
+guarantee of its global bound; it does not report a global numerical estimate
+in certified mode. Root results retain both estimates when available.</p>
+<p>Solomon instances are in <a href="https://github.com/lseman/baldes/tree/main/instances"><code>instances/</code></a>, and a few CVRPLIB ones in
+<a href="https://github.com/lseman/baldes/tree/main/instances/cvrplib"><code>instances/cvrplib/</code></a>.</p>
+<p>Enable <code>--verbose</code> for an aligned progress table with the restricted-master
+objective, selected lower bound, incumbent, gap, reduced cost, column counts,
+pricing phase, and elapsed time. Use <code>--log-interval 5</code> for more frequent output.</p>
+<p>For advanced routing, see the <a href="tree.html">branch-and-price tree guide</a> and
+<a href="enumerated-mip.html">enumerated MIP guide</a>. Build checks and test commands
+live in the <a href="testing.html">validation guide</a>; benchmark results are in
+<a href="benchmarks.html">Root benchmarks</a>.</p>
+<p>For named pricing controls, see the <a href="options.html">BALDES option reference</a>.
+Public option names start with <code>BALDES</code>, for example
+<code>--option BALDESlabelDominanceStrategy=1</code>. Rust exposes supported metadata in
+<code>OPTION_TABLE</code>; Python exposes <code>Solver.option_names()</code> and
+<code>Solver.option_support(name)</code>. The public list contains 39 supported controls,
+plus two enumerated-MIP controls when both <code>clp</code> and <code>highs</code> are enabled.
+Scope can depend on the operation or configured cut family.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="index.html"><small>Previous guide</small>BALDES documentation <span aria-hidden="true">↗</span></a><a href="python.html"><small>Next guide</small>Python: pybaldes <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#options">Options</a></nav></aside>
+</div>
+</body></html>

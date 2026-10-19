@@ -187,12 +187,70 @@ img,svg {
 }
 
 .hero {
+  position:relative;
   display:grid;
   grid-template-columns:1fr 1.08fr;
   gap:clamp(30px,5vw,70px);
   align-items:center;
-  min-height:690px;
+  min-height:calc(100vh - 85px);
+  min-height:calc(100svh - 85px);
   padding-block:72px 78px
+}
+
+.hero-scroll {
+  position:absolute;
+  bottom:16px;
+  left:50%;
+  transform:translateX(-50%);
+  display:grid;
+  place-items:center;
+  width:44px;
+  height:44px;
+  color:var(--muted);
+  border:1px solid var(--line);
+  border-radius:50%;
+  transition:color .15s,border-color .15s
+}
+
+.hero-scroll:hover {
+  color:var(--green);
+  border-color:currentColor
+}
+
+.hero-copy > * {
+  animation:hero-reveal .7s ease-out both
+}
+
+.hero-copy > :nth-child(2) { animation-delay:.08s }
+.hero-copy > :nth-child(3) { animation-delay:.16s }
+.hero-copy > :nth-child(4) { animation-delay:.24s }
+.hero-copy > :nth-child(5) { animation-delay:.32s }
+
+.hero .route-card {
+  animation:hero-reveal .9s .18s ease-out both
+}
+
+.hero #route-lines {
+  animation:hero-routes 1.2s .45s ease-out both
+}
+
+.hero-scroll svg {
+  animation:hero-scroll-hint 1.4s .6s ease-in-out 3
+}
+
+@keyframes hero-reveal {
+  from { opacity:0; transform:translateY(18px) }
+  to { opacity:1; transform:translateY(0) }
+}
+
+@keyframes hero-routes {
+  from { opacity:0 }
+  to { opacity:1 }
+}
+
+@keyframes hero-scroll-hint {
+  0%,100% { transform:translateY(0) }
+  50% { transform:translateY(5px) }
 }
 
 .hero .eyebrow {
@@ -422,6 +480,21 @@ img,svg {
   justify-content:space-between;
   font:9px var(--mono);
   color:var(--muted)
+}
+
+.route-demo {
+  display:block;
+  margin:14px 0 0 auto;
+  padding:6px 10px;
+  border:1px solid var(--line);
+  border-radius:4px;
+  background:transparent;
+  color:var(--green);
+  font:10px var(--mono)
+}
+
+.route-demo:hover {
+  border-color:currentColor
 }
 
 .route-card figcaption {
@@ -776,19 +849,11 @@ img,svg {
   margin-top:0
 }
 
-@media(min-width:1500px) {
-  .hero {
-    min-height:770px
-  }
-
-}
-
 @media(max-width:1000px) {
   .hero {
     grid-template-columns:1fr 1fr;
     gap:30px;
-    min-height:0;
-    padding-block:55px
+    padding-block:55px 78px
   }
 
   .hero h1 {
@@ -875,7 +940,9 @@ img,svg {
   .hero {
     grid-template-columns:1fr;
     padding-top:40px;
-    padding-bottom:35px;
+    padding-bottom:80px;
+    min-height:calc(100vh - 66px);
+    min-height:calc(100svh - 66px);
     gap:36px
   }
 
@@ -1032,18 +1099,6 @@ img,svg {
 
   .figure-index {
     font-size:8px
-  }
-
-}
-
-@media(prefers-reduced-motion:reduce) {
-  html {
-    scroll-behavior:auto
-  }
-
-  *,*::before,*::after {
-    transition:none!important;
-    animation:none!important
   }
 
 }

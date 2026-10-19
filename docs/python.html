@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Python: pybaldes Documentation index · Command-line usage Commands below run from the repository root. Python 3.9+, Rust/Cargo and aC++14 compiler are required to build the default">
+<meta name="theme-color" content="#0b0e11">
+<title>Python: pybaldes — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/python.html">
+<link rel="icon" href="_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="_static/site.css">
+<link rel="stylesheet" href="_static/docs.css">
+<link rel="stylesheet" href="_static/syntax.css">
+<script src="_static/app.js" defer></script>
+<script src="_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="./">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../"><img src="_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="cli.html">Command-line usage</a><a href="python.html" aria-current="page">Python: pybaldes</a><a href="algorithms.html">Algorithms and references</a><a href="build.html">Configuring and building BALDES</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="benchmarks.html">Root benchmarks</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/python.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="python-pybaldes">Python: pybaldes</h1>
+<p><a href="index.html">Documentation index</a> · <a href="cli.html">Command-line usage</a></p>
+<p>Commands below run from the repository root. Python 3.9+, Rust/Cargo and a
+C++14 compiler are required to build the default package from source.</p>
+<p>The Python distribution and import are both named <code>pybaldes</code>. It contains the
+low-level <code>Solver</code>, <code>Route</code>, and <code>Phase</code> bindings and direct Rust-backed VRPTW/CVRP
+root solving. The default build includes the Clp master, built from the same
+<code>vendor/</code> submodules as the Rust CLI:</p>
+<pre><code class="language-bash">git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.
+</code></pre>
+<pre><code class="language-python"><span class="kn">import</span><span class="w"> </span><span class="nn">pybaldes</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">pybaldes</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span>
+    <span class="s2">&quot;instances/R101.txt&quot;</span><span class="p">,</span>
+    <span class="n">problem_type</span><span class="o">=</span><span class="s2">&quot;vrptw&quot;</span><span class="p">,</span>  <span class="c1"># or &quot;cvrp&quot; for CVRPLIB .vrp files</span>
+    <span class="n">customers</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span>
+    <span class="n">capacity_cuts</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">rank_one_cuts</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">time_limit</span><span class="o">=</span><span class="mi">120</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">lp</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">bound</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">cuts</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">route</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">routes</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">route</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">route</span><span class="o">.</span><span class="n">cost</span><span class="p">,</span> <span class="n">route</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+</code></pre>
+<p><code>Instance.from_file(path)</code> reads Solomon-format and CVRPLIB <code>.vrp</code> files. You can also build inputs
+in memory:</p>
+<pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Customer</span><span class="p">,</span> <span class="n">Instance</span>
+
+<span class="n">instance</span> <span class="o">=</span> <span class="n">Instance</span><span class="p">(</span><span class="s2">&quot;small&quot;</span><span class="p">,</span> <span class="n">capacity</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">customers</span><span class="o">=</span><span class="p">[</span>
+    <span class="n">Customer</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>  <span class="c1"># depot, zero demand</span>
+    <span class="n">Customer</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">demand</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="n">Customer</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">demand</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+<span class="p">])</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span><span class="n">problem_type</span><span class="o">=</span><span class="s2">&quot;cvrp&quot;</span><span class="p">,</span> <span class="n">capacity_cuts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre>
+<p>CVRP ignores time windows and service times; in-memory VRPTW data requires finite
+<code>ready</code>/<code>due</code> windows, including the depot. <code>vehicles</code> is retained as input
+metadata; the current root model uses the customer count as its fleet upper
+bound, matching the Rust CLI.</p>
+<h2 id="solve-options-and-results">Solve options and results</h2>
+<p>Options include <code>ng</code>, <code>reference_ng</code>, <code>rounding</code> (<code>none</code>, <code>nearest</code>, <code>tenth</code>, <code>ceil</code>),
+<code>stabilize</code>, <code>reduced_cost_fixing</code>, <code>upper_bound</code>, <code>max_iterations</code>,
+<code>max_cut_rounds</code>, and a <code>pricing_options</code> dictionary of BALDES option values.
+Disabling reduced-cost fixing also disables enumeration. Results include positive
+LP routes, duals, iteration history, cut/fixing counts, and timers;
+<code>result.to_dict()</code> and <code>result.to_json()</code> export them. <code>to_dict()</code> retains
+infinite values; <code>to_json()</code> converts non-finite values to <code>null</code>.
+Cut counts include generated rows later retired.
+These are root LP relaxations; <code>Optimal</code> does not certify an integer VRP optimum.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>master_solver</code></td>
+<td><code>&quot;clp&quot;</code></td>
+<td>Select <code>&quot;clp&quot;</code>, native <code>&quot;ipm&quot;</code>, or <code>&quot;highs&quot;</code> (requires its build feature); IPM disables stabilization</td>
+</tr>
+<tr>
+<td><code>bound_mode</code></td>
+<td><code>&quot;numerical&quot;</code></td>
+<td>Use numerical pricing bounds, or <code>&quot;certified&quot;</code> for independent original-domain bound validation</td>
+</tr>
+<tr>
+<td><code>verbose</code></td>
+<td><code>False</code></td>
+<td>Print column-generation progress to stderr</td>
+</tr>
+<tr>
+<td><code>log_interval</code></td>
+<td><code>10</code></td>
+<td>Positive iteration interval for progress when verbose</td>
+</tr>
+<tr>
+<td><code>hgs_time</code></td>
+<td><code>None</code></td>
+<td>Positive HGS search budget in seconds before the root solve, separate from <code>time_limit</code></td>
+</tr>
+<tr>
+<td><code>hgs_columns</code></td>
+<td><code>&quot;best&quot;</code></td>
+<td>Seed the best plan, <code>&quot;all&quot;</code> validated encountered routes, or a positive integer of cheapest new routes</td>
+</tr>
+<tr>
+<td><code>hgs_seed</code></td>
+<td><code>0</code></td>
+<td>Random seed for HGS seeding</td>
+</tr>
+</tbody>
+</table>
+<p><code>result.bound_mode</code> identifies the selected <code>result.bound</code> guarantee.
+<code>result.numerical_bound</code> and <code>result.certified_bound</code> are separate: unknown
+certificates remain negative infinity (<code>null</code> in JSON), even when a numerical
+estimate is finite. Normal mode skips certificate searches; exact pricing and
+route-feasibility validation remain enabled. Certified mode requests a bound
+when pricing or the incumbent gap may close. Failure never promotes the
+numerical estimate to a certificate.</p>
+<p>For example, seed a native IPM root solve with HGS and log progress:</p>
+<pre><code class="language-python"><span class="n">result</span> <span class="o">=</span> <span class="n">pybaldes</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span>
+    <span class="s2">&quot;instances/R101.txt&quot;</span><span class="p">,</span> <span class="n">customers</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span>
+    <span class="n">master_solver</span><span class="o">=</span><span class="s2">&quot;ipm&quot;</span><span class="p">,</span> <span class="n">hgs_time</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">hgs_columns</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">to_json</span><span class="p">())</span>
+</code></pre>
+<p>Python root solves enable Kohl with <code>two_path_cuts=True</code>. This attaches time
+resource 0 for capacity-cut registration;
+ordinary capacity cuts retain the default resource -1. Both use the capacity
+family's priority 3 at root and 1 below it, complement form and persistent subset pool.</p>
+<h2 id="build-variants-and-development">Build variants and development</h2>
+<p>For pricing alone, build without Clp:</p>
+<pre><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.<span class="w"> </span>--config-settings<span class="o">=</span>build-args<span class="o">=</span>--no-default-features
+</code></pre>
+<p><code>pybaldes.has_clp</code> reports backend availability; root solving raises a clear error
+in a pricing-only build. The wheel uses Python's stable ABI for Python 3.9+.
+For local development, <code>maturin develop --release</code> installs the mixed package.
+See the <a href="testing.html#python">Python validation guide</a> for test commands.</p>
+<p>To include HiGHS, install its shared library as described in the
+<a href="build.html">build guide</a>, then install with its feature:</p>
+<pre><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.<span class="w"> </span>--config-settings<span class="o">=</span>build-args<span class="o">=</span><span class="s2">&quot;--features highs&quot;</span>
+</code></pre>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="cli.html"><small>Previous guide</small>Command-line usage <span aria-hidden="true">↗</span></a><a href="algorithms.html"><small>Next guide</small>Algorithms and references <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#solve-options-and-results">Solve options and results</a><a class="toc-level-2" href="#build-variants-and-development">Build variants and development</a></nav></aside>
+</div>
+</body></html>
