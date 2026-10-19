@@ -14,9 +14,6 @@ use std::{
 
 #[path = "network_bounds.rs"]
 mod bounds;
-#[cfg(test)]
-#[path = "networks_tests.rs"]
-mod tests;
 
 #[derive(Clone, Debug)]
 pub struct Network {

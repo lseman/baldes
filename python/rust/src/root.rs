@@ -1,5 +1,5 @@
 //! Owned Python inputs and results for the Rust routing front end.
-use baldes::vrptw::Instance;
+use baldes::inputs::Instance;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -21,10 +21,10 @@ fn _read_instance(py: Python<'_>, path: PathBuf) -> PyResult<Py<PyDict>> {
         .collect();
     data.set_item("customers", customers)?;
     let rounding = match instance.rounding {
-        baldes::vrptw::Rounding::None => "none",
-        baldes::vrptw::Rounding::Nearest => "nearest",
-        baldes::vrptw::Rounding::Tenth => "tenth",
-        baldes::vrptw::Rounding::Ceil => "ceil",
+        baldes::inputs::Rounding::None => "none",
+        baldes::inputs::Rounding::Nearest => "nearest",
+        baldes::inputs::Rounding::Tenth => "tenth",
+        baldes::inputs::Rounding::Ceil => "ceil",
     };
     data.set_item("rounding", rounding)?;
     data.set_item("distances", instance.distances)?;
@@ -58,7 +58,7 @@ fn _solve_root(
     two_path_cuts: bool,
 ) -> PyResult<Py<PyDict>> {
     use baldes::master::root::{self, RootOptions, RootProblem};
-    use baldes::vrptw::{Customer, Rounding};
+    use baldes::inputs::{Customer, Rounding};
     if problem_type != "vrptw" && problem_type != "cvrp" {
         return Err(PyValueError::new_err(
             "problem_type must be 'vrptw' or 'cvrp'",

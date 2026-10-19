@@ -24,7 +24,7 @@ A complete Rust entry point, requiring `clp`:
 ```rust
 use baldes::{
     master::{root::RootProblem, tree::{self, TreeOptions}},
-    vrptw::{Instance, Rounding},
+    inputs::{Instance, Rounding},
 };
 use std::time::Duration;
 

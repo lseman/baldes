@@ -1,0 +1,120 @@
+# Configuring and building BALDES
+
+From the repository root:
+
+```sh
+make config       # Open the configuration window in your terminal
+make              # Compile with the saved settings
+```
+
+`make menuconfig` opens the same window. Use **Up/Down** or **J/K** to select
+an option, **Space/Enter** to change it, **S** to save and exit, and **Q/Escape**
+to discard changes. Text fields accept Enter to confirm, Escape to cancel,
+Backspace to delete and Ctrl-U to clear. Resize to at least 65 columns by 22
+rows; press a key after resizing to refresh the view.
+
+This is a kernel-style terminal menu, implemented in Rust rather than Linux's
+Kconfig tooling. It requires Make, Rust/Cargo, and POSIX `stty` in an interactive
+ANSI terminal (Linux/macOS). It opens in the current terminal; no desktop
+session, Python packages, ncurses headers or UI library downloads are needed.
+The helper is compiled directly with `rustc` into `target/baldes-build` before
+configuration, so it does not need to build the solver first.
+
+## Build options
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| Profile | `release` | Choose Cargo's `release` or `dev` profile |
+| Clp | Off | Enable the `clp` Cargo feature |
+| HiGHS | Off | Enable the `highs` Cargo feature |
+| Command-line program | Off | Build the `baldes` executable along with the library; selects Clp |
+| Native CPU | Off | Add `-C target-cpu=native`, preserving existing Rust flags |
+| Release debug symbols | Off | Set `CARGO_PROFILE_RELEASE_DEBUG=1` for profiling |
+| Offline | Off | Pass `--offline` to Cargo |
+| Locked dependencies | On | Pass `--locked`, preserving `Cargo.lock` |
+| Parallel jobs | `0` (automatic) | Pass `--jobs N` when nonzero |
+| Target triple | Empty (host) | Pass `--target TRIPLE` for cross compilation |
+| HiGHS installation | Empty (automatic) | Set `HIGHS_DIR` to the root containing `lib/libhighs` |
+
+The library, including native IPM, pricing, cuts, and HGS, is always included.
+These components currently have no Cargo feature switches. Algorithm settings
+such as cut priorities and IPM tolerances remain runtime options.
+
+The CLI requires Clp. Selecting the CLI enables Clp; deselecting Clp also
+deselects the CLI. Native CPU optimization cannot be combined with a target
+triple. Cross compilation requires installing the Rust target and configuring
+its linker separately, including any enabled native solver libraries.
+
+Before building Clp, initialize its source submodules and provide a C++14
+compiler:
+
+```sh
+git submodule update --init vendor/Clp vendor/CoinUtils
+```
+
+HiGHS needs a shared library with 32-bit `HighsInt`. Discovery follows the
+existing Cargo build: `HIGHS_DIR/lib`, `vendor/highs/lib`, `pkg-config`, then the
+system linker path. Leaving the menu's installation field empty preserves
+`HIGHS_DIR` from your shell. Configure your runtime library search path as
+needed for a custom HiGHS installation.
+
+## Saved settings and automation
+
+The menu saves a local `.config`, ignored by Git. Subsequent Make commands
+read it. A missing configuration uses release/library-only defaults with no
+optional solver dependencies. Cargo commands invoked directly continue to
+use their explicit Cargo flags; they do not read `.config`.
+
+```sh
+make showconfig                # Display effective settings
+make print-command             # Preview the Cargo build invocation
+make defconfig                 # Replace .config with defaults
+make defconfig CONFIG=ci.config # Write another configuration file
+make CONFIG=ci.config          # Build with it
+```
+
+For noninteractive use, run `make defconfig` and edit the file or supply a
+saved config via `CONFIG=path`. The format is `CONFIG_NAME=value`, using `y/n`
+for booleans and double quotes for strings. Backslashes and quotes in strings
+must be escaped. Missing settings take their defaults; unknown/duplicate keys,
+invalid values and conflicting dependencies are rejected. The file is parsed
+as data and is never included as Make code or sourced by a shell.
+
+An example configuration for the CLI with both LP backends:
+
+```ini
+CONFIG_PROFILE=release
+CONFIG_CLP=y
+CONFIG_HIGHS=y
+CONFIG_CLI=y
+CONFIG_NATIVE_CPU=n
+CONFIG_RELEASE_DEBUG=n
+CONFIG_OFFLINE=n
+CONFIG_LOCKED=y
+CONFIG_JOBS=0
+CONFIG_TARGET=""
+CONFIG_HIGHS_DIR=""
+```
+
+## Other Make targets
+
+| Command | Action |
+| --- | --- |
+| `make build` / `make all` | Same build as plain `make` |
+| `make check` | Cargo check for the selected artifacts and features |
+| `make test` | Run library/integration tests with the selected profile/features |
+| `make clippy` | Lint library/integration tests and the selected CLI |
+| `make fmt` | Check formatting in the `baldes` package |
+| `make clean` | Run `cargo clean -p baldes`; retain `.config` |
+| `make test-config` | Test config parsing, dependencies and Cargo argument translation |
+| `make help` | List targets and tool overrides |
+
+`make test` and `make clippy` select integration tests as well as the library;
+Cargo may build the CLI for integration tests when its Clp requirement is
+enabled, even if the CLI artifact is disabled for ordinary builds. The
+workspace's Python extension is built separately using its existing packaging
+commands. `CARGO=path` and `RUSTC=path` override the tool executables.
+
+Existing compiler/linker environment variables remain available to Cargo.
+The frontend prints the command and any configuration-specific environment
+overrides before running it and propagates Cargo's failure status to Make.

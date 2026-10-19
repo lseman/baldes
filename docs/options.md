@@ -37,7 +37,7 @@ the prior option values, controls, phases and prepared engine.
 
 Paths below name consumers, not unconditional guarantees. For example, NG
 initialization options are consumed by the explicit C initialization calls;
-`vrptw::Instance::graph` receives its NG size as an argument. Cut options need
+`inputs::Instance::graph` receives its NG size as an argument. Cut options need
 the corresponding cut family. The staged `Solver::price` convenience method
 installs its own heuristic column schedule, while `price_phase` uses the
 configured per-iteration limit. Knapsack root overrides currently apply when

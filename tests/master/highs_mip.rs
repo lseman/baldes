@@ -190,7 +190,7 @@ mod routing {
         },
     };
     use baldes::pricing::branching::RyanFosterConstraint;
-    use baldes::vrptw::{Instance, Rounding};
+    use baldes::inputs::{Instance, Rounding};
     fn instance() -> Instance {
         Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap()
     }

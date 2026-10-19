@@ -1123,6 +1123,3 @@ impl IntoIterator for LabelArena {
         std::mem::take(self.full_mut()).into_iter()
     }
 }
-
-#[cfg(test)]
-mod tests;

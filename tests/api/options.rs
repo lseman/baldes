@@ -187,7 +187,7 @@ fn c_api_lists_supported_canonical_names_and_accepts_legacy_inputs() {
 #[test]
 fn capacity_option_controls_separation_in_fresh_and_inherited_nodes() {
     use baldes::master::root::{self, CapacityCutConfig, RootOptions};
-    use baldes::vrptw::{Instance, Rounding};
+    use baldes::inputs::{Instance, Rounding};
     let instance = Instance::parse("option-test\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let mut options =
         RootOptions::default().with_capacity_cuts(CapacityCutConfig::new(vec![0., 1., 1., 1.], 2.));
@@ -223,7 +223,7 @@ fn capacity_option_controls_separation_in_fresh_and_inherited_nodes() {
 #[test]
 fn capacity_per_round_option_caps_the_number_of_generated_rows() {
     use baldes::master::root::RootOptions;
-    use baldes::vrptw::{Instance, Rounding};
+    use baldes::inputs::{Instance, Rounding};
     // Two distant odd customer groups each need their own capacity cut.
     let instance = Instance::parse("two-triangles\nVEHICLE\nNUMBER CAPACITY\n6 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000 0\n1 10 10 1 0 1000 0\n2 11 10 1 0 1000 0\n3 10 11 1 0 1000 0\n4 -10 -10 1 0 1000 0\n5 -11 -10 1 0 1000 0\n6 -10 -11 1 0 1000 0\n").unwrap();
     let mut options = RootOptions::default()

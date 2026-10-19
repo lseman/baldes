@@ -4,7 +4,7 @@ use baldes::{
         root::{RootOptions, RootProblem},
         tree::{self, TreeOptions, TreeStatus},
     },
-    vrptw::{Instance, Rounding},
+    inputs::{Instance, Rounding},
 };
 use std::time::Duration;
 

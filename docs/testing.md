@@ -54,10 +54,27 @@ Each file remains a separate test target, explicitly registered in the root
 `Cargo.toml`. For example,
 `cargo test --test main_pricing` runs `tests/pricing/main_pricing.rs`.
 When adding a suite, place it in the appropriate directory and add a `[[test]]`
-entry with its name and path. Keep unit tests beside their implementation and
-Python integration tests under `python/tests/`.
+entry with its name and path. Small inline unit tests remain beside their
+implementation; Python integration tests live under `python/tests/`. Standalone
+network, root checkpoint, labeling profile, and arena test modules live outside
+this checkout in `../baldes-verification/overlays/unit/`. Run them with:
+
+```sh
+python ../baldes-verification/run.py -- test --lib --all-features
+```
+
+The workbench runner attaches these private modules to its source snapshot.
+Normal Cargo builds and integration tests do not require the workbench.
 
 ## Focused checks
+
+The native interior-point solver is tested without optional LP backends:
+
+```sh
+cargo test -p baldes --test ipm
+cargo test -p baldes --lib ipm::
+cargo run -p baldes --example ipm
+```
 
 | Area | Integration test targets |
 | --- | --- |
@@ -115,6 +132,10 @@ Root incumbent checks round approximately integral route quantities, validate
 the resulting logical row activities, and evaluate an upper bound from original
 arc costs. The numerical LP objective alone is not accepted as an integer
 incumbent. Arithmetic overflow leaves the candidate unaccepted.
+Scalar resource checks accumulate original consumptions exactly, apply disposable
+waiting or equality semantics, and compare exact states with vertex/arc windows.
+They also recheck fixed routes and match recorded nodes to the physical arc
+chain. Stored floating resource profiles do not prove witness feasibility.
 
 CG passes its remaining wall-time budget to both Clp and HiGHS through
 `LpMaster::solve_with_time_limit`. Root preparation, CG and pricing share the
@@ -129,6 +150,44 @@ Finite-matrix certificate tests cover fractional quantities, invalid dual signs,
 original cost cancellation, fixed objective terms and unproved multiplicity
 rows. Unsupported or overflowing arithmetic returns an unknown bound. These
 checks do not establish completeness of a routing column universe.
+
+The root controller combines conservative disposable-resource path coverage,
+residual cover-row proofs and finite-matrix numerical bounds before publishing
+a lower certificate. The transaction shares the root deadline, with an
+additional 250 ms cap, ten million logical work units, 10,000 paths and one million
+stored arc/coefficient positions. Row DP has at most 65,536 states and the
+auxiliary LP has at most 10,000 iterations. Limits are cooperative rather than
+hard heap/CPU caps. Failure leaves the bound unknown; the ordinary pricing
+estimate is not substituted. Node tests cover interruption, omission of
+unproved rows and parent-model isolation. General resource kinds and arbitrary
+fractional fixed-row shifts remain unsupported by this certificate.
+
+Weighted packing rows can use an exact additive envelope instead of partition
+DP: every path must satisfy `denominator * coefficient <= customer weight sum`.
+An integer residual cover then has row activity at most the floor of its total
+remaining weight divided by the denominator. The proof checks actual path
+coefficients, signed weights, fixed residual covers and interruption. Other
+rows retain the general partition audit. Sparse row extraction avoids scanning
+the entire matrix once per cut.
+
+CG keeps its LP pricing convergence estimate separate from the published
+integer-domain certificate, including for warm starts. A bound on integer
+solutions can exceed the pricing LP optimum. The independent fractional-cover
+regression checks that such a bound does not skip improving LP columns.
+
+If exact pricing exhausts the allowed artificial penalties, the routing
+controller can restore bounded original columns before returning `Stalled`.
+Each candidate passes physical, exact-resource and vertex-elementarity replay;
+relaxation resource bounds are not route witnesses. Recovery adds columns and
+re-solves the master before accepting its point. Incomplete recovery leaves the
+node unknown. Arc-element descriptors currently decline this optional recovery.
+Normal regressions cover a large-cost routing case, exhausted penalties,
+ineligible columns and deadline interruption without route-cache mutation.
+
+A finite caller-supplied `RootOptions::incumbent` is an assumed upper bound.
+Its scalar value is not a validated route witness; callers must supply a
+conservative upper bound on the original objective. Automatically discovered
+incumbents use the exact checks described above.
 
 Canonical path collector unit tests cover cycles, parallel arcs, waiting,
 equality resources, direct terminal arcs, malformed input and exact budget
@@ -156,6 +215,9 @@ topology changes, zero-time stops and an unresolved root without an incumbent.
 Forward binary64 replay can also reject a path that satisfies exact-real sums
 of its input consumptions. These checks establish forward consistency; original
 resource-domain certificates need conservative coverage of arithmetic boundaries.
+The conservative collector has a separate exact-real coverage test, including
+an exactly representable sum that nearest/even accumulation rejects. A retained
+boundary path also passes the integer row audit and a finite-matrix bound check.
 
 Passing these checks establishes the cases exercised by the suite. Benchmark
 timings depend on the instance, graph conventions, enabled cuts, backend, and

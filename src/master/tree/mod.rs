@@ -696,9 +696,9 @@ mod pool_tests {
 
     #[test]
     fn global_integer_pool_does_not_preload_child_masters() {
-        let instance = crate::vrptw::Instance::parse("one\nVEHICLE\nNUMBER CAPACITY\n1 1\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n").unwrap();
+        let instance = crate::inputs::Instance::parse("one\nVEHICLE\nNUMBER CAPACITY\n1 1\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n").unwrap();
         let problem = RootProblem::set_partitioning(
-            instance.graph(1, crate::vrptw::Rounding::None).unwrap(),
+            instance.graph(1, crate::inputs::Rounding::None).unwrap(),
             1.,
         )
         .unwrap();

@@ -159,6 +159,8 @@ impl Default for Options {
 pub struct Output {
     pub status: Status,
     pub lp: f64,
+    /// Controller-certified lower bound for the target problem. A certificate
+    /// for its integer domain can exceed this restricted master's LP value.
     pub bound: f64,
     pub iterations: usize,
     pub pricing_calls: usize,
@@ -183,6 +185,8 @@ pub trait Controller<M> {
     }
     /// Override publication of an exact batch's estimate with a conservative
     /// certificate. Negative infinity means its lower bound is still unknown.
+    /// This may certify the original integer domain; it is not an LP pricing
+    /// convergence estimate, including when inherited through a warm start.
     fn certified_pricing_bound(&self, _master: &M, _duals: &[f64]) -> Result<Option<f64>> {
         Ok(None)
     }
@@ -203,6 +207,14 @@ pub trait Controller<M> {
     }
     fn incumbent(&self) -> f64 {
         f64::INFINITY
+    }
+    /// Optional original-model feasible columns after exact pricing leaves
+    /// positive artificials. These columns do not certify a bound or prove
+    /// infeasibility. The controller must validate their original constraints.
+    /// Recovery from restricted pricing requires an original-domain publication
+    /// certificate; a restricted oracle's scalar estimate is insufficient.
+    fn restore_feasible_columns(&mut self, _duals: &[f64]) -> Result<Vec<Column>> {
+        Ok(vec![])
     }
     fn enumerated_universe(&mut self, _duals: &[f64], _bound: f64) -> Result<Option<Vec<Column>>> {
         Ok(None)
@@ -361,6 +373,10 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
         .warm_start
         .as_ref()
         .map_or(f64::NEG_INFINITY, |w| w.bound);
+    // The published certificate may cover the original integer domain through
+    // a stronger relaxation than the pricing LP. Keep its convergence estimate
+    // separate: an integer bound cannot prove that LP pricing is exhausted.
+    let mut pricing_estimate = f64::NEG_INFINITY;
     let mut round_lower_bound = if inherited_bound.is_finite() {
         inherited_bound
     } else {
@@ -513,8 +529,8 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
             );
         }
         // earlyCGtermType1 uses the phase value for stage > 0
-        // and the certified bound for stage zero, before another pricing call.
-        let stopping_bound = if stage > 0 { stage_bound } else { out.bound };
+        // and the LP pricing estimate for stage zero, before another call.
+        let stopping_bound = if stage > 0 { stage_bound } else { pricing_estimate };
         let converged = !positive
             && stopping_bound.is_finite()
             && gap_smaller_than_tolerance(
@@ -619,6 +635,7 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                     stage_bound = pass_bound;
                 }
                 if answer.exact {
+                    pricing_estimate = pricing_estimate.max(pass_bound);
                     let certified = controller.certified_pricing_bound(master, &current)?
                         .unwrap_or(pass_bound);
                     if !certified.is_finite() && certified != f64::NEG_INFINITY {
@@ -821,14 +838,14 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                     // eval restarts the phase walk whether or not the master changed.
                     out.columns = master.costs().len();
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
-                    if out.bound.is_finite() {
-                        round_lower_bound = out.bound.max(round_lower_bound);
+                    if pricing_estimate.is_finite() {
+                        round_lower_bound = pricing_estimate.max(round_lower_bound);
                         // A completed CG round accepts its LP objective at the
                         // configured convergence tolerance for gap bookkeeping.
                         // The published pricing certificate stays unchanged.
                         if !positive
                             && gap_smaller_than_tolerance(
-                                out.bound,
+                                pricing_estimate,
                                 out.lp,
                                 options.gap_absolute,
                                 options.gap_relative,
@@ -981,14 +998,14 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                     out.cut_rounds += 1;
                     round_penalty_updates = 0;
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
-                    if out.bound.is_finite() {
-                        round_lower_bound = out.bound.max(round_lower_bound);
+                    if pricing_estimate.is_finite() {
+                        round_lower_bound = pricing_estimate.max(round_lower_bound);
                         // A completed CG round accepts its LP objective at the
                         // configured convergence tolerance for gap bookkeeping.
                         // The published pricing certificate stays unchanged.
                         if !positive
                             && gap_smaller_than_tolerance(
-                                out.bound,
+                                pricing_estimate,
                                 out.lp,
                                 options.gap_absolute,
                                 options.gap_relative,
@@ -1003,6 +1020,39 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
                     stage_bound = -1e12;
                     out.columns = master.costs().len();
                     continue;
+                }
+            }
+            if positive {
+                let mut present: HashSet<_> = loaded.iter().flatten().map(Column::signature).collect();
+                let restored = controller.restore_feasible_columns(&raw)?;
+                let mut inserted = 0;
+                for column in restored {
+                    if !column.acceptable { continue; }
+                    let identity = column.signature();
+                    if !present.insert(identity.clone()) { continue; }
+                    master.add_column(column.cost, &column.entries)?;
+                    seen.insert(identity.clone());
+                    if pool_seen.insert(identity) { pool.push(column.clone()); }
+                    out.column_tags.push(column.tag);
+                    out.inserted_tags.push(column.tag);
+                    loaded.push(Some(column));
+                    inserted += 1;
+                }
+                if inserted > 0 {
+                    // The original domain can contain feasible columns omitted
+                    // by a restricted pricing cache. Re-solve before accepting
+                    // an LP point or interpreting exhausted artificial penalties.
+                    out.columns = master.costs().len();
+                    pricing_estimate = f64::NEG_INFINITY;
+                    smoothing.restart_schedule((schedule.len() - 1) as i32);
+                    stage = schedule.len() - 1;
+                    stage_bound = -1e12;
+                    round_penalty_updates = 0;
+                    continue;
+                }
+                if started.elapsed() >= options.time_limit {
+                    out.status = Status::TimeLimit;
+                    return finish(out, loaded, cut_artificials, pool, smoothing);
                 }
             }
             out.status = if positive {

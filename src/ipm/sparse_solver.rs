@@ -1,0 +1,275 @@
+use super::factor::{block_order, minimum_degree, Factor, Symbolic};
+use super::{finite, Error, Result, SparseMatrix};
+use std::collections::BTreeSet;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SolverType {
+    #[default]
+    HiPO,
+    NormalEquations,
+    Auto,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct FillEstimate {
+    pub normal_eq_nnz: usize,
+    pub augmented_nnz: usize,
+}
+
+/// Upper-triangle structural estimate, including all diagonal entries.
+/// Contraction is over *columns* of A, because the normal matrix is A D⁻¹ Aᵀ.
+pub fn estimate_fill(a: &SparseMatrix) -> FillEstimate {
+    let pairs = (0..a.cols).fold(a.rows, |s, j| {
+        let d = a.ptr[j + 1] - a.ptr[j];
+        s.saturating_add(d.saturating_mul(d.saturating_sub(1)) / 2)
+    });
+    FillEstimate {
+        normal_eq_nnz: pairs.min(a.rows.saturating_mul(a.rows.saturating_add(1)) / 2),
+        augmented_nnz: a.cols.saturating_add(a.rows).saturating_add(a.nnz()),
+    }
+}
+
+fn validate(a: &SparseMatrix, theta: &[f64], rp: &[f64], rd: &[f64]) -> Result<()> {
+    if theta.len() != a.cols
+        || rp.len() != a.cols
+        || rd.len() != a.rows
+        || !finite(theta)
+        || !finite(rp)
+        || !finite(rd)
+        || theta.iter().any(|&v| v < 0.)
+        || rp.iter().any(|&v| v <= 0.)
+        || rd.iter().any(|&v| v <= 0.)
+        || theta.iter().zip(rp).any(|(t, r)| !(t + r).is_finite())
+    {
+        return Err(Error::InvalidInput(
+            "invalid KKT diagonal dimensions or regularization".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn augmented(a: &SparseMatrix, theta: &[f64], rp: &[f64], rd: &[f64]) -> Result<SparseMatrix> {
+    let n = a.cols;
+    let mut entries = Vec::with_capacity(n + a.rows + 2 * a.nnz());
+    for j in 0..n {
+        entries.push((j, j, -theta[j] - rp[j]));
+        for (i, v) in a.column(j) {
+            entries.push((n + i, j, v));
+            entries.push((j, n + i, v));
+        }
+    }
+    for (i, &r) in rd.iter().enumerate() {
+        entries.push((n + i, n + i, r));
+    }
+    SparseMatrix::from_triplets(n + a.rows, n + a.rows, &entries)
+}
+
+/// Block-ordered multifrontal augmented-system LDLᵀ with restricted BK pivots.
+#[derive(Debug, Clone)]
+pub struct HiPOLDLT {
+    a: SparseMatrix,
+    symbolic: Symbolic,
+    factor: Option<Factor>,
+    matrix: Option<SparseMatrix>,
+}
+
+impl HiPOLDLT {
+    pub fn new(a: SparseMatrix) -> Result<Self> {
+        let pattern = augmented(&a, &vec![1.; a.cols], &vec![1.; a.cols], &vec![1.; a.rows])?;
+        let symbolic = Symbolic::analyze(&pattern, block_order(&a), a.cols);
+        Ok(Self {
+            a,
+            symbolic,
+            factor: None,
+            matrix: None,
+        })
+    }
+    /// Numeric refactorization reuses symbolic analysis. Failure invalidates the old factor.
+    pub fn factorize(&mut self, theta: &[f64], rp: &[f64], rd: &[f64]) -> Result<()> {
+        self.factor = None;
+        self.matrix = None;
+        validate(&self.a, theta, rp, rd)?;
+        let matrix = augmented(&self.a, theta, rp, rd)?;
+        let factor = self.symbolic.factorize(&matrix, true)?;
+        self.matrix = Some(matrix);
+        self.factor = Some(factor);
+        Ok(())
+    }
+    pub fn solve(&self, rhs: &[f64]) -> Result<Vec<f64>> {
+        self.factor.as_ref().ok_or(Error::NotFactorized)?.solve(rhs)
+    }
+    pub fn solve_with_refinement(&self, rhs: &[f64]) -> Result<(Vec<f64>, usize)> {
+        let mut x = self.solve(rhs)?;
+        let a = self.matrix.as_ref().ok_or(Error::NotFactorized)?;
+        let mut iterations = 0;
+        for _ in 0..2 {
+            let ax = a.mul(&x);
+            let residual: Vec<_> = rhs.iter().zip(ax).map(|(b, v)| b - v).collect();
+            let mut denominator: Vec<_> = rhs.iter().map(|b| b.abs()).collect();
+            for (j, xj) in x.iter().enumerate() {
+                for (i, v) in a.column(j) {
+                    denominator[i] += v.abs() * xj.abs();
+                }
+            }
+            let error = residual
+                .iter()
+                .zip(denominator)
+                .map(|(r, d)| r.abs() / d.max(1e-300))
+                .fold(0.0_f64, f64::max);
+            if error <= 1e-10 {
+                break;
+            }
+            let dx = self.solve(&residual)?;
+            for (xi, di) in x.iter_mut().zip(dx) {
+                *xi += di;
+            }
+            iterations += 1;
+        }
+        if !finite(&x) {
+            return Err(Error::NumericalFailure("refinement overflow".into()));
+        }
+        Ok((x, iterations))
+    }
+    pub fn perturbed_pivots(&self) -> usize {
+        self.factor.as_ref().map_or(0, |f| f.stats.perturbed_pivots)
+    }
+    pub fn num_2x2_pivots(&self) -> usize {
+        self.factor.as_ref().map_or(0, |f| f.stats.num_2x2)
+    }
+    pub fn min_abs_pivot(&self) -> Option<f64> {
+        self.factor.as_ref().map(|f| f.stats.min_abs_pivot)
+    }
+}
+
+/// SPD normal equations, with recovery of the primal part of the KKT solution.
+#[derive(Debug, Clone)]
+pub struct NormalEqLDLT {
+    a: SparseMatrix,
+    symbolic: Symbolic,
+    factor: Option<Factor>,
+    dinv: Vec<f64>,
+}
+
+impl NormalEqLDLT {
+    pub fn new(a: SparseMatrix) -> Result<Self> {
+        let mut graph = vec![BTreeSet::new(); a.rows];
+        let mut entries: Vec<_> = (0..a.rows).map(|i| (i, i, 1.)).collect();
+        for j in 0..a.cols {
+            let rows: Vec<_> = a.column(j).map(|(i, _)| i).collect();
+            for (p, &i) in rows.iter().enumerate() {
+                for &k in &rows[p + 1..] {
+                    graph[i].insert(k);
+                    graph[k].insert(i);
+                    entries.push((i, k, 1.));
+                    entries.push((k, i, 1.));
+                }
+            }
+        }
+        let pattern = SparseMatrix::from_triplets(a.rows, a.rows, &entries)?;
+        let symbolic = Symbolic::analyze(&pattern, minimum_degree(graph), a.rows);
+        Ok(Self {
+            a,
+            symbolic,
+            factor: None,
+            dinv: vec![],
+        })
+    }
+    pub fn factorize(&mut self, theta: &[f64], rp: &[f64], rd: &[f64]) -> Result<()> {
+        self.factor = None;
+        validate(&self.a, theta, rp, rd)?;
+        self.dinv = theta.iter().zip(rp).map(|(t, r)| 1. / (t + r)).collect();
+        let mut entries: Vec<_> = rd.iter().enumerate().map(|(i, &v)| (i, i, v)).collect();
+        for j in 0..self.a.cols {
+            for (i, v) in self.a.column(j) {
+                for (k, w) in self.a.column(j) {
+                    entries.push((i, k, v * w * self.dinv[j]));
+                }
+            }
+        }
+        let matrix = SparseMatrix::from_triplets(self.a.rows, self.a.rows, &entries)?;
+        self.factor = Some(self.symbolic.factorize(&matrix, false)?);
+        Ok(())
+    }
+    pub fn solve(&self, xi_d: &[f64], xi_p: &[f64]) -> Result<(Vec<f64>, Vec<f64>)> {
+        let factor = self.factor.as_ref().ok_or(Error::NotFactorized)?;
+        if xi_d.len() != self.a.cols || xi_p.len() != self.a.rows || !finite(xi_d) || !finite(xi_p)
+        {
+            return Err(Error::InvalidInput("invalid KKT RHS".into()));
+        }
+        let scaled: Vec<_> = xi_d.iter().zip(&self.dinv).map(|(d, s)| d * s).collect();
+        let rhs: Vec<_> = self
+            .a
+            .mul(&scaled)
+            .iter()
+            .zip(xi_p)
+            .map(|(a, p)| a + p)
+            .collect();
+        let dy = factor.solve(&rhs)?;
+        let dx: Vec<_> = self
+            .a
+            .tmul(&dy)
+            .iter()
+            .zip(xi_d)
+            .zip(&self.dinv)
+            .map(|((a, d), s)| (a - d) * s)
+            .collect();
+        if !finite(&dx) {
+            return Err(Error::NumericalFailure("primal recovery overflow".into()));
+        }
+        Ok((dx, dy))
+    }
+}
+
+#[derive(Debug, Clone)]
+enum Backend {
+    HiPO(HiPOLDLT),
+    Normal(NormalEqLDLT),
+}
+
+/// Owns matrix values and cached symbolic analysis. Recreate when A changes.
+#[derive(Debug, Clone)]
+pub struct SparseSolver {
+    backend: Backend,
+    n: usize,
+    m: usize,
+}
+impl SparseSolver {
+    pub fn new(a: SparseMatrix, kind: SolverType) -> Result<Self> {
+        let n = a.cols;
+        let m = a.rows;
+        let fill = estimate_fill(&a);
+        let normal = kind == SolverType::NormalEquations
+            || (kind == SolverType::Auto && fill.normal_eq_nnz < fill.augmented_nnz);
+        let backend = if normal {
+            Backend::Normal(NormalEqLDLT::new(a)?)
+        } else {
+            Backend::HiPO(HiPOLDLT::new(a)?)
+        };
+        Ok(Self { backend, n, m })
+    }
+    pub fn active_solver_type(&self) -> SolverType {
+        match self.backend {
+            Backend::HiPO(_) => SolverType::HiPO,
+            Backend::Normal(_) => SolverType::NormalEquations,
+        }
+    }
+    pub fn factorize(&mut self, theta: &[f64], rp: &[f64], rd: &[f64]) -> Result<()> {
+        match &mut self.backend {
+            Backend::HiPO(s) => s.factorize(theta, rp, rd),
+            Backend::Normal(s) => s.factorize(theta, rp, rd),
+        }
+    }
+    pub fn solve(&self, rhs: &[f64]) -> Result<Vec<f64>> {
+        if rhs.len() != self.n + self.m {
+            return Err(Error::InvalidInput("KKT RHS dimension mismatch".into()));
+        }
+        match &self.backend {
+            Backend::HiPO(s) => Ok(s.solve_with_refinement(rhs)?.0),
+            Backend::Normal(s) => {
+                let (mut x, y) = s.solve(&rhs[..self.n], &rhs[self.n..])?;
+                x.extend(y);
+                Ok(x)
+            }
+        }
+    }
+}

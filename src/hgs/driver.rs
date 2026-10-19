@@ -3,7 +3,7 @@
 use crate::hgs::local_search::HGSLocalSearch;
 use crate::hgs::split::Split;
 use crate::hgs::{Genetic, Params, Population};
-use crate::vrptw::Instance;
+use crate::inputs::Instance;
 
 /// HGS solver options.
 #[derive(Clone, Debug)]

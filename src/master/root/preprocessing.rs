@@ -407,7 +407,7 @@ mod tests {
 
     #[test]
     fn inherited_cut_rows_follow_physical_remapping_and_retirement() {
-        use crate::vrptw::{Instance, Rounding};
+        use crate::inputs::{Instance, Rounding};
         let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
         let problem =
             RootProblem::set_partitioning(instance.graph(3, Rounding::None).unwrap(), 3.).unwrap();

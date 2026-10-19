@@ -12,12 +12,13 @@ Existing Rust import paths and C symbols remain available.
 | [src/core/](../src/core/) | Shared errors, logging, and solver options |
 | [src/cuts/](../src/cuts/) | Cut registry and cut-family modules |
 | [src/graph/](../src/graph/) | Graph representation, buckets, NG preparation, relaxation, and symmetry |
+| [src/ipm/](../src/ipm/README.md) | Native interior-point LP solver, HiPO augmented factorization, and normal equations |
 | [src/labeling/](../src/labeling/) | Labeling engine, label storage, and route pool |
 | [src/enumeration/](../src/enumeration/) | Full-memory elementary enumeration |
 | [src/pricing/](../src/pricing/) | Stateful pricing workflow, branching resources, fixing, and NG updates |
 | [src/master/](../src/master/) | Restricted master, column generation, stabilization, branching constraints, root driver, and tree |
 | [src/hgs/](../src/hgs/) | Hybrid genetic search: individuals, split, local search, genetic operators, population, and driver |
-| [src/vrptw/](../src/vrptw/) | Solomon/CVRPLIB instances, parsing, graph construction, and optional root adapter |
+| [src/inputs/](../src/inputs/) | Solomon/CVRPLIB instances, parsing, graph construction, and optional root adapter |
 | [src/bin/](../src/bin/) | Command-line application |
 
 ## Cuts
@@ -34,17 +35,39 @@ or inheritance entry points. `problem.rs` owns rows and route coefficients;
 `options.rs` owns root and cut-family configuration; `controller.rs` owns
 column-generation callbacks and separation scheduling.
 
+[master/root/incumbent.rs](../src/master/root/incumbent.rs) validates integer
+route quantities, exact original row activities and scalar resource feasibility,
+then evaluates an objective upper bound from original arc costs. Physical arc
+chains determine the resource checks; recorded nodes must agree with them.
+
 [master/root/domain.rs](../src/master/root/domain.rs) validates unit visit-count
 cover rows, fixed-route residuals and disposable scalar resources before
 collecting a `CanonicalCoverRelaxation`. This projects feasible integer routes
 onto canonical physical paths; it does not establish completeness of an NG LP
 or authorize cut rows or root bound publication.
+`ConservativeCoverRelaxation` uses downward resource bounds to cover exact-real
+feasible paths, including arithmetic boundaries missed by strict forward replay.
+Its states describe a relaxation and cannot serve as integer route witnesses.
+
+[master/root/certificate.rs](../src/master/root/certificate.rs) publishes root
+bounds for eligible unit-cover models. It restores conservative physical paths,
+proves optional rows over residual integer partitions, obtains auxiliary LP
+duals, and checks them against raw original costs and coefficients with directed
+arithmetic. Unsupported models or exhausted budgets return an unknown bound.
+Auxiliary slacks supply duals but never enter the certified matrix.
+
+[master/root/restoration.rs](../src/master/root/restoration.rs) recovers bounded,
+validated original columns when exhausted pricing leaves positive artificials.
+It replays physical paths, exact resources and vertex elementarity before
+registration; generic CG then re-solves rather than inferring infeasibility.
 
 [master/root/cover_rows.rs](../src/master/root/cover_rows.rs) computes exact
 integer row-activity ranges over residual customer partitions of that domain.
 It relaxes fleet and branch restrictions and has explicit state, work and time
 limits. Passing its range test proves a row valid on those canonical covers;
 resource-schedule projection and original-domain eligibility remain separate.
+Its additive-weight upper proof checks every auxiliary path and uses exact
+integer cover conservation to validate weighted packing rows without subset DP.
 
 [master/tree/mod.rs](../src/master/tree/mod.rs) owns node processing and the search queue. Its sibling
 `candidates.rs`, `strong.rs`, and `diving.rs` own candidate generation, strong
@@ -109,15 +132,24 @@ identity and borrows the graph. Budget exhaustion discards the partial result.
 It keeps one earliest resource profile per path; callers must establish any
 equivalence to all routing columns or alternative schedules separately.
 
+`CompleteResourceRelaxation` shares the bounded physical-path search while
+using directed additions for disposable resources. Its `RelaxedResourcePath`
+values provide resource lower bounds; extra infeasible paths may remain.
+Unsupported resource kinds and arithmetic failures return an explicit failure.
+
 ## C API and instances
 
 C API implementation modules are private; public functions and ABI types are
 re-exported through `api`. Shared handle validation and error handling stay in
 [api/mod.rs](../src/api/mod.rs). Symbol names and calling conventions are unchanged.
 
-[vrptw/mod.rs](../src/vrptw/mod.rs) owns `Customer`, `Instance`, and `Rounding`; `parsing.rs` reads
+[inputs/mod.rs](../src/inputs/mod.rs) owns `Customer`, `Instance`, and `Rounding`; `parsing.rs` reads
 instances; `graph.rs` builds pricing graphs; `root.rs` provides the optional Clp
-adapter. Public paths such as `vrptw::Instance` remain unchanged.
+adapter. The public path is `inputs::Instance`.
+
+Standalone network, root checkpoint, labeling profile, and arena test modules
+live in the sibling `baldes-verification/overlays/unit/` directory. Its runner
+attaches them to an isolated source snapshot; production builds need no external files.
 
 For new code, place routines with the component that owns their state and add
 exports at its existing facade when needed. Keep numerical and branching

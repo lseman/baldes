@@ -63,6 +63,76 @@ pub struct CoverRowAudit {
     pub work_used: usize,
     pub states: usize,
 }
+
+/// An exact additive-weight upper proof, independent of separator metadata.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WeightedCoverRowAudit {
+    /// None means some path fails the proposed weight envelope.
+    pub upper_bound: Option<i128>,
+    pub work_used: usize,
+}
+
+impl ConservativeCoverRelaxation<'_> {
+    /// Check d*a(path) <= sum of customer weights on every auxiliary path.
+    /// In an integer residual cover the weighted visit total is fixed, hence
+    /// its integer row activity is <= floor(total/d). Signed weights and
+    /// coefficients are allowed; source/sink weights must be zero.
+    /// This proves an upper bound only, without enumerating partitions.
+    pub fn audit_weighted_upper_row(
+        &self,
+        coefficients: &[i64],
+        weights: &[i64],
+        denominator: u64,
+        mut limits: CoverRowLimits,
+    ) -> Result<WeightedCoverRowAudit, CoverRowFailure> {
+        let initial = limits.max_work;
+        spend(&mut limits, 0)?;
+        let graph = &self.problem().graph;
+        if denominator == 0
+            || weights.len() != graph.vertices.len()
+            || coefficients.len() != self.paths().paths().len()
+            || weights[graph.source] != 0
+            || weights[graph.sink] != 0
+        {
+            return Err(CoverRowFailure::Dimension);
+        }
+        let mut total = 0i128;
+        for &(vertex, row) in self.customer_rows() {
+            spend(&mut limits, 1)?;
+            if self.problem().rows[row].rhs == 1. {
+                total = total
+                    .checked_add(i128::from(weights[vertex]))
+                    .ok_or(CoverRowFailure::Arithmetic)?;
+            }
+        }
+        let d = i128::from(denominator);
+        for (path, &coefficient) in self.paths().paths().iter().zip(coefficients) {
+            spend(&mut limits, 1)?;
+            let mut sum = 0i128;
+            for &arc in path.arc_positions() {
+                spend(&mut limits, 1)?;
+                sum = sum
+                    .checked_add(i128::from(weights[graph.arcs[arc].head]))
+                    .ok_or(CoverRowFailure::Arithmetic)?;
+            }
+            if i128::from(coefficient)
+                .checked_mul(d)
+                .ok_or(CoverRowFailure::Arithmetic)?
+                > sum
+            {
+                return Ok(WeightedCoverRowAudit {
+                    upper_bound: None,
+                    work_used: initial - limits.max_work,
+                });
+            }
+        }
+        spend(&mut limits, 0)?;
+        Ok(WeightedCoverRowAudit {
+            upper_bound: Some(total.div_euclid(d)),
+            work_used: initial - limits.max_work,
+        })
+    }
+}
 fn spend(limits: &mut CoverRowLimits, work: usize) -> Result<(), CoverRowFailure> {
     if limits.deadline.is_some_and(|end| Instant::now() >= end) {
         return Err(CoverRowFailure::TimeLimit);
@@ -240,6 +310,99 @@ mod tests {
         }
     }
     #[test]
+    fn weighted_envelopes_prove_rows_and_reject_a_single_violating_path() {
+        let p = problem();
+        let domain = ConservativeCoverRelaxation::collect(
+            &p,
+            PathDomainLimits {
+                deadline: None,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        for weights in [[0, 1, 1, 0], [0, -3, 2, 0]] {
+            let coefficients = domain
+                .paths()
+                .paths()
+                .iter()
+                .map(|path| {
+                    path.arc_positions()
+                        .iter()
+                        .map(|&a| weights[p.graph.arcs[a].head])
+                        .sum::<i64>()
+                        .div_euclid(2)
+                })
+                .collect::<Vec<_>>();
+            let audit = domain
+                .audit_weighted_upper_row(&coefficients, &weights, 2, limits())
+                .unwrap();
+            let exact = domain
+                .audit_cover_row(&coefficients, limits())
+                .unwrap()
+                .range
+                .unwrap();
+            assert!(exact.maximum <= audit.upper_bound.unwrap());
+            assert_eq!(
+                audit.upper_bound,
+                Some(i128::from(weights[1] + weights[2]).div_euclid(2))
+            );
+            let mut bad = coefficients.clone();
+            bad[0] += 1;
+            assert_eq!(
+                domain
+                    .audit_weighted_upper_row(&bad, &weights, 2, limits())
+                    .unwrap()
+                    .upper_bound,
+                None
+            );
+            let mut exhausted = limits();
+            exhausted.max_work = audit.work_used - 1;
+            assert_eq!(
+                domain.audit_weighted_upper_row(&coefficients, &weights, 2, exhausted),
+                Err(CoverRowFailure::WorkLimit)
+            );
+            exhausted = limits();
+            exhausted.deadline = Some(Instant::now());
+            assert_eq!(
+                domain.audit_weighted_upper_row(&coefficients, &weights, 2, exhausted),
+                Err(CoverRowFailure::TimeLimit)
+            );
+        }
+        let mut fixed = problem();
+        let route = fixed.elementary_route(&[0, 1]).unwrap();
+        fixed.fixed_routes.push((route, 1));
+        fixed.rows[0].rhs -= 1.;
+        fixed.rows[1].rhs = 0.;
+        let domain = ConservativeCoverRelaxation::collect(
+            &fixed,
+            PathDomainLimits {
+                deadline: None,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let weights = [0, 3, 2, 0];
+        let coefficients = domain
+            .paths()
+            .paths()
+            .iter()
+            .map(|path| {
+                path.arc_positions()
+                    .iter()
+                    .map(|&a| weights[fixed.graph.arcs[a].head])
+                    .sum::<i64>()
+                    .div_euclid(2)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            domain
+                .audit_weighted_upper_row(&coefficients, &weights, 2, limits())
+                .unwrap()
+                .upper_bound,
+            Some(1)
+        );
+    }
+    #[test]
     fn exact_partition_extrema_reject_a_cut_that_excludes_a_cover() {
         let p = problem();
         let domain = CanonicalCoverRelaxation::collect(
@@ -394,5 +557,31 @@ mod tests {
         );
         assert!(row.satisfies(RowSense::LessEqual, 1.));
         assert!(!row.satisfies(RowSense::LessEqual, 0.));
+        // The retained path can support an actual finite-matrix lower bound
+        // even though strict forward accumulation omitted its column.
+        let entries = domain.paths().paths()[0]
+            .arc_positions()
+            .iter()
+            .flat_map(|&a| p.arc_entries[a].iter().copied())
+            .collect::<Vec<_>>();
+        let costs = domain.paths().paths()[0]
+            .arc_positions()
+            .iter()
+            .map(|&a| p.graph.arcs[a].cost)
+            .collect::<Vec<_>>();
+        let rhs = p.rows.iter().map(|r| r.rhs).collect::<Vec<_>>();
+        let senses = p.rows.iter().map(|r| r.sense).collect::<Vec<_>>();
+        let columns = [crate::master::certificates::Column {
+            cost_terms: &costs,
+            entries: &entries,
+        }];
+        let matrix = crate::master::certificates::FiniteMaster {
+            rhs: &rhs,
+            senses: &senses,
+            columns: &columns,
+            offset_terms: &[],
+            multiplicity_row: 0,
+        };
+        assert_eq!(matrix.lower_bound(&[0., 1., 2.]), Some(3.));
     }
 }

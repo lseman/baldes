@@ -1,5 +1,5 @@
 use baldes::hgs::driver::{run_hgs, HgsOptions};
-use baldes::vrptw::Instance;
+use baldes::inputs::Instance;
 
 /// Check the HGS routes: every customer once, capacity, and time windows in
 /// HGS's metric (coordinates and times scaled by 10, distances truncated).

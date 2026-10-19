@@ -36,6 +36,16 @@ impl FiniteMaster<'_> {
     /// multiplicity coefficients return None, never a guessed finite bound.
     /// Assumes ordinary IEEE binary64 operations without fast-math reassociation.
     pub fn lower_bound(&self, duals: &[f64]) -> Option<f64> {
+        self.lower_bound_checked(duals, || Some(()))
+    }
+
+    /// Internal cooperative budget checkpoints; interruption discards the proof.
+    pub(crate) fn lower_bound_checked(
+        &self,
+        duals: &[f64],
+        mut checkpoint: impl FnMut() -> Option<()>,
+    ) -> Option<f64> {
+        checkpoint()?;
         let rows = self.rhs.len();
         if self.senses.len() != rows
             || duals.len() != rows
@@ -49,26 +59,33 @@ impl FiniteMaster<'_> {
         let projected = duals
             .iter()
             .zip(self.senses)
-            .map(|(&dual, sense)| match sense {
-                RowSense::LessEqual => dual.min(0.),
-                RowSense::GreaterEqual => dual.max(0.),
-                RowSense::Equal => dual,
+            .map(|(&dual, sense)| {
+                checkpoint()?;
+                Some(match sense {
+                    RowSense::LessEqual => dual.min(0.),
+                    RowSense::GreaterEqual => dual.max(0.),
+                    RowSense::Equal => dual,
+                })
             })
-            .collect::<Vec<_>>();
+            .collect::<Option<Vec<_>>>()?;
         let mut value = 0.;
         for &(term, multiplier) in self.offset_terms {
+            checkpoint()?;
             if !term.is_finite() || !multiplier.is_finite() {
                 return None;
             }
             value = add_down(value, multiply_down(term, multiplier)?)?;
         }
         for (&dual, &rhs) in projected.iter().zip(self.rhs) {
+            checkpoint()?;
             value = add_down(value, multiply_down(dual, rhs)?)?;
         }
         let mut minimum = 0f64;
         for column in self.columns {
+            checkpoint()?;
             let mut reduced = 0.;
             for &term in column.cost_terms {
+                checkpoint()?;
                 if !term.is_finite() {
                     return None;
                 }
@@ -77,6 +94,7 @@ impl FiniteMaster<'_> {
             let mut unit_lower = 0.;
             let mut unit_upper = 0.;
             for &(row, coefficient) in column.entries {
+                checkpoint()?;
                 if row >= rows || !coefficient.is_finite() {
                     return None;
                 }
@@ -95,6 +113,7 @@ impl FiniteMaster<'_> {
             value,
             multiply_down(self.rhs[self.multiplicity_row], minimum)?,
         )?;
+        checkpoint()?;
         bound.is_finite().then_some(bound)
     }
 }
@@ -102,6 +121,39 @@ impl FiniteMaster<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn interrupted_numerical_proofs_publish_no_partial_bound() {
+        let columns = [Column {
+            cost_terms: &[3.],
+            entries: &[(0, 1.)],
+        }];
+        let model = FiniteMaster {
+            rhs: &[1.],
+            senses: &[RowSense::LessEqual],
+            columns: &columns,
+            offset_terms: &[],
+            multiplicity_row: 0,
+        };
+        let mut checkpoints = 0usize;
+        assert_eq!(
+            model.lower_bound_checked(&[0.], || {
+                checkpoints += 1;
+                Some(())
+            }),
+            Some(0.)
+        );
+        for allowance in 0usize..checkpoints {
+            let mut remaining = allowance;
+            assert_eq!(
+                model.lower_bound_checked(&[0.], || {
+                    remaining = remaining.checked_sub(1usize)?;
+                    Some(())
+                }),
+                None
+            );
+        }
+        assert_eq!(model.lower_bound(&[0.]), Some(0.));
+    }
     #[test]
     fn fractional_primal_and_projected_duals_have_a_valid_bound() {
         let columns = [

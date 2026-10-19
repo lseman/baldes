@@ -1,0 +1,415 @@
+use baldes::ipm::{
+    solve, HiPOLDLT, ModelData, NormalEqLDLT, Options, Sense, SolverType, SparseMatrix, Status,
+};
+
+fn model(
+    a: &[&[f64]],
+    b: &[f64],
+    c: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+    sense: &[Sense],
+) -> ModelData {
+    let entries: Vec<_> = a
+        .iter()
+        .enumerate()
+        .flat_map(|(i, row)| row.iter().enumerate().map(move |(j, &v)| (i, j, v)))
+        .collect();
+    ModelData {
+        a: SparseMatrix::from_triplets(b.len(), c.len(), &entries).unwrap(),
+        b: b.to_vec(),
+        c: c.to_vec(),
+        lower: lower.to_vec(),
+        upper: upper.to_vec(),
+        sense: sense.to_vec(),
+    }
+}
+fn check(m: &ModelData, objective: f64) {
+    for solver in [
+        SolverType::HiPO,
+        SolverType::NormalEquations,
+        SolverType::Auto,
+    ] {
+        for scaling_iterations in [0, 5] {
+            let s = solve(
+                m,
+                &Options {
+                    solver,
+                    scaling_iterations,
+                    ..Options::default()
+                },
+            )
+            .unwrap();
+            assert_eq!(s.status, Status::Optimal, "{s:?}");
+            assert!(
+                (s.objective - objective).abs() < 1e-6 * (1. + objective.abs()),
+                "{s:?}"
+            );
+            assert!(s.primal_residual < 1e-8, "{s:?}");
+        }
+    }
+}
+#[test]
+fn mixed_rows() {
+    use Sense::*;
+    check(
+        &model(
+            &[&[1., 1.], &[1., 0.]],
+            &[3., 1.],
+            &[-1., -2.],
+            &[0., 0.],
+            &[f64::INFINITY; 2],
+            &[LessEqual, GreaterEqual],
+        ),
+        -5.,
+    );
+    check(
+        &model(
+            &[&[1., 1.]],
+            &[3.],
+            &[1., 2.],
+            &[0., 0.],
+            &[f64::INFINITY; 2],
+            &[Equal],
+        ),
+        3.,
+    );
+}
+#[test]
+fn variable_transformations() {
+    use Sense::*;
+    let inf = f64::INFINITY;
+    check(
+        &model(
+            &[&[1., 1., 1., 1.]],
+            &[8.],
+            &[1., 0., 3., 0.],
+            &[-inf, -inf, 2., 4.],
+            &[inf, 3., 5., 4.],
+            &[Equal],
+        ),
+        5.,
+    );
+    check(
+        &model(
+            &[&[0., 0., 0.]],
+            &[1.],
+            &[0., 0., 1.],
+            &[-inf, -inf, 0.],
+            &[inf, inf, inf],
+            &[LessEqual],
+        ),
+        0.,
+    );
+}
+#[test]
+fn finite_bounds_and_empty_rows() {
+    check(
+        &model(&[], &[], &[-1., 2.], &[2., -3.], &[5., 4.], &[]),
+        -11.,
+    );
+    check(
+        &model(
+            &[&[1., 1.]],
+            &[3.],
+            &[-1., -2.],
+            &[0., 0.],
+            &[2., 2.],
+            &[Sense::LessEqual],
+        ),
+        -5.,
+    );
+    check(&model(&[], &[], &[2., -3.], &[4., 2.], &[4., 2.], &[]), 2.);
+    check(&model(&[&[]], &[0.], &[], &[], &[], &[Sense::Equal]), 0.);
+}
+#[test]
+fn multiple_free_variables_with_zero_cost() {
+    check(
+        &model(
+            &[&[1., 0., 0.], &[0., 1., 0.], &[0., 0., 1.]],
+            &[-2., 3., 7.],
+            &[0., 0., 1.],
+            &[f64::NEG_INFINITY; 3],
+            &[f64::INFINITY; 3],
+            &[Sense::Equal; 3],
+        ),
+        7.,
+    );
+}
+#[test]
+fn kkt_backends_repeated_factorization() {
+    let a = SparseMatrix::from_triplets(
+        3,
+        4,
+        &[
+            (0, 0, 2.),
+            (1, 0, -1.),
+            (1, 1, 3.),
+            (2, 1, 1.),
+            (0, 2, 1.),
+            (2, 2, 4.),
+            (1, 3, 2.),
+        ],
+    )
+    .unwrap();
+    let expected = vec![1., -2., 3., 4., -1., 0.5, 2.];
+    let mut hi = HiPOLDLT::new(a.clone()).unwrap();
+    let mut ne = NormalEqLDLT::new(a.clone()).unwrap();
+    for scale in [1., 1e-4, 100.] {
+        let theta = vec![scale; 4];
+        let rp = vec![0.1; 4];
+        let rd = vec![0.2; 3];
+        let mut rhs: Vec<_> = a
+            .transpose_multiply(&expected[4..])
+            .unwrap()
+            .iter()
+            .enumerate()
+            .map(|(j, v)| v - (theta[j] + rp[j]) * expected[j])
+            .collect();
+        rhs.extend(
+            a.multiply(&expected[..4])
+                .unwrap()
+                .iter()
+                .enumerate()
+                .map(|(i, v)| v + rd[i] * expected[4 + i]),
+        );
+        hi.factorize(&theta, &rp, &rd).unwrap();
+        ne.factorize(&theta, &rp, &rd).unwrap();
+        let x = hi.solve_with_refinement(&rhs).unwrap().0;
+        let (mut z, y) = ne.solve(&rhs[..4], &rhs[4..]).unwrap();
+        z.extend(y);
+        for solution in [x, z] {
+            for (x, e) in solution.iter().zip(&expected) {
+                assert!((x - e).abs() < 1e-8, "{solution:?}");
+            }
+        }
+    }
+    assert!(hi.factorize(&[], &[], &[]).is_err());
+    assert!(hi.solve(&expected).is_err());
+}
+#[test]
+fn invalid_inputs_and_iteration_limit() {
+    let mut m = model(&[&[1.]], &[1.], &[1.], &[0.], &[2.], &[Sense::Equal]);
+    assert_eq!(
+        solve(
+            &m,
+            &Options {
+                max_iterations: 0,
+                ..Options::default()
+            }
+        )
+        .unwrap()
+        .status,
+        Status::IterationLimit
+    );
+    m.lower[0] = 3.;
+    assert!(solve(&m, &Options::default()).is_err());
+    assert!(SparseMatrix::from_csr(1, 1, &[0, 2], &[0], &[1.]).is_err());
+    assert!(SparseMatrix::from_triplets(1, 1, &[(2, 0, 1.)]).is_err());
+}
+#[test]
+fn certificates() {
+    for solver in [SolverType::HiPO, SolverType::NormalEquations] {
+        let m = model(
+            &[&[1.]],
+            &[-1.],
+            &[1.],
+            &[0.],
+            &[f64::INFINITY],
+            &[Sense::Equal],
+        );
+        let s = solve(
+            &m,
+            &Options {
+                solver,
+                ..Options::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(s.status, Status::Infeasible, "{s:?}");
+        assert!(s.certificate.is_some());
+        let m = model(
+            &[&[0.]],
+            &[0.],
+            &[-1.],
+            &[0.],
+            &[f64::INFINITY],
+            &[Sense::Equal],
+        );
+        let s = solve(
+            &m,
+            &Options {
+                solver,
+                ..Options::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(s.status, Status::Unbounded, "{s:?}");
+        assert!(s.certificate.is_some());
+    }
+}
+
+#[test]
+fn cpp_shifted_bound_regression() {
+    check(
+        &model(
+            &[&[1., 1.]],
+            &[0.],
+            &[-1., 0.],
+            &[-2., -10.],
+            &[2., 10.],
+            &[Sense::Equal],
+        ),
+        -2.,
+    );
+    check(
+        &model(&[&[1.]], &[1.], &[-1.], &[0.], &[2.], &[Sense::LessEqual]),
+        -1.,
+    );
+    check(
+        &model(&[&[1.]], &[1.], &[1.], &[0.], &[2.], &[Sense::GreaterEqual]),
+        1.,
+    );
+}
+
+struct Random(u64);
+impl Random {
+    fn next(&mut self) -> f64 {
+        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1);
+        ((self.0 >> 32) as f64) / (u32::MAX as f64)
+    }
+}
+
+#[test]
+fn original_dual_signs_and_equilibration() {
+    for (sense, cost, expected_dual) in
+        [(Sense::GreaterEqual, 1., 1.), (Sense::LessEqual, -1., -1.)]
+    {
+        let m = model(&[&[1.]], &[2.], &[cost], &[0.], &[5.], &[sense]);
+        let s = solve(&m, &Options::default()).unwrap();
+        assert_eq!(s.status, Status::Optimal);
+        assert!((s.dual[0] - expected_dual).abs() < 1e-7, "{s:?}");
+    }
+    check(
+        &model(
+            &[&[1e-6, 1e6]],
+            &[1.],
+            &[1., 1.],
+            &[0., 0.],
+            &[f64::INFINITY; 2],
+            &[Sense::Equal],
+        ),
+        1e-6,
+    );
+}
+
+#[test]
+fn csr_canonicalization_and_fill_estimate() {
+    let a = SparseMatrix::from_csr(2, 2, &[0, 3, 4], &[1, 0, 1, 1], &[2., 3., -2., 4.]).unwrap();
+    assert_eq!(a.nnz(), 2);
+    assert_eq!(a.multiply(&[2., 3.]).unwrap(), vec![6., 12.]);
+    // A single dense column produces a dense 4x4 normal matrix.
+    let a = SparseMatrix::from_triplets(4, 1, &[(0, 0, 1.), (1, 0, 1.), (2, 0, 1.), (3, 0, 1.)])
+        .unwrap();
+    let fill = baldes::ipm::estimate_fill(&a);
+    assert_eq!(fill.normal_eq_nnz, 10);
+    assert_eq!(fill.augmented_nnz, 9);
+    assert_eq!(
+        baldes::ipm::SparseSolver::new(a, SolverType::Auto)
+            .unwrap()
+            .active_solver_type(),
+        SolverType::HiPO
+    );
+}
+
+// Construct LPs with known primal/dual KKT witnesses, so expected objectives
+// do not depend on either implementation of the interior-point algorithm.
+#[test]
+fn seeded_lps_with_known_kkt_witnesses() {
+    let mut rng = Random(42);
+    for case in 0..30 {
+        let n = 5 + case % 11;
+        let m = 2 + case % 5;
+        let mut entries = vec![];
+        for i in 0..m {
+            for j in 0..n {
+                let v = 2. * rng.next() - 1.;
+                if rng.next() > 0.35 {
+                    entries.push((i, j, v));
+                }
+            }
+        }
+        let a = SparseMatrix::from_triplets(m, n, &entries).unwrap();
+        let lower: Vec<_> = (0..n).map(|_| -2. * rng.next()).collect();
+        let upper: Vec<_> = lower.iter().map(|l| l + 1. + 3. * rng.next()).collect();
+        let x: Vec<_> = (0..n)
+            .map(|j| match j % 3 {
+                0 => lower[j],
+                1 => upper[j],
+                _ => 0.5 * (lower[j] + upper[j]),
+            })
+            .collect();
+        let y: Vec<_> = (0..m).map(|_| 2. * rng.next() - 1.).collect();
+        let mut c = a.transpose_multiply(&y).unwrap();
+        for (j, cj) in c.iter_mut().enumerate() {
+            *cj += match j % 3 {
+                0 => 0.5 + rng.next(),
+                1 => -0.5 - rng.next(),
+                _ => 0.,
+            };
+        }
+        let objective: f64 = c.iter().zip(&x).map(|(c, x)| c * x).sum();
+        let b = a.multiply(&x).unwrap();
+        let lp = ModelData {
+            a,
+            b,
+            c,
+            lower,
+            upper,
+            sense: vec![Sense::Equal; m],
+        };
+        check(&lp, objective);
+    }
+}
+
+#[test]
+fn seeded_sparse_kkt_residuals() {
+    let mut rng = Random(57);
+    for case in 0..40 {
+        let n = 1 + case % 17;
+        let m = 1 + case % 11;
+        let mut entries = vec![];
+        for j in 0..n {
+            for i in 0..m {
+                let v = 2. * rng.next() - 1.;
+                if rng.next() > 0.6 {
+                    entries.push((i, j, v));
+                }
+            }
+        }
+        let a = SparseMatrix::from_triplets(m, n, &entries).unwrap();
+        let expected: Vec<_> = (0..n + m).map(|_| 2. * rng.next() - 1.).collect();
+        let theta: Vec<_> = (0..n).map(|_| 0.1 + 10. * rng.next()).collect();
+        let rp = vec![0.1; n];
+        let rd = vec![0.2; m];
+        let mut rhs = a.transpose_multiply(&expected[n..]).unwrap();
+        for j in 0..n {
+            rhs[j] -= (theta[j] + rp[j]) * expected[j];
+        }
+        rhs.extend(
+            a.multiply(&expected[..n])
+                .unwrap()
+                .iter()
+                .enumerate()
+                .map(|(i, v)| v + rd[i] * expected[n + i]),
+        );
+        for kind in [SolverType::HiPO, SolverType::NormalEquations] {
+            let mut s = baldes::ipm::SparseSolver::new(a.clone(), kind).unwrap();
+            s.factorize(&theta, &rp, &rd).unwrap();
+            let result = s.solve(&rhs).unwrap();
+            for (r, e) in result.iter().zip(&expected) {
+                assert!((r - e).abs() < 1e-8, "case {case}: {result:?}");
+            }
+        }
+    }
+}

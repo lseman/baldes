@@ -154,3 +154,7 @@ path = "tests/pricing/porting_regressions.rs"
 [[test]]
 name = "partial_solution"
 path = "tests/master/partial_solution.rs"
+
+[[test]]
+name = "ipm"
+path = "tests/ipm/solver.rs"

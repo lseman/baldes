@@ -1,5 +1,5 @@
 use baldes::master::root::RootOptions;
-use baldes::vrptw::{Instance, Rounding};
+use baldes::inputs::{Instance, Rounding};
 const HELP: &str = "Usage: baldes <vrptw|cvrp|hgs> INSTANCE [OPTIONS]
 
 Instance types (Solomon-format or CVRPLIB .vrp input):

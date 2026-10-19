@@ -8,6 +8,7 @@ root. The guides below describe the current Rust implementation.
 
 | Guide | Use it to |
 | --- | --- |
+| [Build configuration](build.md) | Configure optional backends and compiler options in the terminal menu, then build with Make |
 | [Tree and node lifecycle](tree.md) | Run integer routing, understand node inheritance, bounds, limits, and result status |
 | [Branching](branching.md) | Choose vehicle-count, Ryan–Foster, or arc-flow branching and understand the single-network assignment limitation |
 | [Cuts](cuts.md) | Configure cut families and keep coefficients consistent across pricing, enumeration, and child nodes |

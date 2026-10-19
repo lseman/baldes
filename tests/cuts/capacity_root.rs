@@ -3,7 +3,7 @@ use baldes::master::{
     column_generation::Status,
     root::{CapacityCutConfig, RootOptions},
 };
-use baldes::vrptw::{Instance, Rounding};
+use baldes::inputs::{Instance, Rounding};
 
 #[test]
 fn cleanup_retains_basic_capacity_rows_with_negative_normalized_slack() {

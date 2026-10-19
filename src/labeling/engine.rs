@@ -15,9 +15,6 @@ use crate::pricing::phases::Phase;
 use crate::{incomplete, invalid, Result};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
-#[cfg(test)]
-#[path = "profile_tests.rs"]
-mod profile_tests;
 pub(crate) const RESOURCE_REPLAY_MISMATCH: &str = "reconstructed route violates resource windows";
 #[derive(Clone, Debug)]
 pub struct EngineControls {

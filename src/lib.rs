@@ -10,6 +10,7 @@ pub mod core;
 pub mod cuts;
 pub mod enumeration;
 pub mod graph;
+pub mod ipm;
 pub mod labeling;
 pub mod master;
 pub mod pricing;
@@ -32,4 +33,4 @@ pub(crate) fn incomplete(message: impl Into<String>) -> core::error::OrError {
 }
 
 pub mod hgs;
-pub mod vrptw;
+pub mod inputs;

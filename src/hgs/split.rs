@@ -437,7 +437,7 @@ impl<'p> Split<'p> {
 mod tests {
     use super::*;
     use crate::hgs::Params;
-    use crate::vrptw::{Customer, Instance};
+    use crate::inputs::{Customer, Instance};
 
     fn make_test_instance() -> Instance {
         Instance {
@@ -451,7 +451,7 @@ mod tests {
                 Customer { x: 30.0, y: 0.0, demand: 15.0, ready: 0.0, due: 1000.0, service: 5.0 },
                 Customer { x: 40.0, y: 0.0, demand: 25.0, ready: 0.0, due: 1000.0, service: 10.0 },
             ],
-            rounding: crate::vrptw::Rounding::None,
+            rounding: crate::inputs::Rounding::None,
             distances: None,
         }
     }

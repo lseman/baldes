@@ -158,7 +158,7 @@ make it valid. The 54-case parameter corpus covers this capacity-row transition.
 A complete Rust example, requiring `clp`:
 
 ```rust
-use baldes::{master::root::RootOptions, vrptw::{Instance, Rounding}};
+use baldes::{master::root::RootOptions, inputs::{Instance, Rounding}};
 
 fn main() -> baldes::Result<()> {
     let mut instance = Instance::read("instances/R101.txt")?;

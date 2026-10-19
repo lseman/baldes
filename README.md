@@ -55,6 +55,18 @@ uses Clp for LPs and HiGHS for its optional enumerated MIP.
 
 ## Build
 
+For an interactive kernel-style build configuration:
+
+```bash
+make config   # Configure backends, CLI, build profile and compiler options
+make          # Build with the saved .config
+```
+
+Use arrows and Space/Enter to change settings, **S** to save, and **Q** to
+cancel. `make menuconfig` is an alias. See [build configuration](docs/build.md)
+for all options, prerequisites and noninteractive builds. Direct Cargo builds
+remain available as below.
+
 The library without the master LP:
 
 ```bash

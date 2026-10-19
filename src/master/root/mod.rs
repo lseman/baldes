@@ -20,13 +20,13 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 mod controller;
+mod certificate;
+mod restoration;
 mod domain;
 pub use domain::{CanonicalCoverRelaxation, ConservativeCoverRelaxation, CoverDomainFailure};
 mod cover_rows;
-pub use cover_rows::{CoverRowAudit, CoverRowFailure, CoverRowLimits, CoverRowRange};
+pub use cover_rows::{CoverRowAudit, CoverRowFailure, CoverRowLimits, CoverRowRange, WeightedCoverRowAudit};
 mod incumbent;
-#[cfg(test)]
-mod checkpoint_tests;
 mod integer;
 pub use integer::{EnumeratedMipOutput, EnumerationMipPolicy};
 mod options;

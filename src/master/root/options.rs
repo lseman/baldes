@@ -143,6 +143,9 @@ pub struct RootOptions {
     pub cg: Options,
     pub pricing_options: Vec<(String, f64)>,
     pub initial_routes: Vec<Route>,
+    /// Assumed feasible objective upper bound supplied by the caller (default
+    /// infinity). This scalar is not independently validated as a route witness.
+    /// It must bound the original arc-cost sum, including rounding error.
     pub incumbent: f64,
     pub enumerate: bool,
     pub round_reduced_costs: bool,

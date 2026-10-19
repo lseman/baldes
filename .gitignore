@@ -78,6 +78,8 @@ _deps/
 *.log
 
 # Local configuration and credentials
+/.config
+/.config.old
 AGENTS.md
 /.codex/
 /.aws/

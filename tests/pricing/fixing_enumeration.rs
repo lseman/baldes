@@ -1,6 +1,6 @@
 use baldes::enumeration::{Controls, Enumeration};
 use baldes::pricing::Solver;
-use baldes::vrptw::{Instance, Rounding};
+use baldes::inputs::{Instance, Rounding};
 
 
 #[test]

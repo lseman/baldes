@@ -1205,7 +1205,7 @@ fn knapsack_root_cuts_close_fractional_capacity_gap_and_survive_snapshot() {
         column_generation::Status,
         root::{KnapsackCutConfig, RootOptions},
     };
-    use baldes::vrptw::{Instance, Rounding};
+    use baldes::inputs::{Instance, Rounding};
     let instance = Instance::parse("knapsack-root\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let scaled = RootOptions::default()
         .with_knapsack_cuts(KnapsackCutConfig::new(vec![KnapsackRow::new(0, 1, 2., 6)]));

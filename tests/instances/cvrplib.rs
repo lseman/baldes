@@ -1,4 +1,4 @@
-use baldes::vrptw::{Instance, Rounding};
+use baldes::inputs::{Instance, Rounding};
 
 const EUC: &str = "NAME : tiny-k2
 COMMENT : (test, Optimal value: 0)

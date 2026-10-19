@@ -171,7 +171,7 @@ fn enumerated_snapshot_survives_siblings_grandchildren_and_failed_setup() {
         root::{self, RootOptions, RootProblem},
         RowSense,
     };
-    use baldes::vrptw::{Instance, Rounding};
+    use baldes::inputs::{Instance, Rounding};
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let problem =
         RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
@@ -252,7 +252,7 @@ fn tree_honors_enumeration_control_during_node_processing() {
         root::{RootOptions, RootProblem},
         tree::{self, TreeOptions, TreeStatus},
     };
-    use baldes::vrptw::{Instance, Rounding};
+    use baldes::inputs::{Instance, Rounding};
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for enumerate in [false, true] {
         let problem =
@@ -409,7 +409,7 @@ fn snapshots_keep_cached_columns_and_extend_branch_rows_without_aliasing() {
         root::{self, RootOptions, RootProblem},
         RowSense,
     };
-    use baldes::vrptw::{Instance, Rounding};
+    use baldes::inputs::{Instance, Rounding};
     let mut instance = Instance::read("instances/R201.txt").unwrap();
     instance.truncate(10).unwrap();
     let graph = instance.graph(12, Rounding::None).unwrap();
@@ -473,7 +473,7 @@ fn child_enumeration_never_reactivates_a_forbidden_cached_arc() {
         root::{self, RootOptions, RootProblem},
         RowSense,
     };
-    use baldes::vrptw::{Instance, Rounding};
+    use baldes::inputs::{Instance, Rounding};
     let instance = Instance::read("tests/master/fixtures/fractional.txt").unwrap();
     let graph = instance.graph(5, Rounding::None).unwrap();
     let arc = graph
@@ -650,7 +650,7 @@ fn child_regeneration_rechecks_ryan_foster_for_cached_columns() {
         root::{self, RootOptions, RootProblem},
     };
     use baldes::pricing::branching::RyanFosterConstraint;
-    use baldes::vrptw::{Instance, Rounding};
+    use baldes::inputs::{Instance, Rounding};
     // Two odd clusters keep one fractional triangle after branching on the
     // other, so both children actually reach fixing/enumeration.
     let instance = Instance::parse("clusters\nVEHICLE\nNUMBER CAPACITY\n6 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 1 .1 1 0 100 0\n3 1 -.1 1 0 100 0\n4 -1 0 1 0 100 0\n5 -1 .1 1 0 100 0\n6 -1 -.1 1 0 100 0\n").unwrap();

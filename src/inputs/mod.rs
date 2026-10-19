@@ -1,5 +1,5 @@
-//! Solomon and CVRPLIB (TSPLIB format) instance input and the split-depot
-//! VRPTW model.
+//! Solomon and CVRPLIB (TSPLIB format) inputs and routing graph adapters
+//! for CVRP and VRPTW.
 use crate::{invalid, Graph, Result};
 #[derive(Clone, Debug)]
 pub struct Customer {

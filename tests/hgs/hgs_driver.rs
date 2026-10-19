@@ -1,5 +1,5 @@
 use baldes::hgs::driver::{run_hgs, HgsOptions};
-use baldes::vrptw::{Instance, Customer};
+use baldes::inputs::{Instance, Customer};
 
 /// Create a small test instance (CVRP, 10 customers + depot).
 fn make_test_instance() -> Instance {
@@ -22,7 +22,7 @@ fn make_test_instance() -> Instance {
         vehicles: 3,
         capacity: 50.0,
         customers,
-        rounding: baldes::vrptw::Rounding::Nearest,
+        rounding: baldes::inputs::Rounding::Nearest,
         distances: None,
     }
 }

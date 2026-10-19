@@ -12,6 +12,13 @@ pub(super) struct RootController {
     pub(super) checkpoint: Option<PricingCheckpoint>,
 }
 impl Controller<ClpMaster> for RootController {
+    fn restore_feasible_columns(&mut self, duals: &[f64]) -> Result<Vec<Column>> {
+        super::restoration::columns(&self.problem, &mut self.state.borrow_mut(), duals)
+    }
+    fn certified_pricing_bound(&self, master: &ClpMaster, _duals: &[f64]) -> Result<Option<f64>> {
+        Ok(Some(super::certificate::lower_bound(&self.problem, &self.state.borrow(), master)
+            .unwrap_or(f64::NEG_INFINITY)))
+    }
     fn save_pricing_checkpoint(&mut self, master: &ClpMaster, output: &Output) -> Result<()> {
         let mut state = self.state.borrow_mut();
         let mut pricing = state.solver.fork_for_node();

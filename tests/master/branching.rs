@@ -84,7 +84,7 @@ fn ryan_foster_pricing_and_enumeration_obey_both_children() {
 fn triangle_problem() -> baldes::master::root::RootProblem {
     use baldes::{
         master::root::RootProblem,
-        vrptw::{Instance, Rounding},
+        inputs::{Instance, Rounding},
     };
     let instance=Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap()

@@ -301,7 +301,7 @@ fn inherited_capacity_rows_detect_a_child_contradiction_before_pricing() {
         column_generation::Status,
         root::{self, CapacityCutConfig, RootOptions, RootProblem},
     };
-    use baldes::vrptw::{Instance, Rounding};
+    use baldes::inputs::{Instance, Rounding};
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for complement in [false, true] {
         let graph = instance.graph(3, Rounding::None).unwrap();

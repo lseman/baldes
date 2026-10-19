@@ -1,6 +1,6 @@
 #![cfg(feature = "clp")]
 use baldes::master::{column_generation::Status, root::RootOptions};
-use baldes::vrptw::{Instance, Rounding};
+use baldes::inputs::{Instance, Rounding};
 
 fn r101_25() -> Instance {
     let mut instance =
