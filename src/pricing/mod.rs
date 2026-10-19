@@ -1,5 +1,8 @@
 //! Stateful pricing, cut preparation, and retained elementary route universe.
-pub mod branching;
+pub mod restrictions;
+/// Compatibility alias; new callers should use `pricing::restrictions`.
+#[doc(hidden)]
+pub use restrictions as branching;
 pub mod controller;
 pub mod fixing;
 pub mod phases;
@@ -14,7 +17,7 @@ use std::time::Duration;
 pub struct Solver {
     pub graph: Graph,
     pub(crate) forbidden_arcs: Vec<bool>,
-    pub(crate) ryan_foster: Vec<branching::RyanFosterConstraint>,
+    pub(crate) ryan_foster: Vec<restrictions::RyanFosterConstraint>,
     pub controls: Controls,
     pub options: Options,
     pub phases: Vec<phases::Phase>,
@@ -30,7 +33,7 @@ pub struct Solver {
     pub round: controller::RoundState,
     pub maximum_variable_id: Option<usize>,
     pub dominance_mode: i32,
-    accumulated_branches: Vec<branching::AccumulatedResourceBranch>,
+    accumulated_branches: Vec<restrictions::AccumulatedResourceBranch>,
     accumulated_original_bounds: Vec<(i32, usize, Option<crate::graph::Window>, bool)>,
     ng_baseline: Option<(Vec<Vec<usize>>, Vec<Vec<usize>>)>,
     pub variable_costs: Vec<f64>,
@@ -142,13 +145,13 @@ impl Solver {
             applied_cuts: self.applied_cuts.clone(),
         }
     }
-    pub fn accumulated_resource_branches(&self) -> &[branching::AccumulatedResourceBranch] {
+    pub fn accumulated_resource_branches(&self) -> &[restrictions::AccumulatedResourceBranch] {
         &self.accumulated_branches
     }
     /// Install a head-resource window in the physical graph. The existing
     /// forward/backward extension, joins, replay and enumeration enforce it.
     pub fn add_accumulated_resource_branch(
-        &mut self, constraint: branching::AccumulatedResourceBranch,
+        &mut self, constraint: restrictions::AccumulatedResourceBranch,
     ) -> Result<usize> {
         let window = constraint.window(&self.graph)?;
         let original = self.graph.arc_mut(constraint.arc)?.bounds[constraint.resource];
@@ -178,7 +181,7 @@ impl Solver {
         self.restore_arcs();
         Ok(())
     }
-    pub fn ryan_foster_constraints(&self) -> &[branching::RyanFosterConstraint] {
+    pub fn ryan_foster_constraints(&self) -> &[restrictions::RyanFosterConstraint] {
         &self.ryan_foster
     }
     /// Install original arcs fixed to zero at this node. Indices address
@@ -219,9 +222,9 @@ impl Solver {
     /// valid for descendants; dual-dependent labels and enumeration filters refresh.
     pub fn set_ryan_foster(
         &mut self,
-        constraints: Vec<branching::RyanFosterConstraint>,
+        constraints: Vec<restrictions::RyanFosterConstraint>,
     ) -> Result<()> {
-        let prepared = branching::RyanFosterResources::prepare(&self.graph, &constraints)?;
+        let prepared = restrictions::RyanFosterResources::prepare(&self.graph, &constraints)?;
         if constraints != self.ryan_foster {
             if !self.ryan_foster.iter().all(|c| constraints.contains(c)) {
                 self.restore_arcs();
@@ -361,7 +364,7 @@ impl Solver {
         }
         let mut engine = LabelingEngine::prepare(&self.graph, controls, phase)?;
         engine.forbidden_arcs = self.forbidden_arcs.clone();
-        engine.branching = branching::RyanFosterResources::prepare(&self.graph, &self.ryan_foster)?;
+        engine.branching = restrictions::RyanFosterResources::prepare(&self.graph, &self.ryan_foster)?;
         engine.cuts.knapsack = self.knapsack_pricing.clone();
         if !engine.load_cuts(
             &self.graph,

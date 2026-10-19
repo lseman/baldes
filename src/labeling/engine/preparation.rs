@@ -1,0 +1,197 @@
+use super::*;
+
+impl LabelingEngine {
+    /// Carry the bucket graph (including fixed arcs), adaptive state and cuts.
+    /// Labels depend on the node's duals and are rebuilt in the child.
+    pub(crate) fn fork_for_node(&self) -> Self {
+        Self {
+            grid: self.grid.clone(),
+            forward: LabelStorage::new(self.forward.buckets.iter().map(Vec::len)),
+            backward: LabelStorage::new(self.backward.buckets.iter().map(Vec::len)),
+            statistics: Statistics::default(),
+            controls: self.controls.clone(),
+            phase: self.phase,
+            ng: self.ng.clone(),
+            branching: self.branching.clone(),
+            forbidden_arcs: self.forbidden_arcs.clone(),
+            half_ready: false,
+            full_ready: false,
+            last_costs: vec![],
+            pending_middle: self.pending_middle,
+            consumption_joins: self.consumption_joins,
+            symmetric_costs: self.symmetric_costs.clone(),
+            reverse: self.reverse.clone(),
+            extension_checks: vec![0; self.extension_checks.len()],
+            filter_checks: vec![0; self.filter_checks.len()],
+            cuts: self.cuts.clone(),
+        }
+    }
+
+    pub fn prepare(g: &Graph, controls: EngineControls, phase: Phase) -> Result<Self> {
+        phase.validate()?;
+        let mut grid = BucketGraph::prepare(
+            g,
+            controls.steps,
+            controls.target_buckets,
+            controls.bidirectional,
+        )?;
+        let reverse = crate::graph::symmetry::reverse_arcs(g).unwrap_or_default();
+        let consumption_joins = controls.bidirectional
+            && controls.use_symmetric_execution
+            && !reverse.is_empty()
+            && crate::graph::symmetry::consumption_symmetric(g, &grid, &reverse);
+        if consumption_joins {
+            grid.bidirectional = false;
+            grid.middle = (grid.lower[0][0] + grid.upper[grid.order.len() - 1][0]) * 0.5;
+            for v in 0..grid.forward.buckets.len() {
+                for k in 0..grid.forward.buckets[v].len() {
+                    let arcs = grid.forward.buckets[v][k].arcs.clone();
+                    let flags: Vec<_> = arcs.iter().map(|a| grid.flags(g, true, a)).collect();
+                    for (a, flags) in grid.forward.buckets[v][k].arcs.iter_mut().zip(flags) {
+                        a.flags = flags;
+                    }
+                }
+            }
+        }
+        let forward = LabelStorage::new(grid.forward.buckets.iter().map(Vec::len));
+        let backward = LabelStorage::new(grid.backward.buckets.iter().map(Vec::len));
+        Ok(Self {
+            grid,
+            forward,
+            backward,
+            statistics: Statistics::default(),
+            controls,
+            phase,
+            ng: PreparedNg::new(g)?,
+            branching: crate::pricing::restrictions::RyanFosterResources::prepare(g, &[])?,
+            forbidden_arcs: vec![],
+            half_ready: false,
+            full_ready: false,
+            last_costs: vec![],
+            pending_middle: None,
+            consumption_joins,
+            symmetric_costs: if consumption_joins {
+                crate::graph::symmetry::reversal_costs(g, &reverse).unwrap()
+            } else {
+                vec![]
+            },
+            reverse,
+            extension_checks: vec![0; g.vertices.len()],
+            filter_checks: vec![0; g.vertices.len()],
+            cuts: EngineCuts::default(),
+        })
+    }
+
+    pub(super) fn storage(&self, forward: bool) -> &LabelStorage {
+        if forward {
+            &self.forward
+        } else {
+            &self.backward
+        }
+    }
+
+    pub(super) fn storage_mut(&mut self, forward: bool) -> &mut LabelStorage {
+        if forward {
+            &mut self.forward
+        } else {
+            &mut self.backward
+        }
+    }
+
+    pub(super) fn root(&mut self, g: &Graph, forward: bool) -> Result<()> {
+        let vertex = if forward { g.source } else { g.sink };
+        let mut resources = [0.; 2];
+        for (r, kind) in g.resources.iter().enumerate() {
+            let w = g.vertices[vertex].bounds[r];
+            resources[r] = if forward {
+                g.initial[r].unwrap_or(w.lower)
+            } else {
+                w.upper
+            };
+            if resources[r] < w.lower || resources[r] > w.upper {
+                return Err(invalid("root resource outside vertex window"));
+            }
+            if *kind == ResourceKind::Equality && !forward && w.lower != w.upper {
+                return Err(invalid(
+                    "backward equality resource requires a fixed sink window",
+                ));
+            }
+        }
+        let internal = self.grid.internal[vertex];
+        let bucket = self
+            .grid
+            .bucket_id(forward, internal, self.grid.coordinate(resources))
+            .ok_or_else(|| invalid("root outside bucket grid"))?;
+        let label = StoredLabel {
+            id: 0,
+            local_id: 0,
+            bucket: BucketId {
+                vertex: internal,
+                bucket,
+            },
+            vertex,
+            cost: 0.,
+            original_cost: 0.,
+            resources,
+            ng: self.ng.vertex_bits[vertex],
+            branch_state: None,
+            parent: None,
+            arc: None,
+            hops: 0,
+            expanded: false,
+            cut_words: [0; LIMITED_WORDS],
+            additional_cost: 0.,
+            half_potential: self
+                .cuts
+                .info
+                .vertex_cut_potential
+                .get(vertex)
+                .map_or(0.0, |&p| 0.5 * p),
+        };
+        let mut label = label;
+        (label.cut_words, label.additional_cost) = self.root_cut_state(vertex);
+        let storage = self.storage_mut(forward);
+        let id = storage.retain(label);
+        storage.root = Some(id);
+        let hot = storage.hot[id];
+        storage.buckets[internal][bucket].active.push(id);
+        storage.buckets[internal][bucket].hot.push(hot);
+        storage.buckets[internal][bucket].next_id = 1;
+        Ok(())
+    }
+    pub fn costs_unchanged(&self, g: &Graph) -> bool {
+        self.last_costs
+            .iter()
+            .copied()
+            .eq(g.arcs.iter().map(|a| a.reduced_cost))
+    }
+    pub(super) fn runtime_bidirectional(&self) -> bool {
+        self.controls.bidirectional
+            && (self.controls.bidirectional_mode == 1
+                || (self.controls.bidirectional_mode == 2 && self.phase.exact()))
+    }
+    /// Refresh conservative cost potentials after dual changes. Costs with
+    /// nonzero reversal cycles require ordinary directional labeling.
+    pub(super) fn ensure_reversal_costs(&mut self, g: &Graph) -> Result<()> {
+        if !self.consumption_joins {
+            return Ok(());
+        }
+        if let Some(costs) = crate::graph::symmetry::reversal_costs(g, &self.reverse) {
+            self.symmetric_costs = costs;
+            return Ok(());
+        }
+        let mut controls = self.controls.clone();
+        controls.use_symmetric_execution = false;
+        let mut rebuilt = Self::prepare(g, controls, self.phase)?;
+        rebuilt.branching = self.branching.clone();
+        rebuilt.forbidden_arcs = self.forbidden_arcs.clone();
+        rebuilt.cuts.knapsack = self.cuts.knapsack.clone();
+        if !rebuilt.load_cuts(g, self.cuts.inputs.clone(), self.cuts.kpath.clone()) {
+            return Err(invalid(
+                "cut memory exceeds capacity after symmetry fallback",
+            ));
+        }
+        *self = rebuilt;
+        Ok(())
+    }
+}

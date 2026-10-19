@@ -8,8 +8,8 @@ center and bounded retries when smoothed pricing finds no fresh columns.
 It is enabled by default in `column_generation::Options`.
 
 The implementation is
-[`DualPriceSmoothing`](../src/master/stabilization.rs), integrated by the
-[column-generation loop](../src/master/column_generation.rs). The sections below
+[`DualPriceSmoothing`](../src/master/stabilization/mod.rs), integrated by the
+[column-generation loop](../src/master/column_generation/driver.rs). The sections below
 describe the implemented update and retry rules.
 
 ## Smoothing weight

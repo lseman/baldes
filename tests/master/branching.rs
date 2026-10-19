@@ -1,5 +1,5 @@
 use baldes::{
-    pricing::{branching::RyanFosterConstraint, Solver},
+    pricing::{restrictions::RyanFosterConstraint, Solver},
     Graph,
 };
 
@@ -340,7 +340,7 @@ fn removing_branch_rebuilds_the_unrestricted_pricing_domain() {
 
 #[test]
 fn accumulated_resource_windows_cover_schedules_and_restore_pricing() {
-    use baldes::pricing::branching::AccumulatedResourceBranch;
+    use baldes::pricing::restrictions::AccumulatedResourceBranch;
     use baldes::graph::ResourceKind;
     for mode in [0., 1., 2.] {
         for kind in [ResourceKind::Disposable, ResourceKind::Equality] {
@@ -388,7 +388,7 @@ fn accumulated_resource_windows_cover_schedules_and_restore_pricing() {
 #[test]
 fn aggregate_branches_match_fresh_and_inherited_masters() {
     use baldes::master::{branching::BranchConstraint as B, root::{self, RootOptions}, RowSense};
-    use baldes::pricing::branching::AccumulatedResourceBranch;
+    use baldes::pricing::restrictions::AccumulatedResourceBranch;
     for (enumerate, mode) in [(false, root::BoundMode::Numerical), (true, root::BoundMode::Numerical), (false, root::BoundMode::Certified)] {
     let p = triangle_problem();
     let arc = p.graph.arcs.iter().find(|a| a.tail == 1 && a.head == p.graph.sink).unwrap().id;
@@ -446,7 +446,7 @@ fn equality_bucket_jumps_cannot_invent_resource_consumption() {
 
 #[test]
 fn resource_boundary_belongs_to_both_sides_and_empty_intersections_forbid_only_the_arc() {
-    use baldes::pricing::branching::AccumulatedResourceBranch;
+    use baldes::pricing::restrictions::AccumulatedResourceBranch;
     for mode in [0., 1., 2.] {
         for upper in [false, true] {
             let mut s = solver(); s.graph.elementary = true;

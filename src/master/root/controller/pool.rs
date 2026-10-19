@@ -1,0 +1,121 @@
+//! Cached-column coefficient synchronization and row remapping.
+use super::*;
+
+/// Reuse the refreshed integer cut incidence of loaded routes. Base/branch
+/// coefficients stay in their original representation, including tiny values
+/// the LP backend may have dropped. Routing tags are local to this node.
+pub(super) fn synchronize_pool(
+    pool: &mut [Column],
+    loaded: &[Option<Column>],
+    route_count: usize,
+    base_rows: &[bool],
+    mut refresh: impl FnMut(&mut Column) -> Result<()>,
+) -> Result<()> {
+    let mut by_tag = vec![None; route_count];
+    for current in loaded.iter().flatten() {
+        if let Some(slot) = usize::try_from(current.tag)
+            .ok()
+            .and_then(|tag| by_tag.get_mut(tag))
+        {
+            *slot = Some(current);
+        }
+    }
+    let is_base = |row: usize| base_rows.get(row).copied().unwrap_or(false);
+    for column in pool {
+        if let Some(current) = usize::try_from(column.tag)
+            .ok()
+            .and_then(|tag| by_tag.get(tag))
+            .and_then(|c| *c)
+            .filter(|c| c.identity == column.identity && c.cost == column.cost)
+        {
+            column.entries.retain(|&(row, _)| is_base(row));
+            column.entries.extend(
+                current
+                    .entries
+                    .iter()
+                    .copied()
+                    .filter(|&(row, value)| !is_base(row) && value != 0.),
+            );
+            column.entries.sort_by_key(|&(row, _)| row);
+        } else {
+            refresh(column)?;
+        }
+    }
+    Ok(())
+}
+
+impl RootController {
+    pub(super) fn refresh_pool(&mut self, pool: &mut [Column]) -> Result<()> {
+        let state = self.state.borrow();
+        for column in pool {
+            let route = state
+                .routes
+                .get(usize::try_from(column.tag).map_err(|_| invalid("cached route tag"))?)
+                .ok_or_else(|| invalid("cached route tag"))?;
+            let mut entries = self.problem.base_entries(route)?;
+            entries.extend(state.cut_entries(route)?);
+            entries.sort_by_key(|&(row, _)| row);
+            column.entries = entries;
+        }
+        Ok(())
+    }
+
+    pub(super) fn synchronize_pool_entries(
+        &mut self,
+        pool: &mut [Column],
+        loaded: &[Option<Column>],
+    ) -> Result<()> {
+        let state = self.state.borrow();
+        // Scaled knapsack coefficients need not survive the backend's small
+        // element threshold. Reconstruct them from their original scales.
+        if state.cut.knapsack_rows.iter().any(Option::is_some) {
+            drop(state);
+            return self.refresh_generated_columns(pool);
+        }
+        let route_count = state.routes.len();
+        drop(state);
+        let map = self.problem.row_map.borrow();
+        let mut base_rows = vec![false; map.iter().max().map_or(0, |r| r + 1)];
+        for &row in map.iter() {
+            base_rows[row] = true;
+        }
+        drop(map);
+        synchronize_pool(pool, loaded, route_count, &base_rows, |column| {
+            self.refresh_generated_columns(std::slice::from_mut(column))
+        })
+    }
+
+    pub(super) fn remap_pool_rows(&mut self, rows: &[Option<usize>]) -> Result<()> {
+        for row in self.problem.row_map.borrow_mut().iter_mut() {
+            *row = rows[*row].ok_or_else(|| invalid("attempt to remove a base or branch row"))?;
+        }
+        let mut state = self.state.borrow_mut();
+        for index in 0..state.cut.knapsack_rows.len() {
+            if let Some(row) = state.cut.knapsack_rows[index] {
+                state.cut.knapsack_rows[index] = rows[row];
+                if rows[row].is_none() {
+                    state.solver.cuts.knapsack_cuts[index].dual = 0.;
+                }
+            }
+        }
+        for row in &mut state.cut.capacity_rows {
+            *row = row.and_then(|r| rows[r]);
+        }
+        for entries in &mut state.cut.capacity_arc_entries {
+            *entries = entries
+                .iter()
+                .filter_map(|&(r, a)| rows[r].map(|row| (row, a)))
+                .collect();
+        }
+        for index in 0..state.cut.rows.len() {
+            let Some(row) = state.cut.rows[index] else {
+                continue;
+            };
+            state.cut.rows[index] = rows[row];
+            if rows[row].is_none() {
+                state.solver.cuts.retire(index);
+            }
+        }
+        Ok(())
+    }
+}

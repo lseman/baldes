@@ -112,5 +112,4 @@ Thumbs.db
 
 # External compiled-reference verification lives outside this repository.
 /tests/verification/
-/src/labeling/engine/
 /examples/verify_*.rs

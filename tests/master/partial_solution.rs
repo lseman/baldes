@@ -110,7 +110,7 @@ fn fixed_routes_keep_all_cut_families_costs_and_parent_isolation() {
 
 #[test]
 fn residual_branches_and_invalid_fixings_do_not_corrupt_snapshots() {
-    use baldes::pricing::branching::RyanFosterConstraint;
+    use baldes::pricing::restrictions::RyanFosterConstraint;
     let (problem, options, pair, _) = fixture(2);
     let arc = problem.arc_position(pair[0]).unwrap();
     let parent = root::solve(problem, options.clone()).unwrap();

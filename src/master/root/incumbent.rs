@@ -176,8 +176,10 @@ pub(super) fn validated_upper(
     // allocating exact row sums or validating any of its integral routes.
     if values.iter().any(|&value| {
         let quantity = value.round();
-        !value.is_finite() || (value - quantity).abs() > 1e-6
-            || quantity < 0. || quantity > 9_007_199_254_740_992.
+        !value.is_finite()
+            || (value - quantity).abs() > 1e-6
+            || quantity < 0.
+            || quantity > 9_007_199_254_740_992.
     }) {
         return None;
     }
@@ -348,7 +350,7 @@ mod tests {
         assert_eq!(validated_upper(&p, &[], &[], &[]), Some(2.));
         let (mut p, mut r) = chain(&[0., 0., 0.], 1.);
         p.branch(BranchConstraint::RyanFoster(
-            crate::pricing::branching::RyanFosterConstraint {
+            crate::pricing::restrictions::RyanFosterConstraint {
                 first: 1,
                 second: 2,
                 together: false,

@@ -382,7 +382,7 @@ fn transitive_ryan_foster_contradictions_are_preprocessed_without_pricing() {
         branching::BranchConstraint,
         root::{self, RootOptions, RootProblem},
     };
-    use baldes::pricing::branching::RyanFosterConstraint;
+    use baldes::pricing::restrictions::RyanFosterConstraint;
     let mut graph = baldes::Graph::new(5, 0).unwrap();
     graph.elementary = true;
     for u in 0..4 {

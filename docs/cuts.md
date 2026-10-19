@@ -113,7 +113,7 @@ See [BALDES options](options.md) for supported values and setter errors.
 
 The cut registry and coefficient logic live under [src/cuts](../src/cuts/).
 Root scheduling and row remapping live in the
-[root controller](../src/master/root/controller.rs).
+[root controller](../src/master/root/controller/mod.rs).
 
 ## Validation
 

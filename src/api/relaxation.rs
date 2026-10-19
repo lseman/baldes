@@ -337,7 +337,7 @@ pub unsafe extern "C" fn or_rcsp_add_accumulated_resource_branch(
         if !threshold.is_finite() || (upper != 0 && upper != 1) {
             return Err(invalid("accumulated branch input"));
         }
-        let id = s.add_accumulated_resource_branch(crate::pricing::branching::AccumulatedResourceBranch {
+        let id = s.add_accumulated_resource_branch(crate::pricing::restrictions::AccumulatedResourceBranch {
             arc, resource: r as usize, threshold, upper: upper != 0,
         })?;
         Ok(id as i32)

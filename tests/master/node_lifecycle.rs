@@ -652,7 +652,7 @@ fn child_regeneration_rechecks_ryan_foster_for_cached_columns() {
         branching::BranchConstraint,
         root::{self, RootOptions, RootProblem},
     };
-    use baldes::pricing::branching::RyanFosterConstraint;
+    use baldes::pricing::restrictions::RyanFosterConstraint;
     use baldes::inputs::{Instance, Rounding};
     // Two odd clusters keep one fractional triangle after branching on the
     // other, so both children actually reach fixing/enumeration.

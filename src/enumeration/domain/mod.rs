@@ -1,0 +1,376 @@
+//! Complete physical-simple paths under deterministic forward scalar resources.
+//! No reduced-cost cutoff, bucket fixing, NG, cut or branch restriction is used.
+use crate::graph::Graph;
+use crate::labeling::extend_resources;
+use std::time::{Duration, Instant};
+
+#[derive(Clone, Copy, Debug)]
+pub struct PathDomainLimits {
+    pub max_paths: usize,
+    /// Logical stored arc entries; profiles add one fixed-size state per arc
+    /// plus one per path. Allocator/graph-validation overhead is not included.
+    pub max_stored_arcs: usize,
+    pub max_work: usize,
+    /// Absolute shared deadline; None deliberately disables the time limit.
+    pub deadline: Option<Instant>,
+}
+impl Default for PathDomainLimits {
+    fn default() -> Self {
+        Self {
+            max_paths: 100_000,
+            max_stored_arcs: 1_000_000,
+            max_work: 10_000_000,
+            deadline: Instant::now().checked_add(Duration::from_secs(1)),
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PathDomainFailure {
+    InvalidGraph,
+    PathLimit,
+    StoredArcLimit,
+    WorkLimit,
+    TimeLimit,
+    Allocation,
+    UnsupportedResources,
+    Arithmetic,
+}
+impl std::fmt::Display for PathDomainFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "physical path collection: {self:?}")
+    }
+}
+impl std::error::Error for PathDomainFailure {}
+
+#[derive(Debug)]
+pub struct CanonicalPath {
+    arcs: Vec<usize>,
+    resources: Vec<[f64; 2]>,
+}
+impl CanonicalPath {
+    /// Positions in the borrowed original graph, retaining parallel arc identity.
+    pub fn arc_positions(&self) -> &[usize] {
+        &self.arcs
+    }
+    /// Source state and state after each arc; unused resource slots are zero.
+    pub fn resource_profile(&self) -> &[[f64; 2]] {
+        &self.resources
+    }
+}
+
+/// A physical path with downward resource bounds, rather than a feasible
+/// floating-point schedule. It must not be submitted as an integer witness.
+#[derive(Debug)]
+pub struct RelaxedResourcePath {
+    arcs: Vec<usize>,
+    lower_resources: Vec<[f64; 2]>,
+}
+impl RelaxedResourcePath {
+    pub fn arc_positions(&self) -> &[usize] {
+        &self.arcs
+    }
+    /// Source value and a lower bound after each arc on every exact-real
+    /// feasible schedule along this path; unused slots are zero.
+    pub fn resource_lower_bounds(&self) -> &[[f64; 2]] {
+        &self.lower_resources
+    }
+}
+
+/// A conservative superset of exact-real feasible, physically vertex-simple
+/// source/sink paths for disposable scalar resources. Directed addition keeps
+/// lower resource bounds; a path is rejected only when such a bound exceeds an
+/// upper window. Extra infeasible paths may remain. These bounds are not route
+/// schedules and do not establish backward/tolerant native-domain equivalence.
+/// Cost cutoffs, fixing, NG, element sets, cuts and branches are ignored.
+#[derive(Debug)]
+pub struct CompleteResourceRelaxation<'g> {
+    data: CollectedPaths<'g, RelaxedResourcePath>,
+}
+impl<'g> CompleteResourceRelaxation<'g> {
+    /// The same path/work/storage/deadline controls as canonical collection.
+    /// Unsupported kinds or arithmetic failure return no partial universe.
+    pub fn collect(graph: &'g Graph, limits: PathDomainLimits) -> Result<Self, PathDomainFailure> {
+        if limits.deadline.is_some_and(|end| Instant::now() >= end) {
+            return Err(PathDomainFailure::TimeLimit);
+        }
+        if graph.resources.len() > 2 {
+            return Err(PathDomainFailure::InvalidGraph);
+        }
+        if graph
+            .resources
+            .iter()
+            .any(|r| *r != crate::graph::ResourceKind::Disposable)
+        {
+            return Err(PathDomainFailure::UnsupportedResources);
+        }
+        let data = collect_paths(
+            graph,
+            limits,
+            extend_resource_lower_bounds,
+            |arcs, lower_resources| RelaxedResourcePath {
+                arcs,
+                lower_resources,
+            },
+        )?;
+        Ok(Self { data })
+    }
+    pub fn graph(&self) -> &'g Graph {
+        self.data.graph
+    }
+    pub fn paths(&self) -> &[RelaxedResourcePath] {
+        &self.data.paths
+    }
+    pub fn work_used(&self) -> usize {
+        self.data.work_used
+    }
+    pub fn stored_arcs(&self) -> usize {
+        self.data.stored_arcs
+    }
+}
+fn extend_resource_lower_bounds(
+    g: &Graph,
+    arc: &crate::graph::Arc,
+    mut q: [f64; 2],
+) -> Result<Option<[f64; 2]>, PathDomainFailure> {
+    for (r, value) in q.iter_mut().enumerate().take(g.resources.len()) {
+        let mut bounds = g.vertices[arc.head].bounds[r];
+        if let Some(window) = arc.bounds[r] {
+            bounds.lower = bounds.lower.max(window.lower);
+            bounds.upper = bounds.upper.min(window.upper);
+        }
+        *value = crate::master::rounding::add_down(*value, arc.consumption[r])
+            .ok_or(PathDomainFailure::Arithmetic)?
+            .max(bounds.lower);
+        if *value > bounds.upper {
+            return Ok(None);
+        }
+    }
+    Ok(Some(q))
+}
+
+/// Every vertex-simple source/sink path accepted by canonical forward resource
+/// extension, including a direct source/sink arc. One earliest profile is kept.
+/// This is not a proof that all feasible resource schedules or original routing
+/// columns are represented. Such equivalence must be established by the caller.
+/// The graph borrow prevents stale membership after graph mutation.
+///
+/// ```compile_fail
+/// use baldes::{Graph, enumeration::{CompleteCanonicalPaths, PathDomainLimits}};
+/// let mut graph = Graph::new(2, 0).unwrap();
+/// let domain = CompleteCanonicalPaths::collect(&graph, PathDomainLimits::default()).unwrap();
+/// graph.arcs.clear();
+/// assert!(domain.paths().is_empty());
+/// ```
+#[derive(Debug)]
+pub struct CompleteCanonicalPaths<'g> {
+    data: CollectedPaths<'g, CanonicalPath>,
+}
+#[derive(Debug)]
+struct CollectedPaths<'g, P> {
+    graph: &'g Graph,
+    paths: Vec<P>,
+    work_used: usize,
+    stored_arcs: usize,
+}
+struct Budget {
+    remaining: usize,
+    deadline: Option<Instant>,
+    until_clock_check: usize,
+}
+impl Budget {
+    fn spend(&mut self, work: usize) -> Result<(), PathDomainFailure> {
+        // Collection is cooperatively timed. Poll once per small batch of
+        // work, and always at explicit validation/completion checkpoints.
+        if work == 0 || work >= self.until_clock_check {
+            if self.deadline.is_some_and(|end| Instant::now() >= end) {
+                return Err(PathDomainFailure::TimeLimit);
+            }
+            self.until_clock_check = 64;
+        } else {
+            self.until_clock_check -= work;
+        }
+        self.remaining = self
+            .remaining
+            .checked_sub(work)
+            .ok_or(PathDomainFailure::WorkLimit)?;
+        Ok(())
+    }
+}
+struct Frame {
+    vertex: usize,
+    next_arc: usize,
+    resources: [f64; 2],
+}
+fn reserve<T>(values: &mut Vec<T>, additional: usize) -> Result<(), PathDomainFailure> {
+    values
+        .try_reserve_exact(additional)
+        .map_err(|_| PathDomainFailure::Allocation)
+}
+fn collect_paths<'g, P>(
+    graph: &'g Graph,
+    limits: PathDomainLimits,
+    mut extend: impl FnMut(
+        &Graph,
+        &crate::graph::Arc,
+        [f64; 2],
+    ) -> Result<Option<[f64; 2]>, PathDomainFailure>,
+    mut make_path: impl FnMut(Vec<usize>, Vec<[f64; 2]>) -> P,
+) -> Result<CollectedPaths<'g, P>, PathDomainFailure> {
+    let mut budget = Budget {
+        remaining: limits.max_work,
+        deadline: limits.deadline,
+        until_clock_check: 0,
+    };
+    budget.spend(
+        graph
+            .vertices
+            .len()
+            .checked_add(graph.arcs.len())
+            .ok_or(PathDomainFailure::WorkLimit)?,
+    )?;
+    graph
+        .validate()
+        .map_err(|_| PathDomainFailure::InvalidGraph)?;
+    budget.spend(0)?;
+    let mut result = CollectedPaths {
+        graph,
+        paths: vec![],
+        work_used: 0,
+        stored_arcs: 0,
+    };
+    let mut initial = [0.; 2];
+    for (r, value) in initial.iter_mut().enumerate().take(graph.resources.len()) {
+        let bounds = graph.vertices[graph.source].bounds[r];
+        *value = graph.initial[r].unwrap_or(bounds.lower);
+        if *value < bounds.lower || *value > bounds.upper {
+            budget.spend(0)?;
+            result.work_used = limits.max_work - budget.remaining;
+            return Ok(result);
+        }
+    }
+    let n = graph.vertices.len();
+    // Retain physical arc positions and their original order, including
+    // parallel arcs. A DFS frame must scan only its outgoing arcs, rather
+    // than the entire graph at every vertex of every partial path.
+    budget.spend(
+        n.checked_add(graph.arcs.len())
+            .ok_or(PathDomainFailure::WorkLimit)?,
+    )?;
+    let mut outgoing = Vec::new();
+    reserve(&mut outgoing, n)?;
+    outgoing.resize_with(n, Vec::new);
+    for (position, arc) in graph.arcs.iter().enumerate() {
+        outgoing[arc.tail]
+            .try_reserve(1)
+            .map_err(|_| PathDomainFailure::Allocation)?;
+        outgoing[arc.tail].push(position);
+    }
+    budget.spend(0)?;
+    let mut visited = vec![];
+    reserve(&mut visited, n)?;
+    visited.resize(n, false);
+    let mut stack = vec![];
+    reserve(&mut stack, n)?;
+    let mut prefix = vec![];
+    reserve(&mut prefix, n)?;
+    visited[graph.source] = true;
+    stack.push(Frame {
+        vertex: graph.source,
+        next_arc: 0,
+        resources: initial,
+    });
+    while !stack.is_empty() {
+        budget.spend(1)?;
+        let frame = stack.last_mut().unwrap();
+        if frame.next_arc == outgoing[frame.vertex].len() {
+            let frame = stack.pop().unwrap();
+            visited[frame.vertex] = false;
+            if !stack.is_empty() {
+                prefix.pop();
+            }
+            continue;
+        }
+        let physical = outgoing[frame.vertex][frame.next_arc];
+        frame.next_arc += 1;
+        let arc = &graph.arcs[physical];
+        if visited[arc.head] {
+            continue;
+        }
+        let Some(resources) = extend(graph, arc, frame.resources)? else {
+            continue;
+        };
+        if arc.head == graph.sink {
+            if result.paths.len() == limits.max_paths {
+                return Err(PathDomainFailure::PathLimit);
+            }
+            let length = prefix.len() + 1;
+            let stored = result
+                .stored_arcs
+                .checked_add(length)
+                .ok_or(PathDomainFailure::StoredArcLimit)?;
+            if stored > limits.max_stored_arcs {
+                return Err(PathDomainFailure::StoredArcLimit);
+            }
+            budget.spend(
+                length
+                    .checked_add(stack.len() + 1)
+                    .ok_or(PathDomainFailure::WorkLimit)?,
+            )?;
+            let mut arcs = vec![];
+            reserve(&mut arcs, length)?;
+            arcs.extend_from_slice(&prefix);
+            arcs.push(physical);
+            let mut profile = vec![];
+            reserve(&mut profile, stack.len() + 1)?;
+            profile.extend(stack.iter().map(|frame| frame.resources));
+            profile.push(resources);
+            if result.paths.len() == result.paths.capacity() {
+                let additional =
+                    (limits.max_paths - result.paths.len()).min(result.paths.len().max(16));
+                reserve(&mut result.paths, additional)?;
+            }
+            result.paths.push(make_path(arcs, profile));
+            result.stored_arcs = stored;
+        } else {
+            visited[arc.head] = true;
+            prefix.push(physical);
+            stack.push(Frame {
+                vertex: arc.head,
+                next_arc: 0,
+                resources,
+            });
+        }
+    }
+    budget.spend(0)?;
+    result.work_used = limits.max_work - budget.remaining;
+    Ok(result)
+}
+impl<'g> CompleteCanonicalPaths<'g> {
+    /// Failure discards every candidate; only an exhausted search completes.
+    /// Work counts validation size, scans and payload copy. Validation and
+    /// allocation are cooperative checkpoints, not hard realtime.
+    pub fn collect(graph: &'g Graph, limits: PathDomainLimits) -> Result<Self, PathDomainFailure> {
+        let data = collect_paths(
+            graph,
+            limits,
+            |g, arc, q| Ok(extend_resources(g, arc, q, true)),
+            |arcs, resources| CanonicalPath { arcs, resources },
+        )?;
+        Ok(Self { data })
+    }
+    pub fn graph(&self) -> &'g Graph {
+        self.data.graph
+    }
+    pub fn paths(&self) -> &[CanonicalPath] {
+        &self.data.paths
+    }
+    pub fn work_used(&self) -> usize {
+        self.data.work_used
+    }
+    pub fn stored_arcs(&self) -> usize {
+        self.data.stored_arcs
+    }
+}
+
+#[cfg(test)]
+mod tests;

@@ -224,7 +224,11 @@ impl CutState {
     }
 }
 
-pub(super) fn infeasible_output(report: Report, started: std::time::Instant, bound_mode: BoundMode) -> RootOutput {
+pub(super) fn infeasible_output(
+    report: Report,
+    started: std::time::Instant,
+    bound_mode: BoundMode,
+) -> RootOutput {
     RootOutput {
         fixed_routes: vec![],
         fixed_cost: 0.,
@@ -278,7 +282,7 @@ pub(super) fn infeasible_output(report: Report, started: std::time::Instant, bou
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pricing::branching::RyanFosterConstraint;
+    use crate::pricing::restrictions::RyanFosterConstraint;
 
     fn complete_problem() -> RootProblem {
         let mut graph = Graph::new(6, 0).unwrap();

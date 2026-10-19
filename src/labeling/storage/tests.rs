@@ -1,0 +1,367 @@
+use super::*;
+
+fn check_scan<const PREFIX: bool, const FORWARD: bool, const RESOURCES: usize, const NG: bool>() {
+    // A unique qualifying label at every position exercises short scans,
+    // vector block boundaries, and resuming after a previous candidate.
+    const LEN: usize = 25;
+    for use_ng in [false, true] {
+        if use_ng && !NG {
+            continue;
+        }
+        for matching in 0..=LEN {
+            let mut columns = HotColumns::default();
+            for i in 0..LEN {
+                let failing = if PREFIX == FORWARD { 2. } else { 0. };
+                let resources = if i == matching || use_ng {
+                    [1.; 2]
+                } else {
+                    [failing; 2]
+                };
+                columns.push(HotLabel {
+                    key: 0.,
+                    cost: 0.,
+                    additional_cost: 0.,
+                    resources,
+                    hops: 1,
+                    ng: if !use_ng || i == matching {
+                        1
+                    } else if PREFIX {
+                        2
+                    } else {
+                        0
+                    },
+                });
+            }
+            for from in [0, 1, 7, 8, 9, 15, 16, 24, LEN] {
+                let expected = if matching >= from { matching } else { LEN };
+                assert_eq!(
+                    columns.next_candidate::<PREFIX, FORWARD, RESOURCES, NG>(from, 1., 1., 1., 1),
+                    expected,
+                    "prefix={PREFIX} forward={FORWARD} resources={RESOURCES} ng={NG} use_ng={use_ng} matching={matching} from={from}"
+                );
+            }
+        }
+    }
+    if PREFIX {
+        let mut columns = HotColumns::default();
+        for _ in 0..LEN {
+            columns.push(HotLabel {
+                key: 2.,
+                cost: 0.,
+                additional_cost: 0.,
+                resources: [3.; 2],
+                hops: 1,
+                ng: 2,
+            });
+        }
+        // A key above the prefix threshold stops the scan independently
+        // of resource and NG dominance.
+        assert_eq!(
+            columns.next_candidate::<PREFIX, FORWARD, RESOURCES, NG>(0, 1., 1., 1., 1),
+            0
+        );
+    }
+}
+
+#[test]
+fn dominance_scan_preserves_first_candidate_across_block_boundaries() {
+    macro_rules! check {
+        ($p:literal, $f:literal) => {
+            check_scan::<$p, $f, 1, false>();
+            check_scan::<$p, $f, 1, true>();
+            check_scan::<$p, $f, 2, false>();
+            check_scan::<$p, $f, 2, true>();
+        };
+    }
+    check!(true, true);
+    check!(true, false);
+    check!(false, true);
+    check!(false, false);
+}
+#[test]
+fn backward_disposable_dominance_subtracts_before_comparing() {
+    let graph = Graph::new(3, 1).unwrap();
+    let a = HotLabel {
+        key: -1.,
+        cost: -1.,
+        additional_cost: 0.,
+        resources: [-EPSILON, 0.],
+        hops: 1,
+        ng: 0,
+    };
+    let b = HotLabel {
+        resources: [f64::from_bits(1), 0.],
+        ..a
+    };
+    assert!(LabelStorage::dominates_hot(
+        &graph,
+        &a,
+        &b,
+        false,
+        InsertionTest::Resources,
+        false,
+        &[],
+        || panic!("unexpected cut state")
+    ));
+    let mut prefix = HotColumns::default();
+    let mut suffix = HotColumns::default();
+    for i in 0..9 {
+        prefix.push(if i == 8 {
+            a
+        } else {
+            HotLabel {
+                resources: [-100., 0.],
+                ..a
+            }
+        });
+        suffix.push(if i == 8 {
+            b
+        } else {
+            HotLabel {
+                resources: [100., 0.],
+                ..b
+            }
+        });
+    }
+    assert_eq!(
+        prefix.next_candidate::<true, false, 1, false>(0, 0., b.resources[0], 0., 0),
+        8
+    );
+    assert_eq!(
+        suffix.next_candidate::<false, false, 1, false>(0, 0., a.resources[0], 0., 0),
+        8
+    );
+}
+
+#[test]
+fn equality_dominance_retains_binary_interval_endpoints() {
+    let mut graph = Graph::new(3, 1).unwrap();
+    graph.resources[0] = ResourceKind::Equality;
+    let make = |resource, cost| StoredLabel {
+        id: 0,
+        local_id: 0,
+        bucket: BucketId {
+            vertex: 1,
+            bucket: 0,
+        },
+        vertex: 1,
+        cost,
+        original_cost: cost,
+        resources: [resource, 0.],
+        ng: 0,
+        branch_state: None,
+        parent: None,
+        arc: None,
+        hops: 1,
+        expanded: true,
+        cut_words: [0; LIMITED_WORDS],
+        additional_cost: 0.,
+        half_potential: 0.,
+    };
+    for forward in [true, false] {
+        for test in [
+            InsertionTest::Full,
+            InsertionTest::ResourcesAndCost,
+            InsertionTest::ResourcesAndNg,
+            InsertionTest::Resources,
+        ] {
+            // These three pairs are accepted by the binary, but rejected
+            // by abs(a-b) <= EPSILON because subtraction rounds differently.
+            for (a, b) in [
+                (1., 1. - EPSILON),
+                (1e6, 1e6 - EPSILON),
+                (1e6, 1e6 + EPSILON),
+            ] {
+                let mut storage = LabelStorage::new([1, 1, 1]);
+                let mut stats = Statistics::default();
+                assert!(storage.insert(
+                    &graph,
+                    make(a, -1.),
+                    forward,
+                    test,
+                    10,
+                    false,
+                    &[],
+                    &mut stats
+                ));
+                assert!(
+                    !storage.insert(
+                        &graph,
+                        make(b, 0.),
+                        forward,
+                        test,
+                        10,
+                        false,
+                        &[],
+                        &mut stats
+                    ),
+                    "forward={forward} test={test:?} a={a} b={b}"
+                );
+                assert_eq!(storage.buckets[1][0].active.len(), 1);
+                assert_eq!(storage.buckets[1][0].next_id, 1);
+
+                // Exercise removal as well as rejection, and the archive
+                // path for already expanded resource-only predecessors.
+                let mut storage = LabelStorage::new([1, 1, 1]);
+                assert!(storage.insert(
+                    &graph,
+                    make(b, 0.),
+                    forward,
+                    test,
+                    10,
+                    false,
+                    &[],
+                    &mut stats
+                ));
+                assert!(storage.insert(
+                    &graph,
+                    make(a, -1.),
+                    forward,
+                    test,
+                    10,
+                    false,
+                    &[],
+                    &mut stats
+                ));
+                assert_eq!(storage.buckets[1][0].active.len(), 1);
+                let archived = matches!(
+                    test,
+                    InsertionTest::ResourcesAndCost | InsertionTest::Resources
+                );
+                assert_eq!(storage.buckets[1][0].archived.len(), usize::from(archived));
+            }
+        }
+    }
+}
+
+#[test]
+fn empty_cut_dominance_does_not_load_cold_words() {
+    let g = Graph::new(3, 1).unwrap();
+    let mut a = HotLabel {
+        key: 0.,
+        cost: -2.,
+        additional_cost: 0.,
+        resources: [0.; 2],
+        hops: 1,
+        ng: 0,
+    };
+    let b = HotLabel { cost: -1., ..a };
+    for cost in [-2., -1., -1. + EPSILON, f64::NAN] {
+        a.cost = cost;
+        let mut gap = (a.cost - b.cost) + (a.additional_cost - b.additional_cost);
+        let expected = if gap >= EPSILON {
+            false
+        } else {
+            packed_dominate(&[], &[0; LIMITED_WORDS], &[0; LIMITED_WORDS], &mut gap)
+        };
+        assert_eq!(
+            LabelStorage::dominates_hot(
+                &g,
+                &a,
+                &b,
+                true,
+                InsertionTest::Full,
+                false,
+                &[],
+                || panic!("empty cuts accessed cold state")
+            ),
+            expected
+        );
+    }
+    a.cost = -2.;
+    let descriptors = [DominanceDescriptor {
+        mask: 1,
+        word: 0,
+        cost: 2.,
+        ..Default::default()
+    }];
+    let mut left = [0; LIMITED_WORDS];
+    left[0] = 1;
+    let right = [0; LIMITED_WORDS];
+    let called = std::cell::Cell::new(false);
+    assert!(!LabelStorage::dominates_hot(
+        &g,
+        &a,
+        &b,
+        true,
+        InsertionTest::Full,
+        false,
+        &descriptors,
+        || {
+            called.set(true);
+            (&left, &right)
+        }
+    ));
+    assert!(called.get());
+}
+
+#[test]
+fn owned_insertion_moves_branch_state_and_borrowed_insertion_clones_on_acceptance() {
+    let graph = Graph::new(3, 1).unwrap();
+    let make = || StoredLabel {
+        id: 0,
+        local_id: 0,
+        bucket: BucketId {
+            vertex: 1,
+            bucket: 0,
+        },
+        vertex: 1,
+        cost: -1.,
+        original_cost: 2.,
+        resources: [0.; 2],
+        ng: 0,
+        branch_state: Some(Box::new([5; 16])),
+        parent: None,
+        arc: None,
+        hops: 1,
+        expanded: false,
+        cut_words: [0; LIMITED_WORDS],
+        additional_cost: 0.,
+        half_potential: 0.,
+    };
+    let mut owned = LabelStorage::new([1, 1, 1]);
+    owned.labels.set_word_limit(2);
+    owned.labels.set_mode(false, false);
+    let label = make();
+    let pointer = label.branch_state.as_deref().unwrap().as_ptr();
+    assert!(owned.insert(
+        &graph,
+        label,
+        true,
+        InsertionTest::Full,
+        10,
+        false,
+        &[],
+        &mut Statistics::default()
+    ));
+    assert_eq!(
+        owned
+            .labels
+            .view(0)
+            .branch_state()
+            .as_deref()
+            .unwrap()
+            .as_ptr(),
+        pointer
+    );
+    let mut borrowed = LabelStorage::new([1, 1, 1]);
+    borrowed.labels.set_word_limit(2);
+    borrowed.labels.set_mode(false, false);
+    let label = make();
+    let pointer = label.branch_state.as_deref().unwrap().as_ptr();
+    assert!(borrowed.insert_ref(
+        &graph,
+        &label,
+        HotLabel::of(&label),
+        true,
+        InsertionTest::Full,
+        10,
+        false,
+        &[],
+        &mut Statistics::default()
+    ));
+    let state = borrowed.labels.view(0).branch_state();
+    assert_eq!(state, &label.branch_state);
+    assert_ne!(state.as_deref().unwrap().as_ptr(), pointer);
+    assert_eq!(label.branch_state.as_deref().unwrap().as_ptr(), pointer);
+}

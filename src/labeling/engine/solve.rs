@@ -1,0 +1,273 @@
+use super::*;
+
+impl LabelingEngine {
+    pub fn solve(&mut self, g: &Graph, controls: &Controls) -> Result<PricingResult> {
+        self.ensure_reversal_costs(g)?;
+        if controls.max_columns == 0 || controls.max_labels == 0 {
+            return Err(invalid("positive pricing limits required"));
+        }
+        if let Some(direction) = self.pending_middle.take() {
+            self.grid.move_middle(g, direction);
+        }
+        self.extension_checks.fill(0);
+        self.filter_checks.fill(0);
+        self.half_ready = false;
+        self.full_ready = false;
+        self.last_costs = g.arcs.iter().map(|a| a.reduced_cost).collect();
+        self.forward
+            .reset(self.grid.forward.buckets.iter().map(Vec::len));
+        self.backward
+            .reset(self.grid.backward.buckets.iter().map(Vec::len));
+        let ordinary = !self.has_cuts() && self.branching.resources == 0;
+        let branch_only = !self.has_cuts() && self.branching.resources != 0;
+        self.forward.labels.set_mode(ordinary, branch_only);
+        self.backward.labels.set_mode(ordinary, branch_only);
+        self.statistics = Statistics::default();
+        self.root(g, true)?;
+        if self.runtime_bidirectional() && !self.consumption_joins {
+            self.root(g, false)?;
+        }
+        let started = Instant::now();
+        if controls.time_limit.is_zero() {
+            return Err(incomplete("pricing hard time limit exceeded"));
+        }
+        let mut pool = SolutionPool::new(
+            g.vertices.len(),
+            controls.max_columns,
+            self.controls.group_limit,
+        );
+        let parallel = self.runtime_bidirectional() && !self.consumption_joins;
+        if parallel {
+            (self.statistics.forward_time, self.statistics.backward_time) =
+                self.run_both_directions(g, controls, started, &mut pool)?;
+        } else {
+            self.run_direction(g, true, controls, started, &mut pool)?;
+            self.statistics.forward_time = started.elapsed().as_secs_f64();
+        }
+        // Small heuristic sweeps may perform fewer than 64 extensions and
+        // have no concatenation pass. They still consume the call deadline.
+        if started.elapsed() >= controls.time_limit {
+            return Err(incomplete("pricing hard time limit exceeded"));
+        }
+        let mut concatenation_tests = 0;
+        if self.runtime_bidirectional() {
+            if !parallel {
+                self.statistics.backward_time =
+                    started.elapsed().as_secs_f64() - self.statistics.forward_time;
+            }
+            let concatenation_started = Instant::now();
+            self.update_unreachable(self.consumption_joins);
+            for internal in 0..self.grid.order.len() {
+                let v = self.grid.order[internal];
+                let mut cutoff = pool.cutoff(v);
+                for &f in &self.forward.crossing[v] {
+                    let label = self.forward.labels.view(f);
+                    let mut coordinate = self.grid.coordinate(*label.resources());
+                    if self.consumption_joins {
+                        for r in 0..self.grid.dimensions {
+                            coordinate[r] = (self.grid.upper[internal][r]
+                                + self.grid.lower[internal][r])
+                                - coordinate[r];
+                        }
+                    }
+                    let Some(bucket) =
+                        self.grid
+                            .bucket_id(self.consumption_joins, internal, coordinate)
+                    else {
+                        continue;
+                    };
+                    let key =
+                        label.key() + self.cuts.knapsack.partial_cost(g, label.resources(), true);
+                    let mut work = vec![(bucket, 0usize)];
+                    while let Some((k, min)) = work.pop() {
+                        let row = &self.storage(self.consumption_joins).buckets[internal][k];
+                        if key + row.completion_bound(self.cuts.knapsack.active) >= cutoff {
+                            continue;
+                        }
+                        for &b in &row.active {
+                            let other = self.storage(self.consumption_joins).labels.view(b);
+                            if key + other.key() >= cutoff {
+                                break;
+                            }
+                            concatenation_tests += 1;
+                            if let Some(cost) = self.ctx().join_cost(g, v, label, other) {
+                                if cost < cutoff
+                                    && controls
+                                        .max_route_arcs
+                                        .is_none_or(|limit| label.hops() + other.hops() <= limit)
+                                {
+                                    pool.insert(v, cost, 0., (Some(f), Some(b)));
+                                    cutoff = pool.cutoff(v);
+                                }
+                            }
+                        }
+                        for p in self.grid.direction(self.consumption_joins).buckets[internal][k]
+                            .predecessors
+                            .iter()
+                            .rev()
+                        {
+                            if p.bucket.bucket >= min {
+                                work.push((p.bucket.bucket, min.max(p.minimum)));
+                            }
+                        }
+                    }
+                }
+                if started.elapsed() > controls.time_limit {
+                    return Err(incomplete("pricing concatenation time limit exceeded"));
+                }
+            }
+            self.statistics.concatenation_time = concatenation_started.elapsed().as_secs_f64();
+            if self.phase.exact() && !self.consumption_joins {
+                let f = self
+                    .forward
+                    .buckets
+                    .iter()
+                    .flatten()
+                    .map(|b| b.active.len())
+                    .sum::<usize>() as f64;
+                let b = self
+                    .backward
+                    .buckets
+                    .iter()
+                    .flatten()
+                    .map(|b| b.active.len())
+                    .sum::<usize>() as f64;
+                if f / b > 1.2 {
+                    self.pending_middle = Some(false);
+                } else if b / f > 1.2 {
+                    self.pending_middle = Some(true);
+                }
+                self.half_ready = self.controls.direction_flags == 1;
+            }
+        }
+        if self.phase.exact() && self.controls.filter_other_buckets {
+            for v in 0..self.grid.order.len() {
+                if self.grid.forward.depth[v] > 0
+                    && self.filter_checks[v] > self.extension_checks[v].wrapping_mul(3)
+                {
+                    self.grid.forward.depth[v] =
+                        (self.grid.forward.depth[v] as f64 * 0.9).floor() as i32;
+                    if self.grid.bidirectional {
+                        self.grid.backward.depth[v] =
+                            (self.grid.backward.depth[v] as f64 * 0.9).floor() as i32;
+                    }
+                }
+            }
+        }
+        self.statistics.concatenation_tests = concatenation_tests;
+        self.statistics.forward_labels = self
+            .forward
+            .buckets
+            .iter()
+            .flatten()
+            .map(|b| b.active.len())
+            .sum();
+        self.statistics.backward_labels = self
+            .backward
+            .buckets
+            .iter()
+            .flatten()
+            .map(|b| b.active.len())
+            .sum();
+        self.statistics.elapsed = started.elapsed().as_secs_f64();
+        // The minimum is the first candidate that can be recorded.
+        let mut minimum = NO_ROUTE_COST;
+        let mut recorded = false;
+        let mut columns = vec![];
+        for c in pool.into_sorted() {
+            let Some(route) = self.reconstruct(g, c.value, c.cost)? else {
+                continue;
+            };
+            if !recorded {
+                minimum = c.cost;
+                recorded = true;
+            }
+            if !controls.negative_only || c.cost < controls.zero_threshold - EPSILON {
+                columns.push(route);
+            }
+        }
+        Ok(PricingResult {
+            columns,
+            minimum_reduced_cost: minimum,
+            exact: self.phase.exact(),
+            statistics: self.statistics.clone(),
+        })
+    }
+    pub(super) fn update_unreachable(&mut self, forward: bool) {
+        for v in 0..self.grid.order.len() {
+            for k in 0..self.grid.direction(forward).buckets[v].len() {
+                let b = &self.grid.direction(forward).buckets[v][k];
+                if b.reachable {
+                    continue;
+                }
+                let lower = b
+                    .predecessors
+                    .iter()
+                    .map(|p| self.storage(forward).buckets[v][p.bucket.bucket].lower_cost)
+                    .fold(NO_ROUTE_COST, f64::min);
+                let knapsack_lower = b
+                    .predecessors
+                    .iter()
+                    .map(|p| self.storage(forward).buckets[v][p.bucket.bucket].knapsack_lower_cost)
+                    .fold(NO_ROUTE_COST, f64::min);
+                self.storage_mut(forward).buckets[v][k].lower_cost = lower;
+                self.storage_mut(forward).buckets[v][k].knapsack_lower_cost = knapsack_lower;
+            }
+        }
+    }
+
+    pub fn continue_after_halfway(&mut self, g: &Graph, controls: &Controls) -> Result<()> {
+        if self.full_ready
+            && self
+                .last_costs
+                .iter()
+                .copied()
+                .eq(g.arcs.iter().map(|a| a.reduced_cost))
+        {
+            return Ok(());
+        }
+        if !self.half_ready
+            || !self
+                .last_costs
+                .iter()
+                .copied()
+                .eq(g.arcs.iter().map(|a| a.reduced_cost))
+        {
+            return Err(invalid("continuation requires fresh exact half-labels"));
+        }
+        self.half_ready = false;
+        self.full_ready = false;
+        let saved = self.controls.clone();
+        let phase = self.phase;
+        self.controls.direction_flags = 2;
+        self.controls.sink_concatenation = false;
+        self.phase.labels_per_bucket = i64::MAX;
+        let result = (|| {
+            for v in 0..self.forward.crossing.len() {
+                let crossing = self.forward.crossing[v].clone();
+                for id in crossing {
+                    let mut label = self.forward.labels.view(id).to_owned();
+                    self.vertex_step(&mut label);
+                    let hot = HotLabel::of(&label);
+                    self.insert(g, true, &label, hot, controls);
+                }
+            }
+            let grid = &self.grid;
+            self.forward
+                .labels
+                .unexpand_where(|resources| grid.coordinate(resources)[0] > grid.middle + EPSILON);
+            let started = Instant::now();
+            let mut pool = SolutionPool::new(g.vertices.len(), 1, 0);
+            self.run_direction(g, true, controls, started, &mut pool)?;
+            self.backward.labels.unexpand_where(|_| true);
+            self.run_direction(g, false, controls, started, &mut pool)?;
+            self.update_unreachable(true);
+            self.update_unreachable(false);
+            self.full_ready = true;
+            Ok(())
+        })();
+        self.controls = saved;
+        self.phase = phase;
+        result
+    }
+}

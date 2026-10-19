@@ -48,7 +48,7 @@ reconfigure its existing separator.
 | --- | --- | --- | --- |
 | `BALDESstopCutGenTimeThresholdInPricing` | Double | `10.0` | [src/pricing/controller.rs](../src/pricing/controller.rs) |
 | `BALDEShardTimeThresholdInPricing` | Double | `20.0` | [src/pricing/mod.rs](../src/pricing/mod.rs); [src/pricing/solve.rs](../src/pricing/solve.rs); [src/master/tree/mod.rs](../src/master/tree/mod.rs) |
-| `BALDESredCostFixingTimeThreshold` | Double | `100.0` | [src/pricing/fixing_workflow.rs](../src/pricing/fixing_workflow.rs); [src/master/root/controller.rs](../src/master/root/controller.rs) |
+| `BALDESredCostFixingTimeThreshold` | Double | `100.0` | [src/pricing/fixing_workflow.rs](../src/pricing/fixing_workflow.rs); [src/master/root/controller/enumeration.rs](../src/master/root/controller/enumeration.rs) |
 | `BALDESnumberOfBucketsPerVertex` | Int | `25.0` | [src/pricing/mod.rs](../src/pricing/mod.rs); [src/api/options.rs](../src/api/options.rs) |
 | `BALDESdynamicBucketSteps` | Int | `1.0` | [src/pricing/controller.rs](../src/pricing/controller.rs); [src/pricing/solve.rs](../src/pricing/solve.rs) |
 | `BALDESuseBidirectionalSearch` | Int | `2.0` | [src/pricing/mod.rs](../src/pricing/mod.rs); [src/api/options.rs](../src/api/options.rs) |
@@ -58,11 +58,11 @@ reconfigure its existing separator.
 | `BALDESmaxNumOfLabelsInEnumeration` | Int | `1000000.0` | [src/pricing/fixing_workflow.rs](../src/pricing/fixing_workflow.rs); [src/pricing/universe.rs](../src/pricing/universe.rs) |
 | `BALDESmaxNumOfEnumeratedSolutions` | Int | `1000000.0` | [src/pricing/fixing_workflow.rs](../src/pricing/fixing_workflow.rs); [src/pricing/universe.rs](../src/pricing/universe.rs) |
 | `BALDESinitNGneighbourhoodSize` | Int | `8.0` | [src/api/relaxation.rs](../src/api/relaxation.rs) |
-| `BALDESmaxNGneighbourhoodSize` | Int | `0.0` | [src/api/relaxation.rs](../src/api/relaxation.rs); [src/master/root/controller.rs](../src/master/root/controller.rs) |
-| `BALDESrankOneCutsMaxNumRows` | Int | `5.0` | [src/cuts/registry.rs](../src/cuts/registry.rs) |
-| `BALDESrankOneCutsMaxNumPerRound` | Int | `100.0` | [src/cuts/registry.rs](../src/cuts/registry.rs); [src/cuts/kpath/mod.rs](../src/cuts/kpath/mod.rs) |
-| `BALDESrankOneCutsMemoryType` | Int | `2.0` | [src/cuts/registry.rs](../src/cuts/registry.rs) |
-| `BALDESrankOneCutsLSnumIterations` | Int | `1000.0` | [src/cuts/registry.rs](../src/cuts/registry.rs) |
+| `BALDESmaxNGneighbourhoodSize` | Int | `0.0` | [src/api/relaxation.rs](../src/api/relaxation.rs); [src/master/root/controller/relaxation.rs](../src/master/root/controller/relaxation.rs) |
+| `BALDESrankOneCutsMaxNumRows` | Int | `5.0` | [src/cuts/registry/rank_one.rs](../src/cuts/registry/rank_one.rs) |
+| `BALDESrankOneCutsMaxNumPerRound` | Int | `100.0` | [src/cuts/registry/rank_one.rs](../src/cuts/registry/rank_one.rs); [src/cuts/kpath/mod.rs](../src/cuts/kpath/mod.rs) |
+| `BALDESrankOneCutsMemoryType` | Int | `2.0` | [src/cuts/registry/rank_one.rs](../src/cuts/registry/rank_one.rs) |
+| `BALDESrankOneCutsLSnumIterations` | Int | `1000.0` | [src/cuts/registry/rank_one.rs](../src/cuts/registry/rank_one.rs) |
 | `BALDESredCostFixingFalseGap` | Double | `0.0` | [src/pricing/fixing_workflow.rs](../src/pricing/fixing_workflow.rs) |
 | `BALDESmaxNumOfLabelsInHeurEnumeration` | Int | `0.0` | [src/pricing/fixing_workflow.rs](../src/pricing/fixing_workflow.rs) |
 | `BALDEScheckDominInOtherBuckets` | Bool | `1.0` | [src/pricing/mod.rs](../src/pricing/mod.rs) |
@@ -70,20 +70,20 @@ reconfigure its existing separator.
 | `BALDESlabelDominanceStrategy` | Int | `0.0` | [src/pricing/mod.rs](../src/pricing/mod.rs); label dominance mode (0 or 1), shared with the C strategy setter |
 | `BALDESdynBuckStepAdjustRatioThreshold` | Double | `500.0` | [src/pricing/controller.rs](../src/pricing/controller.rs) |
 | `BALDESdynBuckStepAdjustNumBuckArcsThreshold` | Double | `10000.0` | [src/pricing/controller.rs](../src/pricing/controller.rs) |
-| `BALDESdynamicNGmode` | Int | `-1.0` | [src/api/relaxation.rs](../src/api/relaxation.rs); [src/master/root/controller.rs](../src/master/root/controller.rs) |
-| `BALDESmaxNumOfColumnsInDynamicNG` | Int | `100.0` | [src/api/relaxation.rs](../src/api/relaxation.rs); [src/master/root/controller.rs](../src/master/root/controller.rs) |
-| `BALDESmaxCycleSizeInDynamicNG` | Int | `5.0` | [src/api/relaxation.rs](../src/api/relaxation.rs); [src/master/root/controller.rs](../src/master/root/controller.rs) |
-| `BALDESmaxNGaverNeighbourhoodSize` | Int | `0.0` | [src/api/relaxation.rs](../src/api/relaxation.rs); [src/master/root/controller.rs](../src/master/root/controller.rs) |
+| `BALDESdynamicNGmode` | Int | `-1.0` | [src/api/relaxation.rs](../src/api/relaxation.rs); [src/master/root/controller/relaxation.rs](../src/master/root/controller/relaxation.rs) |
+| `BALDESmaxNumOfColumnsInDynamicNG` | Int | `100.0` | [src/api/relaxation.rs](../src/api/relaxation.rs); [src/master/root/controller/relaxation.rs](../src/master/root/controller/relaxation.rs) |
+| `BALDESmaxCycleSizeInDynamicNG` | Int | `5.0` | [src/api/relaxation.rs](../src/api/relaxation.rs); [src/master/root/controller/relaxation.rs](../src/master/root/controller/relaxation.rs) |
+| `BALDESmaxNGaverNeighbourhoodSize` | Int | `0.0` | [src/api/relaxation.rs](../src/api/relaxation.rs); [src/master/root/controller/relaxation.rs](../src/master/root/controller/relaxation.rs) |
 | `BALDESuseCapacityCuts` | Bool | `1.0` | [src/master/root/mod.rs](../src/master/root/mod.rs); explicit option overrides a configured capacity separator and is inherited by children |
 | `BALDEScapacityCutsSeparator` | Int | `1.0` | [src/pricing/mod.rs](../src/pricing/mod.rs); accepts the available built-in separator; external CVRPSEP (0) is rejected |
 | `BALDEScapCutsMaxNumPerRound` | Int | `100.0` | [src/master/root/mod.rs](../src/master/root/mod.rs); explicit per-round override for configured capacity separation, including inherited nodes |
 | `BALDESresConsKnapsackCutsMode` | Int | `-1.0` | [src/master/root/mod.rs](../src/master/root/mod.rs); [src/cuts/knapsack/mod.rs](../src/cuts/knapsack/mod.rs) |
 | `BALDESresConsKnapsackCutsMaxNumPerRound` | Int | `100.0` | [src/master/root/mod.rs](../src/master/root/mod.rs); [src/cuts/knapsack/mod.rs](../src/cuts/knapsack/mod.rs) |
-| `BALDESrankOneCutsArcMemoryType` | Int | `2.0` | [src/cuts/registry.rs](../src/cuts/registry.rs) |
-| `BALDESrankOneCutsSpDependentMemory` | Bool | `0.0` | [src/cuts/registry.rs](../src/cuts/registry.rs) |
-| `BALDESrankOneCutsMaxNumTriplets` | Int | `10000.0` | [src/cuts/registry.rs](../src/cuts/registry.rs) |
-| `BALDESrankOneCutsTypeToSeparate` | Int | `0.0` | [src/cuts/registry.rs](../src/cuts/registry.rs) |
-| `BALDESuseCovSetsForSepOneRowPackingCuts` | Bool | `0.0` | [src/cuts/registry.rs](../src/cuts/registry.rs) |
+| `BALDESrankOneCutsArcMemoryType` | Int | `2.0` | [src/cuts/registry/rank_one.rs](../src/cuts/registry/rank_one.rs) |
+| `BALDESrankOneCutsSpDependentMemory` | Bool | `0.0` | [src/cuts/registry/rank_one.rs](../src/cuts/registry/rank_one.rs) |
+| `BALDESrankOneCutsMaxNumTriplets` | Int | `10000.0` | [src/cuts/registry/rank_one.rs](../src/cuts/registry/rank_one.rs) |
+| `BALDESrankOneCutsTypeToSeparate` | Int | `0.0` | [src/cuts/registry/rank_one.rs](../src/cuts/registry/rank_one.rs) |
+| `BALDESuseCovSetsForSepOneRowPackingCuts` | Bool | `0.0` | [src/cuts/registry/rank_one.rs](../src/cuts/registry/rank_one.rs) |
 | `BALDESuseExactComplBoundsInEnumeration` | Bool | `1.0` | [src/pricing/universe.rs](../src/pricing/universe.rs) |
 
 `BALDEShardTimeThresholdInPricing` is measured in seconds. Pricing uses fifty
