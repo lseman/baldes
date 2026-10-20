@@ -186,6 +186,24 @@ fn kkt_backends_repeated_factorization() {
     }
     assert!(hi.factorize(&[], &[], &[]).is_err());
     assert!(hi.solve(&expected).is_err());
+    assert!(hi.solve_with_refinement(&expected).is_err());
+    // Failed updates invalidate the factor; a valid update must recover using
+    // fresh diagonals in the cached sparse matrix.
+    hi.factorize(&[2.; 4], &[0.1; 4], &[0.2; 3]).unwrap();
+    let mut rhs = a.transpose_multiply(&expected[4..]).unwrap();
+    for j in 0..4 {
+        rhs[j] -= 2.1 * expected[j];
+    }
+    rhs.extend(
+        a.multiply(&expected[..4])
+            .unwrap()
+            .iter()
+            .enumerate()
+            .map(|(i, v)| v + 0.2 * expected[4 + i]),
+    );
+    for (x, e) in hi.solve_with_refinement(&rhs).unwrap().0.iter().zip(&expected) {
+        assert!((x - e).abs() < 1e-8);
+    }
 }
 #[test]
 fn invalid_inputs_and_iteration_limit() {

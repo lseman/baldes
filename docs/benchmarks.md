@@ -302,3 +302,43 @@ all starting positions, NG masks, EPSILON boundaries, signed zeros, subnormal
 values, infinities and NaNs. Malformed public columns are checked before
 vector loads. Changed Rust files pass rustfmt; the workspace-wide format
 check still reports existing formatting differences in untouched files.
+
+## Sparse IPM refactorization (October 20, 2026)
+
+The sparse multifrontal factorization now applies pivot row permutations once
+after assembly, instead of scanning all earlier factor entries at every front.
+One global-to-local row map is reused, clearing only each front's touched rows.
+HiPO also retains the augmented CSC matrix and updates only its diagonal
+between Newton iterations, avoiding repeated triplet construction and sorting.
+Ordering, pivot selection, regularization and convergence tolerances are unchanged.
+
+`examples/ipm_sparse_bench.rs` measures setup, numeric refactorization and one
+solve separately for deterministic diagonal, banded and overlapping matrices.
+Each RHS is constructed from a known solution. Diagonals change on each
+refactorization, and every solution is checked against that witness.
+
+Baseline IPM sources: `35815d2`. Measurements use Rust 1.97.1, the default
+release profile, no native CPU flags, and a Ryzen 9 9950X pinned to CPU 0.
+Three sequential before/after pairs use frozen binaries, each with one warmup
+and 50 measured refactorizations. The table reports the median of the three
+per-process medians, in microseconds; setup and triangular solves are excluded.
+
+| Matrix (rows × columns; nnz) | HiPO before | HiPO after | Speedup | Normal before | Normal after |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Diagonal (2048 × 2048; 2048) | 4897.399 | 219.630 | 22.3× | 689.217 | 121.254 |
+| Banded (256 × 1024; 3072) | 1194.334 | 130.244 | 9.2× | 124.764 | 72.666 |
+| Overlapping (128 × 512; 4096) | 832.641 | 197.521 | 4.2× | 243.839 | 229.799 |
+
+Maximum absolute solution error is below `2.3e-15` for both versions. These
+synthetic KKT results isolate sparse overhead and do not establish routing or
+end-to-end IPM speedups. Ordering and dense arithmetic inside larger fronts
+remain potential bottlenecks. Raw output is retained locally under
+`results/ipm-sparse-20261020/`; frozen binaries are `/tmp/baldes-ipm-before`
+and `/tmp/baldes-ipm-after`.
+
+Reproduce a measurement with:
+
+```sh
+cargo build --offline --release --example ipm_sparse_bench
+taskset -c 0 target/release/examples/ipm_sparse_bench 50
+```

@@ -158,6 +158,8 @@ impl Symbolic {
         let mut l: Vec<Vec<(usize, f64)>> = vec![vec![]; n];
         let mut blocks = vec![Block::Skip; n];
         let mut order = self.order.clone();
+        let mut row_position: Vec<_> = (0..n).collect();
+        let mut local = vec![usize::MAX; n];
         let mut schur: Vec<Option<Vec<f64>>> = vec![None; self.fronts.len()];
         let mut stats = FactorStats {
             min_abs_pivot: f64::INFINITY,
@@ -167,7 +169,6 @@ impl Symbolic {
             let np = front.end - front.lo;
             let nf = np + front.updates.len();
             let mut f = vec![0.0; nf * nf];
-            let mut local = vec![usize::MAX; n];
             for k in 0..np {
                 local[front.lo + k] = k;
             }
@@ -202,17 +203,9 @@ impl Symbolic {
                 }
             }
             let (d, perm) = bk(&mut f, nf, np, regularize, &mut stats)?;
-            let mut inv = vec![0; np];
             for (k, &old) in perm.iter().enumerate() {
                 order[front.lo + k] = self.order[front.lo + old];
-                inv[old] = k;
-            }
-            for col in &mut l[..front.lo] {
-                for (i, _) in col {
-                    if *i >= front.lo && *i < front.end {
-                        *i = front.lo + inv[*i - front.lo];
-                    }
-                }
+                row_position[front.lo + old] = front.lo + k;
             }
             for k in 0..np {
                 blocks[front.lo + k] = d[k];
@@ -222,7 +215,7 @@ impl Symbolic {
                     if v != 0.0 {
                         l[front.lo + k].push((
                             if i < np {
-                                front.lo + i
+                                front.lo + perm[i]
                             } else {
                                 front.updates[i - np]
                             },
@@ -239,8 +232,20 @@ impl Symbolic {
                 }
             }
             schur[s] = Some(update);
+            for i in front.lo..front.end {
+                local[i] = usize::MAX;
+            }
+            for &i in &front.updates {
+                local[i] = usize::MAX;
+            }
         }
         for col in &mut l {
+            // Rows remain in symbolic coordinates during assembly. Apply all
+            // local pivot permutations once, instead of rescanning the entire
+            // existing factor after every front (quadratic on sparse systems).
+            for (i, _) in col.iter_mut() {
+                *i = row_position[*i];
+            }
             col.sort_by_key(|e| e.0);
         }
         if n == 0 {
@@ -447,6 +452,50 @@ fn bk(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pivot_permutations_relabel_rows_from_earlier_fronts() {
+        // Column 0 is a separate front with an update into the pivoted front.
+        // A disconnected component also exercises reuse of the local row map.
+        for (diagonal, coupling) in [(0.21, 1.), (0.2, 2.)] {
+            let a = SparseMatrix::from_triplets(
+                6,
+                6,
+                &[
+                    (0, 0, 5.),
+                    (1, 1, diagonal),
+                    (2, 2, 10.),
+                    (3, 3, 3.),
+                    (0, 1, 1.),
+                    (1, 0, 1.),
+                    (1, 2, coupling),
+                    (2, 1, coupling),
+                    (1, 3, 0.2),
+                    (3, 1, 0.2),
+                    (2, 3, 2.),
+                    (3, 2, 2.),
+                    (4, 4, 2.),
+                    (5, 5, -3.),
+                    (4, 5, 0.5),
+                    (5, 4, 0.5),
+                ],
+            )
+            .unwrap();
+            let symbolic = Symbolic::analyze(&a, (0..6).collect(), 3);
+            assert_eq!(symbolic.fronts[0].end, 1);
+            let factor = symbolic.factorize(&a, false).unwrap();
+            assert_ne!(
+                factor.order, symbolic.order,
+                "fixture must interchange pivots"
+            );
+            let expected = [1., -2., 3., -4., 5., -6.];
+            let rhs = a.mul(&expected);
+            let result = factor.solve(&rhs).unwrap();
+            for (x, e) in result.iter().zip(expected) {
+                assert!((x - e).abs() < 1e-10, "{result:?}");
+            }
+        }
+    }
+
     #[test]
     fn two_by_two_and_pivot_interchange() {
         for values in [

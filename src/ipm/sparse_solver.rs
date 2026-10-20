@@ -70,28 +70,45 @@ pub struct HiPOLDLT {
     a: SparseMatrix,
     symbolic: Symbolic,
     factor: Option<Factor>,
-    matrix: Option<SparseMatrix>,
+    matrix: SparseMatrix,
+    diagonal: Vec<usize>,
 }
 
 impl HiPOLDLT {
     pub fn new(a: SparseMatrix) -> Result<Self> {
         let pattern = augmented(&a, &vec![1.; a.cols], &vec![1.; a.cols], &vec![1.; a.rows])?;
         let symbolic = Symbolic::analyze(&pattern, block_order(&a), a.cols);
+        let diagonal = (0..pattern.cols)
+            .map(|j| {
+                let start = pattern.ptr[j];
+                start
+                    + pattern.idx[start..pattern.ptr[j + 1]]
+                        .binary_search(&j)
+                        .unwrap()
+            })
+            .collect();
         Ok(Self {
             a,
             symbolic,
             factor: None,
-            matrix: None,
+            matrix: pattern,
+            diagonal,
         })
     }
     /// Numeric refactorization reuses symbolic analysis. Failure invalidates the old factor.
     pub fn factorize(&mut self, theta: &[f64], rp: &[f64], rd: &[f64]) -> Result<()> {
         self.factor = None;
-        self.matrix = None;
         validate(&self.a, theta, rp, rd)?;
-        let matrix = augmented(&self.a, theta, rp, rd)?;
-        let factor = self.symbolic.factorize(&matrix, true)?;
-        self.matrix = Some(matrix);
+        // A and the KKT sparsity pattern are fixed for this solver's lifetime.
+        // Only diagonal values change between Newton iterations; retain the
+        // canonical CSC matrix used by factorization and refinement.
+        for j in 0..self.a.cols {
+            self.matrix.val[self.diagonal[j]] = -theta[j] - rp[j];
+        }
+        for (i, &v) in rd.iter().enumerate() {
+            self.matrix.val[self.diagonal[self.a.cols + i]] = v;
+        }
+        let factor = self.symbolic.factorize(&self.matrix, true)?;
         self.factor = Some(factor);
         Ok(())
     }
@@ -100,7 +117,7 @@ impl HiPOLDLT {
     }
     pub fn solve_with_refinement(&self, rhs: &[f64]) -> Result<(Vec<f64>, usize)> {
         let mut x = self.solve(rhs)?;
-        let a = self.matrix.as_ref().ok_or(Error::NotFactorized)?;
+        let a = &self.matrix;
         let mut iterations = 0;
         for _ in 0..2 {
             let ax = a.mul(&x);
