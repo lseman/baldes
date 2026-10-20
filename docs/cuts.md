@@ -1,7 +1,6 @@
 # Routing cuts
 
-[Documentation index](README.md) · [BALDES options](options.md) ·
-[Source layout](source-layout.md)
+[Documentation index](README.md) · [BALDES options](options.md)
 
 A cut must have consistent coefficients in the master, pricing, retained
 routes, and descendants. The root adapter installs cut rows and dual effects;
@@ -110,19 +109,3 @@ See [BALDES options](options.md) for supported values and setter errors.
 4. Child snapshots preserve active rows and cut state. The optional
    [HiGHS solve](enumerated-mip.md) rebuilds full-memory route columns against
    every active physical row and omits artificial columns.
-
-The cut registry and coefficient logic live under [src/cuts](../src/cuts/).
-Root scheduling and row remapping live in the
-[root controller](../src/master/root/controller/mod.rs).
-
-## Validation
-
-```sh
-cargo test --features clp --test capacity_root --test kpath_knapsack
-cargo test --features clp,highs --test highs_mip
-```
-
-The suites cover small exhaustive validity checks, separation violations,
-bidirectional pricing, enumeration repricing, mapped resource IDs, time
-windows, and inherited cut rows. The HiGHS tests exercise complete node
-masters across the existing cut-family configurations.

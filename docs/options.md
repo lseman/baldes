@@ -139,23 +139,10 @@ cargo run --release --features clp --bin baldes -- \
 
 [`OPTION_TABLE`](../src/core/options.rs) is the source of truth for names,
 types, defaults, and feature-dependent support. It lists only controls supported
-in the current build. Keep this document synchronized when adding a consumer.
+in the current build.
 Bool values are numeric zero/one; integer options
 require integral values. Live setters also validate operation-specific modes
 and limits before changing solver state.
-
-[Option tests](../tests/api/options.rs) cover canonical discovery in Rust/C,
-input-alias compatibility, failure atomicity, dominance synchronization, and
-capacity overrides
-in fresh/inherited nodes. Run:
-
-```sh
-cargo test --features clp,highs --test options
-cargo test --features clp --test options --test cli
-```
-
-See [Build and validation](testing.md) for the full suite. Separate feature
-builds matter because MIP threshold support changes with the enabled backends.
 
 ## HGS initial columns and master backends
 

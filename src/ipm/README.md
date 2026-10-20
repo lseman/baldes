@@ -169,9 +169,7 @@ Objective-scale tests check original-unit dual recovery with both backends.
 `cargo run --offline --release --example ipm_sparse_bench -- 20` measures setup,
 numeric refactorization and triangular solves on synthetic matrices and the
 captured R201 master sparsity pattern. Every solve is checked against a known
-KKT witness; factorization diagonals change between repetitions. See
-[the October 20 investigation](../../docs/ipm-optimization-20261020.md) for
-routing profiles, candidate comparisons and measurement conditions.
+KKT witness; factorization diagonals change between repetitions.
 
 Root CLI JSON and Python `RootResult.ipm_iterations` report completed Newton
 iterations separately from CG `iterations` and Clp `simplex_iterations`.

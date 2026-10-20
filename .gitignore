@@ -72,6 +72,7 @@ _deps/
 /tools/
 /PORTING.md
 /VRPSOLVER_GAPS.md
+# Local engineering notes and investigations; public docs/ is for users.
 /internal/
 /internals/
 /reports/

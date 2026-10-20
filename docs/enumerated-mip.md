@@ -118,28 +118,7 @@ retained in `MipOutput::solver_status`, with solution, dual bound, node count,
 simplex iterations, and elapsed time. Tree JSON adds `enumerated_mip_calls` and
 `enumerated_mip_nodes`; its existing `mip_nodes` includes this work too.
 
-## Validation and remaining gaps
-
-`tests/master/highs_mip.rs` covers generic Clp/HiGHS model transfer, source isolation,
-rows and upper bounds, mixed integrality, infeasibility, cutoffs, zero budgets,
-50 independent exhaustive integer comparisons, threshold boundaries and time
-reserve, and complete snapshot solves across all five existing cut-family
-configurations. Child tests enforce vehicle count, together/apart, arc-flow and
-assignment rows and then re-solve the parent to check isolation. Tree and CLI
-tests exercise opt-in MIP, disabled enumeration, exhausted budgets, and missing
-backend support.
-
-Run the MIP and command-line checks with both backends:
-
-```sh
-cargo test --features clp,highs --test highs_mip --test cli
-```
-
-See [Build and validation](testing.md) for the full feature matrix and Python
-checks. The implementation lives in the
-[HiGHS model transfer](../src/master/solvers/highs/integer.rs),
-[snapshot adapter](../src/master/root/integer.rs), and
-[tree integration](../src/master/tree/integer.rs).
+## Limitations
 
 BALDES currently runs the optional solve after node evaluation. A handoff
 inside column generation, new cut separation during integer solving, and

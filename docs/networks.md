@@ -98,27 +98,13 @@ are newly certified only when their RHS, offset and residual multiplicity
 reductions are exact; otherwise valid inherited certificates remain available,
 but a new original-domain bound stays unknown.
 
-## Remaining integration
+## Limitations
 
 The supported lifecycle uses additive rows. Automatic nonlinear cut separation,
 reduced-cost-pruned enumeration with proved coverage, adaptive in-loop
 transfer eligibility, other branching families, stronger resource-aware
 certificates and C dispatch remain open. The existing
 single-network routing entry points retain their current behavior.
-
-## Validation
-
-The registered integration suite exercises shared covering rows, fractional and
-required multiplicities, disabled networks, overlapping local IDs, once-per-route
-coefficients, both assignment children, sibling/parent restore, additive cuts,
-fixed routes, generated-pool cleanup, smoothing, nondefault resource dimensions,
-new columns required only in a child, and conservative incomplete outcomes.
-The two-network triangle has analytic LP value `1.5`; exhaustive binary-route
-enumeration gives integer value `2`, matching both children and the tree.
-
-```sh
-cargo test --offline --features clp --test networks
-```
 
 ## CLI
 
@@ -212,11 +198,6 @@ The root/tree solve accepts `time_limit`, `max_iterations`, `node_limit`,
 `pricing_options`. Resuming a snapshot accepts node options; `tree=True`
 requires a fresh model. Tree iteration, pricing-batch and individual oracle
 counts aggregate the evaluated nodes; `nodes` and `open_nodes` report tree work.
-
-```sh
-cargo test --offline --features clp --test networks_cli
-python -m pytest python/tests/test_networks.py
-```
 
 ## Complete enumeration and integer transfer
 

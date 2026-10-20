@@ -95,7 +95,7 @@ resource 0 for capacity-cut registration;
 ordinary capacity cuts retain the default resource -1. Both use the capacity
 family's priority 3 at root and 1 below it, complement form and persistent subset pool.
 
-## Build variants and development
+## Build variants
 
 For pricing alone, build without Clp:
 
@@ -106,7 +106,6 @@ python -m pip install . --config-settings=build-args=--no-default-features
 `pybaldes.has_clp` reports backend availability; root solving raises a clear error
 in a pricing-only build. The wheel uses Python's stable ABI for Python 3.9+.
 For local development, `maturin develop --release` installs the mixed package.
-See the [Python validation guide](testing.md#python) for test commands.
 
 To include HiGHS, install its shared library as described in the
 [build guide](build.md), then install with its feature:

@@ -84,8 +84,7 @@ objective, selected lower bound, incumbent, gap, reduced cost, column counts,
 pricing phase, and elapsed time. Use `--log-interval 5` for more frequent output.
 
 For advanced routing, see the [branch-and-price tree guide](tree.md) and
-[enumerated MIP guide](enumerated-mip.md). Build checks and test commands
-live in the [validation guide](testing.md); benchmark results are in
+[enumerated MIP guide](enumerated-mip.md). Build instructions are in the [build guide](build.md); benchmark results are in
 [Root benchmarks](benchmarks.md).
 
 For named pricing controls, see the [BALDES option reference](options.md).

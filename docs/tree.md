@@ -136,7 +136,7 @@ The restricted-column heuristic uses `TreeOptions::mip_node_limit` and
 `mip_time_limit`; CLI `--mip-nodes` budgets that heuristic. Optional HiGHS node
 MIP has separate controls and counters; see [Enumerated MIP](enumerated-mip.md).
 
-## Limits and validation
+## Limits and supported models
 
 Every root, child, and priced trial runs node preprocessing before column
 generation. A worklist propagates continuous bounds through the original
@@ -220,17 +220,6 @@ subproblems; closing a node does not replace its lower bound with the incumbent.
 The final bound can therefore remain below the incumbent after successful gap
 closure. If the retained bound cannot justify closure, the status is `Incomplete`.
 
-- [Node snapshots and inheritance](../src/master/root/mod.rs)
-- [Tree driver](../src/master/tree/mod.rs)
-- [Lifecycle tests](../tests/master/node_lifecycle.rs): fixing carry, sibling isolation,
-  full-memory updates, grandchildren, and failed setup
-- [Tree tests](../tests/master/branch_price.rs): exhaustive route universes, limits,
-  feasible witnesses, and branch/cut preservation
-
-```sh
-cargo test --features clp --test node_lifecycle --test branch_price
-```
-
 Vehicle-count upper branches reuse the fleet row when its coefficients match
 the branch. Repeated bounds keep the tighter RHS, while branch depth still
 counts every recorded decision. Fixed route quantities reduce that RHS once.
@@ -240,8 +229,7 @@ The root master receives explicit `root.initial_routes`. Child masters inherit
 their parent's restricted model and generated column pool. Routes collected
 globally for integer search, including automatic singletons and routes from
 other evaluations, do not preload the child's restricted model. Equal-bound
-child insertion visits the upward branch before its downward sibling. Complete
-tree trace parity remains open.
+child insertion visits the upward branch before its downward sibling.
 
 For normal tree evaluations, a compatible preceding LP can supply numerical
 state after its trailing branch columns and rows are removed. Exact ordered

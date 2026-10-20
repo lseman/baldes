@@ -111,20 +111,6 @@ discrepancy, node, and time limits. Disable it with `--no-diving`.
 Heuristic trial objectives and dive bounds cannot certify the original node.
 See [Tree lifecycle](tree.md) for bound and incumbent handling.
 
-## Implementation and checks
-
-- [Typed constraints and route coefficients](../src/master/branching/mod.rs)
-- [Candidate generation and history checks](../src/master/tree/candidates.rs)
-- [Ryan–Foster pricing resources](../src/pricing/restrictions/ryan_foster.rs)
-- [Branching tests](../tests/master/branching.rs): both children, resource limits,
-  fresh versus inherited models, and pricing with active cuts
-- [Tree tests](../tests/master/branch_price.rs): exhaustive small instances, strong
-  trials, diving, and incomplete-bound handling
-
-```sh
-cargo test --features clp --test branching --test branch_price
-```
-
 ## Cluster branching
 
 `--branching cluster` enables the cluster variables of Silva, Uchoa and
@@ -209,13 +195,3 @@ cargo run --release --features clp --bin baldes -- \
   vrptw instances/R101.txt --customers 10 --tree \
   --branching hybrid --branch-history --time 60 --json /tmp/tree.json
 ```
-
-The implementation is organized by family under `src/master/branching/`:
-`arc_flow`, `number_of_vehicles`, `packing_set_assignment`, `ryan_foster`,
-`cluster`, and `accumulated_resource`, with shared configuration in `options`.
-`mod.rs` retains the typed constraint enum, dispatch and public re-exports.
-Pricing-specific constraints and binary labeling resources live separately in
-`src/pricing/restrictions/{accumulated_resource,ryan_foster}.rs`.
-`master::branching` defines LP branching decisions; `pricing::restrictions`
-enforces route-level restrictions in pricing. The old `pricing::branching`
-path remains available as a compatibility re-export.
