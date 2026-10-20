@@ -13,6 +13,14 @@ pub(crate) fn minimum_degree(mut graph: Vec<BTreeSet<usize>>) -> Vec<usize> {
             .filter(|&i| active[i])
             .min_by_key(|&i| (graph[i].len(), i))
             .unwrap();
+        // If even the minimum degree reaches every remaining vertex, the
+        // remaining graph is complete. Elimination cannot add fill and every
+        // degree stays tied, so the existing tie-break visits IDs in order.
+        // Dense routing rows otherwise cause cubic redundant tree insertions.
+        if graph[k].len() == n - order.len() - 1 {
+            order.extend((0..n).filter(|&i| active[i]));
+            break;
+        }
         let neighbors: Vec<_> = graph[k].iter().copied().collect();
         for &i in &neighbors {
             graph[i].remove(&k);
@@ -30,8 +38,87 @@ pub(crate) fn minimum_degree(mut graph: Vec<BTreeSet<usize>>) -> Vec<usize> {
     order
 }
 
+// For dense intersection graphs, packed adjacency avoids allocating a tree
+// node per edge and updates an entire word of fill edges at once. Numeric
+// matrices and factors remain sparse. Bound this workspace to 32 MiB.
+fn column_order(rows: &[Vec<usize>], n: usize) -> Vec<usize> {
+    if (64..=16_384).contains(&n) && rows.iter().any(|r| r.len() >= n / 8) {
+        let words = (n + 63) / 64;
+        let mut graph = vec![vec![0u64; words]; n];
+        let mut mask = vec![0u64; words];
+        for row in rows {
+            mask.fill(0);
+            for &j in row {
+                mask[j / 64] |= 1 << (j % 64);
+            }
+            for &j in row {
+                for (dst, &src) in graph[j].iter_mut().zip(&mask) {
+                    *dst |= src;
+                }
+            }
+        }
+        for (j, row) in graph.iter_mut().enumerate() {
+            row[j / 64] &= !(1 << (j % 64));
+        }
+        minimum_degree_bitset(graph)
+    } else {
+        let mut graph = vec![BTreeSet::new(); n];
+        for row in rows {
+            for (p, &i) in row.iter().enumerate() {
+                for &j in &row[p + 1..] {
+                    graph[i].insert(j);
+                    graph[j].insert(i);
+                }
+            }
+        }
+        minimum_degree(graph)
+    }
+}
+
+fn minimum_degree_bitset(mut graph: Vec<Vec<u64>>) -> Vec<usize> {
+    let n = graph.len();
+    let mut active = vec![true; n];
+    let mut degree: Vec<usize> = graph
+        .iter()
+        .map(|row| row.iter().map(|w| w.count_ones() as usize).sum())
+        .collect();
+    let mut order = Vec::with_capacity(n);
+    while order.len() < n {
+        let k = (0..n)
+            .filter(|&i| active[i])
+            .min_by_key(|&i| (degree[i], i))
+            .unwrap();
+        if degree[k] == n - order.len() - 1 {
+            order.extend((0..n).filter(|&i| active[i]));
+            break;
+        }
+        let neighbors = graph[k].clone();
+        for (word, &bits) in neighbors.iter().enumerate() {
+            let mut bits = bits;
+            while bits != 0 {
+                let i = word * 64 + bits.trailing_zeros() as usize;
+                bits &= bits - 1;
+                degree[i] = 0;
+                for (w, (dst, &src)) in graph[i].iter_mut().zip(&neighbors).enumerate() {
+                    *dst |= src;
+                    if w == i / 64 {
+                        *dst &= !(1 << (i % 64));
+                    }
+                    if w == k / 64 {
+                        *dst &= !(1 << (k % 64));
+                    }
+                    degree[i] += dst.count_ones() as usize;
+                }
+            }
+        }
+        graph[k].fill(0);
+        active[k] = false;
+        order.push(k);
+    }
+    order
+}
+
 pub(crate) fn block_order(a: &SparseMatrix) -> Vec<usize> {
-    let mut pg = vec![BTreeSet::new(); a.cols];
     let mut dg = vec![BTreeSet::new(); a.rows];
     let mut rows = vec![vec![]; a.rows];
     for j in 0..a.cols {
@@ -46,15 +133,7 @@ pub(crate) fn block_order(a: &SparseMatrix) -> Vec<usize> {
             }
         }
     }
-    for row in rows {
-        for (p, &i) in row.iter().enumerate() {
-            for &j in &row[p + 1..] {
-                pg[i].insert(j);
-                pg[j].insert(i);
-            }
-        }
-    }
-    let mut order = minimum_degree(pg);
+    let mut order = column_order(&rows, a.cols);
     order.extend(minimum_degree(dg).into_iter().map(|i| a.cols + i));
     order
 }
@@ -452,6 +531,100 @@ fn bk(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn minimum_degree_matches_explicit_elimination() {
+        // Exhaust all undirected five-vertex graphs, including graphs that
+        // become complete only after fill, degree ties and isolated vertices.
+        fn reference(mut graph: Vec<BTreeSet<usize>>) -> Vec<usize> {
+            let n = graph.len();
+            let mut active = vec![true; n];
+            let mut order = Vec::new();
+            for _ in 0..n {
+                let k = (0..n)
+                    .filter(|&i| active[i])
+                    .min_by_key(|&i| (graph[i].len(), i))
+                    .unwrap();
+                let neighbors: Vec<_> = graph[k].iter().copied().collect();
+                for &i in &neighbors {
+                    graph[i].remove(&k);
+                }
+                for (p, &i) in neighbors.iter().enumerate() {
+                    for &j in &neighbors[p + 1..] {
+                        graph[i].insert(j);
+                        graph[j].insert(i);
+                    }
+                }
+                graph[k].clear();
+                active[k] = false;
+                order.push(k);
+            }
+            order
+        }
+        for n in 0..=5 {
+            let pairs: Vec<_> = (0..n)
+                .flat_map(|i| (i + 1..n).map(move |j| (i, j)))
+                .collect();
+            for mask in 0..1usize << pairs.len() {
+                let mut graph = vec![BTreeSet::new(); n];
+                for (bit, &(i, j)) in pairs.iter().enumerate() {
+                    if mask & (1 << bit) != 0 {
+                        graph[i].insert(j);
+                        graph[j].insert(i);
+                    }
+                }
+                let mut packed = vec![vec![0u64; (n + 63) / 64]; n];
+                for (i, row) in graph.iter().enumerate() {
+                    for &j in row {
+                        packed[i][j / 64] |= 1 << (j % 64);
+                    }
+                }
+                assert_eq!(
+                    minimum_degree_bitset(packed),
+                    reference(graph.clone()),
+                    "packed n={n} mask={mask}"
+                );
+                assert_eq!(
+                    minimum_degree(graph.clone()),
+                    reference(graph),
+                    "n={n} mask={mask}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn column_order_matches_explicit_graph_across_word_boundaries() {
+        for n in [63, 64, 65, 127, 129, 257] {
+            // Dense overlapping rows and disconnected columns exercise
+            // fill, complete tails, and masks spanning multiple words.
+            for stride in [2, 3, 7] {
+                let rows: Vec<Vec<usize>> = (0..9)
+                    .map(|r| {
+                        (0..n)
+                            .filter(|&j| (j + r * 13) % (stride + r % 3) == 0 && j % 17 != 1)
+                            .collect()
+                    })
+                    .collect();
+                let mut graph = vec![BTreeSet::new(); n];
+                for row in &rows {
+                    for &i in row {
+                        for &j in row {
+                            if i != j {
+                                graph[i].insert(j);
+                            }
+                        }
+                    }
+                }
+                assert_eq!(
+                    column_order(&rows, n),
+                    minimum_degree(graph),
+                    "n={n} stride={stride}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn pivot_permutations_relabel_rows_from_earlier_fronts() {
         // Column 0 is a separate front with an update into the pivoted front.

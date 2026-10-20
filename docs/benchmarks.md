@@ -342,3 +342,55 @@ Reproduce a measurement with:
 cargo build --offline --release --example ipm_sparse_bench
 taskset -c 0 target/release/examples/ipm_sparse_bench 50
 ```
+
+## IPM routing profile and ordering (October 20, 2026)
+
+Profiling an actual R201/100 `--master ipm` run attributed 94.04% of CPU
+samples to exact minimum-degree ordering, primarily redundant `BTreeSet`
+insertions into already complete neighbor graphs. In a 60-second run, master
+solves used 64.576 seconds and pricing used 0.059 seconds; the cooperative time
+limit returned after 64.654 seconds at CG iteration 40. This includes the sparse
+numeric refactorization improvements above.
+
+Two ordering changes preserve the exact degree/vertex-ID tie-break:
+
+- Once the minimum remaining degree reaches the remaining vertex count minus
+  one, the graph is complete. Append its remaining IDs in ascending order.
+- For dense column-intersection graphs, construct packed adjacency directly
+  from matrix row incidences and perform fill updates using word-wise unions.
+  Sparse graphs retain the tree representation. Packed storage is limited to
+  16,384 vertices (32 MiB); numeric matrices and factors remain sparse.
+
+The equal-work benchmark runs the first 30 CG iterations with no cuts,
+reference NG 8, unrounded Solomon distances, numerical bounds and enumeration
+disabled. Frozen binaries use Rust 1.97.1 and the default release profile with
+debug symbols, no native CPU flags, and a Ryzen 9 9950X pinned to CPUs 0,1.
+OpenMP/OpenBLAS/MKL thread counts are one. One warmup and three alternating
+measured before/after pairs produce these median solver-reported times:
+
+| R201/100, first 30 CG iterations | Before | Packed ordering | Speedup |
+| --- | ---: | ---: | ---: |
+| Total | 25.213202 s | 1.402949 s | 17.97× |
+| Master | 25.135249 s | 1.334894 s | 18.83× |
+
+All non-timing JSON fields match exactly in all eight runs, including history,
+routes, LP values, work counts and termination status. This bounded workload
+ends at its requested iteration limit; it does not prove full root convergence.
+The baseline IPM sources are `efbf734`; both frozen versions include the same
+local pricing edits. Raw outputs, profiles, binaries, `benchmark.cjs` and
+`comparison.json` are retained locally in `results/ipm-routing-20261020/`.
+
+In the longer profile, packed ordering reaches CG iteration 59 in 6.680 seconds;
+a pre-existing IPM feasibility stall then exhausts 500 Newton iterations
+(primal residual `2.888e-9` versus required `1e-9`). The clique-only and packed
+versions return identical non-timing output at that stop. Ordering is faster,
+but this numerical convergence limitation remains. Regularization experiments
+were not retained; acceptance tolerances and numeric factorization are unchanged.
+The plain `vrptw instances/R201.txt --master ipm` command, using default NG,
+also remains numerically limited: the optimized executable reports
+`iterate left the strict interior` after CG iteration 59. This is not a
+successful root solve and is not counted as a convergence speedup.
+
+Regression checks compare ordering against explicit elimination for every
+undirected graph through five vertices and test packed masks across word
+boundaries. IPM LP/KKT tests and routing master integration tests also pass.

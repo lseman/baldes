@@ -94,7 +94,10 @@ Deliberate differences from C++:
 
 - Ordering uses deterministic **exact minimum degree with explicit graph
   updates**, rather than the shared C++ approximate minimum degree quotient
-  graph. It can take more time and memory on large or dense graphs.
+  graph. Complete remaining graphs are emitted directly; dense primal
+  intersection graphs use packed adjacency (at most 32 MiB), while sparse
+  or larger graphs retain tree sets. These representations produce the same
+  ordering. Ordering can still take more time and memory on large graphs.
 - The normal-equations path uses this crate's multifrontal factorization,
   rather than the external C++ supernodal implementation.
 - The comparison backends `LDLT`, `SUPERNOODAL`, and `FRONTAL` from the sibling
