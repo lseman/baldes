@@ -160,3 +160,8 @@ path = "tests/master/partial_solution.rs"
 [[test]]
 name = "ipm"
 path = "tests/ipm/solver.rs"
+
+[[test]]
+name = "networks"
+path = "tests/master/networks.rs"
+required-features = ["clp"]

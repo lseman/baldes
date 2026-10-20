@@ -30,7 +30,7 @@ pub use cover_rows::{
     CoverRowAudit, CoverRowFailure, CoverRowLimits, CoverRowRange, WeightedCoverRowAudit,
 };
 mod incumbent;
-pub(crate) use incumbent::exact_route_feasible;
+pub(crate) use incumbent::{exact_route_feasible, ExactSum};
 mod integer;
 pub use integer::{EnumeratedMipOutput, EnumerationMipPolicy};
 mod options;

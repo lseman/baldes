@@ -2,9 +2,9 @@
 use super::*;
 
 #[derive(Clone, Default)]
-struct ExactSum(Vec<f64>);
+pub(crate) struct ExactSum(Vec<f64>);
 impl ExactSum {
-    fn add(&mut self, mut value: f64) -> Option<()> {
+    pub(crate) fn add(&mut self, mut value: f64) -> Option<()> {
         if !value.is_finite() {
             return None;
         }
@@ -27,7 +27,7 @@ impl ExactSum {
         self.0 = terms;
         Some(())
     }
-    fn product(&mut self, value: f64, integer: f64) -> Option<()> {
+    pub(crate) fn product(&mut self, value: f64, integer: f64) -> Option<()> {
         let product = value * integer;
         // Integer multipliers preserve the subnormal lattice, so an FMA
         // residual cannot hide a fractional subnormal product error.
@@ -35,7 +35,7 @@ impl ExactSum {
         self.add(error)?;
         self.add(product)
     }
-    fn sign(&self) -> f64 {
+    pub(crate) fn sign(&self) -> f64 {
         self.0.last().copied().unwrap_or(0.)
     }
     fn compare(&self, value: f64) -> Option<std::cmp::Ordering> {
@@ -58,7 +58,7 @@ impl ExactSum {
         difference.add(-value)?;
         difference.sign().partial_cmp(&0.)
     }
-    fn upper(&self) -> Option<f64> {
+    pub(crate) fn upper(&self) -> Option<f64> {
         let mut value = 0.;
         for &term in &self.0 {
             let sum = value + term;

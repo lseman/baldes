@@ -1,8 +1,8 @@
-//! Shared root master with independently priced networks.
+//! Shared master with independently priced networks and immutable node snapshots.
 //!
 //! Arc entries refer to shared rows. Each network also receives its own
-//! multiplicity rows. Cuts, enumeration transfer and tree snapshots are not
-//! yet integrated into this coordinator.
+//! multiplicity rows. Additive rows and assignment branches survive node forks.
+//! Nonlinear cut separation and enumeration/MIP transfer remain separate workflows.
 use super::{clp::ClpMaster, column_generation as cg, root::Row, RowSense};
 use crate::{graph::Window, incomplete, invalid, pricing::Solver, Graph, Result, Route};
 use std::{
@@ -14,6 +14,10 @@ use std::{
 
 #[path = "network_bounds.rs"]
 mod bounds;
+mod lifecycle;
+mod tree;
+pub use lifecycle::{Assignment, FixedRoute, NodeSnapshot, RowCoefficients};
+pub use tree::{solve_assignment_tree, AssignmentTreeOptions, AssignmentTreeOutput};
 
 #[derive(Clone, Debug)]
 pub struct Network<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
@@ -55,8 +59,11 @@ pub struct NetworkRoute {
 }
 
 #[derive(Debug)]
-pub struct Output {
+pub struct Output<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub master: cg::Output,
+    pub snapshot: NodeSnapshot<D>,
+    /// Fixed contribution, separate from the remaining master quantities.
+    pub fixed_routes: Vec<FixedRoute>,
     pub routes: Vec<NetworkRoute>,
     /// Restricted-master quantity for each registered route.
     pub values: Vec<f64>,
@@ -67,6 +74,7 @@ pub struct Output {
 
 struct Oracle<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     network: Network<D>,
+    total_multiplicity: Window,
     solver: Solver<D>,
     index: HashMap<i32, usize>,
     route_entries: Vec<(usize, f64)>,
@@ -81,6 +89,8 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     gradient: Option<Vec<f64>>,
     rhs: Vec<f64>,
     deadline: Instant,
+    shared_rows: Vec<Row>,
+    fixed_routes: Vec<FixedRoute>,
 }
 struct Coordinator<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>(Rc<RefCell<State<D>>>);
 impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
@@ -275,15 +285,9 @@ impl<const D: usize> State<D> {
     }
 }
 
-/// Solve a fresh shared master. Each oracle retains its own pricing state.
-pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Output> {
-    if problem.networks.is_empty()
-        || options.cg.warm_start.is_some()
-        || !options.cg.known.is_empty()
-    {
-        return Err(invalid(
-            "network root requires networks and a fresh column registry",
-        ));
+fn validate_options(options: &Options) -> Result<()> {
+    if options.cg.warm_start.is_some() || !options.cg.known.is_empty() {
+        return Err(invalid("network nodes own their column registry"));
     }
     if !options.cg.artificial_cost.is_finite()
         || options.cg.artificial_cost <= 0.
@@ -296,6 +300,20 @@ pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Ou
     {
         return Err(invalid("network root artificial cost or tolerance"));
     }
+    Ok(())
+}
+
+/// Solve a fresh shared master. Each oracle retains its own pricing state.
+pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Output<D>> {
+    if problem.networks.is_empty()
+        || options.cg.warm_start.is_some()
+        || !options.cg.known.is_empty()
+    {
+        return Err(invalid(
+            "network root requires networks and a fresh column registry",
+        ));
+    }
+    validate_options(&options)?;
     let mut ids = HashSet::new();
     for network in &problem.networks {
         network.graph.validate()?;
@@ -333,6 +351,7 @@ pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Ou
         }
     }
     let shared_offset = master.rhs.len();
+    let shared_rows = problem.rows.clone();
     for row in problem.rows {
         master.add_row(row.sense, row.rhs, &[])?;
     }
@@ -345,9 +364,6 @@ pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Ou
             arc.cost = 0.;
             arc.variables = vec![(index, 1.)];
         }
-        for (name, value) in &options.pricing_options {
-            solver.set_option(name, *value)?;
-        }
         let index = network
             .graph
             .arcs
@@ -355,7 +371,9 @@ pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Ou
             .enumerate()
             .map(|(i, arc)| (arc.id, i))
             .collect();
+        let total_multiplicity = network.multiplicity;
         oracles.push(Oracle {
+            total_multiplicity,
             network,
             solver,
             index,
@@ -363,8 +381,7 @@ pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Ou
             calls: 0,
         });
     }
-    let schedule = oracles[0].solver.phases.clone();
-    let state = Rc::new(RefCell::new(State {
+    let state = State {
         oracles,
         shared_offset,
         routes: vec![],
@@ -373,7 +390,29 @@ pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Ou
         gradient: None,
         rhs: master.rhs.clone(),
         deadline,
-    }));
+        shared_rows,
+        fixed_routes: vec![],
+    };
+    run(master, state, options)
+}
+
+fn run<const D: usize>(
+    mut master: ClpMaster,
+    mut state: State<D>,
+    mut options: Options,
+) -> Result<Output<D>> {
+    options.cg.time_limit = options
+        .cg
+        .time_limit
+        .min(state.deadline.saturating_duration_since(Instant::now()));
+    for oracle in &mut state.oracles {
+        oracle.calls = 0;
+        for (name, value) in &options.pricing_options {
+            oracle.solver.set_option(name, *value)?;
+        }
+    }
+    let schedule = state.oracles[0].solver.phases.clone();
+    let state = Rc::new(RefCell::new(state));
     let mut controller = Coordinator(state.clone());
     let gap = (options.cg.gap_absolute, options.cg.gap_relative);
     let mut result = cg::optimize(
@@ -394,7 +433,10 @@ pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Ou
     {
         result.status = cg::Status::Stalled;
     }
-    let mut state = state.borrow_mut();
+    drop(controller);
+    let state = Rc::try_unwrap(state)
+        .map_err(|_| invalid("network state still borrowed"))?
+        .into_inner();
     let mut values = vec![0.; state.routes.len()];
     for (&tag, &value) in result.column_tags.iter().zip(master.values().iter()) {
         if tag >= 0 {
@@ -402,8 +444,8 @@ pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Ou
         }
     }
     Ok(Output {
-        master: result,
-        routes: std::mem::take(&mut state.routes),
+        routes: state.routes.clone(),
+        fixed_routes: state.fixed_routes.clone(),
         values,
         duals: master.duals(),
         oracle_calls: state
@@ -411,5 +453,11 @@ pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Ou
             .iter()
             .map(|oracle| (oracle.network.id, oracle.calls))
             .collect(),
+        snapshot: NodeSnapshot {
+            master,
+            warm: result.warm_start.clone(),
+            state,
+        },
+        master: result,
     })
 }
