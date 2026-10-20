@@ -33,7 +33,7 @@ fn _read_instance(py: Python<'_>, path: PathBuf) -> PyResult<Py<PyDict>> {
 
 #[cfg(feature = "clp")]
 #[pyfunction]
-#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false, master_solver="clp", hgs_time=None, hgs_columns="best", hgs_seed=0, verbose=false, log_interval=10, bound_mode="numerical"))]
+#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false, master_solver="clp", hgs_time=None, hgs_columns="best", hgs_seed=0, verbose=false, log_interval=10, bound_mode="numerical", clp_scaling="auto", clp_keep_work_areas=true))]
 #[allow(clippy::too_many_arguments)]
 fn _solve_root(
     py: Python<'_>,
@@ -63,6 +63,8 @@ fn _solve_root(
     verbose: bool,
     log_interval: usize,
     bound_mode: &str,
+    clp_scaling: &str,
+    clp_keep_work_areas: bool,
 ) -> PyResult<Py<PyDict>> {
     use baldes::master::root::{self, RootOptions, RootProblem};
     use baldes::inputs::{Customer, Rounding};
@@ -160,6 +162,10 @@ fn _solve_root(
         "highs" => root::MasterSolver::Highs,
         _ => return Err(PyValueError::new_err("master_solver must be 'clp', 'highs', or 'ipm'")),
     };
+    options.clp_options = root::ClpOptions {
+        scaling: clp_scaling.parse().map_err(|e: baldes::core::error::OrError| PyValueError::new_err(e.to_string()))?,
+        keep_work_areas: clp_keep_work_areas,
+    };
     options.master_solver.ensure_available().map_err(|e|PyValueError::new_err(e.to_string()))?;
     let columns = baldes::inputs::HgsColumns::parse(hgs_columns)
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -199,6 +205,7 @@ fn _solve_root(
         incumbent: f64,
         pricing_seconds: f64,
         solver_seconds: f64,
+        simplex_iterations: usize,
         cuts: usize,
         lp_before_cuts: f64,
         fixing_calls: usize,
@@ -240,6 +247,7 @@ fn _solve_root(
             }
             let output = root::solve(problem, options)?;
             Ok(PythonRootOutput {
+                simplex_iterations: output.simplex_iterations,
                 master: output.master, routes: output.routes, values: output.values,
                 duals: output.duals, incumbent: output.incumbent,
                 pricing_seconds: output.pricing_seconds, solver_seconds: output.solver_seconds,
@@ -265,6 +273,7 @@ fn _solve_root(
     field!("cuts", output.cuts);
     field!("cut_rounds", output.master.cut_rounds);
     field!("iterations", output.master.iterations);
+    field!("simplex_iterations", output.simplex_iterations);
     field!("pricing_calls", output.master.pricing_calls);
     // Generated columns inserted over the run.
     field!("columns", output.master.inserted_tags.len());

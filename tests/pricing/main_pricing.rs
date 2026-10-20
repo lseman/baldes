@@ -696,3 +696,49 @@ fn zero_and_one_compiled_dimension_models_price() {
     check::<0>();
     check::<1>();
 }
+
+#[test]
+fn engine_label_budgets_remain_enforced_after_unlimited_sweeps() {
+    use baldes::labeling::engine::{EngineControls, LabelingEngine};
+    use baldes::pricing::phases::Phase;
+    let g = scalar_dimensions_fixture::<3>();
+    for bidirectional in [false, true] {
+        let mut engine = LabelingEngine::prepare(
+            &g,
+            EngineControls {
+                bidirectional,
+                ..Default::default()
+            },
+            Phase {
+                check_ng: true,
+                jump_arcs: true,
+                labels_per_bucket: i64::MAX,
+            },
+        )
+        .unwrap();
+        let unlimited = engine.solve(&g, &Controls::default()).unwrap();
+        assert_eq!(unlimited.minimum_reduced_cost, -5.);
+        let error = engine
+            .solve(
+                &g,
+                &Controls {
+                    max_labels: 2,
+                    ..Default::default()
+                },
+            )
+            .unwrap_err();
+        assert!(error.message.contains("label limit"), "{error}");
+        let bounded = engine
+            .solve(
+                &g,
+                &Controls {
+                    max_labels: 100_000,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(bounded.columns, unlimited.columns);
+        let repeated = engine.solve(&g, &Controls::default()).unwrap();
+        assert_eq!(repeated.columns, unlimited.columns);
+    }
+}

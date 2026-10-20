@@ -75,6 +75,7 @@ impl ClpMaster {
                 continued.set_upper(column, self.upper[column])?;
             }
         }
+        continued.set_clp_options(self.clp_options);
         continued.solver = self.solver;
         continued.zero_tolerance = self.zero_tolerance;
         continued.set_tolerances(1e-7, self.dual_tolerance)?;
@@ -99,6 +100,7 @@ impl ClpMaster {
         Ok(Self {
             model,
             solver: self.solver,
+            clp_options: self.clp_options,
             #[cfg(feature = "highs")]
             highs_backend,
             primal_tolerance: self.primal_tolerance,
@@ -137,10 +139,12 @@ impl ClpMaster {
         unsafe {
             Clp_setLogLevel(model.as_ptr(), 0);
             Clp_setOptimizationDirection(model.as_ptr(), 1.);
+            Clp_scaling(model.as_ptr(), ClpOptions::default().scaling.code());
         }
         Ok(Self {
             model,
             solver: MasterSolver::Clp,
+            clp_options: ClpOptions::default(),
             highs_row_basic: vec![],
             #[cfg(feature = "highs")]
             highs_backend: None,

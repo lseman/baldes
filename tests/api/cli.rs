@@ -288,3 +288,23 @@ fn hgs_solver_log_precedes_column_generation_and_preserves_stdout() {
     assert!(String::from_utf8_lossy(&standalone.stderr).contains("HGS Feasible"));
     assert!(!String::from_utf8_lossy(&standalone.stdout).contains("Best infeas"));
 }
+
+#[test]
+fn clp_runtime_policy_modes_are_validated() {
+    for (flag, value) in [("--clp-scaling", "invalid"), ("--clp-work-areas", "invalid")] {
+        let output = command().args(["vrptw", "instances/C101.txt", flag, value]).output().unwrap();
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("Clp"));
+    }
+    let path = std::env::temp_dir().join(format!("baldes-clp-policy-{}.txt", std::process::id()));
+    std::fs::write(&path, "tiny\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n").unwrap();
+    for scaling in ["auto", "geometric", "equilibrium", "off"] {
+        for areas in ["retain", "discard"] {
+            let output = command().arg("vrptw").arg(&path)
+                .args(["--clp-scaling", scaling, "--clp-work-areas", areas, "--no-enumeration"]).output().unwrap();
+            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            assert!(String::from_utf8_lossy(&output.stdout).contains("status=Optimal"));
+        }
+    }
+    std::fs::remove_file(path).unwrap();
+}

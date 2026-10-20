@@ -25,6 +25,8 @@ Options:
   --no-mip-heuristic    Disable restricted-master integer search
   --mip-nodes N         Restricted-master integer-search node budget per call
   --master MODE         clp (default), highs, or ipm (disables stabilization)
+  --clp-scaling MODE    auto (default), geometric, equilibrium, or off
+  --clp-work-areas MODE retain (default) or discard after each LP solve
   --bound-mode MODE     numerical (default) or certified (independent bound validation)
   --hgs-time SECONDS    Run HGS before root/tree solve for this search budget
   --hgs-columns MODE    best (default), all, or N cheapest feasible HGS routes
@@ -130,6 +132,15 @@ fn run() -> std::result::Result<(), String> {
                 )
                 .map_err(|e| e.to_string())?
             }
+            "--clp-scaling" => options.clp_options.scaling = args.next()
+                .ok_or("missing Clp scaling mode")?.parse::<baldes::master::root::ClpScaling>()
+                .map_err(|e| e.to_string())?,
+            "--clp-work-areas" => options.clp_options.keep_work_areas = match args.next()
+                .ok_or("missing Clp work-area mode")?.as_str() {
+                    "retain" => true,
+                    "discard" => false,
+                    mode => return Err(format!("unknown Clp work-area mode: {mode}")),
+                },
             "--master" => options.master_solver = match args.next().ok_or("missing master mode")?.as_str() {
                 "clp" => baldes::master::root::MasterSolver::Clp,
                 "ipm" => baldes::master::root::MasterSolver::Ipm,
@@ -395,7 +406,7 @@ fn run() -> std::result::Result<(), String> {
             .iter()
             .filter(|&&t| t >= 0)
             .count();
-        let json=format!("{{\"instance\":{:?},\"status\":\"{}\",\"lp\":{},\"cuts\":{},\"cut_rounds\":{},\"lp_before_cuts\":{},\"route_columns\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"incumbent\":{},\"bound\":{},\"bound_mode\":\"{}\",\"numerical_bound\":{},\"certified_bound\":{},\"iterations\":{},\"pricing_calls\":{},\"columns\":{},\"master_columns\":{},\"seconds\":{},\"pricing_seconds\":{},\"master_seconds\":{},\"history\":[{}],\"routes\":[{}]}}\n",instance.name,if cut_off {"Cutoff".to_string()} else {format!("{:?}",output.master.status)},number(lp_value),output.cuts,output.master.cut_rounds,number(output.lp_before_cuts),route_columns,output.fixing_calls,output.enumerated_routes,number(output.incumbent),number(output.master.bound),output.master.bound_mode.as_str(),number(output.master.numerical_bound),number(output.master.certified_bound),output.master.iterations,output.master.pricing_calls,output.master.inserted_tags.len(),output.master.columns,seconds,output.pricing_seconds,output.solver_seconds-output.pricing_seconds,history.join(","),routes.join(","));
+        let json=format!("{{\"instance\":{:?},\"status\":\"{}\",\"lp\":{},\"cuts\":{},\"cut_rounds\":{},\"lp_before_cuts\":{},\"route_columns\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"incumbent\":{},\"bound\":{},\"bound_mode\":\"{}\",\"numerical_bound\":{},\"certified_bound\":{},\"iterations\":{},\"simplex_iterations\":{},\"pricing_calls\":{},\"columns\":{},\"master_columns\":{},\"seconds\":{},\"pricing_seconds\":{},\"master_seconds\":{},\"history\":[{}],\"routes\":[{}]}}\n",instance.name,if cut_off {"Cutoff".to_string()} else {format!("{:?}",output.master.status)},number(lp_value),output.cuts,output.master.cut_rounds,number(output.lp_before_cuts),route_columns,output.fixing_calls,output.enumerated_routes,number(output.incumbent),number(output.master.bound),output.master.bound_mode.as_str(),number(output.master.numerical_bound),number(output.master.certified_bound),output.master.iterations,output.simplex_iterations,output.master.pricing_calls,output.master.inserted_tags.len(),output.master.columns,seconds,output.pricing_seconds,output.solver_seconds-output.pricing_seconds,history.join(","),routes.join(","));
         std::fs::write(path, json).map_err(|e| e.to_string())?;
     }
     println!(
