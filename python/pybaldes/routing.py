@@ -126,6 +126,7 @@ class RootResult:
     routes: Tuple[RootRoute, ...]
     history: Tuple[Iteration, ...]
     simplex_iterations: int = 0
+    ipm_iterations: int = 0
 
     def to_dict(self) -> dict:
         """Return ordinary Python data, retaining infinite unknown incumbents."""

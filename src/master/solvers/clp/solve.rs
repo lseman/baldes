@@ -236,6 +236,7 @@ impl ClpMaster {
             },
         )
         .map_err(|e| incomplete(format!("IPM master: {e}")))?;
+        self.ipm_iterations = self.ipm_iterations.saturating_add(solution.iterations);
         self.status = match solution.status {
             crate::ipm::Status::Optimal => 0,
             crate::ipm::Status::Infeasible => 1,

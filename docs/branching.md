@@ -129,8 +129,7 @@ cargo test --features clp --test branching --test branch_price
 
 `--branching cluster` enables the cluster variables of Silva, Uchoa and
 Subramanian, *Cluster Branching for Vehicle Routing Problems* (2024),
-Sections 3 and 4.1 ([local paper](../papers/L_2024_2___Cluster_branching.pdf),
-PDF pages 8–12). For a customer cluster `C`, the boundary variable counts
+Sections 3 and 4.1. For a customer cluster `C`, the boundary variable counts
 entries from outside `C`, equivalent to half the undirected cutset flow on a
 complete depot-to-depot route. For disjoint clusters `C,D`, the pair variable
 counts arc traversals in either direction between them. Both variables are

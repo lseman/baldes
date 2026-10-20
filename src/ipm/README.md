@@ -85,21 +85,36 @@ problems may instead reach the iteration limit or return a numerical error.
 The augmented matrix is `[-(theta + Rp), Aᵀ; A, Rd]`. The ordering preserves
 the primal/dual boundary, and fundamental supernodes cannot cross it. Fronts
 are processed in increasing elimination order, a valid child-before-parent
-order, and child Schur buffers are released after parent assembly.
+order, and child Schur buffers are released after parent assembly. Child updates
+store only the lower triangle, packed by row; parents assemble that triangle
+without copying an unused upper half.
+Sparse augmented factors may use an up-looking row-update path when the
+primal block has at least twice as many variables as rows and symbolic L has
+at most 32 off-diagonal entries per system variable on average. This path
+expects negative primal and positive dual pivots; small, non-finite or wrongly
+signed pivots retry the existing pivoted multifrontal factorization. Original
+KKT refinement remains enabled. Sparse factor columns use contiguous CSC values
+and share an immutable pattern across numerical refactors and clones.
+
 Numeric pivot swaps are composed with the symbolic permutation and applied to
 rows of previously assembled factor columns. Iterative refinement uses
 `|b - Kx| / (|b| + |K||x|)` with at most two correction solves.
 
 Deliberate differences from C++:
 
-- Ordering uses deterministic **exact minimum degree with explicit graph
-  updates**, rather than the shared C++ approximate minimum degree quotient
-  graph. Complete remaining graphs are emitted directly; dense primal
-  intersection graphs use packed adjacency (at most 32 MiB), while sparse
-  or larger graphs retain tree sets. These representations produce the same
-  ordering. Ordering can still take more time and memory on large graphs.
+- Ordering keeps the independent diagonal primal block in natural order.
+  Eliminating these vertices cannot connect other primal vertices, so building
+  a primal column-intersection graph cannot reduce fill. The dual Schur graph
+  uses deterministic **exact minimum degree with explicit graph updates**,
+  rather than the shared C++ approximate minimum degree quotient graph.
+  Complete remaining graphs are emitted directly; dense intersection graphs
+  use packed adjacency (at most 32 MiB), while sparse or larger graphs retain
+  tree sets. Those graph representations produce the same ordering. Primal
+  reordering preserves structural fill but can change floating-point sums.
 - The normal-equations path uses this crate's multifrontal factorization,
-  rather than the external C++ supernodal implementation.
+  rather than the external C++ supernodal implementation. Its fixed CSC pattern
+  and row-to-column source positions are cached; refactors accumulate values
+  directly without duplicate triplets or repeated sorting.
 - The comparison backends `LDLT`, `SUPERNOODAL`, and `FRONTAL` from the sibling
   `linear_system` directory are not separately ported or aliased to HiPO.
 - Fixed variables are eliminated. Free variables, upper-only bounds, shifted
@@ -119,6 +134,11 @@ Deliberate differences from C++:
   dual/gap checks undo objective scaling, retaining tolerances in original
   units. Wide upper bounds start with feasible slacks and unit complementarity
   products, avoiding a large artificial residual from bounds such as `1e12`.
+- A regularized least-squares starting estimate reduces initial row and dual
+  residuals before positive shifts for the HSD variables. Finite upper bounds
+  retain unit complementarity. Unsafe estimates, empty systems and very tight
+  bounds retain the unit initializer. This adds one factorization and two solves
+  per eligible LP; it is not a warm start from the previous CG solve.
 
 The restricted master selects this solver with `--master ipm`; the API is also
 usable independently. Performance parity with the
@@ -143,3 +163,19 @@ numerical results and residuals, not identical iteration histories or factors.
 A captured R201 master checks convergence at `1e-9` feasibility with both
 relaxed and strict gap tolerances, against an independent simplex objective.
 Objective-scale tests check original-unit dual recovery with both backends.
+
+## Performance investigation
+
+`cargo run --offline --release --example ipm_sparse_bench -- 20` measures setup,
+numeric refactorization and triangular solves on synthetic matrices and the
+captured R201 master sparsity pattern. Every solve is checked against a known
+KKT witness; factorization diagonals change between repetitions. See
+[the October 20 investigation](../../docs/ipm-optimization-20261020.md) for
+routing profiles, candidate comparisons and measurement conditions.
+
+Root CLI JSON and Python `RootResult.ipm_iterations` report completed Newton
+iterations separately from CG `iterations` and Clp `simplex_iterations`.
+The master counter resets on a fork, like the simplex counter. Centering now
+adapts to the affine step, bounded between `1e-4` and `0.1`; the previous
+expression was always `0.1` for valid step lengths. Stopping tolerances and
+original-coordinate feasibility checks are unchanged.

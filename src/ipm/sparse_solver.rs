@@ -1,4 +1,4 @@
-use super::factor::{block_order, minimum_degree, Factor, Symbolic};
+use super::factor::{block_order, minimum_degree, Factor, Symbolic, Uplooking};
 use super::{finite, Error, Result, SparseMatrix};
 use std::collections::BTreeSet;
 
@@ -64,7 +64,8 @@ fn augmented(a: &SparseMatrix, theta: &[f64], rp: &[f64], rd: &[f64]) -> Result<
     SparseMatrix::from_triplets(n + a.rows, n + a.rows, &entries)
 }
 
-/// Block-ordered multifrontal augmented-system LDLᵀ with restricted BK pivots.
+/// Sparse up-looking or block-ordered multifrontal augmented-system LDLᵀ.
+/// Unsafe sparse pivots retry the multifrontal path with restricted BK pivots.
 #[derive(Debug, Clone)]
 pub struct HiPOLDLT {
     a: SparseMatrix,
@@ -72,12 +73,14 @@ pub struct HiPOLDLT {
     factor: Option<Factor>,
     matrix: SparseMatrix,
     diagonal: Vec<usize>,
+    uplooking: Option<Uplooking>,
 }
 
 impl HiPOLDLT {
     pub fn new(a: SparseMatrix) -> Result<Self> {
         let pattern = augmented(&a, &vec![1.; a.cols], &vec![1.; a.cols], &vec![1.; a.rows])?;
         let symbolic = Symbolic::analyze(&pattern, block_order(&a), a.cols);
+        let uplooking = Uplooking::new(&symbolic, a.cols);
         let diagonal = (0..pattern.cols)
             .map(|j| {
                 let start = pattern.ptr[j];
@@ -93,6 +96,7 @@ impl HiPOLDLT {
             factor: None,
             matrix: pattern,
             diagonal,
+            uplooking,
         })
     }
     /// Numeric refactorization reuses symbolic analysis. Failure invalidates the old factor.
@@ -108,7 +112,14 @@ impl HiPOLDLT {
         for (i, &v) in rd.iter().enumerate() {
             self.matrix.val[self.diagonal[self.a.cols + i]] = v;
         }
-        let factor = self.symbolic.factorize(&self.matrix, true)?;
+        let factor = match self
+            .uplooking
+            .as_ref()
+            .and_then(|plan| plan.factorize(&self.symbolic, &self.matrix).ok())
+        {
+            Some(factor) => factor,
+            None => self.symbolic.factorize(&self.matrix, true)?,
+        };
         self.factor = Some(factor);
         Ok(())
     }
@@ -165,46 +176,69 @@ pub struct NormalEqLDLT {
     symbolic: Symbolic,
     factor: Option<Factor>,
     dinv: Vec<f64>,
+    matrix: SparseMatrix,
+    row_entries: Vec<Vec<(usize, usize)>>,
+    work: Vec<f64>,
 }
 
 impl NormalEqLDLT {
     pub fn new(a: SparseMatrix) -> Result<Self> {
         let mut graph = vec![BTreeSet::new(); a.rows];
-        let mut entries: Vec<_> = (0..a.rows).map(|i| (i, i, 1.)).collect();
+        let mut row_entries = vec![Vec::new(); a.rows];
         for j in 0..a.cols {
+            for p in a.ptr[j]..a.ptr[j + 1] {
+                row_entries[a.idx[p]].push((j, p));
+            }
             let rows: Vec<_> = a.column(j).map(|(i, _)| i).collect();
             for (p, &i) in rows.iter().enumerate() {
                 for &k in &rows[p + 1..] {
                     graph[i].insert(k);
                     graph[k].insert(i);
-                    entries.push((i, k, 1.));
-                    entries.push((k, i, 1.));
                 }
             }
         }
+        let mut entries = Vec::new();
+        for (j, neighbors) in graph.iter().enumerate() {
+            entries.push((j, j, 1.));
+            entries.extend(neighbors.iter().map(|&i| (i, j, 1.)));
+        }
         let pattern = SparseMatrix::from_triplets(a.rows, a.rows, &entries)?;
         let symbolic = Symbolic::analyze(&pattern, minimum_degree(graph), a.rows);
+        let work = vec![0.; a.rows];
         Ok(Self {
             a,
             symbolic,
             factor: None,
             dinv: vec![],
+            matrix: pattern,
+            row_entries,
+            work,
         })
     }
     pub fn factorize(&mut self, theta: &[f64], rp: &[f64], rd: &[f64]) -> Result<()> {
         self.factor = None;
         validate(&self.a, theta, rp, rd)?;
-        self.dinv = theta.iter().zip(rp).map(|(t, r)| 1. / (t + r)).collect();
-        let mut entries: Vec<_> = rd.iter().enumerate().map(|(i, &v)| (i, i, v)).collect();
-        for j in 0..self.a.cols {
-            for (i, v) in self.a.column(j) {
-                for (k, w) in self.a.column(j) {
-                    entries.push((i, k, v * w * self.dinv[j]));
+        self.dinv.clear();
+        self.dinv
+            .extend(theta.iter().zip(rp).map(|(t, r)| 1. / (t + r)));
+        // The row-to-column correspondence and CSC structure are fixed.
+        // Accumulate values directly, avoiding duplicate triplets and sorting
+        // on every Newton step. Clear scratch after failed refactorizations too.
+        self.work.fill(0.);
+        for (j, &regularization) in rd.iter().enumerate() {
+            for &(col, position) in &self.row_entries[j] {
+                let value = self.a.val[position];
+                for p in self.a.ptr[col]..self.a.ptr[col + 1] {
+                    self.work[self.a.idx[p]] += value * self.a.val[p] * self.dinv[col];
                 }
             }
+            for p in self.matrix.ptr[j]..self.matrix.ptr[j + 1] {
+                let i = self.matrix.idx[p];
+                self.matrix.val[p] = self.work[i] + if i == j { regularization } else { 0. };
+                self.work[i] = 0.;
+            }
         }
-        let matrix = SparseMatrix::from_triplets(self.a.rows, self.a.rows, &entries)?;
-        self.factor = Some(self.symbolic.factorize(&matrix, false)?);
+        self.factor = Some(self.symbolic.factorize(&self.matrix, false)?);
         Ok(())
     }
     pub fn solve(&self, xi_d: &[f64], xi_p: &[f64]) -> Result<(Vec<f64>, Vec<f64>)> {
@@ -288,5 +322,96 @@ impl SparseSolver {
                 Ok(x)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cached_normal_equations_refactor_and_recover_after_failure() {
+        let a = SparseMatrix::from_triplets(
+            3,
+            4,
+            &[
+                (0, 0, 1.),
+                (2, 0, -2.),
+                (1, 1, 3.),
+                (0, 2, 0.5),
+                (1, 2, -1.),
+                (2, 3, 2.),
+            ],
+        )
+        .unwrap();
+        let mut solver = NormalEqLDLT::new(a.clone()).unwrap();
+        let expected = [0.5, -1., 2., 0.25, 1., -0.5, 0.75];
+        for theta in [[1., 2., 3., 4.], [4., 0.5, 2., 1.]] {
+            let rp = [0.1; 4];
+            let rd = [0.2; 3];
+            solver.factorize(&theta, &rp, &rd).unwrap();
+            let rhs = augmented(&a, &theta, &rp, &rd).unwrap().mul(&expected);
+            let (x, y) = solver.solve(&rhs[..4], &rhs[4..]).unwrap();
+            for (actual, expected) in x.iter().chain(&y).zip(expected) {
+                assert!((actual - expected).abs() < 1e-10);
+            }
+            assert!(solver.factorize(&theta, &[0.; 4], &rd).is_err());
+            assert_eq!(
+                solver.solve(&rhs[..4], &rhs[4..]).unwrap_err(),
+                Error::NotFactorized
+            );
+        }
+    }
+
+    #[test]
+    fn sparse_ldl_clones_share_only_immutable_structure() {
+        let n = 64;
+        let entries: Vec<_> = (0..n).map(|j| (0, j, 1.)).collect();
+        let mut original =
+            HiPOLDLT::new(SparseMatrix::from_triplets(1, n, &entries).unwrap()).unwrap();
+        assert!(original.uplooking.is_some());
+        original
+            .factorize(&vec![1.; n], &vec![0.1; n], &[0.2])
+            .unwrap();
+        let mut sibling = original.clone();
+        sibling
+            .factorize(&vec![2.; n], &vec![0.1; n], &[0.2])
+            .unwrap();
+        let mut rhs = vec![-0.1; n];
+        rhs.push(n as f64 + 0.2);
+        for x in original.solve(&rhs).unwrap() {
+            assert!((x - 1.).abs() < 1e-10);
+        }
+        let mut rhs = vec![-0.8; n];
+        rhs.push(n as f64 * 0.5 + 0.05);
+        let x = sibling.solve(&rhs).unwrap();
+        for &x in &x[..n] {
+            assert!((x - 0.5).abs() < 1e-10);
+        }
+        assert!((x[n] - 0.25).abs() < 1e-10);
+    }
+
+    #[test]
+    fn sparse_ldl_unsafe_pivots_retry_pivoted_factorization_and_invalidate_on_error() {
+        let n = 64;
+        let a = SparseMatrix::from_triplets(1, n, &[]).unwrap();
+        let mut solver = HiPOLDLT::new(a).unwrap();
+        assert!(solver.uplooking.is_some());
+        solver
+            .factorize(&vec![1.; n], &vec![0.1; n], &[0.2])
+            .unwrap();
+        assert_eq!(solver.perturbed_pivots(), 0);
+        // The fast path rejects these tiny pivots. The existing multifrontal
+        // path must regularize them instead of publishing an invalid factor.
+        solver
+            .factorize(&vec![1e-20; n], &vec![1e-20; n], &[1e-20])
+            .unwrap();
+        assert_eq!(solver.perturbed_pivots(), n + 1);
+        assert_eq!(solver.solve(&vec![0.; n + 1]).unwrap(), vec![0.; n + 1]);
+        assert!(solver.factorize(&vec![1.; n], &vec![0.; n], &[1.]).is_err());
+        assert_eq!(
+            solver.solve(&vec![0.; n + 1]).unwrap_err(),
+            Error::NotFactorized
+        );
     }
 }

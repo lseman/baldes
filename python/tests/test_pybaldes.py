@@ -190,6 +190,7 @@ def test_hgs_columns_and_ipm_master(columns):
         master_solver="ipm", hgs_time=0.03, hgs_columns=columns, hgs_seed=7,
     )
     assert result.status == "Optimal"
+    assert result.ipm_iterations > 0
     assert result.lp == pytest.approx(4 + math.sqrt(2), abs=1e-6)
     assert all(step.alpha == 0 for step in result.history)
     assert_routes(result, 3, 2)

@@ -20,49 +20,78 @@ fn main() {
             }
         }
         let a = SparseMatrix::from_triplets(m, n, &entries).unwrap();
-        let expected: Vec<_> = (0..n + m).map(|i| (i % 17) as f64 / 17. - 0.5).collect();
-        let rp = vec![0.1; n];
-        let rd = vec![0.2; m];
-        for kind in [SolverType::HiPO, SolverType::NormalEquations] {
-            let start = Instant::now();
-            let mut solver = SparseSolver::new(a.clone(), kind).unwrap();
-            let setup = start.elapsed();
-            let mut factor_ns = Vec::new();
-            let mut solve_ns = Vec::new();
-            let mut max_error = 0.0_f64;
-            // One warmup followed by measured refactorizations with changing diagonals.
-            for r in 0..=repeats {
-                let theta = vec![1. + r as f64 / repeats as f64; n];
-                let mut rhs = a.transpose_multiply(&expected[n..]).unwrap();
-                for j in 0..n {
-                    rhs[j] -= (theta[j] + rp[j]) * expected[j];
-                }
-                rhs.extend(
-                    a.multiply(&expected[..n])
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                        .map(|(i, v)| v + rd[i] * expected[n + i]),
-                );
-                let start = Instant::now();
-                solver.factorize(black_box(&theta), &rp, &rd).unwrap();
-                let factor = start.elapsed().as_nanos();
-                let start = Instant::now();
-                let x = black_box(solver.solve(black_box(&rhs)).unwrap());
-                let solve = start.elapsed().as_nanos();
-                for (x, e) in x.iter().zip(&expected) {
-                    max_error = max_error.max((x - e).abs());
-                }
-                if r > 0 {
-                    factor_ns.push(factor);
-                    solve_ns.push(solve);
-                }
-            }
-            assert!(max_error < 1e-8, "{name} {kind:?}: {max_error}");
-            factor_ns.sort_unstable();
-            solve_ns.sort_unstable();
-            println!("{name} {kind:?} rows={m} cols={n} nnz={} setup_ms={:.3} factor_us={:.3} solve_us={:.3} max_error={max_error:.3e}",
-                a.nnz(), setup.as_secs_f64() * 1000., factor_ns[repeats / 2] as f64 / 1000., solve_ns[repeats / 2] as f64 / 1000.);
+        measure(name, a, repeats);
+    }
+    // Captured routing master: exercise the actual row/column sparsity as well
+    // as synthetic patterns. The KKT witness below is independent of its LP optimum.
+    let mut lines = include_str!("../tests/ipm/fixtures/r201_master.txt").lines();
+    let shape: Vec<usize> = lines
+        .next()
+        .unwrap()
+        .split_whitespace()
+        .take(2)
+        .map(|v| v.parse().unwrap())
+        .collect();
+    lines.next(); // RHS
+    lines.next(); // Row senses
+    let mut entries = Vec::new();
+    for (j, line) in lines.enumerate() {
+        for value in line.split_whitespace().skip(3) {
+            let (i, v) = value.split_once(':').unwrap();
+            entries.push((i.parse().unwrap(), j, v.parse().unwrap()));
         }
+    }
+    measure(
+        "r201-master",
+        SparseMatrix::from_triplets(shape[0], shape[1], &entries).unwrap(),
+        repeats,
+    );
+}
+
+fn measure(name: &str, a: SparseMatrix, repeats: usize) {
+    let (m, n) = (a.rows(), a.cols());
+    let expected: Vec<_> = (0..n + m).map(|i| (i % 17) as f64 / 17. - 0.5).collect();
+    let rp = vec![0.1; n];
+    let rd = vec![0.2; m];
+    for kind in [SolverType::HiPO, SolverType::NormalEquations] {
+        let start = Instant::now();
+        let mut solver = SparseSolver::new(a.clone(), kind).unwrap();
+        let setup = start.elapsed();
+        let mut factor_ns = Vec::new();
+        let mut solve_ns = Vec::new();
+        let mut max_error = 0.0_f64;
+        // One warmup followed by measured refactorizations with changing diagonals.
+        for r in 0..=repeats {
+            let theta = vec![1. + r as f64 / repeats as f64; n];
+            let mut rhs = a.transpose_multiply(&expected[n..]).unwrap();
+            for j in 0..n {
+                rhs[j] -= (theta[j] + rp[j]) * expected[j];
+            }
+            rhs.extend(
+                a.multiply(&expected[..n])
+                    .unwrap()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| v + rd[i] * expected[n + i]),
+            );
+            let start = Instant::now();
+            solver.factorize(black_box(&theta), &rp, &rd).unwrap();
+            let factor = start.elapsed().as_nanos();
+            let start = Instant::now();
+            let x = black_box(solver.solve(black_box(&rhs)).unwrap());
+            let solve = start.elapsed().as_nanos();
+            for (x, e) in x.iter().zip(&expected) {
+                max_error = max_error.max((x - e).abs());
+            }
+            if r > 0 {
+                factor_ns.push(factor);
+                solve_ns.push(solve);
+            }
+        }
+        assert!(max_error < 1e-8, "{name} {kind:?}: {max_error}");
+        factor_ns.sort_unstable();
+        solve_ns.sort_unstable();
+        println!("{name} {kind:?} rows={m} cols={n} nnz={} setup_ms={:.3} factor_us={:.3} solve_us={:.3} max_error={max_error:.3e}",
+                a.nnz(), setup.as_secs_f64() * 1000., factor_ns[repeats / 2] as f64 / 1000., solve_ns[repeats / 2] as f64 / 1000.);
     }
 }
