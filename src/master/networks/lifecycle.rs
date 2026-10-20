@@ -44,7 +44,7 @@ impl<const D: usize> std::fmt::Debug for NodeSnapshot<D> {
 }
 
 impl<const D: usize> NodeSnapshot<D> {
-    fn fork(&self) -> Result<Self> {
+    pub(super) fn fork(&self) -> Result<Self> {
         Ok(Self {
             master: self.master.try_clone()?,
             warm: self.warm.clone(),
@@ -71,6 +71,8 @@ impl<const D: usize> NodeSnapshot<D> {
                 deadline: self.state.deadline,
                 shared_rows: self.state.shared_rows.clone(),
                 fixed_routes: self.state.fixed_routes.clone(),
+                universe: self.state.universe.clone(),
+                enumeration_report: self.state.enumeration_report.clone(),
             },
         })
     }

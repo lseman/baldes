@@ -99,7 +99,12 @@ pub(super) fn certificate<const D: usize>(
         if limits.upper == 0. {
             continue;
         }
-        match network_minimum(oracle, state.shared_offset, duals)? {
+        let minimum = if let Some(universe) = &state.universe {
+            super::enumeration::minimum(state, oracle, universe, duals)?
+        } else {
+            network_minimum(oracle, state.shared_offset, duals)?
+        };
+        match minimum {
             None if limits.lower > 0. => return None,
             None => {}
             Some(minimum) => {

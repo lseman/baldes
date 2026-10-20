@@ -160,3 +160,39 @@ fn model_validation_rejects_bad_ids_rows_resources_and_unknown_fields() {
         .success());
     std::fs::remove_file(path).unwrap();
 }
+
+#[test]
+fn enumeration_reporting_is_shared_with_python_and_partial_transfer_falls_back() {
+    let complete = solve(&["--enumerate"]);
+    assert_eq!(complete["status"], "Optimal");
+    assert_eq!(complete["enumeration_reports"][0]["complete"], true);
+    assert_eq!(complete["enumeration_reports"][0]["routes"], 9);
+    let partial = solve(&["--enumerate", "--enumeration-route-limit", "5"]);
+    assert_eq!(partial["status"], "Optimal");
+    assert_eq!(partial["enumeration_reports"][0]["complete"], false);
+    assert_eq!(partial["enumeration_reports"][0]["transferred"], 0);
+    let output = command()
+        .arg("networks")
+        .arg(fixture())
+        .arg("--enumerated-mip")
+        .output()
+        .unwrap();
+    assert!(!output.status.success()); // --tree is required.
+    #[cfg(not(feature = "highs"))]
+    assert!(!command()
+        .arg("networks")
+        .arg(fixture())
+        .args(["--tree", "--enumerated-mip"])
+        .output()
+        .unwrap()
+        .status
+        .success());
+    #[cfg(feature = "highs")]
+    {
+        let mip = solve(&["--tree", "--enumerated-mip"]);
+        assert_eq!(mip["status"], "Optimal");
+        assert_eq!(mip["incumbent"], 2.);
+        assert_eq!(mip["nodes"], 1);
+        assert_eq!(mip["enumerated_mip_calls"], 1);
+    }
+}

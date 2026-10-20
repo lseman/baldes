@@ -2,7 +2,7 @@
 //!
 //! Arc entries refer to shared rows. Each network also receives its own
 //! multiplicity rows. Additive rows and assignment branches survive node forks.
-//! Nonlinear cut separation and enumeration/MIP transfer remain separate workflows.
+//! Complete all-network enumeration can feed an optional HiGHS integer copy.
 use super::{clp::ClpMaster, column_generation as cg, root::Row, RowSense};
 use crate::{graph::Window, incomplete, invalid, pricing::Solver, Graph, Result, Route};
 use std::{
@@ -14,8 +14,10 @@ use std::{
 
 #[path = "network_bounds.rs"]
 mod bounds;
+mod enumeration;
 pub mod format;
 mod lifecycle;
+pub use enumeration::{EnumeratedMipOutput, EnumerationOptions, EnumerationReport};
 mod tree;
 pub use lifecycle::{Assignment, FixedRoute, NodeSnapshot, RowCoefficients};
 pub use tree::{solve_assignment_tree, AssignmentTreeOptions, AssignmentTreeOutput};
@@ -74,6 +76,7 @@ impl<const D: usize> Problem<D> {
 pub struct Options {
     pub cg: cg::Options,
     pub pricing_options: Vec<(String, f64)>,
+    pub enumeration: Option<EnumerationOptions>,
 }
 impl Default for Options {
     fn default() -> Self {
@@ -82,6 +85,7 @@ impl Default for Options {
         Self {
             cg,
             pricing_options: vec![],
+            enumeration: None,
         }
     }
 }
@@ -125,6 +129,8 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     deadline: Instant,
     shared_rows: Vec<Row>,
     fixed_routes: Vec<FixedRoute>,
+    universe: Option<Vec<usize>>,
+    enumeration_report: EnumerationReport,
 }
 struct Coordinator<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>(Rc<RefCell<State<D>>>);
 impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
@@ -185,6 +191,9 @@ fn entries<const D: usize>(
 
 impl<const D: usize> State<D> {
     fn price(&mut self, phase: usize, duals: &[f64]) -> Result<cg::Answer> {
+        if self.universe.is_some() {
+            return enumeration::price(self, duals);
+        }
         let mut columns = vec![];
         let mut minimum = f64::INFINITY;
         let mut exact = true;
@@ -404,6 +413,8 @@ pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Ou
         deadline,
         shared_rows,
         fixed_routes: vec![],
+        universe: None,
+        enumeration_report: EnumerationReport::default(),
     };
     run(master, state, options)
 }
@@ -422,6 +433,9 @@ fn run<const D: usize>(
         for (name, value) in &options.pricing_options {
             oracle.solver.set_option(name, *value)?;
         }
+    }
+    if let Some(configured) = &options.enumeration {
+        enumeration::transfer(&mut master, &mut state, &mut options.cg, configured)?;
     }
     let schedule = state.oracles[0].solver.phases.clone();
     let state = Rc::new(RefCell::new(state));

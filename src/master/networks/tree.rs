@@ -10,6 +10,7 @@ pub struct AssignmentTreeOptions {
     pub node_limit: usize,
     pub time_limit: Duration,
     pub tolerance: f64,
+    pub enumerated_mip: Option<crate::master::solvers::mip::MipOptions>,
 }
 impl Default for AssignmentTreeOptions {
     fn default() -> Self {
@@ -18,6 +19,7 @@ impl Default for AssignmentTreeOptions {
             node_limit: 10000,
             time_limit: Duration::from_secs(120),
             tolerance: 1e-6,
+            enumerated_mip: None,
         }
     }
 }
@@ -35,6 +37,10 @@ pub struct AssignmentTreeOutput {
     pub iterations: usize,
     pub pricing_calls: usize,
     pub oracle_calls: Vec<(i32, usize)>,
+    pub enumerated_mip_calls: usize,
+    pub enumerated_mip_nodes: usize,
+    pub enumerated_mip_failures: usize,
+    pub enumeration_reports: Vec<EnumerationReport>,
 }
 
 impl<const D: usize> NodeSnapshot<D> {
@@ -68,40 +74,45 @@ impl<const D: usize> NodeSnapshot<D> {
                 quantity,
             });
         }
-        let Some((mut rows, objective, counts)) =
-            bounds::exact_contributions(&self.state, &routes)?
-        else {
-            return Ok(None);
-        };
-        for (activity, row) in rows.iter_mut().zip(&self.state.shared_rows) {
-            if activity.add(-row.rhs).is_none() {
-                return Ok(None);
-            }
-            let sign = activity.sign();
-            if match row.sense {
-                RowSense::Equal => sign != 0.,
-                RowSense::LessEqual => sign > 0.,
-                RowSense::GreaterEqual => sign < 0.,
-            } {
-                return Ok(None);
-            }
-        }
-        for (count, oracle) in counts.iter().zip(&self.state.oracles) {
-            let mut lower = count.clone();
-            let mut upper = count.clone();
-            if lower.add(-oracle.total_multiplicity.lower).is_none()
-                || upper.add(-oracle.total_multiplicity.upper).is_none()
-                || lower.sign() < 0.
-                || upper.sign() > 0.
-            {
-                return Ok(None);
-            }
-        }
-        let Some(objective) = objective.upper() else {
-            return Ok(None);
-        };
-        Ok(Some((objective, routes)))
+        Ok(validate_routes(&self.state, &routes)?.map(|objective| (objective, routes)))
     }
+}
+
+pub(super) fn validate_routes<const D: usize>(
+    state: &State<D>,
+    routes: &[FixedRoute],
+) -> Result<Option<f64>> {
+    let Some((mut rows, objective, counts)) = bounds::exact_contributions(state, routes)? else {
+        return Ok(None);
+    };
+    for (activity, row) in rows.iter_mut().zip(&state.shared_rows) {
+        if activity.add(-row.rhs).is_none() {
+            return Ok(None);
+        }
+        let sign = activity.sign();
+        if match row.sense {
+            RowSense::Equal => sign != 0.,
+            RowSense::LessEqual => sign > 0.,
+            RowSense::GreaterEqual => sign < 0.,
+        } {
+            return Ok(None);
+        }
+    }
+    for (count, oracle) in counts.iter().zip(&state.oracles) {
+        let mut lower = count.clone();
+        let mut upper = count.clone();
+        if lower.add(-oracle.total_multiplicity.lower).is_none()
+            || upper.add(-oracle.total_multiplicity.upper).is_none()
+            || lower.sign() < 0.
+            || upper.sign() > 0.
+        {
+            return Ok(None);
+        }
+    }
+    let Some(objective) = objective.upper() else {
+        return Ok(None);
+    };
+    Ok(Some(objective))
 }
 
 /// Best-bound assignment tree. Each child prices all its networks and carries
@@ -109,9 +120,17 @@ impl<const D: usize> NodeSnapshot<D> {
 /// candidate leaves an open node; finite artificial penalties never prune it.
 pub fn solve_assignment_tree<const D: usize>(
     problem: Problem<D>,
-    options: AssignmentTreeOptions,
+    mut options: AssignmentTreeOptions,
 ) -> Result<AssignmentTreeOutput> {
     validate_options(&options.node)?;
+    if options.enumerated_mip.is_some() {
+        if !cfg!(feature = "highs") {
+            return Err(invalid("enumerated MIP requires the highs feature"));
+        }
+        if options.node.enumeration.is_none() {
+            options.node.enumeration = Some(EnumerationOptions::default());
+        }
+    }
     problem.validate()?;
     if !options.tolerance.is_finite() || options.tolerance <= 0. || options.tolerance >= 0.5 {
         return Err(invalid(
@@ -132,6 +151,10 @@ pub fn solve_assignment_tree<const D: usize>(
         iterations: 0,
         pricing_calls: 0,
         oracle_calls: problem.networks.iter().map(|n| (n.id, 0)).collect(),
+        enumerated_mip_calls: 0,
+        enumerated_mip_nodes: 0,
+        enumerated_mip_failures: 0,
+        enumeration_reports: vec![],
     };
     if options.node_limit == 0 {
         result.status = TreeStatus::NodeLimit;
@@ -191,7 +214,51 @@ pub fn solve_assignment_tree<const D: usize>(
                 *total += calls;
             }
         }
+        result
+            .enumeration_reports
+            .push(output.snapshot.enumeration_report().clone());
         let bound = output.master.bound;
+        if let Some(configured) = &options.enumerated_mip {
+            if output.snapshot.enumeration_report().complete {
+                let mut configured = configured.clone();
+                configured.time_limit = configured
+                    .time_limit
+                    .min(deadline.saturating_duration_since(Instant::now()));
+                configured.objective_cutoff = configured.objective_cutoff.min(result.incumbent);
+                result.enumerated_mip_calls += 1;
+                match output.snapshot.solve_enumerated_mip(&configured) {
+                    Ok(Some(mip)) => {
+                        use crate::master::solvers::mip::MipStatus;
+                        result.enumerated_mip_nodes += mip.mip.nodes;
+                        if let Some(solution) = &mip.mip.solution {
+                            if solution.objective < result.incumbent {
+                                result.incumbent = solution.objective;
+                                result.routes = mip.route_values;
+                            }
+                        }
+                        // HiGHS supplies a numerical integer bound; it never
+                        // becomes a directed-arithmetic publication certificate.
+                        if options.node.cg.bound_mode == cg::BoundMode::Numerical {
+                            if mip.mip.status == MipStatus::Infeasible {
+                                continue;
+                            }
+                            if matches!(
+                                mip.mip.status,
+                                MipStatus::Optimal | MipStatus::ObjectiveCutoff
+                            ) && result.incumbent.is_finite()
+                                && mip.mip.bound >= result.incumbent - options.tolerance
+                            {
+                                continue;
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        result.enumerated_mip_failures += 1;
+                    }
+                    Ok(None) => {}
+                }
+            }
+        }
         if output.master.status != cg::Status::Optimal {
             result.status = if output.master.status == cg::Status::TimeLimit {
                 TreeStatus::TimeLimit
@@ -241,8 +308,12 @@ pub fn solve_assignment_tree<const D: usize>(
         .map(|node| node.warm.bound)
         .chain(unresolved)
         .fold(result.incumbent, f64::min);
-    if result.open_nodes == 0 && result.incumbent.is_finite() {
-        result.status = TreeStatus::Optimal;
+    if result.open_nodes == 0 {
+        result.status = if result.incumbent.is_finite() {
+            TreeStatus::Optimal
+        } else {
+            TreeStatus::Infeasible
+        };
     }
     Ok(result)
 }

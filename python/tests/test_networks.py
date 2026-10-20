@@ -154,3 +154,42 @@ def test_json_resources_keep_exact_incumbent_validation():
         root.snapshot.fix_route(root.routes[0].route_index)
     tree = problem.solve(tree=True)
     assert tree.status == "Incomplete" and tree.incumbent is None
+
+
+def test_enumeration_reports_resume_and_unsupported_mip_builds():
+    from pybaldes import has_highs
+    parent = triangle().solve()
+    assert parent.snapshot.solve_enumerated_mip() is None
+    completed = parent.snapshot.solve(enumerate=True)
+    assert completed.lp == pytest.approx(1.5)
+    report = completed.enumeration_reports[0]
+    assert report.complete and report.routes == 9
+    repeated = completed.snapshot.solve(enumerate=True)
+    assert repeated.enumeration_reports[0].attempts == 1
+    partial = parent.snapshot.solve(enumerate=True, enumeration_route_limit=5)
+    assert not partial.enumeration_reports[0].complete
+    assert partial.enumeration_reports[0].transferred == 0
+    assert partial.snapshot.solve().lp == pytest.approx(1.5)
+    assert parent.snapshot.solve().enumeration_reports[0].attempts == 0
+    assert json.loads(completed.to_json())["enumeration_reports"][0]["complete"]
+    if not has_highs:
+        with pytest.raises(ValueError, match="highs"):
+            completed.snapshot.solve_enumerated_mip()
+        with pytest.raises(ValueError, match="highs"):
+            triangle().solve(tree=True, enumerated_mip=True)
+
+
+@pytest.mark.skipif(not __import__("pybaldes").has_highs, reason="HiGHS required")
+def test_full_integer_transfer_and_mip_retry():
+    completed = triangle().solve(enumerate=True)
+    mip = completed.snapshot.solve_enumerated_mip()
+    assert mip.mode == "mip" and mip.status == "Optimal"
+    assert mip.incumbent == pytest.approx(2.)
+    limited = completed.snapshot.solve_enumerated_mip(node_limit=0)
+    assert limited.status == "NodeLimit" and limited.incumbent is None
+    cutoff = completed.snapshot.solve_enumerated_mip(objective_cutoff=2.)
+    assert cutoff.status == "ObjectiveCutoff" and cutoff.incumbent is None
+    assert completed.snapshot.solve_enumerated_mip().incumbent == pytest.approx(2.)
+    tree = triangle().solve(tree=True, enumerated_mip=True)
+    assert tree.status == "Optimal" and tree.incumbent == pytest.approx(2.)
+    assert tree.nodes == 1 and tree.enumerated_mip_calls == 1

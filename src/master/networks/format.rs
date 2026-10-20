@@ -161,6 +161,14 @@ impl Model {
 #[serde(default, deny_unknown_fields)]
 pub struct SolveOptions {
     pub tree: bool,
+    pub enumerate: bool,
+    pub enumeration_route_limit: usize,
+    pub enumeration_work_limit: usize,
+    pub enumeration_stored_arc_limit: usize,
+    pub enumeration_time_limit: f64,
+    pub enumerated_mip: bool,
+    pub mip_time_limit: f64,
+    pub mip_node_limit: usize,
     pub time_limit: f64,
     pub max_iterations: usize,
     pub node_limit: usize,
@@ -174,6 +182,14 @@ impl Default for SolveOptions {
     fn default() -> Self {
         Self {
             tree: false,
+            enumerate: false,
+            enumeration_route_limit: 10000,
+            enumeration_work_limit: 10000000,
+            enumeration_stored_arc_limit: 1000000,
+            enumeration_time_limit: 1.,
+            enumerated_mip: false,
+            mip_time_limit: 1.,
+            mip_node_limit: 100000,
             time_limit: 120.,
             max_iterations: 100000,
             node_limit: 10000,
@@ -191,6 +207,23 @@ impl SolveOptions {
     }
     pub fn node_options(&self) -> Result<Options> {
         let mut options = Options::default();
+        if self.enumerated_mip && (!self.tree || !cfg!(feature = "highs")) {
+            return Err(invalid(
+                "enumerated MIP requires tree=True and the highs feature",
+            ));
+        }
+        let enumeration_time = Duration::try_from_secs_f64(self.enumeration_time_limit)
+            .map_err(|_| invalid("enumeration_time_limit must be finite and nonnegative"))?;
+        Duration::try_from_secs_f64(self.mip_time_limit)
+            .map_err(|_| invalid("mip_time_limit must be finite and nonnegative"))?;
+        if self.enumerate || self.enumerated_mip {
+            options.enumeration = Some(EnumerationOptions {
+                max_routes: self.enumeration_route_limit,
+                max_work: self.enumeration_work_limit,
+                max_stored_arcs: self.enumeration_stored_arc_limit,
+                time_limit: enumeration_time,
+            });
+        }
         options.cg.time_limit = Duration::try_from_secs_f64(self.time_limit)
             .map_err(|_| invalid("time_limit must be finite and nonnegative"))?;
         options.cg.max_iterations = self.max_iterations;
@@ -218,6 +251,16 @@ impl SolveOptions {
             time_limit: node.cg.time_limit,
             node,
             node_limit: self.node_limit,
+            enumerated_mip: if self.enumerated_mip {
+                Some(crate::master::solvers::mip::MipOptions {
+                    time_limit: Duration::try_from_secs_f64(self.mip_time_limit)
+                        .map_err(|_| invalid("MIP time limit"))?,
+                    node_limit: self.mip_node_limit,
+                    ..Default::default()
+                })
+            } else {
+                None
+            },
             ..AssignmentTreeOptions::default()
         })
     }
@@ -297,6 +340,10 @@ pub struct SolveResult {
     pub nodes: usize,
     pub open_nodes: usize,
     pub seconds: f64,
+    pub enumeration_reports: Vec<EnumerationReport>,
+    pub enumerated_mip_calls: usize,
+    pub enumerated_mip_nodes: usize,
+    pub enumerated_mip_failures: usize,
 }
 fn finite(value: f64) -> Option<f64> {
     value.is_finite().then_some(value)
@@ -330,6 +377,10 @@ impl SolveResult {
             oracle_calls: output.oracle_calls.clone(),
             nodes: 0,
             open_nodes: 0,
+            enumeration_reports: vec![output.snapshot.enumeration_report().clone()],
+            enumerated_mip_calls: 0,
+            enumerated_mip_nodes: 0,
+            enumerated_mip_failures: 0,
             seconds,
         }
     }
@@ -355,7 +406,50 @@ impl SolveResult {
             oracle_calls: output.oracle_calls.clone(),
             nodes: output.nodes,
             open_nodes: output.open_nodes,
+            enumeration_reports: output.enumeration_reports.clone(),
+            enumerated_mip_calls: output.enumerated_mip_calls,
+            enumerated_mip_nodes: output.enumerated_mip_nodes,
+            enumerated_mip_failures: output.enumerated_mip_failures,
             seconds,
+        }
+    }
+    pub fn mip(output: &EnumeratedMipOutput, report: &EnumerationReport, seconds: f64) -> Self {
+        let proof = matches!(
+            output.mip.status,
+            crate::master::solvers::mip::MipStatus::Optimal
+                | crate::master::solvers::mip::MipStatus::Infeasible
+                | crate::master::solvers::mip::MipStatus::ObjectiveCutoff
+        );
+        Self {
+            mode: "mip",
+            status: format!("{:?}", output.mip.status),
+            bound_mode: "numerical".into(),
+            lp: None,
+            bound: finite(output.mip.bound),
+            numerical_bound: finite(output.mip.bound),
+            certified_bound: None,
+            incumbent: output
+                .mip
+                .solution
+                .as_ref()
+                .and_then(|s| finite(s.objective)),
+            routes: output
+                .route_values
+                .iter()
+                .map(|f| RouteResult::new(&f.route, f.quantity, None))
+                .collect(),
+            fixed_routes: vec![],
+            duals: vec![],
+            iterations: 0,
+            pricing_calls: 0,
+            oracle_calls: vec![],
+            nodes: output.mip.nodes,
+            open_nodes: usize::from(!proof),
+            seconds,
+            enumeration_reports: vec![report.clone()],
+            enumerated_mip_calls: 1,
+            enumerated_mip_nodes: output.mip.nodes,
+            enumerated_mip_failures: 0,
         }
     }
     pub fn to_json(&self) -> Result<String> {

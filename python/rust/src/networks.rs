@@ -71,6 +71,32 @@ impl NetworkNode {
                 .map_err(error)?,
         })
     }
+    fn solve_enumerated_mip(
+        &self,
+        time_limit: f64,
+        node_limit: usize,
+        objective_cutoff: Option<f64>,
+    ) -> PyResult<Option<String>> {
+        let started = Instant::now();
+        let options = baldes::master::solvers::mip::MipOptions {
+            time_limit: std::time::Duration::try_from_secs_f64(time_limit).map_err(error)?,
+            node_limit,
+            objective_cutoff: objective_cutoff.unwrap_or(f64::INFINITY),
+        };
+        self.snapshot
+            .solve_enumerated_mip(&options)
+            .map_err(error)?
+            .map(|output| {
+                SolveResult::mip(
+                    &output,
+                    self.snapshot.enumeration_report(),
+                    started.elapsed().as_secs_f64(),
+                )
+                .to_json()
+                .map_err(error)
+            })
+            .transpose()
+    }
     fn fractional_assignments(&self, tolerance: f64) -> PyResult<Vec<(usize, i32, f64)>> {
         Ok(self
             .snapshot

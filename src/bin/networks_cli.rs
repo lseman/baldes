@@ -7,6 +7,12 @@ const HELP: &str = "Usage: baldes networks MODEL.json [OPTIONS]
 
 Solve shared master rows with multiple pricing networks (Clp).
   --tree                 Run the assignment branch-and-price tree
+  --enumerate            Attempt bounded full-domain all-network transfer
+  --enumerated-mip       Solve transferred nodes with HiGHS (--tree; highs feature)
+  --enumeration-route-limit N  Global enumeration candidate limit (default: 10000)
+  --enumeration-time SECONDS   Enumeration budget per attempt (default: 1)
+  --mip-time SECONDS     MIP budget per node (default: 1)
+  --mip-nodes N          MIP search-node budget per call (default: 100000)
   --time SECONDS         Total time budget (default: 120)
   --iterations N         Column-generation iteration limit per node
   --nodes N              Assignment tree node limit
@@ -44,6 +50,22 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
                 return Ok(());
             }
             "--tree" => options.tree = true,
+            "--enumerate" => options.enumerate = true,
+            "--enumerated-mip" => options.enumerated_mip = true,
+            "--enumeration-route-limit" => {
+                options.enumeration_route_limit =
+                    value()?.parse::<usize>().map_err(|e| e.to_string())?
+            }
+            "--enumeration-time" => {
+                options.enumeration_time_limit =
+                    value()?.parse::<f64>().map_err(|e| e.to_string())?
+            }
+            "--mip-time" => {
+                options.mip_time_limit = value()?.parse::<f64>().map_err(|e| e.to_string())?
+            }
+            "--mip-nodes" => {
+                options.mip_node_limit = value()?.parse::<usize>().map_err(|e| e.to_string())?
+            }
             "--no-stabilization" => options.stabilize = false,
             "--verbose" | "-v" => options.log_interval = Some(10),
             "--time" => options.time_limit = value()?.parse::<f64>().map_err(|e| e.to_string())?,

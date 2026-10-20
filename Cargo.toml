@@ -173,3 +173,8 @@ required-features = ["clp"]
 name = "networks_cli"
 path = "tests/api/networks_cli.rs"
 required-features = ["clp"]
+
+[[test]]
+name = "network_enumeration"
+path = "tests/master/network_enumeration.rs"
+required-features = ["clp"]

@@ -101,8 +101,9 @@ but a new original-domain bound stays unknown.
 ## Remaining integration
 
 The supported lifecycle uses additive rows. Automatic nonlinear cut separation,
-all-network enumeration/MIP transfer, other branching families, stronger
-resource-aware certificates and C dispatch remain open. The existing
+reduced-cost-pruned enumeration with proved coverage, adaptive in-loop
+transfer eligibility, other branching families, stronger resource-aware
+certificates and C dispatch remain open. The existing
 single-network routing entry points retain their current behavior.
 
 ## Validation
@@ -216,3 +217,82 @@ counts aggregate the evaluated nodes; `nodes` and `open_nodes` report tree work.
 cargo test --offline --features clp --test networks_cli
 python -m pytest python/tests/test_networks.py
 ```
+
+## Complete enumeration and integer transfer
+
+Enumeration is opt-in. `Options.enumeration` in Rust, `enumerate=True` in
+Python, or `--enumerate` in the CLI attempts a bounded full-domain transfer
+before column generation starts/resumes. This can strengthen an NG master to
+its elementary-route master. Every enabled network must complete before any
+columns are committed. Existing valid columns and their bounds remain; cyclic
+columns outside the integer domain are fixed to zero. All current physical
+rows, including additive cuts/branches, remain in place. Descendants reuse the
+complete route universe and evaluate new row coefficients on it.
+
+The first implementation supports nonempty physically elementary paths with
+**disposable scalar resources**. Graphs containing direct source/sink routes
+decline transfer because empty-route integer semantics are not yet defined. Collection uses a downward resource relaxation
+that cannot discard an exact-feasible path, then independently replays original
+resources. Unsupported resources, ambiguous canonical replay, global work/path/
+storage limits or timeout leave the transfer unavailable. Normal pricing remains
+usable. Limits apply across all enabled networks, not independently per network.
+The default candidate limit is 10,000, work limit 10,000,000, stored-arc limit
+1,000,000 and attempt budget one second. Disabled networks contribute no routes.
+
+`enumeration_reports` distinguishes no attempt, complete transfer and failure.
+Each report records attempts, per-network counts, route count, newly transferred
+columns and the failure reason. A repeated transfer on a complete snapshot does
+not duplicate columns. Failed transfers do not retain a partial universe.
+
+No reduced-cost/objective cutoff removes paths during this collection; coverage
+is the full supported domain, including incumbent routes. This is deliberately
+separate from adaptive reduced-cost enumeration: that optimization still needs
+a coverage proof and in-CG eligibility policy before it can replace this path.
+
+With the optional `highs` feature, the tree can solve a complete transferred
+copy as an integer model. Artificial columns are fixed to zero, and route
+bounds, fleet rows, shared rows, inherited cuts/branches, fixed-route RHS
+contributions and objective offsets are retained. Positive integer routes are
+replayed against the original graph and original rows before an incumbent is
+published. Source masters and siblings remain unchanged after any MIP outcome.
+
+```sh
+cargo build --offline --features clp,highs --bin baldes
+target/debug/baldes networks examples/networks/triangle.json --tree --enumerated-mip --json -
+# Force enumeration to decline and normal pricing/branching to continue:
+target/debug/baldes networks examples/networks/triangle.json --tree --enumerated-mip --enumeration-route-limit 5 --json -
+```
+
+`--enumerated-mip` requires `--tree` and HiGHS support; it also enables enumeration.
+`--enumeration-time`, `--mip-time` and `--mip-nodes` control per-attempt budgets.
+MIP timeout/node limits/backend failure do not authorize pricing termination.
+`enumerated_mip_calls`, `enumerated_mip_nodes` and `enumerated_mip_failures` report
+work and fallback. Full-MIP numerical proof outcomes may close numerical-mode
+nodes; they never become certified-mode lower-bound certificates. A cutoff
+without a validated witness is not an incumbent or an infeasibility claim.
+
+Python uses the same options and reports:
+
+```python
+from pybaldes import NetworkProblem
+problem = NetworkProblem.from_file("examples/networks/triangle.json")
+root = problem.solve(enumerate=True)
+assert root.enumeration_reports[0].complete
+integer = root.snapshot.solve_enumerated_mip(time_limit=1.0)
+assert integer.status == "Optimal" and integer.incumbent == 2.0
+# Or combine node enumeration and MIP with the tree:
+tree = problem.solve(tree=True, enumerated_mip=True)
+assert tree.nodes == 1 and tree.incumbent == 2.0
+```
+
+`node.solve(enumerate=True, enumeration_route_limit=..., enumeration_work_limit=...,
+enumeration_stored_arc_limit=..., enumeration_time_limit=...)` prepares a resumed
+node and returns a new snapshot. `solve_enumerated_mip` returns `None` when the
+node has not completed transfer. Its optional `objective_cutoff` filters improving
+witnesses without restricting enumeration; `ObjectiveCutoff` remains distinct
+from `Infeasible`. MIP calls on existing Python snapshots keep the GIL and their
+thread ownership. Fresh tree calls retain the existing GIL-release behavior.
+
+For Python, build with `maturin develop --features highs` (Clp is enabled by
+default). Clp-only builds still support complete enumeration; they reject MIP
+requests explicitly.

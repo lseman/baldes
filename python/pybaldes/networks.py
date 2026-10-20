@@ -139,6 +139,19 @@ class NetworkRoute:
 
 
 @dataclass(frozen=True)
+class NetworkEnumerationReport:
+    attempts: int
+    complete: bool
+    networks: Tuple[Tuple[int, int], ...]
+    routes: int
+    transferred: int
+    failure: Optional[str]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "networks", tuple(tuple(n) for n in self.networks))
+
+
+@dataclass(frozen=True)
 class NetworkNode:
     """Immutable, thread-bound native snapshot. Child operations preserve parents."""
     _native: Any = field(repr=False, compare=False)
@@ -159,6 +172,12 @@ class NetworkNode:
         if quantity <= 0 or quantity > 9_007_199_254_740_992:
             raise ValueError("quantity must be between 1 and 2**53")
         return NetworkNode(self._native.fix_route(route_index, quantity))
+
+    def solve_enumerated_mip(self, *, time_limit: float = 1.0, node_limit: int = 100000,
+                             objective_cutoff: Optional[float] = None) -> Optional[NetworkResult]:
+        """Solve a complete transferred copy with HiGHS, or return None if unprepared."""
+        text = self._native.solve_enumerated_mip(time_limit, node_limit, objective_cutoff)
+        return None if text is None else _result(text, None)
 
     def fractional_assignments(self, tolerance: float = 1e-6) -> Tuple[NetworkAssignment, ...]:
         return tuple(NetworkAssignment(*c) for c in self._native.fractional_assignments(tolerance))
@@ -183,12 +202,17 @@ class NetworkResult:
     nodes: int
     open_nodes: int
     seconds: float
+    enumeration_reports: Tuple[NetworkEnumerationReport, ...]
+    enumerated_mip_calls: int
+    enumerated_mip_nodes: int
+    enumerated_mip_failures: int
     snapshot: Optional[NetworkNode] = field(default=None, repr=False, compare=False)
 
     def to_json(self, *, indent: Optional[int] = 2) -> str:
         data = {k: v for k, v in vars(self).items() if k != "snapshot"}
         data["routes"] = [asdict(r) for r in self.routes]
         data["fixed_routes"] = [asdict(r) for r in self.fixed_routes]
+        data["enumeration_reports"] = [asdict(r) for r in self.enumeration_reports]
         return json.dumps(data, allow_nan=False, indent=indent)
 
 
@@ -196,6 +220,7 @@ def _result(text: str, native: Any) -> NetworkResult:
     data = json.loads(text)
     data["routes"] = tuple(NetworkRoute(**r) for r in data["routes"])
     data["fixed_routes"] = tuple(NetworkRoute(**r) for r in data["fixed_routes"])
+    data["enumeration_reports"] = tuple(NetworkEnumerationReport(**r) for r in data["enumeration_reports"])
     data["duals"] = tuple(data["duals"])
     data["oracle_calls"] = tuple(tuple(c) for c in data["oracle_calls"])
     return NetworkResult(**data, snapshot=None if native is None else NetworkNode(native))
@@ -212,6 +237,14 @@ def solve_networks(
     problem: NetworkProblem,
     *,
     tree: bool = False,
+    enumerate: bool = False,
+    enumeration_route_limit: int = 10000,
+    enumeration_work_limit: int = 10000000,
+    enumeration_stored_arc_limit: int = 1000000,
+    enumeration_time_limit: float = 1.0,
+    enumerated_mip: bool = False,
+    mip_time_limit: float = 1.0,
+    mip_node_limit: int = 100000,
     time_limit: float = 120.0,
     max_iterations: int = 100000,
     node_limit: int = 10000,
@@ -231,7 +264,11 @@ def solve_networks(
         raise TypeError("problem must be a NetworkProblem")
     if not _core.has_clp:
         raise RuntimeError("multi-network solving requires a build with Clp")
-    options = dict(tree=tree, time_limit=time_limit, max_iterations=max_iterations,
+    options = dict(tree=tree, enumerate=enumerate, enumeration_route_limit=enumeration_route_limit,
+                   enumeration_work_limit=enumeration_work_limit, enumeration_stored_arc_limit=enumeration_stored_arc_limit,
+                   enumeration_time_limit=enumeration_time_limit, enumerated_mip=enumerated_mip,
+                   mip_time_limit=mip_time_limit, mip_node_limit=mip_node_limit,
+                   time_limit=time_limit, max_iterations=max_iterations,
                    node_limit=node_limit, stabilize=stabilize, bound_mode=bound_mode,
                    artificial_cost=artificial_cost, log_interval=log_interval,
                    pricing_options={} if pricing_options is None else dict(pricing_options))
