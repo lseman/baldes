@@ -9,7 +9,12 @@ type Model = c_void;
 extern "C" {
     fn Clp_newModel() -> *mut Model;
     fn baldes_clp_clone(m: *const Model) -> *mut Model;
-    fn baldes_clp_dual_limited(m: *mut Model, iterations: i32, seconds: f64) -> i32;
+    fn baldes_clp_dual_limited(
+        m: *mut Model,
+        iterations: i32,
+        seconds: f64,
+        keep_work_areas: i32,
+    ) -> i32;
     #[cfg(test)]
     fn baldes_clp_solve_limits(m: *mut Model, values: *mut f64);
     #[cfg(test)]
@@ -44,7 +49,7 @@ extern "C" {
     fn Clp_chgColumnUpper(m: *mut Model, upper: *const f64);
     fn Clp_deleteRows(m: *mut Model, n: i32, indices: *const i32);
     fn Clp_deleteColumns(m: *mut Model, n: i32, indices: *const i32);
-    fn Clp_dual(m: *mut Model, values_pass: i32) -> i32;
+    fn Clp_scaling(m: *mut Model, mode: i32);
     fn Clp_status(m: *mut Model) -> i32;
     fn Clp_secondaryStatus(m: *mut Model) -> i32;
     fn Clp_objectiveValue(m: *mut Model) -> f64;
@@ -93,6 +98,7 @@ impl MasterSolver {
 pub struct ClpMaster {
     model: NonNull<Model>,
     solver: MasterSolver,
+    clp_options: ClpOptions,
     highs_row_basic: Vec<bool>,
     #[cfg(feature = "highs")]
     highs_backend: Option<super::highs::HighsMaster>,
@@ -170,3 +176,9 @@ mod model;
 mod solve;
 
 mod interface;
+
+mod options;
+pub use options::{ClpOptions, ClpScaling};
+
+#[cfg(test)]
+mod reoptimization_tests;

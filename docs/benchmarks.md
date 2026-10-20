@@ -2,18 +2,72 @@
 
 [Documentation index](README.md) · [Build and validation](testing.md)
 
-Root relaxations of Solomon VRPTW instances (100 customers). Both solvers
-use the same split-depot graph with unrounded
-Euclidean distances, the same NG neighbourhoods (the 8 nearest customers), the
-Clp master and no reduced-cost fixing or enumeration. Times are the solvers' own
-root timers, medians of three runs, each solver running alone on an AMD
-Ryzen 9 9950X. The reference run uses one thread; BALDES runs the forward and backward
-labeling of exact pricing on two threads, so it is timed on one and two cores.
+Root relaxations of Solomon VRPTW instances (100 customers), using split-depot
+graphs, unrounded Euclidean distances, NG neighbourhoods of the 8 nearest
+customers, the Clp master, and no reduced-cost fixing or enumeration. Times are
+the solvers' own root timers, reported as medians of three runs on an AMD
+Ryzen 9 9950X.
+
+The chart retains the **historical VRPSolver one-thread measurements** and
+refreshes **both BALDES series on October 20, 2026**. BALDES uses automatic Clp
+scaling, retained work areas and numerical bounds, with optional SIMD disabled.
+Its forward/backward exact pricing uses two threads; one-core and two-core runs
+are pinned to CPU 0 and CPUs 0/1 respectively (different physical cores).
+One warmup precedes three measured runs per case/core configuration, alternating
+core configurations. Other work was running on the machine, so the new times
+are indicative; the displayed speedups compare against historical reference
+values rather than a fresh paired reference run.
 
 ![Root relaxation solve times](benchmark.svg)
 
 On C101–C103, C201, C202 and R102, rank-one separation finds no violated cut,
 so those runs equal the ones without cuts.
+
+## Current chart refresh (October 20, 2026)
+
+The initial refresh used CPUs 14/15 instead of the earlier CPUs 0/1. A
+[paired regression check](runtime-regression-check-20261020.md) found different
+effective clock rates between those core groups and additional timing variation.
+The chart now consistently uses CPU 0 and CPUs 0/1. On matched CPUs 0/1, saved
+portable/current-default medians were 5.6933/5.5844 s on R202 and 1.8307/1.6871 s
+on R103 rank-one; the suspected regression did not reproduce.
+
+All 104 warmup/measured runs in the corrected chart batch finished with optimal
+root LP termination. Every non-timing JSON field matches the preceding 14/15
+chart batch, including histories, routes, work counts, objectives and bounds.
+This is root LP termination, not a general integer optimality certificate.
+
+| Workload | One core | Two cores |
+| --- | ---: | ---: |
+| C101 | 0.0617 s | 0.0616 s |
+| C102 | 0.3819 s | 0.3652 s |
+| C103 | 1.0354 s | 0.9654 s |
+| C201 | 0.1277 s | 0.1264 s |
+| C202 | 10.6514 s | 9.7075 s |
+| R101 | 0.0482 s | 0.0481 s |
+| R101-rank1 | 1.1443 s | 1.1409 s |
+| R102 | 0.2883 s | 0.2839 s |
+| R103 | 0.8663 s | 0.8486 s |
+| R103-rank1 | 1.7604 s | 1.6963 s |
+| R201 | 1.4887 s | 1.4657 s |
+| R201-rank1 | 6.8624 s | 6.7643 s |
+| R202 | 5.8373 s | 5.5827 s |
+| Geometric mean, all 13 | 0.7916 s | 0.7693 s |
+
+These are default automatic-scaling/retained-work-area results. The optional
+geometric-scaling experiment is described in the [Clp investigation](clp-tuning-20261020.md)
+and is not mixed into this chart. Background work was present; the numbers remain
+local indicative measurements.
+
+The SVG embeds the binary hash, full-precision medians and settings in its metadata.
+Raw JSON, logs and the runner are retained locally in
+`results/chart-refresh-cpu01-20261020/`; the preceding 14/15 batch remains in
+`results/chart-refresh-20261020/`. Historical reference values are unchanged;
+speedup pills use the reference times displayed in the previous chart.
+
+For future updates, preserve CPU placement and benchmark settings, and run a
+saved baseline alongside the candidate. Compare hardware work counters and full
+non-timing outputs before attributing elapsed-time changes to solver code.
 
 ## Original-domain certificate search regression
 

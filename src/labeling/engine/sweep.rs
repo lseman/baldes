@@ -274,6 +274,11 @@ impl<'a, const D: usize> Sweep<'a, D> {
                 let mut repeat = false;
                 for &id in component {
                     self.filter::<BRANCHING>(g, forward, id, controls);
+                    // Empty buckets have no extensions or labels to expand.
+                    // Keep filtering above and component lower bounds below.
+                    if self.storage.buckets[id.vertex][id.bucket].active.is_empty() {
+                        continue;
+                    }
                     // The bucket graph is fixed during the sweep: copy each arc
                     // as it is used instead of cloning the bucket's arc list.
                     let arc_count = self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket]
@@ -297,10 +302,16 @@ impl<'a, const D: usize> Sweep<'a, D> {
                             if clock % 64 == 0 && started.elapsed() >= controls.time_limit {
                                 return Err(incomplete("pricing hard time limit exceeded"));
                             }
-                            let own = self.storage.labels.len();
-                            self.labels.0.store(own, Ordering::Relaxed);
-                            if own + self.labels.1.load(Ordering::Relaxed) >= controls.max_labels {
-                                return Err(incomplete("pricing label limit exceeded"));
+                            // usize::MAX denotes an unlimited label budget. In that
+                            // case neither direction needs to publish or read counts.
+                            if controls.max_labels != usize::MAX {
+                                let own = self.storage.labels.len();
+                                self.labels.0.store(own, Ordering::Relaxed);
+                                if own + self.labels.1.load(Ordering::Relaxed)
+                                    >= controls.max_labels
+                                {
+                                    return Err(incomplete("pricing label limit exceeded"));
+                                }
                             }
                             let (from_vertex, extension) =
                                 if let Some(from) = R::get(&self.storage.labels, index) {

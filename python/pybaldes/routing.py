@@ -125,6 +125,7 @@ class RootResult:
     solver_seconds: float
     routes: Tuple[RootRoute, ...]
     history: Tuple[Iteration, ...]
+    simplex_iterations: int = 0
 
     def to_dict(self) -> dict:
         """Return ordinary Python data, retaining infinite unknown incumbents."""
@@ -158,6 +159,8 @@ def solve_root(
     stabilize: bool = True,
     master_solver: str = "clp",
     bound_mode: str = "numerical",
+    clp_scaling: str = "auto",
+    clp_keep_work_areas: bool = True,
     verbose: bool = False,
     log_interval: int = 10,
     hgs_time: Optional[float] = None,
@@ -177,6 +180,8 @@ def solve_root(
     (unrounded for Solomon, TSPLIB nint for CVRPLIB EUC_2D); rounding accepts
     'none', 'nearest', 'tenth' and 'ceil'.
     verbose=True prints a CG progress table to stderr every log_interval iterations.
+    clp_scaling selects auto, geometric, equilibrium, or off for Clp.
+    clp_keep_work_areas retains native work buffers between LP solves by default.
     master_solver='highs' selects HiGHS (requires a build with its feature);
     master_solver='ipm' uses native IPM and disables stabilization. hgs_time
     gives HGS a separate positive search budget before column generation;
@@ -206,7 +211,7 @@ def solve_root(
         instance.name, instance.vehicles, instance.capacity, rows, distances, problem_type,
         ng, reference_ng, rounding or instance.rounding, capacity_cuts, rank_one_cuts, stabilize,
         reduced_cost_fixing, upper_bound, time_limit, max_iterations,
-        max_cut_rounds, dict(pricing_options or {}), two_path_cuts, master_solver, hgs_time, str(hgs_columns), hgs_seed, verbose, log_interval, bound_mode,
+        max_cut_rounds, dict(pricing_options or {}), two_path_cuts, master_solver, hgs_time, str(hgs_columns), hgs_seed, verbose, log_interval, bound_mode, clp_scaling, clp_keep_work_areas,
     )
     data["duals"] = tuple(data["duals"])
     data["routes"] = tuple(

@@ -130,11 +130,13 @@ struct BaldesScopedSolveLimits {
   BaldesScopedSolveLimits(const BaldesScopedSolveLimits &) = delete;
   BaldesScopedSolveLimits &operator=(const BaldesScopedSolveLimits &) = delete;
 };
-extern "C" int baldes_clp_dual_limited(Clp_Simplex *model, int iterations, double seconds) {
-  if (!model || iterations < 0 || !std::isfinite(seconds) || seconds < 0.0) return -1;
+extern "C" int baldes_clp_dual_limited(Clp_Simplex *model, int iterations, double seconds, int keepWorkAreas) {
+  if (!model || iterations < 0 || !std::isfinite(seconds) || seconds < 0.0 || (keepWorkAreas != 0 && keepWorkAreas != 1)) return -1;
   try {
     BaldesScopedSolveLimits limits(*model->model_, iterations, seconds);
-    Clp_dual(model, 0);
+    // Bit 1 retains work areas. Rebuild/init stays enabled; do not force
+    // factorization reuse (bit 2) or skip initialization (bit 4).
+    model->model_->dual(0, keepWorkAreas);
     return 0;
   } catch (...) {
     model->model_->setProblemStatus(4);

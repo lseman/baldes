@@ -13,7 +13,7 @@ use crate::cuts::knapsack::{
 };
 use crate::cuts::kpath::{KPathGraph, KPathParameters, KPathSeparator, NativeKPathSeparator};
 use crate::cuts::FractionalColumn;
-pub use crate::master::solvers::clp::MasterSolver;
+pub use crate::master::solvers::clp::{ClpOptions, ClpScaling, MasterSolver};
 use crate::pricing::Solver;
 use crate::{invalid, Graph, Result, Route};
 use std::cell::RefCell;

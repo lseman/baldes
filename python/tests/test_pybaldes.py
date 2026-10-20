@@ -249,3 +249,22 @@ def test_general_scalar_resource_dimensions():
 def test_resource_capacity_is_fixed_at_build_time():
     with pytest.raises(RuntimeError):
         pybaldes.Solver(3, pybaldes.resource_dimensions + 1)
+
+
+@pytest.mark.parametrize("scaling", ["auto", "geometric", "equilibrium", "off"])
+@pytest.mark.parametrize("keep", [False, True])
+@pytest.mark.parametrize("rank_one", [False, True])
+def test_clp_runtime_policy_preserves_routing_solution(scaling, keep, rank_one):
+    result = solve_root(
+        triangle(), clp_scaling=scaling, clp_keep_work_areas=keep,
+        reduced_cost_fixing=False, rank_one_cuts=rank_one,
+    )
+    assert result.status == "Optimal"
+    expected = 4 + math.sqrt(2) if rank_one else 3 + 1.5 * math.sqrt(2)
+    assert result.lp == pytest.approx(expected, abs=1e-6)
+    assert_routes(result, 3, 2)
+
+
+def test_invalid_clp_scaling_is_rejected():
+    with pytest.raises(ValueError, match="Clp scaling"):
+        solve_root(triangle(), clp_scaling="invalid")

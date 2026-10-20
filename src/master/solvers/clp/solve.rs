@@ -29,11 +29,10 @@ impl ClpMaster {
                 Ok(ClpSolveOutcome::Optimal)
             );
         }
-        // SAFETY: The model is exclusively borrowed and owned by this handle.
-        unsafe {
-            Clp_dual(self.model.as_ptr(), 0);
-        }
-        self.read_solution()
+        matches!(
+            self.solve_limited(i32::MAX as usize, Duration::MAX),
+            Ok(ClpSolveOutcome::Optimal)
+        )
     }
 
     /// Cooperatively limit one LP solve by elapsed wall time and simplex pivots.
@@ -69,7 +68,12 @@ impl ClpMaster {
         // SAFETY: The native scope guard restores this owned model's limits
         // before returning, including on caught C++ exceptions.
         let failed = unsafe {
-            baldes_clp_dual_limited(self.model.as_ptr(), iterations, time_limit.as_secs_f64())
+            baldes_clp_dual_limited(
+                self.model.as_ptr(),
+                iterations,
+                time_limit.as_secs_f64(),
+                i32::from(self.clp_options.keep_work_areas),
+            )
         } != 0;
         if failed {
             self.status = 4;

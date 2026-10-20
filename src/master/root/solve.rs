@@ -108,6 +108,7 @@ pub(super) fn solve_seeded<const D: usize>(
         (None, ClpMaster::new()?)
     };
     master.set_solver(options.master_solver);
+    master.set_clp_options(options.clp_options);
     if options.cg.log_interval.is_some() {
         crate::log_err!(
             "  Master: {:?} | Node depth: {} | Stabilization: {} | Bound mode: {}",
