@@ -236,3 +236,69 @@ not integer routing optimality or a guarantee of identical Clp/HiGHS trajectorie
 An attempted RC201 workload was excluded because its input file is absent.
 Raw commands, timings, counters, option shim and frozen executable are retained
 in `../baldes-verification/benchmarks/highs-tuning-20261019/`.
+
+## Optional AVX2 dominance scans (October 19, 2026)
+
+The opt-in `simd` Cargo feature accelerates the disposable-resource/NG
+candidate filter on x86-64 CPUs supporting AVX2. Runtime detection retains the
+portable implementation on other CPUs. The optimized filter processes four
+labels at once and preserves first-match order and the exact placement of
+`EPSILON` in forward/backward comparisons. Full dominance, cut state,
+incumbent validation and certification policy are unchanged. Scans with fewer
+than 16 remaining labels use the portable path to avoid dispatch overhead.
+The configured resource capacity remains const-generic and unrestricted;
+this filter specializes models with one or two active disposable resources
+within a compiled capacity of at least two.
+
+On the Ryzen 9 9950X, a fresh R201/100 rank-one profile attributed about 4.2%
+of sampled cycles to the prefix candidate filter. The portable implementation
+already auto-vectorizes, so simply compiling that same kernel for AVX2 was
+essentially flat (7.253 s versus 7.264 s in the initial screen). The explicit
+AVX2 implementation combines resource and NG comparisons into lane masks.
+A focused 200,000-call microbenchmark measured full prefix scans of 64, 256
+and 1,024 labels at approximately 16/62/253 ns portable versus 10/35/142 ns
+with SIMD dispatch. Immediate matches cost about 2 ns in both paths. These
+microbenchmarks measure one specialization and do not represent total solver
+speedups.
+
+Reproduce the microbenchmark with:
+
+```sh
+cargo test --release --features simd --lib measure_dispatch -- --ignored --nocapture
+```
+
+Solver comparisons use frozen release executables, Clp, 100 customers,
+8-NN reference NG, unrounded Euclidean distances, enumeration disabled and
+numerical bound mode. Runs are sequential and alternating, pinned to CPUs
+`0,1`, with one warmup followed by three measured runs per executable.
+OpenMP/OpenBLAS/MKL thread environment variables are set to `1`.
+Every non-timing JSON field must match, including routes, bounds, iteration
+history and work counts. The baseline is commit `349b84e`, without SIMD or
+`target-cpu=native`. Raw profiles, executables, scripts and JSON are retained
+locally under `results/optional-simd-20261019/`.
+
+Median solver-reported times from the five-case comparison:
+
+| Instance | Portable | Optional SIMD | Change |
+| --- | ---: | ---: | ---: |
+| C101 | 0.064537 s | 0.064476 s | -0.09% |
+| C202 | 12.413117 s | 12.277061 s | -1.10% |
+| R103-rank1 | 1.828878 s | 1.842685 s | +0.75% |
+| R201-rank1 | 7.248671 s | 7.210256 s | -0.53% |
+| R202 | 5.674164 s | 5.671850 s | -0.04% |
+
+The geometric-mean time ratio is 0.9980 (SIMD/portable). The measured
+solver gains are small and workload-dependent; R103 rank-one is slightly
+slower, and C101/R202 are effectively flat. Three measured runs cannot
+establish the significance of sub-percent differences. This remains an
+opt-in experiment, disabled by default, rather than a default performance
+claim. All 40 warmup/measured solver outputs match outside the three timing
+fields (`seconds`, `pricing_seconds`, `master_seconds`).
+
+Validation: 335 Clp/SIMD tests, 71 portable library tests and 10 configuration
+tests passed; the Python extension checks with the forwarded `simd` feature.
+The numerical differential test covers all 16 scan modes, block/tail lengths,
+all starting positions, NG masks, EPSILON boundaries, signed zeros, subnormal
+values, infinities and NaNs. Malformed public columns are checked before
+vector loads. Changed Rust files pass rustfmt; the workspace-wide format
+check still reports existing formatting differences in untouched files.

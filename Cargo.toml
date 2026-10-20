@@ -32,6 +32,8 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 
 [features]
 default = []
+# Runtime-dispatched AVX2 dominance scans; portable fallback on other CPUs.
+simd = []
 # Clp restricted master and column-generation loop. Builds Clp 1.17.10 and
 # CoinUtils 2.11 from the vendor/ submodules.
 clp = ["dep:cc"]

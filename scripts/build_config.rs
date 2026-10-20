@@ -17,6 +17,7 @@ struct Config {
     cli: bool,
     release: bool,
     native_cpu: bool,
+    simd: bool,
     release_debug: bool,
     offline: bool,
     locked: bool,
@@ -34,6 +35,7 @@ impl Default for Config {
             cli: false,
             release: true,
             native_cpu: false,
+            simd: false,
             release_debug: false,
             offline: false,
             locked: true,
@@ -71,6 +73,7 @@ impl Config {
                 "CONFIG_CLP" => config.clp = boolean()?,
                 "CONFIG_HIGHS" => config.highs = boolean()?,
                 "CONFIG_CLI" => config.cli = boolean()?,
+                "CONFIG_SIMD" => config.simd = boolean()?,
                 "CONFIG_NATIVE_CPU" => config.native_cpu = boolean()?,
                 "CONFIG_RELEASE_DEBUG" => config.release_debug = boolean()?,
                 "CONFIG_OFFLINE" => config.offline = boolean()?,
@@ -138,12 +141,13 @@ impl Config {
         format!(
             "# BALDES build configuration; edit with make config.\n\
             CONFIG_PROFILE={}\nCONFIG_CLP={}\nCONFIG_HIGHS={}\nCONFIG_CLI={}\n\
-            CONFIG_NATIVE_CPU={}\nCONFIG_RELEASE_DEBUG={}\nCONFIG_OFFLINE={}\nCONFIG_LOCKED={}\n\
+            CONFIG_SIMD={}\nCONFIG_NATIVE_CPU={}\nCONFIG_RELEASE_DEBUG={}\nCONFIG_OFFLINE={}\nCONFIG_LOCKED={}\n\
             CONFIG_JOBS={}\nCONFIG_RESOURCE_DIMENSIONS={}\nCONFIG_TARGET={}\nCONFIG_HIGHS_DIR={}\n",
             if self.release { "release" } else { "dev" },
             yn(self.clp),
             yn(self.highs),
             yn(self.cli),
+            yn(self.simd),
             yn(self.native_cpu),
             yn(self.release_debug),
             yn(self.offline),
@@ -198,12 +202,15 @@ impl Config {
             },
             "--no-default-features".into(),
         ]);
-        let features = match (self.clp, self.highs) {
-            (true, true) => "clp,highs",
-            (true, false) => "clp",
-            (false, true) => "highs",
-            _ => "",
-        };
+        let features = [
+            (self.clp, "clp"),
+            (self.highs, "highs"),
+            (self.simd, "simd"),
+        ]
+        .into_iter()
+        .filter_map(|(enabled, name)| enabled.then_some(name))
+        .collect::<Vec<_>>()
+        .join(",");
         if !features.is_empty() {
             args.extend(["--features".into(), features.into()]);
         }
@@ -307,6 +314,7 @@ impl Config {
                         .map_err(|_| "Resource dimensions must be a nonnegative usize")?;
                 }
             }
+            12 => self.simd = !self.simd,
             _ => {}
         }
         Ok(())
@@ -327,6 +335,7 @@ impl Config {
             (format!("Target triple              <{}>",if self.target.is_empty(){"host"}else{&self.target}),"Empty means host. Otherwise install that Rust target and its linker first."),
             (format!("HiGHS installation         <{}>",if self.highs_dir.is_empty(){"auto / environment"}else{&self.highs_dir}),"Optional installation root holding lib/libhighs. Empty preserves HIGHS_DIR from your shell."),
             (format!("Scalar resource dimensions <{}>", self.resource_dimensions),"Compiled scalar capacity for C/Python and Rust defaults; explicit Rust const counts remain arbitrary."),
+            (format!("{} Optional AVX2 dominance scans", check(self.simd)), "Runtime CPU detection; portable fallback on CPUs without AVX2. Default off."),
         ]
     }
 }
@@ -510,10 +519,10 @@ fn line(row: usize, text: &str, width: usize, highlight: bool) {
 fn draw(terminal: &Terminal, config: &Config, selected: usize, message: &str) -> Result<()> {
     let (height, width) = terminal.size();
     print!("\x1b[H\x1b[2J");
-    if height < 22 || width < 65 {
+    if height < 23 || width < 65 {
         line(
             1,
-            "Resize terminal to at least 65 columns x 22 rows.",
+            "Resize terminal to at least 65 columns x 23 rows.",
             width,
             false,
         );
@@ -534,14 +543,14 @@ fn draw(terminal: &Terminal, config: &Config, selected: usize, message: &str) ->
         for (i, (text, _)) in config.rows().iter().enumerate() {
             line(6 + i, text, width, i == selected);
         }
-        line(18, config.rows()[selected].1, width, false);
+        line(19, config.rows()[selected].1, width, false);
         line(
-            20,
+            21,
             "Core pricing, HGS, cuts and native IPM are always included.",
             width,
             false,
         );
-        line(21, message, width, false);
+        line(22, message, width, false);
     }
     io::stdout().flush().map_err(|e| e.to_string())
 }
@@ -591,14 +600,22 @@ fn menu(config: &mut Config, path: &Path) -> Result<()> {
                 }
                 Err(e) => message = e,
             },
-            Key::Up | Key::Byte(b'k' | b'K') => selected = (selected + config.rows().len() - 1) % config.rows().len(),
-            Key::Down | Key::Byte(b'j' | b'J' | b'\t') => selected = (selected + 1) % config.rows().len(),
+            Key::Up | Key::Byte(b'k' | b'K') => {
+                selected = (selected + config.rows().len() - 1) % config.rows().len()
+            }
+            Key::Down | Key::Byte(b'j' | b'J' | b'\t') => {
+                selected = (selected + 1) % config.rows().len()
+            }
             Key::Left | Key::Right | Key::Byte(b' ' | b'\r' | b'\n') => {
                 let value = match selected {
                     8 => input(&terminal, "Jobs (0 = automatic)", &config.jobs.to_string())?,
                     9 => input(&terminal, "Target triple (empty = host)", &config.target)?,
                     10 => input(&terminal, "HiGHS root (empty = auto)", &config.highs_dir)?,
-                    11 => input(&terminal, "Scalar capacity (default = 2)", &config.resource_dimensions.to_string())?,
+                    11 => input(
+                        &terminal,
+                        "Scalar capacity (default = 2)",
+                        &config.resource_dimensions.to_string(),
+                    )?,
                     _ => None,
                 };
                 message = match config.edit(selected, value) {
@@ -679,6 +696,23 @@ mod tests {
             .iter()
             .map(|x| x.to_string_lossy().into_owned())
             .collect()
+    }
+
+    #[test]
+    fn optional_simd_round_trips_and_reaches_cargo() {
+        let mut c = Config::default();
+        assert!(!c.simd);
+        c.edit(12, None).unwrap();
+        assert_eq!(Config::parse(&c.text()).unwrap(), c);
+        assert!(args(&c, "build")
+            .windows(2)
+            .any(|w| w == ["--features", "simd"]));
+        c.clp = true;
+        assert!(args(&c, "test")
+            .windows(2)
+            .any(|w| w == ["--features", "clp,simd"]));
+        c.edit(12, None).unwrap();
+        assert!(!c.simd);
     }
 
     #[test]
@@ -786,7 +820,10 @@ mod tests {
         assert_eq!(Config::parse(&c.text()).unwrap(), c);
         for action in ["build", "check", "test", "clippy"] {
             assert_eq!(
-                c.cargo(action).unwrap().vars.get(OsStr::new("BALDES_RESOURCE_DIMENSIONS")),
+                c.cargo(action)
+                    .unwrap()
+                    .vars
+                    .get(OsStr::new("BALDES_RESOURCE_DIMENSIONS")),
                 Some(&OsString::from("5"))
             );
         }
@@ -797,7 +834,7 @@ mod tests {
         c.edit(11, Some("0".into())).unwrap();
         assert_eq!(c.resource_dimensions, 0);
         assert!(c.cargo("clean").unwrap().vars.is_empty());
-        assert_eq!(c.rows().len(), 12);
+        assert_eq!(c.rows().len(), 13);
     }
     #[test]
     fn clean_does_not_receive_build_flags() {

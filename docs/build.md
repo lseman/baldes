@@ -38,7 +38,7 @@ make              # Compile with the saved settings
 `make menuconfig` opens the same window. Use **Up/Down** or **J/K** to select
 an option, **Space/Enter** to change it, **S** to save and exit, and **Q/Escape**
 to discard changes. Text fields accept Enter to confirm, Escape to cancel,
-Backspace to delete and Ctrl-U to clear. Resize to at least 65 columns by 22
+Backspace to delete and Ctrl-U to clear. Resize to at least 65 columns by 23
 rows; press a key after resizing to refresh the view.
 
 This is a kernel-style terminal menu, implemented in Rust rather than Linux's
@@ -56,6 +56,7 @@ configuration, so it does not need to build the solver first.
 | Clp | Off | Enable the `clp` Cargo feature |
 | HiGHS | Off | Enable the `highs` Cargo feature |
 | Command-line program | Off | Build the `baldes` executable along with the library; selects Clp |
+| Optional SIMD | Off | Enable runtime-dispatched AVX2 dominance scans (`simd` feature) |
 | Native CPU | Off | Add `-C target-cpu=native`, preserving existing Rust flags |
 | Release debug symbols | Off | Set `CARGO_PROFILE_RELEASE_DEBUG=1` for profiling |
 | Offline | Off | Pass `--offline` to Cargo |
@@ -116,6 +117,7 @@ CONFIG_PROFILE=release
 CONFIG_CLP=y
 CONFIG_HIGHS=y
 CONFIG_CLI=y
+CONFIG_SIMD=n
 CONFIG_NATIVE_CPU=n
 CONFIG_RELEASE_DEBUG=n
 CONFIG_OFFLINE=n
@@ -155,3 +157,13 @@ coordinates. The saved setting overrides `BALDES_RESOURCE_DIMENSIONS` inherited
 from the shell for Make builds. Direct Cargo or maturin builds use that environment
 variable instead and do not read `.config`. Explicit Rust `Graph::<D>` / `Solver::<D>`
 counts remain independent of the configured default. See [scalar resources](resources.md).
+
+Optional SIMD is disabled by default. Enable `CONFIG_SIMD=y` in `make config`,
+use `cargo build --release --features clp,simd`, or pass `--features clp,simd`
+to maturin. On x86-64, sufficiently long disposable-resource dominance scans
+use AVX2 after runtime CPU detection. Other CPUs and small scans retain the
+portable implementation. Scalar capacities remain arbitrary; the optimized
+scan applies when the model activates one or two disposable resources and
+the compiled capacity is at least two.
+This feature does not require `target-cpu=native` and does not change numerical
+comparison tolerances or certification policy.

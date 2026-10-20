@@ -77,6 +77,46 @@ impl<const D: usize> HotColumns<D> {
         candidate_r1: f64,
         candidate_ng: u16,
     ) -> usize {
+        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+        if D >= 2
+            && self.key.len().saturating_sub(from) >= 16
+            && std::is_x86_feature_detected!("avx2")
+        {
+            // SAFETY: runtime detection establishes the required CPU feature.
+            // The kernel validates column lengths before its unaligned loads.
+            return unsafe {
+                self.next_candidate_avx2::<PREFIX, FORWARD, RESOURCES, NG>(
+                    from,
+                    threshold,
+                    candidate_r0,
+                    candidate_r1,
+                    candidate_ng,
+                )
+            };
+        }
+        self.next_candidate_scalar::<PREFIX, FORWARD, RESOURCES, NG>(
+            from,
+            threshold,
+            candidate_r0,
+            candidate_r1,
+            candidate_ng,
+        )
+    }
+
+    #[inline(always)]
+    fn next_candidate_scalar<
+        const PREFIX: bool,
+        const FORWARD: bool,
+        const RESOURCES: usize,
+        const NG: bool,
+    >(
+        &self,
+        from: usize,
+        threshold: f64,
+        candidate_r0: f64,
+        candidate_r1: f64,
+        candidate_ng: u16,
+    ) -> usize {
         if D < 2 {
             return from;
         }
@@ -141,3 +181,8 @@ impl<const D: usize> HotColumns<D> {
         i
     }
 }
+
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
+mod avx2;
+#[cfg(all(test, feature = "simd", target_arch = "x86_64"))]
+mod simd_tests;
