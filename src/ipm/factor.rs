@@ -2,6 +2,11 @@
 use super::{finite, Error, Result, SparseMatrix};
 use std::collections::BTreeSet;
 
+mod storage;
+use storage::LowerFactor;
+mod uplooking;
+pub(crate) use uplooking::Uplooking;
+
 /// Deterministic minimum-degree ordering. `order[new] = old`.
 /// Uses explicit graph updates rather than the C++ approximate-degree quotient graph.
 pub(crate) fn minimum_degree(mut graph: Vec<BTreeSet<usize>>) -> Vec<usize> {
@@ -119,22 +124,21 @@ fn minimum_degree_bitset(mut graph: Vec<Vec<u64>>) -> Vec<usize> {
 }
 
 pub(crate) fn block_order(a: &SparseMatrix) -> Vec<usize> {
-    let mut dg = vec![BTreeSet::new(); a.rows];
-    let mut rows = vec![vec![]; a.rows];
-    for j in 0..a.cols {
-        let col: Vec<_> = a.column(j).map(|(i, _)| i).collect();
-        for &i in &col {
-            rows[i].push(j);
-        }
-        for (p, &i) in col.iter().enumerate() {
-            for &k in &col[p + 1..] {
-                dg[i].insert(k);
-                dg[k].insert(i);
-            }
-        }
-    }
-    let mut order = column_order(&rows, a.cols);
-    order.extend(minimum_degree(dg).into_iter().map(|i| a.cols + i));
+    // The augmented KKT primal block is diagonal: primal vertices have no
+    // edges to each other, and eliminating one cannot create such edges.
+    // Their order therefore cannot change fill. Do not build/order the
+    // potentially huge column-intersection graph of A for this block.
+    let columns: Vec<Vec<_>> = (0..a.cols)
+        .map(|j| a.column(j).map(|(i, _)| i).collect())
+        .collect();
+    let mut order: Vec<_> = (0..a.cols).collect();
+    // Eliminating the primal block connects rows sharing a column. Preserve
+    // exact minimum-degree ordering on that dual Schur-complement graph.
+    order.extend(
+        column_order(&columns, a.rows)
+            .into_iter()
+            .map(|i| a.cols + i),
+    );
     order
 }
 
@@ -244,10 +248,14 @@ impl Symbolic {
             min_abs_pivot: f64::INFINITY,
             ..FactorStats::default()
         };
+        // Fronts are processed sequentially. Reuse their dense assembly
+        // workspace instead of allocating one for every eliminated front.
+        let mut f = Vec::new();
         for (s, front) in self.fronts.iter().enumerate() {
             let np = front.end - front.lo;
             let nf = np + front.updates.len();
-            let mut f = vec![0.0; nf * nf];
+            f.clear();
+            f.resize(nf * nf, 0.0);
             for k in 0..np {
                 local[front.lo + k] = k;
             }
@@ -268,11 +276,16 @@ impl Symbolic {
                 })?;
                 let rows = &self.fronts[child].updates;
                 let nc = rows.len();
-                for j in 0..nc {
-                    for i in j..nc {
-                        let r = local[rows[i]];
+                // Child updates contain only the lower triangle, packed by
+                // row. Row-wise assembly keeps both source and destination
+                // accesses local; each cell still accumulates children in the
+                // same order as before.
+                for i in 0..nc {
+                    let r = local[rows[i]];
+                    let offset = i * (i + 1) / 2;
+                    for j in 0..=i {
                         let c = local[rows[j]];
-                        f[r * nf + c] += values[i * nc + j];
+                        f[r * nf + c] += values[offset + j];
                     }
                 }
             }
@@ -304,11 +317,12 @@ impl Symbolic {
                 }
             }
             let nu = nf - np;
-            let mut update = vec![0.0; nu * nu];
+            // Parents only consume the lower triangle. Avoid allocating and
+            // copying the unused upper half of every child Schur complement.
+            let mut update = Vec::with_capacity(nu * (nu + 1) / 2);
             for i in 0..nu {
-                for j in 0..nu {
-                    update[i * nu + j] = f[(np + i) * nf + np + j];
-                }
+                let start = (np + i) * nf + np;
+                update.extend_from_slice(&f[start..start + i + 1]);
             }
             schur[s] = Some(update);
             for i in front.lo..front.end {
@@ -331,7 +345,7 @@ impl Symbolic {
             stats.min_abs_pivot = 0.0;
         }
         Ok(Factor {
-            l,
+            l: LowerFactor::Columns(l),
             blocks,
             order,
             stats,
@@ -355,7 +369,7 @@ pub(crate) struct FactorStats {
 
 #[derive(Debug, Clone)]
 pub(crate) struct Factor {
-    l: Vec<Vec<(usize, f64)>>,
+    l: LowerFactor,
     blocks: Vec<Block>,
     order: Vec<usize>,
     pub stats: FactorStats,
@@ -368,11 +382,7 @@ impl Factor {
             return Err(Error::InvalidInput("invalid linear solve RHS".into()));
         }
         let mut x: Vec<_> = self.order.iter().map(|&i| rhs[i]).collect();
-        for j in 0..n {
-            for &(i, v) in &self.l[j] {
-                x[i] -= v * x[j];
-            }
-        }
+        self.l.forward(&mut x);
         for k in 0..n {
             match self.blocks[k] {
                 Block::One(d) => x[k] /= d,
@@ -386,11 +396,7 @@ impl Factor {
                 Block::Skip => {}
             }
         }
-        for j in (0..n).rev() {
-            for &(i, v) in &self.l[j] {
-                x[j] -= v * x[i];
-            }
-        }
+        self.l.backward(&mut x);
         let mut out = vec![0.0; n];
         for (k, &i) in self.order.iter().enumerate() {
             out[i] = x[k];
@@ -531,6 +537,66 @@ fn bk(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn independent_primal_order_preserves_fill_and_kkt_solution() {
+        let (m, n) = (9, 80);
+        let mut entries = Vec::new();
+        for j in 0..n {
+            for i in 0..m {
+                if j == 0 || i == j % m || i == (3 * j + 1) % m {
+                    entries.push((i, j, 0.25 + ((i + j) % 5) as f64 * 0.2));
+                }
+            }
+        }
+        let a = SparseMatrix::from_triplets(m, n, &entries).unwrap();
+        let mut rows = vec![vec![]; m];
+        for &(i, j, _) in &entries {
+            rows[i].push(j);
+        }
+        let order = block_order(&a);
+        assert_eq!(order[..n], (0..n).collect::<Vec<_>>());
+        let mut previous = column_order(&rows, n);
+        assert_ne!(previous, order[..n]);
+        previous.extend_from_slice(&order[n..]);
+        let mut kkt: Vec<_> = (0..n).map(|j| (j, j, -1. - j as f64 / n as f64)).collect();
+        kkt.extend((0..m).map(|i| (n + i, n + i, 1.)));
+        for &(i, j, value) in &entries {
+            kkt.push((n + i, j, value));
+            kkt.push((j, n + i, value));
+        }
+        let kkt = SparseMatrix::from_triplets(n + m, n + m, &kkt).unwrap();
+        let current = Symbolic::analyze(&kkt, order, n);
+        let previous = Symbolic::analyze(&kkt, previous, n);
+        let fill = |symbolic: &Symbolic| {
+            symbolic
+                .fronts
+                .iter()
+                .map(|f| {
+                    let np = f.end - f.lo;
+                    np * (np - 1) / 2 + np * f.updates.len()
+                })
+                .sum::<usize>()
+        };
+        assert_eq!(fill(&current), fill(&previous));
+        let expected: Vec<_> = (0..n + m).map(|i| (i % 11) as f64 / 11. - 0.25).collect();
+        let rhs = kkt.mul(&expected);
+        for symbolic in [current, previous] {
+            let sparse = Uplooking::new(&symbolic, n).unwrap();
+            for factor in [
+                symbolic.factorize(&kkt, true).unwrap(),
+                sparse.factorize(&symbolic, &kkt).unwrap(),
+            ] {
+                let solution = factor.solve(&rhs).unwrap();
+                for (x, wanted) in solution.iter().zip(&expected) {
+                    assert!((x - wanted).abs() < 1e-10);
+                }
+                for (value, wanted) in kkt.mul(&solution).iter().zip(&rhs) {
+                    assert!((value - wanted).abs() < 1e-10);
+                }
+            }
+        }
+    }
 
     #[test]
     fn minimum_degree_matches_explicit_elimination() {

@@ -584,13 +584,18 @@ fn ipm_master_handles_edits_limits_and_independent_forks() {
     master.add_column(3., &[(0, 1.)]).unwrap();
     assert!(master.solve());
     assert!((master.objective - 3.).abs() < 1e-7);
+    let first_iterations = master.ipm_iterations;
+    assert!(first_iterations > 0);
+    assert_eq!(master.simplex_iterations, 0);
     master.add_column(1., &[(0, 1.)]).unwrap();
     assert!(master.solve());
     assert!((master.objective - 1.).abs() < 1e-7);
+    assert!(master.ipm_iterations > first_iterations);
     assert!((master.duals[0] - 1.).abs() < 1e-7);
     assert!((master.reduced_costs[0] - 2.).abs() < 1e-7);
     let mut fork = master.try_clone().unwrap();
     assert_eq!(fork.solver(), MasterSolver::Ipm);
+    assert_eq!(fork.ipm_iterations, 0);
     fork.set_upper(1, 0.).unwrap();
     assert!(fork.solve());
     assert!((fork.objective - 3.).abs() < 1e-7);
@@ -639,7 +644,7 @@ fn ipm_pricing_accuracy_does_not_leak_into_standalone_solves() {
     let mut master = ClpMaster::new().unwrap();
     master.set_solver(MasterSolver::Ipm);
     master.add_row(RowSense::Equal, 1., &[]).unwrap();
-    for cost in [1., 2., 8.] { master.add_column(cost, &[(0, 1.)]).unwrap(); }
+    for cost in [1., 2., 8e4] { master.add_column(cost, &[(0, 1.)]).unwrap(); }
     assert_eq!(master.solve_for_column_generation(Duration::from_secs(1), Some(0.5)).unwrap(),
         LpSolveOutcome::Suboptimal);
     assert!(master.objective > 1. + 1e-8);

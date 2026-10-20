@@ -119,6 +119,7 @@ impl ClpMaster {
             dual_tolerance: self.dual_tolerance,
             zero_tolerance: self.zero_tolerance,
             simplex_iterations: 0,
+            ipm_iterations: 0,
         })
     }
 
@@ -162,6 +163,7 @@ impl ClpMaster {
             solved: false,
             dual_tolerance: 1e-7,
             simplex_iterations: 0,
+            ipm_iterations: 0,
             zero_tolerance: 0.,
         })
     }

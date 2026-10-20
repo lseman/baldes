@@ -444,7 +444,9 @@ fn cooperative_time_limit_is_distinct_from_iteration_exhaustion() {
 
 #[test]
 fn relaxed_optimality_keeps_primal_and_dual_feasibility_tight() {
-    let m = model(&[&[1., 1., 1.]], &[1.], &[1., 2., 8.], &[0.; 3],
+    // Separate cost and feasibility scales so relaxed and strict gap targets
+    // remain distinguishable even with faster adaptive centering.
+    let m = model(&[&[1., 1., 1.]], &[1.], &[1., 2., 8e4], &[0.; 3],
         &[f64::INFINITY; 3], &[Sense::Equal]);
     let tight = solve(&m, &Options { tolerance: 1e-9, ..Default::default() }).unwrap();
     let loose = solve(&m, &Options {

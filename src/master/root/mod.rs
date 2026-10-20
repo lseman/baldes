@@ -55,6 +55,7 @@ pub struct RootOutput<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub preprocessing: crate::master::preprocessing::Report,
     pub snapshot: Option<Rc<NodeSnapshot<D>>>,
     pub simplex_iterations: usize,
+    pub ipm_iterations: usize,
     pub inherited_cuts: usize,
     pub master: Output,
     pub routes: Vec<Route>,

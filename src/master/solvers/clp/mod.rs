@@ -117,6 +117,8 @@ pub struct ClpMaster {
     pub solved: bool,
     pub dual_tolerance: f64,
     pub simplex_iterations: usize,
+    /// Completed Newton iterations reported by IPM solves on this model.
+    pub ipm_iterations: usize,
     /// Primal values and duals with magnitude at most this are read as zero,
     /// using a default tolerance of 1e-7.
     pub zero_tolerance: f64,

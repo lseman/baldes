@@ -1,3 +1,5 @@
+mod initialization;
+
 use super::model::StandardForm;
 use super::{dot, finite, norm, Error, ModelData, Result, SolverType, SparseSolver};
 
@@ -211,6 +213,9 @@ pub fn solve(model: &ModelData, options: &Options) -> Result<Solution> {
             q.w[i] = 1. / q.v[i];
         }
     }
+    if let Some(initial) = initialization::least_squares(&f, &mut ls) {
+        q = initial;
+    }
     let mut rp = vec![1.0_f64; n];
     let mut rd = vec![1.0_f64; m];
     let mut rg = 1.0_f64;
@@ -346,7 +351,11 @@ pub fn solve(model: &ModelData, options: &Options) -> Result<Solution> {
             / (n + nu + 1) as f64;
         let affine = newton.solve(&r, &xs, &vw, -q.tau * q.kappa)?;
         let one_minus = 1. - q.alpha(&affine);
-        let gamma = (one_minus * one_minus * one_minus.min(0.1)).max(0.1);
+        // alpha is in [0, 1], so the expression before clipping is at most
+        // 0.1. A lower bound of 0.1 would make centering constant and damp
+        // even near-full affine steps. Retain strong centering for short
+        // steps, but permit faster feasibility progress near a full step.
+        let gamma = (one_minus * one_minus * one_minus.min(0.1)).clamp(1e-4, 0.1);
         let damping = 1. - gamma;
         let damped = Residual {
             p: r.p.iter().map(|r| damping * r).collect(),

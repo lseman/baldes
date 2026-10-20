@@ -565,6 +565,7 @@ pub(super) fn solve_seeded<const D: usize>(
     let values = master.values().to_vec();
     let duals = master.duals().to_vec();
     let simplex_iterations = master.simplex_iterations;
+    let ipm_iterations = master.ipm_iterations;
     let snapshot = capture_state.then(|| {
         Rc::new(NodeSnapshot {
             master,
@@ -586,6 +587,7 @@ pub(super) fn solve_seeded<const D: usize>(
         preprocessing,
         snapshot,
         simplex_iterations,
+        ipm_iterations,
         inherited_cuts,
         master: output,
         routes: state.routes.clone(),

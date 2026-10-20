@@ -234,6 +234,7 @@ pub(super) fn infeasible_output<const D: usize>(
         fixed_cost: 0.,
         snapshot: None,
         simplex_iterations: 0,
+        ipm_iterations: 0,
         inherited_cuts: 0,
         master: Output {
             status: column_generation::Status::Infeasible,

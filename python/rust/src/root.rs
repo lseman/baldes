@@ -206,6 +206,7 @@ fn _solve_root(
         pricing_seconds: f64,
         solver_seconds: f64,
         simplex_iterations: usize,
+        ipm_iterations: usize,
         cuts: usize,
         lp_before_cuts: f64,
         fixing_calls: usize,
@@ -248,6 +249,7 @@ fn _solve_root(
             let output = root::solve(problem, options)?;
             Ok(PythonRootOutput {
                 simplex_iterations: output.simplex_iterations,
+                ipm_iterations: output.ipm_iterations,
                 master: output.master, routes: output.routes, values: output.values,
                 duals: output.duals, incumbent: output.incumbent,
                 pricing_seconds: output.pricing_seconds, solver_seconds: output.solver_seconds,
@@ -274,6 +276,7 @@ fn _solve_root(
     field!("cut_rounds", output.master.cut_rounds);
     field!("iterations", output.master.iterations);
     field!("simplex_iterations", output.simplex_iterations);
+    field!("ipm_iterations", output.ipm_iterations);
     field!("pricing_calls", output.master.pricing_calls);
     // Generated columns inserted over the run.
     field!("columns", output.master.inserted_tags.len());
