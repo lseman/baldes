@@ -146,8 +146,8 @@ fn propagation_preserves_every_feasible_point_on_a_small_grid() {
     }
 }
 
-fn solver() -> baldes::pricing::Solver {
-    let mut s = baldes::pricing::Solver::new(4, 1).unwrap();
+fn solver() -> baldes::pricing::Solver<2> {
+    let mut s = baldes::pricing::Solver::<2>::new(4, 1).unwrap();
     for v in 0..4 {
         s.graph.set_bounds(v, 0, 0., 2.).unwrap();
     }
@@ -252,7 +252,7 @@ fn tree_reports_proved_infeasibility_without_an_incumbent() {
         root::RootProblem,
         tree::{self, TreeOptions, TreeStatus},
     };
-    let mut graph = baldes::Graph::new(4, 1).unwrap();
+    let mut graph = baldes::Graph::<2>::new(4, 1).unwrap();
     for (u, v) in [(0, 1), (1, 3), (0, 2), (2, 3)] {
         graph.add_arc(u, v, 1.).unwrap();
     }
@@ -271,7 +271,7 @@ fn positive_aggregate_bounds_do_not_filter_unrelated_routes() {
         branching::BranchConstraint,
         root::{self, RootOptions, RootProblem},
     };
-    let mut s = baldes::pricing::Solver::new(5, 1).unwrap();
+    let mut s = baldes::pricing::Solver::<2>::new(5, 1).unwrap();
     for (u, v) in [(0, 1), (1, 2), (2, 4), (0, 3), (3, 4)] {
         s.graph.add_arc(u, v, 1.).unwrap();
     }
@@ -383,7 +383,7 @@ fn transitive_ryan_foster_contradictions_are_preprocessed_without_pricing() {
         root::{self, RootOptions, RootProblem},
     };
     use baldes::pricing::restrictions::RyanFosterConstraint;
-    let mut graph = baldes::Graph::new(5, 0).unwrap();
+    let mut graph = baldes::Graph::<2>::new(5, 0).unwrap();
     graph.elementary = true;
     for u in 0..4 {
         for v in 1..5 {

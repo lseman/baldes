@@ -1,6 +1,6 @@
 use super::*;
 
-impl LabelingEngine {
+impl<const D: usize> LabelingEngine<D> {
     pub fn has_cuts(&self) -> bool {
         !self.cuts.inputs.is_empty() || !self.cuts.kpath.is_empty()
     }
@@ -9,7 +9,7 @@ impl LabelingEngine {
     /// would need more than twenty words. Labels are discarded.
     pub fn load_cuts(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         inputs: Vec<LimitedInput>,
         kpath: Vec<LimitedKPathInput>,
     ) -> bool {
@@ -111,7 +111,7 @@ impl LabelingEngine {
 
     /// updateComplBoundsWithResConsKnapsackCutDuals: preserve the raw
     /// dominance bounds and rebuild the resource-cost completion bounds.
-    pub(super) fn update_knapsack_bounds(&mut self, g: &Graph, forward: bool) {
+    pub(super) fn update_knapsack_bounds(&mut self, g: &Graph<D>, forward: bool) {
         if !self.cuts.knapsack.active {
             return;
         }
@@ -146,7 +146,7 @@ impl LabelingEngine {
     /// pricing only needs the opposite table for joins and must not be used as
     /// a substitute: an unreachable forward cell can still inherit a valid
     /// completion bound from its dominance predecessors.
-    pub fn prepare_full_labels(&mut self, g: &Graph, controls: &Controls) -> Result<()> {
+    pub fn prepare_full_labels(&mut self, g: &Graph<D>, controls: &Controls) -> Result<()> {
         self.ensure_reversal_costs(g)?;
         if self.costs_unchanged(g) {
             if self.full_ready {

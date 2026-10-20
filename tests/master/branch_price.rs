@@ -1,10 +1,10 @@
 #![cfg(feature = "clp")]
 use baldes::{
+    inputs::{Instance, Rounding},
     master::{
         root::{BoundMode, RootOptions, RootProblem},
         tree::{self, TreeOptions, TreeStatus},
     },
-    inputs::{Instance, Rounding},
 };
 use std::time::Duration;
 
@@ -24,7 +24,7 @@ fn options() -> TreeOptions {
 }
 #[test]
 fn integer_heuristic_incumbent_bounds_the_original_arc_sum() {
-    let mut graph = baldes::Graph::new(3, 1).unwrap();
+    let mut graph = baldes::Graph::<2>::new(3, 1).unwrap();
     for vertex in 0..3 {
         graph.set_bounds(vertex, 0, 0., 10.).unwrap();
     }
@@ -42,7 +42,7 @@ fn integer_heuristic_incumbent_bounds_the_original_arc_sum() {
 }
 #[test]
 fn tolerance_closed_tree_keeps_its_lower_certificate() {
-    let mut graph = baldes::Graph::new(4, 1).unwrap();
+    let mut graph = baldes::Graph::<2>::new(4, 1).unwrap();
     for vertex in 0..4 {
         graph.set_bounds(vertex, 0, 0., 10.).unwrap();
     }
@@ -183,9 +183,16 @@ fn small_trees_agree_with_exhaustive_elementary_route_universe() {
             advanced.diving = Some(Default::default());
             let out = tree::solve(problem, advanced).unwrap();
             assert_eq!(out.bound_mode, mode);
-            assert_eq!(out.status, TreeStatus::Optimal, "n={n} capacity={capacity} mode={mode:?}: {out:?}");
-            assert!((out.incumbent - exact).abs() < 1e-5,
-                "n={n} capacity={capacity} mode={mode:?}: {} != {exact}", out.incumbent);
+            assert_eq!(
+                out.status,
+                TreeStatus::Optimal,
+                "n={n} capacity={capacity} mode={mode:?}: {out:?}"
+            );
+            assert!(
+                (out.incumbent - exact).abs() < 1e-5,
+                "n={n} capacity={capacity} mode={mode:?}: {} != {exact}",
+                out.incumbent
+            );
             assert!(out.bound <= exact + 1e-7, "{out:?}, exact={exact}");
         }
     }
@@ -248,7 +255,11 @@ fn fork_and_carry_inherits_cuts_basis_and_protects_branch_rows() {
         "five\nVEHICLE\nNUMBER CAPACITY\n5 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000 0\n",
     );
     for i in 1..=5 {
-        text.push_str(&format!("{i} {} {} 1 0 1000 0\n", (i * 7) % 11, (i * 3) % 13));
+        text.push_str(&format!(
+            "{i} {} {} 1 0 1000 0\n",
+            (i * 7) % 11,
+            (i * 3) % 13
+        ));
     }
     let instance = Instance::parse(&text).unwrap();
     let problem =
@@ -311,29 +322,53 @@ fn fork_and_carry_inherits_cuts_basis_and_protects_branch_rows() {
     assert!((tree_out.incumbent - exact).abs() < 1e-5, "{tree_out:?}");
 }
 
-
 #[test]
 fn ryan_foster_tree_agrees_with_exhaustive_routes_and_strong_trials() {
     use baldes::master::branching::BranchingOptions;
-    for (n,capacity) in [(3,2),(4,2),(5,3),(6,3)] {
+    for (n, capacity) in [(3, 2), (4, 2), (5, 3), (6, 3)] {
         let mut text=format!("small\nVEHICLE\nNUMBER CAPACITY\n{n} {capacity}\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000 0\n");
-        for i in 1..=n {text.push_str(&format!("{i} {} {} 1 0 1000 0\n",(i*7)%11,(i*3)%13));}
-        let instance=Instance::parse(&text).unwrap();let exact=exhaustive(&instance);
-        for enumerate in [false,true] {
-            let problem=RootProblem::set_partitioning(instance.graph(1,Rounding::None).unwrap(),n as f64).unwrap();
-            let mut controls=options();controls.root.enumerate=enumerate;
-            controls.branching=BranchingOptions{ryan_foster:true,..BranchingOptions::arc_flow_only()};
-            controls.strong_branching=Some(Default::default());controls.diving=Some(Default::default());
-            let out=tree::solve(problem,controls).unwrap_or_else(|e|panic!("n={n} enum={enumerate}: {e:?}"));
-            assert_eq!(out.status,TreeStatus::Optimal,"n={n}, enum={enumerate} {out:?}");
-            assert!((out.incumbent-exact).abs()<1e-5,"n={n}, enum={enumerate} {out:?}");
+        for i in 1..=n {
+            text.push_str(&format!(
+                "{i} {} {} 1 0 1000 0\n",
+                (i * 7) % 11,
+                (i * 3) % 13
+            ));
+        }
+        let instance = Instance::parse(&text).unwrap();
+        let exact = exhaustive(&instance);
+        for enumerate in [false, true] {
+            let problem =
+                RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), n as f64)
+                    .unwrap();
+            let mut controls = options();
+            controls.root.enumerate = enumerate;
+            controls.branching = BranchingOptions {
+                ryan_foster: true,
+                ..BranchingOptions::arc_flow_only()
+            };
+            controls.strong_branching = Some(Default::default());
+            controls.diving = Some(Default::default());
+            let out = tree::solve(problem, controls)
+                .unwrap_or_else(|e| panic!("n={n} enum={enumerate}: {e:?}"));
+            assert_eq!(
+                out.status,
+                TreeStatus::Optimal,
+                "n={n}, enum={enumerate} {out:?}"
+            );
+            assert!(
+                (out.incumbent - exact).abs() < 1e-5,
+                "n={n}, enum={enumerate} {out:?}"
+            );
         }
     }
 }
 
 #[test]
 fn cluster_resource_and_history_trees_preserve_exhaustive_optimum() {
-    use baldes::master::{branching::{BranchingOptions, ClusterBranchingOptions}, tree::BranchHistoryOptions};
+    use baldes::master::{
+        branching::{BranchingOptions, ClusterBranchingOptions},
+        tree::BranchHistoryOptions,
+    };
     let inst = triangle();
     let optimum = exhaustive(&inst);
     for family in ["cluster", "resource", "hybrid"] {
@@ -345,16 +380,31 @@ fn cluster_resource_and_history_trees_preserve_exhaustive_optimum() {
             controls.mip_node_limit = 0;
             controls.branching = BranchingOptions::arc_flow_only();
             if family != "resource" {
-                controls.branching.clusters = Some(ClusterBranchingOptions { partition: Some(vec![vec![1], vec![2,3]]), ..Default::default() });
+                controls.branching.clusters = Some(ClusterBranchingOptions {
+                    partition: Some(vec![vec![1], vec![2, 3]]),
+                    ..Default::default()
+                });
             }
             controls.branching.accumulated_resource = family != "cluster";
-            if strong { controls.strong_branching = Some(Default::default()); }
-            controls.branch_history = Some(BranchHistoryOptions { minimum_observations: 1 });
+            if strong {
+                controls.strong_branching = Some(Default::default());
+            }
+            controls.branch_history = Some(BranchHistoryOptions {
+                minimum_observations: 1,
+            });
             let result = tree::solve(problem, controls).unwrap();
-            assert_eq!(result.status, TreeStatus::Optimal, "{family} strong={strong}: {result:?}");
+            assert_eq!(
+                result.status,
+                TreeStatus::Optimal,
+                "{family} strong={strong}: {result:?}"
+            );
             assert!((result.incumbent - optimum).abs() < 1e-6);
-            if strong { assert!(!result.branch_history.evaluations.is_empty()); }
-            assert!(result.to_json("branch-history").contains("\"branch_evaluations\":["));
+            if strong {
+                assert!(!result.branch_history.evaluations.is_empty());
+            }
+            assert!(result
+                .to_json("branch-history")
+                .contains("\"branch_evaluations\":["));
         }
     }
 }
@@ -366,7 +416,13 @@ fn learned_branch_costs_are_reused_below_the_root_without_changing_the_optimum()
     let mut reused = 0;
     for n in [6, 7, 8] {
         let mut text = format!("history\nVEHICLE\nNUMBER CAPACITY\n{n} 3\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000 0\n");
-        for i in 1..=n { text.push_str(&format!("{i} {} {} 1 0 1000 0\n", (i*7)%11, (i*3)%13)); }
+        for i in 1..=n {
+            text.push_str(&format!(
+                "{i} {} {} 1 0 1000 0\n",
+                (i * 7) % 11,
+                (i * 3) % 13
+            ));
+        }
         let inst = Instance::parse(&text).unwrap();
         let exact = exhaustive(&inst);
         let mut options = options();
@@ -376,12 +432,48 @@ fn learned_branch_costs_are_reused_below_the_root_without_changing_the_optimum()
         let mut strong = StrongBranchingOptions::default();
         strong.phases.truncate(1); // Require ordinary child solves to complete pricing.
         options.strong_branching = Some(strong);
-        options.branch_history = Some(BranchHistoryOptions { minimum_observations: 1 });
-        let result = tree::solve(RootProblem::set_partitioning(inst.graph(1, Rounding::None).unwrap(), n as f64).unwrap(), options).unwrap();
+        options.branch_history = Some(BranchHistoryOptions {
+            minimum_observations: 1,
+        });
+        let result = tree::solve(
+            RootProblem::set_partitioning(inst.graph(1, Rounding::None).unwrap(), n as f64)
+                .unwrap(),
+            options,
+        )
+        .unwrap();
         assert_eq!(result.status, TreeStatus::Optimal, "n={n}: {result:?}");
         assert!((result.incumbent - exact).abs() < 1e-6);
         assert!(result.bound <= exact + 1e-6);
         reused += result.branch_history.ranked_candidates;
     }
-    assert!(reused > 0, "the fixture must exercise learned candidate ordering");
+    assert!(
+        reused > 0,
+        "the fixture must exercise learned candidate ordering"
+    );
+}
+
+#[test]
+fn root_and_exact_incumbent_validation_support_more_than_two_resources() {
+    let mut graph = baldes::Graph::<5>::new(3, 5).unwrap();
+    for v in 0..3 {
+        for r in 0..5 {
+            graph.set_bounds(v, r, 0., 10.).unwrap();
+        }
+    }
+    let a = graph.add_arc(0, 1, 2.).unwrap();
+    let b = graph.add_arc(1, 2, 3.).unwrap();
+    for r in 0..5 {
+        graph.arc_mut(a).unwrap().consumption[r] = 1.;
+        graph.arc_mut(b).unwrap().consumption[r] = 2.;
+    }
+    let problem = RootProblem::set_partitioning(graph, 1.).unwrap();
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let mut controls = options();
+        controls.root.bound_mode = mode;
+        let output = tree::solve(problem.clone(), controls).unwrap();
+        assert_eq!(output.status, TreeStatus::Optimal);
+        assert_eq!(output.incumbent, 5.);
+        assert_eq!(output.routes[0].resources, vec![3.; 5]);
+        assert!(output.bound <= 5.);
+    }
 }

@@ -2,18 +2,18 @@ use super::*;
 /// The read-only engine state a labeling sweep reads; both directions can
 /// share it across threads.
 #[derive(Clone, Copy)]
-pub(super) struct Context<'a> {
+pub(super) struct Context<'a, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub(super) grid: &'a BucketGraph,
     pub(super) ng: &'a PreparedNg,
     pub(super) branching: &'a crate::pricing::restrictions::RyanFosterResources,
     pub(super) forbidden_arcs: &'a [bool],
     pub(super) cuts: &'a EngineCuts,
-    pub(super) controls: &'a EngineControls,
+    pub(super) controls: &'a EngineControls<D>,
     pub(super) phase: Phase,
     pub(super) consumption_joins: bool,
     pub(super) symmetric_costs: &'a [f64],
 }
-impl<'a> Context<'a> {
+impl<'a, const D: usize> Context<'a, D> {
     pub(super) fn has_cuts(&self) -> bool {
         !self.cuts.inputs.is_empty() || !self.cuts.kpath.is_empty()
     }
@@ -23,13 +23,13 @@ impl<'a> Context<'a> {
                 || (self.controls.bidirectional_mode == 2 && self.phase.exact()))
     }
     /// The meeting vertex's NG bits and cut supports.
-    pub(super) fn vertex_step(&self, label: &mut StoredLabel) {
+    pub(super) fn vertex_step(&self, label: &mut StoredLabel<D>) {
         self.vertex_step_with_branching::<true>(label);
     }
     #[inline(always)]
     pub(super) fn vertex_step_with_branching<const BRANCHING: bool>(
         &self,
-        label: &mut StoredLabel,
+        label: &mut StoredLabel<D>,
     ) {
         label.ng |= self.ng.vertex_bits[label.vertex];
         if BRANCHING {
@@ -59,10 +59,10 @@ impl<'a> Context<'a> {
     #[inline(always)]
     pub(super) fn concatenate(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         vertex: usize,
-        f: LabelRef<'_>,
-        b: LabelRef<'_>,
+        f: LabelRef<'_, D>,
+        b: LabelRef<'_, D>,
     ) -> (bool, f64) {
         match (f, b) {
             (LabelRef::Ordinary(f, _), LabelRef::Ordinary(b, _)) => {
@@ -90,7 +90,7 @@ impl<'a> Context<'a> {
     #[inline(always)]
     pub(super) fn concatenate_records<F: LabelData, B: LabelData>(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         vertex: usize,
         f: &F,
         b: &B,
@@ -132,10 +132,10 @@ impl<'a> Context<'a> {
     }
     pub fn join_cost(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         vertex: usize,
-        f: LabelRef<'_>,
-        b: LabelRef<'_>,
+        f: LabelRef<'_, D>,
+        b: LabelRef<'_, D>,
     ) -> Option<f64> {
         match self.concatenate(g, vertex, f, b) {
             (true, cost) => Some(cost),
@@ -145,7 +145,7 @@ impl<'a> Context<'a> {
     /// Join of a label reaching its end vertex with the opposite root (forward:
     /// the backward root, or the forward one for symmetric joins; backward: the
     /// forward root at the source). The join's result is not tested.
-    pub(super) fn terminal_cost(&self, g: &Graph, forward: bool, label: &StoredLabel) -> f64 {
+    pub(super) fn terminal_cost(&self, g: &Graph<D>, forward: bool, label: &StoredLabel<D>) -> f64 {
         if !self.has_cuts() && !self.cuts.knapsack.active {
             return label.cost;
         }
@@ -175,11 +175,11 @@ impl<'a> Context<'a> {
     #[inline(always)]
     pub(super) fn extend(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
         arc: &BucketArc,
-        from: LabelRef<'_>,
-    ) -> Option<StoredLabel> {
+        from: LabelRef<'_, D>,
+    ) -> Option<StoredLabel<D>> {
         self.extend_resources_kept::<true>(g, forward, arc, from)
             .map(|(label, _)| label)
     }
@@ -189,11 +189,11 @@ impl<'a> Context<'a> {
     #[inline(always)]
     pub(super) fn extend_resources_kept<const BRANCHING: bool>(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
         arc: &BucketArc,
-        from: LabelRef<'_>,
-    ) -> Option<(StoredLabel, [f64; 2])> {
+        from: LabelRef<'_, D>,
+    ) -> Option<(StoredLabel<D>, crate::graph::ResourceValues<D>)> {
         match from {
             LabelRef::Ordinary(label, id) => {
                 self.extend_record::<BRANCHING, _>(g, forward, arc, label, id)
@@ -221,12 +221,12 @@ impl<'a> Context<'a> {
     #[inline(always)]
     pub(super) fn extend_record<const BRANCHING: bool, L: LabelData>(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
         arc: &BucketArc,
         from: &L,
         id: usize,
-    ) -> Option<(StoredLabel, [f64; 2])> {
+    ) -> Option<(StoredLabel<D>, crate::graph::ResourceValues<D>)> {
         if self.has_cuts() {
             self.extend_record_with_cuts::<BRANCHING, true, L>(g, forward, arc, from, id)
         } else {
@@ -236,12 +236,12 @@ impl<'a> Context<'a> {
     #[inline(always)]
     pub(super) fn extend_record_with_cuts<const BRANCHING: bool, const CUTS: bool, L: LabelData>(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
         arc: &BucketArc,
         from: &L,
         id: usize,
-    ) -> Option<(StoredLabel, [f64; 2])> {
+    ) -> Option<(StoredLabel<D>, crate::graph::ResourceValues<D>)> {
         let physical = &g.arcs[arc.physical];
         if self
             .forbidden_arcs
@@ -252,27 +252,25 @@ impl<'a> Context<'a> {
         {
             return None;
         }
-        // Scalars, not `resources[slot]`: see BucketGraph::coordinate.
-        let [mut q0, mut q1] = *from.resources();
+        let mut q = crate::graph::ResourceValues::<D>::from_slice(from.resources());
         if self.phase.jump_arcs {
             if let Some(jump) = arc.jump {
                 let point = self.grid.direction(forward).corners[arc.from.vertex][jump];
-                for (r, &slot) in self.grid.resource_slots.iter().enumerate() {
-                    // A bucket jump may wait only on disposable resources.
-                    // Equality coordinates must preserve physical accumulation.
+                for (axis, &slot) in self.grid.resource_slots.iter().enumerate() {
                     if g.resources[slot] == ResourceKind::Equality {
                         continue;
                     }
-                    let q = if slot == 0 { &mut q0 } else { &mut q1 };
-                    *q = if forward {
-                        q.max(point[r])
+                    q[slot] = if forward {
+                        q[slot].max(point[axis])
                     } else {
-                        q.min(point[r])
+                        q[slot].min(point[axis])
                     };
                 }
             }
         }
-        let resources = extend_resources(g, physical, [q0, q1], forward)?;
+        let resources: crate::graph::ResourceValues<D> =
+            crate::labeling::ScalarResourceKernel::<D>::extend_active(g, physical, q.0, forward)?
+                .into();
         let vertex = if forward {
             physical.head
         } else {
@@ -290,7 +288,7 @@ impl<'a> Context<'a> {
         let internal = self.grid.internal[vertex];
         let bucket = self
             .grid
-            .bucket_id(forward, internal, self.grid.coordinate(resources))?;
+            .bucket_id(forward, internal, self.grid.coordinate(&resources))?;
         let mut additional_cost = from.additional_cost();
         let cut_words = if CUTS {
             let table = if forward {
@@ -324,7 +322,7 @@ impl<'a> Context<'a> {
                     .unwrap_or(physical.reduced_cost)
                     + from.cost(),
                 original_cost: physical.cost + from.original_cost(),
-                resources,
+                resources: resources.clone(),
                 ng,
                 // Like NG state, a crossing label excludes its meeting vertex.
                 branch_state: if BRANCHING {
@@ -350,7 +348,7 @@ impl<'a> Context<'a> {
     }
     pub(super) fn resources_join<F: LabelData, B: LabelData>(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         f: &F,
         b: &B,
     ) -> bool {

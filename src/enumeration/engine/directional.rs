@@ -1,10 +1,10 @@
 use super::*;
 
-impl Enumeration {
+impl<const D: usize> Enumeration<D> {
     /// Directional elementary enumeration with a shared path-equivalence store.
     /// Completion is supplied by the complete pricing stores at these same costs.
-    pub fn run_directional<F: Fn(bool, &Label) -> bool>(
-        g: &Graph,
+    pub fn run_directional<F: Fn(bool, &Label<D>) -> bool>(
+        g: &Graph<D>,
         grid: &BucketGraph,
         controls: &Controls,
         completion: F,
@@ -12,8 +12,8 @@ impl Enumeration {
         Self::run_with_symmetry(g, grid, controls, &[], None, completion)
     }
 
-    pub fn run_with_symmetry<F: Fn(bool, &Label) -> bool>(
-        g: &Graph,
+    pub fn run_with_symmetry<F: Fn(bool, &Label<D>) -> bool>(
+        g: &Graph<D>,
         grid: &BucketGraph,
         controls: &Controls,
         reverse: &[usize],
@@ -57,7 +57,7 @@ impl Enumeration {
             let mut root = Label {
                 id: 0,
                 vertex,
-                resources: [0.; 2],
+                resources: crate::graph::ResourceValues::filled(g.resources.len(), 0.),
                 reduced_cost: 0.,
                 original_cost: 0.,
                 visited: [0; 16],
@@ -119,7 +119,7 @@ impl Enumeration {
                     continue;
                 }
                 let v = grid.internal[from.vertex];
-                let Some(bucket) = grid.bucket_id(direction, v, grid.coordinate(from.resources))
+                let Some(bucket) = grid.bucket_id(direction, v, grid.coordinate(&from.resources))
                 else {
                     continue;
                 };
@@ -153,10 +153,10 @@ impl Enumeration {
                             };
                         }
                     }
-                    let Some(q) = extend_resources(g, physical, q, direction) else {
+                    let Some(q) = extend_resources(g, physical, &q, direction) else {
                         continue;
                     };
-                    next.resources = q;
+                    next.resources = q.clone();
                     if let Some(c) = &cuts {
                         c.along_arc(&mut next, direction, arc.physical);
                     }
@@ -168,7 +168,7 @@ impl Enumeration {
                         if !next.can_add_elements(&g.vertices[next.vertex].elements) {
                             continue;
                         }
-                        let before = grid.coordinate(q)[0] <= grid.middle + EPSILON;
+                        let before = grid.coordinate(&q)[0] <= grid.middle + EPSILON;
                         if !direction && before {
                             continue;
                         }
@@ -281,13 +281,13 @@ impl Enumeration {
                 let label = &opposite.arena[id];
                 let vertex = grid.internal[label.vertex];
                 if let Some(k) =
-                    grid.bucket_id(consumption, vertex, grid.coordinate(label.resources))
+                    grid.bucket_id(consumption, vertex, grid.coordinate(&label.resources))
                 {
                     buckets[vertex][k].push(id);
                 }
             }
         }
-        let label_key = |l: &Label| {
+        let label_key = |l: &Label<D>| {
             l.key_with(
                 cuts.and_then(|c| c.info.vertex_cut_potential.get(l.vertex))
                     .copied()
@@ -316,7 +316,7 @@ impl Enumeration {
         for vertex in 0..grid.order.len() {
             let v = grid.order[vertex];
             for f in &crossing[v] {
-                let mut q = grid.coordinate(f.resources);
+                let mut q = grid.coordinate(&f.resources);
                 if consumption {
                     for r in 0..grid.dimensions {
                         q[r] = grid.upper[vertex][r] + grid.lower[vertex][r] - q[r];

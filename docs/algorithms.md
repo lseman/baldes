@@ -7,6 +7,9 @@
 - Bucket-graph labeling: resource and NG preparation, bucket grids, strongly
   connected component ordering, jump arcs, preceding-bucket dominance,
   bidirectional search with a moving half-way point, and symmetric joins.
+- Const-generic scalar resource dimensions, defaulting to two, with fixed-array
+  labels, feasibility, dominance, enumeration, and replay.
+  See [scalar resources](resources.md).
 - Staged pricing with the native heuristic phase schedule.
 - Reduced-cost fixing on bucket arcs and elementary route enumeration with
   inspection pricing at the root and descendant nodes.

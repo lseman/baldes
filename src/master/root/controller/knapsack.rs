@@ -1,10 +1,10 @@
 //! Resource-knapsack cut separation.
 use super::*;
 
-impl RootController {
+impl<const D: usize> RootController<D> {
     pub(super) fn separate_knapsack(
         &self,
-        state: &mut State,
+        state: &mut State<D>,
         rows: &mut PendingRows,
         tagged: &[(usize, usize)],
         values: &[f64],

@@ -89,18 +89,18 @@ impl PathStorage {
     }
     /// Path repricing: physical arc costs, then rank-one costs from
     /// physical incidence (no memory).
-    pub fn inspect(
+    pub fn inspect<const D: usize>(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         cutoff: f64,
         cuts: &[LimitedInput],
         kpath: &[LimitedKPathInput],
     ) -> Result<usize> {
         self.inspect_with_knapsack(g, cutoff, cuts, kpath, &Default::default())
     }
-    pub fn inspect_with_knapsack(
+    pub fn inspect_with_knapsack<const D: usize>(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         cutoff: f64,
         cuts: &[LimitedInput],
         kpath: &[LimitedKPathInput],
@@ -126,12 +126,12 @@ impl PathStorage {
                     );
                 }
                 if knapsack.active {
-                    let mut q = [0.; 2];
+                    let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
                     for r in 0..g.resources.len() {
                         q[r] = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower);
                     }
                     for &arc in &path.arcs {
-                        q = extend_resources(g, &g.arcs[arc], q, true)
+                        q = extend_resources(g, &g.arcs[arc], &q, true)
                             .ok_or_else(|| invalid("enumerated knapsack resource infeasible"))?;
                     }
                     path.reduced_cost += knapsack.cost(&q);
@@ -166,7 +166,7 @@ impl PathStorage {
                 .collect();
         }
     }
-    pub fn routes(&self, g: &Graph) -> Result<Vec<Route>> {
+    pub fn routes<const D: usize>(&self, g: &Graph<D>) -> Result<Vec<Route>> {
         // Native export visits hash partitions in activation order, then
         // their candidates in original-cost insertion order. Dominance may
         // use fewer physical partitions without changing this path index.
@@ -182,7 +182,7 @@ impl PathStorage {
         }
         let mut result = vec![];
         for path in ordered.into_iter().flatten() {
-            let mut q = [0.; 2];
+            let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
             for r in 0..g.resources.len() {
                 q[r] = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower);
             }
@@ -190,7 +190,7 @@ impl PathStorage {
             let mut resource_profile = vec![q[..g.resources.len()].to_vec()];
             for &id in &path.arcs {
                 let a = &g.arcs[id];
-                q = extend_resources(g, a, q, true)
+                q = extend_resources(g, a, &q, true)
                     .ok_or_else(|| invalid("enumerated route is no longer resource feasible"))?;
                 nodes.push(a.head as i32);
                 resource_profile.push(q[..g.resources.len()].to_vec());
@@ -224,7 +224,7 @@ mod order_tests {
 
     #[test]
     fn export_order_survives_partition_tuning_replacement_retention_and_forks() {
-        let mut graph = Graph::new(4, 1).unwrap();
+        let mut graph = Graph::<2>::new(4, 1).unwrap();
         for (tail, head, cost) in [(0, 1, 1.), (1, 3, 1.), (0, 2, 2.), (2, 3, 2.), (1, 2, 1.)] {
             graph.add_arc(tail, head, cost).unwrap();
         }

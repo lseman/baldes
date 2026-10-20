@@ -1,7 +1,7 @@
 //! Enumeration and regeneration of admissible cached columns.
 use super::*;
 
-impl RootController {
+impl<const D: usize> RootController<D> {
     pub(super) fn enumerate_columns(
         &mut self,
         duals: &[f64],

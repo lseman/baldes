@@ -1,7 +1,7 @@
 use super::*;
 
-impl LabelingEngine {
-    pub fn solve(&mut self, g: &Graph, controls: &Controls) -> Result<PricingResult> {
+impl<const D: usize> LabelingEngine<D> {
+    pub fn solve(&mut self, g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
         self.ensure_reversal_costs(g)?;
         if controls.max_columns == 0 || controls.max_labels == 0 {
             return Err(invalid("positive pricing limits required"));
@@ -62,7 +62,7 @@ impl LabelingEngine {
                 let mut cutoff = pool.cutoff(v);
                 for &f in &self.forward.crossing[v] {
                     let label = self.forward.labels.view(f);
-                    let mut coordinate = self.grid.coordinate(*label.resources());
+                    let mut coordinate = self.grid.coordinate(label.resources());
                     if self.consumption_joins {
                         for r in 0..self.grid.dimensions {
                             coordinate[r] = (self.grid.upper[internal][r]
@@ -216,7 +216,7 @@ impl LabelingEngine {
         }
     }
 
-    pub fn continue_after_halfway(&mut self, g: &Graph, controls: &Controls) -> Result<()> {
+    pub fn continue_after_halfway(&mut self, g: &Graph<D>, controls: &Controls) -> Result<()> {
         if self.full_ready
             && self
                 .last_costs
@@ -255,7 +255,7 @@ impl LabelingEngine {
             let grid = &self.grid;
             self.forward
                 .labels
-                .unexpand_where(|resources| grid.coordinate(resources)[0] > grid.middle + EPSILON);
+                .unexpand_where(|resources| grid.coordinate(&resources)[0] > grid.middle + EPSILON);
             let started = Instant::now();
             let mut pool = SolutionPool::new(g.vertices.len(), 1, 0);
             self.run_direction(g, true, controls, started, &mut pool)?;

@@ -14,20 +14,20 @@ use crate::labeling::engine::{EngineControls, LabelingEngine};
 use crate::{incomplete, invalid, Controls, Graph, PricingResult, Result};
 use std::time::Duration;
 #[derive(Debug)]
-pub struct Solver {
-    pub graph: Graph,
+pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    pub graph: Graph<D>,
     pub(crate) forbidden_arcs: Vec<bool>,
     pub(crate) ryan_foster: Vec<restrictions::RyanFosterConstraint>,
     pub controls: Controls,
     pub options: Options,
     pub phases: Vec<phases::Phase>,
-    pub engine: Option<LabelingEngine>,
-    pub enumeration: Option<Enumeration>,
+    pub engine: Option<LabelingEngine<D>>,
+    pub enumeration: Option<Enumeration<D>>,
     /// Preserve arc orderings needed by current or future arc-flow branches.
     pub enumeration_preserve_arc_paths: bool,
     pub cutoff: f64,
-    prepared: Option<Graph>,
-    pub bucket_steps: [f64; 2],
+    prepared: Option<Graph<D>>,
+    pub bucket_steps: crate::graph::ResourceValues<D>,
     pub rollback_point_saved: bool,
     pub requires_rollback: bool,
     pub round: controller::RoundState,
@@ -37,7 +37,7 @@ pub struct Solver {
     accumulated_original_bounds: Vec<(i32, usize, Option<crate::graph::Window>, bool)>,
     ng_baseline: Option<(Vec<Vec<usize>>, Vec<Vec<usize>>)>,
     pub variable_costs: Vec<f64>,
-    enumeration_snapshot: Option<Graph>,
+    enumeration_snapshot: Option<Graph<D>>,
     /// Registered rank-one cuts and their separator.
     pub cuts: CutRegistry,
     /// Original knapsack resource ID -> solver coordinate. Empty is identity.
@@ -51,7 +51,7 @@ pub struct Solver {
         Vec<FullKPathInput>,
     ),
 }
-impl Solver {
+impl<const D: usize> Solver<D> {
     pub fn new(vertices: usize, resources: usize) -> Result<Self> {
         Ok(Self {
             graph: Graph::new(vertices, resources)?,
@@ -65,7 +65,7 @@ impl Solver {
             enumeration_preserve_arc_paths: false,
             cutoff: f64::INFINITY,
             prepared: None,
-            bucket_steps: [0.; 2],
+            bucket_steps: [0.; D].into(),
             rollback_point_saved: false,
             requires_rollback: false,
             round: controller::RoundState::default(),
@@ -124,7 +124,7 @@ impl Solver {
             } else {
                 None
             },
-            bucket_steps: self.bucket_steps,
+            bucket_steps: self.bucket_steps.clone(),
             rollback_point_saved: self.rollback_point_saved,
             requires_rollback: false,
             round: self.round.clone(),
@@ -151,13 +151,24 @@ impl Solver {
     /// Install a head-resource window in the physical graph. The existing
     /// forward/backward extension, joins, replay and enumeration enforce it.
     pub fn add_accumulated_resource_branch(
-        &mut self, constraint: restrictions::AccumulatedResourceBranch,
+        &mut self,
+        constraint: restrictions::AccumulatedResourceBranch,
     ) -> Result<usize> {
         let window = constraint.window(&self.graph)?;
         let original = self.graph.arc_mut(constraint.arc)?.bounds[constraint.resource];
-        let position = self.graph.arcs.iter().position(|a| a.id == constraint.arc).unwrap();
+        let position = self
+            .graph
+            .arcs
+            .iter()
+            .position(|a| a.id == constraint.arc)
+            .unwrap();
         let forbidden = self.forbidden_arcs.get(position).copied().unwrap_or(false);
-        self.accumulated_original_bounds.push((constraint.arc, constraint.resource, original, forbidden));
+        self.accumulated_original_bounds.push((
+            constraint.arc,
+            constraint.resource,
+            original,
+            forbidden,
+        ));
         if let Some(window) = window {
             self.graph.arc_mut(constraint.arc)?.bounds[constraint.resource] = Some(window);
         } else {
@@ -173,7 +184,9 @@ impl Solver {
         for &(arc, resource, window, forbidden) in self.accumulated_original_bounds.iter().rev() {
             self.graph.arc_mut(arc)?.bounds[resource] = window;
             if let Some(position) = self.graph.arcs.iter().position(|a| a.id == arc) {
-                if let Some(flag) = self.forbidden_arcs.get_mut(position) { *flag = forbidden; }
+                if let Some(flag) = self.forbidden_arcs.get_mut(position) {
+                    *flag = forbidden;
+                }
             }
         }
         self.accumulated_original_bounds.clear();
@@ -190,12 +203,17 @@ impl Solver {
     pub fn set_forbidden_arcs(&mut self, arcs: Vec<usize>) -> Result<()> {
         let mut next = vec![false; self.graph.arcs.len()];
         for a in arcs {
-            *next.get_mut(a).ok_or_else(|| invalid("forbidden arc index"))? = true;
+            *next
+                .get_mut(a)
+                .ok_or_else(|| invalid("forbidden arc index"))? = true;
         }
         if next == self.forbidden_arcs {
             return Ok(());
         }
-        let weaker = self.forbidden_arcs.iter().enumerate()
+        let weaker = self
+            .forbidden_arcs
+            .iter()
+            .enumerate()
             .any(|(a, &b)| b && !next.get(a).copied().unwrap_or(false));
         if weaker {
             self.restore_arcs();
@@ -356,7 +374,11 @@ impl Solver {
         self.applied_cuts = next;
         Ok(())
     }
-    fn new_engine(&self, controls: EngineControls, phase: phases::Phase) -> Result<LabelingEngine> {
+    fn new_engine(
+        &self,
+        controls: EngineControls<D>,
+        phase: phases::Phase,
+    ) -> Result<LabelingEngine<D>> {
         let mut controls = controls;
         // A one-sided arc fixing need not preserve reverse-arc symmetry.
         if self.forbidden_arcs.iter().any(|&b| b) {
@@ -364,7 +386,8 @@ impl Solver {
         }
         let mut engine = LabelingEngine::prepare(&self.graph, controls, phase)?;
         engine.forbidden_arcs = self.forbidden_arcs.clone();
-        engine.branching = restrictions::RyanFosterResources::prepare(&self.graph, &self.ryan_foster)?;
+        engine.branching =
+            restrictions::RyanFosterResources::prepare(&self.graph, &self.ryan_foster)?;
         engine.cuts.knapsack = self.knapsack_pricing.clone();
         if !engine.load_cuts(
             &self.graph,
@@ -464,18 +487,26 @@ impl Solver {
         let seconds = self
             .options
             .get("BALDEShardTimeThresholdInPricing")?
-            .max(0.) * factor;
+            .max(0.)
+            * factor;
         if seconds >= self.controls.time_limit.as_secs_f64() {
             return Ok(self.controls.time_limit);
         }
         Duration::try_from_secs_f64(seconds).map_err(|_| invalid("pricing time limit"))
     }
-    fn engine_controls(&self, exact: bool) -> EngineControls {
+    fn engine_controls(&self, exact: bool) -> EngineControls<D> {
         EngineControls {
-            bidirectional: self.options.get("BALDESuseBidirectionalSearch").unwrap_or(2.) != 0.,
-            bidirectional_mode: self.options.get("BALDESuseBidirectionalSearch").unwrap_or(2.) as i32,
+            bidirectional: self
+                .options
+                .get("BALDESuseBidirectionalSearch")
+                .unwrap_or(2.)
+                != 0.,
+            bidirectional_mode: self
+                .options
+                .get("BALDESuseBidirectionalSearch")
+                .unwrap_or(2.) as i32,
             dominance_mode: self.dominance_mode,
-            steps: self.bucket_steps,
+            steps: self.bucket_steps.clone(),
             target_buckets: self
                 .options
                 .get("BALDESnumberOfBucketsPerVertex")
@@ -512,13 +543,15 @@ impl Solver {
             if let Some(engine) = self.engine.as_mut() {
                 // "cannot decrease bucket steps" is reported and ignored.
                 let _ = engine.grid.decrease_steps(&self.graph);
-                self.bucket_steps = engine.grid.step;
+                for (axis, &slot) in engine.grid.resource_slots.iter().enumerate() {
+                    self.bucket_steps[slot] = engine.grid.step[axis];
+                }
             }
         }
         Ok(stop)
     }
 }
-impl Solver {
+impl<const D: usize> Solver<D> {
     /// Resource and topology edits invalidate both completion labels and paths.
     /// Reduced costs are deliberately excluded by `same_topology`.
     fn invalidate_changed_graph(&mut self) {
@@ -532,7 +565,7 @@ impl Solver {
             self.restore_arcs();
         }
     }
-    fn topology(&self) -> Graph {
+    fn topology(&self) -> Graph<D> {
         let mut graph = self.graph.clone();
         for a in &mut graph.arcs {
             a.reduced_cost = 0.;

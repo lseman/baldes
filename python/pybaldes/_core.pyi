@@ -2,6 +2,7 @@ from os import PathLike
 from typing import Any, Optional, Union
 
 __version__: str
+resource_dimensions: int
 has_clp: bool
 
 class Route:

@@ -112,7 +112,7 @@ use baldes::{core::options::Options, pricing::Solver};
 
 fn main() -> baldes::Result<()> {
     println!("{:?}", Options::support("BALDESlabelDominanceStrategy")?);
-    let mut solver = Solver::new(3, 1)?;
+    let mut solver = Solver::<2>::new(3, 1)?;
     solver.set_option("BALDESlabelDominanceStrategy", 1.0)?;
     Ok(())
 }

@@ -25,10 +25,10 @@ pub struct LimitedPreparation {
 
 /// Vertex fields, dominance descriptors and supports. False when a vertex needs more
 /// than twenty words.
-pub fn prepare_vertices(
+pub fn prepare_vertices<const D: usize>(
     info: &mut CutResourceInfo,
     prep: &mut LimitedPreparation,
-    g: &Graph,
+    g: &Graph<D>,
     cuts: &[LimitedInput],
     kpath: &[LimitedKPathInput],
 ) -> bool {
@@ -141,10 +141,10 @@ pub fn prepare_vertices(
     })
 }
 /// Arc transitions of one direction.
-pub fn prepare_arcs(
+pub fn prepare_arcs<const D: usize>(
     info: &mut CutResourceInfo,
     prep: &mut LimitedPreparation,
-    g: &Graph,
+    g: &Graph<D>,
     cuts: &[LimitedInput],
     kpath: &[LimitedKPathInput],
     forward: bool,

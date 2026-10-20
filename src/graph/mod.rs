@@ -1,5 +1,7 @@
 //! Physical graph input. Physical IDs never index bucket or label storage.
 pub mod buckets;
+pub mod resources;
+pub use resources::{ResourceValues, ScalarValues};
 pub mod relaxation;
 pub mod symmetry;
 use crate::{invalid, Result};
@@ -33,42 +35,42 @@ impl Default for Window {
     }
 }
 #[derive(Clone, Debug, PartialEq)]
-pub struct Vertex {
-    pub bounds: [Window; 2],
+pub struct Vertex<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    pub bounds: ScalarValues<Window, D>,
     pub elements: Vec<usize>,
     pub memory: Vec<usize>,
 }
 #[derive(Clone, Debug, PartialEq)]
-pub struct Arc {
+pub struct Arc<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub id: i32,
     pub tail: usize,
     pub head: usize,
     pub cost: f64,
     pub reduced_cost: f64,
     pub variables: Vec<(usize, f64)>,
-    pub consumption: [f64; 2],
-    pub bounds: [Option<Window>; 2],
+    pub consumption: ResourceValues<D>,
+    pub bounds: ScalarValues<Option<Window>, D>,
     pub elements: Vec<usize>,
     pub memory: Vec<usize>,
 }
 #[derive(Clone, Debug, PartialEq)]
-pub struct Graph {
-    pub vertices: Vec<Vertex>,
-    pub arcs: Vec<Arc>,
+pub struct Graph<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    pub vertices: Vec<Vertex<D>>,
+    pub arcs: Vec<Arc<D>>,
     pub resources: Vec<ResourceKind>,
     pub source: usize,
     pub sink: usize,
     pub element_count: usize,
     pub elementary: bool,
-    pub initial: [Option<f64>; 2],
+    pub initial: ScalarValues<Option<f64>, D>,
     pub graph_id: i32,
     pub main_resource: Option<usize>,
     grouped: bool,
 }
-impl Graph {
+impl<const D: usize> Graph<D> {
     /// `self == other` with every arc's `reduced_cost` ignored, without
     /// cloning. The destructuring breaks the build if a field is added.
-    pub fn same_topology(&self, other: &Graph) -> bool {
+    pub fn same_topology(&self, other: &Graph<D>) -> bool {
         let Graph {
             vertices,
             arcs,
@@ -96,7 +98,7 @@ impl Graph {
         {
             return false;
         }
-        let same_arc_scalars = |a: &Arc, b: &Arc| {
+        let same_arc_scalars = |a: &Arc<D>, b: &Arc<D>| {
             let Arc {
                 id,
                 tail,
@@ -126,7 +128,9 @@ impl Graph {
             a.is_empty() || a == b
         }
         // Contiguous fields first; the per-arc vectors cost a pointer chase.
-        arcs.iter().zip(&other.arcs).all(|(a, b)| same_arc_scalars(a, b))
+        arcs.iter()
+            .zip(&other.arcs)
+            .all(|(a, b)| same_arc_scalars(a, b))
             && *vertices == other.vertices
             && arcs.iter().zip(&other.arcs).all(|(a, b)| {
                 same(&a.variables, &b.variables)
@@ -135,15 +139,15 @@ impl Graph {
             })
     }
     pub fn new(vertices: usize, resources: usize) -> Result<Self> {
-        if vertices == 0 || vertices > 1024 || resources > 2 {
+        if vertices == 0 || vertices > 1024 || resources > D {
             return Err(invalid(
-                "pricing accepts 1..1024 vertices and 0..2 resources",
+                "pricing accepts 1..1024 vertices and at most the compiled scalar dimensions",
             ));
         }
         Ok(Self {
             vertices: (0..vertices)
                 .map(|v| Vertex {
-                    bounds: [Window::default(); 2],
+                    bounds: ScalarValues::filled(resources, Window::default()),
                     elements: vec![v],
                     memory: vec![v],
                 })
@@ -154,11 +158,28 @@ impl Graph {
             sink: vertices - 1,
             element_count: vertices,
             elementary: false,
-            initial: [None; 2],
+            initial: ScalarValues::filled(resources, None),
             graph_id: -1,
             main_resource: None,
             grouped: false,
         })
+    }
+    /// Append a scalar resource and initialize existing vertices and arcs.
+    pub fn add_resource(&mut self, kind: ResourceKind) -> Result<usize> {
+        let r = self.resources.len();
+        if r >= D || r >= i32::MAX as usize {
+            return Err(invalid("resource count exceeds compiled scalar capacity"));
+        }
+        self.resources.push(kind);
+        self.initial[r] = None;
+        for vertex in &mut self.vertices {
+            vertex.bounds[r] = Window::default();
+        }
+        for arc in &mut self.arcs {
+            arc.consumption[r] = 0.;
+            arc.bounds[r] = None;
+        }
+        Ok(r)
     }
     pub fn add_arc(&mut self, tail: usize, head: usize, cost: f64) -> Result<i32> {
         let id = self
@@ -187,14 +208,14 @@ impl Graph {
             cost,
             reduced_cost: cost,
             variables: vec![],
-            consumption: [0.0; 2],
-            bounds: [None; 2],
+            consumption: ResourceValues::filled(self.resources.len(), 0.),
+            bounds: ScalarValues::filled(self.resources.len(), None),
             elements: vec![],
             memory: vec![],
         });
         Ok(())
     }
-    pub fn arc_mut(&mut self, id: i32) -> Result<&mut Arc> {
+    pub fn arc_mut(&mut self, id: i32) -> Result<&mut Arc<D>> {
         self.arcs
             .iter_mut()
             .find(|a| a.id == id)
@@ -293,14 +314,20 @@ impl Graph {
             || self.source >= n
             || self.sink >= n
             || self.source == self.sink
-            || self.resources.len() > 2
+            || self.initial.len() < self.resources.len()
+            || self
+                .vertices
+                .iter()
+                .any(|v| v.bounds.len() < self.resources.len())
             || self.element_count > 1024
         {
             return Err(invalid("invalid graph dimensions or distinct terminals"));
         }
         let mut ids = HashSet::new();
         for a in &self.arcs {
-            if a.id < 0
+            if a.consumption.len() < self.resources.len()
+                || a.bounds.len() < self.resources.len()
+                || a.id < 0
                 || !ids.insert(a.id)
                 || a.tail >= n
                 || a.head >= n
@@ -334,7 +361,7 @@ impl Graph {
         Ok(())
     }
 }
-impl Graph {
+impl<const D: usize> Graph<D> {
     pub fn configure_ng(
         &mut self,
         sets: usize,

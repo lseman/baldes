@@ -1,6 +1,9 @@
 use super::*;
 
-pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutput> {
+pub fn solve<const D: usize>(
+    problem: RootProblem<D>,
+    mut options: TreeOptions,
+) -> Result<TreeOutput> {
     #[cfg(not(feature = "highs"))]
     if options.enumerated_mip.is_some() {
         return Err(invalid("enumerated MIP requires the highs feature"));
@@ -122,7 +125,7 @@ pub fn solve(problem: RootProblem, mut options: TreeOptions) -> Result<TreeOutpu
     // Tolerance closure does not strengthen a node's lower certificate to
     // the incumbent. These leaves still contribute to the global minimum.
     let mut closed_bound = f64::INFINITY;
-    let mut previous = None::<Rc<root::NodeSnapshot>>;
+    let mut previous = None::<Rc<root::NodeSnapshot<D>>>;
     while !open.is_empty() {
         // Discard only nodes whose selected bound closes the global gap.
         open.retain(|n| {

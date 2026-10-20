@@ -1,6 +1,6 @@
 //! Dynamic NG relaxation updates and route validation.
 use super::*;
-impl Solver {
+impl<const D: usize> Solver<D> {
     pub fn strengthen_ng(
         &mut self,
         paths: &[crate::graph::relaxation::FractionalPath],

@@ -158,7 +158,7 @@ fn root_snapshots_and_tree_modes_do_not_promote_an_unsupported_certificate() {
         },
         Graph,
     };
-    let mut graph = Graph::new(3, 1).unwrap();
+    let mut graph = Graph::<2>::new(3, 1).unwrap();
     graph.resources[0] = ResourceKind::Equality;
     for vertex in 0..3 {
         graph.set_bounds(vertex, 0, 0., 10.).unwrap();
@@ -537,7 +537,7 @@ fn heuristic_stage_value_skips_pricing_resets_and_never_certifies_the_global_bou
 fn resource_rounding_retry_does_not_publish_a_root_feasibility_proof() {
     use baldes::{Graph, master::root::{self, RootOptions, RootProblem}};
     let upper = f64::from_bits(1f64.to_bits() - 1);
-    let mut graph = Graph::new(4, 1).unwrap();
+    let mut graph = Graph::<2>::new(4, 1).unwrap();
     for customer in [1,2] { graph.add_elementarity_set(&[customer]).unwrap(); }
     graph.initial[0] = Some(0.);
     for v in 0..4 {
@@ -561,7 +561,7 @@ fn resource_rounding_retry_does_not_publish_a_root_feasibility_proof() {
 #[test]
 fn rounded_resource_feasibility_does_not_publish_an_integer_incumbent() {
     use baldes::{Graph, master::root::{self, RootOptions, RootProblem}};
-    let mut graph=Graph::new(3,1).unwrap();
+    let mut graph=Graph::<2>::new(3,1).unwrap();
     graph.initial[0]=Some(0.);
     graph.add_elementarity_set(&[1]).unwrap();
     for v in 0..3 {graph.set_bounds(v,0,0.,1.).unwrap();graph.set_ng(v,&[0]).unwrap();}

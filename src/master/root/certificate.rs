@@ -16,11 +16,11 @@ pub(super) struct SearchCache {
     attempts: std::cell::Cell<usize>,
 }
 impl SearchCache {
-    fn collect<'a>(
+    fn collect<'a, const D: usize>(
         &self,
-        problem: &'a RootProblem,
+        problem: &'a RootProblem<D>,
         limits: PathDomainLimits,
-    ) -> Option<ConservativeCoverRelaxation<'a>> {
+    ) -> Option<ConservativeCoverRelaxation<'a, D>> {
         use super::domain::CoverDomainFailure;
         use crate::enumeration::PathDomainFailure;
         if self
@@ -62,8 +62,8 @@ impl SearchCache {
 mod search_tests {
     use super::*;
 
-    fn problem() -> RootProblem {
-        let mut graph = crate::Graph::new(4, 0).unwrap();
+    fn problem() -> RootProblem<2> {
+        let mut graph = crate::Graph::<2>::new(4, 0).unwrap();
         for (tail, head) in [(0, 1), (0, 2), (1, 2), (2, 1), (1, 3), (2, 3)] {
             graph.add_arc(tail, head, 1.).unwrap();
         }
@@ -155,9 +155,9 @@ impl Budget {
 
 /// Unknown on unsupported geometry, exhausted budget, or incomplete proof.
 /// No parent model, pricing cache, or primal witness is changed here.
-pub(super) fn lower_bound(
-    problem: &RootProblem,
-    state: &State,
+pub(super) fn lower_bound<const D: usize>(
+    problem: &RootProblem<D>,
+    state: &State<D>,
     master: &ClpMaster,
     cache: &SearchCache,
 ) -> Option<f64> {

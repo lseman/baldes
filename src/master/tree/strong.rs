@@ -122,9 +122,9 @@ struct Candidate {
     score: f64,
     bounds: [f64; 2],
 }
-fn restricted_value(
-    parent: Option<&Rc<root::NodeSnapshot>>,
-    problem: &RootProblem,
+fn restricted_value<const D: usize>(
+    parent: Option<&Rc<root::NodeSnapshot<D>>>,
+    problem: &RootProblem<D>,
     branches: &[Branch],
     pool: &Pool,
     options: &TreeOptions,
@@ -145,10 +145,7 @@ fn restricted_value(
     }
     for route in &pool.routes {
         let entries = child.base_entries(route)?;
-        master.add_column(
-            route.original_cost,
-            &entries,
-        )?;
+        master.add_column(route.original_cost, &entries)?;
     }
     for (r, row) in child.rows.iter().enumerate() {
         if row.sense != RowSense::LessEqual {
@@ -166,10 +163,10 @@ fn restricted_value(
 }
 /// Return a chosen candidate and its selected-mode child bounds. Restricted LP
 /// objectives and heuristic pricing values affect scores only.
-pub(super) fn choose(
-    parent: Option<&Rc<root::NodeSnapshot>>,
-    problem: &RootProblem,
-    node: &Node,
+pub(super) fn choose<const D: usize>(
+    parent: Option<&Rc<root::NodeSnapshot<D>>>,
+    problem: &RootProblem<D>,
+    node: &Node<D>,
     supplied: Vec<super::candidates::BranchCandidate>,
     pool: &mut Pool,
     options: &TreeOptions,
@@ -179,9 +176,15 @@ pub(super) fn choose(
     let mut supplied = supplied;
     if !node.branches.is_empty() {
         if let Some(history) = &options.branch_history {
-            let limit = options.strong_branching.as_ref()
-                .map_or(supplied.len().saturating_mul(2), |strong| strong.phases.first().map_or(0, |p| p.candidates));
-            output.branch_history.prioritize(&mut supplied, limit, history);
+            let limit = options
+                .strong_branching
+                .as_ref()
+                .map_or(supplied.len().saturating_mul(2), |strong| {
+                    strong.phases.first().map_or(0, |p| p.candidates)
+                });
+            output
+                .branch_history
+                .prioritize(&mut supplied, limit, history);
         }
     }
     let mut candidates: Vec<_> = supplied
@@ -240,8 +243,16 @@ pub(super) fn choose(
                             output.fixing_calls += result.fixing_calls;
                             output.enumerated_routes += result.enumerated_routes;
                             estimates[side] = result.master.lp.min(1e12);
-                            if result.master.artificials.iter().all(|&c| result.values.get(c).copied().unwrap_or(0.) <= 1e-6) {
-                                if result.master.status == Status::Optimal && !result.master.pruned_by_bound && phase.pricing_phase_floor == 0 {
+                            if result
+                                .master
+                                .artificials
+                                .iter()
+                                .all(|&c| result.values.get(c).copied().unwrap_or(0.) <= 1e-6)
+                            {
+                                if result.master.status == Status::Optimal
+                                    && !result.master.pruned_by_bound
+                                    && phase.pricing_phase_floor == 0
+                                {
                                     observation = Some(history::EvaluationKind::ExactPricing);
                                 } else if phase.pricing_phase_floor > 0 {
                                     observation = Some(history::EvaluationKind::HeuristicPricing);
@@ -271,8 +282,15 @@ pub(super) fn choose(
                 }
                 if options.branch_history.is_some() {
                     if let Some(kind) = observation {
-                        output.branch_history.record(&candidate.branch, side, node.branches.len(), kind,
-                            node.bound, estimates[side], trial_started.elapsed().as_secs_f64());
+                        output.branch_history.record(
+                            &candidate.branch,
+                            side,
+                            node.branches.len(),
+                            kind,
+                            node.bound,
+                            estimates[side],
+                            trial_started.elapsed().as_secs_f64(),
+                        );
                     }
                 }
             }

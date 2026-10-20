@@ -1,34 +1,36 @@
 use super::*;
 
-impl HotColumns {
+impl<const D: usize> HotColumns<D> {
     #[inline(always)]
-    pub fn get(&self, i: usize) -> HotLabel {
+    pub fn get(&self, i: usize) -> HotLabel<D> {
         HotLabel {
             key: self.key[i],
             cost: self.cost[i],
             additional_cost: self.additional_cost[i],
-            resources: [self.resources[0][i], self.resources[1][i]],
+            resources: std::array::from_fn(|r| self.resources[r][i]),
             hops: self.hops[i],
             ng: self.ng[i],
         }
     }
 
-    pub fn push(&mut self, h: HotLabel) {
+    pub fn push(&mut self, h: HotLabel<D>) {
         self.key.push(h.key);
         self.cost.push(h.cost);
         self.additional_cost.push(h.additional_cost);
-        self.resources[0].push(h.resources[0]);
-        self.resources[1].push(h.resources[1]);
+        for r in 0..D {
+            self.resources[r].push(h.resources[r]);
+        }
         self.hops.push(h.hops);
         self.ng.push(h.ng);
     }
 
-    pub(super) fn insert(&mut self, i: usize, h: HotLabel) {
+    pub(super) fn insert(&mut self, i: usize, h: HotLabel<D>) {
         self.key.insert(i, h.key);
         self.cost.insert(i, h.cost);
         self.additional_cost.insert(i, h.additional_cost);
-        self.resources[0].insert(i, h.resources[0]);
-        self.resources[1].insert(i, h.resources[1]);
+        for r in 0..D {
+            self.resources[r].insert(i, h.resources[r]);
+        }
         self.hops.insert(i, h.hops);
         self.ng.insert(i, h.ng);
     }
@@ -39,8 +41,9 @@ impl HotColumns {
         self.key.copy_within(from.clone(), to);
         self.cost.copy_within(from.clone(), to);
         self.additional_cost.copy_within(from.clone(), to);
-        self.resources[0].copy_within(from.clone(), to);
-        self.resources[1].copy_within(from.clone(), to);
+        for r in 0..D {
+            self.resources[r].copy_within(from.clone(), to);
+        }
         self.hops.copy_within(from.clone(), to);
         self.ng.copy_within(from, to);
     }
@@ -49,8 +52,9 @@ impl HotColumns {
         self.key.truncate(n);
         self.cost.truncate(n);
         self.additional_cost.truncate(n);
-        self.resources[0].truncate(n);
-        self.resources[1].truncate(n);
+        for r in 0..D {
+            self.resources[r].truncate(n);
+        }
         self.hops.truncate(n);
         self.ng.truncate(n);
     }
@@ -73,6 +77,9 @@ impl HotColumns {
         candidate_r1: f64,
         candidate_ng: u16,
     ) -> usize {
+        if D < 2 {
+            return from;
+        }
         let n = self.key.len();
         // One label's test on values, so the 8-wide block below reads
         // fixed-size arrays without bounds checks and vectorizes.

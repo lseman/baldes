@@ -1,6 +1,6 @@
 use super::*;
 
-impl<const WORDS: usize> LabelData for ExtendedLabel<WORDS> {
+impl<const WORDS: usize, const D: usize> LabelData for ExtendedLabel<WORDS, D> {
     #[inline(always)]
     fn vertex(&self) -> usize {
         self.base.vertex()
@@ -14,7 +14,7 @@ impl<const WORDS: usize> LabelData for ExtendedLabel<WORDS> {
         self.base.original_cost()
     }
     #[inline(always)]
-    fn resources(&self) -> &[f64; 2] {
+    fn resources(&self) -> &[f64] {
         self.base.resources()
     }
     #[inline(always)]
@@ -43,7 +43,7 @@ impl<const WORDS: usize> LabelData for ExtendedLabel<WORDS> {
     }
 }
 
-impl LabelData for BranchedLabel {
+impl<const D: usize> LabelData for BranchedLabel<D> {
     #[inline(always)]
     fn vertex(&self) -> usize {
         self.base.vertex()
@@ -57,7 +57,7 @@ impl LabelData for BranchedLabel {
         self.base.original_cost()
     }
     #[inline(always)]
-    fn resources(&self) -> &[f64; 2] {
+    fn resources(&self) -> &[f64] {
         self.base.resources()
     }
     #[inline(always)]
@@ -86,7 +86,7 @@ impl LabelData for BranchedLabel {
     }
 }
 
-impl LabelData for OrdinaryLabel {
+impl<const D: usize> LabelData for OrdinaryLabel<D> {
     #[inline(always)]
     fn vertex(&self) -> usize {
         self.vertex as usize
@@ -100,7 +100,7 @@ impl LabelData for OrdinaryLabel {
         self.original_cost
     }
     #[inline(always)]
-    fn resources(&self) -> &[f64; 2] {
+    fn resources(&self) -> &[f64] {
         &self.resources
     }
     #[inline(always)]
@@ -129,7 +129,7 @@ impl LabelData for OrdinaryLabel {
     }
 }
 
-impl LabelData for StoredLabel {
+impl<const D: usize> LabelData for StoredLabel<D> {
     #[inline(always)]
     fn vertex(&self) -> usize {
         self.vertex
@@ -143,7 +143,7 @@ impl LabelData for StoredLabel {
         self.original_cost
     }
     #[inline(always)]
-    fn resources(&self) -> &[f64; 2] {
+    fn resources(&self) -> &[f64] {
         &self.resources
     }
     #[inline(always)]
@@ -172,7 +172,7 @@ impl LabelData for StoredLabel {
     }
 }
 
-impl LabelData for LabelRef<'_> {
+impl<const D: usize> LabelData for LabelRef<'_, D> {
     #[inline(always)]
     fn vertex(&self) -> usize {
         (*self).vertex()
@@ -186,7 +186,7 @@ impl LabelData for LabelRef<'_> {
         (*self).original_cost()
     }
     #[inline(always)]
-    fn resources(&self) -> &[f64; 2] {
+    fn resources(&self) -> &[f64] {
         (*self).resources()
     }
     #[inline(always)]

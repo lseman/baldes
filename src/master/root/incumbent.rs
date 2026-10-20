@@ -87,11 +87,14 @@ impl ExactSum {
 
 /// Exact-real scalar feasibility of a nonempty physically elementary path.
 /// Stored floating resource profiles are not used as feasibility proofs.
-pub(crate) fn exact_route_feasible(problem: &RootProblem, route: &Route) -> Option<()> {
+pub(crate) fn exact_route_feasible<const D: usize>(
+    problem: &RootProblem<D>,
+    route: &Route,
+) -> Option<()> {
     use crate::graph::ResourceKind;
     use std::cmp::Ordering::{Greater, Less};
     let g = &problem.graph;
-    if g.resources.len() > 2
+    if g.resources.len() > D
         || g.source == g.sink
         || g.sink >= g.vertices.len()
         || route.arcs.len() >= g.vertices.len()
@@ -101,15 +104,16 @@ pub(crate) fn exact_route_feasible(problem: &RootProblem, route: &Route) -> Opti
         return None;
     }
     let source = g.vertices.get(g.source)?;
-    let mut resources = [ExactSum::default(), ExactSum::default()];
+    let mut resources =
+        crate::graph::ScalarValues::<_, D>::filled(g.resources.len(), ExactSum::default());
     let valid_window =
         |w: crate::graph::Window| w.lower.is_finite() && w.upper.is_finite() && w.lower <= w.upper;
     for (r, value) in resources.iter_mut().enumerate().take(g.resources.len()) {
-        let bounds = source.bounds[r];
+        let bounds = *source.bounds.get(r)?;
         if !valid_window(bounds) {
             return None;
         }
-        value.add(g.initial[r].unwrap_or(bounds.lower))?;
+        value.add(g.initial.get(r)?.unwrap_or(bounds.lower))?;
         if value.compare(bounds.lower)? == Less || value.compare(bounds.upper)? == Greater {
             return None;
         }
@@ -131,18 +135,18 @@ pub(crate) fn exact_route_feasible(problem: &RootProblem, route: &Route) -> Opti
             return None;
         }
         for (r, value) in resources.iter_mut().enumerate().take(g.resources.len()) {
-            let mut bounds = head.bounds[r];
+            let mut bounds = *head.bounds.get(r)?;
             if !valid_window(bounds) {
                 return None;
             }
-            if let Some(window) = arc.bounds[r] {
+            if let Some(window) = *arc.bounds.get(r)? {
                 if !valid_window(window) {
                     return None;
                 }
                 bounds.lower = bounds.lower.max(window.lower);
                 bounds.upper = bounds.upper.min(window.upper);
             }
-            let consumption = arc.consumption[r];
+            let consumption = *arc.consumption.get(r)?;
             if g.resources[r] == ResourceKind::Disposable && consumption < 0. {
                 return None;
             }
@@ -163,8 +167,8 @@ pub(crate) fn exact_route_feasible(problem: &RootProblem, route: &Route) -> Opti
     (at == g.sink && !visited.is_empty()).then_some(())
 }
 
-pub(super) fn validated_upper(
-    problem: &RootProblem,
+pub(super) fn validated_upper<const D: usize>(
+    problem: &RootProblem<D>,
     routes: &[Route],
     tags: &[i32],
     values: &[f64],
@@ -238,7 +242,7 @@ pub(super) fn validated_upper(
     objective.upper()
 }
 
-impl RootProblem {
+impl<const D: usize> RootProblem<D> {
     pub(crate) fn unit_route_incumbent(&self, routes: &[Route]) -> Option<f64> {
         let tags = (0..routes.len())
             .map(i32::try_from)
@@ -253,7 +257,7 @@ mod tests {
     use super::*;
     #[test]
     fn rounded_witness_uses_original_cost_and_exact_rows() {
-        let mut graph = Graph::new(3, 1).unwrap();
+        let mut graph = Graph::<2>::new(3, 1).unwrap();
         for v in 0..3 {
             graph.set_bounds(v, 0, 0., 10.).unwrap();
         }
@@ -283,9 +287,9 @@ mod tests {
         sum.add(f64::EPSILON / 4.).unwrap();
         assert_eq!(sum.upper(), Some(f64::from_bits(1f64.to_bits() + 1)));
     }
-    fn chain(consumption: &[f64], upper: f64) -> (RootProblem, Route) {
+    fn chain(consumption: &[f64], upper: f64) -> (RootProblem<2>, Route) {
         let n = consumption.len() + 1;
-        let mut graph = Graph::new(n, 1).unwrap();
+        let mut graph = Graph::<2>::new(n, 1).unwrap();
         graph.initial[0] = Some(0.);
         for v in 0..n {
             graph.set_bounds(v, 0, 0., upper).unwrap();

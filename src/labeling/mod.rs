@@ -2,10 +2,12 @@
 mod arena;
 pub mod engine;
 pub mod pool;
+mod resources;
 pub mod storage;
 use crate::graph::ng::PreparedNg;
 use crate::graph::{Arc, Graph, ResourceKind};
 use crate::{incomplete, invalid, Result};
+pub use resources::ScalarResourceKernel;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
@@ -55,13 +57,18 @@ pub struct Route {
 impl Route {
     pub(crate) fn identity(&self) -> String {
         use std::fmt::Write;
-        let capacity = self.resource_profile.iter().fold(
-            self.arcs.len().saturating_mul(12),
-            |size, state| size.saturating_add(1).saturating_add(state.len().saturating_mul(17)),
-        );
+        let capacity =
+            self.resource_profile
+                .iter()
+                .fold(self.arcs.len().saturating_mul(12), |size, state| {
+                    size.saturating_add(1)
+                        .saturating_add(state.len().saturating_mul(17))
+                });
         let mut identity = String::with_capacity(capacity);
         for (i, arc) in self.arcs.iter().enumerate() {
-            if i != 0 { identity.push(','); }
+            if i != 0 {
+                identity.push(',');
+            }
             write!(&mut identity, "{arc}").unwrap();
         }
         for state in &self.resource_profile {
@@ -82,12 +89,32 @@ mod identity_tests {
     fn reserved_identity_preserves_arc_and_schedule_encoding() {
         use std::fmt::Write;
         for arcs in [vec![], vec![0], vec![i32::MIN, i32::MAX, -1, 10]] {
-            for resource_profile in [vec![], vec![vec![]],
-                vec![vec![-0., 0., 1., -1., f64::from_bits(1), f64::INFINITY,
-                    f64::from_bits(0x7ff8000000000012)]]] {
-                let route = Route { nodes: vec![], arcs: arcs.clone(), cost: 0., original_cost: 0.,
-                    resources: vec![], resource_profile };
-                let mut expected = arcs.iter().map(i32::to_string).collect::<Vec<_>>().join(",");
+            for resource_profile in [
+                vec![],
+                vec![vec![]],
+                vec![vec![
+                    -0.,
+                    0.,
+                    1.,
+                    -1.,
+                    f64::from_bits(1),
+                    f64::INFINITY,
+                    f64::from_bits(0x7ff8000000000012),
+                ]],
+            ] {
+                let route = Route {
+                    nodes: vec![],
+                    arcs: arcs.clone(),
+                    cost: 0.,
+                    original_cost: 0.,
+                    resources: vec![],
+                    resource_profile,
+                };
+                let mut expected = arcs
+                    .iter()
+                    .map(i32::to_string)
+                    .collect::<Vec<_>>()
+                    .join(",");
                 for state in &route.resource_profile {
                     expected.push('|');
                     for &value in state {
@@ -162,11 +189,11 @@ pub struct PricingResult {
     pub statistics: Statistics,
 }
 #[derive(Clone, Debug)]
-struct Label {
+struct Label<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     vertex: usize,
     cost: f64,
     original_cost: f64,
-    resources: [f64; 2],
+    resources: crate::graph::ResourceValues<D>,
     ng: u16,
     parent: Option<usize>,
     arc: Option<usize>,
@@ -180,14 +207,27 @@ struct Label {
 /// loop writing `q[r]` kept it in memory, and the next 16-byte read of the
 /// resources stalled on store forwarding.
 #[inline(always)]
-pub fn extend_resources(g: &Graph, a: &Arc, q: [f64; 2], forward: bool) -> Option<[f64; 2]> {
-    let n = g.resources.len();
-    let q0 = if n > 0 { extend_resource(g, a, 0, q[0], forward)? } else { q[0] };
-    let q1 = if n > 1 { extend_resource(g, a, 1, q[1], forward)? } else { q[1] };
-    Some([q0, q1])
+pub fn extend_resources<const D: usize>(
+    g: &Graph<D>,
+    a: &Arc<D>,
+    q: impl AsRef<[f64]>,
+    forward: bool,
+) -> Option<crate::graph::ResourceValues<D>> {
+    let q = q.as_ref();
+    if g.resources.len() > D || q.len() < g.resources.len() {
+        return None;
+    }
+    let values = std::array::from_fn(|r| q.get(r).copied().unwrap_or(0.));
+    ScalarResourceKernel::<D>::extend_active(g, a, values, forward).map(Into::into)
 }
 #[inline(always)]
-fn extend_resource(g: &Graph, a: &Arc, r: usize, mut q: f64, forward: bool) -> Option<f64> {
+fn extend_resource<const D: usize>(
+    g: &Graph<D>,
+    a: &Arc<D>,
+    r: usize,
+    mut q: f64,
+    forward: bool,
+) -> Option<f64> {
     let equality = g.resources[r] == ResourceKind::Equality;
     let mut head = g.vertices[a.head].bounds[r];
     if let Some(window) = a.bounds[r] {
@@ -237,7 +277,7 @@ fn extend_resource(g: &Graph, a: &Arc, r: usize, mut q: f64, forward: bool) -> O
     }
     Some(q)
 }
-fn dominates(g: &Graph, a: &Label, b: &Label, hop_limit: bool) -> bool {
+fn dominates<const D: usize>(g: &Graph<D>, a: &Label<D>, b: &Label<D>, hop_limit: bool) -> bool {
     if a.vertex != b.vertex
         || a.cost - b.cost >= EPSILON
         || a.ng & !b.ng != 0
@@ -250,7 +290,7 @@ fn dominates(g: &Graph, a: &Label, b: &Label, hop_limit: bool) -> bool {
         ResourceKind::Equality => equality_resource_dominates(a.resources[r], b.resources[r]),
     })
 }
-fn reconstruct(g: &Graph, labels: &[Label], terminal: &Label) -> Route {
+fn reconstruct<const D: usize>(g: &Graph<D>, labels: &[Label<D>], terminal: &Label<D>) -> Route {
     let mut arcs = vec![];
     let mut resource_profile = vec![];
     let mut next = Some(terminal);
@@ -279,7 +319,7 @@ fn reconstruct(g: &Graph, labels: &[Label], terminal: &Label) -> Route {
 
 /// Complete a label-correcting search or return an error. Budget/time exhaustion
 /// never returns a partial pool with an exactness certificate.
-pub fn reference_price(g: &Graph, controls: &Controls) -> Result<PricingResult> {
+pub fn reference_price<const D: usize>(g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
     g.validate()?;
     if controls.max_labels == 0 || controls.max_columns == 0 || !controls.zero_threshold.is_finite()
     {
@@ -292,7 +332,7 @@ pub fn reference_price(g: &Graph, controls: &Controls) -> Result<PricingResult> 
     if controls.time_limit.is_zero() {
         return Err(incomplete("pricing hard time limit exceeded"));
     }
-    let mut q = [0.; 2];
+    let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
     for (r, value) in q.iter_mut().enumerate().take(g.resources.len()) {
         *value = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower);
         let w = g.vertices[g.source].bounds[r];
@@ -360,7 +400,7 @@ pub fn reference_price(g: &Graph, controls: &Controls) -> Result<PricingResult> 
             if a.head == g.source {
                 continue;
             }
-            let Some(resources) = extend_resources(g, a, from.resources, true) else {
+            let Some(resources) = extend_resources(g, a, &from.resources, true) else {
                 continue;
             };
             let Some(memory) = ng.forward[index].extend(from.ng, ng.vertex_bits[a.head]) else {
@@ -438,7 +478,8 @@ pub fn reference_price(g: &Graph, controls: &Controls) -> Result<PricingResult> 
 
 /// Native bucket pricing. Equality resources with a non-fixed sink use the
 /// supported forward search, since a backward equality root is undefined.
-pub fn price(g: &Graph, controls: &Controls) -> Result<PricingResult> {
+pub fn price<const D: usize>(g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
+    g.validate()?;
     let bidirectional = !g.resources.iter().enumerate().any(|(r, k)| {
         *k == ResourceKind::Equality
             && g.vertices[g.sink].bounds[r].lower != g.vertices[g.sink].bounds[r].upper

@@ -3,7 +3,7 @@ use super::*;
 impl BucketGraph {
     /// Refine cells while transferring only surviving physical arcs. Rebuilding
     /// from the physical graph here would silently undo reduced-cost fixing.
-    pub fn decrease_steps(&mut self, g: &Graph) -> Result<()> {
+    pub fn decrease_steps<const D: usize>(&mut self, g: &Graph<D>) -> Result<()> {
         let old_steps = self.step;
         let old_forward = self.forward.clone();
         let old_backward = self.backward.clone();

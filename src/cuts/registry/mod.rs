@@ -221,8 +221,10 @@ pub struct CutRegistry {
     )>,
 }
 
-fn physical_arcs<'a>(g: &'a Graph) -> BTreeMap<(usize, usize), &'a crate::graph::Arc> {
-    let mut by_ends: BTreeMap<(usize, usize), &crate::graph::Arc> = BTreeMap::new();
+fn physical_arcs<'a, const D: usize>(
+    g: &'a Graph<D>,
+) -> BTreeMap<(usize, usize), &'a crate::graph::Arc<D>> {
+    let mut by_ends: BTreeMap<(usize, usize), &crate::graph::Arc<D>> = BTreeMap::new();
     for a in &g.arcs {
         let slot = by_ends.entry((a.tail, a.head)).or_insert(a);
         if a.id < slot.id {
@@ -232,7 +234,10 @@ fn physical_arcs<'a>(g: &'a Graph) -> BTreeMap<(usize, usize), &'a crate::graph:
     by_ends
 }
 /// Physical arcs of a customer sequence; source and sink are added.
-pub fn route_arcs<'a>(g: &'a Graph, vertices: &[usize]) -> Result<Vec<&'a crate::graph::Arc>> {
+pub fn route_arcs<'a, const D: usize>(
+    g: &'a Graph<D>,
+    vertices: &[usize],
+) -> Result<Vec<&'a crate::graph::Arc<D>>> {
     let by_ends = physical_arcs(g);
     let mut route = vertices.to_vec();
     if route.is_empty() {

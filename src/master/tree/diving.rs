@@ -30,9 +30,9 @@ impl Default for DivingOptions {
 }
 /// Validate an integral LP witness independently of artificial columns,
 /// solver incumbent summaries, or the branch being explored.
-pub(super) fn record_solution(
-    problem: &RootProblem,
-    result: &root::RootOutput,
+pub(super) fn record_solution<const D: usize>(
+    problem: &RootProblem<D>,
+    result: &root::RootOutput<D>,
     output: &mut TreeOutput,
 ) -> bool {
     if result
@@ -74,16 +74,16 @@ pub(super) fn record_solution(
     }
     true
 }
-struct Dive {
+struct Dive<const D: usize> {
     branches: Vec<Branch>,
     depth: usize,
     discrepancy: usize,
-    result: root::RootOutput,
+    result: root::RootOutput<D>,
 }
-pub(super) fn run(
-    problem: &RootProblem,
-    node: &Node,
-    parent: root::RootOutput,
+pub(super) fn run<const D: usize>(
+    problem: &RootProblem<D>,
+    node: &Node<D>,
+    parent: root::RootOutput<D>,
     pool: &mut Pool,
     options: &TreeOptions,
     output: &mut TreeOutput,

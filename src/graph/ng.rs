@@ -35,7 +35,7 @@ pub struct PreparedNg {
     pub backward: Vec<Transition>,
 }
 impl PreparedNg {
-    pub fn new(g: &Graph) -> Result<Self> {
+    pub fn new<const D: usize>(g: &Graph<D>) -> Result<Self> {
         g.validate()?;
         let n = g.vertices.len();
         let e = g.element_count;

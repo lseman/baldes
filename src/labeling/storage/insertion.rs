@@ -1,10 +1,10 @@
 use super::*;
 
-impl LabelStorage {
+impl<const D: usize> LabelStorage<D> {
     pub fn insert(
         &mut self,
-        g: &Graph,
-        label: StoredLabel,
+        g: &Graph<D>,
+        label: StoredLabel<D>,
         forward: bool,
         test: InsertionTest,
         capacity: usize,
@@ -13,7 +13,7 @@ impl LabelStorage {
         stats: &mut Statistics,
     ) -> bool {
         let candidate = HotLabel::of(&label);
-        self.insert_label::<true, StoredLabel, _>(
+        self.insert_label::<true, StoredLabel<D>, _>(
             g, label, candidate, forward, test, capacity, hop_limit, cuts, stats,
         )
     }
@@ -26,9 +26,9 @@ impl LabelStorage {
     #[inline(always)]
     pub fn insert_ref(
         &mut self,
-        g: &Graph,
-        label: &StoredLabel,
-        candidate: HotLabel,
+        g: &Graph<D>,
+        label: &StoredLabel<D>,
+        candidate: HotLabel<D>,
         forward: bool,
         test: InsertionTest,
         capacity: usize,
@@ -36,7 +36,7 @@ impl LabelStorage {
         cuts: &[DominanceDescriptor],
         stats: &mut Statistics,
     ) -> bool {
-        self.insert_label::<true, StoredLabel, _>(
+        self.insert_label::<true, StoredLabel<D>, _>(
             g, label, candidate, forward, test, capacity, hop_limit, cuts, stats,
         )
     }
@@ -44,11 +44,11 @@ impl LabelStorage {
     /// The branch-free specialization is only used by a sweep with no active
     /// branch resources; the public insertion path checks branch state.
     #[inline(always)]
-    pub(crate) fn insert_label<const BRANCHING: bool, R: ArenaRecord, L: LabelInput>(
+    pub(crate) fn insert_label<const BRANCHING: bool, R: ArenaRecord<D>, L: LabelInput<D>>(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         input: L,
-        candidate: HotLabel,
+        candidate: HotLabel<D>,
         forward: bool,
         test: InsertionTest,
         capacity: usize,
@@ -95,8 +95,8 @@ impl LabelStorage {
                 &bucket.hot,
                 position,
                 threshold,
-                candidate.resources[0],
-                candidate.resources[1],
+                candidate.resources.first().copied().unwrap_or(0.),
+                candidate.resources.get(1).copied().unwrap_or(0.),
                 candidate.ng,
                 forward,
                 ng,
@@ -153,8 +153,8 @@ impl LabelStorage {
                 &bucket.hot,
                 read,
                 0.,
-                candidate.resources[0],
-                candidate.resources[1],
+                candidate.resources.first().copied().unwrap_or(0.),
+                candidate.resources.get(1).copied().unwrap_or(0.),
                 candidate.ng,
                 forward,
                 ng,

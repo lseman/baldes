@@ -16,9 +16,9 @@ use std::{
 mod bounds;
 
 #[derive(Clone, Debug)]
-pub struct Network {
+pub struct Network<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub id: i32,
-    pub graph: Graph,
+    pub graph: Graph<D>,
     pub multiplicity: Window,
     /// Shared-row coefficients, aligned with `graph.arcs`.
     pub arc_entries: Vec<Vec<(usize, f64)>>,
@@ -27,9 +27,9 @@ pub struct Network {
 }
 
 #[derive(Clone, Debug)]
-pub struct Problem {
+pub struct Problem<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub rows: Vec<Row>,
-    pub networks: Vec<Network>,
+    pub networks: Vec<Network<D>>,
 }
 
 #[derive(Clone, Debug)]
@@ -65,15 +65,15 @@ pub struct Output {
     pub oracle_calls: Vec<(i32, usize)>,
 }
 
-struct Oracle {
-    network: Network,
-    solver: Solver,
+struct Oracle<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    network: Network<D>,
+    solver: Solver<D>,
     index: HashMap<i32, usize>,
     route_entries: Vec<(usize, f64)>,
     calls: usize,
 }
-struct State {
-    oracles: Vec<Oracle>,
+struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    oracles: Vec<Oracle<D>>,
     shared_offset: usize,
     routes: Vec<NetworkRoute>,
     tags: HashMap<(i32, String), i32>,
@@ -82,8 +82,8 @@ struct State {
     rhs: Vec<f64>,
     deadline: Instant,
 }
-struct Coordinator(Rc<RefCell<State>>);
-impl cg::Controller<ClpMaster> for Coordinator {
+struct Coordinator<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>(Rc<RefCell<State<D>>>);
+impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
     fn certified_pricing_bound(&self, master: &ClpMaster, duals: &[f64]) -> Result<Option<f64>> {
         Ok(Some(
             bounds::certificate(&self.0.borrow(), master, duals).unwrap_or(f64::NEG_INFINITY),
@@ -109,7 +109,11 @@ impl cg::Controller<ClpMaster> for Coordinator {
     }
 }
 
-fn entries(oracle: &Oracle, route: &Route, offset: usize) -> Result<Vec<(usize, f64)>> {
+fn entries<const D: usize>(
+    oracle: &Oracle<D>,
+    route: &Route,
+    offset: usize,
+) -> Result<Vec<(usize, f64)>> {
     let mut values = BTreeMap::new();
     for &(row, value) in &oracle.route_entries {
         *values.entry(row).or_insert(0.) += value;
@@ -135,7 +139,7 @@ fn entries(oracle: &Oracle, route: &Route, offset: usize) -> Result<Vec<(usize, 
         .collect())
 }
 
-impl State {
+impl<const D: usize> State<D> {
     fn price(&mut self, phase: usize, duals: &[f64]) -> Result<cg::Answer> {
         let mut columns = vec![];
         let mut minimum = f64::INFINITY;
@@ -272,7 +276,7 @@ impl State {
 }
 
 /// Solve a fresh shared master. Each oracle retains its own pricing state.
-pub fn solve(problem: Problem, options: Options) -> Result<Output> {
+pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Output> {
     if problem.networks.is_empty()
         || options.cg.warm_start.is_some()
         || !options.cg.known.is_empty()

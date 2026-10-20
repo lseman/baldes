@@ -3,6 +3,17 @@
 //! submodules, as OpenRSCP's cmake/CoinClp.cmake does.
 //! `--features highs` links against HiGHS via pkg-config or a vendored copy.
 fn main() {
+    println!("cargo:rerun-if-env-changed=BALDES_RESOURCE_DIMENSIONS");
+    let dimensions = std::env::var("BALDES_RESOURCE_DIMENSIONS")
+        .unwrap_or_else(|_| "2".into())
+        .parse::<usize>()
+        .expect("BALDES_RESOURCE_DIMENSIONS must be a usize");
+    let output = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
+    std::fs::write(
+        output.join("resource_dimensions.rs"),
+        format!("pub const DEFAULT_RESOURCE_DIMENSIONS: usize = {dimensions};\n"),
+    )
+    .unwrap();
     #[cfg(feature = "clp")]
     {
         clp::build();

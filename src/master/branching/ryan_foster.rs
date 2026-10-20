@@ -3,7 +3,10 @@ use crate::{
     invalid, master::root::RootProblem, pricing::restrictions::RyanFosterConstraint, Result, Route,
 };
 
-pub(super) fn validate(problem: &RootProblem, rule: RyanFosterConstraint) -> Result<()> {
+pub(super) fn validate<const D: usize>(
+    problem: &RootProblem<D>,
+    rule: RyanFosterConstraint,
+) -> Result<()> {
     if rule.first == rule.second
         || !problem.customers.contains(&rule.first)
         || !problem.customers.contains(&rule.second)

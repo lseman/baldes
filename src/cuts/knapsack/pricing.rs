@@ -78,11 +78,16 @@ impl KnapsackPricing {
     }
     /// resConsKnapsackCutsDualsCost: forward consumption, or sink upper
     /// minus the backward label's remaining-resource coordinate.
-    pub fn partial_cost(&self, g: &crate::Graph, resources: &[f64], forward: bool) -> f64 {
+    pub fn partial_cost<const D: usize>(
+        &self,
+        g: &crate::Graph<D>,
+        resources: &[f64],
+        forward: bool,
+    ) -> f64 {
         if forward {
             return self.cost(resources);
         }
-        let mut consumption = [0.; 2];
+        let mut consumption = crate::graph::ResourceValues::<D>::filled(g.resources.len(), 0.);
         for &r in self.resources.keys() {
             consumption[r] = g.vertices[g.sink].bounds[r].upper - resources[r];
         }
@@ -90,14 +95,14 @@ impl KnapsackPricing {
     }
     /// Native join consumption: forward + (sink upper - backward), or
     /// forward + forward - initial usage for symmetric consumption search.
-    pub fn join_cost(
+    pub fn join_cost<const D: usize>(
         &self,
-        g: &crate::Graph,
+        g: &crate::Graph<D>,
         forward: &[f64],
         backward: &[f64],
         symmetric: bool,
     ) -> f64 {
-        let mut consumption = [0.; 2];
+        let mut consumption = crate::graph::ResourceValues::<D>::filled(g.resources.len(), 0.);
         for &r in self.resources.keys() {
             consumption[r] = if symmetric {
                 forward[r] + backward[r]

@@ -62,7 +62,7 @@ pub struct EnumeratedMipOutput {
     /// about this matrix cannot exclude solutions above this coverage cutoff.
     pub coverage_cutoff: f64,
 }
-impl NodeSnapshot {
+impl<const D: usize> NodeSnapshot<D> {
     pub fn enumeration_mip_policy(&self) -> Result<EnumerationMipPolicy> {
         EnumerationMipPolicy::from_options(&self.pricing.options)
     }

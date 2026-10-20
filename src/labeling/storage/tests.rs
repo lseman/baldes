@@ -21,7 +21,7 @@ fn check_scan<const PREFIX: bool, const FORWARD: bool, const RESOURCES: usize, c
                     key: 0.,
                     cost: 0.,
                     additional_cost: 0.,
-                    resources,
+                    resources: resources.into(),
                     hops: 1,
                     ng: if !use_ng || i == matching {
                         1
@@ -49,7 +49,7 @@ fn check_scan<const PREFIX: bool, const FORWARD: bool, const RESOURCES: usize, c
                 key: 2.,
                 cost: 0.,
                 additional_cost: 0.,
-                resources: [3.; 2],
+                resources: [3.; 2].into(),
                 hops: 1,
                 ng: 2,
             });
@@ -80,17 +80,17 @@ fn dominance_scan_preserves_first_candidate_across_block_boundaries() {
 }
 #[test]
 fn backward_disposable_dominance_subtracts_before_comparing() {
-    let graph = Graph::new(3, 1).unwrap();
+    let graph = Graph::<2>::new(3, 1).unwrap();
     let a = HotLabel {
         key: -1.,
         cost: -1.,
         additional_cost: 0.,
-        resources: [-EPSILON, 0.],
+        resources: [-EPSILON, 0.].into(),
         hops: 1,
         ng: 0,
     };
     let b = HotLabel {
-        resources: [f64::from_bits(1), 0.],
+        resources: [f64::from_bits(1), 0.].into(),
         ..a
     };
     assert!(LabelStorage::dominates_hot(
@@ -107,18 +107,18 @@ fn backward_disposable_dominance_subtracts_before_comparing() {
     let mut suffix = HotColumns::default();
     for i in 0..9 {
         prefix.push(if i == 8 {
-            a
+            a.clone()
         } else {
             HotLabel {
-                resources: [-100., 0.],
+                resources: [-100., 0.].into(),
                 ..a
             }
         });
         suffix.push(if i == 8 {
-            b
+            b.clone()
         } else {
             HotLabel {
-                resources: [100., 0.],
+                resources: [100., 0.].into(),
                 ..b
             }
         });
@@ -135,7 +135,7 @@ fn backward_disposable_dominance_subtracts_before_comparing() {
 
 #[test]
 fn equality_dominance_retains_binary_interval_endpoints() {
-    let mut graph = Graph::new(3, 1).unwrap();
+    let mut graph = Graph::<2>::new(3, 1).unwrap();
     graph.resources[0] = ResourceKind::Equality;
     let make = |resource, cost| StoredLabel {
         id: 0,
@@ -147,7 +147,7 @@ fn equality_dominance_retains_binary_interval_endpoints() {
         vertex: 1,
         cost,
         original_cost: cost,
-        resources: [resource, 0.],
+        resources: [resource, 0.].into(),
         ng: 0,
         branch_state: None,
         parent: None,
@@ -236,16 +236,19 @@ fn equality_dominance_retains_binary_interval_endpoints() {
 
 #[test]
 fn empty_cut_dominance_does_not_load_cold_words() {
-    let g = Graph::new(3, 1).unwrap();
+    let g = Graph::<2>::new(3, 1).unwrap();
     let mut a = HotLabel {
         key: 0.,
         cost: -2.,
         additional_cost: 0.,
-        resources: [0.; 2],
+        resources: [0.; 2].into(),
         hops: 1,
         ng: 0,
     };
-    let b = HotLabel { cost: -1., ..a };
+    let b = HotLabel {
+        cost: -1.,
+        ..a.clone()
+    };
     for cost in [-2., -1., -1. + EPSILON, f64::NAN] {
         a.cost = cost;
         let mut gap = (a.cost - b.cost) + (a.additional_cost - b.additional_cost);
@@ -297,7 +300,7 @@ fn empty_cut_dominance_does_not_load_cold_words() {
 
 #[test]
 fn owned_insertion_moves_branch_state_and_borrowed_insertion_clones_on_acceptance() {
-    let graph = Graph::new(3, 1).unwrap();
+    let graph = Graph::<2>::new(3, 1).unwrap();
     let make = || StoredLabel {
         id: 0,
         local_id: 0,
@@ -308,7 +311,7 @@ fn owned_insertion_moves_branch_state_and_borrowed_insertion_clones_on_acceptanc
         vertex: 1,
         cost: -1.,
         original_cost: 2.,
-        resources: [0.; 2],
+        resources: [0.; 2].into(),
         ng: 0,
         branch_state: Some(Box::new([5; 16])),
         parent: None,
@@ -364,4 +367,73 @@ fn owned_insertion_moves_branch_state_and_borrowed_insertion_clones_on_acceptanc
     assert_eq!(state, &label.branch_state);
     assert_ne!(state.as_deref().unwrap().as_ptr(), pointer);
     assert_eq!(label.branch_state.as_deref().unwrap().as_ptr(), pointer);
+}
+
+#[test]
+fn general_dominance_checks_all_fixed_array_coordinates() {
+    let g = Graph::<3>::new(3, 3).unwrap();
+    let a = StoredLabel {
+        id: 0,
+        local_id: 0,
+        bucket: BucketId {
+            vertex: 1,
+            bucket: 0,
+        },
+        vertex: 1,
+        cost: -9.,
+        original_cost: -9.,
+        resources: vec![0., 0., 9.].into(),
+        ng: 0,
+        branch_state: None,
+        parent: None,
+        arc: None,
+        hops: 1,
+        expanded: false,
+        cut_words: [0; LIMITED_WORDS],
+        additional_cost: 0.,
+        half_potential: 0.,
+    };
+    let b = StoredLabel {
+        cost: -5.,
+        resources: vec![0., 0., 2.].into(),
+        ..a.clone()
+    };
+    assert!(!LabelStorage::dominates(
+        &g,
+        &a,
+        &b,
+        true,
+        InsertionTest::Full,
+        false,
+        &[]
+    ));
+    assert!(LabelStorage::dominates(
+        &g,
+        &a,
+        &b,
+        false,
+        InsertionTest::Full,
+        false,
+        &[]
+    ));
+    assert!(!LabelStorage::dominates_hot(
+        &g,
+        &HotLabel::of(&a),
+        &HotLabel::of(&b),
+        true,
+        InsertionTest::Full,
+        false,
+        &[],
+        || panic!("resource comparison must reject before reading cut words")
+    ));
+    assert!(LabelStorage::dominates_hot(
+        &g,
+        &HotLabel::of(&a),
+        &HotLabel::of(&b),
+        false,
+        InsertionTest::Full,
+        false,
+        &[],
+        || panic!("an empty cut list does not need cut words")
+    ));
 }

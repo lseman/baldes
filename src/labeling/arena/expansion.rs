@@ -1,6 +1,6 @@
 use super::*;
 
-impl LabelArena {
+impl<const D: usize> LabelArena<D> {
     pub(crate) fn expand(&mut self, ids: &[usize]) -> usize {
         let mut count = 0;
         match &mut self.records {
@@ -56,54 +56,54 @@ impl LabelArena {
         count
     }
 
-    pub(crate) fn unexpand_where(&mut self, mut predicate: impl FnMut([f64; 2]) -> bool) {
+    pub(crate) fn unexpand_where(&mut self, mut predicate: impl FnMut(&[f64]) -> bool) {
         self.inspected.take();
         match &mut self.records {
             Records::Ordinary(v) => {
                 for label in v {
-                    if predicate(label.resources) {
+                    if predicate(&label.resources) {
                         label.expanded = false;
                     }
                 }
             }
             Records::Extended(v) => {
                 for label in v {
-                    if predicate(label.base.resources) {
+                    if predicate(&label.base.resources) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Branched(v) => {
                 for label in v {
-                    if predicate(label.base.resources) {
+                    if predicate(&label.base.resources) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Compact2(v) => {
                 for label in v {
-                    if predicate(label.base.resources) {
+                    if predicate(&label.base.resources) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Compact4(v) => {
                 for label in v {
-                    if predicate(label.base.resources) {
+                    if predicate(&label.base.resources) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Compact8(v) => {
                 for label in v {
-                    if predicate(label.base.resources) {
+                    if predicate(&label.base.resources) {
                         label.base.expanded = false;
                     }
                 }
             }
             Records::Full(v) => {
                 for label in v {
-                    if predicate(label.resources) {
+                    if predicate(&label.resources) {
                         label.expanded = false;
                     }
                 }
@@ -111,7 +111,7 @@ impl LabelArena {
         }
     }
 
-    pub(super) fn full_mut(&mut self) -> &mut Vec<StoredLabel> {
+    pub(super) fn full_mut(&mut self) -> &mut Vec<StoredLabel<D>> {
         if !matches!(self.records, Records::Full(_)) {
             let full = self
                 .inspected

@@ -101,3 +101,9 @@ pub use fixing::*;
 mod statistics;
 use pricing::publish;
 pub use statistics::*;
+
+/// Scalar resource capacity compiled into this library's C ABI.
+#[no_mangle]
+pub extern "C" fn or_rcsp_resource_dimensions() -> usize {
+    crate::DEFAULT_RESOURCE_DIMENSIONS
+}

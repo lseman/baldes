@@ -614,7 +614,7 @@ fn exhaustive_mixed_cut_lifecycle_preserves_enumerated_routes() {
 
     // Deliberately independent of cut preparation, route reconstruction and
     // coefficient helpers: enumerate every elementary path by DFS.
-    fn paths(g: &Graph, v: usize, seen: u32, path: &mut Vec<i32>, out: &mut Vec<Vec<i32>>) {
+    fn paths(g: &Graph<2>, v: usize, seen: u32, path: &mut Vec<i32>, out: &mut Vec<Vec<i32>>) {
         if v == g.sink {
             out.push(path.clone());
             return;
@@ -632,7 +632,7 @@ fn exhaustive_mixed_cut_lifecycle_preserves_enumerated_routes() {
     for covering in [false, true] {
         for scan in [0., 1.] {
             for cyclic in [false, true] {
-                let mut solver = Solver::new(6, 1).unwrap();
+                let mut solver = Solver::<2>::new(6, 1).unwrap();
                 solver.graph.elementary = true;
                 solver.enumeration_preserve_arc_paths = true;
                 for v in 0..6 {
@@ -849,7 +849,7 @@ fn exhaustive_mixed_cut_lifecycle_preserves_enumerated_routes() {
 #[test]
 fn enumeration_reprices_current_arc_and_strong_k_path_duals() {
     for covering in [false, true] {
-        let mut solver = Solver::new(4, 0).unwrap();
+        let mut solver = Solver::<2>::new(4, 0).unwrap();
         for (tail, head, cost) in [(0, 1, 1.0), (1, 2, 1.0), (2, 3, 1.0), (0, 3, 4.0)] {
             solver.graph.add_arc(tail, head, cost).unwrap();
         }
@@ -924,7 +924,7 @@ fn enumeration_reprices_current_arc_and_strong_k_path_duals() {
 
 #[test]
 fn bidirectional_pricing_and_non_elementary_memory_with_strong_k_path_cut() {
-    let mut g = Graph::new(5, 1).unwrap();
+    let mut g = Graph::<2>::new(5, 1).unwrap();
     for v in 0..5 {
         g.set_bounds(v, 0, 0.0, 10.0).unwrap();
     }
@@ -942,7 +942,7 @@ fn bidirectional_pricing_and_non_elementary_memory_with_strong_k_path_cut() {
         g.arc_mut(id).unwrap().consumption[0] = d;
     }
 
-    let mut solver = Solver::new(5, 1).unwrap();
+    let mut solver = Solver::<2>::new(5, 1).unwrap();
     solver.graph = g;
     // Strong k-path cut on {1, 2} with dual -3.0 (so visiting {1, 2} adds +3.0 to reduced cost).
     // With vertex 3 in memory, visiting 1 -> 3 -> 2 is charged once (+3.0 -> total 7.0).
@@ -991,7 +991,7 @@ fn bidirectional_pricing_and_non_elementary_memory_with_strong_k_path_cut() {
 fn root_master_with_kpath_cuts() {
     use baldes::master::root::{solve, KPathCutConfig, RootOptions, RootProblem};
 
-    let mut g = Graph::new(5, 1).unwrap();
+    let mut g = Graph::<2>::new(5, 1).unwrap();
     for v in 0..5 {
         g.set_bounds(v, 0, 0.0, 4.0).unwrap();
     }
@@ -1029,7 +1029,7 @@ fn separated_kpath_memory_survives_registration_and_pricing() {
     assert!(cut.memory.is_empty());
     assert!(cut.coefficient(&[1, 999]).is_err());
     assert!(cut.coefficient_with_memory(&[1, 999], true).is_err());
-    let mut solver = Solver::new(5, 1).unwrap();
+    let mut solver = Solver::<2>::new(5, 1).unwrap();
     for v in 0..5 {
         solver.graph.set_bounds(v, 0, 0., 5.).unwrap();
     }
@@ -1115,7 +1115,7 @@ fn kpath_memory_ignores_enumerated_columns() {
 }
 
 
-fn knapsack_pricing_solver(bidirectional: bool) -> Solver {
+fn knapsack_pricing_solver(bidirectional: bool) -> Solver<2> {
     use baldes::cuts::knapsack::{KnapsackColumn, KnapsackRow, ResourceKnapsackSeparator};
     let mut separator = ResourceKnapsackSeparator {
         parameters: KnapsackParameters {
@@ -1136,7 +1136,7 @@ fn knapsack_pricing_solver(bidirectional: bool) -> Solver {
     cuts.retain(|c| c.cut.numerator == 2 && c.cut.denominator == 3);
     assert_eq!(cuts.len(), 1);
     cuts[0].dual = -2.;
-    let mut solver = Solver::new(4, 1).unwrap();
+    let mut solver = Solver::<2>::new(4, 1).unwrap();
     solver
         .set_option(
             "BALDESuseBidirectionalSearch",
@@ -1201,11 +1201,11 @@ fn knapsack_enumeration_and_repricing_keep_load_dependent_costs() {
 #[test]
 fn knapsack_root_cuts_close_fractional_capacity_gap_and_survive_snapshot() {
     use baldes::cuts::knapsack::KnapsackRow;
+    use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         column_generation::Status,
         root::{KnapsackCutConfig, RootOptions},
     };
-    use baldes::inputs::{Instance, Rounding};
     let instance = Instance::parse("knapsack-root\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let scaled = RootOptions::default()
         .with_knapsack_cuts(KnapsackCutConfig::new(vec![KnapsackRow::new(0, 1, 2., 6)]));
@@ -1248,11 +1248,11 @@ fn knapsack_root_cuts_close_fractional_capacity_gap_and_survive_snapshot() {
 fn knapsack_pricing_matches_exhaustive_routes_with_two_resources() {
     use baldes::cuts::knapsack::{KnapsackColumn, KnapsackRow, ResourceKnapsackSeparator};
     fn visit(
-        g: &Graph,
+        g: &Graph<2>,
         cuts: &[baldes::cuts::knapsack::ResourceKnapsackCut],
         vertex: usize,
         seen: u64,
-        q: [f64; 2],
+        q: baldes::graph::ResourceValues<2>,
         cost: f64,
         best: &mut f64,
     ) {
@@ -1268,7 +1268,7 @@ fn knapsack_pricing_matches_exhaustive_routes_with_two_resources() {
             if seen & (1 << arc.head) != 0 {
                 continue;
             }
-            if let Some(next) = baldes::labeling::extend_resources(g, arc, q, true) {
+            if let Some(next) = baldes::labeling::extend_resources(g, arc, &q, true) {
                 visit(
                     g,
                     cuts,
@@ -1305,7 +1305,7 @@ fn knapsack_pricing_matches_exhaustive_routes_with_two_resources() {
         for c in &mut cuts {
             c.dual = -rng.randint(1, 4) as f64;
         }
-        let mut solver = Solver::new(6, 2).unwrap();
+        let mut solver = Solver::<2>::new(6, 2).unwrap();
         solver
             .set_option(
                 "BALDESuseBidirectionalSearch",
@@ -1333,7 +1333,7 @@ fn knapsack_pricing_matches_exhaustive_routes_with_two_resources() {
                 }
                 let cost = rng.randint(-5, 5) as f64;
                 let id = solver.graph.add_arc(u, v, cost).unwrap();
-                solver.graph.arc_mut(id).unwrap().consumption = loads[v];
+                solver.graph.arc_mut(id).unwrap().consumption = loads[v].into();
             }
         }
         solver.cuts.knapsack_cuts = cuts;
@@ -1343,7 +1343,7 @@ fn knapsack_pricing_matches_exhaustive_routes_with_two_resources() {
             &solver.cuts.knapsack_cuts,
             0,
             1,
-            [0., 0.],
+            [0., 0.].into(),
             0.,
             &mut best,
         );

@@ -1,10 +1,10 @@
 //! Enumeration labels and full-memory cut transitions.
 use super::*;
 #[derive(Clone, Debug)]
-pub struct Label {
+pub struct Label<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub id: usize,
     pub vertex: usize,
-    pub resources: [f64; 2],
+    pub resources: crate::graph::ResourceValues<D>,
     pub reduced_cost: f64,
     pub original_cost: f64,
     pub visited: [u64; 16],
@@ -24,7 +24,12 @@ pub struct CutTables<'a> {
     pub knapsack: &'a crate::cuts::knapsack::KnapsackPricing,
 }
 impl<'a> CutTables<'a> {
-    pub(super) fn along_arc(&self, label: &mut Label, forward: bool, arc: usize) {
+    pub(super) fn along_arc<const D: usize>(
+        &self,
+        label: &mut Label<D>,
+        forward: bool,
+        arc: usize,
+    ) {
         let table = if forward {
             &self.info.forward
         } else {
@@ -50,7 +55,7 @@ impl<'a> CutTables<'a> {
             );
         }
     }
-    pub(super) fn to_vertex(&self, label: &mut Label) {
+    pub(super) fn to_vertex<const D: usize>(&self, label: &mut Label<D>) {
         state::apply_vertex_support(
             &mut label.cut_words,
             &mut label.cut_cost,
@@ -58,7 +63,14 @@ impl<'a> CutTables<'a> {
         );
     }
     /// enumeration_labels_can_be_concatenated cost part, at the forward vertex.
-    pub(super) fn join(&self, g: &Graph, symmetric: bool, f: &Label, b: &Label, cost: f64) -> f64 {
+    pub(super) fn join<const D: usize>(
+        &self,
+        g: &Graph<D>,
+        symmetric: bool,
+        f: &Label<D>,
+        b: &Label<D>,
+        cost: f64,
+    ) -> f64 {
         let cost = cost
             + self
                 .knapsack
@@ -73,7 +85,7 @@ impl<'a> CutTables<'a> {
         )
     }
 }
-impl Label {
+impl<const D: usize> Label<D> {
     /// Enumeration bucket key, ((0.5 potential + additional) + reduced) + 0.
     pub fn key(&self) -> f64 {
         ((0.0 + self.cut_cost) + self.reduced_cost) + 0.0

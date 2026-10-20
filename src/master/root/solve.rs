@@ -1,33 +1,36 @@
 use super::*;
 
-pub fn solve(problem: RootProblem, mut options: RootOptions) -> Result<RootOutput> {
+pub fn solve<const D: usize>(
+    problem: RootProblem<D>,
+    mut options: RootOptions,
+) -> Result<RootOutput<D>> {
     options.cg.warm_start = None;
     solve_seeded(problem, options, None)
 }
-pub fn inherit(
-    parent: &NodeSnapshot,
+pub fn inherit<const D: usize>(
+    parent: &NodeSnapshot<D>,
     branches: &[(usize, RowSense, f64)],
     options: RootOptions,
-) -> Result<RootOutput> {
+) -> Result<RootOutput<D>> {
     let branches: Vec<_> = branches
         .iter()
         .map(|&(arc, sense, rhs)| BranchConstraint::ArcFlow { arc, sense, rhs })
         .collect();
     inherit_branches(parent, &branches, options)
 }
-pub fn inherit_branches(
-    parent: &NodeSnapshot,
+pub fn inherit_branches<const D: usize>(
+    parent: &NodeSnapshot<D>,
     branches: &[BranchConstraint],
     options: RootOptions,
-) -> Result<RootOutput> {
+) -> Result<RootOutput<D>> {
     inherit_with_history(parent, branches, None, options)
 }
-pub(crate) fn inherit_with_history(
-    parent: &NodeSnapshot,
+pub(crate) fn inherit_with_history<const D: usize>(
+    parent: &NodeSnapshot<D>,
     branches: &[BranchConstraint],
-    previous: Option<&NodeSnapshot>,
+    previous: Option<&NodeSnapshot<D>>,
     mut options: RootOptions,
-) -> Result<RootOutput> {
+) -> Result<RootOutput<D>> {
     options.node_depth = options
         .node_depth
         .max(parent.branch_depth() + branches.len());
@@ -50,11 +53,11 @@ pub(crate) fn inherit_with_history(
     }
     solve_seeded(problem, options, Some((parent, master, warm)))
 }
-pub(super) fn solve_seeded(
-    problem: RootProblem,
+pub(super) fn solve_seeded<const D: usize>(
+    problem: RootProblem<D>,
     mut options: RootOptions,
-    seed: Option<(&NodeSnapshot, ClpMaster, column_generation::WarmStart)>,
-) -> Result<RootOutput> {
+    seed: Option<(&NodeSnapshot<D>, ClpMaster, column_generation::WarmStart)>,
+) -> Result<RootOutput<D>> {
     options.cg.bound_mode = options.bound_mode;
     options.master_solver.ensure_available()?;
     options.normalize_pricing_options()?;
@@ -138,7 +141,7 @@ pub(super) fn solve_seeded(
     let mut resource_domain_changed = false;
     for (arc, original) in solver.graph.arcs.iter_mut().zip(&problem.graph.arcs) {
         if arc.bounds != original.bounds {
-            arc.bounds = original.bounds;
+            arc.bounds = original.bounds.clone();
             resource_domain_changed = true;
         }
     }

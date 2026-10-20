@@ -33,7 +33,7 @@ not then an original feasible solution.
 The current coordinator accepts fresh roots with an empty initial column
 registry. Cuts, enumeration/MIP transfer, fixed partial solutions and tree
 snapshots still use the existing single-network workflow and are not yet
-integrated here. The scalar resource dimension remains capped at two.
+integrated here. Scalar resource capacity is a const generic, defaulting to two; see [scalar resources](resources.md).
 
 Independent checks cover shared covering constraints, fractional and required
 multiplicities, disabled networks, overlapping local arc IDs, original lower

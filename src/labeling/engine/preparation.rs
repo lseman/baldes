@@ -1,6 +1,6 @@
 use super::*;
 
-impl LabelingEngine {
+impl<const D: usize> LabelingEngine<D> {
     /// Carry the bucket graph (including fixed arcs), adaptive state and cuts.
     /// Labels depend on the node's duals and are rebuilt in the child.
     pub(crate) fn fork_for_node(&self) -> Self {
@@ -27,11 +27,11 @@ impl LabelingEngine {
         }
     }
 
-    pub fn prepare(g: &Graph, controls: EngineControls, phase: Phase) -> Result<Self> {
+    pub fn prepare(g: &Graph<D>, controls: EngineControls<D>, phase: Phase) -> Result<Self> {
         phase.validate()?;
         let mut grid = BucketGraph::prepare(
             g,
-            controls.steps,
+            &controls.steps,
             controls.target_buckets,
             controls.bidirectional,
         )?;
@@ -82,7 +82,7 @@ impl LabelingEngine {
         })
     }
 
-    pub(super) fn storage(&self, forward: bool) -> &LabelStorage {
+    pub(super) fn storage(&self, forward: bool) -> &LabelStorage<D> {
         if forward {
             &self.forward
         } else {
@@ -90,7 +90,7 @@ impl LabelingEngine {
         }
     }
 
-    pub(super) fn storage_mut(&mut self, forward: bool) -> &mut LabelStorage {
+    pub(super) fn storage_mut(&mut self, forward: bool) -> &mut LabelStorage<D> {
         if forward {
             &mut self.forward
         } else {
@@ -98,9 +98,9 @@ impl LabelingEngine {
         }
     }
 
-    pub(super) fn root(&mut self, g: &Graph, forward: bool) -> Result<()> {
+    pub(super) fn root(&mut self, g: &Graph<D>, forward: bool) -> Result<()> {
         let vertex = if forward { g.source } else { g.sink };
-        let mut resources = [0.; 2];
+        let mut resources = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
         for (r, kind) in g.resources.iter().enumerate() {
             let w = g.vertices[vertex].bounds[r];
             resources[r] = if forward {
@@ -120,7 +120,7 @@ impl LabelingEngine {
         let internal = self.grid.internal[vertex];
         let bucket = self
             .grid
-            .bucket_id(forward, internal, self.grid.coordinate(resources))
+            .bucket_id(forward, internal, self.grid.coordinate(&resources))
             .ok_or_else(|| invalid("root outside bucket grid"))?;
         let label = StoredLabel {
             id: 0,
@@ -159,7 +159,7 @@ impl LabelingEngine {
         storage.buckets[internal][bucket].next_id = 1;
         Ok(())
     }
-    pub fn costs_unchanged(&self, g: &Graph) -> bool {
+    pub fn costs_unchanged(&self, g: &Graph<D>) -> bool {
         self.last_costs
             .iter()
             .copied()
@@ -172,7 +172,7 @@ impl LabelingEngine {
     }
     /// Refresh conservative cost potentials after dual changes. Costs with
     /// nonzero reversal cycles require ordinary directional labeling.
-    pub(super) fn ensure_reversal_costs(&mut self, g: &Graph) -> Result<()> {
+    pub(super) fn ensure_reversal_costs(&mut self, g: &Graph<D>) -> Result<()> {
         if !self.consumption_joins {
             return Ok(());
         }

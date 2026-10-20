@@ -8,7 +8,11 @@ pub(super) fn validate(graph_id: i32, rhs: f64) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn coefficient(problem: &RootProblem, arc: usize, graph_id: i32) -> f64 {
+pub(super) fn coefficient<const D: usize>(
+    problem: &RootProblem<D>,
+    arc: usize,
+    graph_id: i32,
+) -> f64 {
     let a = &problem.graph.arcs[arc];
     (graph_id == problem.graph.graph_id.max(0)
         && a.head == problem.graph.sink

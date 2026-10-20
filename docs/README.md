@@ -13,6 +13,7 @@ root. The guides below describe the current Rust implementation.
 | [Algorithms and references](algorithms.md) | Review solver components and research references |
 | [Build configuration](build.md) | Configure optional backends and compiler options in the terminal menu, then build with Make |
 | [Tree and node lifecycle](tree.md) | Run integer routing, understand node inheritance, bounds, limits, and result status |
+| [Scalar resources](resources.md) | Configure general scalar dimensions and bucket indexing |
 | [Branching](branching.md) | Choose vehicle-count, Ryan–Foster, or arc-flow branching and understand the single-network assignment limitation |
 | [Cuts](cuts.md) | Configure cut families and keep coefficients consistent across pricing, enumeration, and child nodes |
 | [Enumerated MIP](enumerated-mip.md) | Enable HiGHS integer solving and interpret its route-count gate and proof coverage |

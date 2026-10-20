@@ -1,14 +1,14 @@
 use super::*;
 
-impl<'a> From<&'a StoredLabel> for LabelRef<'a> {
+impl<'a, const D: usize> From<&'a StoredLabel<D>> for LabelRef<'a, D> {
     #[inline(always)]
-    fn from(l: &'a StoredLabel) -> Self {
+    fn from(l: &'a StoredLabel<D>) -> Self {
         Self::Full(l)
     }
 }
 
-impl<'a> LabelRef<'a> {
-    view_accessors!(vertex: usize, cost: f64, original_cost: f64, additional_cost: f64, ng: u16, resources: &'a [f64; 2],
+impl<'a, const D: usize> LabelRef<'a, D> {
+    view_accessors!(vertex: usize, cost: f64, original_cost: f64, additional_cost: f64, ng: u16, resources: &'a [f64],
         branch_state: &'a BranchState, hops: usize,
         cut_words: &'a [u32], key: f64);
     #[inline(always)]
@@ -77,7 +77,7 @@ impl<'a> LabelRef<'a> {
             Self::Full(l) => l.arc,
         }
     }
-    pub fn to_owned(self) -> StoredLabel {
+    pub fn to_owned(self) -> StoredLabel<D> {
         match self {
             Self::Ordinary(l, id) => l.unpack(id),
             Self::Extended(l, id) => l.unpack(id),

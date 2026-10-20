@@ -1,13 +1,14 @@
 use super::*;
 
 impl BucketGraph {
-    pub fn prepare(
-        g: &Graph,
-        steps: [f64; 2],
+    pub fn prepare<const D: usize>(
+        g: &Graph<D>,
+        steps: impl AsRef<[f64]>,
         target_buckets: i32,
         bidirectional: bool,
     ) -> Result<Self> {
         g.validate()?;
+        let steps = steps.as_ref();
         if target_buckets <= 0 {
             return Err(invalid("positive bucket count required"));
         }
@@ -31,18 +32,28 @@ impl BucketGraph {
                     .position(|k| *k == crate::graph::ResourceKind::Disposable)
             })
             .unwrap_or(0);
-        let resource_slots: Vec<_> = g
+        let mut resource_slots: Vec<_> = g
             .resources
             .iter()
             .enumerate()
             .filter_map(|(r, k)| {
-                (r == main || (*k == crate::graph::ResourceKind::Disposable && steps[r] > 1e-6))
+                (r == main
+                    || (*k == crate::graph::ResourceKind::Disposable
+                        && steps.get(r).copied().unwrap_or(0.) > 1e-6))
                     .then_some(r)
             })
             .collect();
+        // Resource dimensions and indexing axes are independent. Always retain
+        // the designated main resource, including when its index exceeds one.
+        if g.resources.len() > 2 {
+            if let Some(axis) = resource_slots.iter().position(|&r| r == main) {
+                resource_slots.swap(0, axis);
+            }
+        }
+        resource_slots.truncate(2);
         let mut grid_steps = [0.; 2];
         for (axis, &r) in resource_slots.iter().enumerate() {
-            grid_steps[axis] = steps[r];
+            grid_steps[axis] = steps.get(r).copied().unwrap_or(0.);
         }
         let dimensions = resource_slots.len().max(1);
         let n = order.len();
@@ -119,7 +130,7 @@ impl BucketGraph {
             consumption,
             arc_lower,
             arc_upper,
-            step: steps,
+            step: grid_steps,
             middle,
             jump_arcs: true,
             version: 0,
@@ -207,8 +218,17 @@ impl BucketGraph {
     // runtime slot keeps the array in memory, and reloading it right after
     // its two scalar stores stalls on store forwarding in the labeling loop.
     #[inline]
-    pub fn coordinate(&self, q: [f64; 2]) -> [f64; 2] {
-        let pick = |r: usize| if r == 0 { q[0] } else { q[1] };
+    pub fn coordinate(&self, q: impl AsRef<[f64]>) -> [f64; 2] {
+        let q = q.as_ref();
+        let pick = |r: usize| {
+            if r == 0 {
+                q[0]
+            } else if r == 1 {
+                q[1]
+            } else {
+                q[r]
+            }
+        };
         let slots = &self.resource_slots;
         [
             slots.first().map_or(0., |&r| pick(r)),

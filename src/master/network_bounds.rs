@@ -9,7 +9,11 @@ fn subtract_product(value: f64, a: f64, b: f64) -> Option<f64> {
     add(value, multiply(-a, b)?)
 }
 
-fn network_minimum(oracle: &Oracle, offset: usize, duals: &[f64]) -> Option<Option<f64>> {
+fn network_minimum<const D: usize>(
+    oracle: &Oracle<D>,
+    offset: usize,
+    duals: &[f64],
+) -> Option<Option<f64>> {
     let graph = &oracle.network.graph;
     // Only cycles on a source-to-sink walk can affect the relaxation.
     let mut reaches_sink = vec![false; graph.vertices.len()];
@@ -70,7 +74,11 @@ fn network_minimum(oracle: &Oracle, offset: usize, duals: &[f64]) -> Option<Opti
     Some(Some(minimum))
 }
 
-pub(super) fn certificate(state: &State, master: &ClpMaster, duals: &[f64]) -> Option<f64> {
+pub(super) fn certificate<const D: usize>(
+    state: &State<D>,
+    master: &ClpMaster,
+    duals: &[f64],
+) -> Option<f64> {
     if duals.len() != state.rhs.len() || duals.iter().any(|value| !value.is_finite()) {
         return None;
     }

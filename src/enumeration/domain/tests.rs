@@ -6,8 +6,8 @@ fn limits() -> PathDomainLimits {
         ..Default::default()
     }
 }
-fn graph() -> Graph {
-    let mut graph = Graph::new(4, 1).unwrap();
+fn graph() -> Graph<2> {
+    let mut graph = Graph::<2>::new(4, 1).unwrap();
     for v in 0..4 {
         graph.set_bounds(v, 0, 0., 5.).unwrap();
     }
@@ -96,7 +96,7 @@ fn limits_reject_partial_results_and_accept_exact_boundaries() {
 }
 #[test]
 fn empty_domain_and_impossible_initial_state_are_complete() {
-    let graph = Graph::new(2, 0).unwrap();
+    let graph = Graph::<2>::new(2, 0).unwrap();
     let limit = PathDomainLimits {
         max_paths: 0,
         max_stored_arcs: 0,
@@ -115,11 +115,11 @@ fn empty_domain_and_impossible_initial_state_are_complete() {
 }
 #[test]
 fn direct_paths_and_cost_overflow_are_not_silently_omitted() {
-    let mut graph = Graph::new(2, 0).unwrap();
+    let mut graph = Graph::<2>::new(2, 0).unwrap();
     graph.add_arc(0, 1, 1.).unwrap();
     let domain = CompleteCanonicalPaths::collect(&graph, limits()).unwrap();
     assert_eq!(domain.paths()[0].arc_positions(), &[0]);
-    let mut graph = Graph::new(3, 0).unwrap();
+    let mut graph = Graph::<2>::new(3, 0).unwrap();
     graph.add_arc(0, 1, f64::MAX).unwrap();
     graph.add_arc(1, 2, f64::MAX).unwrap();
     let domain = CompleteCanonicalPaths::collect(&graph, limits()).unwrap();
@@ -137,7 +137,7 @@ fn malformed_graphs_are_not_completed_domains() {
 
 #[test]
 fn sparse_path_search_does_not_rescan_unrelated_arcs() {
-    let mut graph = Graph::new(80, 0).unwrap();
+    let mut graph = Graph::<2>::new(80, 0).unwrap();
     graph.add_arc(0, 1, 1.).unwrap();
     graph.add_arc(1, 79, 1.).unwrap();
     for tail in 2..79 {
@@ -160,8 +160,8 @@ fn sparse_path_search_does_not_rescan_unrelated_arcs() {
     assert_eq!(domain.paths()[0].arc_positions(), &[0, 1]);
 }
 
-fn chain(consumption: &[f64], upper: f64) -> Graph {
-    let mut g = Graph::new(consumption.len() + 1, 1).unwrap();
+fn chain(consumption: &[f64], upper: f64) -> Graph<2> {
+    let mut g = Graph::<2>::new(consumption.len() + 1, 1).unwrap();
     g.initial[0] = Some(0.);
     for vertex in 0..g.vertices.len() {
         g.set_bounds(vertex, 0, 0., upper).unwrap();

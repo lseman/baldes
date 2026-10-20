@@ -1,10 +1,10 @@
 //! Strong k-path cut separation.
 use super::*;
 
-impl RootController {
+impl<const D: usize> RootController<D> {
     pub(super) fn separate_kpath<M: LpMaster>(
         &self,
-        state: &mut State,
+        state: &mut State<D>,
         master: &mut M,
         rows: &mut PendingRows,
         tagged: &[(usize, usize)],
@@ -76,7 +76,10 @@ impl RootController {
         for &(_, tag) in tagged {
             let route = &state.routes[tag];
             paths.push((
-                state.solver.cuts.route(&graph, &State::customers(route))?,
+                state
+                    .solver
+                    .cuts
+                    .route(&graph, &State::<D>::customers(route))?,
                 state.is_enumerated(route),
             ));
         }

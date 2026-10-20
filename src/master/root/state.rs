@@ -1,6 +1,6 @@
 use super::*;
 
-impl State {
+impl<const D: usize> State<D> {
     pub(super) fn remaining_time(&self) -> Result<std::time::Duration> {
         match self.deadline {
             Some(end) => end
@@ -30,7 +30,7 @@ impl State {
     }
     pub(super) fn column(
         &self,
-        problem: &RootProblem,
+        problem: &RootProblem<D>,
         route: &Route,
         duals: &[f64],
         tag: i32,
@@ -57,7 +57,7 @@ impl State {
     }
     /// cache_costs: arc reduced costs and the rounded cut duals, active cuts
     /// ordered by rounded dual magnitude then index.
-    pub(super) fn reprice(&mut self, problem: &RootProblem, duals: &[f64]) -> Result<f64> {
+    pub(super) fn reprice(&mut self, problem: &RootProblem<D>, duals: &[f64]) -> Result<f64> {
         let rounded = self.rounded;
         let offset = problem.reprice(
             &mut self.solver,

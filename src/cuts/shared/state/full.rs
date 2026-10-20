@@ -18,10 +18,10 @@ pub struct FullPreparation {
 }
 /// Full-memory enumeration tables. Rows with the same ordered
 /// support share one field whose cost is the sum of their duals.
-pub fn prepare_full_memory(
+pub fn prepare_full_memory<const D: usize>(
     info: &mut CutResourceInfo,
     prep: &mut FullPreparation,
-    g: &Graph,
+    g: &Graph<D>,
     cuts: &[FullInput],
     kpath: &[FullKPathInput],
     backward: bool,

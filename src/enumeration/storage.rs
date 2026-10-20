@@ -2,9 +2,9 @@
 use super::*;
 use crate::labeling::equality_resource_dominates;
 #[derive(Clone, Debug)]
-pub struct Storage {
+pub struct Storage<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub partitions: Vec<Vec<usize>>,
-    pub arena: Vec<Label>,
+    pub arena: Vec<Label<D>>,
     pub live: Vec<bool>,
     cursor: usize,
     pub pending: usize,
@@ -12,7 +12,7 @@ pub struct Storage {
     pub(super) preserve_arc_paths: bool,
 }
 
-impl Storage {
+impl<const D: usize> Storage<D> {
     pub fn new(partitions: usize) -> Result<Self> {
         if partitions == 0 {
             return Err(invalid("positive enumeration partitions required"));
@@ -27,7 +27,7 @@ impl Storage {
             preserve_arc_paths: false,
         })
     }
-    fn dominates(g: &Graph, a: &Label, b: &Label, forward: bool) -> bool {
+    fn dominates(g: &Graph<D>, a: &Label<D>, b: &Label<D>, forward: bool) -> bool {
         a.vertex == b.vertex
             && a.visited == b.visited
             && a.original_cost - b.original_cost < EPSILON
@@ -44,7 +44,7 @@ impl Storage {
                 }
             })
     }
-    pub fn insert(&mut self, g: &Graph, mut label: Label, forward: bool) -> bool {
+    pub fn insert(&mut self, g: &Graph<D>, mut label: Label<D>, forward: bool) -> bool {
         let partition = label.element_hash as usize % self.partitions.len();
         if self.preserve_arc_paths {
             let id = self.arena.len();
@@ -89,7 +89,7 @@ impl Storage {
         self.pending += 1;
         true
     }
-    pub fn pop(&mut self) -> Option<Label> {
+    pub fn pop(&mut self) -> Option<Label<D>> {
         while self.cursor < self.arena.len() {
             let id = self.cursor;
             self.cursor += 1;
@@ -108,12 +108,12 @@ mod tests {
 
     #[test]
     fn resource_dominance_preserves_binary_boundaries_during_enumeration() {
-        let mut graph = Graph::new(3, 1).unwrap();
+        let mut graph = Graph::<2>::new(3, 1).unwrap();
         graph.resources[0] = ResourceKind::Equality;
         let make = |resource, cost| Label {
             id: 0,
             vertex: 1,
-            resources: [resource, 0.],
+            resources: [resource, 0.].into(),
             reduced_cost: cost,
             original_cost: cost,
             visited: [0; 16],

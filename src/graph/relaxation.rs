@@ -44,7 +44,7 @@ pub struct Counts {
     pub non_elementary: usize,
     pub elementary: usize,
 }
-pub fn cycles(g: &Graph, path: &[i32]) -> Result<Vec<Cycle>> {
+pub fn cycles<const D: usize>(g: &Graph<D>, path: &[i32]) -> Result<Vec<Cycle>> {
     let mut last = vec![None; g.element_count];
     let physical: Vec<_> = path
         .iter()
@@ -84,7 +84,11 @@ pub fn cycles(g: &Graph, path: &[i32]) -> Result<Vec<Cycle>> {
     }
     Ok(cycles)
 }
-pub fn strengthen(g: &mut Graph, paths: &[FractionalPath], controls: &Controls) -> Result<Counts> {
+pub fn strengthen<const D: usize>(
+    g: &mut Graph<D>,
+    paths: &[FractionalPath],
+    controls: &Controls,
+) -> Result<Counts> {
     g.validate()?;
     let prepared = PreparedNg::new(g)?;
     let mut counts = Counts::default();
@@ -224,7 +228,11 @@ pub fn strengthen(g: &mut Graph, paths: &[FractionalPath], controls: &Controls) 
 }
 /// NG memories from a distance matrix: stable distance/id ties, and each
 /// physical traversal stops at the first previously populated destination.
-pub fn initialize_distances(g: &mut Graph, distances: &[f64], size: usize) -> Result<bool> {
+pub fn initialize_distances<const D: usize>(
+    g: &mut Graph<D>,
+    distances: &[f64],
+    size: usize,
+) -> Result<bool> {
     let n = g.element_count;
     if distances.len()
         != n.checked_mul(n)

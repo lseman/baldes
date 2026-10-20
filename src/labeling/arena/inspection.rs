@@ -1,7 +1,7 @@
 use super::*;
 
-impl Deref for LabelArena {
-    type Target = Vec<StoredLabel>;
+impl<const D: usize> Deref for LabelArena<D> {
+    type Target = Vec<StoredLabel<D>>;
     fn deref(&self) -> &Self::Target {
         match &self.records {
             Records::Full(v) => v,
@@ -30,31 +30,31 @@ impl Deref for LabelArena {
     }
 }
 
-impl DerefMut for LabelArena {
+impl<const D: usize> DerefMut for LabelArena<D> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.full_mut()
     }
 }
 
-impl<'a> IntoIterator for &'a LabelArena {
-    type Item = &'a StoredLabel;
-    type IntoIter = std::slice::Iter<'a, StoredLabel>;
+impl<'a, const D: usize> IntoIterator for &'a LabelArena<D> {
+    type Item = &'a StoredLabel<D>;
+    type IntoIter = std::slice::Iter<'a, StoredLabel<D>>;
     fn into_iter(self) -> Self::IntoIter {
         self.deref().iter()
     }
 }
 
-impl<'a> IntoIterator for &'a mut LabelArena {
-    type Item = &'a mut StoredLabel;
-    type IntoIter = std::slice::IterMut<'a, StoredLabel>;
+impl<'a, const D: usize> IntoIterator for &'a mut LabelArena<D> {
+    type Item = &'a mut StoredLabel<D>;
+    type IntoIter = std::slice::IterMut<'a, StoredLabel<D>>;
     fn into_iter(self) -> Self::IntoIter {
         self.full_mut().iter_mut()
     }
 }
 
-impl IntoIterator for LabelArena {
-    type Item = StoredLabel;
-    type IntoIter = std::vec::IntoIter<StoredLabel>;
+impl<const D: usize> IntoIterator for LabelArena<D> {
+    type Item = StoredLabel<D>;
+    type IntoIter = std::vec::IntoIter<StoredLabel<D>>;
     fn into_iter(mut self) -> Self::IntoIter {
         std::mem::take(self.full_mut()).into_iter()
     }

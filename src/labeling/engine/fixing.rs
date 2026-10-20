@@ -1,12 +1,12 @@
 use super::*;
 
-impl LabelingEngine {
+impl<const D: usize> LabelingEngine<D> {
     /// Fix after exact completion at the same reduced costs. Symmetric search
     /// pairs forward prefixes; ordinary search uses both directions. Cached
     /// associations are local to this fixing pass.
     pub fn fix_bucket_arcs(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         threshold: f64,
     ) -> Result<crate::pricing::fixing::FixingReport> {
         use crate::pricing::fixing::{contains, update, FixingReport, PairingCache};

@@ -1,11 +1,13 @@
 //! Completed pricing checkpoints and timeout recovery.
 use super::*;
 
-pub(in crate::master::root) struct PricingCheckpoint {
+pub(in crate::master::root) struct PricingCheckpoint<
+    const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS },
+> {
     pub(super) master: ClpMaster,
     pub(super) row_map: Vec<usize>,
     pub(super) cut: CutState,
-    pub(super) pricing: Solver,
+    pub(super) pricing: Solver<D>,
     pub(super) incumbent: f64,
     pub(super) route_count: usize,
     pub(super) output: Output,
@@ -13,7 +15,7 @@ pub(in crate::master::root) struct PricingCheckpoint {
     pub(super) enumerated_routes: usize,
 }
 
-impl RootController {
+impl<const D: usize> RootController<D> {
     pub(super) fn store_checkpoint(&mut self, master: &ClpMaster, output: Output) -> Result<()> {
         let mut state = self.state.borrow_mut();
         // Separation returns without changing the formulation at a closed

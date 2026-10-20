@@ -1,9 +1,9 @@
 use super::*;
 
 impl BucketGraph {
-    pub fn propagate(
+    pub fn propagate<const D: usize>(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
         physical: usize,
         mut q: [f64; 2],
@@ -38,7 +38,7 @@ impl BucketGraph {
         Some(q)
     }
 
-    pub fn flags(&self, g: &Graph, forward: bool, a: &BucketArc) -> u8 {
+    pub fn flags<const D: usize>(&self, g: &Graph<D>, forward: bool, a: &BucketArc) -> u8 {
         let d = self.direction(forward);
         let mut q = d.corners[a.from.vertex][a.from.bucket];
         if let Some(jump) = a.jump {
@@ -63,7 +63,7 @@ impl BucketGraph {
         }
     }
 
-    pub fn move_middle(&mut self, g: &Graph, forward: bool) {
+    pub fn move_middle<const D: usize>(&mut self, g: &Graph<D>, forward: bool) {
         let m = if forward {
             self.middle + (self.upper[self.order.len() - 1][0] - self.middle) * 0.05
         } else {
@@ -179,7 +179,7 @@ impl BucketGraph {
         Ok(())
     }
 
-    pub fn rebuild(&mut self, g: &Graph, forward: bool) -> Result<()> {
+    pub fn rebuild<const D: usize>(&mut self, g: &Graph<D>, forward: bool) -> Result<()> {
         self.regenerate(forward)?;
         let mut counter = 0;
         for &index in &self.arc_order.clone() {
@@ -213,7 +213,7 @@ impl BucketGraph {
         Ok(())
     }
 
-    pub(super) fn refresh_counts(&mut self, g: &Graph, forward: bool) {
+    pub(super) fn refresh_counts<const D: usize>(&mut self, g: &Graph<D>, forward: bool) {
         let current = self
             .direction(forward)
             .buckets
@@ -232,7 +232,7 @@ impl BucketGraph {
         d.current_arcs = current;
         d.maximum_arcs = maximum;
     }
-    pub fn ensure_backward(&mut self, g: &Graph) -> Result<()> {
+    pub fn ensure_backward<const D: usize>(&mut self, g: &Graph<D>) -> Result<()> {
         if self.backward.buckets.is_empty() {
             self.rebuild(g, false)?;
             self.regenerate_jumps(g, false);

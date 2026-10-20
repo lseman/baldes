@@ -1,8 +1,7 @@
 //! Complete exact labels and restore the original arc domain.
 use super::*;
-impl Solver {
+impl<const D: usize> Solver<D> {
     pub fn complete_labels(&mut self, enforce_time_limit: bool) -> Result<()> {
-
         let exact = phases::Phase {
             check_ng: true,
             jump_arcs: true,

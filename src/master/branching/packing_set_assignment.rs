@@ -13,7 +13,11 @@ pub(super) fn row(assigned: bool) -> (RowSense, f64) {
     }
 }
 
-pub(super) fn validate(problem: &RootProblem, vertex: usize, graph_id: i32) -> Result<()> {
+pub(super) fn validate<const D: usize>(
+    problem: &RootProblem<D>,
+    vertex: usize,
+    graph_id: i32,
+) -> Result<()> {
     if !problem.customers.contains(&vertex) || graph_id < 0 {
         return Err(invalid(
             "assignment requires a customer packing set and nonnegative graph ID",
@@ -22,7 +26,12 @@ pub(super) fn validate(problem: &RootProblem, vertex: usize, graph_id: i32) -> R
     Ok(())
 }
 
-pub(super) fn coefficient(problem: &RootProblem, arc: usize, vertex: usize, graph_id: i32) -> f64 {
+pub(super) fn coefficient<const D: usize>(
+    problem: &RootProblem<D>,
+    arc: usize,
+    vertex: usize,
+    graph_id: i32,
+) -> f64 {
     (graph_id == problem.graph.graph_id.max(0) && problem.graph.arcs[arc].head == vertex) as u8
         as f64
 }

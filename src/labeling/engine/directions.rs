@@ -1,8 +1,8 @@
 use super::sweep::Sweep;
 use super::*;
 
-impl LabelingEngine {
-    pub(super) fn ctx(&self) -> Context<'_> {
+impl<const D: usize> LabelingEngine<D> {
+    pub(super) fn ctx(&self) -> Context<'_, D> {
         Context {
             grid: &self.grid,
             ng: &self.ng,
@@ -16,7 +16,7 @@ impl LabelingEngine {
         }
     }
 
-    pub(super) fn vertex_step(&self, label: &mut StoredLabel) {
+    pub(super) fn vertex_step(&self, label: &mut StoredLabel<D>) {
         self.ctx().vertex_step(label)
     }
 
@@ -26,21 +26,21 @@ impl LabelingEngine {
 
     pub fn join_cost(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         vertex: usize,
-        f: &StoredLabel,
-        b: &StoredLabel,
+        f: &StoredLabel<D>,
+        b: &StoredLabel<D>,
     ) -> Option<f64> {
         self.ctx().join_cost(g, vertex, f.into(), b.into())
     }
 
     pub(super) fn extend(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
         arc: &BucketArc,
-        from: LabelRef<'_>,
-    ) -> Option<StoredLabel> {
+        from: LabelRef<'_, D>,
+    ) -> Option<StoredLabel<D>> {
         self.ctx().extend(g, forward, arc, from)
     }
 
@@ -51,7 +51,7 @@ impl LabelingEngine {
         forward: bool,
         terminals: &'a mut Vec<(usize, f64, usize)>,
         counts: &'a (AtomicUsize, AtomicUsize),
-    ) -> Sweep<'a> {
+    ) -> Sweep<'a, D> {
         let ctx = Context {
             grid: &self.grid,
             ng: &self.ng,
@@ -82,21 +82,21 @@ impl LabelingEngine {
 
     pub(super) fn insert(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
-        label: &StoredLabel,
-        hot: HotLabel,
+        label: &StoredLabel<D>,
+        hot: HotLabel<D>,
         controls: &Controls,
     ) -> bool {
         let mut terminals = vec![];
         let counts = Default::default();
         self.sweep(forward, &mut terminals, &counts)
-            .insert::<true, StoredLabel, _>(g, forward, label, hot, controls)
+            .insert::<true, StoredLabel<D>, _>(g, forward, label, hot, controls)
     }
 
     pub(super) fn run_direction(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
         controls: &Controls,
         started: Instant,
@@ -121,7 +121,7 @@ impl LabelingEngine {
     /// different point; it ends pricing either way. Returns the sweep times.
     pub(super) fn run_both_directions(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         controls: &Controls,
         started: Instant,
         pool: &mut SolutionPool<(Option<usize>, Option<usize>)>,
@@ -161,7 +161,7 @@ impl LabelingEngine {
             terminals: &mut backward_terminals,
             labels: (&backward_count, &forward_count),
         };
-        let timed = |sweep: &mut Sweep, forward: bool| {
+        let timed = |sweep: &mut Sweep<D>, forward: bool| {
             let begin = Instant::now();
             let result = sweep.run_direction(g, forward, controls, started);
             (result, begin.elapsed().as_secs_f64())

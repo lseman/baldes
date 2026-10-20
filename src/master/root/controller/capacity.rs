@@ -1,10 +1,10 @@
 //! Capacity and complement cut separation.
 use super::*;
 
-impl RootController {
+impl<const D: usize> RootController<D> {
     pub(super) fn separate_capacity(
         &self,
-        state: &mut State,
+        state: &mut State<D>,
         rows: &mut PendingRows,
         tagged: &[(usize, usize)],
         fractional: &[FractionalColumn],
@@ -21,7 +21,7 @@ impl RootController {
             let entries: Vec<_> = tagged
                 .iter()
                 .filter_map(|&(column, tag)| {
-                    let coefficient = cut.coefficient(&State::customers(&state.routes[tag]));
+                    let coefficient = cut.coefficient(&State::<D>::customers(&state.routes[tag]));
                     (coefficient != 0).then_some((column, coefficient as f64))
                 })
                 .collect();
@@ -33,7 +33,7 @@ impl RootController {
             let rhs = cut.rhs as f64
                 - self
                     .problem
-                    .fixed_sum(|route| Ok(cut.coefficient(&State::customers(route)) as f64))?;
+                    .fixed_sum(|route| Ok(cut.coefficient(&State::<D>::customers(route)) as f64))?;
             let row = rows.push(sense, rhs, entries);
             for (index, arc) in self.problem.graph.arcs.iter().enumerate() {
                 let u = if arc.tail == self.problem.graph.sink {

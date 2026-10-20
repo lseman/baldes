@@ -2,9 +2,9 @@ use super::*;
 
 impl CutRegistry {
     /// Separates with the current parameters and registers every emitted cut.
-    pub fn separate(
+    pub fn separate<const D: usize>(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         customers: &[usize],
         columns: &[FractionalColumn],
     ) -> Result<usize> {
@@ -215,9 +215,9 @@ impl CutRegistry {
 
     /// or_rcsp_separate_cuts_default: the option-driven separator, packing
     /// then (with covering sets) covering, starting at the separation phase.
-    pub fn separate_default(
+    pub fn separate_default<const D: usize>(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         options: &Options,
         customers: &[usize],
         columns: &[FractionalColumn],

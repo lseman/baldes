@@ -1,7 +1,7 @@
 use super::*;
 
-struct IntegerSearch<'a> {
-    problem: &'a RootProblem,
+struct IntegerSearch<'a, const D: usize> {
+    problem: &'a RootProblem<D>,
     pool: &'a Pool,
     by_customer: Vec<Vec<usize>>,
     customers: &'a [usize],
@@ -14,7 +14,7 @@ struct IntegerSearch<'a> {
     limit: usize,
     deadline: Instant,
 }
-impl IntegerSearch<'_> {
+impl<const D: usize> IntegerSearch<'_, D> {
     fn search(&mut self, cost: f64) {
         if self.nodes >= self.limit || Instant::now() >= self.deadline || cost >= *self.best {
             return;
@@ -78,8 +78,8 @@ impl IntegerSearch<'_> {
         }
     }
 }
-pub(super) fn integer_heuristic(
-    problem: &RootProblem,
+pub(super) fn integer_heuristic<const D: usize>(
+    problem: &RootProblem<D>,
     pool: &Pool,
     best: &mut f64,
     solution: &mut Vec<Route>,

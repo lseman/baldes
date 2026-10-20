@@ -2,10 +2,10 @@
 use super::*;
 use crate::master::solvers::mip::MipStatus;
 
-pub(super) fn run(
-    snapshot: Option<&Rc<root::NodeSnapshot>>,
-    problem: &RootProblem,
-    node: &mut Node,
+pub(super) fn run<const D: usize>(
+    snapshot: Option<&Rc<root::NodeSnapshot<D>>>,
+    problem: &RootProblem<D>,
+    node: &mut Node<D>,
     options: &TreeOptions,
     output: &mut TreeOutput,
     deadline: Instant,

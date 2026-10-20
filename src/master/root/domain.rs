@@ -38,9 +38,9 @@ impl std::error::Error for CoverDomainFailure {}
 /// need a separate domination proof, and all added rows need original validity.
 /// Nor does it validate a floating LP objective or publish a root certificate.
 #[derive(Debug)]
-pub struct CanonicalCoverRelaxation<'a> {
-    problem: &'a RootProblem,
-    paths: CompleteCanonicalPaths<'a>,
+pub struct CanonicalCoverRelaxation<'a, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    problem: &'a RootProblem<D>,
+    paths: CompleteCanonicalPaths<'a, D>,
     /// (physical customer vertex, logical covering row).
     customer_rows: Vec<(usize, usize)>,
     work_used: usize,
@@ -57,19 +57,14 @@ fn spend(limits: &mut PathDomainLimits, amount: usize) -> Result<(), CoverDomain
     Ok(())
 }
 
-fn validate_cover_structure(
-    problem: &RootProblem,
+fn validate_cover_structure<const D: usize>(
+    problem: &RootProblem<D>,
     limits: &mut PathDomainLimits,
 ) -> Result<Vec<(usize, usize)>, CoverDomainFailure> {
     spend(limits, 0)?;
     let g = &problem.graph;
     let n = g.vertices.len();
-    if !(2..=1024).contains(&n)
-        || g.source >= n
-        || g.sink >= n
-        || g.source == g.sink
-        || g.resources.len() > 2
-    {
+    if !(2..=1024).contains(&n) || g.source >= n || g.sink >= n || g.source == g.sink {
         return Err(PathDomainFailure::InvalidGraph.into());
     }
     if g.resources
@@ -184,12 +179,12 @@ fn validate_cover_structure(
     }
     Ok(customer_rows)
 }
-impl<'a> CanonicalCoverRelaxation<'a> {
+impl<'a, const D: usize> CanonicalCoverRelaxation<'a, D> {
     /// Validate the cover structure and fixed residual, then exhaust the path
     /// search under the same work/deadline budget. Failure returns no domain.
     /// Storage limits describe path payload, not total validation heap usage.
     pub fn collect(
-        problem: &'a RootProblem,
+        problem: &'a RootProblem<D>,
         mut limits: PathDomainLimits,
     ) -> Result<Self, CoverDomainFailure> {
         let initial_work = limits.max_work;
@@ -205,10 +200,10 @@ impl<'a> CanonicalCoverRelaxation<'a> {
             work_used,
         })
     }
-    pub fn problem(&self) -> &'a RootProblem {
+    pub fn problem(&self) -> &'a RootProblem<D> {
         self.problem
     }
-    pub fn paths(&self) -> &CompleteCanonicalPaths<'a> {
+    pub fn paths(&self) -> &CompleteCanonicalPaths<'a, D> {
         &self.paths
     }
     pub fn customer_rows(&self) -> &[(usize, usize)] {
@@ -227,15 +222,16 @@ impl<'a> CanonicalCoverRelaxation<'a> {
 /// still need validity over this relaxed domain; no native/tolerant resource
 /// equivalence or root certificate is implied.
 #[derive(Debug)]
-pub struct ConservativeCoverRelaxation<'a> {
-    problem: &'a RootProblem,
-    paths: CompleteResourceRelaxation<'a>,
+pub struct ConservativeCoverRelaxation<'a, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>
+{
+    problem: &'a RootProblem<D>,
+    paths: CompleteResourceRelaxation<'a, D>,
     customer_rows: Vec<(usize, usize)>,
     work_used: usize,
 }
-impl<'a> ConservativeCoverRelaxation<'a> {
+impl<'a, const D: usize> ConservativeCoverRelaxation<'a, D> {
     pub fn collect(
-        problem: &'a RootProblem,
+        problem: &'a RootProblem<D>,
         mut limits: PathDomainLimits,
     ) -> Result<Self, CoverDomainFailure> {
         let initial_work = limits.max_work;
@@ -250,10 +246,10 @@ impl<'a> ConservativeCoverRelaxation<'a> {
             work_used,
         })
     }
-    pub fn problem(&self) -> &'a RootProblem {
+    pub fn problem(&self) -> &'a RootProblem<D> {
         self.problem
     }
-    pub fn paths(&self) -> &CompleteResourceRelaxation<'a> {
+    pub fn paths(&self) -> &CompleteResourceRelaxation<'a, D> {
         &self.paths
     }
     pub fn customer_rows(&self) -> &[(usize, usize)] {
@@ -268,8 +264,8 @@ impl<'a> ConservativeCoverRelaxation<'a> {
 mod tests {
     use super::*;
     use crate::Graph;
-    fn problem() -> RootProblem {
-        let mut g = Graph::new(4, 1).unwrap();
+    fn problem() -> RootProblem<2> {
+        let mut g = Graph::<2>::new(4, 1).unwrap();
         for (u, v) in [
             (0, 1),
             (1, 3),

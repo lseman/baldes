@@ -21,6 +21,7 @@ struct Config {
     offline: bool,
     locked: bool,
     jobs: usize,
+    resource_dimensions: usize,
     target: String,
     highs_dir: String,
 }
@@ -37,6 +38,7 @@ impl Default for Config {
             offline: false,
             locked: true,
             jobs: 0,
+            resource_dimensions: 2,
             target: String::new(),
             highs_dir: String::new(),
         }
@@ -85,6 +87,11 @@ impl Config {
                         .parse()
                         .map_err(|_| "CONFIG_JOBS must be a nonnegative integer (0 = automatic)")?
                 }
+                "CONFIG_RESOURCE_DIMENSIONS" => {
+                    config.resource_dimensions = value
+                        .parse()
+                        .map_err(|_| "CONFIG_RESOURCE_DIMENSIONS must be a nonnegative usize")?;
+                }
                 "CONFIG_TARGET" => config.target = parse_string(value)?,
                 "CONFIG_HIGHS_DIR" => config.highs_dir = parse_string(value)?,
                 _ => return Err(format!("unknown setting {key}")),
@@ -132,7 +139,7 @@ impl Config {
             "# BALDES build configuration; edit with make config.\n\
             CONFIG_PROFILE={}\nCONFIG_CLP={}\nCONFIG_HIGHS={}\nCONFIG_CLI={}\n\
             CONFIG_NATIVE_CPU={}\nCONFIG_RELEASE_DEBUG={}\nCONFIG_OFFLINE={}\nCONFIG_LOCKED={}\n\
-            CONFIG_JOBS={}\nCONFIG_TARGET={}\nCONFIG_HIGHS_DIR={}\n",
+            CONFIG_JOBS={}\nCONFIG_RESOURCE_DIMENSIONS={}\nCONFIG_TARGET={}\nCONFIG_HIGHS_DIR={}\n",
             if self.release { "release" } else { "dev" },
             yn(self.clp),
             yn(self.highs),
@@ -142,6 +149,7 @@ impl Config {
             yn(self.offline),
             yn(self.locked),
             self.jobs,
+            self.resource_dimensions,
             quoted(&self.target),
             quoted(&self.highs_dir)
         )
@@ -212,6 +220,10 @@ impl Config {
             args.extend(["--target".into(), self.target.clone().into()]);
         }
         let mut vars = BTreeMap::new();
+        vars.insert(
+            "BALDES_RESOURCE_DIMENSIONS".into(),
+            self.resource_dimensions.to_string().into(),
+        );
         if self.release_debug {
             vars.insert("CARGO_PROFILE_RELEASE_DEBUG".into(), "1".into());
         }
@@ -288,6 +300,13 @@ impl Config {
                     *self = next;
                 }
             }
+            11 => {
+                if let Some(value) = input {
+                    self.resource_dimensions = value
+                        .parse()
+                        .map_err(|_| "Resource dimensions must be a nonnegative usize")?;
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -307,6 +326,7 @@ impl Config {
             (format!("Parallel jobs              <{}>",if self.jobs==0 {"automatic".into()}else{self.jobs.to_string()}),"Cargo compilation jobs; 0 uses Cargo's automatic setting."),
             (format!("Target triple              <{}>",if self.target.is_empty(){"host"}else{&self.target}),"Empty means host. Otherwise install that Rust target and its linker first."),
             (format!("HiGHS installation         <{}>",if self.highs_dir.is_empty(){"auto / environment"}else{&self.highs_dir}),"Optional installation root holding lib/libhighs. Empty preserves HIGHS_DIR from your shell."),
+            (format!("Scalar resource dimensions <{}>", self.resource_dimensions),"Compiled scalar capacity for C/Python and Rust defaults; explicit Rust const counts remain arbitrary."),
         ]
     }
 }
@@ -571,13 +591,14 @@ fn menu(config: &mut Config, path: &Path) -> Result<()> {
                 }
                 Err(e) => message = e,
             },
-            Key::Up | Key::Byte(b'k' | b'K') => selected = (selected + 10) % 11,
-            Key::Down | Key::Byte(b'j' | b'J' | b'\t') => selected = (selected + 1) % 11,
+            Key::Up | Key::Byte(b'k' | b'K') => selected = (selected + config.rows().len() - 1) % config.rows().len(),
+            Key::Down | Key::Byte(b'j' | b'J' | b'\t') => selected = (selected + 1) % config.rows().len(),
             Key::Left | Key::Right | Key::Byte(b' ' | b'\r' | b'\n') => {
                 let value = match selected {
                     8 => input(&terminal, "Jobs (0 = automatic)", &config.jobs.to_string())?,
                     9 => input(&terminal, "Target triple (empty = host)", &config.target)?,
                     10 => input(&terminal, "HiGHS root (empty = auto)", &config.highs_dir)?,
+                    11 => input(&terminal, "Scalar capacity (default = 2)", &config.resource_dimensions.to_string())?,
                     _ => None,
                 };
                 message = match config.edit(selected, value) {
@@ -697,6 +718,7 @@ mod tests {
             offline: true,
             locked: false,
             jobs: 3,
+            resource_dimensions: 5,
             target: "aarch64-unknown-linux-gnu".into(),
             highs_dir: "/opt/HiGHS build".into(),
             release_debug: true,
@@ -755,6 +777,27 @@ mod tests {
         c.native_cpu = false;
         c.edit(9, Some("aarch64-unknown-linux-gnu".into())).unwrap();
         assert!(c.edit(4, None).is_err());
+    }
+    #[test]
+    fn resource_capacity_round_trips_and_reaches_every_build_action() {
+        let mut c = Config::default();
+        assert_eq!(c.resource_dimensions, 2);
+        c.edit(11, Some("5".into())).unwrap();
+        assert_eq!(Config::parse(&c.text()).unwrap(), c);
+        for action in ["build", "check", "test", "clippy"] {
+            assert_eq!(
+                c.cargo(action).unwrap().vars.get(OsStr::new("BALDES_RESOURCE_DIMENSIONS")),
+                Some(&OsString::from("5"))
+            );
+        }
+        assert!(c.edit(11, Some("-1".into())).is_err());
+        assert_eq!(c.resource_dimensions, 5);
+        assert!(Config::parse("CONFIG_RESOURCE_DIMENSIONS=arbitrary").is_err());
+        assert!(Config::parse("CONFIG_RESOURCE_DIMENSIONS=184467440737095516160").is_err());
+        c.edit(11, Some("0".into())).unwrap();
+        assert_eq!(c.resource_dimensions, 0);
+        assert!(c.cargo("clean").unwrap().vars.is_empty());
+        assert_eq!(c.rows().len(), 12);
     }
     #[test]
     fn clean_does_not_receive_build_flags() {

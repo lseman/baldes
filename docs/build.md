@@ -60,6 +60,7 @@ configuration, so it does not need to build the solver first.
 | Release debug symbols | Off | Set `CARGO_PROFILE_RELEASE_DEBUG=1` for profiling |
 | Offline | Off | Pass `--offline` to Cargo |
 | Locked dependencies | On | Pass `--locked`, preserving `Cargo.lock` |
+| Scalar resource dimensions | `2` | Set `BALDES_RESOURCE_DIMENSIONS`; fixed capacity for C/Python and the default Rust types |
 | Parallel jobs | `0` (automatic) | Pass `--jobs N` when nonzero |
 | Target triple | Empty (host) | Pass `--target TRIPLE` for cross compilation |
 | HiGHS installation | Empty (automatic) | Set `HIGHS_DIR` to the root containing `lib/libhighs` |
@@ -120,6 +121,7 @@ CONFIG_RELEASE_DEBUG=n
 CONFIG_OFFLINE=n
 CONFIG_LOCKED=y
 CONFIG_JOBS=0
+CONFIG_RESOURCE_DIMENSIONS=2
 CONFIG_TARGET=""
 CONFIG_HIGHS_DIR=""
 ```
@@ -146,3 +148,10 @@ commands. `CARGO=path` and `RUSTC=path` override the tool executables.
 Existing compiler/linker environment variables remain available to Cargo.
 The frontend prints the command and any configuration-specific environment
 overrides before running it and propagates Cargo's failure status to Make.
+
+The scalar setting accepts any nonnegative `usize`. For example,
+`CONFIG_RESOURCE_DIMENSIONS=5` compiles capacity 5; models may activate fewer
+coordinates. The saved setting overrides `BALDES_RESOURCE_DIMENSIONS` inherited
+from the shell for Make builds. Direct Cargo or maturin builds use that environment
+variable instead and do not read `.config`. Explicit Rust `Graph::<D>` / `Solver::<D>`
+counts remain independent of the configured default. See [scalar resources](resources.md).

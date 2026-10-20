@@ -86,9 +86,9 @@ impl Instance {
     /// initial columns. A complete validated best solution also supplies an
     /// incumbent. `problem` must use this instance's split-depot vertex IDs.
     /// HGS uses the selected distance metric; the target graph validates every route.
-    pub fn seed_hgs(
+    pub fn seed_hgs<const D: usize>(
         &self,
-        problem: &RootProblem,
+        problem: &RootProblem<D>,
         rounding: Rounding,
         options: &mut RootOptions,
         warm: &HgsWarmStart,

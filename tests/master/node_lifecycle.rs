@@ -1,7 +1,7 @@
 use baldes::pricing::Solver;
 
-fn ordering_solver() -> Solver {
-    let mut solver = Solver::new(4, 1).unwrap();
+fn ordering_solver() -> Solver<2> {
+    let mut solver = Solver::<2>::new(4, 1).unwrap();
     for v in 0..4 {
         solver.graph.set_bounds(v, 0, 0., 2.).unwrap();
     }
@@ -50,7 +50,7 @@ fn fork_keeps_arc_orderings_and_sibling_enumeration_is_independent() {
     }
 }
 
-fn bucket_arcs(s: &Solver) -> (usize, usize) {
+fn bucket_arcs(s: &Solver<2>) -> (usize, usize) {
     let grid = &s.engine.as_ref().unwrap().grid;
     (
         grid.forward
@@ -724,7 +724,7 @@ fn ng_strengthening_cannot_stamp_a_stale_resource_grid_as_current() {
         )
         .unwrap();
     assert_eq!(counts.columns_forbidden, 1);
-    let mut fresh = Solver::new(4, 1).unwrap();
+    let mut fresh = Solver::<2>::new(4, 1).unwrap();
     fresh.graph = solver.graph.clone();
     fresh.enumeration_preserve_arc_paths = true;
     let paths = |routes: Vec<baldes::Route>| {

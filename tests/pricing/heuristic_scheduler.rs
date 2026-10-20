@@ -4,7 +4,7 @@ use baldes::{Graph, Statistics};
 
 #[test]
 fn single_label_phase_replaces_cheaper_prefix_and_requests_expansion() {
-    let graph = Graph::new(3, 1).unwrap();
+    let graph = Graph::<2>::new(3, 1).unwrap();
     let mut storage = LabelStorage::new([1, 1, 1]);
     let mut stats = Statistics::default();
     let label = |cost, resource| StoredLabel {
@@ -17,7 +17,7 @@ fn single_label_phase_replaces_cheaper_prefix_and_requests_expansion() {
         vertex: 1,
         cost,
         original_cost: cost,
-        resources: [resource, 0.],
+        resources: [resource, 0.].into(),
         ng: 0,
         branch_state: None,
         parent: None,

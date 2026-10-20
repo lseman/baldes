@@ -10,7 +10,11 @@ pub(super) fn pair_coefficient(first: &[usize], second: &[usize], tail: usize, h
         || (second.contains(&tail) && first.contains(&head))) as u8 as f64
 }
 
-pub(super) fn validate_pair(p: &RootProblem, first: &[usize], second: &[usize]) -> Result<()> {
+pub(super) fn validate_pair<const D: usize>(
+    p: &RootProblem<D>,
+    first: &[usize],
+    second: &[usize],
+) -> Result<()> {
     validate(p, first)?;
     validate(p, second)?;
     if first.iter().any(|v| second.contains(v)) {
@@ -19,7 +23,7 @@ pub(super) fn validate_pair(p: &RootProblem, first: &[usize], second: &[usize]) 
     Ok(())
 }
 
-pub(super) fn validate(p: &RootProblem, vertices: &[usize]) -> Result<()> {
+pub(super) fn validate<const D: usize>(p: &RootProblem<D>, vertices: &[usize]) -> Result<()> {
     let depot = vertices.len() == 2
         && vertices.contains(&p.graph.source)
         && vertices.contains(&p.graph.sink);

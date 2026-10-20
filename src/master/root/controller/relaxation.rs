@@ -1,7 +1,7 @@
 //! Dynamic NG relaxation improvement.
 use super::*;
 
-impl RootController {
+impl<const D: usize> RootController<D> {
     /// Dynamic NG (runColGenSpRelaxationImprovement and
     /// BcRCSPFunctor::improveCurrentSpRelaxation): strengthen the NG memories
     /// from the cycles of the routes in the LP solution, then mark the master
@@ -10,7 +10,7 @@ impl RootController {
     /// master (cuts of the current round do not count yet).
     pub(super) fn improve_relaxation(
         &self,
-        state: &mut State,
+        state: &mut State<D>,
         rank_one_in_master: bool,
         tagged: &[(usize, usize)],
         values: &[f64],

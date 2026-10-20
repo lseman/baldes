@@ -19,16 +19,16 @@ fn order(candidates: &mut [BranchCandidate]) {
 }
 /// Packing sets in RootProblem::set_partitioning are its customer vertices.
 /// Assignment to this sole pricing network is integral once cover rows hold.
-pub fn candidates(
-    problem: &RootProblem,
-    result: &root::RootOutput,
+pub fn candidates<const D: usize>(
+    problem: &RootProblem<D>,
+    result: &root::RootOutput<D>,
     options: &BranchingOptions,
 ) -> Vec<BranchCandidate> {
     candidates_with_history(problem, result, options, &[])
 }
-pub fn candidates_with_history(
-    problem: &RootProblem,
-    result: &root::RootOutput,
+pub fn candidates_with_history<const D: usize>(
+    problem: &RootProblem<D>,
+    result: &root::RootOutput<D>,
     options: &BranchingOptions,
     history: &[BranchConstraint],
 ) -> Vec<BranchCandidate> {
@@ -181,8 +181,8 @@ pub fn candidates_with_history(
 
 /// Split the observed head-resource schedules of an arc with unit LP flow.
 /// Fractional arc flows remain handled by the ordinary arc-flow fallback.
-fn resource_candidates(
-    problem: &RootProblem,
+fn resource_candidates<const D: usize>(
+    problem: &RootProblem<D>,
     routes: &[(&crate::Route, f64)],
     history: &[BranchConstraint],
 ) -> Vec<BranchCandidate> {

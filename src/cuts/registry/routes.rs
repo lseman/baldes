@@ -3,7 +3,11 @@ use super::*;
 impl CutRegistry {
     /// Physical (tail, head, arc ID) route of a customer sequence; source and
     /// sink are added. Parallel arcs resolve to the smallest ID.
-    pub fn route(&self, g: &Graph, vertices: &[usize]) -> Result<Vec<(usize, usize, i32)>> {
+    pub fn route<const D: usize>(
+        &self,
+        g: &Graph<D>,
+        vertices: &[usize],
+    ) -> Result<Vec<(usize, usize, i32)>> {
         let mut ends = self.ends.borrow_mut();
         if ends.0 != g.arcs.len() || ends.1.is_empty() {
             ends.1.clear();
@@ -41,9 +45,9 @@ impl CutRegistry {
     }
 
     /// or_rcsp_cut_coefficient_ex for a customer sequence.
-    pub fn coefficient(
+    pub fn coefficient<const D: usize>(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         cut: usize,
         vertices: &[usize],
         enumerated: bool,
@@ -52,9 +56,9 @@ impl CutRegistry {
         coefficient(&self.cuts[cut], g.graph_id.max(0), &route, enumerated)
     }
 
-    pub fn route_coefficient(
+    pub fn route_coefficient<const D: usize>(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         cut: usize,
         route: &[(usize, usize, i32)],
         enumerated: bool,

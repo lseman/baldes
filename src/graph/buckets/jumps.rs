@@ -1,7 +1,7 @@
 use super::*;
 
 impl BucketGraph {
-    pub fn regenerate_jumps(&mut self, g: &Graph, forward: bool) {
+    pub fn regenerate_jumps<const D: usize>(&mut self, g: &Graph<D>, forward: bool) {
         let mut identity = self.direction(forward).arc_counter;
         let mut attempts = 0;
         for v in 0..self.order.len() {

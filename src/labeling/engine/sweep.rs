@@ -3,9 +3,9 @@ use super::*;
 /// direction's storage, and private counters merged afterwards. Terminal pool
 /// candidates are recorded and replayed in sweep order, so a forward and a
 /// backward sweep can run in parallel with the result of running them in turn.
-pub(super) struct Sweep<'a> {
-    pub(super) ctx: Context<'a>,
-    pub(super) storage: &'a mut LabelStorage,
+pub(super) struct Sweep<'a, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    pub(super) ctx: Context<'a, D>,
+    pub(super) storage: &'a mut LabelStorage<D>,
     pub(super) statistics: &'a mut Statistics,
     pub(super) extension_checks: &'a mut [i32],
     pub(super) filter_checks: &'a mut [i32],
@@ -15,14 +15,14 @@ pub(super) struct Sweep<'a> {
     /// combined label limit.
     pub(super) labels: (&'a AtomicUsize, &'a AtomicUsize),
 }
-impl<'a> Sweep<'a> {
+impl<'a, const D: usize> Sweep<'a, D> {
     #[inline(always)]
-    pub(super) fn insert<const BRANCHING: bool, R: ArenaRecord, L: LabelInput>(
+    pub(super) fn insert<const BRANCHING: bool, R: ArenaRecord<D>, L: LabelInput<D>>(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
         input: L,
-        hot: HotLabel,
+        hot: HotLabel<D>,
         controls: &Controls,
     ) -> bool {
         let label = input.label();
@@ -64,7 +64,7 @@ impl<'a> Sweep<'a> {
     }
     pub(super) fn filter<const BRANCHING: bool>(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
         id: BucketId,
         controls: &Controls,
@@ -191,7 +191,7 @@ impl<'a> Sweep<'a> {
     }
     pub(super) fn run_direction(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
         controls: &Controls,
         started: Instant,
@@ -210,7 +210,7 @@ impl<'a> Sweep<'a> {
     }
     pub(super) fn run_direction_with_branching<const BRANCHING: bool, const FORWARD: bool>(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         controls: &Controls,
         started: Instant,
     ) -> Result<()> {
@@ -222,31 +222,29 @@ impl<'a> Sweep<'a> {
     }
     pub(super) fn run_cut_mode<const BRANCHING: bool, const FORWARD: bool, const CUTS: bool>(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         controls: &Controls,
         started: Instant,
     ) -> Result<()> {
         match self.storage.labels.kind() {
             RecordKind::Ordinary => {
-                self.run_records::<BRANCHING, FORWARD, CUTS, OrdinaryLabel>(g, controls, started)
+                self.run_records::<BRANCHING, FORWARD, CUTS, OrdinaryLabel<D>>(g, controls, started)
             }
-            RecordKind::Extended => {
-                self.run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel>(g, controls, started)
-            }
+            RecordKind::Extended => self
+                .run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel<LIMITED_WORDS, D>>(
+                    g, controls, started,
+                ),
             RecordKind::Branched => {
-                self.run_records::<BRANCHING, FORWARD, CUTS, BranchedLabel>(g, controls, started)
+                self.run_records::<BRANCHING, FORWARD, CUTS, BranchedLabel<D>>(g, controls, started)
             }
-            RecordKind::Compact2 => {
-                self.run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel<2>>(g, controls, started)
-            }
-            RecordKind::Compact4 => {
-                self.run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel<4>>(g, controls, started)
-            }
-            RecordKind::Compact8 => {
-                self.run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel<8>>(g, controls, started)
-            }
+            RecordKind::Compact2 => self
+                .run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel<2, D>>(g, controls, started),
+            RecordKind::Compact4 => self
+                .run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel<4, D>>(g, controls, started),
+            RecordKind::Compact8 => self
+                .run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel<8, D>>(g, controls, started),
             RecordKind::Full => {
-                self.run_records::<BRANCHING, FORWARD, CUTS, StoredLabel>(g, controls, started)
+                self.run_records::<BRANCHING, FORWARD, CUTS, StoredLabel<D>>(g, controls, started)
             }
         }
     }
@@ -254,10 +252,10 @@ impl<'a> Sweep<'a> {
         const BRANCHING: bool,
         const FORWARD: bool,
         const CUTS: bool,
-        R: ArenaRecord,
+        R: ArenaRecord<D>,
     >(
         &mut self,
-        g: &Graph,
+        g: &Graph<D>,
         controls: &Controls,
         started: Instant,
     ) -> Result<()> {
@@ -356,7 +354,7 @@ impl<'a> Sweep<'a> {
                                 self.terminals.push((group, cost, target));
                                 continue;
                             }
-                            let q = self.ctx.grid.coordinate(resources);
+                            let q = self.ctx.grid.coordinate(&resources);
                             let side = if forward {
                                 if q[0] > self.ctx.grid.middle + EPSILON {
                                     2
@@ -378,7 +376,7 @@ impl<'a> Sweep<'a> {
                             }
                             self.ctx.vertex_step_with_branching::<BRANCHING>(&mut label);
                             let hot = HotLabel {
-                                resources,
+                                resources: resources.0,
                                 ..HotLabel::of(&label)
                             };
                             if label.bucket == id {

@@ -301,9 +301,9 @@ const DENOMINATOR_BITS: [i32; 8] = [0, 1, 1, 2, 2, 3, 3, 3];
 /// build_cut_inputs: active registry cuts in pricing order. Zero-dual and
 /// retired cuts allocate no label state. The cost of a cut is minus its
 /// master dual.
-pub fn build_inputs(
+pub fn build_inputs<const D: usize>(
     registry: &CutRegistry,
-    g: &Graph,
+    g: &Graph<D>,
 ) -> (
     Vec<LimitedInput>,
     Vec<LimitedKPathInput>,

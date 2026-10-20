@@ -1,8 +1,8 @@
 use super::*;
 
-impl OrdinaryLabel {
+impl<const D: usize> OrdinaryLabel<D> {
     #[inline(always)]
-    pub(super) fn pack(label: &StoredLabel, id: usize) -> Option<Self> {
+    pub(super) fn pack(label: &StoredLabel<D>, id: usize) -> Option<Self> {
         // Positive zero is required: preserve even the sign of zero in full
         // records instead of changing floating-point keys during conversion.
         if label.id != id
@@ -16,7 +16,7 @@ impl OrdinaryLabel {
         Self::pack_metadata(label, id)
     }
     #[inline(always)]
-    pub(super) fn pack_metadata(label: &StoredLabel, id: usize) -> Option<Self> {
+    pub(super) fn pack_metadata(label: &StoredLabel<D>, id: usize) -> Option<Self> {
         if label.id != id {
             return None;
         }
@@ -27,7 +27,7 @@ impl OrdinaryLabel {
         Some(Self {
             cost: label.cost,
             original_cost: label.original_cost,
-            resources: label.resources,
+            resources: label.resources.0,
             parent: optional(label.parent)?,
             arc: optional(label.arc)?,
             bucket_vertex: u32::try_from(label.bucket.vertex).ok()?,
@@ -40,10 +40,10 @@ impl OrdinaryLabel {
         })
     }
     #[inline(always)]
-    pub(super) fn view(&self, id: usize) -> LabelRef<'_> {
+    pub(super) fn view(&self, id: usize) -> LabelRef<'_, D> {
         LabelRef::Ordinary(self, id)
     }
-    pub(super) fn unpack(self, id: usize) -> StoredLabel {
+    pub(super) fn unpack(self, id: usize) -> StoredLabel<D> {
         StoredLabel {
             id,
             local_id: self.local_id as u64,
@@ -54,7 +54,7 @@ impl OrdinaryLabel {
             vertex: self.vertex as usize,
             cost: self.cost,
             original_cost: self.original_cost,
-            resources: self.resources,
+            resources: self.resources.into(),
             ng: self.ng,
             branch_state: None,
             parent: (self.parent != NONE).then_some(self.parent as usize),
@@ -68,9 +68,9 @@ impl OrdinaryLabel {
     }
 }
 
-impl<const WORDS: usize> ExtendedLabel<WORDS> {
+impl<const WORDS: usize, const D: usize> ExtendedLabel<WORDS, D> {
     #[inline(always)]
-    pub(super) fn pack(label: &mut StoredLabel, id: usize) -> Option<Self> {
+    pub(super) fn pack(label: &mut StoredLabel<D>, id: usize) -> Option<Self> {
         if label.cut_words.get(WORDS..)?.iter().any(|&w| w != 0) {
             return None;
         }
@@ -82,7 +82,7 @@ impl<const WORDS: usize> ExtendedLabel<WORDS> {
             branch_state: label.branch_state.take(),
         })
     }
-    pub(super) fn unpack(&self, id: usize) -> StoredLabel {
+    pub(super) fn unpack(&self, id: usize) -> StoredLabel<D> {
         let mut label = self.base.unpack(id);
         label.cut_words[..WORDS].copy_from_slice(&self.cut_words);
         label.additional_cost = self.additional_cost;
@@ -92,9 +92,9 @@ impl<const WORDS: usize> ExtendedLabel<WORDS> {
     }
 }
 
-impl BranchedLabel {
+impl<const D: usize> BranchedLabel<D> {
     #[inline(always)]
-    pub(super) fn pack(label: &mut StoredLabel, id: usize) -> Option<Self> {
+    pub(super) fn pack(label: &mut StoredLabel<D>, id: usize) -> Option<Self> {
         if label.additional_cost.to_bits() != 0
             || label.half_potential.to_bits() != 0
             || label.cut_words.iter().any(|&w| w != 0)
@@ -106,7 +106,7 @@ impl BranchedLabel {
             branch_state: label.branch_state.take(),
         })
     }
-    pub(super) fn unpack(&self, id: usize) -> StoredLabel {
+    pub(super) fn unpack(&self, id: usize) -> StoredLabel<D> {
         let mut label = self.base.unpack(id);
         label.branch_state = self.branch_state.clone();
         label

@@ -141,6 +141,9 @@ values provide resource lower bounds; extra infeasible paths may remain.
 Unsupported resource kinds and arithmetic failures return an explicit failure.
 
 
+`graph/resources.rs` provides const-generic fixed scalar arrays. Bucket axes
+remain separate from the graph's resource dimension; see [scalar resources](resources.md).
+
 ## Labeling, buckets, and HGS
 
 Public Rust paths are unchanged when a former `.rs` file becomes a directory.

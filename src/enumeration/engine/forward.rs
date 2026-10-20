@@ -1,10 +1,10 @@
 use super::*;
 
-impl Enumeration {
+impl<const D: usize> Enumeration<D> {
     /// Abort without publishing a partial universe. Existing successful path
     /// storage remains reusable for inspection at subsequent master duals.
     pub fn run(
-        g: &Graph,
+        g: &Graph<D>,
         grid: &BucketGraph,
         controls: &Controls,
         cuts: Option<CutTables>,
@@ -22,7 +22,7 @@ impl Enumeration {
         let mut root = Label {
             id: 0,
             vertex: g.source,
-            resources: [0.; 2],
+            resources: crate::graph::ResourceValues::filled(g.resources.len(), 0.),
             reduced_cost: 0.,
             original_cost: 0.,
             visited: [0; 16],
@@ -67,7 +67,7 @@ impl Enumeration {
                 continue;
             }
             let v = grid.internal[from.vertex];
-            let Some(bucket) = grid.bucket_id(true, v, grid.coordinate(from.resources)) else {
+            let Some(bucket) = grid.bucket_id(true, v, grid.coordinate(&from.resources)) else {
                 continue;
             };
             for arc in &grid.forward.buckets[v][bucket].arcs {
@@ -91,7 +91,7 @@ impl Enumeration {
                         q[slot] = q[slot].max(grid.forward.corners[v][jump][r]);
                     }
                 }
-                let Some(q) = extend_resources(g, physical, q, true) else {
+                let Some(q) = extend_resources(g, physical, &q, true) else {
                     continue;
                 };
                 next.resources = q;

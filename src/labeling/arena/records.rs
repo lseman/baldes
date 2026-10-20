@@ -1,8 +1,8 @@
 use super::*;
 
-impl ArenaRecord for OrdinaryLabel {
+impl<const D: usize> ArenaRecord<D> for OrdinaryLabel<D> {
     #[inline(always)]
-    fn get(arena: &LabelArena, id: usize) -> Option<&Self> {
+    fn get(arena: &LabelArena<D>, id: usize) -> Option<&Self> {
         arena.ordinary_record(id)
     }
     #[inline(always)]
@@ -10,7 +10,7 @@ impl ArenaRecord for OrdinaryLabel {
         self.expanded
     }
     #[inline(always)]
-    fn try_push(arena: &mut LabelArena, label: &mut StoredLabel) -> bool {
+    fn try_push(arena: &mut LabelArena<D>, label: &mut StoredLabel<D>) -> bool {
         if let Records::Ordinary(v) = &mut arena.records {
             if let Some(compact) = OrdinaryLabel::pack(label, v.len()) {
                 v.push(compact);
@@ -21,9 +21,9 @@ impl ArenaRecord for OrdinaryLabel {
     }
 }
 
-impl ArenaRecord for ExtendedLabel {
+impl<const D: usize> ArenaRecord<D> for ExtendedLabel<LIMITED_WORDS, D> {
     #[inline(always)]
-    fn get(arena: &LabelArena, id: usize) -> Option<&Self> {
+    fn get(arena: &LabelArena<D>, id: usize) -> Option<&Self> {
         arena.extended_record(id)
     }
     #[inline(always)]
@@ -31,9 +31,9 @@ impl ArenaRecord for ExtendedLabel {
         self.base.expanded
     }
     #[inline(always)]
-    fn try_push(arena: &mut LabelArena, label: &mut StoredLabel) -> bool {
+    fn try_push(arena: &mut LabelArena<D>, label: &mut StoredLabel<D>) -> bool {
         if let Records::Extended(v) = &mut arena.records {
-            if let Some(compact) = ExtendedLabel::<LIMITED_WORDS>::pack(label, v.len()) {
+            if let Some(compact) = ExtendedLabel::<LIMITED_WORDS, D>::pack(label, v.len()) {
                 v.push(compact);
                 return true;
             }
@@ -42,9 +42,9 @@ impl ArenaRecord for ExtendedLabel {
     }
 }
 
-impl ArenaRecord for BranchedLabel {
+impl<const D: usize> ArenaRecord<D> for BranchedLabel<D> {
     #[inline(always)]
-    fn get(arena: &LabelArena, id: usize) -> Option<&Self> {
+    fn get(arena: &LabelArena<D>, id: usize) -> Option<&Self> {
         arena.branched_record(id)
     }
     #[inline(always)]
@@ -52,7 +52,7 @@ impl ArenaRecord for BranchedLabel {
         self.base.expanded
     }
     #[inline(always)]
-    fn try_push(arena: &mut LabelArena, label: &mut StoredLabel) -> bool {
+    fn try_push(arena: &mut LabelArena<D>, label: &mut StoredLabel<D>) -> bool {
         if let Records::Branched(v) = &mut arena.records {
             if let Some(compact) = BranchedLabel::pack(label, v.len()) {
                 v.push(compact);
@@ -63,9 +63,9 @@ impl ArenaRecord for BranchedLabel {
     }
 }
 
-impl ArenaRecord for ExtendedLabel<2> {
+impl<const D: usize> ArenaRecord<D> for ExtendedLabel<2, D> {
     #[inline(always)]
-    fn get(arena: &LabelArena, id: usize) -> Option<&Self> {
+    fn get(arena: &LabelArena<D>, id: usize) -> Option<&Self> {
         match &arena.records {
             Records::Compact2(v) => Some(&v[id]),
             _ => None,
@@ -76,9 +76,9 @@ impl ArenaRecord for ExtendedLabel<2> {
         self.base.expanded
     }
     #[inline(always)]
-    fn try_push(arena: &mut LabelArena, label: &mut StoredLabel) -> bool {
+    fn try_push(arena: &mut LabelArena<D>, label: &mut StoredLabel<D>) -> bool {
         if let Records::Compact2(v) = &mut arena.records {
-            if let Some(compact) = ExtendedLabel::<2>::pack(label, v.len()) {
+            if let Some(compact) = ExtendedLabel::<2, D>::pack(label, v.len()) {
                 v.push(compact);
                 return true;
             }
@@ -87,9 +87,9 @@ impl ArenaRecord for ExtendedLabel<2> {
     }
 }
 
-impl ArenaRecord for ExtendedLabel<4> {
+impl<const D: usize> ArenaRecord<D> for ExtendedLabel<4, D> {
     #[inline(always)]
-    fn get(arena: &LabelArena, id: usize) -> Option<&Self> {
+    fn get(arena: &LabelArena<D>, id: usize) -> Option<&Self> {
         match &arena.records {
             Records::Compact4(v) => Some(&v[id]),
             _ => None,
@@ -100,9 +100,9 @@ impl ArenaRecord for ExtendedLabel<4> {
         self.base.expanded
     }
     #[inline(always)]
-    fn try_push(arena: &mut LabelArena, label: &mut StoredLabel) -> bool {
+    fn try_push(arena: &mut LabelArena<D>, label: &mut StoredLabel<D>) -> bool {
         if let Records::Compact4(v) = &mut arena.records {
-            if let Some(compact) = ExtendedLabel::<4>::pack(label, v.len()) {
+            if let Some(compact) = ExtendedLabel::<4, D>::pack(label, v.len()) {
                 v.push(compact);
                 return true;
             }
@@ -111,9 +111,9 @@ impl ArenaRecord for ExtendedLabel<4> {
     }
 }
 
-impl ArenaRecord for ExtendedLabel<8> {
+impl<const D: usize> ArenaRecord<D> for ExtendedLabel<8, D> {
     #[inline(always)]
-    fn get(arena: &LabelArena, id: usize) -> Option<&Self> {
+    fn get(arena: &LabelArena<D>, id: usize) -> Option<&Self> {
         match &arena.records {
             Records::Compact8(v) => Some(&v[id]),
             _ => None,
@@ -124,9 +124,9 @@ impl ArenaRecord for ExtendedLabel<8> {
         self.base.expanded
     }
     #[inline(always)]
-    fn try_push(arena: &mut LabelArena, label: &mut StoredLabel) -> bool {
+    fn try_push(arena: &mut LabelArena<D>, label: &mut StoredLabel<D>) -> bool {
         if let Records::Compact8(v) = &mut arena.records {
-            if let Some(compact) = ExtendedLabel::<8>::pack(label, v.len()) {
+            if let Some(compact) = ExtendedLabel::<8, D>::pack(label, v.len()) {
                 v.push(compact);
                 return true;
             }
@@ -135,9 +135,9 @@ impl ArenaRecord for ExtendedLabel<8> {
     }
 }
 
-impl ArenaRecord for StoredLabel {
+impl<const D: usize> ArenaRecord<D> for StoredLabel<D> {
     #[inline(always)]
-    fn get(arena: &LabelArena, id: usize) -> Option<&Self> {
+    fn get(arena: &LabelArena<D>, id: usize) -> Option<&Self> {
         match &arena.records {
             Records::Full(v) => Some(&v[id]),
             _ => None,
@@ -152,7 +152,7 @@ impl ArenaRecord for StoredLabel {
         self.id
     }
     #[inline(always)]
-    fn push_fallback(arena: &mut LabelArena, label: StoredLabel) {
+    fn push_fallback(arena: &mut LabelArena<D>, label: StoredLabel<D>) {
         // The public insertion adapter accepts every current arena format.
         arena.push(label);
     }

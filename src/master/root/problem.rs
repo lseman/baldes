@@ -7,8 +7,8 @@ pub struct Row {
     pub rhs: f64,
 }
 #[derive(Clone, Debug)]
-pub struct RootProblem {
-    pub graph: Graph,
+pub struct RootProblem<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    pub graph: Graph<D>,
     pub rows: Vec<Row>,
     pub arc_entries: Vec<Vec<(usize, f64)>>,
     pub route_entries: Vec<(usize, f64)>,
@@ -22,10 +22,10 @@ pub struct RootProblem {
     /// after inherited cuts stay valid when those cuts are retired.
     pub(super) row_map: RefCell<Vec<usize>>,
 }
-impl RootProblem {
+impl<const D: usize> RootProblem<D> {
     /// Cover each nonterminal vertex and bound the number of vehicle routes.
     /// Arc entries charge the head vertex, retaining repeated-visit coefficients.
-    pub fn set_partitioning(graph: Graph, vehicles: f64) -> Result<Self> {
+    pub fn set_partitioning(graph: Graph<D>, vehicles: f64) -> Result<Self> {
         if !vehicles.is_finite() || vehicles <= 0. {
             return Err(invalid("positive finite vehicle multiplicity required"));
         }
@@ -130,9 +130,17 @@ impl RootProblem {
         // whole node. Express it as an additive zero-flow row for propagation.
         let constraint = if let BranchConstraint::AccumulatedResource(c) = &constraint {
             if c.window(&self.graph)?.is_none() {
-                BranchConstraint::ArcFlow { arc: self.arc_position(c.arc).unwrap(), sense: RowSense::LessEqual, rhs: 0. }
-            } else { constraint }
-        } else { constraint };
+                BranchConstraint::ArcFlow {
+                    arc: self.arc_position(c.arc).unwrap(),
+                    sense: RowSense::LessEqual,
+                    rhs: 0.,
+                }
+            } else {
+                constraint
+            }
+        } else {
+            constraint
+        };
         let logical = self.rows.len();
         let (sense, mut rhs) = constraint.row();
         rhs -= self.fixed_sum(|route| Ok(constraint.coefficient(self, route)))?;
@@ -191,7 +199,7 @@ impl RootProblem {
     }
     pub(super) fn reprice(
         &self,
-        solver: &mut Solver,
+        solver: &mut Solver<D>,
         duals: &[f64],
         round: bool,
         capacity_entries: &[Vec<(usize, f64)>],
@@ -222,13 +230,13 @@ impl RootProblem {
     }
 }
 
-impl RootProblem {
+impl<const D: usize> RootProblem<D> {
     pub(crate) fn elementary_route(&self, ids: &[i32]) -> Option<Route> {
         let g = &self.graph;
         let mut at = g.source;
         let mut nodes = vec![at as i32];
         let mut visited = HashSet::new();
-        let mut q = [0.; 2];
+        let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
         for (r, value) in q.iter_mut().enumerate().take(g.resources.len()) {
             *value = g.initial[r].unwrap_or(g.vertices[at].bounds[r].lower);
             if *value < g.vertices[at].bounds[r].lower || *value > g.vertices[at].bounds[r].upper {
@@ -242,7 +250,7 @@ impl RootProblem {
             if arc.tail != at || at == g.sink {
                 return None;
             }
-            q = extend_resources(g, arc, q, true)?;
+            q = extend_resources(g, arc, &q, true)?;
             at = arc.head;
             if at == g.source || (at != g.sink && !visited.insert(at)) {
                 return None;

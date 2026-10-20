@@ -1,6 +1,6 @@
 use super::*;
 
-impl LabelStorage {
+impl<const D: usize> LabelStorage<D> {
     pub fn new(counts: impl IntoIterator<Item = usize>) -> Self {
         let buckets: Vec<Vec<_>> = counts
             .into_iter()
@@ -46,7 +46,7 @@ impl LabelStorage {
         self.root = None;
     }
 
-    pub fn retain(&mut self, mut label: StoredLabel) -> usize {
+    pub fn retain(&mut self, mut label: StoredLabel<D>) -> usize {
         let id = self.labels.len();
         label.id = id;
         self.hot.push(HotLabel::of(&label));
@@ -55,7 +55,7 @@ impl LabelStorage {
     }
 
     #[inline(never)]
-    pub(crate) fn retain_for<R: ArenaRecord>(&mut self, mut label: StoredLabel) -> usize {
+    pub(crate) fn retain_for<R: ArenaRecord<D>>(&mut self, mut label: StoredLabel<D>) -> usize {
         let id = self.labels.len();
         label.id = id;
         self.hot.push(HotLabel::of(&label));

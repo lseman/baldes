@@ -1,7 +1,7 @@
 //! Native split-depot reversal and standard-resource symmetry predicates.
 use super::buckets::BucketGraph;
 use super::{Graph, ResourceKind};
-pub fn reverse_arcs(g: &Graph) -> Option<Vec<usize>> {
+pub fn reverse_arcs<const D: usize>(g: &Graph<D>) -> Option<Vec<usize>> {
     let mut reverse = vec![];
     for a in &g.arcs {
         if g.arcs
@@ -30,7 +30,11 @@ pub fn reverse_arcs(g: &Graph) -> Option<Vec<usize>> {
     }
     Some(reverse)
 }
-pub fn consumption_symmetric(g: &Graph, grid: &BucketGraph, reverse: &[usize]) -> bool {
+pub fn consumption_symmetric<const D: usize>(
+    g: &Graph<D>,
+    grid: &BucketGraph,
+    reverse: &[usize],
+) -> bool {
     if !depot_elements_symmetric(g) || reversal_costs(g, reverse).is_none() {
         return false;
     }
@@ -68,7 +72,7 @@ pub fn consumption_symmetric(g: &Graph, grid: &BucketGraph, reverse: &[usize]) -
 
 /// Forward-prefix reuse also reverses its arc costs. Resource symmetry alone
 /// does not justify reusing a prefix at arbitrary master duals.
-pub fn reduced_costs_symmetric(g: &Graph, reverse: &[usize]) -> bool {
+pub fn reduced_costs_symmetric<const D: usize>(g: &Graph<D>, reverse: &[usize]) -> bool {
     reverse.len() == g.arcs.len()
         && g.arcs.iter().zip(reverse).all(|(a, &r)| {
             g.arcs
@@ -79,7 +83,7 @@ pub fn reduced_costs_symmetric(g: &Graph, reverse: &[usize]) -> bool {
 
 /// Terminal elements can be exchanged only when they have no internal
 /// membership and the source and sink describe disjoint element sets.
-pub fn depot_elements_symmetric(g: &Graph) -> bool {
+pub fn depot_elements_symmetric<const D: usize>(g: &Graph<D>) -> bool {
     let source = &g.vertices[g.source].elements;
     let sink = &g.vertices[g.sink].elements;
     !source.iter().any(|e| sink.contains(e))
@@ -101,7 +105,7 @@ pub fn depot_elements_symmetric(g: &Graph) -> bool {
 /// Find a vertex potential making opposite arcs have equal reduced cost.
 /// Source and sink share the depot potential, so all complete route costs are
 /// preserved. Nonconservative directional costs cannot use prefix reversal.
-pub fn reversal_costs(g: &Graph, reverse: &[usize]) -> Option<Vec<f64>> {
+pub fn reversal_costs<const D: usize>(g: &Graph<D>, reverse: &[usize]) -> Option<Vec<f64>> {
     if reverse.len() != g.arcs.len() {
         return None;
     }
@@ -153,7 +157,7 @@ pub fn reversal_costs(g: &Graph, reverse: &[usize]) -> Option<Vec<f64>> {
     Some(costs)
 }
 
-pub fn depot_mask(g: &Graph) -> [u64; 16] {
+pub fn depot_mask<const D: usize>(g: &Graph<D>) -> [u64; 16] {
     let mut mask = [0; 16];
     for &e in g.vertices[g.source]
         .elements

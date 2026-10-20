@@ -1,6 +1,6 @@
 use super::*;
 
-impl LabelingEngine {
+impl<const D: usize> LabelingEngine<D> {
     /// getPrevLabelPtr: every predecessor must still be active
     /// or archived in its bucket. A dominated expanded label that was not
     /// archived is gone, and candidates through it cannot be recorded.
@@ -29,7 +29,7 @@ impl LabelingEngine {
     /// recordSolution; `None` when a predecessor is missing.
     pub(super) fn reconstruct(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         pair: (Option<usize>, Option<usize>),
         cost: f64,
     ) -> Result<Option<Route>> {
@@ -51,7 +51,7 @@ impl LabelingEngine {
             }
         }
         let mut nodes = vec![g.source as i32];
-        let mut q = [0.; 2];
+        let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
         for r in 0..g.resources.len() {
             q[r] = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower);
         }
@@ -59,7 +59,7 @@ impl LabelingEngine {
         let mut current = pair.0;
         while let Some(id) = current {
             let label = self.forward.labels.view(id);
-            prefix_states.push(*label.resources());
+            prefix_states.push(crate::graph::ResourceValues::from_slice(label.resources()));
             current = label.parent();
         }
         prefix_states.reverse();
@@ -70,12 +70,12 @@ impl LabelingEngine {
             if nodes.last().copied() != Some(a.tail as i32) {
                 return Err(invalid("broken labeling predecessor chain"));
             }
-            let extended = extend_resources(g, a, q, true)
+            let extended = extend_resources(g, a, &q, true)
                 .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
             // Forward labels retain waiting imposed by jump arcs. Replaying
             // their arcs at earliest arrival would collapse distinct schedules.
             // Continue the backward suffix from the actual forward state.
-            q = prefix_states.get(position + 1).copied().unwrap_or(extended);
+            q = prefix_states.get(position + 1).cloned().unwrap_or(extended);
             resource_profile.push(q[..g.resources.len()].to_vec());
             nodes.push(a.head as i32);
             original_cost += a.cost;

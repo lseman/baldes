@@ -1,9 +1,9 @@
 use super::*;
 
 impl BucketGraph {
-    pub(super) fn auxiliary(
+    pub(super) fn auxiliary<const D: usize>(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
     ) -> (Vec<BucketId>, Vec<usize>, Vec<Vec<usize>>) {
         let d = self.direction(forward);
@@ -143,7 +143,11 @@ impl BucketGraph {
         (ids, offsets, edges)
     }
 
-    pub(super) fn order_components(&mut self, g: &Graph, forward: bool) -> Result<()> {
+    pub(super) fn order_components<const D: usize>(
+        &mut self,
+        g: &Graph<D>,
+        forward: bool,
+    ) -> Result<()> {
         let (ids, offsets, mut edges) = self.auxiliary(g, forward);
         if ids.is_empty() {
             return Err(invalid("empty bucket graph"));

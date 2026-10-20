@@ -1,6 +1,6 @@
 //! Staged pricing and retained-universe repricing.
 use super::*;
-impl Solver {
+impl<const D: usize> Solver<D> {
     pub fn price(&mut self, maximum: usize, negative_only: bool) -> Result<PricingResult> {
         if !negative_only {
             return self.price_phase(0, maximum, false);
@@ -45,7 +45,6 @@ impl Solver {
         maximum: usize,
         negative_only: bool,
     ) -> Result<PricingResult> {
-
         let phase = *self
             .phases
             .get(index)
@@ -178,8 +177,8 @@ fn enumerated_cost_order(left: f64, right: f64) -> std::cmp::Ordering {
 #[cfg(test)]
 mod resource_boundary_tests {
     use super::*;
-    fn boundary(alternative: bool) -> Solver {
-        let mut s = Solver::new(if alternative { 4 } else { 3 }, 1).unwrap();
+    fn boundary(alternative: bool) -> Solver<2> {
+        let mut s = Solver::<2>::new(if alternative { 4 } else { 3 }, 1).unwrap();
         let upper = f64::from_bits(1f64.to_bits() - 1);
         s.graph.initial[0] = Some(0.);
         for v in 0..s.graph.vertices.len() {

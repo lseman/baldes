@@ -3,7 +3,10 @@ use crate::{
     master::root::RootProblem, pricing::restrictions::AccumulatedResourceBranch, Result, Route,
 };
 
-pub(super) fn validate(problem: &RootProblem, rule: AccumulatedResourceBranch) -> Result<()> {
+pub(super) fn validate<const D: usize>(
+    problem: &RootProblem<D>,
+    rule: AccumulatedResourceBranch,
+) -> Result<()> {
     rule.window(&problem.graph)?;
     Ok(())
 }

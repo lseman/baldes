@@ -72,7 +72,7 @@ pub struct WeightedCoverRowAudit {
     pub work_used: usize,
 }
 
-impl ConservativeCoverRelaxation<'_> {
+impl<const D: usize> ConservativeCoverRelaxation<'_, D> {
     /// Check d*a(path) <= sum of customer weights on every auxiliary path.
     /// In an integer residual cover the weighted visit total is fixed, hence
     /// its integer row activity is <= floor(total/d). Signed weights and
@@ -147,7 +147,7 @@ fn reserve<T>(v: &mut Vec<T>, n: usize) -> Result<(), CoverRowFailure> {
     v.try_reserve_exact(n)
         .map_err(|_| CoverRowFailure::Allocation)
 }
-impl CanonicalCoverRelaxation<'_> {
+impl<const D: usize> CanonicalCoverRelaxation<'_, D> {
     /// Extremize the exact sum of one integer coefficient per canonical path
     /// over every partition of the remaining customers. Coefficient order must
     /// match `self.paths().paths()`. Direct empty routes and paths using already
@@ -173,7 +173,7 @@ impl CanonicalCoverRelaxation<'_> {
         )
     }
 }
-impl ConservativeCoverRelaxation<'_> {
+impl<const D: usize> ConservativeCoverRelaxation<'_, D> {
     /// Exact row ranges over the conservative residual path relaxation.
     /// Extra resource-infeasible paths enlarge the partition domain. A passing
     /// range test therefore covers exact-real feasible integer partitions too.
@@ -193,8 +193,8 @@ impl ConservativeCoverRelaxation<'_> {
         )
     }
 }
-fn audit_cover_row<'p>(
-    p: &RootProblem,
+fn audit_cover_row<'p, const D: usize>(
+    p: &RootProblem<D>,
     customer_rows: &[(usize, usize)],
     paths: impl ExactSizeIterator<Item = &'p [usize]>,
     coefficients: &[i64],
@@ -296,8 +296,8 @@ fn audit_cover_row<'p>(
 mod tests {
     use super::*;
     use crate::{enumeration::PathDomainLimits, master::root::RootProblem, Graph};
-    fn problem() -> RootProblem {
-        let mut g = Graph::new(4, 0).unwrap();
+    fn problem() -> RootProblem<2> {
+        let mut g = Graph::<2>::new(4, 0).unwrap();
         for (u, v) in [(0, 1), (1, 3), (0, 2), (2, 3), (1, 2), (2, 1), (0, 3)] {
             g.add_arc(u, v, 1.).unwrap();
         }
@@ -444,7 +444,7 @@ mod tests {
     }
     #[test]
     fn missing_and_fully_fixed_covers_are_distinct() {
-        let mut g = Graph::new(3, 0).unwrap();
+        let mut g = Graph::<2>::new(3, 0).unwrap();
         g.add_arc(0, 2, 1.).unwrap();
         let mut p = RootProblem::set_partitioning(g, 1.).unwrap();
         let d = CanonicalCoverRelaxation::collect(
@@ -522,7 +522,7 @@ mod tests {
     }
     #[test]
     fn conservative_row_domain_includes_an_exact_real_feasible_rounding_boundary() {
-        let mut graph = Graph::new(4, 1).unwrap();
+        let mut graph = Graph::<2>::new(4, 1).unwrap();
         let upper = f64::from_bits(1f64.to_bits() + 3);
         let delta = 3. * 2f64.powi(-53);
         graph.initial[0] = Some(0.);

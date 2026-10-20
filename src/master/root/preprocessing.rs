@@ -2,7 +2,7 @@
 use super::*;
 use crate::master::preprocessing::{propagate, Bounds, Constraint, Report};
 
-impl RootProblem {
+impl<const D: usize> RootProblem<D> {
     pub(super) fn preprocess(&self, additional: &[Constraint]) -> Result<(Report, Vec<Bounds>)> {
         if self.arc_entries.len() != self.graph.arcs.len() {
             return Err(invalid("preprocessing arc dimensions"));
@@ -184,9 +184,9 @@ impl CutState {
     /// Only cuts with a full-universe additive arc representation are eligible.
     /// Row identities and RHS come from the current physical master, after any
     /// row retirement/remapping. No restricted-column activities are consulted.
-    pub(super) fn preprocessing_rows(
+    pub(super) fn preprocessing_rows<const D: usize>(
         &self,
-        graph: &Graph,
+        graph: &Graph<D>,
         master: &ClpMaster,
     ) -> Result<Vec<Constraint>> {
         if self.capacity_cuts.len() != self.capacity_rows.len() {
@@ -224,11 +224,11 @@ impl CutState {
     }
 }
 
-pub(super) fn infeasible_output(
+pub(super) fn infeasible_output<const D: usize>(
     report: Report,
     started: std::time::Instant,
     bound_mode: BoundMode,
-) -> RootOutput {
+) -> RootOutput<D> {
     RootOutput {
         fixed_routes: vec![],
         fixed_cost: 0.,
@@ -284,8 +284,8 @@ mod tests {
     use super::*;
     use crate::pricing::restrictions::RyanFosterConstraint;
 
-    fn complete_problem() -> RootProblem {
-        let mut graph = Graph::new(6, 0).unwrap();
+    fn complete_problem() -> RootProblem<2> {
+        let mut graph = Graph::<2>::new(6, 0).unwrap();
         graph.elementary = true;
         for tail in 0..5 {
             for head in 1..6 {
@@ -298,7 +298,7 @@ mod tests {
     }
 
     fn paths(
-        graph: &Graph,
+        graph: &Graph<2>,
         vertex: usize,
         seen: u64,
         path: &mut Vec<usize>,

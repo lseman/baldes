@@ -1,19 +1,19 @@
 use super::*;
 
-impl LabelingEngine {
+impl<const D: usize> LabelingEngine<D> {
     /// Completion query shared by pricing, enumeration and fixing. The lower
     /// cost already includes dominance predecessors; scanning follows their
     /// native staircase and minimum-index bounds.
     pub fn completion_exists(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
-        label: &StoredLabel,
+        label: &StoredLabel<D>,
         threshold: f64,
         scan: bool,
     ) -> bool {
         let vertex = self.grid.internal[label.vertex];
-        let mut q = self.grid.coordinate(*label.resources());
+        let mut q = self.grid.coordinate(label.resources());
         let opposite = self.consumption_joins || !forward;
         if self.consumption_joins && forward {
             for r in 0..self.grid.dimensions {
@@ -67,9 +67,9 @@ impl LabelingEngine {
 
     pub fn enumeration_completion(
         &self,
-        g: &Graph,
+        g: &Graph<D>,
         forward: bool,
-        label: &crate::enumeration::Label,
+        label: &crate::enumeration::Label<D>,
         threshold: f64,
         scan: bool,
     ) -> bool {
@@ -107,7 +107,7 @@ impl LabelingEngine {
             vertex: label.vertex,
             cost: label.reduced_cost,
             original_cost: label.original_cost,
-            resources: label.resources,
+            resources: label.resources.clone(),
             ng,
             branch_state: None,
             parent: None,

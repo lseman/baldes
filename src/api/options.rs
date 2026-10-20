@@ -128,12 +128,13 @@ pub unsafe extern "C" fn or_rcsp_build_resource_buckets(p: *mut ORECSP, steps: *
     guard(-1, || {
         let s = unsafe { solver(p)? };
         if steps.is_null() {
-            s.bucket_steps = [0.; 2];
+            s.bucket_steps = crate::graph::ResourceValues::filled(s.graph.resources.len(), 0.);
         } else {
             let values = unsafe { input(steps, s.graph.resources.len())? };
-            let mut selected = [0.; 2];
-            selected[..values.len()].copy_from_slice(values);
-            s.bucket_steps = selected;
+            if values.iter().any(|v| !v.is_finite() || *v < 0.) {
+                return Err(invalid("finite nonnegative resource bucket steps required"));
+            }
+            s.bucket_steps = crate::graph::ResourceValues::from_slice(values);
         }
         let phase = crate::pricing::phases::Phase {
             check_ng: true,
@@ -141,7 +142,7 @@ pub unsafe extern "C" fn or_rcsp_build_resource_buckets(p: *mut ORECSP, steps: *
             labels_per_bucket: i64::MAX,
         };
         let controls = crate::labeling::engine::EngineControls {
-            steps: s.bucket_steps,
+            steps: s.bucket_steps.clone(),
             bidirectional: s.options.get("BALDESuseBidirectionalSearch")? != 0.,
             target_buckets: s.options.get("BALDESnumberOfBucketsPerVertex")? as i32,
             ..Default::default()
@@ -164,7 +165,10 @@ pub unsafe extern "C" fn or_rcsp_decrease_bucket_steps(p: *mut ORECSP, factor: f
             .as_mut()
             .ok_or_else(|| invalid("resource buckets are not built"))?;
         engine.grid.decrease_steps(&s.graph)?;
-        s.bucket_steps = engine.grid.step;
+
+        for (axis, &slot) in engine.grid.resource_slots.iter().enumerate() {
+            s.bucket_steps[slot] = engine.grid.step[axis];
+        }
         Ok(0)
     })
 }

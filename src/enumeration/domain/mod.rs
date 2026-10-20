@@ -43,17 +43,17 @@ impl std::fmt::Display for PathDomainFailure {
 impl std::error::Error for PathDomainFailure {}
 
 #[derive(Debug)]
-pub struct CanonicalPath {
+pub struct CanonicalPath<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     arcs: Vec<usize>,
-    resources: Vec<[f64; 2]>,
+    resources: Vec<crate::graph::ResourceValues<D>>,
 }
-impl CanonicalPath {
+impl<const D: usize> CanonicalPath<D> {
     /// Positions in the borrowed original graph, retaining parallel arc identity.
     pub fn arc_positions(&self) -> &[usize] {
         &self.arcs
     }
     /// Source state and state after each arc; unused resource slots are zero.
-    pub fn resource_profile(&self) -> &[[f64; 2]] {
+    pub fn resource_profile(&self) -> &[crate::graph::ResourceValues<D>] {
         &self.resources
     }
 }
@@ -61,17 +61,17 @@ impl CanonicalPath {
 /// A physical path with downward resource bounds, rather than a feasible
 /// floating-point schedule. It must not be submitted as an integer witness.
 #[derive(Debug)]
-pub struct RelaxedResourcePath {
+pub struct RelaxedResourcePath<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     arcs: Vec<usize>,
-    lower_resources: Vec<[f64; 2]>,
+    lower_resources: Vec<crate::graph::ResourceValues<D>>,
 }
-impl RelaxedResourcePath {
+impl<const D: usize> RelaxedResourcePath<D> {
     pub fn arc_positions(&self) -> &[usize] {
         &self.arcs
     }
     /// Source value and a lower bound after each arc on every exact-real
     /// feasible schedule along this path; unused slots are zero.
-    pub fn resource_lower_bounds(&self) -> &[[f64; 2]] {
+    pub fn resource_lower_bounds(&self) -> &[crate::graph::ResourceValues<D>] {
         &self.lower_resources
     }
 }
@@ -83,18 +83,18 @@ impl RelaxedResourcePath {
 /// schedules and do not establish backward/tolerant native-domain equivalence.
 /// Cost cutoffs, fixing, NG, element sets, cuts and branches are ignored.
 #[derive(Debug)]
-pub struct CompleteResourceRelaxation<'g> {
-    data: CollectedPaths<'g, RelaxedResourcePath>,
+pub struct CompleteResourceRelaxation<'g, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    data: CollectedPaths<'g, RelaxedResourcePath<D>, D>,
 }
-impl<'g> CompleteResourceRelaxation<'g> {
+impl<'g, const D: usize> CompleteResourceRelaxation<'g, D> {
     /// The same path/work/storage/deadline controls as canonical collection.
     /// Unsupported kinds or arithmetic failure return no partial universe.
-    pub fn collect(graph: &'g Graph, limits: PathDomainLimits) -> Result<Self, PathDomainFailure> {
+    pub fn collect(
+        graph: &'g Graph<D>,
+        limits: PathDomainLimits,
+    ) -> Result<Self, PathDomainFailure> {
         if limits.deadline.is_some_and(|end| Instant::now() >= end) {
             return Err(PathDomainFailure::TimeLimit);
-        }
-        if graph.resources.len() > 2 {
-            return Err(PathDomainFailure::InvalidGraph);
         }
         if graph
             .resources
@@ -114,10 +114,10 @@ impl<'g> CompleteResourceRelaxation<'g> {
         )?;
         Ok(Self { data })
     }
-    pub fn graph(&self) -> &'g Graph {
+    pub fn graph(&self) -> &'g Graph<D> {
         self.data.graph
     }
-    pub fn paths(&self) -> &[RelaxedResourcePath] {
+    pub fn paths(&self) -> &[RelaxedResourcePath<D>] {
         &self.data.paths
     }
     pub fn work_used(&self) -> usize {
@@ -127,11 +127,11 @@ impl<'g> CompleteResourceRelaxation<'g> {
         self.data.stored_arcs
     }
 }
-fn extend_resource_lower_bounds(
-    g: &Graph,
-    arc: &crate::graph::Arc,
-    mut q: [f64; 2],
-) -> Result<Option<[f64; 2]>, PathDomainFailure> {
+fn extend_resource_lower_bounds<const D: usize>(
+    g: &Graph<D>,
+    arc: &crate::graph::Arc<D>,
+    mut q: crate::graph::ResourceValues<D>,
+) -> Result<Option<crate::graph::ResourceValues<D>>, PathDomainFailure> {
     for (r, value) in q.iter_mut().enumerate().take(g.resources.len()) {
         let mut bounds = g.vertices[arc.head].bounds[r];
         if let Some(window) = arc.bounds[r] {
@@ -156,18 +156,18 @@ fn extend_resource_lower_bounds(
 ///
 /// ```compile_fail
 /// use baldes::{Graph, enumeration::{CompleteCanonicalPaths, PathDomainLimits}};
-/// let mut graph = Graph::new(2, 0).unwrap();
+/// let mut graph = Graph::<2>::new(2, 0).unwrap();
 /// let domain = CompleteCanonicalPaths::collect(&graph, PathDomainLimits::default()).unwrap();
 /// graph.arcs.clear();
 /// assert!(domain.paths().is_empty());
 /// ```
 #[derive(Debug)]
-pub struct CompleteCanonicalPaths<'g> {
-    data: CollectedPaths<'g, CanonicalPath>,
+pub struct CompleteCanonicalPaths<'g, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    data: CollectedPaths<'g, CanonicalPath<D>, D>,
 }
 #[derive(Debug)]
-struct CollectedPaths<'g, P> {
-    graph: &'g Graph,
+struct CollectedPaths<'g, P, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    graph: &'g Graph<D>,
     paths: Vec<P>,
     work_used: usize,
     stored_arcs: usize,
@@ -196,26 +196,26 @@ impl Budget {
         Ok(())
     }
 }
-struct Frame {
+struct Frame<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     vertex: usize,
     next_arc: usize,
-    resources: [f64; 2],
+    resources: crate::graph::ResourceValues<D>,
 }
 fn reserve<T>(values: &mut Vec<T>, additional: usize) -> Result<(), PathDomainFailure> {
     values
         .try_reserve_exact(additional)
         .map_err(|_| PathDomainFailure::Allocation)
 }
-fn collect_paths<'g, P>(
-    graph: &'g Graph,
+fn collect_paths<'g, P, const D: usize>(
+    graph: &'g Graph<D>,
     limits: PathDomainLimits,
     mut extend: impl FnMut(
-        &Graph,
-        &crate::graph::Arc,
-        [f64; 2],
-    ) -> Result<Option<[f64; 2]>, PathDomainFailure>,
-    mut make_path: impl FnMut(Vec<usize>, Vec<[f64; 2]>) -> P,
-) -> Result<CollectedPaths<'g, P>, PathDomainFailure> {
+        &Graph<D>,
+        &crate::graph::Arc<D>,
+        crate::graph::ResourceValues<D>,
+    ) -> Result<Option<crate::graph::ResourceValues<D>>, PathDomainFailure>,
+    mut make_path: impl FnMut(Vec<usize>, Vec<crate::graph::ResourceValues<D>>) -> P,
+) -> Result<CollectedPaths<'g, P, D>, PathDomainFailure> {
     let mut budget = Budget {
         remaining: limits.max_work,
         deadline: limits.deadline,
@@ -238,7 +238,7 @@ fn collect_paths<'g, P>(
         work_used: 0,
         stored_arcs: 0,
     };
-    let mut initial = [0.; 2];
+    let mut initial = crate::graph::ResourceValues::filled(graph.resources.len(), 0.);
     for (r, value) in initial.iter_mut().enumerate().take(graph.resources.len()) {
         let bounds = graph.vertices[graph.source].bounds[r];
         *value = graph.initial[r].unwrap_or(bounds.lower);
@@ -296,7 +296,7 @@ fn collect_paths<'g, P>(
         if visited[arc.head] {
             continue;
         }
-        let Some(resources) = extend(graph, arc, frame.resources)? else {
+        let Some(resources) = extend(graph, arc, frame.resources.clone())? else {
             continue;
         };
         if arc.head == graph.sink {
@@ -322,7 +322,7 @@ fn collect_paths<'g, P>(
             arcs.push(physical);
             let mut profile = vec![];
             reserve(&mut profile, stack.len() + 1)?;
-            profile.extend(stack.iter().map(|frame| frame.resources));
+            profile.extend(stack.iter().map(|frame| frame.resources.clone()));
             profile.push(resources);
             if result.paths.len() == result.paths.capacity() {
                 let additional =
@@ -345,23 +345,26 @@ fn collect_paths<'g, P>(
     result.work_used = limits.max_work - budget.remaining;
     Ok(result)
 }
-impl<'g> CompleteCanonicalPaths<'g> {
+impl<'g, const D: usize> CompleteCanonicalPaths<'g, D> {
     /// Failure discards every candidate; only an exhausted search completes.
     /// Work counts validation size, scans and payload copy. Validation and
     /// allocation are cooperative checkpoints, not hard realtime.
-    pub fn collect(graph: &'g Graph, limits: PathDomainLimits) -> Result<Self, PathDomainFailure> {
+    pub fn collect(
+        graph: &'g Graph<D>,
+        limits: PathDomainLimits,
+    ) -> Result<Self, PathDomainFailure> {
         let data = collect_paths(
             graph,
             limits,
-            |g, arc, q| Ok(extend_resources(g, arc, q, true)),
+            |g, arc, q| Ok(extend_resources(g, arc, &q, true)),
             |arcs, resources| CanonicalPath { arcs, resources },
         )?;
         Ok(Self { data })
     }
-    pub fn graph(&self) -> &'g Graph {
+    pub fn graph(&self) -> &'g Graph<D> {
         self.data.graph
     }
-    pub fn paths(&self) -> &[CanonicalPath] {
+    pub fn paths(&self) -> &[CanonicalPath<D>] {
         &self.data.paths
     }
     pub fn work_used(&self) -> usize {

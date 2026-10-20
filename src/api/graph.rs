@@ -45,11 +45,9 @@ pub unsafe extern "C" fn or_rcsp_new_resource(p: *mut ORECSP, _name: *const c_ch
     guard(-1, || {
         let k = kind(t)?;
         let s = unsafe { solver(p)? };
-        if s.graph.resources.len() >= 2 {
-            return Err(invalid("pricing accepts at most two resources"));
-        }
-        let r = s.graph.resources.len();
-        s.graph.resources.push(k);
+        let r = s.graph.add_resource(k)?;
+        s.bucket_steps[r] = 0.;
+        s.engine = None;
         Ok(r as i32)
     })
 }

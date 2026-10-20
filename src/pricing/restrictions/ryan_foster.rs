@@ -58,7 +58,10 @@ pub struct RyanFosterResources {
     pub parity: [u32; 16],
 }
 impl RyanFosterResources {
-    pub fn prepare(g: &Graph, constraints: &[RyanFosterConstraint]) -> Result<Self> {
+    pub fn prepare<const D: usize>(
+        g: &Graph<D>,
+        constraints: &[RyanFosterConstraint],
+    ) -> Result<Self> {
         let mut result = Self {
             vertices: vec![vec![]; g.vertices.len()],
             ..Default::default()

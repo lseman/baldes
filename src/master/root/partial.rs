@@ -9,7 +9,7 @@ pub struct FixedRoute {
     pub quantity: u32,
 }
 
-impl RootProblem {
+impl<const D: usize> RootProblem<D> {
     pub(super) fn fixed_cost(&self) -> f64 {
         self.fixed_routes
             .iter()
@@ -30,7 +30,7 @@ impl RootProblem {
         Ok(sum)
     }
 }
-impl RootOutput {
+impl<const D: usize> RootOutput<D> {
     /// Current route values including the fixed part. Positive artificials must
     /// still be ruled out before treating the current LP values as a witness.
     pub fn route_values(&self) -> Vec<(&Route, f64)> {
@@ -49,7 +49,7 @@ impl RootOutput {
             .collect()
     }
 }
-impl NodeSnapshot {
+impl<const D: usize> NodeSnapshot<D> {
     pub fn fixed_routes(&self) -> &[(Route, u32)] {
         &self.problem.fixed_routes
     }
@@ -61,11 +61,11 @@ impl NodeSnapshot {
 /// Restrict a solved node by fixing additional elementary routes. Quantities
 /// are additive across calls. The parent, its basis and siblings are unchanged.
 /// All returned objective values include the fixed contribution.
-pub fn inherit_fixed_routes(
-    parent: &NodeSnapshot,
+pub fn inherit_fixed_routes<const D: usize>(
+    parent: &NodeSnapshot<D>,
     fixed: &[FixedRoute],
     mut options: RootOptions,
-) -> Result<RootOutput> {
+) -> Result<RootOutput<D>> {
     let (problem, master, warm) = residual_fork(parent, fixed, options.cg.artificial_cost)?;
     // This is the remaining fleet bound, not the total pre-fixing multiplicity.
     options.cg.multiplicity = problem.rows[0].rhs.max(0.);
@@ -73,11 +73,11 @@ pub fn inherit_fixed_routes(
     solve_seeded(problem, options, Some((parent, master, warm)))
 }
 
-fn residual_fork(
-    parent: &NodeSnapshot,
+fn residual_fork<const D: usize>(
+    parent: &NodeSnapshot<D>,
     fixed: &[FixedRoute],
     penalty: f64,
-) -> Result<(RootProblem, ClpMaster, column_generation::WarmStart)> {
+) -> Result<(RootProblem<D>, ClpMaster, column_generation::WarmStart)> {
     let (mut problem, mut master, warm) = parent.fork(&[], penalty)?;
     let mut checked = vec![];
     for entry in fixed {
@@ -318,7 +318,7 @@ mod tests {
             for (cut, row) in child.cut.capacity_cuts.iter().zip(&child.cut.capacity_rows) {
                 if let Some(row) = row {
                     let contribution =
-                        cut.coefficient(&State::customers(&child.problem.fixed_routes[0].0));
+                        cut.coefficient(&State::<2>::customers(&child.problem.fixed_routes[0].0));
                     assert_eq!(child.master.rhs[*row], cut.rhs as f64 - contribution as f64);
                 }
             }

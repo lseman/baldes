@@ -3,7 +3,7 @@ use super::floor_isize;
 #[test]
 fn automatic_grid_supports_large_resource_windows() {
     use super::{BucketGraph, Graph};
-    let mut graph = Graph::new(3, 1).unwrap();
+    let mut graph = Graph::<2>::new(3, 1).unwrap();
     for vertex in 0..3 {
         graph.set_bounds(vertex, 0, 0., 100_000_000.).unwrap();
     }

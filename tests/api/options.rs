@@ -4,7 +4,7 @@ use baldes::pricing::Solver;
 #[test]
 fn public_metadata_lists_only_supported_canonical_names_and_consistent_indices() {
     let mut options = Options::default();
-    let mut solver = Solver::new(2, 0).unwrap();
+    let mut solver = Solver::<2>::new(2, 0).unwrap();
     let expected = if cfg!(all(feature = "clp", feature = "highs")) { 41 } else { 39 };
     assert_eq!(OPTION_TABLE.len(), expected);
     let mut names = std::collections::HashSet::new();
@@ -30,7 +30,7 @@ fn public_metadata_lists_only_supported_canonical_names_and_consistent_indices()
 #[test]
 fn unregistered_options_are_rejected_without_changing_supported_values() {
     let mut options = Options::default();
-    let mut solver = Solver::new(2, 0).unwrap();
+    let mut solver = Solver::<2>::new(2, 0).unwrap();
     let name = "BALDESnotARealOption";
     assert!(Options::support(name).is_err());
     assert!(Options::canonical_name(name).is_err());
@@ -66,7 +66,7 @@ fn legacy_aliases_share_storage_and_reach_runtime_validation() {
     assert_eq!(options.get("BALDESnumberOfBucketsPerVertex").unwrap(), 17.);
     options.set("BALDESnumberOfBucketsPerVertex", 23.).unwrap();
     assert_eq!(options.get("RCSPnumberOfBucketsPerVertex").unwrap(), 23.);
-    let mut solver = Solver::new(2, 0).unwrap();
+    let mut solver = Solver::<2>::new(2, 0).unwrap();
     solver.set_option("RCSPlabelDominanceStrategy", 1.).unwrap();
     assert_eq!(solver.dominance_mode, 1);
     assert!(solver.set_option("RCSPlabelDominanceStrategy", 2.).is_err());
@@ -76,7 +76,7 @@ fn legacy_aliases_share_storage_and_reach_runtime_validation() {
 
 #[test]
 fn failed_solver_setters_preserve_options_controls_phases_and_prepared_engine() {
-    let mut solver = Solver::new(2, 0).unwrap();
+    let mut solver = Solver::<2>::new(2, 0).unwrap();
     solver.graph.add_arc(0, 1, -2.).unwrap();
     solver.price_phase(0, 10, true).unwrap();
     let values: Vec<_> = OPTION_TABLE
@@ -121,7 +121,7 @@ fn failed_solver_setters_preserve_options_controls_phases_and_prepared_engine() 
 
 #[test]
 fn named_dominance_option_reaches_labeling_and_the_c_setter_stays_synchronized() {
-    let mut solver = Solver::new(2, 0).unwrap();
+    let mut solver = Solver::<2>::new(2, 0).unwrap();
     solver.graph.add_arc(0, 1, -2.).unwrap();
     solver.set_option("BALDESlabelDominanceStrategy", 1.).unwrap();
     assert_eq!(solver.dominance_mode, 1);

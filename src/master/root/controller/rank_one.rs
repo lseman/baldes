@@ -1,13 +1,13 @@
 //! Rank-one cut separation and fixed-route contributions.
 use super::*;
 
-impl RootController {
-    pub(super) fn fixed_rank_one(&self, state: &State, index: usize) -> Result<f64> {
+impl<const D: usize> RootController<D> {
+    pub(super) fn fixed_rank_one(&self, state: &State<D>, index: usize) -> Result<f64> {
         self.problem.fixed_sum(|route| {
             let path = state
                 .solver
                 .cuts
-                .route(&state.solver.graph, &State::customers(route))?;
+                .route(&state.solver.graph, &State::<D>::customers(route))?;
             Ok(state
                 .solver
                 .cuts
@@ -18,7 +18,7 @@ impl RootController {
     /// New rank-one cuts, and whether existing cut memories changed.
     pub(super) fn separate_rank_one<M: LpMaster>(
         &self,
-        state: &mut State,
+        state: &mut State<D>,
         master: &mut M,
         rows: &mut PendingRows,
         tagged: &[(usize, usize)],
@@ -38,7 +38,10 @@ impl RootController {
         for &(_, tag) in tagged {
             let route = &state.routes[tag];
             paths.push((
-                state.solver.cuts.route(&graph, &State::customers(route))?,
+                state
+                    .solver
+                    .cuts
+                    .route(&graph, &State::<D>::customers(route))?,
                 state.is_enumerated(route),
             ));
         }

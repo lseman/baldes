@@ -51,7 +51,8 @@ impl Instance {
                 return Ok(());
             }
             let id = graph.add_arc(u, v, d / scale)?;
-            graph.arc_mut(id)?.consumption = [travel, if v == sink { 0. } else { to.demand }];
+            graph.arc_mut(id)?.consumption =
+                [travel, if v == sink { 0. } else { to.demand }].into();
             Ok(())
         };
         for j in 1..=n {

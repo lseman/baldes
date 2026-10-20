@@ -12,7 +12,10 @@ pub struct AccumulatedResourceBranch {
     pub upper: bool,
 }
 impl AccumulatedResourceBranch {
-    pub(crate) fn window(&self, graph: &Graph) -> Result<Option<crate::graph::Window>> {
+    pub(crate) fn window<const D: usize>(
+        &self,
+        graph: &Graph<D>,
+    ) -> Result<Option<crate::graph::Window>> {
         if self.resource >= graph.resources.len() || !self.threshold.is_finite() {
             return Err(invalid("accumulated-resource branch coordinate/threshold"));
         }

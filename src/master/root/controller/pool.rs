@@ -44,7 +44,7 @@ pub(super) fn synchronize_pool(
     Ok(())
 }
 
-impl RootController {
+impl<const D: usize> RootController<D> {
     pub(super) fn refresh_pool(&mut self, pool: &mut [Column]) -> Result<()> {
         let state = self.state.borrow();
         for column in pool {

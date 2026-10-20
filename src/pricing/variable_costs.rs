@@ -1,6 +1,6 @@
 //! Variable-cost caching and route bound correction.
 use super::*;
-impl Solver {
+impl<const D: usize> Solver<D> {
     pub fn cache_variable_costs(&mut self, costs: &[f64]) -> Result<()> {
         if costs.iter().any(|v| !v.is_finite())
             || self.maximum_variable_id.is_some_and(|id| id >= costs.len())

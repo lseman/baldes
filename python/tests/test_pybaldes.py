@@ -227,3 +227,25 @@ def test_highs_master_selection_respects_the_build_features():
     else:
         with pytest.raises(ValueError, match="highs build feature"):
             solve_root(triangle(), master_solver="highs")
+
+
+def test_general_scalar_resource_dimensions():
+    dimensions = pybaldes.resource_dimensions
+    solver = pybaldes.Solver(3, dimensions)
+    for resource in range(dimensions):
+        assert solver.new_resource(f"r{resource}", 0) == resource
+        for vertex in range(3):
+            solver.set_vertex_bounds(vertex, resource, 0.0, 10.0)
+    first = solver.new_arc(0, 1, -2.0)
+    second = solver.new_arc(1, 2, -3.0)
+    for resource in range(dimensions):
+        solver.set_arc_consumption(first, resource, 1.0)
+        solver.set_arc_consumption(second, resource, 2.0)
+    cost, route = solver.solve()
+    assert cost == -5.0
+    assert [route.resource_consumption(r) for r in range(dimensions)] == [3.0] * dimensions
+
+
+def test_resource_capacity_is_fixed_at_build_time():
+    with pytest.raises(RuntimeError):
+        pybaldes.Solver(3, pybaldes.resource_dimensions + 1)

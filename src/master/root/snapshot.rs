@@ -1,6 +1,6 @@
 use super::*;
 
-impl std::fmt::Debug for NodeSnapshot {
+impl<const D: usize> std::fmt::Debug for NodeSnapshot<D> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NodeSnapshot")
             .field("rows", &self.master.rhs.len())
@@ -10,7 +10,7 @@ impl std::fmt::Debug for NodeSnapshot {
     }
 }
 
-impl NodeSnapshot {
+impl<const D: usize> NodeSnapshot<D> {
     pub fn bound_mode(&self) -> BoundMode {
         self.warm.bound_mode
     }
@@ -42,7 +42,7 @@ impl NodeSnapshot {
         &self,
         branches: &[BranchConstraint],
         penalty: f64,
-    ) -> Result<(RootProblem, ClpMaster, column_generation::WarmStart)> {
+    ) -> Result<(RootProblem<D>, ClpMaster, column_generation::WarmStart)> {
         let mut master = self.master.try_clone()?;
         let mut problem = self.problem.clone();
         let mut warm = self.warm.clone();

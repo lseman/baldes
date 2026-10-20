@@ -48,12 +48,12 @@ pub use partial::{inherit_fixed_routes, FixedRoute};
 pub use problem::{RootProblem, Row};
 
 #[derive(Debug)]
-pub struct RootOutput {
+pub struct RootOutput<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     /// Routes removed into the fixed part, separate from residual LP columns.
     pub fixed_routes: Vec<(Route, f64)>,
     pub fixed_cost: f64,
     pub preprocessing: crate::master::preprocessing::Report,
-    pub snapshot: Option<Rc<NodeSnapshot>>,
+    pub snapshot: Option<Rc<NodeSnapshot<D>>>,
     pub simplex_iterations: usize,
     pub inherited_cuts: usize,
     pub master: Output,
@@ -70,11 +70,11 @@ pub struct RootOutput {
 }
 /// Immutable solved-node state, shared by siblings and copied only when a
 /// descendant or a trial is evaluated. No sibling mutates this model.
-pub struct NodeSnapshot {
+pub struct NodeSnapshot<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     master: ClpMaster,
-    problem: RootProblem,
+    problem: RootProblem<D>,
     cut: CutState,
-    pricing: Solver,
+    pricing: Solver<D>,
     incumbent: f64,
     routes: Vec<Route>,
     warm: column_generation::WarmStart,
@@ -134,8 +134,8 @@ enum Separator {
     Relaxation,
 }
 
-struct State {
-    solver: Solver,
+struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    solver: Solver<D>,
     routes: Vec<Route>,
     /// Arc sequence -> tag of each entry in `routes`.
     route_tags: std::collections::HashMap<String, i32>,
@@ -151,7 +151,7 @@ struct State {
 }
 
 /// Stable tag of the first route with this ordered arc path and resource schedule.
-fn register(state: &mut State, route: &Route) -> Result<i32> {
+fn register<const D: usize>(state: &mut State<D>, route: &Route) -> Result<i32> {
     let identity = route.identity();
     if let Some(&tag) = state.route_tags.get(&identity) {
         return Ok(tag);

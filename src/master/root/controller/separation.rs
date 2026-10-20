@@ -9,7 +9,7 @@ pub(super) fn separation_gap_closed(value: f64, incumbent: f64) -> bool {
     gap <= value.abs().max(incumbent.abs()) * 1e-10 + 1e-6 || gap / incumbent.abs() <= 1e-9
 }
 
-impl RootController {
+impl<const D: usize> RootController<D> {
     pub(super) fn separate_round(&mut self, master: &mut ClpMaster, tags: &[i32]) -> Result<usize> {
         let mut state = self.state.borrow_mut();
         let state = &mut *state;
@@ -86,7 +86,7 @@ impl RootController {
             if values[index] > 1e-9 {
                 let route = &state.routes[tag];
                 fractional.push(FractionalColumn {
-                    vertices: State::customers(route),
+                    vertices: State::<D>::customers(route),
                     value: values[index],
                     graph_id: -1,
                     enumerated: state.is_enumerated(route),
@@ -97,7 +97,7 @@ impl RootController {
         // New rows are then shifted once for the residual master below.
         for (route, quantity) in &self.problem.fixed_routes {
             fractional.push(FractionalColumn {
-                vertices: State::customers(route),
+                vertices: State::<D>::customers(route),
                 value: f64::from(*quantity),
                 graph_id: -1,
                 enumerated: true,

@@ -1,6 +1,6 @@
 //! Elementary enumeration, inspection, and reduced-cost fixing.
 use super::*;
-impl Solver {
+impl<const D: usize> Solver<D> {
     pub fn enumerate(&mut self, cutoff: f64) -> Result<Vec<crate::Route>> {
         if self.engine.is_none() {
             self.price_phase(0, 1, false)?;

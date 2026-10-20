@@ -1,6 +1,6 @@
 //! Native fixing/enumeration mode dispatch and limits.
 use super::*;
-impl Solver {
+impl<const D: usize> Solver<D> {
     pub fn run_fixing_enumeration(
         &mut self,
         mode: i32,
@@ -31,7 +31,9 @@ impl Solver {
         let outcome = (|| {
             if mode == 0 {
                 self.controls.time_limit = Duration::try_from_secs_f64(
-                    self.options.get("BALDESredCostFixingTimeThreshold")?.max(0.),
+                    self.options
+                        .get("BALDESredCostFixingTimeThreshold")?
+                        .max(0.),
                 )
                 .map_err(|_| invalid("fixing time threshold"))?;
             }

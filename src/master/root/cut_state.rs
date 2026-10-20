@@ -40,14 +40,14 @@ impl CutState {
 }
 
 impl CutState {
-    pub(super) fn entries(
+    pub(super) fn entries<const D: usize>(
         &self,
-        solver: &Solver,
+        solver: &Solver<D>,
         route: &Route,
         enumerated: bool,
     ) -> Result<Vec<(usize, f64)>> {
         let mut entries = vec![];
-        let customers = State::customers(route);
+        let customers = State::<D>::customers(route);
         for (cut, row) in self.capacity_cuts.iter().zip(&self.capacity_rows) {
             if let Some(row) = row {
                 let coefficient = cut.coefficient(&customers);
@@ -67,7 +67,9 @@ impl CutState {
         if self.rows.iter().all(Option::is_none) {
             return Ok(entries);
         }
-        let path = solver.cuts.route(&solver.graph, &State::customers(route))?;
+        let path = solver
+            .cuts
+            .route(&solver.graph, &State::<D>::customers(route))?;
         for (index, row) in self.rows.iter().enumerate() {
             let Some(row) = *row else {
                 continue;

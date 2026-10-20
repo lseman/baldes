@@ -1,18 +1,18 @@
 use super::*;
 
-impl LabelStorage {
+impl<const D: usize> LabelStorage<D> {
     #[inline]
     pub fn dominates(
-        g: &Graph,
-        a: &StoredLabel,
-        b: &StoredLabel,
+        g: &Graph<D>,
+        a: &StoredLabel<D>,
+        b: &StoredLabel<D>,
         forward: bool,
         test: InsertionTest,
         hop_limit: bool,
         cuts: &[DominanceDescriptor],
     ) -> bool {
         a.branch_state == b.branch_state
-            && Self::dominates_hot(
+            && Self::dominates_hot_slices(
                 g,
                 &HotLabel::of(a),
                 &HotLabel::of(b),
@@ -20,17 +20,18 @@ impl LabelStorage {
                 test,
                 hop_limit,
                 cuts,
-                || (&a.cut_words, &b.cut_words),
+                || (&a.cut_words[..], &b.cut_words[..]),
             )
     }
 
     /// `dominates` on the packed fields; `words` loads the cut words only
-    /// when full dominance reaches a nonempty cut list.
+    /// when full dominance reaches a nonempty cut list. Every scalar
+    /// coordinate is held in the fixed-size hot cache.
     #[inline(always)]
     pub fn dominates_hot<'w>(
-        g: &Graph,
-        a: &HotLabel,
-        b: &HotLabel,
+        g: &Graph<D>,
+        a: &HotLabel<D>,
+        b: &HotLabel<D>,
         forward: bool,
         test: InsertionTest,
         hop_limit: bool,
@@ -45,9 +46,9 @@ impl LabelStorage {
 
     #[inline(always)]
     pub(crate) fn dominates_hot_slices<'w>(
-        g: &Graph,
-        a: &HotLabel,
-        b: &HotLabel,
+        g: &Graph<D>,
+        a: &HotLabel<D>,
+        b: &HotLabel<D>,
         forward: bool,
         test: InsertionTest,
         hop_limit: bool,
@@ -57,16 +58,12 @@ impl LabelStorage {
         if hop_limit && a.hops > b.hops {
             return false;
         }
-        if !g.resources.iter().enumerate().all(|(r, kind)| match kind {
-            ResourceKind::Disposable => {
-                if forward {
-                    a.resources[r] <= b.resources[r] + EPSILON
-                } else {
-                    b.resources[r] - EPSILON <= a.resources[r]
-                }
-            }
-            ResourceKind::Equality => equality_resource_dominates(a.resources[r], b.resources[r]),
-        }) {
+        if !crate::labeling::ScalarResourceKernel::<D>::dominates(
+            &g.resources,
+            &a.resources,
+            &b.resources,
+            forward,
+        ) {
             return false;
         }
         if matches!(test, InsertionTest::Full | InsertionTest::ResourcesAndNg) && a.ng & !b.ng != 0
@@ -97,8 +94,8 @@ impl LabelStorage {
     /// as scalars instead of reloading a freshly assembled `HotLabel`.
     #[inline]
     pub(super) fn next_candidate<const PREFIX: bool>(
-        g: &Graph,
-        cols: &HotColumns,
+        g: &Graph<D>,
+        cols: &HotColumns<D>,
         from: usize,
         threshold: f64,
         candidate_r0: f64,

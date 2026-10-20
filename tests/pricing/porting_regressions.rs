@@ -2,8 +2,8 @@
 use baldes::{pricing::Solver, Graph, Route};
 use std::collections::BTreeMap;
 
-fn solver(symmetric: bool, cut: bool) -> Solver {
-    let mut s = Solver::new(5, 1).unwrap();
+fn solver(symmetric: bool, cut: bool) -> Solver<2> {
+    let mut s = Solver::<2>::new(5, 1).unwrap();
     s.graph.vertices[0].elements.clear();
     s.graph.vertices[4].elements.clear();
     for v in 0..5 {
@@ -55,9 +55,9 @@ fn assert_costs(actual: &BTreeMap<Vec<i32>, f64>, expected: &BTreeMap<Vec<i32>, 
 
 // Exhaustive elementary paths: no buckets, dominance, completion bounds or
 // production coefficient routines. The optional cut charges a support once.
-fn exhaustive(g: &Graph, cut: bool, threshold: f64) -> BTreeMap<Vec<i32>, f64> {
+fn exhaustive(g: &Graph<2>, cut: bool, threshold: f64) -> BTreeMap<Vec<i32>, f64> {
     fn walk(
-        g: &Graph,
+        g: &Graph<2>,
         v: usize,
         seen: u64,
         q: Vec<f64>,
@@ -532,14 +532,14 @@ fn transformed_symmetry_preserves_routes_after_dual_changes_and_fixing() {
 #[test]
 fn mirrored_fixing_preserves_two_resource_frontiers() {
     for seed in 0..16 {
-        let mut s = Solver::new(5, 2).unwrap();
+        let mut s = Solver::<2>::new(5, 2).unwrap();
         s.graph.elementary = true;
         s.enumeration_preserve_arc_paths = true;
         for v in 0..5 {
             s.graph.set_bounds(v, 0, 2., 8.).unwrap();
             s.graph.set_bounds(v, 1, 1., 10.).unwrap();
         }
-        s.graph.initial = [Some(2.), Some(1.)];
+        s.graph.initial = [Some(2.), Some(1.)].into();
         for u in 0..4 {
             for v in 1..5 {
                 if u == v || (u == 0 && v == 4) {
@@ -549,7 +549,7 @@ fn mirrored_fixing_preserves_two_resource_frontiers() {
                 let key = a.min(b) * 7 + a.max(b) * 3 + seed;
                 let id = s.graph.add_arc(u, v, (key % 9) as f64 / 4.).unwrap();
                 let arc = s.graph.arc_mut(id).unwrap();
-                arc.consumption = [1. + (key % 2) as f64, 1. + (key % 3) as f64];
+                arc.consumption = [1. + (key % 2) as f64, 1. + (key % 3) as f64].into();
                 arc.reduced_cost -= [0., 1., 2., 0.5, 0.][v];
             }
         }

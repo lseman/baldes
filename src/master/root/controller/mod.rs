@@ -18,14 +18,14 @@ use separation::separation_gap_closed;
 #[path = "tests.rs"]
 mod synchronization_tests;
 
-pub(super) struct RootController {
-    pub(super) problem: Rc<RootProblem>,
-    pub(super) state: Rc<RefCell<State>>,
-    pub(super) checkpoint: Option<PricingCheckpoint>,
+pub(super) struct RootController<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    pub(super) problem: Rc<RootProblem<D>>,
+    pub(super) state: Rc<RefCell<State<D>>>,
+    pub(super) checkpoint: Option<PricingCheckpoint<D>>,
     pub(super) certificate_search: super::certificate::SearchCache,
 }
 
-impl Controller<ClpMaster> for RootController {
+impl<const D: usize> Controller<ClpMaster> for RootController<D> {
     fn restore_feasible_columns(&mut self, duals: &[f64]) -> Result<Vec<Column>> {
         super::restoration::columns(&self.problem, &mut self.state.borrow_mut(), duals)
     }

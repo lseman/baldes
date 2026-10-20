@@ -3,8 +3,8 @@ use baldes::{
     Graph,
 };
 
-fn solver() -> Solver {
-    let mut s = Solver::new(5, 1).unwrap();
+fn solver() -> Solver<2> {
+    let mut s = Solver::<2>::new(5, 1).unwrap();
     for v in 0..5 {
         s.graph.set_bounds(v, 0, 0., 3.).unwrap();
     }
@@ -236,7 +236,7 @@ fn randomized_branch_pricing_with_cuts_matches_complete_paths() {
             (seed >> 32) as usize
         };
         let n = 3 + next() % 4;
-        let mut s = Solver::new(n + 2, 1).unwrap();
+        let mut s = Solver::<2>::new(n + 2, 1).unwrap();
         for v in 0..n + 2 {
             s.graph.set_bounds(v, 0, 0., n as f64).unwrap();
         }
@@ -263,7 +263,7 @@ fn randomized_branch_pricing_with_cuts_matches_complete_paths() {
         s.set_option("BALDESuseBidirectionalSearch", (case % 3) as f64)
             .unwrap();
         fn dfs(
-            s: &Solver,
+            s: &Solver<2>,
             c: RyanFosterConstraint,
             v: usize,
             vertices: &mut Vec<usize>,
@@ -429,7 +429,7 @@ fn aggregate_branches_match_fresh_and_inherited_masters() {
 fn equality_bucket_jumps_cannot_invent_resource_consumption() {
     use baldes::graph::ResourceKind;
     for mode in [0., 1., 2.] {
-        let mut s = Solver::new(3, 1).unwrap();
+        let mut s = Solver::<2>::new(3, 1).unwrap();
         s.graph.resources[0] = ResourceKind::Equality;
         for v in 0..3 { s.graph.set_bounds(v, 0, 0., 3.).unwrap(); }
         s.graph.set_bounds(2, 0, 3., 3.).unwrap();

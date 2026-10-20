@@ -5,8 +5,8 @@ use crate::master::branching::ClusterBranchingOptions;
 /// Deterministic MST clustering of customers, excluding the split depot.
 /// Distances use the cheaper physical arc in either direction. Missing edges
 /// are allowed, but a disconnected customer graph has no automatic partition.
-pub fn partition(
-    problem: &RootProblem,
+pub fn partition<const D: usize>(
+    problem: &RootProblem<D>,
     options: &ClusterBranchingOptions,
 ) -> Result<Vec<Vec<usize>>> {
     if !options.theta.is_finite() || options.theta < 0. {
@@ -107,9 +107,9 @@ pub fn partition(
     Ok(groups)
 }
 
-pub(super) fn candidates(
-    problem: &RootProblem,
-    result: &root::RootOutput,
+pub(super) fn candidates<const D: usize>(
+    problem: &RootProblem<D>,
+    result: &root::RootOutput<D>,
     groups: &[Vec<usize>],
 ) -> Vec<super::candidates::BranchCandidate> {
     use super::candidates::BranchCandidate;
@@ -156,7 +156,7 @@ mod tests {
     use super::*;
     #[test]
     fn mst_partition_and_aggregate_coefficients_match_physical_crossings() {
-        let mut graph = crate::Graph::new(6, 0).unwrap();
+        let mut graph = crate::Graph::<2>::new(6, 0).unwrap();
         for tail in 0..5 {
             for head in 1..6 {
                 if tail == head {

@@ -58,7 +58,7 @@ impl BranchConstraint {
             Self::RyanFoster(_) | Self::AccumulatedResource(_) => (RowSense::LessEqual, 0.),
         }
     }
-    pub fn validate(&self, p: &RootProblem) -> Result<()> {
+    pub fn validate<const D: usize>(&self, p: &RootProblem<D>) -> Result<()> {
         if !self.row().1.is_finite() {
             return Err(invalid("finite branch RHS required"));
         }
@@ -77,7 +77,7 @@ impl BranchConstraint {
         }
     }
     /// Per-arc contribution, so new columns and pricing receive identical rows.
-    pub(crate) fn arc_coefficient(&self, p: &RootProblem, arc: usize) -> f64 {
+    pub(crate) fn arc_coefficient<const D: usize>(&self, p: &RootProblem<D>, arc: usize) -> f64 {
         match self {
             Self::ArcFlow { arc: target, .. } => arc_flow::coefficient(arc, *target),
             Self::NumberOfVehicles { graph_id, .. } => {
@@ -100,7 +100,7 @@ impl BranchConstraint {
             ),
         }
     }
-    pub fn coefficient(&self, p: &RootProblem, route: &Route) -> f64 {
+    pub fn coefficient<const D: usize>(&self, p: &RootProblem<D>, route: &Route) -> f64 {
         match self {
             Self::RyanFoster(c) => ryan_foster::coefficient(*c, route),
             Self::AccumulatedResource(c) => accumulated_resource::coefficient(*c, route),

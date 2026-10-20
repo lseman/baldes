@@ -52,7 +52,7 @@ fn invalid_route_tags_do_not_bypass_refresh_validation() {
 
 #[test]
 fn owned_checkpoint_restores_warm_pool_rows_and_routes_after_pricing_timeout() {
-    let mut graph = Graph::new(3, 1).unwrap();
+    let mut graph = Graph::<2>::new(3, 1).unwrap();
     for v in 0..3 {
         graph.set_bounds(v, 0, 0., 10.).unwrap();
     }

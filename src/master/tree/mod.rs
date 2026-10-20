@@ -127,11 +127,11 @@ impl TreeOutput {
     }
 }
 type Branch = BranchConstraint;
-struct Node {
+struct Node<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     observation: Option<(candidates::BranchCandidate, usize, f64)>,
     branches: Vec<Branch>,
     bound: f64,
-    parent: Option<Rc<root::NodeSnapshot>>,
+    parent: Option<Rc<root::NodeSnapshot<D>>>,
 }
 struct Pool {
     routes: Vec<Route>,
@@ -139,7 +139,7 @@ struct Pool {
     seen: HashSet<Vec<i32>>,
 }
 impl Pool {
-    fn add(&mut self, problem: &RootProblem, arcs: &[i32]) {
+    fn add<const D: usize>(&mut self, problem: &RootProblem<D>, arcs: &[i32]) {
         if self.seen.contains(arcs) {
             return;
         }
@@ -156,7 +156,7 @@ impl Pool {
 }
 /// Reconstruct and check every incumbent route, including resources and
 /// repeated customers. Never trust a supplied cost, node list or LP tag alone.
-fn feasible_route(problem: &RootProblem, ids: &[i32]) -> Option<Route> {
+fn feasible_route<const D: usize>(problem: &RootProblem<D>, ids: &[i32]) -> Option<Route> {
     problem.elementary_route(ids)
 }
 fn closed(bound: f64, incumbent: f64, options: &TreeOptions) -> bool {
@@ -167,7 +167,10 @@ fn closed(bound: f64, incumbent: f64, options: &TreeOptions) -> bool {
                     - options.absolute_gap
                     - options.relative_gap * incumbent.abs().max(bound.abs()))
 }
-fn branch_problem(problem: &RootProblem, branches: &[Branch]) -> Result<RootProblem> {
+fn branch_problem<const D: usize>(
+    problem: &RootProblem<D>,
+    branches: &[Branch],
+) -> Result<RootProblem<D>> {
     let mut child = problem.clone();
     for branch in branches {
         child.branch(branch.clone())?;
@@ -177,10 +180,10 @@ fn branch_problem(problem: &RootProblem, branches: &[Branch]) -> Result<RootProb
 fn budget_error(error: &crate::core::error::OrError) -> bool {
     error.message.contains("time limit") || error.message.contains("label limit")
 }
-fn evaluate(
-    parent: Option<&Rc<root::NodeSnapshot>>,
-    previous: Option<&root::NodeSnapshot>,
-    problem: &RootProblem,
+fn evaluate<const D: usize>(
+    parent: Option<&Rc<root::NodeSnapshot<D>>>,
+    previous: Option<&root::NodeSnapshot<D>>,
+    problem: &RootProblem<D>,
     branches: &[Branch],
     _pool: &Pool,
     options: &TreeOptions,
@@ -189,7 +192,7 @@ fn evaluate(
     max_iterations: usize,
     floor: usize,
     capture_state: bool,
-) -> Result<root::RootOutput> {
+) -> Result<root::RootOutput<D>> {
     let mut controls = options.root.clone();
     controls.capture_state = capture_state;
     controls.node_depth = branches.len();

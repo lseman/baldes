@@ -3,9 +3,9 @@ use super::*;
 use crate::enumeration::PathDomainLimits;
 use std::time::{Duration, Instant};
 
-pub(super) fn columns(
-    problem: &RootProblem,
-    state: &mut State,
+pub(super) fn columns<const D: usize>(
+    problem: &RootProblem<D>,
+    state: &mut State<D>,
     duals: &[f64],
 ) -> Result<Vec<Column>> {
     let now = Instant::now();
