@@ -394,3 +394,42 @@ successful root solve and is not counted as a convergence speedup.
 Regression checks compare ordering against explicit elimination for every
 undirected graph through five vertices and test packed masks across word
 boundaries. IPM LP/KKT tests and routing master integration tests also pass.
+
+## IPM convergence on R201 (October 20, 2026)
+
+The feasibility stall above is addressed by objective normalization and wide
+upper-bound initialization. After matrix equilibration, the internal objective
+is divided by `max(1, ||c||∞)`. Dual recovery and dual/gap convergence checks
+undo this scaling. For upper bounds above two, the initial unit primal is paired
+with `v = upper - 1` and `w = 1/v`, so the upper-bound residual starts at zero
+and its complementarity product remains one. This avoids the initial `1e12`
+bound residual and homogeneous-scale collapse seen in routing masters.
+Primal/dual feasibility remains `1e-9`; regularization, factorization, refinement,
+and the routing gap policy are unchanged.
+
+Release builds with `--features clp`, instance `instances/R201.txt`, and
+`--time 120` produced these single-run root results. Commands used
+`vrptw instances/R201.txt --master BACKEND`, with `--reference-ng` for the
+reference-neighborhood row. Runs were not CPU-pinned and some validation ran
+concurrently; these timings establish completion, not a controlled speedup.
+
+| Master / neighborhoods | Status | CG iterations | Root LP | Seconds |
+| --- | --- | ---: | ---: | ---: |
+| Previous IPM / default | Numerical failure | about 59 | incomplete | 6.95 |
+| Updated IPM / default | Optimal | 290 | 1140.130145330 | 69.33 |
+| Updated IPM / reference NG | Optimal | 312 | 1140.130144931 | 82.84 |
+| Clp / default | Optimal | 341 | 1140.130144534 | 1.48 |
+
+`Optimal` here is root column-generation termination with numerical bounds,
+not an integer routing solution or a certified bound. The default IPM result
+agrees with Clp within `8e-7`. IPM master solves still consume 68.62 seconds of
+69.33 seconds, so repeated master factorization/solve work remains the next
+performance target.
+
+The captured failing master is a checked-in regression under
+`tests/ipm/fixtures/`, with an independently computed simplex objective. The
+updated solver passes both relaxed and strict gap checks at `1e-9` feasibility;
+the baseline and objective-normalization-only variants fail this regression.
+An initialization-only variant solves that captured LP but fails on a later
+routing master. Local diagnostic logs and JSON results are in
+`results/ipm-convergence-20261020/` in the convergence worktree.

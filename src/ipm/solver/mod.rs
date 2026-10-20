@@ -182,6 +182,12 @@ pub fn solve(model: &ModelData, options: &Options) -> Result<Solution> {
         f.c.iter()
             .zip(&col_scale)
             .fold(0.0_f64, |v, (c, s)| v.max((c / s).abs()));
+    // Keep the objective comparable to the equilibrated constraint matrix.
+    // Residual checks and recovered multipliers below undo this scaling.
+    let cost_scale = 1. / norm(&f.c).max(1.);
+    for c in &mut f.c {
+        *c *= cost_scale;
+    }
     let n = f.c.len();
     let m = f.b.len();
     let nu = f.upper.len();
@@ -195,6 +201,16 @@ pub fn solve(model: &ModelData, options: &Options) -> Result<Solution> {
         tau: 1.,
         kappa: 1.,
     };
+    for (i, &(_, upper)) in f.upper.iter().enumerate() {
+        if upper > 2. {
+            // x = 1 and tau = 1: satisfy wide upper bounds initially,
+            // with v*w = 1 like the other complementarity products.
+            // Unit slacks would introduce residuals of order upper and
+            // collapse the homogeneous scale on routing masters (u=1e12).
+            q.v[i] = upper - 1.;
+            q.w[i] = 1. / q.v[i];
+        }
+    }
     let mut rp = vec![1.0_f64; n];
     let mut rd = vec![1.0_f64; m];
     let mut rg = 1.0_f64;
@@ -221,8 +237,8 @@ pub fn solve(model: &ModelData, options: &Options) -> Result<Solution> {
             r.d.iter()
                 .zip(&col_scale)
                 .fold(0.0_f64, |v, (d, s)| v.max((d / s).abs()))
-                / (q.tau * (1. + unscaled_cost_norm)),
-            (dot(&f.c, &q.x) - dual_obj).abs() / (q.tau + dual_obj.abs()),
+                / (q.tau * cost_scale * (1. + unscaled_cost_norm)),
+            (dot(&f.c, &q.x) - dual_obj).abs() / (cost_scale * q.tau + dual_obj.abs()),
         );
         // Verify original coordinates too, since equilibration can conceal
         // large original-unit row errors.
@@ -241,7 +257,7 @@ pub fn solve(model: &ModelData, options: &Options) -> Result<Solution> {
         if options.gap_tolerance.is_some() {
             // Recovery includes objective contributions from shifted/fixed variables.
             metrics.2 = (dot(&f.c, &q.x) - dual_obj).abs()
-                / (q.tau * (1. + dot(&model.c, &original).abs()));
+                / (cost_scale * q.tau * (1. + dot(&model.c, &original).abs()));
         }
         if metrics.0 <= tol
             && original_p <= tol
@@ -440,7 +456,7 @@ pub fn solve(model: &ModelData, options: &Options) -> Result<Solution> {
         q.y.iter()
             .zip(&row_scale)
             .zip(&f.row_sign)
-            .map(|((y, r), s)| y * r * s / q.tau)
+            .map(|((y, r), s)| y * r * s / q.tau / cost_scale)
             .collect();
     let objective = dot(&model.c, &primal);
     if !finite(&primal) || !finite(&dual) || !objective.is_finite() {

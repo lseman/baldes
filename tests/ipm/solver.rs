@@ -462,3 +462,108 @@ fn relaxed_optimality_keeps_primal_and_dual_feasibility_tight() {
         }).is_err());
     }
 }
+
+/// Exact master captured immediately before the R201 strict-interior failure.
+/// The simplex reference objective is recorded in fixtures/README.md.
+#[test]
+fn r201_master_with_wide_bounds_converges() {
+    let mut lines = include_str!("fixtures/r201_master.txt").lines();
+    let mut header = lines.next().unwrap().split_whitespace();
+    let m: usize = header.next().unwrap().parse().unwrap();
+    let n: usize = header.next().unwrap().parse().unwrap();
+    let gap: f64 = header.next().unwrap().parse().unwrap();
+    let b = lines
+        .next()
+        .unwrap()
+        .split_whitespace()
+        .map(|s| s.parse().unwrap())
+        .collect();
+    let sense = lines
+        .next()
+        .unwrap()
+        .split_whitespace()
+        .map(|s| match s {
+            "0" => Sense::Equal,
+            "1" => Sense::LessEqual,
+            "2" => Sense::GreaterEqual,
+            _ => panic!("invalid row sense"),
+        })
+        .collect();
+    let mut entries = Vec::new();
+    let mut c = Vec::new();
+    let mut lower = Vec::new();
+    let mut upper = Vec::new();
+    for (j, line) in lines.enumerate() {
+        let mut fields = line.split_whitespace();
+        c.push(fields.next().unwrap().parse().unwrap());
+        lower.push(fields.next().unwrap().parse().unwrap());
+        upper.push(fields.next().unwrap().parse().unwrap());
+        for field in fields {
+            let (i, value) = field.split_once(':').unwrap();
+            entries.push((i.parse().unwrap(), j, value.parse().unwrap()));
+        }
+    }
+    assert_eq!(c.len(), n);
+    let lp = ModelData {
+        a: SparseMatrix::from_triplets(m, n, &entries).unwrap(),
+        b,
+        c,
+        lower,
+        upper,
+        sense,
+    };
+    for gap_tolerance in [Some(gap), None] {
+        let s = solve(
+            &lp,
+            &Options {
+                tolerance: 1e-9,
+                gap_tolerance,
+                ..Options::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(s.status, Status::Optimal, "{s:?}");
+        assert!(s.iterations < 100, "iterations={}", s.iterations);
+        assert!(s.primal_residual <= 1e-9, "{}", s.primal_residual);
+        assert!(s.dual_residual <= 1e-9, "{}", s.dual_residual);
+        assert!(s.relative_gap <= gap_tolerance.unwrap_or(1e-9));
+        assert!(
+            (s.objective - 937.6319384978376).abs() < 2e-6,
+            "{}",
+            s.objective
+        );
+    }
+}
+
+#[test]
+fn objective_scaling_recovers_original_duals() {
+    for factor in [1e-6, 1., 1e6] {
+        let lp = model(
+            &[&[1., 1.], &[1., 0.]],
+            &[3., 1.],
+            &[-factor, -2. * factor],
+            &[0., 0.],
+            &[1e12, 1e12],
+            &[Sense::LessEqual, Sense::GreaterEqual],
+        );
+        for solver in [SolverType::HiPO, SolverType::NormalEquations] {
+            let s = solve(
+                &lp,
+                &Options {
+                    solver,
+                    tolerance: 1e-9,
+                    ..Options::default()
+                },
+            )
+            .unwrap();
+            assert_eq!(s.status, Status::Optimal, "{s:?}");
+            assert!(s.primal_residual <= 1e-9);
+            assert!(s.dual_residual <= 1e-9);
+            assert!(s.relative_gap <= 1e-9);
+            assert!((s.objective + 5. * factor).abs() < 1e-7 * factor.max(1.));
+            for (&actual, expected) in s.dual.iter().zip([-2. * factor, factor]) {
+                assert!((actual - expected).abs() < 1e-7 * factor.max(1.), "{s:?}");
+            }
+        }
+    }
+}

@@ -115,9 +115,13 @@ Deliberate differences from C++:
 - Ruiz equilibration is implemented and enabled by default (five passes).
   The C++ header declares scaling routines, but its optimization loop does
   not invoke them. Set `scaling_iterations: 0` to disable scaling.
+- The internal objective is normalized after equilibration. Dual recovery and
+  dual/gap checks undo objective scaling, retaining tolerances in original
+  units. Wide upper bounds start with feasible slacks and unit complementarity
+  products, avoiding a large artificial residual from bounds such as `1e12`.
 
-There is no integration with the BALDES restricted master or its LP backend
-selection yet. Use `baldes::ipm` independently. Performance parity with the
+The restricted master selects this solver with `--master ipm`; the API is also
+usable independently. Performance parity with the
 C++ solver and large-instance robustness have not been established; there is
 no parallel factorization, relaxed supernode amalgamation or nested dissection.
 
@@ -135,3 +139,7 @@ vectors. The three LP fixtures from `solvers/tests/test_ip_solver.cpp` are
 included as Rust regressions. The original C++ test executable was also built
 with C++20/Eigen/BLAS and run successfully during the port. These tests verify
 numerical results and residuals, not identical iteration histories or factors.
+
+A captured R201 master checks convergence at `1e-9` feasibility with both
+relaxed and strict gap tolerances, against an independent simplex objective.
+Objective-scale tests check original-unit dual recovery with both backends.
