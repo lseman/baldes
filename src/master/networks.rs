@@ -14,6 +14,7 @@ use std::{
 
 #[path = "network_bounds.rs"]
 mod bounds;
+pub mod format;
 mod lifecycle;
 mod tree;
 pub use lifecycle::{Assignment, FixedRoute, NodeSnapshot, RowCoefficients};
@@ -34,6 +35,39 @@ pub struct Network<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
 pub struct Problem<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub rows: Vec<Row>,
     pub networks: Vec<Network<D>>,
+}
+
+impl<const D: usize> Problem<D> {
+    /// Validate every network and shared coefficient, even before a zero-budget run.
+    pub fn validate(&self) -> Result<()> {
+        if self.networks.is_empty() {
+            return Err(invalid("network model requires at least one network"));
+        }
+        let mut ids = HashSet::new();
+        for network in &self.networks {
+            network.graph.validate()?;
+            if network.id < 0
+                || !ids.insert(network.id)
+                || network.arc_entries.len() != network.graph.arcs.len()
+                || !network.multiplicity.lower.is_finite()
+                || !network.multiplicity.upper.is_finite()
+                || network.multiplicity.lower < 0.
+                || network.multiplicity.upper < network.multiplicity.lower
+                || network
+                    .arc_entries
+                    .iter()
+                    .flatten()
+                    .chain(&network.route_entries)
+                    .any(|&(row, value)| row >= self.rows.len() || !value.is_finite())
+            {
+                return Err(invalid("network identity, multiplicity or coefficients"));
+            }
+        }
+        if self.rows.iter().any(|row| !row.rhs.is_finite()) {
+            return Err(invalid("network master row RHS"));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -314,29 +348,7 @@ pub fn solve<const D: usize>(problem: Problem<D>, options: Options) -> Result<Ou
         ));
     }
     validate_options(&options)?;
-    let mut ids = HashSet::new();
-    for network in &problem.networks {
-        network.graph.validate()?;
-        if network.id < 0
-            || !ids.insert(network.id)
-            || network.arc_entries.len() != network.graph.arcs.len()
-            || !network.multiplicity.lower.is_finite()
-            || !network.multiplicity.upper.is_finite()
-            || network.multiplicity.lower < 0.
-            || network.multiplicity.upper < network.multiplicity.lower
-            || network
-                .arc_entries
-                .iter()
-                .flatten()
-                .chain(&network.route_entries)
-                .any(|&(row, value)| row >= problem.rows.len() || !value.is_finite())
-        {
-            return Err(invalid("network identity, multiplicity or coefficients"));
-        }
-    }
-    if problem.rows.iter().any(|row| !row.rhs.is_finite()) {
-        return Err(invalid("network master row RHS"));
-    }
+    problem.validate()?;
     let deadline = Instant::now()
         .checked_add(options.cg.time_limit)
         .ok_or_else(|| invalid("network time limit"))?;

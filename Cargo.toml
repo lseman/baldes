@@ -36,13 +36,16 @@ default = []
 simd = []
 # Clp restricted master and column-generation loop. Builds Clp 1.17.10 and
 # CoinUtils 2.11 from the vendor/ submodules.
-clp = ["dep:cc"]
+clp = ["dep:cc", "dep:serde", "dep:serde_json"]
 # HiGHS LP backend and integer solving (including optional Clp-tree node MIP).
 # Links against the system
 # HiGHS shared library (libhighs.so) or a vendored copy placed in vendor/highs/.
 highs = ["dep:pkg-config"]
 
 [dependencies]
+serde = { version = "=1.0.204", features = ["derive"], optional = true }
+# Preserve the crate MSRV for the optional JSON front end.
+serde_json = { version = "=1.0.122", features = ["float_roundtrip"], optional = true }
 
 [build-dependencies]
 cc = { version = "1", features = ["parallel"], optional = true }
@@ -164,4 +167,9 @@ path = "tests/ipm/solver.rs"
 [[test]]
 name = "networks"
 path = "tests/master/networks.rs"
+required-features = ["clp"]
+
+[[test]]
+name = "networks_cli"
+path = "tests/api/networks_cli.rs"
 required-features = ["clp"]

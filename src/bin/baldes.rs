@@ -1,6 +1,9 @@
+mod networks_cli;
 use baldes::master::root::RootOptions;
 use baldes::inputs::{Instance, Rounding};
 const HELP: &str = "Usage: baldes <vrptw|cvrp|hgs> INSTANCE [OPTIONS]
+
+Additional command: baldes networks MODEL.json [OPTIONS] (see networks --help)
 
 Instance types (Solomon-format or CVRPLIB .vrp input):
   vrptw                 Vehicle routing with time windows
@@ -56,6 +59,7 @@ fn run() -> std::result::Result<(), String> {
         println!("{HELP}");
         return Ok(());
     }
+    if kind == "networks" { return networks_cli::run(args.collect()); }
     if kind != "vrptw" && kind != "cvrp" && kind != "hgs" {
         return Err(format!("unknown instance type: {kind}\n\n{HELP}"));
     }

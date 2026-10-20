@@ -6,3 +6,14 @@ __all__ = [
     "Customer", "Instance", "Iteration", "Phase", "RootResult", "RootRoute",
     "Route", "Solver", "__version__", "has_clp", "has_highs", "resource_dimensions", "solve_root",
 ]
+
+from .networks import (
+    NetworkAssignment, NetworkNode, NetworkProblem, NetworkResult, NetworkRoute,
+    NetworkRowCoefficients, PricingArc, PricingNetwork, PricingResource, SharedRow,
+    solve_networks,
+)
+__all__ += [
+    "NetworkAssignment", "NetworkNode", "NetworkProblem", "NetworkResult", "NetworkRoute",
+    "NetworkRowCoefficients", "PricingArc", "PricingNetwork", "PricingResource", "SharedRow",
+    "solve_networks",
+]

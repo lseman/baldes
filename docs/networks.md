@@ -102,7 +102,7 @@ but a new original-domain bound stays unknown.
 
 The supported lifecycle uses additive rows. Automatic nonlinear cut separation,
 all-network enumeration/MIP transfer, other branching families, stronger
-resource-aware certificates, and CLI/C/Python dispatch remain open. The existing
+resource-aware certificates and C dispatch remain open. The existing
 single-network routing entry points retain their current behavior.
 
 ## Validation
@@ -117,4 +117,102 @@ enumeration gives integer value `2`, matching both children and the tree.
 
 ```sh
 cargo test --offline --features clp --test networks
+```
+
+## CLI
+
+The `networks` command accepts an explicit JSON model, rather than a Solomon
+instance. It uses Clp and supports both shared roots and the assignment tree:
+
+```sh
+cargo build --offline --features clp --bin baldes
+target/debug/baldes networks examples/networks/triangle.json --json root.json
+target/debug/baldes networks examples/networks/triangle.json --tree --json tree.json
+# JSON alone on stdout, suitable for a pipe:
+target/debug/baldes networks examples/networks/triangle.json --tree --json -
+```
+
+The example has shared LP optimum `1.5` and integer optimum `2`. `--time`,
+`--iterations`, `--nodes`, `--bound-mode`, `--no-stabilization`,
+`--artificial-cost`, `--option NAME=VALUE`, and `--log-interval` control solves.
+Run `baldes networks --help` for details. Unsupported routing flags are errors.
+A successful command means the run completed and produced a result: inspect
+`status` and `open_nodes` for `NodeLimit`, `TimeLimit` or `Incomplete` outcomes.
+
+A model contains `rows` and `networks`. Rows use `sense: "eq" | "le" | "ge"`
+and a finite `rhs`. Each network has a unique nonnegative `id`, a `vertices`
+count, `[lower, upper]` fleet `multiplicity`, and an `arcs` list. Optional
+fields are `source` (default zero), `sink` (default last vertex), `resources`,
+`route_entries` and `ng`. Vertex indices and shared-row indices are zero based.
+Arc IDs are assigned consecutively in each network's input order, starting at
+zero; overlapping IDs in different networks are supported.
+
+Each arc provides `tail`, `head`, `cost` and optional `entries` pairs
+`[shared_row, coefficient]`. Its optional `consumption` and `bounds` arrays
+must match the resource count when nonempty. Arc bounds contain either
+`[lower, upper]` or `null` for each resource. Missing consumption is zero.
+Each resource has `kind: "disposable"` (default) or `"equality"`, an optional
+`initial` value, and optional `bounds` with one `[lower, upper]` pair per vertex.
+Default resource bounds are `[0, 100000]`. Network `route_entries` are charged
+once per route. Optional `ng` contains one neighborhood list per vertex.
+Resources may be empty; the maximum count is the build's scalar capacity.
+Unknown fields, nonfinite values and inconsistent dimensions are rejected.
+
+Result routes retain `network`, local `arcs`, `nodes`, cost, resource states and
+`value`. A root's `route_index` identifies its registry entry for later fixing;
+zero-valued registered routes are retained too. `fixed_routes` lists fixed
+quantities separately. Unknown/nonfinite bounds and absent objectives are JSON
+`null`, not `Infinity`. Root mode reports an LP relaxation; tree mode reports
+an independently replayed integer witness when available. Their `mode` and
+`bound_mode` fields preserve that distinction.
+
+## Python
+
+Install the extension with Clp support (the Python build's default). The typed
+inputs use the same JSON schema as the CLI, allowing a single model to drive
+both interfaces:
+
+```python
+from pybaldes import NetworkProblem, solve_networks
+
+problem = NetworkProblem.from_file("examples/networks/triangle.json")
+root = solve_networks(problem)
+assert root.lp == 1.5
+integer = problem.solve(tree=True)
+assert integer.incumbent == 2.0
+
+candidate = root.snapshot.fractional_assignments()[0]
+left = root.snapshot.branch_assignment(
+    candidate.shared_row, candidate.network, True,
+)
+right = root.snapshot.branch_assignment(
+    candidate.shared_row, candidate.network, False,
+)
+assert left.solve().lp == 2.0
+assert right.solve().lp == 2.0
+assert root.snapshot.solve().lp == 1.5
+```
+
+Models can also be constructed with `NetworkProblem`, `SharedRow`,
+`PricingNetwork`, `PricingArc` and `PricingResource` dataclasses. Use
+`problem.to_json()` to export them for the CLI. `NetworkResult.to_json()`
+serializes owned result data and excludes its native snapshot.
+
+Root snapshots additionally expose `with_row(SharedRow(...), coefficients)`
+with `NetworkRowCoefficients(network, arcs, per_route=0)`, and
+`fix_route(route_index, quantity=1)`. Child operations return independent
+`NetworkNode` objects; `node.solve(**options)` returns a new result and snapshot.
+Quantities fixed in Python must be positive integers. Node handles belong to
+one Python thread and root/node calls keep the GIL. Fresh `tree=True` calls
+release the GIL and return owned results without a resumable snapshot.
+
+The root/tree solve accepts `time_limit`, `max_iterations`, `node_limit`,
+`stabilize`, `bound_mode`, `artificial_cost`, `log_interval` and
+`pricing_options`. Resuming a snapshot accepts node options; `tree=True`
+requires a fresh model. Tree iteration, pricing-batch and individual oracle
+counts aggregate the evaluated nodes; `nodes` and `open_nodes` report tree work.
+
+```sh
+cargo test --offline --features clp --test networks_cli
+python -m pytest python/tests/test_networks.py
 ```

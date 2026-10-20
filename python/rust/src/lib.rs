@@ -21,6 +21,8 @@ use pyo3::prelude::*;
 use std::ffi::CString;
 
 mod root;
+#[cfg(feature = "clp")]
+mod networks;
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -538,5 +540,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("has_highs", cfg!(feature = "highs"))?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     root::register(m)?;
+    #[cfg(feature = "clp")]
+    networks::register(m)?;
     Ok(())
 }

@@ -32,6 +32,9 @@ pub struct AssignmentTreeOutput {
     pub routes: Vec<FixedRoute>,
     pub nodes: usize,
     pub open_nodes: usize,
+    pub iterations: usize,
+    pub pricing_calls: usize,
+    pub oracle_calls: Vec<(i32, usize)>,
 }
 
 impl<const D: usize> NodeSnapshot<D> {
@@ -109,6 +112,7 @@ pub fn solve_assignment_tree<const D: usize>(
     options: AssignmentTreeOptions,
 ) -> Result<AssignmentTreeOutput> {
     validate_options(&options.node)?;
+    problem.validate()?;
     if !options.tolerance.is_finite() || options.tolerance <= 0. || options.tolerance >= 0.5 {
         return Err(invalid(
             "assignment tree tolerance must be between zero and one half",
@@ -125,6 +129,9 @@ pub fn solve_assignment_tree<const D: usize>(
         routes: vec![],
         nodes: 0,
         open_nodes: 1,
+        iterations: 0,
+        pricing_calls: 0,
+        oracle_calls: problem.networks.iter().map(|n| (n.id, 0)).collect(),
     };
     if options.node_limit == 0 {
         result.status = TreeStatus::NodeLimit;
@@ -173,6 +180,17 @@ pub fn solve_assignment_tree<const D: usize>(
             node.solve(node_options(remaining))?
         };
         result.nodes += 1;
+        result.iterations += output.master.iterations;
+        result.pricing_calls += output.master.pricing_calls;
+        for &(id, calls) in &output.oracle_calls {
+            if let Some((_, total)) = result
+                .oracle_calls
+                .iter_mut()
+                .find(|(network, _)| *network == id)
+            {
+                *total += calls;
+            }
+        }
         let bound = output.master.bound;
         if output.master.status != cg::Status::Optimal {
             result.status = if output.master.status == cg::Status::TimeLimit {
