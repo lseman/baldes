@@ -38,8 +38,14 @@ make              # Compile with the saved settings
 `make menuconfig` opens the same window. Use **Up/Down** or **J/K** to select
 an option, **Space/Enter** to change it, **S** to save and exit, and **Q/Escape**
 to discard changes. Text fields accept Enter to confirm, Escape to cancel,
-Backspace to delete and Ctrl-U to clear. Resize to at least 65 columns by 23
-rows; press a key after resizing to refresh the view.
+Backspace to delete and Ctrl-U to clear. **Home/End** jump to the first/last
+setting; **Page Up/Page Down** move five settings at a time.
+
+Settings are grouped into Build, Performance, Toolchain and Cargo. Wide
+terminals show contextual help and a live build summary beside the options;
+compact terminals keep help below the scrolling list. The header tracks
+unsaved changes. The menu adapts automatically when resized, down to 64 columns
+by 20 rows, and respects `NO_COLOR` for a monochrome display.
 
 This is a kernel-style terminal menu, implemented in Rust rather than Linux's
 Kconfig tooling. It requires Make, Rust/Cargo, and POSIX `stty` in an interactive

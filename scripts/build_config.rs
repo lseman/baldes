@@ -7,6 +7,10 @@ use std::fs;
 use std::io::{self, IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+mod build_config_ui;
+use build_config_ui::{Item, State, View};
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -320,22 +324,21 @@ impl Config {
         Ok(())
     }
 
-    fn rows(&self) -> Vec<(String, &'static str)> {
-        let check = |b| if b { "[*]" } else { "[ ]" };
+    fn rows(&self) -> Vec<Item> {
         vec![
-            (format!("Build profile              <{}>",if self.release {"release"}else{"dev"}),"Release enables optimizations; dev builds faster for development."),
-            (format!("{} Clp LP backend",check(self.clp)),"Builds vendor/Clp and vendor/CoinUtils. Needs their submodules and a C++14 compiler."),
-            (format!("{} HiGHS LP / MIP backend",check(self.highs)),"Needs libhighs (32-bit HighsInt): HIGHS_DIR/lib, vendor/highs/lib, pkg-config or system."),
-            (format!("{} baldes command-line program",check(self.cli)),"Selects Clp automatically. Disabling Clp also disables the CLI."),
-            (format!("{} Optimize for this CPU",check(self.native_cpu)),"Adds -C target-cpu=native. Use for local builds; disabled for cross compilation."),
-            (format!("{} Debug symbols in release",check(self.release_debug)),"Adds release debug symbols for profiling. Dev profile keeps Cargo's debug defaults."),
-            (format!("{} Offline Cargo builds",check(self.offline)),"Passes --offline. All required dependencies must already be cached."),
-            (format!("{} Lock dependency versions",check(self.locked)),"Passes --locked so Cargo cannot modify Cargo.lock."),
-            (format!("Parallel jobs              <{}>",if self.jobs==0 {"automatic".into()}else{self.jobs.to_string()}),"Cargo compilation jobs; 0 uses Cargo's automatic setting."),
-            (format!("Target triple              <{}>",if self.target.is_empty(){"host"}else{&self.target}),"Empty means host. Otherwise install that Rust target and its linker first."),
-            (format!("HiGHS installation         <{}>",if self.highs_dir.is_empty(){"auto / environment"}else{&self.highs_dir}),"Optional installation root holding lib/libhighs. Empty preserves HIGHS_DIR from your shell."),
-            (format!("Scalar resource dimensions <{}>", self.resource_dimensions),"Compiled scalar capacity for C/Python and Rust defaults; explicit Rust const counts remain arbitrary."),
-            (format!("{} Optional AVX2 dominance scans", check(self.simd)), "Runtime CPU detection; portable fallback on CPUs without AVX2. Default off."),
+            Item::value(0, "BUILD", "Build profile", if self.release { "Release" } else { "Development" }, "Release optimizes solver performance. Development compiles faster and keeps debug information."),
+            Item::toggle(3, "BUILD", "Command-line program", self.cli, "Build the baldes executable alongside the library. Enabling the CLI selects Clp; disabling Clp also disables the CLI."),
+            Item::toggle(1, "BUILD", "Clp backend", self.clp, "LP solver and routing model store. Builds the Clp and CoinUtils submodules; requires a C++14 compiler."),
+            Item::toggle(2, "BUILD", "HiGHS backend", self.highs, "LP and mixed-integer solver. Requires libhighs with 32-bit HighsInt, discovered through the installation path, pkg-config or system libraries."),
+            Item::toggle(12, "PERFORMANCE", "SIMD acceleration", self.simd, "Enable runtime-dispatched AVX2 dominance scans. Other CPUs use the portable implementation. This opt-in feature does not require native CPU optimization."),
+            Item::toggle(4, "PERFORMANCE", "Native CPU", self.native_cpu, "Optimize for this computer with target-cpu=native. Clear the target triple before enabling; use portable builds for distribution."),
+            Item::toggle(5, "PERFORMANCE", "Release debug symbols", self.release_debug, "Keep debug symbols in release builds for perf and other profilers. The development profile retains Cargo's normal debug settings."),
+            Item::value(8, "PERFORMANCE", "Parallel jobs", if self.jobs == 0 { "Automatic".into() } else { self.jobs.to_string() }, "Maximum parallel Cargo compilation jobs. Enter 0 to let Cargo choose automatically."),
+            Item::value(11, "TOOLCHAIN", "Resource dimensions", self.resource_dimensions.to_string(), "Compiled scalar capacity for C/Python and default Rust types. Explicit const-generic Rust capacities remain independent. Default: 2."),
+            Item::value(9, "TOOLCHAIN", "Target triple", if self.target.is_empty() { "Host" } else { &self.target }, "Leave empty to build for this host. Cross compilation requires the Rust target, a linker and compatible native solver libraries."),
+            Item::value(10, "TOOLCHAIN", "HiGHS installation", if self.highs_dir.is_empty() { "Automatic" } else { &self.highs_dir }, "Optional installation root containing lib/libhighs. Leave empty to preserve HIGHS_DIR and normal library discovery."),
+            Item::toggle(6, "CARGO", "Offline builds", self.offline, "Use Cargo's offline mode. All dependencies must already be available in the local cache."),
+            Item::toggle(7, "CARGO", "Locked dependencies", self.locked, "Require Cargo.lock to stay unchanged. Recommended for reproducible builds."),
         ]
     }
 }
@@ -406,6 +409,7 @@ fn shell_quote(s: &OsStr) -> String {
 // unsafe termios binding, desktop session, or Cargo package download is needed.
 struct Terminal {
     saved: String,
+    color: bool,
 }
 impl Terminal {
     fn enter() -> Result<Self> {
@@ -418,6 +422,7 @@ impl Terminal {
         let saved = stty(&["-g"])?;
         let terminal = Self {
             saved: saved.trim().into(),
+            color: env::var_os("NO_COLOR").is_none(),
         };
         stty(&["raw", "-echo", "min", "0", "time", "1"])?;
         print!("\x1b[?1049h\x1b[?25l");
@@ -436,7 +441,7 @@ impl Terminal {
 impl Drop for Terminal {
     fn drop(&mut self) {
         let _ = stty(&[&self.saved]);
-        print!("\x1b[?25h\x1b[?1049l");
+        print!("\x1b[0m\x1b[?25h\x1b[?1049l");
         let _ = io::stdout().flush();
     }
 }
@@ -462,6 +467,10 @@ enum Key {
     Down,
     Left,
     Right,
+    Home,
+    End,
+    PageUp,
+    PageDown,
     Escape,
     Idle,
 }
@@ -484,6 +493,20 @@ fn key() -> Result<Key> {
                 Some(b'B') => Key::Down,
                 Some(b'C') => Key::Right,
                 Some(b'D') => Key::Left,
+                Some(b'H') => Key::Home,
+                Some(b'F') => Key::End,
+                Some(code @ (b'1' | b'4' | b'5' | b'6' | b'7' | b'8')) => {
+                    if read()? != Some(b'~') {
+                        Key::Idle
+                    } else {
+                        match code {
+                            b'1' | b'7' => Key::Home,
+                            b'4' | b'8' => Key::End,
+                            b'5' => Key::PageUp,
+                            _ => Key::PageDown,
+                        }
+                    }
+                }
                 _ => Key::Idle,
             },
             _ => Key::Escape,
@@ -492,81 +515,60 @@ fn key() -> Result<Key> {
     })
 }
 
-fn next_key() -> Result<Key> {
-    loop {
-        let pressed = key()?;
-        if pressed != Key::Idle {
-            return Ok(pressed);
+struct Screen {
+    size: (usize, usize),
+    checked: Instant,
+    dirty: bool,
+}
+impl Screen {
+    fn new() -> Self {
+        Self {
+            size: (0, 0),
+            checked: Instant::now(),
+            dirty: true,
         }
+    }
+    fn paint(&mut self, terminal: &Terminal, view: &View<'_>, state: &mut State) -> Result<()> {
+        // stty is portable and dependency-free; poll only a few times per
+        // second, and redraw only after input or an actual terminal resize.
+        if self.dirty || self.checked.elapsed() >= Duration::from_millis(250) {
+            let size = terminal.size();
+            if self.dirty || size != self.size {
+                print!(
+                    "{}",
+                    build_config_ui::render(size.1, size.0, view, state, terminal.color)
+                );
+                io::stdout().flush().map_err(|e| e.to_string())?;
+            }
+            self.size = size;
+            self.checked = Instant::now();
+            self.dirty = false;
+        }
+        Ok(())
     }
 }
 
-fn line(row: usize, text: &str, width: usize, highlight: bool) {
-    // Config fields never become terminal control sequences.
-    let safe: String = text
-        .chars()
-        .filter(|c| !c.is_control())
-        .take(width.saturating_sub(4))
-        .collect();
-    print!(
-        "\x1b[{};3H\x1b[{}m{:<fill$}\x1b[0m",
-        row,
-        if highlight { "7" } else { "0" },
-        safe,
-        fill = width.saturating_sub(4)
-    );
-}
-fn draw(terminal: &Terminal, config: &Config, selected: usize, message: &str) -> Result<()> {
-    let (height, width) = terminal.size();
-    print!("\x1b[H\x1b[2J");
-    if height < 23 || width < 65 {
-        line(
-            1,
-            "Resize terminal to at least 65 columns x 23 rows.",
-            width,
-            false,
-        );
-        line(2, "Q cancels without saving.", width, false);
-    } else {
-        let title = format!(
-            "BALDES build configuration {}",
-            if config.release { "(release)" } else { "(dev)" }
-        );
-        line(1, &title, width, true);
-        line(
-            3,
-            "Arrow keys / J,K move | Space / Enter change",
-            width,
-            false,
-        );
-        line(4, "S saves and exits | Q / Escape cancels", width, false);
-        for (i, (text, _)) in config.rows().iter().enumerate() {
-            line(6 + i, text, width, i == selected);
-        }
-        line(19, config.rows()[selected].1, width, false);
-        line(
-            21,
-            "Core pricing, HGS, cuts and native IPM are always included.",
-            width,
-            false,
-        );
-        line(22, message, width, false);
-    }
-    io::stdout().flush().map_err(|e| e.to_string())
-}
-
-fn input(terminal: &Terminal, prompt: &str, current: &str) -> Result<Option<String>> {
+fn input(
+    terminal: &Terminal,
+    view: &View<'_>,
+    state: &mut State,
+    prompt: &str,
+    current: &str,
+) -> Result<Option<String>> {
     let mut value = current.to_string();
+    let mut screen = Screen::new();
     loop {
-        let (height, width) = terminal.size();
-        line(
-            height.saturating_sub(1),
-            &format!("{prompt}: {value}_"),
-            width,
-            true,
-        );
-        io::stdout().flush().map_err(|e| e.to_string())?;
-        match next_key()? {
+        let editing = View {
+            editing: Some((prompt, &value)),
+            ..*view
+        };
+        screen.paint(terminal, &editing, state)?;
+        let pressed = key()?;
+        if pressed == Key::Idle {
+            continue;
+        }
+        screen.dirty = true;
+        match pressed {
             Key::Byte(b'\r' | b'\n') => return Ok(Some(value)),
             Key::Escape | Key::Byte(3) => return Ok(None),
             Key::Byte(127 | 8) => {
@@ -581,12 +583,26 @@ fn input(terminal: &Terminal, prompt: &str, current: &str) -> Result<Option<Stri
 
 fn menu(config: &mut Config, path: &Path) -> Result<()> {
     let terminal = Terminal::enter()?;
-    let mut selected = 0;
-    let mut message =
-        String::from("Settings apply to subsequent make builds. Ctrl-U clears a text field.");
+    let original = config.clone();
+    let mut state = State::default();
+    let mut screen = Screen::new();
+    let mut message = String::new();
     loop {
-        draw(&terminal, config, selected, &message)?;
-        match next_key()? {
+        let view = View {
+            config,
+            original: &original,
+            path,
+            message: &message,
+            editing: None,
+        };
+        screen.paint(&terminal, &view, &mut state)?;
+        let pressed = key()?;
+        if pressed == Key::Idle {
+            continue;
+        }
+        screen.dirty = true;
+        let rows = config.rows();
+        match pressed {
             Key::Escape | Key::Byte(b'q' | b'Q' | 3) => {
                 drop(terminal);
                 println!("Configuration unchanged.");
@@ -601,25 +617,52 @@ fn menu(config: &mut Config, path: &Path) -> Result<()> {
                 Err(e) => message = e,
             },
             Key::Up | Key::Byte(b'k' | b'K') => {
-                selected = (selected + config.rows().len() - 1) % config.rows().len()
+                state.selected = (state.selected + rows.len() - 1) % rows.len();
+                message.clear();
             }
             Key::Down | Key::Byte(b'j' | b'J' | b'\t') => {
-                selected = (selected + 1) % config.rows().len()
+                state.selected = (state.selected + 1) % rows.len();
+                message.clear();
             }
+            Key::Home => state.selected = 0,
+            Key::End => state.selected = rows.len() - 1,
+            Key::PageUp => state.selected = state.selected.saturating_sub(5),
+            Key::PageDown => state.selected = (state.selected + 5).min(rows.len() - 1),
             Key::Left | Key::Right | Key::Byte(b' ' | b'\r' | b'\n') => {
-                let value = match selected {
-                    8 => input(&terminal, "Jobs (0 = automatic)", &config.jobs.to_string())?,
-                    9 => input(&terminal, "Target triple (empty = host)", &config.target)?,
-                    10 => input(&terminal, "HiGHS root (empty = auto)", &config.highs_dir)?,
+                let id = rows[state.selected].id;
+                let value = match id {
+                    8 => input(
+                        &terminal,
+                        &view,
+                        &mut state,
+                        "Parallel jobs (0 = automatic)",
+                        &config.jobs.to_string(),
+                    )?,
+                    9 => input(
+                        &terminal,
+                        &view,
+                        &mut state,
+                        "Target triple (empty = host)",
+                        &config.target,
+                    )?,
+                    10 => input(
+                        &terminal,
+                        &view,
+                        &mut state,
+                        "HiGHS root (empty = automatic)",
+                        &config.highs_dir,
+                    )?,
                     11 => input(
                         &terminal,
-                        "Scalar capacity (default = 2)",
+                        &view,
+                        &mut state,
+                        "Resource dimensions (default = 2)",
                         &config.resource_dimensions.to_string(),
                     )?,
                     _ => None,
                 };
-                message = match config.edit(selected, value) {
-                    Ok(()) => "Unsaved changes. Press S to save.".into(),
+                message = match config.edit(id, value) {
+                    Ok(()) => String::new(),
                     Err(e) => e,
                 };
             }

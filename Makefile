@@ -12,7 +12,7 @@ RUN_CONFIG = $(CONFIG_TOOL) --config $(call quote,$(CONFIG)) --cargo $(call quot
 
 all: build
 
-$(CONFIG_TOOL): scripts/build_config.rs
+$(CONFIG_TOOL): scripts/build_config.rs scripts/build_config_ui.rs
 	@mkdir -p target
 	$(call quote,$(RUSTC)) --edition=2021 -O $< -o $@
 
