@@ -7,6 +7,32 @@ fn command() -> Command {
 }
 
 #[test]
+fn pstep_parallel_command_and_validation() {
+    let output = command().args(["pstep", "--help"]).output().unwrap();
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("--threads"));
+    let instance = concat!(env!("CARGO_MANIFEST_DIR"), "/instances/cvrplib/P-n16-k8.vrp");
+    let json = std::env::temp_dir().join(format!("baldes-pstep-cli-{}.json", std::process::id()));
+    let output = command().args(["pstep", instance, "--p", "2", "--threads", "3", "--enumerate", "--json"])
+        .arg(&json).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let report: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+    assert_eq!(report["status"], "Converged");
+    assert_eq!(report["pricing_workers"], 3);
+    assert!((report["lp_bound"].as_f64().unwrap() - report["enumerated_bound"].as_f64().unwrap()).abs() < 1e-6);
+    std::fs::remove_file(&json).unwrap();
+    let output = command().args(["pstep", instance, "--iterations", "0", "--json"]).arg(&json).output().unwrap();
+    assert!(output.status.success());
+    let report: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+    assert_eq!(report["status"], "IterationLimit");
+    assert!(report["lp_bound"].is_null());
+    std::fs::remove_file(&json).unwrap();
+    for flags in [vec!["--threads", "0"], vec!["--p", "0"], vec!["--time", "-1"], vec!["--p"], vec!["--unknown"]] {
+        assert!(!command().args(["pstep", instance]).args(flags).output().unwrap().status.success());
+    }
+}
+
+#[test]
 fn help_and_invalid_instance_types() {
     for args in [
         vec!["--help"],

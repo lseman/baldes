@@ -12,6 +12,8 @@ pub mod api;
 pub mod core;
 pub mod cuts;
 pub mod enumeration;
+/// Specialized solver extensions.
+pub mod extensions;
 pub mod graph;
 pub mod ipm;
 pub mod labeling;

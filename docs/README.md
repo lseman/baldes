@@ -14,6 +14,7 @@ root. These guides cover installing, configuring and using BALDES.
 | [Build configuration](build.md) | Configure optional backends and compiler options in the terminal menu, then build with Make |
 | [Tree and node lifecycle](tree.md) | Run integer routing, understand node inheritance, bounds, limits, and result status |
 | [Multiple pricing networks](networks.md) | Model a shared master, resume or fork snapshots, and run assignment branching |
+| [P-step CVRP](pstep.md) | Build and solve the compact p-step LP relaxation |
 | [Scalar resources](resources.md) | Configure general scalar dimensions and bucket indexing |
 | [Branching](branching.md) | Choose vehicle-count, Ryan–Foster, or arc-flow branching and understand the single-network assignment limitation |
 | [Cuts](cuts.md) | Configure cut families and keep coefficients consistent across pricing, enumeration, and child nodes |
