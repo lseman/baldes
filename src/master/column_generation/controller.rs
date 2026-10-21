@@ -2,6 +2,12 @@ use super::*;
 
 /// The controller owns incumbent tracking and the pricing route universe.
 pub trait Controller<M> {
+    /// Optional original-model cap, restored whenever this column is loaded.
+    /// The controller must justify the cap for every omitted/future column
+    /// with the same tag. Numerical/certified bounds must account for it.
+    fn column_upper_bound(&self, _tag: i32) -> Option<f64> {
+        None
+    }
     /// Optional Lagrangian estimate for the most recent batch at these prices.
     /// Only exact batches publish a numerical bound. Multiple pricing domains
     /// can contribute different multiplicities.
@@ -114,3 +120,20 @@ pub trait Controller<M> {
 
 pub struct NoController;
 impl<M> Controller<M> for NoController {}
+
+pub(super) fn apply_column_cap<M: LpMaster, C: Controller<M>>(
+    master: &mut M,
+    controller: &C,
+    column: usize,
+    tag: i32,
+) -> Result<()> {
+    if let Some(upper) = controller.column_upper_bound(tag) {
+        if !upper.is_finite() || upper < 0. {
+            return Err(invalid("finite nonnegative column cap required"));
+        }
+        if upper < master.upper()[column] {
+            master.set_upper(column, upper)?;
+        }
+    }
+    Ok(())
+}

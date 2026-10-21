@@ -49,6 +49,9 @@ impl<const D: usize> Solver<D> {
             .phases
             .get(index)
             .ok_or_else(|| invalid("pricing phase out of range"))?;
+        if self.enumeration.is_some() {
+            self.check_presence_universe()?;
+        }
         self.refresh_cuts()?;
         let enumerated_kpath = self.enumerated_kpath_inputs();
         if let Some(universe) = &mut self.enumeration {
@@ -60,12 +63,13 @@ impl<const D: usize> Solver<D> {
                     statistics: Default::default(),
                 });
             }
-            universe.paths.inspect_with_knapsack(
+            universe.paths.inspect_with_presence(
                 &self.graph,
                 f64::INFINITY,
                 &self.applied_cuts.0,
                 &enumerated_kpath,
                 &self.knapsack_pricing,
+                &self.presence_pricing,
             )?;
             let mut routes = universe.paths.routes(&self.graph)?;
             routes.sort_by(|a, b| enumerated_cost_order(a.cost, b.cost));

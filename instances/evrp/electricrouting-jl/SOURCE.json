@@ -1,0 +1,3327 @@
+{
+  "repository": "https://github.com/sean-lo/ElectricRouting.jl",
+  "revision": "102c9c90f6021d2dea664f0d8ad6990661c7668a",
+  "download_date": "2026-10-20",
+  "archive_sha256": "97f1178a2275fe53ddc0f545327437443528074b86510a23eee385a79e3e03c0",
+  "license_file_in_upstream_revision": false,
+  "files": [
+    {
+      "path": "Instances/016_08_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/016_08_big_01.txt",
+      "bytes": 2855,
+      "sha256": "8200c6af0c237e8e20fdc28a64c7f43cecc9f8bf11d00ee95e7a9a4cc552de49",
+      "git_blob_sha1": "b0a32548987588862d55bdb180e3be6e4954299b"
+    },
+    {
+      "path": "Instances/016_08_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/016_08_big_02.txt",
+      "bytes": 2855,
+      "sha256": "bad647efe1b46c63de5501d5b0cb6c0fcc578d5e5110bc1202b9db66f798c424",
+      "git_blob_sha1": "466a4694c250750396788edd9f36854ece74c72d"
+    },
+    {
+      "path": "Instances/016_08_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/016_08_big_03.txt",
+      "bytes": 2855,
+      "sha256": "0b466f1cdf0dcdb4840e103f785781ee4ef2761687a46cafa3b32784cae8f6ba",
+      "git_blob_sha1": "6a17fd1df92b03221c7d8b456edbc9bd5f297e5e"
+    },
+    {
+      "path": "Instances/016_08_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/016_08_big_04.txt",
+      "bytes": 2855,
+      "sha256": "02a27cdc42abb2e2bfb83b74bb4c069c920e4058b5d9ef4d55adb67ab01a9493",
+      "git_blob_sha1": "c4aa6313eeee7559d772b5884ae2af18caf3cd12"
+    },
+    {
+      "path": "Instances/016_08_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/016_08_big_05.txt",
+      "bytes": 2855,
+      "sha256": "34f8c64e3c9d0e5b79871545a21b2c576f097fbc9c64b0baffa82d14a7dabbb8",
+      "git_blob_sha1": "d9ee7460c24ff6863e9ecba079c149f736deb07f"
+    },
+    {
+      "path": "Instances/016_08_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/016_08_small_01.txt",
+      "bytes": 2855,
+      "sha256": "24c1936a02e76c2af6b673624127b1de7378e290236959f2456fa2f3a059a9a7",
+      "git_blob_sha1": "93fc466f9078e688f8620978059919a19c1ff9dd"
+    },
+    {
+      "path": "Instances/016_08_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/016_08_small_02.txt",
+      "bytes": 2855,
+      "sha256": "c718e8fe4bfccec0edaf3c295954b12e0fb603bbfd39b2096a01919b387681f3",
+      "git_blob_sha1": "07857341eee59d414b82d1e9d9eaafe6f8bc0ca3"
+    },
+    {
+      "path": "Instances/016_08_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/016_08_small_03.txt",
+      "bytes": 2855,
+      "sha256": "cb8172aab0e2e134cd995014592a497827379a3cd78ca7995a780b767254a4b7",
+      "git_blob_sha1": "c881c0be1d4d68a50c279751c976f50491cf11ef"
+    },
+    {
+      "path": "Instances/016_08_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/016_08_small_04.txt",
+      "bytes": 2855,
+      "sha256": "856ec7b4d291ae9cdff6cb925edf9097135800f65a8236f8b11adc8da95cea0f",
+      "git_blob_sha1": "387b895a48ea132cf5c524e8b9b388ccd77a04b8"
+    },
+    {
+      "path": "Instances/016_08_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/016_08_small_05.txt",
+      "bytes": 2855,
+      "sha256": "9f2a0e75f1a8e483c25e521baf65eafca1f288351dd1c9065dcaaa125d26b95b",
+      "git_blob_sha1": "f62dd5c49754a71e93d0ae0460a1bf2adafb96ff"
+    },
+    {
+      "path": "Instances/024_08_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_08_big_01.txt",
+      "bytes": 3504,
+      "sha256": "c6ba1f0790a3cde33c77276ac53ddcc63ee7ebbfccb01a18ea51835a63296a8a",
+      "git_blob_sha1": "c7c818f3aeef48071c0dfd428bedbe8483e6baaa"
+    },
+    {
+      "path": "Instances/024_08_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_08_big_02.txt",
+      "bytes": 3503,
+      "sha256": "4984f1518eb4cce00f274df3a9fd3764b1170015b66185e284fdae5d5fac2d5d",
+      "git_blob_sha1": "d023f51d88139915b87dde7e6ac3a203041c1571"
+    },
+    {
+      "path": "Instances/024_08_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_08_big_03.txt",
+      "bytes": 3504,
+      "sha256": "c41646000a6ef66b8a531f2d79b40b90a1708a7b772810fbaa5d167ee71962ee",
+      "git_blob_sha1": "015f3d4feae932d5d9f10896a3159a68ce3372f2"
+    },
+    {
+      "path": "Instances/024_08_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_08_big_04.txt",
+      "bytes": 3504,
+      "sha256": "119ce6629aa083f6bfd55e25b0b9246b5765f10121200fae42a49b86588bdffe",
+      "git_blob_sha1": "3c8b2ee8cf35922afcb36e837f51aeee40cac35c"
+    },
+    {
+      "path": "Instances/024_08_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_08_big_05.txt",
+      "bytes": 3503,
+      "sha256": "903694a68fcc0f86117c746548d39b83cdb3b1ee90a031fefa91476f74384f2d",
+      "git_blob_sha1": "a44ff61f1386ff958dc98241bb27241b22365ae6"
+    },
+    {
+      "path": "Instances/024_08_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_08_small_01.txt",
+      "bytes": 3504,
+      "sha256": "d3467159665d5bcabcf4f2ae74580fb9697ecf44b2575671dcc09cd882a97c69",
+      "git_blob_sha1": "b0ca75abfe3426de807e050a84b59b65413419e5"
+    },
+    {
+      "path": "Instances/024_08_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_08_small_02.txt",
+      "bytes": 3503,
+      "sha256": "21bf20c3d5eb3d7bd793229d1703e74c25a1f871998d33629c5317542cb6dd45",
+      "git_blob_sha1": "4fd991ff509454689e60b05cdc84fe4513dc210b"
+    },
+    {
+      "path": "Instances/024_08_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_08_small_03.txt",
+      "bytes": 3504,
+      "sha256": "173bdb04f6a463d04d1fec8eea30b8305b579ad5eb9f9fa09277b535d4d734c6",
+      "git_blob_sha1": "acb97736dbd91061c7a42616b85c534e81025b90"
+    },
+    {
+      "path": "Instances/024_08_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_08_small_04.txt",
+      "bytes": 3504,
+      "sha256": "b13899d5d6294f7ac72b3b0208b1d43bf7488b022a024e79058db5e0463e04dc",
+      "git_blob_sha1": "84947e4111391381e166167ae902a20c79277006"
+    },
+    {
+      "path": "Instances/024_08_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_08_small_05.txt",
+      "bytes": 3503,
+      "sha256": "d3af92a4d41aeab461945882c33ffd75a76999c6eb44c3b2ac7ac2e174d0d3f6",
+      "git_blob_sha1": "52c1ff4ee32468eabe2d8b6c8f62ea9758d6b3b2"
+    },
+    {
+      "path": "Instances/024_12_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_12_big_01.txt",
+      "bytes": 3909,
+      "sha256": "122da33523f95714d1249643338497a8e901675a3755e675f53312b6f9a91766",
+      "git_blob_sha1": "a10b68b13ee89f0289f61195064627bbfdb99ac7"
+    },
+    {
+      "path": "Instances/024_12_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_12_big_02.txt",
+      "bytes": 3908,
+      "sha256": "d5c3b94852c2c83b4749b2aab1843f1fc25963d89490d3ece9c9101be68d6645",
+      "git_blob_sha1": "8e1f789f816ab8338fa486d7342c1368558f7bff"
+    },
+    {
+      "path": "Instances/024_12_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_12_big_03.txt",
+      "bytes": 3909,
+      "sha256": "fa02585ee8386f6c65b01e71810044a84d0c1215fd78470f435671c650bd2373",
+      "git_blob_sha1": "6dc105763aeb393f55ee96c257885e811d755cdf"
+    },
+    {
+      "path": "Instances/024_12_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_12_big_04.txt",
+      "bytes": 3909,
+      "sha256": "96d0ee2d2c72f08745ae0208d6664c606b629388720e0e15359654fbc4610cad",
+      "git_blob_sha1": "4fcc6fb6728a47b682108fd12fa2cd703d63ef0e"
+    },
+    {
+      "path": "Instances/024_12_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_12_big_05.txt",
+      "bytes": 3908,
+      "sha256": "36ee652d272343f14f387a322dd966080e834efc4358958b3d32d1142185a639",
+      "git_blob_sha1": "8acab86c6f09c17901aa3bc17350b58e83d2934a"
+    },
+    {
+      "path": "Instances/024_12_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_12_small_01.txt",
+      "bytes": 3909,
+      "sha256": "306603889ac0f78bdbed36677830b4252fdf4fb58acafd5fab424d12f582faea",
+      "git_blob_sha1": "fed286ece02ddf0272c9e1f258430646561d8524"
+    },
+    {
+      "path": "Instances/024_12_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_12_small_02.txt",
+      "bytes": 3908,
+      "sha256": "316845be645747bbee56de34b32092b8cf41a72ca5df7651610246ec0c2da307",
+      "git_blob_sha1": "8daeed0f08ccd95715f197c0e601ae378d94db13"
+    },
+    {
+      "path": "Instances/024_12_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_12_small_03.txt",
+      "bytes": 3909,
+      "sha256": "86b66d59576aa9ceb4f92590691f007a088c7ec5da49e482612bc1d7beb3f051",
+      "git_blob_sha1": "d72fb4906f91558216beada1b5f27c91b6f4ce81"
+    },
+    {
+      "path": "Instances/024_12_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_12_small_04.txt",
+      "bytes": 3909,
+      "sha256": "6a348e5ee612ca431c56e67cc447213667169d8a7854771f9128e11c8c1c993a",
+      "git_blob_sha1": "9aa924ebcce5f5fe8ffb5b43593fd0df79b2aa7e"
+    },
+    {
+      "path": "Instances/024_12_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/024_12_small_05.txt",
+      "bytes": 3908,
+      "sha256": "f57ca39cef8006c8cd29ab6bbfc1c0e30fe4f36ac36421dc4a1108b69c6db62d",
+      "git_blob_sha1": "fa08d0acd8f2c0ca880219df978964ed5ee93856"
+    },
+    {
+      "path": "Instances/032_08_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_08_big_01.txt",
+      "bytes": 4152,
+      "sha256": "09cc3a6936f0936ec2996615608838ed84d8bdf9071672e6428f025ca49a3d2d",
+      "git_blob_sha1": "acfb06d6a674875b3e89059721e57e4d52d6f208"
+    },
+    {
+      "path": "Instances/032_08_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_08_big_02.txt",
+      "bytes": 4152,
+      "sha256": "f72f5692059068faae97160a6b5a058a1022ae41d0a083d1b0779867505ae5a3",
+      "git_blob_sha1": "7a81ffef31464cb7584c5c1475409323ddc18502"
+    },
+    {
+      "path": "Instances/032_08_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_08_big_03.txt",
+      "bytes": 4152,
+      "sha256": "7b2b98f7db0018f38acdaabebe1b961468240cd06147caf1441fc89c41665f8e",
+      "git_blob_sha1": "39c4510b8448d8c50adf3f21c14dfdf2e21ddee4"
+    },
+    {
+      "path": "Instances/032_08_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_08_big_04.txt",
+      "bytes": 4152,
+      "sha256": "8dbccc62e0f09383d689bc88bc81d3df9dee4dbbf68be8931cdbc67689412f0e",
+      "git_blob_sha1": "39d25b65d1bad8f976a829703c25609cb9c4c5c8"
+    },
+    {
+      "path": "Instances/032_08_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_08_big_05.txt",
+      "bytes": 4152,
+      "sha256": "d63d121e83d007acd18085620dde2cba626408a69e8abc31b2dfd1dbd5d577d5",
+      "git_blob_sha1": "00021211b6bab2d247eaf9b929b466c75951986c"
+    },
+    {
+      "path": "Instances/032_08_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_08_small_01.txt",
+      "bytes": 4152,
+      "sha256": "9dd30f69d2c660f3565cd38b3c2fc8a52b97431941d35246bdc7e8a66a3a8eff",
+      "git_blob_sha1": "605efb8667699ac32abc0b43f09fc25e5ac8f9eb"
+    },
+    {
+      "path": "Instances/032_08_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_08_small_02.txt",
+      "bytes": 4152,
+      "sha256": "260292daf9bd5449bbd12eadcac5b0ccc0e4a514d537dcc41086c739a3675513",
+      "git_blob_sha1": "83c4e67c0fe3b9210e160e7dc4770137412f15e8"
+    },
+    {
+      "path": "Instances/032_08_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_08_small_03.txt",
+      "bytes": 4152,
+      "sha256": "fefd8b6e4d40fe33abacdbde3aa4b594f8e96fa23ef743659aa45bc095e1d93c",
+      "git_blob_sha1": "dcc61833abaa3500cc9d32b9b2ae78f275b681ad"
+    },
+    {
+      "path": "Instances/032_08_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_08_small_04.txt",
+      "bytes": 4152,
+      "sha256": "19d1fc7855d4363a82ee291c3be0ac2c4a86f9c64f428705bc2f6338462c1276",
+      "git_blob_sha1": "08588d170c52e648ea196e68d21b0d0fd972d2f5"
+    },
+    {
+      "path": "Instances/032_08_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_08_small_05.txt",
+      "bytes": 4152,
+      "sha256": "ca880052452b12c0cf728f7d315a9ffa571273b60512a9df9af76670dbe0497b",
+      "git_blob_sha1": "3efbe70e697316c01b4a56961f6b3655c53a922d"
+    },
+    {
+      "path": "Instances/032_16_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_16_big_01.txt",
+      "bytes": 4962,
+      "sha256": "18d7594fe67e422865b206cfc3ca10d5adf9a3c101bd07ba4c5e249710a9d8a3",
+      "git_blob_sha1": "c67dbf1a58972b4316d409ae48d34b452f82dd76"
+    },
+    {
+      "path": "Instances/032_16_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_16_big_02.txt",
+      "bytes": 4962,
+      "sha256": "b1a167868f0ac88a6288d731d98596f54f47530f333d2f9c504787d7ab73a0c1",
+      "git_blob_sha1": "e71b50608fdeb622e236824330dcdce34a938491"
+    },
+    {
+      "path": "Instances/032_16_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_16_big_03.txt",
+      "bytes": 4962,
+      "sha256": "9d90d4835960f0ca215e5df58c076333e4379d80a4aec1a23027b8935f5a5290",
+      "git_blob_sha1": "b60a447bcd350153eb58d36e271cf49f63b95837"
+    },
+    {
+      "path": "Instances/032_16_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_16_big_04.txt",
+      "bytes": 4962,
+      "sha256": "3574505a50da3e886b660effa1ebe0e6c0d8841092b88be4845bd5b0f712133d",
+      "git_blob_sha1": "dd527c18c73c14fa717a04de07214d485f7ba57c"
+    },
+    {
+      "path": "Instances/032_16_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_16_big_05.txt",
+      "bytes": 4962,
+      "sha256": "00002d4d16303627d5be193e8c8ec74cb388f14c68a50963abe857c57dda6fef",
+      "git_blob_sha1": "e2879c8b076f013a113541b108ec909f59e113ea"
+    },
+    {
+      "path": "Instances/032_16_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_16_small_01.txt",
+      "bytes": 4962,
+      "sha256": "4b328a28ccfab2ba5e363cbcd682d49420f50c0173a792470dad1c9b8ca0dea5",
+      "git_blob_sha1": "c3002b0087a52b33149d8d89b196934710cc936c"
+    },
+    {
+      "path": "Instances/032_16_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_16_small_02.txt",
+      "bytes": 4962,
+      "sha256": "b4e8a5ab3c8e8ed8c5023f3d6277e12c28fc80050426685d38aaae6fbddcdded",
+      "git_blob_sha1": "38474f173f6ed1a691b4c1df26ff2670bdd055db"
+    },
+    {
+      "path": "Instances/032_16_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_16_small_03.txt",
+      "bytes": 4962,
+      "sha256": "29a0822e9c1320e1332a47c55ddceb1730b8c30b815e6a30dc0bab582dae327e",
+      "git_blob_sha1": "26f3dba6d506195cf6b211c3e485af85ee3c45ba"
+    },
+    {
+      "path": "Instances/032_16_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_16_small_04.txt",
+      "bytes": 4962,
+      "sha256": "66456a3cbc658b751b73557b7cec78da5b727ca687bb1a6b45459e9241faf064",
+      "git_blob_sha1": "385654eae24f3930c18d8e88ba7fa37eef092613"
+    },
+    {
+      "path": "Instances/032_16_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/032_16_small_05.txt",
+      "bytes": 4962,
+      "sha256": "96ba393394984034321efd090e6c09d0ecc81eabbb6264333034fed120d49700",
+      "git_blob_sha1": "f6e8b039cc9d1e2506253b5f31532430d03afc58"
+    },
+    {
+      "path": "Instances/036_12_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/036_12_big_01.txt",
+      "bytes": 4881,
+      "sha256": "c575ada0cdd31abfbf6fa7733d6f4db212dd0c8838b0454be85e82da40ebf513",
+      "git_blob_sha1": "669dee3be81cb23e6ae1e9b126fc6253b3f818e9"
+    },
+    {
+      "path": "Instances/036_12_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/036_12_big_02.txt",
+      "bytes": 4881,
+      "sha256": "c7406974cd2a285cfc4bd6792106764a20815a7fd7b197bac87f1ace6b7e0e41",
+      "git_blob_sha1": "f55ef9aed4506f6a804ad1eaa00d7636e056850a"
+    },
+    {
+      "path": "Instances/036_12_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/036_12_big_03.txt",
+      "bytes": 4881,
+      "sha256": "3bafda571482db50e92926cb2d2ba880e673b4939a1ddee154b2e12116db0b75",
+      "git_blob_sha1": "0fe63d171eb524a4cba1ad2b943e3473e83e5fac"
+    },
+    {
+      "path": "Instances/036_12_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/036_12_big_04.txt",
+      "bytes": 4881,
+      "sha256": "3178e0d4a4f9b378254be038850b052bcb8e377439b05faea1acdbe1bca1f455",
+      "git_blob_sha1": "7861fb3d7f0a2cd5f16f15b8d063a189635694a6"
+    },
+    {
+      "path": "Instances/036_12_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/036_12_big_05.txt",
+      "bytes": 4881,
+      "sha256": "39de7091b10c60d123dbd481bd1e5acb61a96a54a793556ca209b91f5286a39a",
+      "git_blob_sha1": "11e3ea45017eae4e9770ddc4bfef246b0e929ef0"
+    },
+    {
+      "path": "Instances/036_12_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/036_12_small_01.txt",
+      "bytes": 4881,
+      "sha256": "5e3107414dea3ce2d60ecd331ed99fec2cd6e96d2a5c782db9265e2530dcfdb6",
+      "git_blob_sha1": "dd31f8f63af6777151a7ebf0b4b067e63252d8f6"
+    },
+    {
+      "path": "Instances/036_12_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/036_12_small_02.txt",
+      "bytes": 4881,
+      "sha256": "30c1cdd50a7cb0af862d8aca59bde5fab4e9c4abf292c5224ed876c897256098",
+      "git_blob_sha1": "4d425bf2db4fbcef664a8d2fb35c6edfb583c5be"
+    },
+    {
+      "path": "Instances/036_12_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/036_12_small_03.txt",
+      "bytes": 4881,
+      "sha256": "853e429ae6d743fe8f791337f5144d32ddeab7c4c0446eb6e74682b090ab3c35",
+      "git_blob_sha1": "d3216a773bc54fc2925c6f41eb3018407d23bdfd"
+    },
+    {
+      "path": "Instances/036_12_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/036_12_small_04.txt",
+      "bytes": 4881,
+      "sha256": "0e19be97cf61e72b463a79cbe39a79b8812976ebe4f1eb9d7f3a32cd5b00dc5d",
+      "git_blob_sha1": "a0d2630c0c02dc629766a0c0e00a04a0bd336307"
+    },
+    {
+      "path": "Instances/036_12_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/036_12_small_05.txt",
+      "bytes": 4881,
+      "sha256": "4c23ba66e9d9aee703251ad25c7b843fb6ac36c64ee6bf82866f33e5ea019c32",
+      "git_blob_sha1": "8f6ddf276529034bcf9d6b1832e69aeda0050b4d"
+    },
+    {
+      "path": "Instances/040_08_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_08_big_01.txt",
+      "bytes": 4800,
+      "sha256": "ed6d89ea50710d4af1bc2cae7dc0ea39e1fc7b9f2428adf84896e561f4c1661f",
+      "git_blob_sha1": "9d340845fadad204c7fd7162ca255235e45fef2d"
+    },
+    {
+      "path": "Instances/040_08_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_08_big_02.txt",
+      "bytes": 4800,
+      "sha256": "7dc78933769f7dc55f4ee10f453ee1dc8b766959fc3655f59b49d0f17b556ccc",
+      "git_blob_sha1": "719f5837837b0bdac798425951c35dbd6ae575e5"
+    },
+    {
+      "path": "Instances/040_08_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_08_big_03.txt",
+      "bytes": 4800,
+      "sha256": "7b80086b68336be0e3b56251f62f205871599a419d6d2681f4eb5b1632846d95",
+      "git_blob_sha1": "e8383d9bd51839fdb20a8a769765d0a7d7f65422"
+    },
+    {
+      "path": "Instances/040_08_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_08_big_04.txt",
+      "bytes": 4800,
+      "sha256": "5672429eab4c6f0ef1aba0a1fd804e71c35783446ed66e9ae7675557415ad970",
+      "git_blob_sha1": "2aae19448db05a26beb8bab58d853fe481e5722e"
+    },
+    {
+      "path": "Instances/040_08_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_08_big_05.txt",
+      "bytes": 4800,
+      "sha256": "a72bc9c4e3aff39be831dd3ba043a4cada67e255b31358bc899a65c6059f67cf",
+      "git_blob_sha1": "7af2603fb8a4ee5291a1fcf19044837b28035661"
+    },
+    {
+      "path": "Instances/040_08_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_08_small_01.txt",
+      "bytes": 4800,
+      "sha256": "a5b94bb99c473f5cc19107cf5d12c28ca239509495dcf532958d078d4ee84939",
+      "git_blob_sha1": "6dff51e2b7b215fbbbdd1f7d6c4905fe935e0522"
+    },
+    {
+      "path": "Instances/040_08_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_08_small_02.txt",
+      "bytes": 4800,
+      "sha256": "6ad8cea302aa4bf47d7d9a90067a12244b66a8cdaeed505e16ec18d47cfa1196",
+      "git_blob_sha1": "e5b973eae0952489d0c34cf7ebbe2bf540126868"
+    },
+    {
+      "path": "Instances/040_08_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_08_small_03.txt",
+      "bytes": 4800,
+      "sha256": "de7e558727ff9e582862a3dd07c814bb184ff33610751fc54330aec603b84acd",
+      "git_blob_sha1": "1d036dfd288ff8fe1df4841a6670365faa4c0fa6"
+    },
+    {
+      "path": "Instances/040_08_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_08_small_04.txt",
+      "bytes": 4800,
+      "sha256": "1521e707aa25168bc5f81c38925241de59a236c7b1908fe3aaa60a91dc2a12fa",
+      "git_blob_sha1": "52e49509cb6cbbdc022730d15670e8ae0f5cdd0a"
+    },
+    {
+      "path": "Instances/040_08_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_08_small_05.txt",
+      "bytes": 4800,
+      "sha256": "eadeab9afb142814df17f6b577737a6c2eaeee816300b2898eab444b1a6dfaee",
+      "git_blob_sha1": "df8b4d79369436885cad81db174cf445284b2fc8"
+    },
+    {
+      "path": "Instances/040_20_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_20_big_01.txt",
+      "bytes": 6015,
+      "sha256": "5451c9b80f686ef3ce738477fbfd1f02fb38a4f52fd285c9b5ff441a1c963110",
+      "git_blob_sha1": "514ea0df1f1232e4e1250fc4714f63edd27ab88c"
+    },
+    {
+      "path": "Instances/040_20_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_20_big_02.txt",
+      "bytes": 6015,
+      "sha256": "8025ebcd71c58ddd820cd40a5c24ea86e3a1141d18e7afdd94412a7e341987a7",
+      "git_blob_sha1": "29a78ccac9c3837e7e5c1d002bf822286c967664"
+    },
+    {
+      "path": "Instances/040_20_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_20_big_03.txt",
+      "bytes": 6015,
+      "sha256": "0b45d4d3d9c7817298dba41a3a8d3789b3cf2ec89feaeb4dc4828d75ad8216ce",
+      "git_blob_sha1": "2bf0b6ab285add0a3e767400224dd5f549bf9ce0"
+    },
+    {
+      "path": "Instances/040_20_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_20_big_04.txt",
+      "bytes": 6015,
+      "sha256": "32d4144495fa2c7e270c81e419a5178ff66427433beb14f60d3618a71b28fe22",
+      "git_blob_sha1": "ff4cf5377ff5d91f7814e4327103a09ebea2a643"
+    },
+    {
+      "path": "Instances/040_20_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_20_big_05.txt",
+      "bytes": 6015,
+      "sha256": "b5262871e2d336181b19fa5a9d91b556ea9cad33ccdb6b4cd46141be42b96aba",
+      "git_blob_sha1": "3140b36832357b726b2cef7f17ea27422d60b1f4"
+    },
+    {
+      "path": "Instances/040_20_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_20_small_01.txt",
+      "bytes": 6015,
+      "sha256": "39c3c29e5c7ece473e89d5b333dd54831fc343c50173ba06222781dc19e28c49",
+      "git_blob_sha1": "7a58e6bf899a06ed623837b214129a1708b86f14"
+    },
+    {
+      "path": "Instances/040_20_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_20_small_02.txt",
+      "bytes": 6015,
+      "sha256": "af5a363f01dbb2f72527059b7e30ca37c72c1979341175da22b75c59003cb4e7",
+      "git_blob_sha1": "30e4ae64145760a8a40b2cab2b7290135ca6214b"
+    },
+    {
+      "path": "Instances/040_20_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_20_small_03.txt",
+      "bytes": 6015,
+      "sha256": "bb9003b4db27e4869ee48a438bbe93018ca15ea2998c1b82a924d478137f89ab",
+      "git_blob_sha1": "9284089b82344c4c1f4e8759375b0ce0fc204d2b"
+    },
+    {
+      "path": "Instances/040_20_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_20_small_04.txt",
+      "bytes": 6015,
+      "sha256": "38345e9ca415b7aed3f0c9673e895e3c2bd72d6117dd16feb81eeb82bd3ede0c",
+      "git_blob_sha1": "3f0b22bfdf34fb3c67489ca62627093936644c46"
+    },
+    {
+      "path": "Instances/040_20_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/040_20_small_05.txt",
+      "bytes": 6015,
+      "sha256": "76309cf85bcc0055ba6c2774c4684847977b620db6b0aa6716ca230a2b17758d",
+      "git_blob_sha1": "8fe8addce51589c593e198a26135de82bdb63c57"
+    },
+    {
+      "path": "Instances/048_12_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_12_big_01.txt",
+      "bytes": 5853,
+      "sha256": "ad36dc979220de5b9c38e1ef712cdf9ca8abcabc46254c78ef5c04c88e61c741",
+      "git_blob_sha1": "c30424dc3c8e122893f2d633ae00d1369dff6960"
+    },
+    {
+      "path": "Instances/048_12_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_12_big_02.txt",
+      "bytes": 5853,
+      "sha256": "ed39c73df08fe5baa1f3a7c0d8b108a8f9527ab04492dcff886e676890e82bbb",
+      "git_blob_sha1": "5730c42c5d6ec39ab3f1bd8420e314f6b0a50a91"
+    },
+    {
+      "path": "Instances/048_12_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_12_big_03.txt",
+      "bytes": 5853,
+      "sha256": "bbe95383b1f2c88114cc51acf53b9c98c39be979896f48836ddf6bf079d0dfc8",
+      "git_blob_sha1": "04924c9664cdc24555aaae7348a4cac57a5a7732"
+    },
+    {
+      "path": "Instances/048_12_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_12_big_04.txt",
+      "bytes": 5853,
+      "sha256": "7b71e45f25758b38ba50e06e03acda396e2fa1319b3b7a31fe09f501b89259b4",
+      "git_blob_sha1": "6695d8631e3d4cf19bf71fefa6939203face7e94"
+    },
+    {
+      "path": "Instances/048_12_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_12_big_05.txt",
+      "bytes": 5853,
+      "sha256": "5096a2e5a381f70d55772d61f0d8d5e505eb0d1fd7dcb2e2e7dd1e67299e99a6",
+      "git_blob_sha1": "a5b536a2201330d7dd91ce4608a3d681d8a1b3fc"
+    },
+    {
+      "path": "Instances/048_12_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_12_small_01.txt",
+      "bytes": 5853,
+      "sha256": "80b7aeaa7843ebf983406d855cba787dbc440353f81db1aa99904b47264d4ca5",
+      "git_blob_sha1": "25ece437020e15909389e9229bf9aa1adf482a32"
+    },
+    {
+      "path": "Instances/048_12_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_12_small_02.txt",
+      "bytes": 5853,
+      "sha256": "2fcf5897a2c4d9fdd9554586672feed9ff8f79e2fa3b619e0bceb35998b9c66b",
+      "git_blob_sha1": "037c00b71d7e10decf4d671a110a55c11009146b"
+    },
+    {
+      "path": "Instances/048_12_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_12_small_03.txt",
+      "bytes": 5853,
+      "sha256": "77968fe6189ec348f4420742cce18349842ab37d9ee45ca18ef6619aff1b5490",
+      "git_blob_sha1": "2fa9a72a8b9ffc1a6ee0ea7e11237feda7c3eb8a"
+    },
+    {
+      "path": "Instances/048_12_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_12_small_04.txt",
+      "bytes": 5853,
+      "sha256": "6fa9609781b7f308df1a4b032ae38b866958e153abe40bc1d0ef894c7c6ed395",
+      "git_blob_sha1": "01e7fa136d1b3d9791fe09ea5b23309e9dbc0e07"
+    },
+    {
+      "path": "Instances/048_12_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_12_small_05.txt",
+      "bytes": 5853,
+      "sha256": "567de03d71969b62590e7cb5a4c96f6e3b07a3cea2a9285e743be79162a1cf6e",
+      "git_blob_sha1": "2f1f849d1394bf14b27ccbc10b510c3a4ece973c"
+    },
+    {
+      "path": "Instances/048_16_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_16_big_01.txt",
+      "bytes": 6258,
+      "sha256": "ecb65d7c92eab3335015d34ef627a5d7d4949962b53d860616ab38f607165292",
+      "git_blob_sha1": "6b7d6aa16963321a955ef1277fc278cdd4303b36"
+    },
+    {
+      "path": "Instances/048_16_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_16_big_02.txt",
+      "bytes": 6258,
+      "sha256": "66d954d93105535f02b2e1bfe310c57f38fab8eacc530f603057172b2331341a",
+      "git_blob_sha1": "5d3a6c4ffe50b9bc2e5a9adf619dd160acdc31b0"
+    },
+    {
+      "path": "Instances/048_16_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_16_big_03.txt",
+      "bytes": 6258,
+      "sha256": "5dd25c79b78d9d788f1fa78d46d1ca2f5bde429b5caf5f03f6eee4f62a2b8f78",
+      "git_blob_sha1": "7a859a8483fe1f2f56f5467af4ad7868bc96dd87"
+    },
+    {
+      "path": "Instances/048_16_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_16_big_04.txt",
+      "bytes": 6258,
+      "sha256": "89e3606e6246a187ba0546bdfa90b27ad3f499094fd6ae7bb288966550a5df63",
+      "git_blob_sha1": "3b53934bb762211e3e945a4b8662c84f09c7aea5"
+    },
+    {
+      "path": "Instances/048_16_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_16_big_05.txt",
+      "bytes": 6258,
+      "sha256": "56b4afcaee75d054f7cf920e6bbb4a6ce0a3c73c3f7b824570f6db07b19a5b67",
+      "git_blob_sha1": "e008d1054dce56da95c1e0a283a879747394dfdd"
+    },
+    {
+      "path": "Instances/048_16_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_16_small_01.txt",
+      "bytes": 6258,
+      "sha256": "b124b30cebc957af7c5e6fc8ddeddcb8524d99978a0afc34908e97513a26f746",
+      "git_blob_sha1": "5225b2727cbdb2d2203d1fdc55959160129b1216"
+    },
+    {
+      "path": "Instances/048_16_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_16_small_02.txt",
+      "bytes": 6258,
+      "sha256": "abc3ad6ae3c1020476045a43246344ac52e8e540316ebc2124a91abf5b717f08",
+      "git_blob_sha1": "fefa75d87829d9807323f28ed4bd54b476cc198c"
+    },
+    {
+      "path": "Instances/048_16_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_16_small_03.txt",
+      "bytes": 6258,
+      "sha256": "6cba6b6f6b61bcb45000f1c4a426e434834731c801b91566ca861add1a115cd8",
+      "git_blob_sha1": "e8b35b7a6ff0c083c0b8f8d2cffbb2bb5b82d29c"
+    },
+    {
+      "path": "Instances/048_16_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_16_small_04.txt",
+      "bytes": 6258,
+      "sha256": "960206e7de04b9947ae540727f38df3b89ad04ca4275ccba19d6d7c8f3fbc95b",
+      "git_blob_sha1": "1936900a9a576ddd1d2df97f768230b51f5ad2c7"
+    },
+    {
+      "path": "Instances/048_16_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/048_16_small_05.txt",
+      "bytes": 6258,
+      "sha256": "c640afa113ebf1b4548ce28000829db0cc326515acda2f7285d333f9b7944688",
+      "git_blob_sha1": "e7af2030dc74c6a9a75da2fe42849134699da8dd"
+    },
+    {
+      "path": "Instances/060_12_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_12_big_01.txt",
+      "bytes": 6825,
+      "sha256": "08571781ed2cc19fd0bfa59c207980eea23f57ab8dcd935ce63b2ff1b6feb6f3",
+      "git_blob_sha1": "afe7bdac2f20bda5b32942de8c29ad56ed5d2217"
+    },
+    {
+      "path": "Instances/060_12_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_12_big_02.txt",
+      "bytes": 6825,
+      "sha256": "68ce0bfdacbbbf86f8eac52b9123fda1d84c5cb8dd9d7a096ada049dfe59f4b2",
+      "git_blob_sha1": "a7dee9eee22cce95a39e9f36df6a06bef0294972"
+    },
+    {
+      "path": "Instances/060_12_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_12_big_03.txt",
+      "bytes": 6825,
+      "sha256": "04b0d9d9d6c631f6c4b165d32040f46da9f4986097dbe329beb0387f5f3b4bbd",
+      "git_blob_sha1": "4bb950faca9826db17b54166a2b19a85ff749013"
+    },
+    {
+      "path": "Instances/060_12_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_12_big_04.txt",
+      "bytes": 6825,
+      "sha256": "2d66f15f9d02898714db3fe01fe9dfff4183cd9e011beddaeb681d6bb9b23bcc",
+      "git_blob_sha1": "812bfe975835a108c3fc92f632a2be7b62eafae1"
+    },
+    {
+      "path": "Instances/060_12_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_12_big_05.txt",
+      "bytes": 6825,
+      "sha256": "241b5957e219943e1cea5698116732765308e5bec4f89a91dff746ae3eeeca82",
+      "git_blob_sha1": "68384497eb56bb64aa0b7ceb96c84a9e6331521a"
+    },
+    {
+      "path": "Instances/060_12_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_12_small_01.txt",
+      "bytes": 6825,
+      "sha256": "54d739490150f36952f8b892749c21231c4d9b83909ff46b1355494d8ce12b43",
+      "git_blob_sha1": "8f24ce98d6e1cc62d07a44a754726d1806ea61ab"
+    },
+    {
+      "path": "Instances/060_12_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_12_small_02.txt",
+      "bytes": 6825,
+      "sha256": "6a798fa64248cdaa53faf3f034e8367a4256a66ed1b76f26da52e8a373e44c8d",
+      "git_blob_sha1": "42d19c01805cae27e10cf871c3ff3dda638dc31f"
+    },
+    {
+      "path": "Instances/060_12_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_12_small_03.txt",
+      "bytes": 6825,
+      "sha256": "477f4b2d295bff0626b0252985d07e33d9547652279901a82df541b72b82418e",
+      "git_blob_sha1": "27195fee81da428d845ec22a00c27dacaae20329"
+    },
+    {
+      "path": "Instances/060_12_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_12_small_04.txt",
+      "bytes": 6825,
+      "sha256": "d3a2c32a0ad28cf8bace133e27aa7ed706169b25049fb613de4c03689c4d48f5",
+      "git_blob_sha1": "e13542b6139477fc1dffa5155c3c2bc9255dd991"
+    },
+    {
+      "path": "Instances/060_12_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_12_small_05.txt",
+      "bytes": 6825,
+      "sha256": "385be6dcd3efbcd8dc21c3359a24637957af342c7131409f9d798f74484a01b7",
+      "git_blob_sha1": "4bedc1548cd900192e03e582f84a757ca8b70db8"
+    },
+    {
+      "path": "Instances/060_20_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_20_big_01.txt",
+      "bytes": 7635,
+      "sha256": "c01e36cf12230cf87a5dac465be7e35ff1e20caf59a567aa98c142412fb9dc6f",
+      "git_blob_sha1": "b9838b3f0eeaecda2460070a20a66495318c012d"
+    },
+    {
+      "path": "Instances/060_20_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_20_big_02.txt",
+      "bytes": 7635,
+      "sha256": "c1890beb8f8fc24ea03cd77aa6e86bdce2ffdd4fffae4899d90f4854fc9a1b26",
+      "git_blob_sha1": "6915c4f4615beb72d63a24883c9302f84c963829"
+    },
+    {
+      "path": "Instances/060_20_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_20_big_03.txt",
+      "bytes": 7635,
+      "sha256": "95632dbe0dd306566bdbf5b3d66d61ac0962928058272089b0c6346d80be2a0e",
+      "git_blob_sha1": "00f44229f67fc8c5a6a9f13f0176cd5f8572ef4b"
+    },
+    {
+      "path": "Instances/060_20_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_20_big_04.txt",
+      "bytes": 7635,
+      "sha256": "334ac8ffb756053332cace55969efc36758389183066eb23a5c02387892b6e3d",
+      "git_blob_sha1": "f0bb384a632e3c17f4f5dc6bdede09b4edd356c8"
+    },
+    {
+      "path": "Instances/060_20_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_20_big_05.txt",
+      "bytes": 7635,
+      "sha256": "a5681318263956ce983b7361228a5e371314c9f8062d7b3a11f9cbb00f3b3b44",
+      "git_blob_sha1": "33ffd1e0a36f3f6de926d1056f0be0d13555d972"
+    },
+    {
+      "path": "Instances/060_20_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_20_small_01.txt",
+      "bytes": 7635,
+      "sha256": "7db91587c58544b31891c762d50d89c152ecaf532fd22aaa433d8b78b6364218",
+      "git_blob_sha1": "2a306ac262d267079e920c8f1e82ee1d325bb02d"
+    },
+    {
+      "path": "Instances/060_20_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_20_small_02.txt",
+      "bytes": 7635,
+      "sha256": "1557342e91441cbdceaf54d48eb28ff568281c7f37a663378bbe2faf36846804",
+      "git_blob_sha1": "1e651f012862506c3843ee0e0b503d346ebea7e9"
+    },
+    {
+      "path": "Instances/060_20_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_20_small_03.txt",
+      "bytes": 7635,
+      "sha256": "331a42bfe2cb9cd66363db49162da8f689b39ad0a9e46a909b282e378c991dae",
+      "git_blob_sha1": "cdaca56ae1d870954a595b8f531918ef91d7089d"
+    },
+    {
+      "path": "Instances/060_20_small_04 copy.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_20_small_04 copy.txt",
+      "bytes": 7635,
+      "sha256": "961cff470b0135ed7ec92f33f2e3e52619b84b631a377a7ac86e46f8c804dd8e",
+      "git_blob_sha1": "347cad1d64505029e6297d8c6cb26abdb1ef6e8b"
+    },
+    {
+      "path": "Instances/060_20_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_20_small_04.txt",
+      "bytes": 7635,
+      "sha256": "8a87f2d48d37cc7c8c41f6b6ac534a78b1a862cc98af33145e56e4b83d0380b4",
+      "git_blob_sha1": "5ec2051bf2de7a2ffbe7f47ee5459aebec57b617"
+    },
+    {
+      "path": "Instances/060_20_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/060_20_small_05.txt",
+      "bytes": 7635,
+      "sha256": "0d13d8db968079f2172624c193f3faa0fda06e850c7caa558cfbe30be06f3f08",
+      "git_blob_sha1": "9400c167040dc62b0f37daeb8ef6e27c8369570f"
+    },
+    {
+      "path": "Instances/064_16_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/064_16_big_01.txt",
+      "bytes": 7554,
+      "sha256": "78ef35b22e6d5271488caaecafb07d350dbe4925696de467e12a158bc496e821",
+      "git_blob_sha1": "b5f3de8c420215a737d9887fa818e4c593fd1f28"
+    },
+    {
+      "path": "Instances/064_16_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/064_16_big_02.txt",
+      "bytes": 7554,
+      "sha256": "ac8340fb2a94afc736c8b82821525af31dbcd0c7b58c3b92ea19045fdd60e0e3",
+      "git_blob_sha1": "e58db732cd4603146001a5603981abc6fc3f4b05"
+    },
+    {
+      "path": "Instances/064_16_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/064_16_big_03.txt",
+      "bytes": 7554,
+      "sha256": "181b10dc79b2b450128e078ae10db7574506f6f0206ff4c6179043212e0af8b0",
+      "git_blob_sha1": "873c86778f81999eedf54c40cb0e9774f7e43ccb"
+    },
+    {
+      "path": "Instances/064_16_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/064_16_big_04.txt",
+      "bytes": 7554,
+      "sha256": "231ca0e5c3f139fb5f63d5afa1f4db2721337e1689d7c9197c22b40777bdfbff",
+      "git_blob_sha1": "8df659c98aeaaf2c58028ef1ad8df33e93b0ac90"
+    },
+    {
+      "path": "Instances/064_16_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/064_16_big_05.txt",
+      "bytes": 7554,
+      "sha256": "40bbe92faf5a59f9e7daf7b1d648b93b612060c3b40d78a5ca488c8215f49895",
+      "git_blob_sha1": "0a65897f9e1aa31fe327249bd312c6e20fde060b"
+    },
+    {
+      "path": "Instances/064_16_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/064_16_small_01.txt",
+      "bytes": 7554,
+      "sha256": "93ab568285922aba5902993d7b1af36a7c9594558d46ba5bc6245ae2170b4b8b",
+      "git_blob_sha1": "35d5da06c5accc20c18c5e39ad85b6c264113061"
+    },
+    {
+      "path": "Instances/064_16_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/064_16_small_02.txt",
+      "bytes": 7554,
+      "sha256": "e3d637c20ba4b7a75b86884708094529555ab4a73c30a1f4cbc6eb73a5e4f158",
+      "git_blob_sha1": "92fed9c0a8c4718aa5b3678162ecdcc142051f15"
+    },
+    {
+      "path": "Instances/064_16_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/064_16_small_03.txt",
+      "bytes": 7554,
+      "sha256": "d9a2d937c528a6e684bd76c7f6274d13b251b536560bf8d50b608f0f5550c885",
+      "git_blob_sha1": "3c611e2e9355d0982b40f13519a8ee3bea789663"
+    },
+    {
+      "path": "Instances/064_16_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/064_16_small_04.txt",
+      "bytes": 7554,
+      "sha256": "dff38bb91d287850b543da472dc3244579e6fbaa9573a7967ad55b3d0b091155",
+      "git_blob_sha1": "3122a0bf6822b29d3215d856c52fb4d701af3f7f"
+    },
+    {
+      "path": "Instances/064_16_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/064_16_small_05.txt",
+      "bytes": 7554,
+      "sha256": "3f104520da4d3405c09cbe13fb5a80765bcf2c16bd2232b8679f0bb63a7ff4df",
+      "git_blob_sha1": "7d9410b1faff6bac65e2bbd1fd3d70365ed31559"
+    },
+    {
+      "path": "Instances/080_16_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_16_big_01.txt",
+      "bytes": 8850,
+      "sha256": "a8416d4355ed3db54646f469c760eecf481338fb005b9eed3bf8a809cade5efb",
+      "git_blob_sha1": "ff3f114b6ac1313773a27aefad4baeeca580c028"
+    },
+    {
+      "path": "Instances/080_16_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_16_big_02.txt",
+      "bytes": 8850,
+      "sha256": "00a957af511f6464792c1e37745ba3803452fdf606ed0b836433c621180ead05",
+      "git_blob_sha1": "fc8324af75a8f6f4e3996b375c6b5b8676a1f01f"
+    },
+    {
+      "path": "Instances/080_16_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_16_big_03.txt",
+      "bytes": 8850,
+      "sha256": "f885dcded1082cc28c40422d40555ef97006c4203b7592a06a52d4c14fc0e87a",
+      "git_blob_sha1": "4d783aeeddbde69d55515793bd473dca40a7b87e"
+    },
+    {
+      "path": "Instances/080_16_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_16_big_04.txt",
+      "bytes": 8850,
+      "sha256": "b3b2f73d9c0f5eea42836c0eee2294e5ddf1c3363a2e6f5c3382ef82fd9a2acd",
+      "git_blob_sha1": "a6ca3b8a53ab067273cb7d77f4fefb3afaaed377"
+    },
+    {
+      "path": "Instances/080_16_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_16_big_05.txt",
+      "bytes": 8850,
+      "sha256": "bf3287b35f53e1a455ce0e89335eb5ae0c94565803857292996e71774f61efda",
+      "git_blob_sha1": "980040e8e2c444f005b1d901b48299abfd887874"
+    },
+    {
+      "path": "Instances/080_16_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_16_small_01.txt",
+      "bytes": 8850,
+      "sha256": "2b55cd7cc8eed73099744a0e800a533b631fdbc3290dbe23e832a95e760b4742",
+      "git_blob_sha1": "33478cc34aaf360bb99fa5c68f12f1e1f6381c0e"
+    },
+    {
+      "path": "Instances/080_16_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_16_small_02.txt",
+      "bytes": 8850,
+      "sha256": "1fd81490ba9720a093f835d467b8ec88e4032035eeda6b7f309d2297bad1e64c",
+      "git_blob_sha1": "b6f765b916a5dc40646335cce3589e542122f914"
+    },
+    {
+      "path": "Instances/080_16_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_16_small_03.txt",
+      "bytes": 8850,
+      "sha256": "74f727466de21f823fc8312a880e8e164d8923703ac9a18ae46d0f9cc6da967a",
+      "git_blob_sha1": "739662ba094044b724341232b6abee530d135788"
+    },
+    {
+      "path": "Instances/080_16_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_16_small_04.txt",
+      "bytes": 8850,
+      "sha256": "b9b5d9d0afb2ea905f39bcee772a66dda815eb039ce0c27547f03a5d288018cb",
+      "git_blob_sha1": "29f9766d330f34f62a83bfc389ca224ca130b8fc"
+    },
+    {
+      "path": "Instances/080_16_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_16_small_05.txt",
+      "bytes": 8850,
+      "sha256": "83e11e04bc02a5afb2a2eada723c29d1c906b8db7da8ea4f3680bdd375605118",
+      "git_blob_sha1": "e7ae5141003b943eeff58ada5ba9c773b318446f"
+    },
+    {
+      "path": "Instances/080_20_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_20_big_01.txt",
+      "bytes": 9255,
+      "sha256": "7dbdcbd03a4dbd1804d044ed212fb4045a15556d19ee93d058711bbf983c5968",
+      "git_blob_sha1": "0d664a92649781a83c18c7c9779f9a42a71d3bab"
+    },
+    {
+      "path": "Instances/080_20_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_20_big_02.txt",
+      "bytes": 9255,
+      "sha256": "6d54e8b6e07c13e1b2609d0dbf5289e6f445050d5d9318e059c95201722dcd53",
+      "git_blob_sha1": "b22dd9dc90c18757358e2a48efb367740a043925"
+    },
+    {
+      "path": "Instances/080_20_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_20_big_03.txt",
+      "bytes": 9255,
+      "sha256": "7a7d156d769a80a7f38d6106139a916907850a2c8531d39745b002d1e9e3f5f2",
+      "git_blob_sha1": "75e12104fc6ebac27a0064f1133e2720c18cd9a4"
+    },
+    {
+      "path": "Instances/080_20_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_20_big_04.txt",
+      "bytes": 9255,
+      "sha256": "51e7d88b6142284dd4b89aa415272f7046733f99854edde1f5e59b1a6b223da9",
+      "git_blob_sha1": "1e8cf6dcbe75dabe6db5d3b18da930b168927766"
+    },
+    {
+      "path": "Instances/080_20_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_20_big_05.txt",
+      "bytes": 9255,
+      "sha256": "18129d009098ede637251cbda0243aabafdbc77b2c8d9546a89b76790e361c83",
+      "git_blob_sha1": "7d61377aefbdde25754858d24406314bb8899f11"
+    },
+    {
+      "path": "Instances/080_20_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_20_small_01.txt",
+      "bytes": 9255,
+      "sha256": "dbe10f09b316ac680120d7ce3524802a7ef53d4344fc1d5299306e577fc9c2a0",
+      "git_blob_sha1": "4e84667c66afd98d011613f717e5d0cc687b6d53"
+    },
+    {
+      "path": "Instances/080_20_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_20_small_02.txt",
+      "bytes": 9255,
+      "sha256": "4b1a483c3dff7afabb22aa79a9680985d329499c8bd4081238124fe15dce98be",
+      "git_blob_sha1": "94fcd6e57177acaacb1f0f00a0a9f456398aadd8"
+    },
+    {
+      "path": "Instances/080_20_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_20_small_03.txt",
+      "bytes": 9255,
+      "sha256": "ffc07b536d5356f190fd6c4ba94a29a84806095ad021cc86582d516072eeb02d",
+      "git_blob_sha1": "9b8f25f326efa5a173e5a18d27233c56b8062876"
+    },
+    {
+      "path": "Instances/080_20_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_20_small_04.txt",
+      "bytes": 9255,
+      "sha256": "0cb711653c9abac991e695f68f43ee34e05e1d505c7ecd32eb62247840d3c9c3",
+      "git_blob_sha1": "dac7539f47eb8683895f2232c088eab4d5681740"
+    },
+    {
+      "path": "Instances/080_20_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/080_20_small_05.txt",
+      "bytes": 9255,
+      "sha256": "e33eb49d5963103be7e21365ed940f45fe05ea5e7a195e3756ea710d44f7a2a8",
+      "git_blob_sha1": "cd0d31fc3cb93f7be10625ebf35d7259e03ed494"
+    },
+    {
+      "path": "Instances/100_20_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/100_20_big_01.txt",
+      "bytes": 10875,
+      "sha256": "c053c757b100dc12ff4b8d1213583416d868b5281cfb83a0310d7e0246c34217",
+      "git_blob_sha1": "a2a4987d305aeefc8e59f1062a3c6f64b3f60831"
+    },
+    {
+      "path": "Instances/100_20_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/100_20_big_02.txt",
+      "bytes": 10875,
+      "sha256": "3d8bad5746f98c4cf1be73fe358b49611eda6a56026e0ce6c6b07f1248f1c1a0",
+      "git_blob_sha1": "fed98f0e2c70a36ee36fef977bf6e191e5f30317"
+    },
+    {
+      "path": "Instances/100_20_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/100_20_big_03.txt",
+      "bytes": 10875,
+      "sha256": "6ff606c8b638c5aee3c4005ad05a778a2f40415a31cf8c429ef6f59e50108220",
+      "git_blob_sha1": "af781d3fbcb12c5d1820fc4da5b76b30e53a4c83"
+    },
+    {
+      "path": "Instances/100_20_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/100_20_big_04.txt",
+      "bytes": 10875,
+      "sha256": "023a6900630b249ffd73216bc3af5c08e7d22826eb75bdb46320f4efd519a253",
+      "git_blob_sha1": "fab6e5393a0160d57b6ef595d863063478f5466b"
+    },
+    {
+      "path": "Instances/100_20_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/100_20_big_05.txt",
+      "bytes": 10875,
+      "sha256": "2f4ef1b1c6a9802b4168fc43a7d79dd08b1621c326777860dff192d1e184ab51",
+      "git_blob_sha1": "91063d353a7861838273962bd89911568511fc6f"
+    },
+    {
+      "path": "Instances/100_20_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/100_20_small_01.txt",
+      "bytes": 10875,
+      "sha256": "ba72dfd96acd61066519bec544c33f8a5a1b2a4879e447f8eade65016bf01333",
+      "git_blob_sha1": "ea6f3014e401fd4ef5e9f78170a593ee1d5104ec"
+    },
+    {
+      "path": "Instances/100_20_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/100_20_small_02.txt",
+      "bytes": 10875,
+      "sha256": "35f8ff1a4c6f1817a97f41551118cf1761dd0bcfdc201a9b10290838aa3f8890",
+      "git_blob_sha1": "4c1f07dd3928d889b51f3b3ba318ab2bd1e007b7"
+    },
+    {
+      "path": "Instances/100_20_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/100_20_small_03.txt",
+      "bytes": 10875,
+      "sha256": "5eba4c5b8a6922e5c82e9346b223d8365611e2c9d324b2f315dd7b4539a100a3",
+      "git_blob_sha1": "ecaedea40fe5f8d74c69b6faa39d4d4f3c23b88e"
+    },
+    {
+      "path": "Instances/100_20_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/100_20_small_04.txt",
+      "bytes": 10875,
+      "sha256": "5fbc4236e5dc683cc584d889d2d676da0131bdab02572fba8f49542d32bd046d",
+      "git_blob_sha1": "dd30f19b8793be9f711380ecce508faad01f5418"
+    },
+    {
+      "path": "Instances/100_20_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Instances/100_20_small_05.txt",
+      "bytes": 10875,
+      "sha256": "563cc81768efd73e03911280e36a24893e567128c5ea86f7e70dd088a7eb2cf9",
+      "git_blob_sha1": "7c44e97b55904308c87a215019eeff9de9719b01"
+    },
+    {
+      "path": "Solutions/016_08_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_big_01.txt",
+      "bytes": 327,
+      "sha256": "d5f90ba3f8c02c159559bffc4a698707a8e568fa50dd46ec70a817a42aaa24dd",
+      "git_blob_sha1": "dbd0f187af004228e6e1351d7e7e4ec22d3faa34"
+    },
+    {
+      "path": "Solutions/016_08_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_big_01_benchmark.txt",
+      "bytes": 327,
+      "sha256": "d5f90ba3f8c02c159559bffc4a698707a8e568fa50dd46ec70a817a42aaa24dd",
+      "git_blob_sha1": "dbd0f187af004228e6e1351d7e7e4ec22d3faa34"
+    },
+    {
+      "path": "Solutions/016_08_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_big_02.txt",
+      "bytes": 334,
+      "sha256": "1ecac570f15d966ab59f56081e1c0ad69d2ead18fb90d70cd6773236911f903f",
+      "git_blob_sha1": "115c2baf91acdab25cf85c631fc5edd0dc370afa"
+    },
+    {
+      "path": "Solutions/016_08_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_big_02_benchmark.txt",
+      "bytes": 334,
+      "sha256": "1ecac570f15d966ab59f56081e1c0ad69d2ead18fb90d70cd6773236911f903f",
+      "git_blob_sha1": "115c2baf91acdab25cf85c631fc5edd0dc370afa"
+    },
+    {
+      "path": "Solutions/016_08_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_big_03.txt",
+      "bytes": 334,
+      "sha256": "ce03f63722b9ad3076183476c8da8b20fa460e9b1fae36c6db1e25f534815c31",
+      "git_blob_sha1": "89a582a4758a58a4b8b7c65d61eb50c7a8190074"
+    },
+    {
+      "path": "Solutions/016_08_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_big_03_benchmark.txt",
+      "bytes": 334,
+      "sha256": "ce03f63722b9ad3076183476c8da8b20fa460e9b1fae36c6db1e25f534815c31",
+      "git_blob_sha1": "89a582a4758a58a4b8b7c65d61eb50c7a8190074"
+    },
+    {
+      "path": "Solutions/016_08_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_big_04.txt",
+      "bytes": 327,
+      "sha256": "3468ba69f100d8bf538f0b61bf8e92a9c96951836aabee289475d90c86a2128c",
+      "git_blob_sha1": "4b32bdd87d43df7a3de9fc44d7b41f6318b2993f"
+    },
+    {
+      "path": "Solutions/016_08_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_big_04_benchmark.txt",
+      "bytes": 327,
+      "sha256": "3468ba69f100d8bf538f0b61bf8e92a9c96951836aabee289475d90c86a2128c",
+      "git_blob_sha1": "4b32bdd87d43df7a3de9fc44d7b41f6318b2993f"
+    },
+    {
+      "path": "Solutions/016_08_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_big_05.txt",
+      "bytes": 327,
+      "sha256": "dd87aa07b8d67b4068a22a2c35a1d4d2eb4a20109a48985e670450367ec2ff93",
+      "git_blob_sha1": "cecbd7806487b726c3f1c6c1ce86c2409251c26f"
+    },
+    {
+      "path": "Solutions/016_08_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_big_05_benchmark.txt",
+      "bytes": 327,
+      "sha256": "dd87aa07b8d67b4068a22a2c35a1d4d2eb4a20109a48985e670450367ec2ff93",
+      "git_blob_sha1": "cecbd7806487b726c3f1c6c1ce86c2409251c26f"
+    },
+    {
+      "path": "Solutions/016_08_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_small_01.txt",
+      "bytes": 327,
+      "sha256": "d5f90ba3f8c02c159559bffc4a698707a8e568fa50dd46ec70a817a42aaa24dd",
+      "git_blob_sha1": "dbd0f187af004228e6e1351d7e7e4ec22d3faa34"
+    },
+    {
+      "path": "Solutions/016_08_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_small_01_benchmark.txt",
+      "bytes": 327,
+      "sha256": "d5f90ba3f8c02c159559bffc4a698707a8e568fa50dd46ec70a817a42aaa24dd",
+      "git_blob_sha1": "dbd0f187af004228e6e1351d7e7e4ec22d3faa34"
+    },
+    {
+      "path": "Solutions/016_08_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_small_02.txt",
+      "bytes": 377,
+      "sha256": "297b0c261cb05b64813fcb9a5eccd5f41b9fbf842066830c27ae280085a39411",
+      "git_blob_sha1": "d4930e9ca91da9723ffc699d619f885d9681940e"
+    },
+    {
+      "path": "Solutions/016_08_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_small_02_benchmark.txt",
+      "bytes": 377,
+      "sha256": "db6c8a8ccb4ab3cddf1c5422d5c13e1188df087437417a7c1af4c3b354dff527",
+      "git_blob_sha1": "cff384581d6180fa64b3e4c3b6611fe5b03995f7"
+    },
+    {
+      "path": "Solutions/016_08_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_small_03.txt",
+      "bytes": 334,
+      "sha256": "b8caa35e3e61a1808e2aab4529172a10427fb3f9be9664015d3eda9469bb6986",
+      "git_blob_sha1": "8d86485ec78fa4be3f473ae7383f0dbc6834c9fb"
+    },
+    {
+      "path": "Solutions/016_08_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_small_03_benchmark.txt",
+      "bytes": 334,
+      "sha256": "b8caa35e3e61a1808e2aab4529172a10427fb3f9be9664015d3eda9469bb6986",
+      "git_blob_sha1": "8d86485ec78fa4be3f473ae7383f0dbc6834c9fb"
+    },
+    {
+      "path": "Solutions/016_08_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_small_04.txt",
+      "bytes": 334,
+      "sha256": "aa4b15d798385ab6dfb6e55e94947537f80c80904a1537e73824e705461adda0",
+      "git_blob_sha1": "84ce7fe69179876a7475e530cb554e3ccbfefe31"
+    },
+    {
+      "path": "Solutions/016_08_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_small_04_benchmark.txt",
+      "bytes": 334,
+      "sha256": "aa4b15d798385ab6dfb6e55e94947537f80c80904a1537e73824e705461adda0",
+      "git_blob_sha1": "84ce7fe69179876a7475e530cb554e3ccbfefe31"
+    },
+    {
+      "path": "Solutions/016_08_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_small_05.txt",
+      "bytes": 370,
+      "sha256": "034c5776ad5cffdc976a4fe50d0dc79e612e4a6e0b94958cfce8db7b5446ff73",
+      "git_blob_sha1": "e00e9d3425e5513e76ba3a02857dae7973681ec8"
+    },
+    {
+      "path": "Solutions/016_08_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/016_08_small_05_benchmark.txt",
+      "bytes": 370,
+      "sha256": "034c5776ad5cffdc976a4fe50d0dc79e612e4a6e0b94958cfce8db7b5446ff73",
+      "git_blob_sha1": "e00e9d3425e5513e76ba3a02857dae7973681ec8"
+    },
+    {
+      "path": "Solutions/024_08_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_big_01.txt",
+      "bytes": 389,
+      "sha256": "bed88a6fa584be6d16fdee05e27ea7e3de7a0d7aaf6e3961007df8a2fa817b7a",
+      "git_blob_sha1": "d89b802fc796971b5cc97bba8dc6b5ce3d2103ad"
+    },
+    {
+      "path": "Solutions/024_08_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_big_01_benchmark.txt",
+      "bytes": 389,
+      "sha256": "b1a9767c13bc9a292a7791e5f6ca7ba389ae4edcadd08352ae543faa335470d8",
+      "git_blob_sha1": "8a586aef1f7309d9e3fcf0d03c3b6edfec0e409f"
+    },
+    {
+      "path": "Solutions/024_08_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_big_02.txt",
+      "bytes": 425,
+      "sha256": "68f4444fbbc9f959a03dac03d9b335caf0c462e56e86000ce75a1cbd75fb2507",
+      "git_blob_sha1": "43115100550675c147b35adf928298761ddafa4d"
+    },
+    {
+      "path": "Solutions/024_08_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_big_02_benchmark.txt",
+      "bytes": 425,
+      "sha256": "68f4444fbbc9f959a03dac03d9b335caf0c462e56e86000ce75a1cbd75fb2507",
+      "git_blob_sha1": "43115100550675c147b35adf928298761ddafa4d"
+    },
+    {
+      "path": "Solutions/024_08_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_big_03.txt",
+      "bytes": 389,
+      "sha256": "7fdc3ea1ff915cb14d3efb6d285ea0e658036edb4b70e8aa7091df2df3f8207c",
+      "git_blob_sha1": "01ab99ae15bdec1996a777bc2f20e5df209cd483"
+    },
+    {
+      "path": "Solutions/024_08_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_big_03_benchmark.txt",
+      "bytes": 389,
+      "sha256": "7fdc3ea1ff915cb14d3efb6d285ea0e658036edb4b70e8aa7091df2df3f8207c",
+      "git_blob_sha1": "01ab99ae15bdec1996a777bc2f20e5df209cd483"
+    },
+    {
+      "path": "Solutions/024_08_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_big_04.txt",
+      "bytes": 425,
+      "sha256": "0976b2d7d2e38a12408f25b7b79544ea1d564aaca9625b99f532c03217dd1d1d",
+      "git_blob_sha1": "0cb4a2ea88ae637d85a30be9d564a265625436a7"
+    },
+    {
+      "path": "Solutions/024_08_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_big_04_benchmark.txt",
+      "bytes": 425,
+      "sha256": "0976b2d7d2e38a12408f25b7b79544ea1d564aaca9625b99f532c03217dd1d1d",
+      "git_blob_sha1": "0cb4a2ea88ae637d85a30be9d564a265625436a7"
+    },
+    {
+      "path": "Solutions/024_08_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_big_05.txt",
+      "bytes": 382,
+      "sha256": "f7ff25cab97f4054c1854d3678cfbd774d0ab679420b1f513568b8e8793bbf69",
+      "git_blob_sha1": "bd20bcfb97fb3a2dba3764e195eda9832f59d3d7"
+    },
+    {
+      "path": "Solutions/024_08_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_big_05_benchmark.txt",
+      "bytes": 382,
+      "sha256": "f7ff25cab97f4054c1854d3678cfbd774d0ab679420b1f513568b8e8793bbf69",
+      "git_blob_sha1": "bd20bcfb97fb3a2dba3764e195eda9832f59d3d7"
+    },
+    {
+      "path": "Solutions/024_08_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_small_01.txt",
+      "bytes": 439,
+      "sha256": "fb763d551df83e16180b9567c9191e3a19b9aa128f891b671cfa3d934c434e5e",
+      "git_blob_sha1": "198c7c7e0024bf85c27c8e9abd3a6f46ba0fbb61"
+    },
+    {
+      "path": "Solutions/024_08_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_small_01_benchmark.txt",
+      "bytes": 439,
+      "sha256": "fb763d551df83e16180b9567c9191e3a19b9aa128f891b671cfa3d934c434e5e",
+      "git_blob_sha1": "198c7c7e0024bf85c27c8e9abd3a6f46ba0fbb61"
+    },
+    {
+      "path": "Solutions/024_08_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_small_02.txt",
+      "bytes": 432,
+      "sha256": "358b13e730ed6738a95940ad14e7500b4d413dcaa0e87abfe769d56213a61aea",
+      "git_blob_sha1": "192b2643147937d0fef226c4b11c023fc3a620c9"
+    },
+    {
+      "path": "Solutions/024_08_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_small_02_benchmark.txt",
+      "bytes": 432,
+      "sha256": "358b13e730ed6738a95940ad14e7500b4d413dcaa0e87abfe769d56213a61aea",
+      "git_blob_sha1": "192b2643147937d0fef226c4b11c023fc3a620c9"
+    },
+    {
+      "path": "Solutions/024_08_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_small_03.txt",
+      "bytes": 432,
+      "sha256": "f5e4d02b2b76722300583753a2b7e06808f7e1021080a0792b73d0e467dc2e0c",
+      "git_blob_sha1": "3638b46ee21b12f46c44ffc5d7c74e44c5abfee5"
+    },
+    {
+      "path": "Solutions/024_08_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_small_03_benchmark.txt",
+      "bytes": 432,
+      "sha256": "f5e4d02b2b76722300583753a2b7e06808f7e1021080a0792b73d0e467dc2e0c",
+      "git_blob_sha1": "3638b46ee21b12f46c44ffc5d7c74e44c5abfee5"
+    },
+    {
+      "path": "Solutions/024_08_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_small_04.txt",
+      "bytes": 432,
+      "sha256": "9532a188c3e665aaa48602b59b0aa21c11dc5183965d1887cc149e49d35d5de5",
+      "git_blob_sha1": "cd5ec6d8aac922196d54aaf903dfb78d267a2eb1"
+    },
+    {
+      "path": "Solutions/024_08_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_small_04_benchmark.txt",
+      "bytes": 432,
+      "sha256": "9532a188c3e665aaa48602b59b0aa21c11dc5183965d1887cc149e49d35d5de5",
+      "git_blob_sha1": "cd5ec6d8aac922196d54aaf903dfb78d267a2eb1"
+    },
+    {
+      "path": "Solutions/024_08_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_small_05.txt",
+      "bytes": 425,
+      "sha256": "e879f73fa8edbdb561ada755159646251a9602f2bdbdee647a6af11dd990cc4e",
+      "git_blob_sha1": "acf92136fcf9b1b6d86e1f50010b9f69a36b958f"
+    },
+    {
+      "path": "Solutions/024_08_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_08_small_05_benchmark.txt",
+      "bytes": 425,
+      "sha256": "e879f73fa8edbdb561ada755159646251a9602f2bdbdee647a6af11dd990cc4e",
+      "git_blob_sha1": "acf92136fcf9b1b6d86e1f50010b9f69a36b958f"
+    },
+    {
+      "path": "Solutions/024_12_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_big_01.txt",
+      "bytes": 403,
+      "sha256": "04bf1edefe680e91d81ba654e1d1958fafede5e3fafb12d03c5bf0782cec2970",
+      "git_blob_sha1": "391ed01faa197a4ae57ed987c13eb29bb9454a80"
+    },
+    {
+      "path": "Solutions/024_12_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_big_01_benchmark.txt",
+      "bytes": 403,
+      "sha256": "04bf1edefe680e91d81ba654e1d1958fafede5e3fafb12d03c5bf0782cec2970",
+      "git_blob_sha1": "391ed01faa197a4ae57ed987c13eb29bb9454a80"
+    },
+    {
+      "path": "Solutions/024_12_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_big_02.txt",
+      "bytes": 439,
+      "sha256": "57828e9a02d2923fb9e880592939981a2c8e04aeae3587a2630d7810576876a2",
+      "git_blob_sha1": "e0ba9f2b367c5bd8c1c5d42c7a410478f5126e36"
+    },
+    {
+      "path": "Solutions/024_12_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_big_02_benchmark.txt",
+      "bytes": 439,
+      "sha256": "57828e9a02d2923fb9e880592939981a2c8e04aeae3587a2630d7810576876a2",
+      "git_blob_sha1": "e0ba9f2b367c5bd8c1c5d42c7a410478f5126e36"
+    },
+    {
+      "path": "Solutions/024_12_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_big_03.txt",
+      "bytes": 453,
+      "sha256": "84b24a31b91235ffc7772f8d941b634ce7e1f99695380411cc8f212d55279395",
+      "git_blob_sha1": "daf412f3847b0f97bacd397deab2825e67473e2c"
+    },
+    {
+      "path": "Solutions/024_12_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_big_03_benchmark.txt",
+      "bytes": 453,
+      "sha256": "84b24a31b91235ffc7772f8d941b634ce7e1f99695380411cc8f212d55279395",
+      "git_blob_sha1": "daf412f3847b0f97bacd397deab2825e67473e2c"
+    },
+    {
+      "path": "Solutions/024_12_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_big_04.txt",
+      "bytes": 453,
+      "sha256": "db32d95d02a26bea58823d9f7c39c9f962615a74fd48992e2a9fe1025b85b6e7",
+      "git_blob_sha1": "aacc01e187533122cab3bfbcad20466159a70e26"
+    },
+    {
+      "path": "Solutions/024_12_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_big_04_benchmark.txt",
+      "bytes": 453,
+      "sha256": "db32d95d02a26bea58823d9f7c39c9f962615a74fd48992e2a9fe1025b85b6e7",
+      "git_blob_sha1": "aacc01e187533122cab3bfbcad20466159a70e26"
+    },
+    {
+      "path": "Solutions/024_12_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_big_05.txt",
+      "bytes": 410,
+      "sha256": "77f5473a1c7c1d5e4bc66533f1f5b72efbbbb385ca4ed63b83f8cfca83af3ca4",
+      "git_blob_sha1": "30a8dffaebd7970ab6050bbb4452b828b285b4a5"
+    },
+    {
+      "path": "Solutions/024_12_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_big_05_benchmark.txt",
+      "bytes": 410,
+      "sha256": "77f5473a1c7c1d5e4bc66533f1f5b72efbbbb385ca4ed63b83f8cfca83af3ca4",
+      "git_blob_sha1": "30a8dffaebd7970ab6050bbb4452b828b285b4a5"
+    },
+    {
+      "path": "Solutions/024_12_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_small_01.txt",
+      "bytes": 410,
+      "sha256": "4d9f224964cd760d9b9534e6ea1e47b93dc0cba972f4053cd0dcf513c8f9f579",
+      "git_blob_sha1": "d8a119ed262d7301892cb228c18759fa41134d2e"
+    },
+    {
+      "path": "Solutions/024_12_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_small_01_benchmark.txt",
+      "bytes": 410,
+      "sha256": "4d9f224964cd760d9b9534e6ea1e47b93dc0cba972f4053cd0dcf513c8f9f579",
+      "git_blob_sha1": "d8a119ed262d7301892cb228c18759fa41134d2e"
+    },
+    {
+      "path": "Solutions/024_12_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_small_02.txt",
+      "bytes": 446,
+      "sha256": "ee53b2a4e59d16820d0e3ee33ff01f72e5564992560d103e9a1934a774b5d82e",
+      "git_blob_sha1": "a5ad2a570ea7fa46afad68ad961019e2b013675f"
+    },
+    {
+      "path": "Solutions/024_12_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_small_02_benchmark.txt",
+      "bytes": 446,
+      "sha256": "ee53b2a4e59d16820d0e3ee33ff01f72e5564992560d103e9a1934a774b5d82e",
+      "git_blob_sha1": "a5ad2a570ea7fa46afad68ad961019e2b013675f"
+    },
+    {
+      "path": "Solutions/024_12_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_small_03.txt",
+      "bytes": 453,
+      "sha256": "3e6cd9afd0bc4e7dfc5365001edb769f4b45a299ccad873a623213997d93e198",
+      "git_blob_sha1": "08f64f293e4be168821f6a480ddbbe7d9799a292"
+    },
+    {
+      "path": "Solutions/024_12_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_small_03_benchmark.txt",
+      "bytes": 453,
+      "sha256": "3e6cd9afd0bc4e7dfc5365001edb769f4b45a299ccad873a623213997d93e198",
+      "git_blob_sha1": "08f64f293e4be168821f6a480ddbbe7d9799a292"
+    },
+    {
+      "path": "Solutions/024_12_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_small_04.txt",
+      "bytes": 446,
+      "sha256": "5e746ecae56cb087ffd7e29398194c974a9d6079580cd5028499f20e104c728c",
+      "git_blob_sha1": "6004591fe9cd27949162ea2b1ce36ecdb993cb91"
+    },
+    {
+      "path": "Solutions/024_12_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_small_04_benchmark.txt",
+      "bytes": 446,
+      "sha256": "5e746ecae56cb087ffd7e29398194c974a9d6079580cd5028499f20e104c728c",
+      "git_blob_sha1": "6004591fe9cd27949162ea2b1ce36ecdb993cb91"
+    },
+    {
+      "path": "Solutions/024_12_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_small_05.txt",
+      "bytes": 460,
+      "sha256": "58efd469c8ea60adb1e2eb3222743b13cca70c9f1ef5ea902c763f2963650597",
+      "git_blob_sha1": "731c1bf8254f38b1cc6aa9aa6a46ece8b3bcc06d"
+    },
+    {
+      "path": "Solutions/024_12_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/024_12_small_05_benchmark.txt",
+      "bytes": 460,
+      "sha256": "58efd469c8ea60adb1e2eb3222743b13cca70c9f1ef5ea902c763f2963650597",
+      "git_blob_sha1": "731c1bf8254f38b1cc6aa9aa6a46ece8b3bcc06d"
+    },
+    {
+      "path": "Solutions/032_08_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_big_01.txt",
+      "bytes": 480,
+      "sha256": "4c369d88cc691f83f648561d96230c5ee838f4f5fc5ff751020bf0b786d93049",
+      "git_blob_sha1": "423d16bc5da5c50977342dfebf17fa1dab6fbdaa"
+    },
+    {
+      "path": "Solutions/032_08_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_big_01_benchmark.txt",
+      "bytes": 480,
+      "sha256": "4c369d88cc691f83f648561d96230c5ee838f4f5fc5ff751020bf0b786d93049",
+      "git_blob_sha1": "423d16bc5da5c50977342dfebf17fa1dab6fbdaa"
+    },
+    {
+      "path": "Solutions/032_08_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_big_02.txt",
+      "bytes": 480,
+      "sha256": "41e7a4696c21e8ff1a3c93c6b87e7572b900e2d29b58675906d2a6418202bc67",
+      "git_blob_sha1": "95ac0312baede022ea8a89ba726333082f7efeb4"
+    },
+    {
+      "path": "Solutions/032_08_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_big_02_benchmark.txt",
+      "bytes": 486,
+      "sha256": "25abb755b7ede85a362d2f026fcf4d6f6f44d6cf7d60987037bfad15ace6265f",
+      "git_blob_sha1": "17d494c14efc68021cad19a8365aef5741fb59db"
+    },
+    {
+      "path": "Solutions/032_08_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_big_03.txt",
+      "bytes": 444,
+      "sha256": "8cebb91d40fb2ebbe619490d493071ad97495458994dcc94e2839fd61711159b",
+      "git_blob_sha1": "cba3e638bc9f305e94cbc38bfee367e0ca8a5815"
+    },
+    {
+      "path": "Solutions/032_08_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_big_03_benchmark.txt",
+      "bytes": 444,
+      "sha256": "8cebb91d40fb2ebbe619490d493071ad97495458994dcc94e2839fd61711159b",
+      "git_blob_sha1": "cba3e638bc9f305e94cbc38bfee367e0ca8a5815"
+    },
+    {
+      "path": "Solutions/032_08_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_big_04.txt",
+      "bytes": 451,
+      "sha256": "434d7c4b66c8ea0ea4f2b5d8c3dac5f31d716cdde9bcc724718d02c5cff818c4",
+      "git_blob_sha1": "33c9c30b096acddecd2316e2be5e4660397f0d92"
+    },
+    {
+      "path": "Solutions/032_08_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_big_04_benchmark.txt",
+      "bytes": 487,
+      "sha256": "a17ce6d6818a793119406810535f74e7b43ffa49dc251e4960c6bb9d9e69c72d",
+      "git_blob_sha1": "f562b173a8899f3599fc0cd4aaae45c41dea89d6"
+    },
+    {
+      "path": "Solutions/032_08_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_big_05.txt",
+      "bytes": 430,
+      "sha256": "c72efce6adb49c7003b0421fa6e47ec3f7ff34f6310b6c135aa7616a197a7da5",
+      "git_blob_sha1": "7f673ee298ab3aea122b8993c1d8eb50d782724e"
+    },
+    {
+      "path": "Solutions/032_08_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_big_05_benchmark.txt",
+      "bytes": 430,
+      "sha256": "c72efce6adb49c7003b0421fa6e47ec3f7ff34f6310b6c135aa7616a197a7da5",
+      "git_blob_sha1": "7f673ee298ab3aea122b8993c1d8eb50d782724e"
+    },
+    {
+      "path": "Solutions/032_08_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_small_01.txt",
+      "bytes": 487,
+      "sha256": "d77c7ee7ac8ebf8a1f91abf5d160b853c422cac5d46941f48db3ee0e920dee31",
+      "git_blob_sha1": "53bc7dde914dfed233f76e69dc414a9e4e6ac105"
+    },
+    {
+      "path": "Solutions/032_08_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_small_01_benchmark.txt",
+      "bytes": 487,
+      "sha256": "d77c7ee7ac8ebf8a1f91abf5d160b853c422cac5d46941f48db3ee0e920dee31",
+      "git_blob_sha1": "53bc7dde914dfed233f76e69dc414a9e4e6ac105"
+    },
+    {
+      "path": "Solutions/032_08_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_small_02.txt",
+      "bytes": 494,
+      "sha256": "45f54aff21f814d5173a0ba00846af0b46dd425f66ecb0d06a00fca2de8afbd0",
+      "git_blob_sha1": "3bfbf30e24326a1f1de4668c7bf69cedf0259fa2"
+    },
+    {
+      "path": "Solutions/032_08_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_small_02_benchmark.txt",
+      "bytes": 494,
+      "sha256": "45f54aff21f814d5173a0ba00846af0b46dd425f66ecb0d06a00fca2de8afbd0",
+      "git_blob_sha1": "3bfbf30e24326a1f1de4668c7bf69cedf0259fa2"
+    },
+    {
+      "path": "Solutions/032_08_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_small_03.txt",
+      "bytes": 487,
+      "sha256": "36fd85a6e93c91d74d23a874167d418cb5ec16815e35c9124ea235c32fa5d430",
+      "git_blob_sha1": "8b885c192e2a078815a18f6d6dfb3c929ef9e0f9"
+    },
+    {
+      "path": "Solutions/032_08_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_small_03_benchmark.txt",
+      "bytes": 487,
+      "sha256": "36fd85a6e93c91d74d23a874167d418cb5ec16815e35c9124ea235c32fa5d430",
+      "git_blob_sha1": "8b885c192e2a078815a18f6d6dfb3c929ef9e0f9"
+    },
+    {
+      "path": "Solutions/032_08_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_small_04.txt",
+      "bytes": 544,
+      "sha256": "7b72286ca656591e7cf4d4f2558f2595bb0153e7a6c602969eaf95f41c3dff58",
+      "git_blob_sha1": "2fb21c694f64def1f2c7632ce37bb926cf54262b"
+    },
+    {
+      "path": "Solutions/032_08_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_small_04_benchmark.txt",
+      "bytes": 544,
+      "sha256": "7b72286ca656591e7cf4d4f2558f2595bb0153e7a6c602969eaf95f41c3dff58",
+      "git_blob_sha1": "2fb21c694f64def1f2c7632ce37bb926cf54262b"
+    },
+    {
+      "path": "Solutions/032_08_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_small_05.txt",
+      "bytes": 480,
+      "sha256": "bbc7d5c534756d0b3256a6d2d24ed0000b8dc012234ecaac06b1bd69d80cea15",
+      "git_blob_sha1": "1d847f2b0d4ed0daef988cc78b67ae0ecf69c636"
+    },
+    {
+      "path": "Solutions/032_08_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_08_small_05_benchmark.txt",
+      "bytes": 480,
+      "sha256": "bbc7d5c534756d0b3256a6d2d24ed0000b8dc012234ecaac06b1bd69d80cea15",
+      "git_blob_sha1": "1d847f2b0d4ed0daef988cc78b67ae0ecf69c636"
+    },
+    {
+      "path": "Solutions/032_16_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_big_01.txt",
+      "bytes": 479,
+      "sha256": "fc90e9b6ba5d804819aa396d1bc209376fe43bfbdbd28dedf5585847aafc5ddd",
+      "git_blob_sha1": "51eb9632b4c1d9061032570aa4c70d26c954da24"
+    },
+    {
+      "path": "Solutions/032_16_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_big_01_benchmark.txt",
+      "bytes": 479,
+      "sha256": "fc90e9b6ba5d804819aa396d1bc209376fe43bfbdbd28dedf5585847aafc5ddd",
+      "git_blob_sha1": "51eb9632b4c1d9061032570aa4c70d26c954da24"
+    },
+    {
+      "path": "Solutions/032_16_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_big_02.txt",
+      "bytes": 522,
+      "sha256": "fd76e06cfcd7a7e06bd4ae9a47f7324104757e7b64d5fd872cd5ef86c102bb9b",
+      "git_blob_sha1": "03b6cce01acad2453c7d64722339e4a77885bc44"
+    },
+    {
+      "path": "Solutions/032_16_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_big_02_benchmark.txt",
+      "bytes": 522,
+      "sha256": "fd76e06cfcd7a7e06bd4ae9a47f7324104757e7b64d5fd872cd5ef86c102bb9b",
+      "git_blob_sha1": "03b6cce01acad2453c7d64722339e4a77885bc44"
+    },
+    {
+      "path": "Solutions/032_16_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_big_03.txt",
+      "bytes": 479,
+      "sha256": "5cf3e21506e65f0476d8e805165e89a3a02f70a10362ff3deea48e1cbe2cd5af",
+      "git_blob_sha1": "8d7e04bba895db55db443d5bfcbfe7174129d7e6"
+    },
+    {
+      "path": "Solutions/032_16_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_big_03_benchmark.txt",
+      "bytes": 479,
+      "sha256": "5cf3e21506e65f0476d8e805165e89a3a02f70a10362ff3deea48e1cbe2cd5af",
+      "git_blob_sha1": "8d7e04bba895db55db443d5bfcbfe7174129d7e6"
+    },
+    {
+      "path": "Solutions/032_16_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_big_04.txt",
+      "bytes": 522,
+      "sha256": "44e6c1b26a5a0fec833cd265645841a93f7760158f3875a39783b5093ea02b59",
+      "git_blob_sha1": "7f35c93198a28807e01a110926985523862afc8c"
+    },
+    {
+      "path": "Solutions/032_16_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_big_04_benchmark.txt",
+      "bytes": 522,
+      "sha256": "44e6c1b26a5a0fec833cd265645841a93f7760158f3875a39783b5093ea02b59",
+      "git_blob_sha1": "7f35c93198a28807e01a110926985523862afc8c"
+    },
+    {
+      "path": "Solutions/032_16_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_big_05.txt",
+      "bytes": 522,
+      "sha256": "9b0dd1fe6a84797943054a786c1483298a281f51af4ed7495bce3648cb2eeee8",
+      "git_blob_sha1": "dc86d30bfecd264cfc74ba09aa276c42d120ceb6"
+    },
+    {
+      "path": "Solutions/032_16_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_big_05_benchmark.txt",
+      "bytes": 522,
+      "sha256": "9b0dd1fe6a84797943054a786c1483298a281f51af4ed7495bce3648cb2eeee8",
+      "git_blob_sha1": "dc86d30bfecd264cfc74ba09aa276c42d120ceb6"
+    },
+    {
+      "path": "Solutions/032_16_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_small_01.txt",
+      "bytes": 479,
+      "sha256": "0c3d33d64431ae7dd963b094814e0a8ed03bef7a2076f76ce607c5988eea6223",
+      "git_blob_sha1": "bf19e7a1ac9f66b53a8136dab9a831ab116d0035"
+    },
+    {
+      "path": "Solutions/032_16_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_small_01_benchmark.txt",
+      "bytes": 479,
+      "sha256": "0c3d33d64431ae7dd963b094814e0a8ed03bef7a2076f76ce607c5988eea6223",
+      "git_blob_sha1": "bf19e7a1ac9f66b53a8136dab9a831ab116d0035"
+    },
+    {
+      "path": "Solutions/032_16_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_small_02.txt",
+      "bytes": 529,
+      "sha256": "c073df1395a5333ce4ee0c851432fd7443b65ca29fc8184dd1953122decf05b8",
+      "git_blob_sha1": "86fb78812415bd62aa6fc0980aa74b1e9ef02699"
+    },
+    {
+      "path": "Solutions/032_16_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_small_02_benchmark.txt",
+      "bytes": 529,
+      "sha256": "c073df1395a5333ce4ee0c851432fd7443b65ca29fc8184dd1953122decf05b8",
+      "git_blob_sha1": "86fb78812415bd62aa6fc0980aa74b1e9ef02699"
+    },
+    {
+      "path": "Solutions/032_16_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_small_03.txt",
+      "bytes": 572,
+      "sha256": "e9dafb95651561ddb721bbf8dcc6a217798b9f84d88b199b1bae94e5f52195fe",
+      "git_blob_sha1": "27e014b45042552b7b778f75ad4c1c463f52fb0e"
+    },
+    {
+      "path": "Solutions/032_16_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_small_03_benchmark.txt",
+      "bytes": 572,
+      "sha256": "6e0e39bdec98fe82d02459fdef0d1e26288000d5bde3cec3b464a6b0882ad926",
+      "git_blob_sha1": "1b6795841ac7ca95dc7b1a315114f28ec871ed46"
+    },
+    {
+      "path": "Solutions/032_16_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_small_04.txt",
+      "bytes": 579,
+      "sha256": "b968e31fd0c2145122cd3cc5b4f831e67b4f18c1937840e10480fd0211d22d0f",
+      "git_blob_sha1": "468ce017830fb355c18c7c95c9214cd265661e33"
+    },
+    {
+      "path": "Solutions/032_16_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_small_04_benchmark.txt",
+      "bytes": 536,
+      "sha256": "2dd57535aa94aa277d3b3945e23a16823a39100ccd6642e7bb89178da34c1de4",
+      "git_blob_sha1": "4374de78a84da4b9763facc93b7579f0c1105794"
+    },
+    {
+      "path": "Solutions/032_16_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_small_05.txt",
+      "bytes": 536,
+      "sha256": "dafa86c77060f09a1458adfc62b6acaf3198f2fd8b608705d576b64c484a7986",
+      "git_blob_sha1": "cda49aed6aa1b97f85d59fec609f99c5206e2b3e"
+    },
+    {
+      "path": "Solutions/032_16_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/032_16_small_05_benchmark.txt",
+      "bytes": 536,
+      "sha256": "dafa86c77060f09a1458adfc62b6acaf3198f2fd8b608705d576b64c484a7986",
+      "git_blob_sha1": "cda49aed6aa1b97f85d59fec609f99c5206e2b3e"
+    },
+    {
+      "path": "Solutions/036_12_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_big_01.txt",
+      "bytes": 482,
+      "sha256": "ba9e61044e7e65d563cfd22b3a1d9c064b02232392a57408d553aeb4a3660074",
+      "git_blob_sha1": "dfdf5ba6b972637ed3a4abf6a57dcda20cfd3fa7"
+    },
+    {
+      "path": "Solutions/036_12_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_big_01_benchmark.txt",
+      "bytes": 482,
+      "sha256": "ba9e61044e7e65d563cfd22b3a1d9c064b02232392a57408d553aeb4a3660074",
+      "git_blob_sha1": "dfdf5ba6b972637ed3a4abf6a57dcda20cfd3fa7"
+    },
+    {
+      "path": "Solutions/036_12_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_big_02.txt",
+      "bytes": 496,
+      "sha256": "2632c3dacdf205eedf980b8cb7b27aeddcb02b619132883b3bba1b819f8486f0",
+      "git_blob_sha1": "e65cf2c88639709bd235c86903711799d7deccde"
+    },
+    {
+      "path": "Solutions/036_12_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_big_02_benchmark.txt",
+      "bytes": 496,
+      "sha256": "2632c3dacdf205eedf980b8cb7b27aeddcb02b619132883b3bba1b819f8486f0",
+      "git_blob_sha1": "e65cf2c88639709bd235c86903711799d7deccde"
+    },
+    {
+      "path": "Solutions/036_12_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_big_03.txt",
+      "bytes": 525,
+      "sha256": "7ee410ed02f8f193e4f5bc4d810e12b678972d2d574ca75e283bfca2945563c2",
+      "git_blob_sha1": "aa736fa7656407b3d9d4b42f78dedf7660db694d"
+    },
+    {
+      "path": "Solutions/036_12_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_big_03_benchmark.txt",
+      "bytes": 525,
+      "sha256": "7ee410ed02f8f193e4f5bc4d810e12b678972d2d574ca75e283bfca2945563c2",
+      "git_blob_sha1": "aa736fa7656407b3d9d4b42f78dedf7660db694d"
+    },
+    {
+      "path": "Solutions/036_12_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_big_04.txt",
+      "bytes": 525,
+      "sha256": "a29d95c995a3b4eb16c59e1a1bfdef80424a83329cee13a2652b6173c4f7c8b3",
+      "git_blob_sha1": "38addd76de01b86b5c4919f7e64c64f85bcfb31a"
+    },
+    {
+      "path": "Solutions/036_12_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_big_04_benchmark.txt",
+      "bytes": 537,
+      "sha256": "60cd5d987fe98a6ef52103a5a6847b8e1286ebd20ccf51b8b5f4c1a17d373a0d",
+      "git_blob_sha1": "2aaf9a90f57ab3f3890ddc9c08ddeb8432293f79"
+    },
+    {
+      "path": "Solutions/036_12_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_big_05.txt",
+      "bytes": 539,
+      "sha256": "61efe7310ba647c3f27360b54e4365b1306d9e783d384d5994170088ce6596d8",
+      "git_blob_sha1": "1170792e29f1dce78295c57deb6ac415e2c416e7"
+    },
+    {
+      "path": "Solutions/036_12_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_big_05_benchmark.txt",
+      "bytes": 539,
+      "sha256": "61efe7310ba647c3f27360b54e4365b1306d9e783d384d5994170088ce6596d8",
+      "git_blob_sha1": "1170792e29f1dce78295c57deb6ac415e2c416e7"
+    },
+    {
+      "path": "Solutions/036_12_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_small_01.txt",
+      "bytes": 539,
+      "sha256": "f9159f6029ce9976753a748b3893c13c5fcc41c7f1c973be679b60410bb5961a",
+      "git_blob_sha1": "813a84b33ec44a35cefb407ec06e9049dcbc3f3c"
+    },
+    {
+      "path": "Solutions/036_12_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_small_01_benchmark.txt",
+      "bytes": 539,
+      "sha256": "f9159f6029ce9976753a748b3893c13c5fcc41c7f1c973be679b60410bb5961a",
+      "git_blob_sha1": "813a84b33ec44a35cefb407ec06e9049dcbc3f3c"
+    },
+    {
+      "path": "Solutions/036_12_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_small_02.txt",
+      "bytes": 582,
+      "sha256": "473fb1921498699160a1bf7cfc0b4929885db4a76dac75d1dc7b15e0b20cb752",
+      "git_blob_sha1": "0e7bc62d69a2c145a4f0507a29456ace5cbc6f5c"
+    },
+    {
+      "path": "Solutions/036_12_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_small_02_benchmark.txt",
+      "bytes": 582,
+      "sha256": "473fb1921498699160a1bf7cfc0b4929885db4a76dac75d1dc7b15e0b20cb752",
+      "git_blob_sha1": "0e7bc62d69a2c145a4f0507a29456ace5cbc6f5c"
+    },
+    {
+      "path": "Solutions/036_12_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_small_03.txt",
+      "bytes": 546,
+      "sha256": "10c6772cd3bf914a20f2e1e621e15d0578cb95ae35b9a5c58c7f6d70907dfdb3",
+      "git_blob_sha1": "ac8647aa3025805b3f96c11d49fb7a50c1c93453"
+    },
+    {
+      "path": "Solutions/036_12_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_small_03_benchmark.txt",
+      "bytes": 546,
+      "sha256": "10c6772cd3bf914a20f2e1e621e15d0578cb95ae35b9a5c58c7f6d70907dfdb3",
+      "git_blob_sha1": "ac8647aa3025805b3f96c11d49fb7a50c1c93453"
+    },
+    {
+      "path": "Solutions/036_12_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_small_04.txt",
+      "bytes": 575,
+      "sha256": "338e699f4d5d69b74059b0fe58f04b687a65cef56b162ec00b07b51505014d42",
+      "git_blob_sha1": "079edc3022674ae1e9bfc7d29d4604f16f1f6849"
+    },
+    {
+      "path": "Solutions/036_12_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_small_04_benchmark.txt",
+      "bytes": 575,
+      "sha256": "338e699f4d5d69b74059b0fe58f04b687a65cef56b162ec00b07b51505014d42",
+      "git_blob_sha1": "079edc3022674ae1e9bfc7d29d4604f16f1f6849"
+    },
+    {
+      "path": "Solutions/036_12_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_small_05.txt",
+      "bytes": 582,
+      "sha256": "8a53c60e9588c768046ece92b34e9515f9b55b45929d9f919d2ddbe8fb50c83b",
+      "git_blob_sha1": "f6a5e7c1020c105cf32c1374686b12d17650d3e1"
+    },
+    {
+      "path": "Solutions/036_12_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/036_12_small_05_benchmark.txt",
+      "bytes": 582,
+      "sha256": "8a53c60e9588c768046ece92b34e9515f9b55b45929d9f919d2ddbe8fb50c83b",
+      "git_blob_sha1": "f6a5e7c1020c105cf32c1374686b12d17650d3e1"
+    },
+    {
+      "path": "Solutions/040_08_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_big_01.txt",
+      "bytes": 547,
+      "sha256": "d73684c08eadeb960c76e97fbb2ec673a0278a59ea32ccb80481b06b7b767a3d",
+      "git_blob_sha1": "ea8be31e5f0085c61fa5eb8c5e92e7879a0fc33d"
+    },
+    {
+      "path": "Solutions/040_08_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_big_01_benchmark.txt",
+      "bytes": 553,
+      "sha256": "97a67653c776aa937e1b78b5b665f4fd9b03bbbcbf1c11edf937e672761ad8cc",
+      "git_blob_sha1": "0ac1b8e4e0eacb6623d1a07f69ebe8a2fb8fb323"
+    },
+    {
+      "path": "Solutions/040_08_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_big_02.txt",
+      "bytes": 548,
+      "sha256": "7965a20444bb57aaaa5e24338e077f44b06d53ad4a2641e198459751637efbba",
+      "git_blob_sha1": "6946c58996aa102869e11433b9182ea39ec51c62"
+    },
+    {
+      "path": "Solutions/040_08_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_big_02_benchmark.txt",
+      "bytes": 543,
+      "sha256": "e6607858e12657aa0e0b7c0c404de8b10e872ed1de0014861b273882d40a9199",
+      "git_blob_sha1": "ffed056d9869f22934fb2025814a8f9dc1035cb2"
+    },
+    {
+      "path": "Solutions/040_08_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_big_03.txt",
+      "bytes": 499,
+      "sha256": "66b58a4c21de3af2f046c9ead89d8323421d879fc0c49a55fe37e6d4670b61cc",
+      "git_blob_sha1": "2b0d956dc257d1326c0a57b26b2cf8f2d25bc862"
+    },
+    {
+      "path": "Solutions/040_08_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_big_03_benchmark.txt",
+      "bytes": 542,
+      "sha256": "5748c89475f227e99ae5d7154aaf4c6df07227305a2464c79a19bee9575da1d4",
+      "git_blob_sha1": "37a759745eb8a8b709a85ac50c45cd1d8c1f5996"
+    },
+    {
+      "path": "Solutions/040_08_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_big_04.txt",
+      "bytes": 492,
+      "sha256": "74f62d28cf7c868f5d512934f3081464babfe7dffbef9bed5d5264948a513ef7",
+      "git_blob_sha1": "34ac11e0b6a825eb984b48de793d2bd6425b4a47"
+    },
+    {
+      "path": "Solutions/040_08_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_big_04_benchmark.txt",
+      "bytes": 492,
+      "sha256": "74f62d28cf7c868f5d512934f3081464babfe7dffbef9bed5d5264948a513ef7",
+      "git_blob_sha1": "34ac11e0b6a825eb984b48de793d2bd6425b4a47"
+    },
+    {
+      "path": "Solutions/040_08_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_big_05.txt",
+      "bytes": 528,
+      "sha256": "f8a74519f22af5157fd959281c15298c64f69642a9c2bb0de085a1bb160beb6f",
+      "git_blob_sha1": "9696755bbbfd73525cc4972b5ca3bf0ee54e8e65"
+    },
+    {
+      "path": "Solutions/040_08_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_big_05_benchmark.txt",
+      "bytes": 540,
+      "sha256": "c6486cee27694ae25852e5c7292a95b5fdf68daa69401e0ea23fcefae99c469b",
+      "git_blob_sha1": "afbf2875e8c159dea4362633e25922eee1e1894b"
+    },
+    {
+      "path": "Solutions/040_08_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_small_01.txt",
+      "bytes": 549,
+      "sha256": "b8d3efa9e60514af0dc3ee9986050ca6134049c2f733a4a706dc4f6141d440aa",
+      "git_blob_sha1": "efad9be9d24bccd40698c68fe4c23dac2a71cf72"
+    },
+    {
+      "path": "Solutions/040_08_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_small_01_benchmark.txt",
+      "bytes": 549,
+      "sha256": "b8d3efa9e60514af0dc3ee9986050ca6134049c2f733a4a706dc4f6141d440aa",
+      "git_blob_sha1": "efad9be9d24bccd40698c68fe4c23dac2a71cf72"
+    },
+    {
+      "path": "Solutions/040_08_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_small_02.txt",
+      "bytes": 556,
+      "sha256": "1c7efc39e4994667f67799124bca09a63d7a4f97776f1b6bc22ecbca5101623b",
+      "git_blob_sha1": "a40ef16f4e0fd8af8bd8991662f298aa0cb7bdf5"
+    },
+    {
+      "path": "Solutions/040_08_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_small_02_benchmark.txt",
+      "bytes": 556,
+      "sha256": "1c7efc39e4994667f67799124bca09a63d7a4f97776f1b6bc22ecbca5101623b",
+      "git_blob_sha1": "a40ef16f4e0fd8af8bd8991662f298aa0cb7bdf5"
+    },
+    {
+      "path": "Solutions/040_08_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_small_03.txt",
+      "bytes": 599,
+      "sha256": "957b6b96313318513a5512a6e28f3c09c9e1465710d0f8a28e58302074032cc0",
+      "git_blob_sha1": "9ef471e77bd639564311921e2aebf905ba0da03a"
+    },
+    {
+      "path": "Solutions/040_08_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_small_03_benchmark.txt",
+      "bytes": 599,
+      "sha256": "957b6b96313318513a5512a6e28f3c09c9e1465710d0f8a28e58302074032cc0",
+      "git_blob_sha1": "9ef471e77bd639564311921e2aebf905ba0da03a"
+    },
+    {
+      "path": "Solutions/040_08_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_small_04.txt",
+      "bytes": 542,
+      "sha256": "c23a7356c264ba9d9075e926da6c55dc938f1d5e0880eec284be6d465ed47411",
+      "git_blob_sha1": "8741235b71f9fe336b129aa2fc6805844227d33b"
+    },
+    {
+      "path": "Solutions/040_08_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_small_04_benchmark.txt",
+      "bytes": 542,
+      "sha256": "c23a7356c264ba9d9075e926da6c55dc938f1d5e0880eec284be6d465ed47411",
+      "git_blob_sha1": "8741235b71f9fe336b129aa2fc6805844227d33b"
+    },
+    {
+      "path": "Solutions/040_08_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_small_05.txt",
+      "bytes": 578,
+      "sha256": "f81bf9da3e0ab95164e29f1f97d52f37faf5a6810946eb9c08d9235d88e6489d",
+      "git_blob_sha1": "5ceb23f313b4568603842c63f2b69ee2086b7d55"
+    },
+    {
+      "path": "Solutions/040_08_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_08_small_05_benchmark.txt",
+      "bytes": 578,
+      "sha256": "f81bf9da3e0ab95164e29f1f97d52f37faf5a6810946eb9c08d9235d88e6489d",
+      "git_blob_sha1": "5ceb23f313b4568603842c63f2b69ee2086b7d55"
+    },
+    {
+      "path": "Solutions/040_20_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_big_01.txt",
+      "bytes": 548,
+      "sha256": "2550ea504ef46d3b53c25cdf1140fd0649e7be80f98584c9b2dea0d864fe7224",
+      "git_blob_sha1": "c415efef3d47c2616e556c91398b1c4a407f84d6"
+    },
+    {
+      "path": "Solutions/040_20_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_big_01_benchmark.txt",
+      "bytes": 548,
+      "sha256": "2550ea504ef46d3b53c25cdf1140fd0649e7be80f98584c9b2dea0d864fe7224",
+      "git_blob_sha1": "c415efef3d47c2616e556c91398b1c4a407f84d6"
+    },
+    {
+      "path": "Solutions/040_20_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_big_02.txt",
+      "bytes": 577,
+      "sha256": "d362ada36d60b10baccdcbba4b58b382877a251bd6bcba74a8b90fda6143dad8",
+      "git_blob_sha1": "52204118c947dc22c726a29bd90cf55c62753f86"
+    },
+    {
+      "path": "Solutions/040_20_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_big_02_benchmark.txt",
+      "bytes": 577,
+      "sha256": "d362ada36d60b10baccdcbba4b58b382877a251bd6bcba74a8b90fda6143dad8",
+      "git_blob_sha1": "52204118c947dc22c726a29bd90cf55c62753f86"
+    },
+    {
+      "path": "Solutions/040_20_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_big_03.txt",
+      "bytes": 555,
+      "sha256": "fbb2a828d346f797d3ac46021458739e3df15d2bfc5089da192fb87669e7ccd7",
+      "git_blob_sha1": "9b2807a3fa300896a31c17e4e7a7108d4e7491a4"
+    },
+    {
+      "path": "Solutions/040_20_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_big_03_benchmark.txt",
+      "bytes": 555,
+      "sha256": "fbb2a828d346f797d3ac46021458739e3df15d2bfc5089da192fb87669e7ccd7",
+      "git_blob_sha1": "9b2807a3fa300896a31c17e4e7a7108d4e7491a4"
+    },
+    {
+      "path": "Solutions/040_20_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_big_04.txt",
+      "bytes": 598,
+      "sha256": "0ca76bca62c4c44435422a0429b88236b3b4c7b25382d554cbb8ee5bf1a171f0",
+      "git_blob_sha1": "f2be0b06ba00597f3aa19a964ac67c6e66e9b20f"
+    },
+    {
+      "path": "Solutions/040_20_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_big_04_benchmark.txt",
+      "bytes": 598,
+      "sha256": "0ca76bca62c4c44435422a0429b88236b3b4c7b25382d554cbb8ee5bf1a171f0",
+      "git_blob_sha1": "f2be0b06ba00597f3aa19a964ac67c6e66e9b20f"
+    },
+    {
+      "path": "Solutions/040_20_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_big_05.txt",
+      "bytes": 605,
+      "sha256": "06926708ffa1a021fae40d25e5760655b085962c6501010da0aa388fc80ce507",
+      "git_blob_sha1": "21a1e8c2e6d096d1bbe2a5a46c983f1154299de4"
+    },
+    {
+      "path": "Solutions/040_20_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_big_05_benchmark.txt",
+      "bytes": 605,
+      "sha256": "06926708ffa1a021fae40d25e5760655b085962c6501010da0aa388fc80ce507",
+      "git_blob_sha1": "21a1e8c2e6d096d1bbe2a5a46c983f1154299de4"
+    },
+    {
+      "path": "Solutions/040_20_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_small_01.txt",
+      "bytes": 605,
+      "sha256": "18a50e83feded0581da44ab2d7b447907745ef02994611ba8a576d7afef76d41",
+      "git_blob_sha1": "fcf882dc6c33cc35734890ac00d130880764a9c3"
+    },
+    {
+      "path": "Solutions/040_20_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_small_01_benchmark.txt",
+      "bytes": 605,
+      "sha256": "18a50e83feded0581da44ab2d7b447907745ef02994611ba8a576d7afef76d41",
+      "git_blob_sha1": "fcf882dc6c33cc35734890ac00d130880764a9c3"
+    },
+    {
+      "path": "Solutions/040_20_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_small_02.txt",
+      "bytes": 584,
+      "sha256": "74c661575d01a9c926eeace359278a56c70c820efe2e8d70ee73b3432bf45f04",
+      "git_blob_sha1": "36ed00f06b6dcbbcbcb50c9a356af9a69a6cda03"
+    },
+    {
+      "path": "Solutions/040_20_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_small_02_benchmark.txt",
+      "bytes": 584,
+      "sha256": "74c661575d01a9c926eeace359278a56c70c820efe2e8d70ee73b3432bf45f04",
+      "git_blob_sha1": "36ed00f06b6dcbbcbcb50c9a356af9a69a6cda03"
+    },
+    {
+      "path": "Solutions/040_20_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_small_03.txt",
+      "bytes": 619,
+      "sha256": "e4f69d9ca9ffb8bdaef62b85a600a0ea413428cf7e74f1134611c75b32fe6e9e",
+      "git_blob_sha1": "c1c5fac61b41e0176a61e072037205c4caf4e6a9"
+    },
+    {
+      "path": "Solutions/040_20_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_small_03_benchmark.txt",
+      "bytes": 619,
+      "sha256": "58758ff037e7137f00928533e6ae46b02171e28e249fdf63b2180cbcd3d953cd",
+      "git_blob_sha1": "d5f4589d3c3fa0af3b7fca930c59c5f3a8844b89"
+    },
+    {
+      "path": "Solutions/040_20_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_small_04.txt",
+      "bytes": 619,
+      "sha256": "7ccf07a0d02f12c5c0b6c15845ff382d7f71041144c800715c9f43d303ae72b9",
+      "git_blob_sha1": "4a128c705c30ca7e05399eacd92019b21a81c0f9"
+    },
+    {
+      "path": "Solutions/040_20_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_small_04_benchmark.txt",
+      "bytes": 619,
+      "sha256": "831c071b31c8fd93461094f4a33eb087ecec95f93ed74909a14fc7ae1eddaef4",
+      "git_blob_sha1": "4927c49c3c8c3cff8f400418c606fc545d047ab6"
+    },
+    {
+      "path": "Solutions/040_20_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_small_05.txt",
+      "bytes": 605,
+      "sha256": "eaeae3c047be349e07ba5127c39e5006fd0029df6c63dc5758c5b279ead4512b",
+      "git_blob_sha1": "5c65f5ef296bff1a7bc4fd81076bde0dcb6676c8"
+    },
+    {
+      "path": "Solutions/040_20_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/040_20_small_05_benchmark.txt",
+      "bytes": 605,
+      "sha256": "eaeae3c047be349e07ba5127c39e5006fd0029df6c63dc5758c5b279ead4512b",
+      "git_blob_sha1": "5c65f5ef296bff1a7bc4fd81076bde0dcb6676c8"
+    },
+    {
+      "path": "Solutions/048_12_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_big_01.txt",
+      "bytes": 611,
+      "sha256": "911c8f8a99a9f7944afe5213a748936f7ca0a58657a236320b2efbcba2f07c35",
+      "git_blob_sha1": "ad8fac3ff0f12c33e1e45db14b5883def90b778a"
+    },
+    {
+      "path": "Solutions/048_12_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_big_01_benchmark.txt",
+      "bytes": 611,
+      "sha256": "911c8f8a99a9f7944afe5213a748936f7ca0a58657a236320b2efbcba2f07c35",
+      "git_blob_sha1": "ad8fac3ff0f12c33e1e45db14b5883def90b778a"
+    },
+    {
+      "path": "Solutions/048_12_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_big_02.txt",
+      "bytes": 631,
+      "sha256": "606db92bbd49dc70f2ce87d393e32ce32264d0542bd7282312fe7f848b418004",
+      "git_blob_sha1": "1c679e6acde5f0e0059964c54278c058e7c1f652"
+    },
+    {
+      "path": "Solutions/048_12_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_big_02_benchmark.txt",
+      "bytes": 637,
+      "sha256": "b580232874f478f4a8eb94bd59cf3b2c3f59833770c3fce8c44c7ef95e91106b",
+      "git_blob_sha1": "43177ea917dc5e84ca60450f0f426236ecb12a61"
+    },
+    {
+      "path": "Solutions/048_12_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_big_03.txt",
+      "bytes": 660,
+      "sha256": "aecf1831daef5223fde363774398fbb26c7b41f7f2b476721bf3309915c66fbb",
+      "git_blob_sha1": "43b5c5541ca8aeabccc1c99fc479160cb81de683"
+    },
+    {
+      "path": "Solutions/048_12_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_big_03_benchmark.txt",
+      "bytes": 685,
+      "sha256": "ff0a4ce2b9e850eb1fe11d34bb31dc957a88068318cf1f72919f19beeeadc1d3",
+      "git_blob_sha1": "bc4b6c0b2665bd492062adc51d0ba0f1e09ee082"
+    },
+    {
+      "path": "Solutions/048_12_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_big_04.txt",
+      "bytes": 604,
+      "sha256": "69cf931d80442d4f716a51bc5c19836f8e293c730fd4f456cdaf46dc51d0c3ff",
+      "git_blob_sha1": "464c2e6352e6feb227b6830a31a8a9062a07ba6c"
+    },
+    {
+      "path": "Solutions/048_12_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_big_04_benchmark.txt",
+      "bytes": 636,
+      "sha256": "b348ee785d59bb7f9574dbe290e6572cc18c83417564983c99cd63e07bbd56ea",
+      "git_blob_sha1": "f441bd530f3ddc2bf1ef7e91c4b516f7e5a54f67"
+    },
+    {
+      "path": "Solutions/048_12_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_big_05.txt",
+      "bytes": 604,
+      "sha256": "4bf484c8b3e25d24670f703ad0d2be9bed0a07f912021adc7b60b1cae05572b2",
+      "git_blob_sha1": "1f5a653182dcaef42eb407c700a847bfd3803c1f"
+    },
+    {
+      "path": "Solutions/048_12_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_big_05_benchmark.txt",
+      "bytes": 597,
+      "sha256": "bb01dfe2f3ed2ee8ba6e7615738d1d7ada5200a5f59a1963fd0fdc31fd4557f8",
+      "git_blob_sha1": "58eec2d49802f5e84c212982dbecac4ba086cfd1"
+    },
+    {
+      "path": "Solutions/048_12_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_small_01.txt",
+      "bytes": 661,
+      "sha256": "2f4f428dc00012d757d9089f6357f38ea817932a72dc8245d147743979a45abd",
+      "git_blob_sha1": "f445b11f8389e93de4d57254624974ecd620fa9c"
+    },
+    {
+      "path": "Solutions/048_12_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_small_01_benchmark.txt",
+      "bytes": 661,
+      "sha256": "2f4f428dc00012d757d9089f6357f38ea817932a72dc8245d147743979a45abd",
+      "git_blob_sha1": "f445b11f8389e93de4d57254624974ecd620fa9c"
+    },
+    {
+      "path": "Solutions/048_12_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_small_02.txt",
+      "bytes": 668,
+      "sha256": "24927101d795511e3e2d8392b99ba989832c1c4ede295cf4ad46d8fa6edffc81",
+      "git_blob_sha1": "e32056cbe39579e9930677f7095198a0569ce1be"
+    },
+    {
+      "path": "Solutions/048_12_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_small_02_benchmark.txt",
+      "bytes": 668,
+      "sha256": "24927101d795511e3e2d8392b99ba989832c1c4ede295cf4ad46d8fa6edffc81",
+      "git_blob_sha1": "e32056cbe39579e9930677f7095198a0569ce1be"
+    },
+    {
+      "path": "Solutions/048_12_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_small_03.txt",
+      "bytes": 675,
+      "sha256": "fde7b173c05cfd539eea26fbc9c06bb7542b45639225e9f6d57e584669a6ffbc",
+      "git_blob_sha1": "19c9ed69e14014bb25dd399de4cd8b1f67172bf9"
+    },
+    {
+      "path": "Solutions/048_12_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_small_03_benchmark.txt",
+      "bytes": 675,
+      "sha256": "fde7b173c05cfd539eea26fbc9c06bb7542b45639225e9f6d57e584669a6ffbc",
+      "git_blob_sha1": "19c9ed69e14014bb25dd399de4cd8b1f67172bf9"
+    },
+    {
+      "path": "Solutions/048_12_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_small_04.txt",
+      "bytes": 711,
+      "sha256": "32efbc8095cb049e0f6a87a88469e675a868555bdd2aece6e76e3281f36a5d54",
+      "git_blob_sha1": "b2bfca87a83de51c32738e5537fdf32874473960"
+    },
+    {
+      "path": "Solutions/048_12_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_small_04_benchmark.txt",
+      "bytes": 711,
+      "sha256": "8ba230ab1b97aa928e719ea4069531d703aec3f5ad5f04ed0762f2656cdc9974",
+      "git_blob_sha1": "d1672391cedeccb9a27604951abd41d163a4bd58"
+    },
+    {
+      "path": "Solutions/048_12_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_small_05.txt",
+      "bytes": 660,
+      "sha256": "703f9dc4edf4b504fb3d9206d7abed524ca5a04e6ebed307d36a65164123714f",
+      "git_blob_sha1": "e12e8ba3664da28bf1214113ce93203b7ebd2a85"
+    },
+    {
+      "path": "Solutions/048_12_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_12_small_05_benchmark.txt",
+      "bytes": 681,
+      "sha256": "1565a6801a8c326ce41a68f4854a5f417d0c078bce47dd9ad550f8308d9bc674",
+      "git_blob_sha1": "99fd5e28f7a8dc70ad49656c8befe1c13a8ad378"
+    },
+    {
+      "path": "Solutions/048_16_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_big_01.txt",
+      "bytes": 625,
+      "sha256": "dd52e0d90a698c2b8fd464c975d9217b5e0ac938d189d6511d5cf5cc7fc8cfa1",
+      "git_blob_sha1": "dc00c6c8656d856cefb520e3ee733057a9d1ff2a"
+    },
+    {
+      "path": "Solutions/048_16_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_big_01_benchmark.txt",
+      "bytes": 661,
+      "sha256": "849c608b5787e5c5fe2c589b6488d41bb3470e1735046744996e2ffe68fa1eb3",
+      "git_blob_sha1": "bfad1ace3c7c160be453e7f6217bc84841d833d0"
+    },
+    {
+      "path": "Solutions/048_16_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_big_02.txt",
+      "bytes": 682,
+      "sha256": "b7a8442cf9ff38effd5373f96e4d5f0f040e001743a26e7ea06dfb8c3e745c2d",
+      "git_blob_sha1": "218aa673186eb611b70d67f7ec8930ad7dd5b923"
+    },
+    {
+      "path": "Solutions/048_16_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_big_02_benchmark.txt",
+      "bytes": 651,
+      "sha256": "e52a62358105df4a4f09a60bb4d94dd65b340bbd4672f0471b07a1575b65418c",
+      "git_blob_sha1": "47186244737905bc8fb961af5209d748d801eb25"
+    },
+    {
+      "path": "Solutions/048_16_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_big_03.txt",
+      "bytes": 632,
+      "sha256": "f2a47290f6c0a7eca646d33f4e5972c20d32d3bf2ff1bf36bbf39279ff13bcd8",
+      "git_blob_sha1": "e61f32f49ac2df304ee55f5922e82ea7abee5d82"
+    },
+    {
+      "path": "Solutions/048_16_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_big_03_benchmark.txt",
+      "bytes": 657,
+      "sha256": "48012306494d59fff9cc551c5385e07659c7f0a78053428755f8f1aaf81059d0",
+      "git_blob_sha1": "86824ff747c337f890b543fc388129e8ec747167"
+    },
+    {
+      "path": "Solutions/048_16_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_big_04.txt",
+      "bytes": 632,
+      "sha256": "4d79cf4aa4bb164407630604d24e59916fc9e6a1784c06cd271cf479e01b4224",
+      "git_blob_sha1": "73ff690e430c41c3d2a8ffcfa67a84645bb17cb9"
+    },
+    {
+      "path": "Solutions/048_16_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_big_04_benchmark.txt",
+      "bytes": 632,
+      "sha256": "4d79cf4aa4bb164407630604d24e59916fc9e6a1784c06cd271cf479e01b4224",
+      "git_blob_sha1": "73ff690e430c41c3d2a8ffcfa67a84645bb17cb9"
+    },
+    {
+      "path": "Solutions/048_16_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_big_05.txt",
+      "bytes": 646,
+      "sha256": "91bc83a67e56a0bb4131131fa9530524ac1bd5b8fbba33f04d08b1f60f3efa4f",
+      "git_blob_sha1": "ff8ba070ad7affd587842031626d4be5c449b69c"
+    },
+    {
+      "path": "Solutions/048_16_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_big_05_benchmark.txt",
+      "bytes": 646,
+      "sha256": "91bc83a67e56a0bb4131131fa9530524ac1bd5b8fbba33f04d08b1f60f3efa4f",
+      "git_blob_sha1": "ff8ba070ad7affd587842031626d4be5c449b69c"
+    },
+    {
+      "path": "Solutions/048_16_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_small_01.txt",
+      "bytes": 682,
+      "sha256": "dd14861088335c1020d9158a5a5d786b5f7e8d6d4d55a4b09552d5bef672a991",
+      "git_blob_sha1": "318833c36d6a3dce31274efb47165530aea7e86b"
+    },
+    {
+      "path": "Solutions/048_16_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_small_01_benchmark.txt",
+      "bytes": 682,
+      "sha256": "fbcd5c9aa27d9c8aa8a2625ca451268feb61a6e7f25a0af5d5a26c1b395d63ef",
+      "git_blob_sha1": "0deaafa0a7cdb74d48294c79bef5d86bddb16834"
+    },
+    {
+      "path": "Solutions/048_16_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_small_02.txt",
+      "bytes": 689,
+      "sha256": "b4f73fe9e0a09dc75933383d13b655085f5f136b8d57e98a82b925f0e3b9f0ab",
+      "git_blob_sha1": "3230a4de4f91d3f1d50d4b9dfaec9314bba342c5"
+    },
+    {
+      "path": "Solutions/048_16_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_small_02_benchmark.txt",
+      "bytes": 689,
+      "sha256": "b4f73fe9e0a09dc75933383d13b655085f5f136b8d57e98a82b925f0e3b9f0ab",
+      "git_blob_sha1": "3230a4de4f91d3f1d50d4b9dfaec9314bba342c5"
+    },
+    {
+      "path": "Solutions/048_16_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_small_03.txt",
+      "bytes": 703,
+      "sha256": "ff01f74edb05f5447fcd441ee15708b23a7a39df07cae0172574f785f12db808",
+      "git_blob_sha1": "e7fc68d9b6a8f23423300de7b0a23b025005f390"
+    },
+    {
+      "path": "Solutions/048_16_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_small_03_benchmark.txt",
+      "bytes": 703,
+      "sha256": "ff01f74edb05f5447fcd441ee15708b23a7a39df07cae0172574f785f12db808",
+      "git_blob_sha1": "e7fc68d9b6a8f23423300de7b0a23b025005f390"
+    },
+    {
+      "path": "Solutions/048_16_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_small_04.txt",
+      "bytes": 682,
+      "sha256": "7245d8a69a0c732ba73ce1f5380e7f2521f5ec06ab59000951df84251a5a9ef6",
+      "git_blob_sha1": "de469cd67332dd230eaa415f276cf1e34aec256a"
+    },
+    {
+      "path": "Solutions/048_16_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_small_04_benchmark.txt",
+      "bytes": 682,
+      "sha256": "7245d8a69a0c732ba73ce1f5380e7f2521f5ec06ab59000951df84251a5a9ef6",
+      "git_blob_sha1": "de469cd67332dd230eaa415f276cf1e34aec256a"
+    },
+    {
+      "path": "Solutions/048_16_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_small_05.txt",
+      "bytes": 696,
+      "sha256": "4cfa9e816b3e28b4fe69f40cb3bcc64e5507566081dce4a669ea78fb63e64179",
+      "git_blob_sha1": "9d99099868ce431e5e4c2c79462817a6909f9380"
+    },
+    {
+      "path": "Solutions/048_16_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/048_16_small_05_benchmark.txt",
+      "bytes": 696,
+      "sha256": "d4d338ab8e447343a407b1f4c3545f67951fe6ef0e68a4b4ac05087429c54d25",
+      "git_blob_sha1": "e51e1afc12cf0e2823c3ef61693023480a00af5c"
+    },
+    {
+      "path": "Solutions/060_12_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_big_01.txt",
+      "bytes": 770,
+      "sha256": "a026053f1ba222251400b2d11282f647cda738b6db2c4fdbeafc8f281ab0b8aa",
+      "git_blob_sha1": "c73e30284a9ae459bf620cd3b5a7aa1681501710"
+    },
+    {
+      "path": "Solutions/060_12_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_big_01_benchmark.txt",
+      "bytes": 740,
+      "sha256": "c393e97bdfc854890682e89f19e7a90232f3b0934ff79c6cec4cdba869a46dab",
+      "git_blob_sha1": "8b81375a6d1b4890c10ce26a1be7692616f215eb"
+    },
+    {
+      "path": "Solutions/060_12_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_big_02.txt",
+      "bytes": 734,
+      "sha256": "7afa0b9b60a5c01574b08ae47cdec781bac2d011002852f2f77fb22d853da2c0",
+      "git_blob_sha1": "41b040f00995c33d95ebf6352392a588acd81fee"
+    },
+    {
+      "path": "Solutions/060_12_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_big_02_benchmark.txt",
+      "bytes": 930,
+      "sha256": "fac190d7b9479baea046e239b321bf8bce05a119dc803f9bafcad2112ed8fe10",
+      "git_blob_sha1": "d6772a6c67588317e2a64141a776442a8f67da86"
+    },
+    {
+      "path": "Solutions/060_12_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_big_03.txt",
+      "bytes": 715,
+      "sha256": "770f6a0a096dda01c174b24f28618a787bc3d2589947244fb41f5f3870b70b88",
+      "git_blob_sha1": "fc628ef633e4a81796159af364e084253f72ea42"
+    },
+    {
+      "path": "Solutions/060_12_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_big_03_benchmark.txt",
+      "bytes": 709,
+      "sha256": "a694b99b97b8a6d66e875b396578247179493a78277176c8928158e09bdcdde0",
+      "git_blob_sha1": "6261eec30a6af96db4a0f55b2d4d400a1328961b"
+    },
+    {
+      "path": "Solutions/060_12_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_big_04.txt",
+      "bytes": 695,
+      "sha256": "ffd894b7197e7adfc3d9b72a65d6b804c5fa7cc3b3934f3cc189a99d73b3e785",
+      "git_blob_sha1": "598a329c903e7afacf4a978761ea24dc9bdee70b"
+    },
+    {
+      "path": "Solutions/060_12_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_big_05.txt",
+      "bytes": 752,
+      "sha256": "b209214f35b2bd42ccedf74c694a01270da5738c44c71d3750bb5f1dd5b88eb0",
+      "git_blob_sha1": "42d3c6e819fb1d9356e4ed6ca9d14c448a4ac7e2"
+    },
+    {
+      "path": "Solutions/060_12_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_big_05_benchmark.txt",
+      "bytes": 867,
+      "sha256": "d925a8891dc2eb8069e9bcb4c0e32ef5631fcd79db3afcce513a6c06b75a77ed",
+      "git_blob_sha1": "8442531e933ff7c7a72d7e9c5df8507d245408fa"
+    },
+    {
+      "path": "Solutions/060_12_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_small_01.txt",
+      "bytes": 774,
+      "sha256": "fdd5cb73b3ada4259543bec27dddd2281a081224d725d801c219732c4a606aec",
+      "git_blob_sha1": "da5055577b1e38ad107372e32f1c2c0026f1462a"
+    },
+    {
+      "path": "Solutions/060_12_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_small_01_benchmark.txt",
+      "bytes": 767,
+      "sha256": "df92d81697d3cd051a4f3a475d55728b187b375d2252d3810b512a443f346f24",
+      "git_blob_sha1": "da24a5c0e68d74aacc4710d30b8a3daaac173274"
+    },
+    {
+      "path": "Solutions/060_12_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_small_02.txt",
+      "bytes": 802,
+      "sha256": "698722299037fdea4d642743490c5088bd274b013037d7776266757981cc71f2",
+      "git_blob_sha1": "5471d7d5b2435207f46ba3d918450d70599c8f59"
+    },
+    {
+      "path": "Solutions/060_12_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_small_02_benchmark.txt",
+      "bytes": 803,
+      "sha256": "1a255e698a9b57e65f270cd7fe777dd935b8f57832696131dd95d30769b9f3ff",
+      "git_blob_sha1": "eb68c75a471da3008b3a66c58f0e5bb6376f87bd"
+    },
+    {
+      "path": "Solutions/060_12_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_small_03.txt",
+      "bytes": 790,
+      "sha256": "d858d0190818e986b6e087e8e21340b729ce0c8ffbbdc713babca52521d29118",
+      "git_blob_sha1": "7bee3692754b133ff4149f5c1506e0bda4b220bb"
+    },
+    {
+      "path": "Solutions/060_12_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_small_03_benchmark.txt",
+      "bytes": 809,
+      "sha256": "196f25d3f756d9644ac7266911466c7caf1dafdbde8a2fb7d4b66e5213ce2b1b",
+      "git_blob_sha1": "0e30aa91f5db773f954db28ed1b3fca9487d0ae2"
+    },
+    {
+      "path": "Solutions/060_12_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_small_04.txt",
+      "bytes": 809,
+      "sha256": "e60785aa63dd118e9f7e8fe74554d727fa5628a181687f14d9b614dae78d7a14",
+      "git_blob_sha1": "f9ebb54e2d58314c493df3314bced292f7ed7966"
+    },
+    {
+      "path": "Solutions/060_12_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_small_04_benchmark.txt",
+      "bytes": 795,
+      "sha256": "31c6c9ee178d7217c07379564fb30f1b600d7408f0d14959a0225b4ccc3cb1e5",
+      "git_blob_sha1": "4079fd964c319868e1808cd6d32757cc0d8471b6"
+    },
+    {
+      "path": "Solutions/060_12_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_small_05.txt",
+      "bytes": 809,
+      "sha256": "a41695947e024990e8115faf14657628694852f577df098e0b4b7b68d152f36c",
+      "git_blob_sha1": "e61886252a9bccb1d35fe30450f63f3a9cee4a2f"
+    },
+    {
+      "path": "Solutions/060_12_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_12_small_05_benchmark.txt",
+      "bytes": 809,
+      "sha256": "f45574a19e61abdeda4f38af46dae9417afd0c1e43d4c83eb3a49266e3ea06e9",
+      "git_blob_sha1": "cd2fde2bd6ce00040ad858ab2dfe14ab3c4085c8"
+    },
+    {
+      "path": "Solutions/060_20_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_big_01.txt",
+      "bytes": 739,
+      "sha256": "4f95cbd2def27d606aa85809ea22e79d6fca714397b5f3af2e1fc89ed1e7510b",
+      "git_blob_sha1": "d3da620663433bd664482df80f84029407b9b349"
+    },
+    {
+      "path": "Solutions/060_20_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_big_01_benchmark.txt",
+      "bytes": 771,
+      "sha256": "fed5b647c0fdad8665cd4f775e445aebd1cd6a8817f82a46958ad04011d499c9",
+      "git_blob_sha1": "958f9e7bc1b7c76ce008e3455826bbc01e5bcc34"
+    },
+    {
+      "path": "Solutions/060_20_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_big_02.txt",
+      "bytes": 739,
+      "sha256": "f239282f5b42c211a017042394606ecda391f60240d7178ac2a24768b64a5df2",
+      "git_blob_sha1": "59f0f8ad522ffa3cfa27c4ac785e7273d20d19a6"
+    },
+    {
+      "path": "Solutions/060_20_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_big_02_benchmark.txt",
+      "bytes": 739,
+      "sha256": "f239282f5b42c211a017042394606ecda391f60240d7178ac2a24768b64a5df2",
+      "git_blob_sha1": "59f0f8ad522ffa3cfa27c4ac785e7273d20d19a6"
+    },
+    {
+      "path": "Solutions/060_20_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_big_03.txt",
+      "bytes": 725,
+      "sha256": "044b7e07a86823d582ed22f410dab208ba8debb0f7ca513a2b40fd63cde67052",
+      "git_blob_sha1": "7c5c5eff6788c78ec0b58b3ddd1c4044246596e1"
+    },
+    {
+      "path": "Solutions/060_20_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_big_03_benchmark.txt",
+      "bytes": 725,
+      "sha256": "c9271260211b6a0f5d9acf974ef16e65a7689c7f5fe66f2c68bce2029815de25",
+      "git_blob_sha1": "3d050b9118583cefc611c4086b397c50b7b81246"
+    },
+    {
+      "path": "Solutions/060_20_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_big_04.txt",
+      "bytes": 775,
+      "sha256": "5bc93e7a7ad06df480ee8d959271d14d2b82c3ee49d039ce78a37561fdfad93f",
+      "git_blob_sha1": "83f7d4c262c2569dee17eeeac414f53145f9f857"
+    },
+    {
+      "path": "Solutions/060_20_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_big_04_benchmark.txt",
+      "bytes": 775,
+      "sha256": "d081b0c36b2303748175018fe316cd931d462a5e62f941c07f5cfc2a83f410de",
+      "git_blob_sha1": "eed09124cde02bc4ad21b1110b56e69374da4897"
+    },
+    {
+      "path": "Solutions/060_20_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_big_05.txt",
+      "bytes": 739,
+      "sha256": "a56f7275e018717cbd7fd4d4bab35e99038566dad96f04afd330dc14afaf7127",
+      "git_blob_sha1": "faf1cf5072727a613fc0cc1bff21b37364bfea80"
+    },
+    {
+      "path": "Solutions/060_20_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_big_05_benchmark.txt",
+      "bytes": 813,
+      "sha256": "ee3e3b9d787379ab078bf8ff51d27dc888fd30a0d8e53876b041463934027493",
+      "git_blob_sha1": "ba181b39d8dbeaa5f01eb4c9f47619737c13b1b3"
+    },
+    {
+      "path": "Solutions/060_20_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_small_01.txt",
+      "bytes": 796,
+      "sha256": "d72b2fd643b91bed2e6da9221bc8ba5979dcb0c33016b63359209ce300c659b1",
+      "git_blob_sha1": "76fa542a47fe3c29f5bfda6abf69ad32f92318e6"
+    },
+    {
+      "path": "Solutions/060_20_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_small_01_benchmark.txt",
+      "bytes": 796,
+      "sha256": "fe2a18ac09a9a79ec0eaa8975931e99c70e8eec61c0b4266a7288bfe7743098f",
+      "git_blob_sha1": "ef01b0fc60cb0dbd4226970b1d254f5e547e87a1"
+    },
+    {
+      "path": "Solutions/060_20_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_small_02.txt",
+      "bytes": 789,
+      "sha256": "ee79fbadf5bc10f232eecc3404db9ef44fb942f3533262d3df77de09e68c09f8",
+      "git_blob_sha1": "732fba79e243dd0552b3b30309e0650415040c70"
+    },
+    {
+      "path": "Solutions/060_20_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_small_02_benchmark.txt",
+      "bytes": 789,
+      "sha256": "ee79fbadf5bc10f232eecc3404db9ef44fb942f3533262d3df77de09e68c09f8",
+      "git_blob_sha1": "732fba79e243dd0552b3b30309e0650415040c70"
+    },
+    {
+      "path": "Solutions/060_20_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_small_03.txt",
+      "bytes": 796,
+      "sha256": "88f18437df5b61266cb5ffe22d6936ac0b3b9bee5733d9c1c9338122b9dbf91a",
+      "git_blob_sha1": "abba1fc53fd7b95b51a502276fb4a5c2d734db07"
+    },
+    {
+      "path": "Solutions/060_20_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_small_03_benchmark.txt",
+      "bytes": 796,
+      "sha256": "88f18437df5b61266cb5ffe22d6936ac0b3b9bee5733d9c1c9338122b9dbf91a",
+      "git_blob_sha1": "abba1fc53fd7b95b51a502276fb4a5c2d734db07"
+    },
+    {
+      "path": "Solutions/060_20_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_small_04.txt",
+      "bytes": 789,
+      "sha256": "88424ffe96552158dfa2e88ea509a19fb14ddba2cd0e49e98054832f9ff4d378",
+      "git_blob_sha1": "3b73c2ee29f09ac1d73afb0586a81c92802cb3ca"
+    },
+    {
+      "path": "Solutions/060_20_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_small_04_benchmark.txt",
+      "bytes": 789,
+      "sha256": "eb92656f002a0aebba374c1b150ce9b4a274886113c4fafc889849ca571f463c",
+      "git_blob_sha1": "aa0e2c853721f2a6e80232c53541f0d8981b567e"
+    },
+    {
+      "path": "Solutions/060_20_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_small_05.txt",
+      "bytes": 832,
+      "sha256": "9f196ae4c4b2bcdad045fbd94c5a7183f289b9fc6405ba6792373a1d63082907",
+      "git_blob_sha1": "6a19d13f8bd09d368cd793ffe49c542a4c1f0097"
+    },
+    {
+      "path": "Solutions/060_20_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/060_20_small_05_benchmark.txt",
+      "bytes": 832,
+      "sha256": "f56dac0c4cf2115efa642f2da19eb0ffdb1de6a44eaf227bea2a1eff32c9a5d7",
+      "git_blob_sha1": "bfd2a5684b353635b321fa63ff482bc79d82a0a5"
+    },
+    {
+      "path": "Solutions/064_16_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_big_01.txt",
+      "bytes": 741,
+      "sha256": "e3ec30a2ddf2e1c943cd0cb0340dc28c3e8cd2808d8c76c0900dea424d0abf19",
+      "git_blob_sha1": "2b04e2cf4f7e5926016f38198792c218b4985ee8"
+    },
+    {
+      "path": "Solutions/064_16_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_big_01_benchmark.txt",
+      "bytes": 765,
+      "sha256": "6e02e326656488d83970cad0b4eb69a0946591dc24e2cf50750a2f212f570f4a",
+      "git_blob_sha1": "39ad38d733c4ca88b551e81acbeffc963af42f97"
+    },
+    {
+      "path": "Solutions/064_16_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_big_02.txt",
+      "bytes": 785,
+      "sha256": "feaa98f5658488bbddd2445f834f6de56935e755dae947c6d313bddf43e6195a",
+      "git_blob_sha1": "f3f210f5d3deb71f7e5e1421a7aa27e023ab094b"
+    },
+    {
+      "path": "Solutions/064_16_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_big_02_benchmark.txt",
+      "bytes": 772,
+      "sha256": "d26bc104a6e5e97f9c6cf9aaa4d74603f999ac7abe67d41502558cd96833b04c",
+      "git_blob_sha1": "d914fbc8cf3ca2c738fb9adf5797c2bf14af580b"
+    },
+    {
+      "path": "Solutions/064_16_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_big_03.txt",
+      "bytes": 778,
+      "sha256": "1c2b3b252e10b0a2f700e591ee243af7c6b626100ed52ac5aa72b7f86991fed9",
+      "git_blob_sha1": "934f365e66f46baf1dfad440015695b813e8156a"
+    },
+    {
+      "path": "Solutions/064_16_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_big_03_benchmark.txt",
+      "bytes": 803,
+      "sha256": "d609d31872be4dae0beb701ded0a492f38a8256f69a6a7ee4789c6477cac4e8e",
+      "git_blob_sha1": "a078e7cd8d7c0659ae312e1aae1ab5aaab0c36c8"
+    },
+    {
+      "path": "Solutions/064_16_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_big_04.txt",
+      "bytes": 735,
+      "sha256": "199f46d0ff93ca8d3f32cac7d7b7670ff1bc6c43814c436d90638de576f3d81a",
+      "git_blob_sha1": "adfe53fcb57165a8bd97ce1cf55197aad32f63a9"
+    },
+    {
+      "path": "Solutions/064_16_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_big_04_benchmark.txt",
+      "bytes": 816,
+      "sha256": "2c551dce7db4ece16dbe0ab2276661a45cf0a305233d9ce7e44430b34d4f75e2",
+      "git_blob_sha1": "7f510b740eec84ff983e3f864c84881ef86d7eff"
+    },
+    {
+      "path": "Solutions/064_16_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_big_05.txt",
+      "bytes": 810,
+      "sha256": "f006cf67653970f13d6219da59d25d65c8bb6eae8b50a56626afa824b4e52d9e",
+      "git_blob_sha1": "09a62dbb2ab731cd875563ff336417ee2579b358"
+    },
+    {
+      "path": "Solutions/064_16_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_big_05_benchmark.txt",
+      "bytes": 971,
+      "sha256": "b8c3ae7e61b7e4261999b8c084ef1e0a74f2175491b98a1eb756d5348a35b519",
+      "git_blob_sha1": "1025975340300e3eebed323f8871967045b57039"
+    },
+    {
+      "path": "Solutions/064_16_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_small_01.txt",
+      "bytes": 799,
+      "sha256": "84d36ecb2cc3d5ea7e4451f11759c99ba2e076bdedaad07a93106d7ff2808eaa",
+      "git_blob_sha1": "b14d0fc7941ee84582e96e84eb6642852e509a91"
+    },
+    {
+      "path": "Solutions/064_16_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_small_01_benchmark.txt",
+      "bytes": 799,
+      "sha256": "4f914e493fbe6403874c9323d37b415bf328503629cdc2d5c3afd9729c714b8a",
+      "git_blob_sha1": "dc5c93cbbe68093d087c093987cff1bb889b7627"
+    },
+    {
+      "path": "Solutions/064_16_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_small_02.txt",
+      "bytes": 842,
+      "sha256": "5f860eb5702ab3b38535b4a82b8de8c60ebfa6058451f447c44bc1c44f1c15ff",
+      "git_blob_sha1": "f5247cfadaa2daadf6008489134ce024086bc226"
+    },
+    {
+      "path": "Solutions/064_16_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_small_02_benchmark.txt",
+      "bytes": 842,
+      "sha256": "53f48eebb31cdc666db22b3c9347d78e9cdc11885807a5ac3eda5ab53162b4f4",
+      "git_blob_sha1": "cd4944f680d1e7ec77d79561cb85818e24a90ff4"
+    },
+    {
+      "path": "Solutions/064_16_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_small_03.txt",
+      "bytes": 806,
+      "sha256": "d30f68cef49b5886d37d912d1730e6f5c4f65b5b400729e23f6ee8e169841454",
+      "git_blob_sha1": "95b07815577a8d9291950880351f8ae9f42b15d8"
+    },
+    {
+      "path": "Solutions/064_16_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_small_03_benchmark.txt",
+      "bytes": 904,
+      "sha256": "7ec67c92b0d6e22c1779f8205fb884c47cd4985d043fbfb9bc40aac47e4fc59d",
+      "git_blob_sha1": "54a8e93c9866c2b6396b6ea4d7f127e1dc9245e9"
+    },
+    {
+      "path": "Solutions/064_16_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_small_04.txt",
+      "bytes": 842,
+      "sha256": "c6601339eb3d23a33ac1cdcbc053c70cad22d4b8f848a55840c34b2a8d5af8e6",
+      "git_blob_sha1": "eced028e6baa638cdb1f0fa9ad0020407aea7401"
+    },
+    {
+      "path": "Solutions/064_16_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_small_04_benchmark.txt",
+      "bytes": 842,
+      "sha256": "9fdcb34504fedc2a4e4644ec402381c50292932c867d944fe6b776324b33378e",
+      "git_blob_sha1": "78d01ddb241b9b816d30c57eb74ee4a7d57f9c44"
+    },
+    {
+      "path": "Solutions/064_16_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_small_05.txt",
+      "bytes": 792,
+      "sha256": "1f71c0153ab69b6f78ac294f770182666472e8f9722207a8a2cc75587aa37c9e",
+      "git_blob_sha1": "5a2625ba7f08c2f0d0a65522ffc506bf0cfdf144"
+    },
+    {
+      "path": "Solutions/064_16_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/064_16_small_05_benchmark.txt",
+      "bytes": 792,
+      "sha256": "3eb6394e960a56f387d638412538049cbf1672d42665536797689f2c3ed29383",
+      "git_blob_sha1": "4514d4c3ef93a99135c8c9a7c9e4b4268dcaee72"
+    },
+    {
+      "path": "Solutions/080_16_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_big_01.txt",
+      "bytes": 913,
+      "sha256": "f366d013ff645a7815fdc1e9fca98aedb5e238359e79b554636180b700102465",
+      "git_blob_sha1": "e56f1e0939cdd50953043c04750a8b25dfe060c4"
+    },
+    {
+      "path": "Solutions/080_16_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_big_01_benchmark.txt",
+      "bytes": 1466,
+      "sha256": "ae30fb4cfcd7fd6a91982f4175e92d2eb62dcd5d686e23fe0b17fb908ba2bc52",
+      "git_blob_sha1": "ca95ec03d7c950be769a88077279a1e9b1bf5370"
+    },
+    {
+      "path": "Solutions/080_16_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_big_02.txt",
+      "bytes": 931,
+      "sha256": "399b8ca8a376ce453a0a250c2d2dd75b5732201e62cc054621ba22bab005e717",
+      "git_blob_sha1": "f73ecd1f9a072cfb760bd3a428cd308e0bc1e3ea"
+    },
+    {
+      "path": "Solutions/080_16_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_big_03.txt",
+      "bytes": 906,
+      "sha256": "ed18bab317ac263ec1eb8aa489fae1066acf327a1d7844d9d0436ca77c44ecb5",
+      "git_blob_sha1": "89070213c439004f3a0a36df20d416a47ddf9e89"
+    },
+    {
+      "path": "Solutions/080_16_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_big_03_benchmark.txt",
+      "bytes": 1098,
+      "sha256": "3442007914158cbdf1abb4de320fc5e9a90e78712c44d322e4d4fdc3f9d9f44e",
+      "git_blob_sha1": "a505d907d89071e5d7269335f0d2fe599ccfdcf1"
+    },
+    {
+      "path": "Solutions/080_16_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_big_04.txt",
+      "bytes": 970,
+      "sha256": "0f8d0a87a62e2f7a6ea7b3b63e0125efdb4672aad8524ea994d2d14b03da4ef9",
+      "git_blob_sha1": "f5fe84c96f841092466fc0268600dcd5e7153fab"
+    },
+    {
+      "path": "Solutions/080_16_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_big_04_benchmark.txt",
+      "bytes": 1469,
+      "sha256": "00bf616b8b480b7c9a7e6b7d8e7c125ce6e70a5322b49bc6b29f7e177f5e770f",
+      "git_blob_sha1": "951ae75805af73b5634b7332375a496b87cd3c0f"
+    },
+    {
+      "path": "Solutions/080_16_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_big_05.txt",
+      "bytes": 943,
+      "sha256": "851692fc5d6fc8815d5b81af4c0e69ac0a7cfd93e22bebc47a9ac819aa95a692",
+      "git_blob_sha1": "53b97e9ec99c17af7d7412bc316b52fd58128332"
+    },
+    {
+      "path": "Solutions/080_16_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_small_01.txt",
+      "bytes": 996,
+      "sha256": "bbff99d21d56297b25738a6841f5bdadd409b3219f3738f9224e2f9655dad580",
+      "git_blob_sha1": "12d78be63e0e9f3c0dc75ec32bf5ad1a086dbfdb"
+    },
+    {
+      "path": "Solutions/080_16_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_small_01_benchmark.txt",
+      "bytes": 972,
+      "sha256": "abf44ef9ac1557a6e9c09711ee1d2d4b327a3d528e6935055cbe13a5fa609999",
+      "git_blob_sha1": "1bc557ea2e7852d1630cbb8c1889fd694e964793"
+    },
+    {
+      "path": "Solutions/080_16_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_small_02.txt",
+      "bytes": 977,
+      "sha256": "9febe486ddeb0d5eb41f7c1447a9f79f01d329f0c3d5dce9542f16ef69669901",
+      "git_blob_sha1": "dfac83bc74e75d3b03eb0b3d69bb121070d81b68"
+    },
+    {
+      "path": "Solutions/080_16_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_small_02_benchmark.txt",
+      "bytes": 1008,
+      "sha256": "24b3c3d3b92ec02b7b14d2bc61942868f8008a5d3475eb0729ad4488e5b05ecd",
+      "git_blob_sha1": "434b3dd85a9d67557f3a099ea741002f2b32cf8f"
+    },
+    {
+      "path": "Solutions/080_16_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_small_03.txt",
+      "bytes": 916,
+      "sha256": "288a9e0ab2d6ef1ee57ae1f1e752f4e9e46d0882bb8e840274209a379c0edb57",
+      "git_blob_sha1": "53345dd57eaf6f9b5b85c3bf73f8c509e3a36e75"
+    },
+    {
+      "path": "Solutions/080_16_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_small_03_benchmark.txt",
+      "bytes": 990,
+      "sha256": "7faea29eb7703d289e435d8440435dfdeb464599dedbd3a4c3f93b566850b1ad",
+      "git_blob_sha1": "39a6a983ffa3457af469eb0251394f77c2420b85"
+    },
+    {
+      "path": "Solutions/080_16_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_small_04.txt",
+      "bytes": 1059,
+      "sha256": "77950a3d0503a53c71377bb680faff5d6dce19838e69b21d685da47676d599d0",
+      "git_blob_sha1": "5c2587fadd09aac1db9f69ad90c574f3eaa97e46"
+    },
+    {
+      "path": "Solutions/080_16_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_small_04_benchmark.txt",
+      "bytes": 1072,
+      "sha256": "e10e25e79c9db905289a0d38ce27e2ac69ed50a1ed0d63f5c8aee72e4cbc4b8b",
+      "git_blob_sha1": "48114ff5dbcdfbcbc61e296c9f6001520322cba0"
+    },
+    {
+      "path": "Solutions/080_16_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_small_05.txt",
+      "bytes": 982,
+      "sha256": "481e480a31ed1f769d7184c6a20ff1741afa08e392af65c9a4ea4bb3bb2f48cc",
+      "git_blob_sha1": "b504279c5d7499253417aa57d577b52424b3e990"
+    },
+    {
+      "path": "Solutions/080_16_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_16_small_05_benchmark.txt",
+      "bytes": 1000,
+      "sha256": "ac7b6bd467a2c5c40dc31f86d43a830c85761351c4eebb9a8b10994aaa97d659",
+      "git_blob_sha1": "77d81ad5cb9c0cf3388ac4473a66ea3476e898eb"
+    },
+    {
+      "path": "Solutions/080_20_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_big_01.txt",
+      "bytes": 911,
+      "sha256": "68bc658b98aebd8fba9f6e22f57fc82c75890dc130ed72799b51a0da791ff6b0",
+      "git_blob_sha1": "2cc79403636a73382ffe4dd84f60e7013579eacd"
+    },
+    {
+      "path": "Solutions/080_20_big_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_big_01_benchmark.txt",
+      "bytes": 1102,
+      "sha256": "932f05121ec9b383a839989ca87540f1144dd98ebd81f0f89e25a60127419b98",
+      "git_blob_sha1": "b9ba29d3f6ec243bedb3dcb405b72c88c23aac8a"
+    },
+    {
+      "path": "Solutions/080_20_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_big_02.txt",
+      "bytes": 953,
+      "sha256": "96bbd9e87dc23c38599a49a8fde5b165a71a19d5c15ac75af5d93e3e1b02fe25",
+      "git_blob_sha1": "73327e0c5cf158c76b308ef2d86364945b10fa09"
+    },
+    {
+      "path": "Solutions/080_20_big_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_big_02_benchmark.txt",
+      "bytes": 1266,
+      "sha256": "7bb5cc209c42f6c56fff6a6314378027aecfe061cb9866635e37ad6f0b5a7ff3",
+      "git_blob_sha1": "52b6dd37109c98614d8548462e1383b17b1c7418"
+    },
+    {
+      "path": "Solutions/080_20_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_big_03.txt",
+      "bytes": 979,
+      "sha256": "4b7f94d193ab03e2efb45165934a18b049bd3a384933d577d5fe8457198ac4f5",
+      "git_blob_sha1": "fe33f1b6526802520a2ac2b057ca11428059ab1a"
+    },
+    {
+      "path": "Solutions/080_20_big_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_big_03_benchmark.txt",
+      "bytes": 1179,
+      "sha256": "81660e9f49f0d513bba3ac4ffb0a1ef7b8c02c7803c37457f814ad19fd45ff16",
+      "git_blob_sha1": "7c8b6603b0aaabddc5d5c000df29cf27c291d51f"
+    },
+    {
+      "path": "Solutions/080_20_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_big_04.txt",
+      "bytes": 1058,
+      "sha256": "d1778bf13ffa519f25294da671d2f2a087d98e9ba131d4c2f4635967ec14a3b2",
+      "git_blob_sha1": "1ad72eb40338da190062abce21ddd5ffa4ac5016"
+    },
+    {
+      "path": "Solutions/080_20_big_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_big_04_benchmark.txt",
+      "bytes": 1199,
+      "sha256": "46f8b584b8b8fcfde177a3d6463c4c6f70db7a3f6839c6fd60d55aca0046709b",
+      "git_blob_sha1": "403565f2d0085827bb2de5307801d2e4e38a6630"
+    },
+    {
+      "path": "Solutions/080_20_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_big_05.txt",
+      "bytes": 959,
+      "sha256": "56aa2bfef4004869ccc1454d145b7af341f699d96d4f17ba27e8d18cd3c9428d",
+      "git_blob_sha1": "4e1699a520d79d840df3f21cfbac6998f520ae69"
+    },
+    {
+      "path": "Solutions/080_20_big_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_big_05_benchmark.txt",
+      "bytes": 1044,
+      "sha256": "24d3a66d6c0f6b9e2bdb574aa826413c62f2c7f00e7e6f5c6f36edbcc1a738e0",
+      "git_blob_sha1": "ab17bcf2731b9f154fee98424caf04b7ee406c13"
+    },
+    {
+      "path": "Solutions/080_20_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_small_01.txt",
+      "bytes": 980,
+      "sha256": "dbf206ad2d7f727f9be7d70a01264c4616eedb42e77cd0e45f63785ef81a2fb3",
+      "git_blob_sha1": "13d2dc0d7f1e7fa0a766a233f5206aeab2fb7496"
+    },
+    {
+      "path": "Solutions/080_20_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_small_01_benchmark.txt",
+      "bytes": 980,
+      "sha256": "cc7512c286a51e687942728a8df08c8c4429469819880aa5c6fba004d14dcd40",
+      "git_blob_sha1": "ac28f6b971e54eef6ae3e9a81218ebbcd0acff8c"
+    },
+    {
+      "path": "Solutions/080_20_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_small_02.txt",
+      "bytes": 1028,
+      "sha256": "935efac87364a949c003fabffb915745fe548ab1cfc86f48b5ae9a52d9c41cf5",
+      "git_blob_sha1": "90fc030061e4a202bbc2d3e443b24910420a864d"
+    },
+    {
+      "path": "Solutions/080_20_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_small_02_benchmark.txt",
+      "bytes": 1016,
+      "sha256": "f8dd9dcc7eccecac6b258444dad6b13538ea7a09e886686336ce69fd75c27767",
+      "git_blob_sha1": "2d4faae0e853aae04aa3725be0f316cfe7b1ef2e"
+    },
+    {
+      "path": "Solutions/080_20_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_small_03.txt",
+      "bytes": 994,
+      "sha256": "3a6de32d315ff33680a74fae74a788751ffbb1d6b1c0643c7db9db284ad88e5f",
+      "git_blob_sha1": "724a18be5f645c253a1e1c00529237e767f03d7c"
+    },
+    {
+      "path": "Solutions/080_20_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_small_03_benchmark.txt",
+      "bytes": 1006,
+      "sha256": "9027d09aef50e6c51c5eaa344ba0d7fc13c7221b2c6cfcc8f272f03b6b162096",
+      "git_blob_sha1": "b480af49d507ae00bb7d27bbaaef82cbd83c409b"
+    },
+    {
+      "path": "Solutions/080_20_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_small_04.txt",
+      "bytes": 1056,
+      "sha256": "3245a13b417081c143783f00374638bc822ec24c18ec6c417f28fa55e06771a6",
+      "git_blob_sha1": "7566ba293bdb9f6fc2eac3903fe27cdb14ad3071"
+    },
+    {
+      "path": "Solutions/080_20_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_small_04_benchmark.txt",
+      "bytes": 1056,
+      "sha256": "e15e03f62aadeb738c6c77134064e32f2a654dc26299caaca8dfd45d0adc9cb0",
+      "git_blob_sha1": "5aa4f0ae47f4a71287ed73f588f607accd86420f"
+    },
+    {
+      "path": "Solutions/080_20_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_small_05.txt",
+      "bytes": 955,
+      "sha256": "4e115a279e501ac01d7af7fb1fbdba1b2c721530e77eb450a5da77080f660cb4",
+      "git_blob_sha1": "a87d50164dc65ea37e3fc5cb16a85016c11cd2ac"
+    },
+    {
+      "path": "Solutions/080_20_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/080_20_small_05_benchmark.txt",
+      "bytes": 979,
+      "sha256": "b0f1520eaa9cb38c61424c55867d15afd0fee645df91348228c168c4009e7ee1",
+      "git_blob_sha1": "97c6ca98d6e3e6011f5ded8c845b3232b0010732"
+    },
+    {
+      "path": "Solutions/100_20_big_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_big_01.txt",
+      "bytes": 1210,
+      "sha256": "c07a8560db5a57bb8f2ab157c179234a31cfebc4186958fa8c5c5c130e3f709d",
+      "git_blob_sha1": "c18ec76887a36abdaad41d6099cba9166bfe173c"
+    },
+    {
+      "path": "Solutions/100_20_big_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_big_02.txt",
+      "bytes": 1422,
+      "sha256": "ca921c06ca8110e76f92de23edf387a3db1fa36ec2eb25fd23ddf59c48aa6842",
+      "git_blob_sha1": "bf23df4ca3c4a3862b3b3e42cb3cf9b2bb196421"
+    },
+    {
+      "path": "Solutions/100_20_big_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_big_03.txt",
+      "bytes": 1175,
+      "sha256": "d1f1e9a6e27f6d53d655e4e992fd124594335e16d3fae943b0fce06ece6cc6f7",
+      "git_blob_sha1": "8b8148a6beaae1dcae38c27fd424d7811d955cb6"
+    },
+    {
+      "path": "Solutions/100_20_big_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_big_04.txt",
+      "bytes": 1141,
+      "sha256": "c01c04540479f4e9b18e3ce1c93084c32e5f2dd58cfbffb8ed263e8b63cc8e19",
+      "git_blob_sha1": "934820c9aca1c23c30969462e6026624e81d017f"
+    },
+    {
+      "path": "Solutions/100_20_big_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_big_05.txt",
+      "bytes": 1098,
+      "sha256": "436c95eb8c1b96e6cc38e407352adead93a1ff0ec9033c57b2a555c28a6e2f36",
+      "git_blob_sha1": "902da22e5322c817eece43e6ce1b654961d71921"
+    },
+    {
+      "path": "Solutions/100_20_small_01.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_small_01.txt",
+      "bytes": 1128,
+      "sha256": "1d6b72735782c9f88b1ee578f20018197cd8500fe1f8c55c7201dbd2952bdb33",
+      "git_blob_sha1": "2b8a9405aa74f96b9c539c8441092c10cc91020c"
+    },
+    {
+      "path": "Solutions/100_20_small_01_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_small_01_benchmark.txt",
+      "bytes": 1269,
+      "sha256": "79b2ec10655128d03e6b1aa9bbebeefc961724e5b19885ba0bae1ba8f2fb48fe",
+      "git_blob_sha1": "9d09c9d6a5e25505901cfe4f443d08035f95b001"
+    },
+    {
+      "path": "Solutions/100_20_small_02.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_small_02.txt",
+      "bytes": 1267,
+      "sha256": "daa72e6d3a4aa008dc6ea9f7385e2d3e3d15be627133158d919be1a4610b913f",
+      "git_blob_sha1": "b8800afc226e8fb7cbb7979719c531ffad9abd6c"
+    },
+    {
+      "path": "Solutions/100_20_small_02_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_small_02_benchmark.txt",
+      "bytes": 1246,
+      "sha256": "48cbd5493e3254611181c3f0e5df1bdd9f477e93d6b1a57cbfda5da5c34b5bd7",
+      "git_blob_sha1": "0ab2240588baf74a7c48467fee35c09481048a08"
+    },
+    {
+      "path": "Solutions/100_20_small_03.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_small_03.txt",
+      "bytes": 1229,
+      "sha256": "eb06bd6738b8f26afb732ec00dd2de5e6879aab8a006e103762c1dbfb5f3f9d0",
+      "git_blob_sha1": "0359bc470e4939f05f5a32cb5aa9d60563aa3329"
+    },
+    {
+      "path": "Solutions/100_20_small_03_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_small_03_benchmark.txt",
+      "bytes": 1303,
+      "sha256": "5941722c19defdcb6a6c4eba47849d89a50e2b0cba5d68380ca82e9245df2f08",
+      "git_blob_sha1": "1859fa03c5b0a686fa0848b8603d9f4a3e6872d0"
+    },
+    {
+      "path": "Solutions/100_20_small_04.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_small_04.txt",
+      "bytes": 1171,
+      "sha256": "ae870aec294ac8d17d9a05b7a2ebcc460de483f59283a36124d1364073250251",
+      "git_blob_sha1": "28a2fe8f999bfc1bd043b85d6000d6655acbbe99"
+    },
+    {
+      "path": "Solutions/100_20_small_04_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_small_04_benchmark.txt",
+      "bytes": 1430,
+      "sha256": "79a5a7492792155d071d178a52f9936e3b4d27e2df2c5db16d0629694c4aa3d3",
+      "git_blob_sha1": "a84b136402477d1a3574eb25cda7457a17c2f2a3"
+    },
+    {
+      "path": "Solutions/100_20_small_05.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_small_05.txt",
+      "bytes": 1201,
+      "sha256": "49d7edf9060ffd228ce253c13d93b67b13ee2cbeb388eb52182c0e06d9e3c3a3",
+      "git_blob_sha1": "338fc7a3ebdc59bf90f2ebabc857f37d05f9b8df"
+    },
+    {
+      "path": "Solutions/100_20_small_05_benchmark.txt",
+      "upstream_path": "data/evrptw_multidepot/Solutions/100_20_small_05_benchmark.txt",
+      "bytes": 1348,
+      "sha256": "2f3d05151bd1d23fb1a0283d62049a0348e9ef69a947ad2c80c9ea45b92ccf1c",
+      "git_blob_sha1": "e8746eb65e0491b6db9c1225a7ebc8b7952af3b7"
+    },
+    {
+      "path": "UPSTREAM_README.md",
+      "upstream_path": "README.md",
+      "bytes": 4265,
+      "sha256": "5fce754c9e74fc12da23231cb8b7a310ce47fd915569197a865b4c900733ec31",
+      "git_blob_sha1": "621409eeb05216c77a987dbf59fdb66deaddb17b"
+    }
+  ]
+}

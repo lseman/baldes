@@ -188,10 +188,12 @@ impl ResourceKnapsackSeparator {
         }
         let separator = KnapsackSeparator::with_parameters(self.parameters.clone())?;
         let mut result = Vec::new();
-        for (row, cut) in separator.separate_totals(&rows) {
+        for (row, cut) in separator.separate_totals(&rows)? {
             let b = &cut.thresholds;
             let rhs = cut.rhs as usize;
-            let class = if b.is_empty() {
+            let class = if cut.kind == KnapsackKind::Fenchel {
+                1
+            } else if b.is_empty() {
                 0
             } else if (1..rhs).all(|i| i == rhs / 2 || b[i - 1] == b[i]) {
                 2

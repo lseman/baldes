@@ -742,3 +742,6 @@ fn engine_label_budgets_remain_enforced_after_unlimited_sweeps() {
         assert_eq!(repeated.columns, unlimited.columns);
     }
 }
+
+#[path = "presence.rs"]
+mod presence_tests;

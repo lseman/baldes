@@ -193,3 +193,57 @@ def test_full_integer_transfer_and_mip_retry():
     tree = triangle().solve(tree=True, enumerated_mip=True)
     assert tree.status == "Optimal" and tree.incumbent == pytest.approx(2.)
     assert tree.nodes == 1 and tree.enumerated_mip_calls == 1
+
+
+def test_equality_transfer_filters_waiting_relaxation_before_certification():
+    model = NetworkProblem.from_json(json.dumps({
+        "rows": [{"sense": "eq", "rhs": 1}],
+        "networks": [{
+            "id": 7, "vertices": 4, "multiplicity": [0, 1],
+            "resources": [{"kind": "equality", "initial": 1,
+                           "bounds": [[0, 10], [5, 10], [0, 10], [0, 10]]}],
+            "arcs": [
+                {"tail": 0, "head": 1, "cost": 1, "consumption": [2], "entries": [[0, 1]]},
+                {"tail": 1, "head": 3, "cost": 0, "consumption": [0]},
+                {"tail": 0, "head": 2, "cost": 3, "consumption": [1], "entries": [[0, 1]]},
+                {"tail": 2, "head": 3, "cost": 0, "consumption": [0]},
+            ],
+        }],
+    }))
+    result = model.solve(enumerate=True, bound_mode="certified")
+    assert result.status == "Optimal"
+    assert result.lp == pytest.approx(3.) and result.bound == pytest.approx(3.)
+    assert result.enumeration_reports[0].complete
+    assert result.enumeration_reports[0].routes == 1
+    assert all(r.arcs == (2, 3) for r in result.routes if r.value > 0)
+    if __import__("pybaldes").has_highs:
+        mip = result.snapshot.solve_enumerated_mip()
+        assert mip.status == "Optimal" and mip.incumbent == pytest.approx(3.)
+
+
+@pytest.mark.parametrize("kind", ["multiplicity", "arc"])
+@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
+def test_generic_integer_tree_without_fractional_assignment_candidates(kind, bound_mode):
+    if kind == "multiplicity":
+        model = NetworkProblem([SharedRow("ge", 0.5)], [PricingNetwork(
+            7, 3, (0, 3), [
+                PricingArc(0, 1, 1., entries=[(0, 1.)]),
+                PricingArc(1, 2, 0.),
+            ],
+        )])
+    else:
+        model = NetworkProblem([SharedRow("eq", 1.), SharedRow("ge", 0.5)], [PricingNetwork(
+            7, 4, (0, 3), [
+                PricingArc(0, 1, 0., entries=[(0, 1.)]),
+                PricingArc(1, 3, 0.),
+                PricingArc(0, 2, 1., entries=[(0, 1.), (1, 1.)]),
+                PricingArc(2, 3, 0.),
+            ],
+        )])
+    root = model.solve(stabilize=False, bound_mode=bound_mode)
+    assert root.lp == pytest.approx(0.5)
+    assert root.snapshot.fractional_assignments() == ()
+    tree = model.solve(tree=True, stabilize=False, bound_mode=bound_mode)
+    assert tree.status == "Optimal" and tree.incumbent == pytest.approx(1.)
+    assert tree.nodes == 3 and tree.open_nodes == 0
+    assert all(r.value.is_integer() for r in tree.routes)

@@ -13,7 +13,8 @@ root. These guides cover installing, configuring and using BALDES.
 | [Algorithms and references](algorithms.md) | Review solver components and research references |
 | [Build configuration](build.md) | Configure optional backends and compiler options in the terminal menu, then build with Make |
 | [Tree and node lifecycle](tree.md) | Run integer routing, understand node inheritance, bounds, limits, and result status |
-| [Multiple pricing networks](networks.md) | Model a shared master, resume or fork snapshots, and run assignment branching |
+| [Multi-pricing](multi-pricing.md) | Model a shared master, resume or fork snapshots, and run assignment branching |
+| [Finite column imports](column-imports.md) | Import original-vector patterns, fix columns and constrain multiplicities without routing graphs |
 | [P-step CVRP](pstep.md) | Build and solve the compact p-step LP relaxation |
 | [Scalar resources](resources.md) | Configure general scalar dimensions and bucket indexing |
 | [Branching](branching.md) | Choose vehicle-count, Ryan–Foster, or arc-flow branching and understand the single-network assignment limitation |
@@ -34,7 +35,7 @@ root. These guides cover installing, configuring and using BALDES.
 | Generic mixed-integer master solve | `highs::solve_integer` | Not exposed directly | Not exposed | HiGHS |
 
 The `vrptw` and `cvrp` routing tree uses one pricing network. For models with
-multiple route families, use the [shared-network interface](networks.md),
+multiple route families, use the [multi-pricing interface](multi-pricing.md),
 including its CLI and Python APIs and assignment tree. Its supported branching
 families and solve limitations differ from the single-network routing tree.
 
@@ -42,3 +43,25 @@ Root `Optimal` means the LP relaxation converged. Tree `Optimal` means the
 integer routing gap closed within the configured tolerances. A feasible
 restricted-column solution supplies an incumbent; its objective alone does
 not prove a lower bound for the full routing problem.
+
+## Rust module organization
+
+Core modules implement graphs, labeling, pricing, cuts, enumeration and the
+master. `master::multi_pricing` coordinates one master with multiple pricing
+subproblems and belongs to the core master framework. Rust callers can also use
+`master::multi_pricing::solve_master` for original master variables with no
+pricing subproblems.
+
+| Module | Purpose |
+| --- | --- |
+| `extensions::hgs` | Hybrid Genetic Search and primal heuristics |
+| `extensions::ipm` | Native interior-point LP backend |
+| `extensions::evrp` | Electric-vehicle routing models and charging schedules |
+| `extensions::pstep` | P-step CVRP LP with parallel bucket pricing and reference enumeration |
+| `master::multi_pricing` | Shared rows, per-subproblem multiplicities and node lifecycle |
+
+`extensions` groups algorithms and specialized models in the same crate; it
+does not imply runtime plugins or new build features. Existing `baldes::hgs`,
+`baldes::ipm`, `baldes::evrp` and `master::networks` paths remain compatibility
+re-exports. New Rust code should use the module paths above. CLI JSON fields
+and Python names such as `NetworkProblem` and `solve_networks` stay compatible.

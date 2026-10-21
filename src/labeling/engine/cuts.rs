@@ -1,6 +1,8 @@
 use super::*;
 
 impl<const D: usize> LabelingEngine<D> {
+    /// Whether packed rank-one/strong-k-path tables are active. Presence and
+    /// knapsack costs have separate preparations in `self.cuts`.
     pub fn has_cuts(&self) -> bool {
         !self.cuts.inputs.is_empty() || !self.cuts.kpath.is_empty()
     }
@@ -19,6 +21,7 @@ impl<const D: usize> LabelingEngine<D> {
             inputs,
             kpath,
             knapsack: self.cuts.knapsack.clone(),
+            presence: self.cuts.presence.clone(),
             ..Default::default()
         };
         if !cuts.inputs.is_empty() || !cuts.kpath.is_empty() {
@@ -147,6 +150,7 @@ impl<const D: usize> LabelingEngine<D> {
     /// a substitute: an unreachable forward cell can still inherit a valid
     /// completion bound from its dominance predecessors.
     pub fn prepare_full_labels(&mut self, g: &Graph<D>, controls: &Controls) -> Result<()> {
+        self.cuts.presence.validate_engine(g.arcs.len())?;
         self.ensure_reversal_costs(g)?;
         if self.costs_unchanged(g) {
             if self.full_ready {

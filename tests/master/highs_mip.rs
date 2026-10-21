@@ -182,6 +182,7 @@ fn small_integer_models_match_independent_enumeration() {
 #[cfg(feature = "clp")]
 mod routing {
     use super::*;
+    use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         branching::BranchConstraint,
         root::{
@@ -190,7 +191,6 @@ mod routing {
         },
     };
     use baldes::pricing::restrictions::RyanFosterConstraint;
-    use baldes::inputs::{Instance, Rounding};
     fn instance() -> Instance {
         Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap()
     }
@@ -199,7 +199,7 @@ mod routing {
         let instance = instance();
         let problem =
             RootProblem::set_partitioning(instance.graph(3, Rounding::None).unwrap(), 3.).unwrap();
-        for family in 0..5 {
+        for family in 0..6 {
             let mut options = RootOptions::default();
             options.capture_state = true;
             options.enumerate = true;
@@ -212,6 +212,7 @@ mod routing {
                 4 => options.with_knapsack_cuts(KnapsackCutConfig::new(vec![
                     baldes::cuts::knapsack::KnapsackRow::new(0, 1, 1., 3),
                 ])),
+                5 => options.with_knapsack_cuts(instance.fenchel_cut_config().unwrap()),
                 _ => options,
             };
             let parent = root::solve(problem.clone(), options.clone()).unwrap();
@@ -259,9 +260,18 @@ mod routing {
             ] {
                 let child =
                     root::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
-                if matches!(branch, BranchConstraint::PackingSetAssignment { assigned: false, .. }) {
+                if matches!(
+                    branch,
+                    BranchConstraint::PackingSetAssignment {
+                        assigned: false,
+                        ..
+                    }
+                ) {
                     assert!(child.preprocessing.infeasible);
-                    assert_eq!(child.master.status, baldes::master::column_generation::Status::Infeasible);
+                    assert_eq!(
+                        child.master.status,
+                        baldes::master::column_generation::Status::Infeasible
+                    );
                     assert_eq!(child.master.pricing_calls, 0);
                     assert!(child.snapshot.is_none());
                     continue;
@@ -356,4 +366,29 @@ fn transfer_refuses_coefficients_that_highs_would_drop() {
             .status,
         MipStatus::Infeasible
     );
+}
+
+#[test]
+fn fractional_integer_upper_bounds_are_normalized_without_clipping_continuous_bounds() {
+    // x=a+4b, x=1, a+b<=1, min 10a-b. Integer b<=1/4 means b=0,
+    // so a=1 is feasible. Native presolve previously rejected this model.
+    let mut model = HighsMaster::new().unwrap();
+    model.add_row(RowSense::Equal, 0., &[]).unwrap();
+    model.add_row(RowSense::Equal, 1., &[]).unwrap();
+    model.add_row(RowSense::LessEqual, 1., &[]).unwrap();
+    model.add_column(0., &[(0, 1.), (1, 1.)]).unwrap();
+    model.set_upper(0, 1.).unwrap();
+    model.add_column(10., &[(0, -1.), (2, 1.)]).unwrap();
+    model.set_upper(1, 1.).unwrap();
+    model.add_column(-1., &[(0, -4.), (2, 1.)]).unwrap();
+    model.set_upper(2, 0.25).unwrap();
+    let integer = solve_integer(&model, &[1, 2], &MipOptions::default()).unwrap();
+    assert_eq!(integer.status, MipStatus::Optimal);
+    assert_eq!(integer.solution.unwrap().values, vec![1., 1., 0.]);
+    let continuous = solve_integer(&model, &[1], &MipOptions::default()).unwrap();
+    assert_eq!(continuous.status, MipStatus::Optimal);
+    let continuous = continuous.solution.unwrap();
+    assert_eq!(continuous.objective, -0.25);
+    assert_eq!(continuous.values, vec![1., 0., 0.25]);
+    assert_eq!(model.upper(), &[1., 1., 0.25]);
 }

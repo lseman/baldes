@@ -99,6 +99,7 @@ pub struct ClpMaster {
     model: NonNull<Model>,
     solver: MasterSolver,
     clp_options: ClpOptions,
+    ipm: ipm_state::IpmState,
     highs_row_basic: Vec<bool>,
     #[cfg(feature = "highs")]
     highs_backend: Option<super::highs::HighsMaster>,
@@ -107,6 +108,7 @@ pub struct ClpMaster {
     pub senses: Vec<RowSense>,
     pub costs: Vec<f64>,
     pub upper: Vec<f64>,
+    column_default_upper: f64,
     pub duals: Vec<f64>,
     pub values: Vec<f64>,
     pub reduced_costs: Vec<f64>,
@@ -176,6 +178,10 @@ mod highs_warm_tests;
 mod matrix;
 mod model;
 mod solve;
+mod ipm_state;
+
+#[cfg(test)]
+mod ipm_warm_tests;
 
 mod interface;
 
@@ -184,3 +190,6 @@ pub use options::{ClpOptions, ClpScaling};
 
 #[cfg(test)]
 mod reoptimization_tests;
+
+#[cfg(test)]
+mod recovery_tests;

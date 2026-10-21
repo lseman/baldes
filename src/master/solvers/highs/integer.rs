@@ -153,6 +153,7 @@ pub fn solve_integer<M: LpMaster>(
             rhs
         });
     }
+    let mut upper = Vec::with_capacity(cols);
     let mut starts = Vec::with_capacity(cols + 1);
     let mut indices = vec![];
     let mut values = vec![];
@@ -163,6 +164,14 @@ pub fn solve_integer<M: LpMaster>(
         {
             return Err(invalid("MIP source cost or upper bound"));
         }
+        // Exact integer-domain normalization. Fractional integer upper bounds
+        // can trigger an invalid presolve reduction in native HiGHS; flooring
+        // them is equivalent for integer columns, unlike continuous columns.
+        upper.push(if integrality[c] != 0 {
+            source.upper()[c].floor()
+        } else {
+            source.upper()[c]
+        });
         starts.push(count(indices.len())?);
         for (r, a) in source.column_entries(c)? {
             if r >= rows || !a.is_finite() {
@@ -192,7 +201,7 @@ pub fn solve_integer<M: LpMaster>(
                 offset,
                 source.costs().as_ptr(),
                 lower.as_ptr(),
-                source.upper().as_ptr(),
+                upper.as_ptr(),
                 row_lower.as_ptr(),
                 row_upper.as_ptr(),
                 starts.as_ptr(),
@@ -291,12 +300,13 @@ pub fn solve_integer<M: LpMaster>(
             .iter()
             .enumerate()
             .all(|(r, &x)| x.is_finite() && x >= row_lower[r] - 1e-7 && x <= row_upper[r] + 1e-7);
-        let objective: f64 = offset + source
-            .costs()
-            .iter()
-            .zip(&solution)
-            .map(|(c, x)| c * x)
-            .sum::<f64>();
+        let objective: f64 = offset
+            + source
+                .costs()
+                .iter()
+                .zip(&solution)
+                .map(|(c, x)| c * x)
+                .sum::<f64>();
         valid_witness &= objective.is_finite();
         if valid_witness && objective < options.objective_cutoff {
             output.solution = Some(MipSolution {

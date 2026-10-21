@@ -1,4 +1,4 @@
-use baldes::ipm::{solve, ModelData, Options, Sense, SparseMatrix, Status};
+use baldes::extensions::ipm::{solve, ModelData, Options, Sense, SparseMatrix, Status};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Minimize -x - 2y, with x + y <= 3, x >= 1, and x,y >= 0.

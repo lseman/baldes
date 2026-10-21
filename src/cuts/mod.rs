@@ -8,6 +8,7 @@ pub mod knapsack;
 pub mod kpath;
 pub mod rank_one;
 pub mod shared;
+pub mod soft_conflicts;
 
 mod registry;
 

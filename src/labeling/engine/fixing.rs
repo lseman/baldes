@@ -98,9 +98,10 @@ impl<const D: usize> LabelingEngine<D> {
                             if let Some(l) =
                                 self.extend(g, forward, &arc, self.storage(forward).labels.view(id))
                             {
+                                let key = l.key()
+                                    + self.cuts.knapsack.partial_cost(g, &l.resources, forward);
                                 minimum = minimum.min(
-                                    l.key()
-                                        + self.cuts.knapsack.partial_cost(g, &l.resources, forward),
+                                    self.ctx().presence_completion_key(key, &l.presence_state),
                                 );
                                 extended.push(l);
                             }
@@ -119,8 +120,10 @@ impl<const D: usize> LabelingEngine<D> {
                                     target
                                 };
                                 let opposite = &storage.buckets[storage_vertex][bucket];
-                                if minimum + opposite.completion_bound(self.cuts.knapsack.active)
-                                    >= threshold
+                                if self.ctx().completion_sum(
+                                    minimum,
+                                    opposite.completion_bound(self.cuts.knapsack.active),
+                                ) >= threshold
                                 {
                                     continue;
                                 }
@@ -137,9 +140,14 @@ impl<const D: usize> LabelingEngine<D> {
                                                 &l.resources,
                                                 forward,
                                             );
+                                        let key = self
+                                            .ctx()
+                                            .presence_completion_key(key, &l.presence_state);
                                         for &id in &opposite.active {
                                             let other = storage.labels.view(id);
-                                            if key + other.key() >= threshold {
+                                            if self.ctx().completion_sum(key, other.key())
+                                                >= threshold
+                                            {
                                                 break;
                                             }
                                             concatenation_tests += 1;

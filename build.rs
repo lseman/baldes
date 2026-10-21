@@ -136,7 +136,25 @@ extern "C" int baldes_clp_dual_limited(Clp_Simplex *model, int iterations, doubl
     BaldesScopedSolveLimits limits(*model->model_, iterations, seconds);
     // Bit 1 retains work areas. Rebuild/init stays enabled; do not force
     // factorization reuse (bit 2) or skip initialization (bit 4).
+    const int iterationLimit = model->model_->maximumIterations();
     model->model_->dual(0, keepWorkAreas);
+    // Dual fake bounds can report unbounded on a bounded LP with very large
+    // RHS values and artificial columns. Cross-check with primal simplex;
+    // never impose a finite cap on an original infinite column domain.
+    if (model->model_->status() == 2) {
+      const int used = std::max(0, model->model_->numberIterations());
+      if (used >= iterationLimit || model->model_->hitMaximumIterations()) {
+        model->model_->setProblemStatus(3);
+      } else {
+        model->model_->setMaximumIterations(iterationLimit - used);
+        model->model_->setNumberIterations(0);
+        model->model_->primal(0, 0);
+        const long long total = static_cast<long long>(used)
+          + std::max(0, model->model_->numberIterations());
+        model->model_->setNumberIterations(static_cast<int>(
+          std::min<long long>(iterationLimit, total)));
+      }
+    }
     return 0;
   } catch (...) {
     model->model_->setProblemStatus(4);

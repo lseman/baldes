@@ -1,3 +1,4 @@
+use super::controller::apply_column_cap;
 use super::*;
 
 /// Generic column generation loop that works with any `LpMaster` backend.
@@ -102,6 +103,11 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         |w| w.columns.clone(),
     );
     loaded.resize(master.costs().len(), None);
+    for (index, column) in loaded.iter().enumerate() {
+        if let Some(column) = column {
+            apply_column_cap(master, controller, index, column.tag)?;
+        }
+    }
     let mut seen: HashSet<_> = loaded.iter().flatten().map(Column::signature).collect();
     // Generated columns exist independently of membership in the restricted
     // master. Columns omitted by a pricing insertion test can become
@@ -499,7 +505,15 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 .iter()
                 .map(|c| c.as_ref().map(|c| (c.cost, c.entries.as_slice())).unwrap())
                 .collect();
-            master.add_columns(&added)?;
+            let added_indices = master.add_columns(&added)?;
+            for index in added_indices {
+                apply_column_cap(
+                    master,
+                    controller,
+                    index,
+                    loaded[index].as_ref().unwrap().tag,
+                )?;
+            }
         }
         out.columns = master.costs().len();
         out.history.push(Iteration {
@@ -530,12 +544,12 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 controller.incumbent(),
             );
         }
-        // An exhausted numerical exact pass completes the ordinary LP/cut
-        // workflow below. Reserve an early cutoff for a still-improving LP
-        // or a separately validated integer-domain certificate.
+        // An exact bound can close the incumbent gap even without a fresh
+        // column. Stop before strict-improvement enumeration discards every
+        // real route and replaces this feasible master with artificials.
         if !converged
             && !positive
-            && (out.bound_mode == BoundMode::Certified || fresh > 0)
+            && (out.bound_mode == BoundMode::Certified || fresh > 0 || exact)
             && controller.incumbent().is_finite()
             && out.bound.is_finite()
             && gap_smaller_than_tolerance(
@@ -610,7 +624,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     }
                     controller.remap_columns(&map)?;
                     for column in regenerated {
-                        master.add_column(column.cost, &column.entries)?;
+                        let index = master.add_column(column.cost, &column.entries)?;
+                        apply_column_cap(master, controller, index, column.tag)?;
                         loaded_set.insert(column.signature());
                         seen.insert(column.signature());
                         out.column_tags.push(column.tag);
@@ -627,7 +642,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                         if !loaded_set.insert(identity.clone()) {
                             continue;
                         }
-                        master.add_column(column.cost, &column.entries)?;
+                        let index = master.add_column(column.cost, &column.entries)?;
+                        apply_column_cap(master, controller, index, column.tag)?;
                         out.column_tags.push(column.tag);
                         out.inserted_tags.push(column.tag);
                         seen.insert(identity);
@@ -859,7 +875,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     if !present.insert(identity.clone()) {
                         continue;
                     }
-                    master.add_column(column.cost, &column.entries)?;
+                    let index = master.add_column(column.cost, &column.entries)?;
+                    apply_column_cap(master, controller, index, column.tag)?;
                     seen.insert(identity.clone());
                     if pool_seen.insert(identity) {
                         pool.push(column.clone());

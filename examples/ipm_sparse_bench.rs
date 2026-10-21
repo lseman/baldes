@@ -1,5 +1,5 @@
 //! Reproducible sparse KKT benchmark: cargo run --release --example ipm_sparse_bench.
-use baldes::ipm::{SolverType, SparseMatrix, SparseSolver};
+use baldes::extensions::ipm::{SolverType, SparseMatrix, SparseSolver};
 use std::{hint::black_box, time::Instant};
 
 fn main() {

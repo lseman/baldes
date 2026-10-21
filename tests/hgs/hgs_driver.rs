@@ -1,4 +1,4 @@
-use baldes::hgs::driver::{run_hgs, HgsOptions};
+use baldes::extensions::hgs::driver::{run_hgs, HgsOptions};
 use baldes::inputs::{Instance, Customer};
 
 /// Create a small test instance (CVRP, 10 customers + depot).
@@ -73,7 +73,7 @@ fn fractional_instance() -> Instance {
 
 #[test]
 fn hgs_uses_unrounded_distances_unless_tenths_are_requested() {
-    use baldes::hgs::Params;
+    use baldes::extensions::hgs::Params;
     use baldes::inputs::Rounding;
     let mut instance = fractional_instance();
     let params = Params::from_instance(&instance);
@@ -92,7 +92,7 @@ fn hgs_uses_unrounded_distances_unless_tenths_are_requested() {
 
 #[test]
 fn hgs_retains_fractional_explicit_matrix_costs_and_search_costs() {
-    use baldes::hgs::{Individual, Params};
+    use baldes::extensions::hgs::{Individual, Params};
     let mut instance = fractional_instance();
     instance.customers[1].due = 5.;
     // Explicit matrices define the metric even if rounding is requested.

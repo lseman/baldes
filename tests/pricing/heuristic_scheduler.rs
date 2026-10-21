@@ -20,6 +20,7 @@ fn single_label_phase_replaces_cheaper_prefix_and_requests_expansion() {
         resources: [resource, 0.].into(),
         ng: 0,
         branch_state: None,
+        presence_state: None,
         parent: None,
         arc: None,
         hops: 1,

@@ -202,45 +202,18 @@ impl ClpMaster {
             return Ok(ClpSolveOutcome::Stopped);
         }
         let started = Instant::now();
-        let mut entries = Vec::new();
-        for column in 0..self.costs.len() {
-            for (row, value) in self.column_entries(column)? {
-                entries.push((row, column, value));
-            }
-        }
-        let model = crate::ipm::ModelData {
-            a: crate::ipm::SparseMatrix::from_triplets(self.rhs.len(), self.costs.len(), &entries)
-                .map_err(|e| incomplete(e.to_string()))?,
-            b: self.rhs.clone(),
-            c: self.costs.clone(),
-            lower: vec![0.; self.costs.len()],
-            upper: self.upper.clone(),
-            sense: self
-                .senses
-                .iter()
-                .map(|s| match s {
-                    RowSense::Equal => crate::ipm::Sense::Equal,
-                    RowSense::LessEqual => crate::ipm::Sense::LessEqual,
-                    RowSense::GreaterEqual => crate::ipm::Sense::GreaterEqual,
-                })
-                .collect(),
-        };
-        let solution = crate::ipm::solve(
-            &model,
-            &crate::ipm::Options {
-                tolerance: 1e-9,
-                gap_tolerance,
-                max_iterations: iterations,
-                time_limit: Some(time_limit.saturating_sub(started.elapsed())),
-                ..Default::default()
-            },
-        )
-        .map_err(|e| incomplete(format!("IPM master: {e}")))?;
+        let solution = self.solve_persistent_ipm(&crate::extensions::ipm::Options {
+            tolerance: 1e-9,
+            gap_tolerance,
+            max_iterations: iterations,
+            time_limit: Some(time_limit.saturating_sub(started.elapsed())),
+            ..Default::default()
+        })?;
         self.ipm_iterations = self.ipm_iterations.saturating_add(solution.iterations);
         self.status = match solution.status {
-            crate::ipm::Status::Optimal => 0,
-            crate::ipm::Status::Infeasible => 1,
-            crate::ipm::Status::Unbounded => 2,
+            crate::extensions::ipm::Status::Optimal => 0,
+            crate::extensions::ipm::Status::Infeasible => 1,
+            crate::extensions::ipm::Status::Unbounded => 2,
             _ => 3,
         };
         if started.elapsed() >= time_limit {

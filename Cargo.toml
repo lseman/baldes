@@ -178,3 +178,7 @@ required-features = ["clp"]
 name = "network_enumeration"
 path = "tests/master/network_enumeration.rs"
 required-features = ["clp"]
+
+[[test]]
+name = "accumulated_resource"
+path = "tests/master/accumulated_resource.rs"

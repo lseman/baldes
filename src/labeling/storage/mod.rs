@@ -50,6 +50,8 @@ pub struct StoredLabel<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> 
     pub resources: crate::graph::ResourceValues<D>,
     pub ng: u16,
     pub branch_state: crate::pricing::restrictions::BranchState,
+    /// Full original-variable incidence for presence-based nonlinear rows.
+    pub presence_state: crate::cuts::soft_conflicts::LabelState,
     pub parent: Option<usize>,
     pub arc: Option<usize>,
     pub hops: usize,

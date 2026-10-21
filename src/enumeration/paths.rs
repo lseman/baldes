@@ -106,6 +106,18 @@ impl PathStorage {
         kpath: &[LimitedKPathInput],
         knapsack: &crate::cuts::knapsack::KnapsackPricing,
     ) -> Result<usize> {
+        self.inspect_with_presence(g, cutoff, cuts, kpath, knapsack, &Default::default())
+    }
+
+    pub fn inspect_with_presence<const D: usize>(
+        &mut self,
+        g: &Graph<D>,
+        cutoff: f64,
+        cuts: &[LimitedInput],
+        kpath: &[LimitedKPathInput],
+        knapsack: &crate::cuts::knapsack::KnapsackPricing,
+        presence: &crate::cuts::soft_conflicts::PresencePricing,
+    ) -> Result<usize> {
         if cutoff.is_nan() {
             return Err(invalid("invalid enumeration inspection cutoff"));
         }
@@ -124,6 +136,9 @@ impl PathStorage {
                         &ids,
                         path.reduced_cost,
                     );
+                }
+                if presence.active() {
+                    path.reduced_cost += presence.route_cost(&path.arcs)?;
                 }
                 if knapsack.active {
                     let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);

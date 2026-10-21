@@ -365,7 +365,7 @@ fn accumulated_resource_windows_cover_schedules_and_restore_pricing() {
                     for (i, &id) in route.arcs.iter().enumerate() {
                         if id == arc {
                             let q = route.resource_profile[i + 1][0];
-                            assert!(if upper { q >= 2.5 } else { q <= 2.5 }, "mode={mode} {kind:?} {route:?}");
+                            assert!(rule.satisfied_by(q), "mode={mode} {kind:?} {route:?}");
                         }
                     }
                 }
@@ -453,11 +453,12 @@ fn resource_boundary_belongs_to_both_sides_and_empty_intersections_forbid_only_t
             s.set_option("BALDESuseBidirectionalSearch", mode).unwrap();
             let arc = s.graph.arcs.iter().find(|a| a.tail == 0 && a.head == 1).unwrap().id;
             let rule = AccumulatedResourceBranch { arc, resource: 0, threshold: 1., upper };
+            s.graph.arc_mut(arc).unwrap().consumption[0] = rule.boundary();
             s.add_accumulated_resource_branch(rule).unwrap();
             let result = s.price_phase(0, 100, false).unwrap();
             assert!(result.columns.iter().any(|r| r.arcs.first() == Some(&arc)));
             for route in result.columns.iter().filter(|r| r.arcs.first() == Some(&arc)) {
-                assert_eq!(route.resource_profile[1][0], 1.);
+                assert_eq!(route.resource_profile[1][0], rule.boundary());
             }
             // Both an inherited restrictive window and an empty intersection
             // must be undone, in reverse order, without weakening other arcs.

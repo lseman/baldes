@@ -24,6 +24,9 @@ pub mod branching;
 #[cfg(feature = "clp")]
 pub mod root;
 #[cfg(feature = "clp")]
-pub mod networks;
+pub mod multi_pricing;
+/// Compatibility path; prefer [`multi_pricing`] for shared-master models.
+#[cfg(feature = "clp")]
+pub use multi_pricing as networks;
 #[cfg(feature = "clp")]
 pub mod tree;

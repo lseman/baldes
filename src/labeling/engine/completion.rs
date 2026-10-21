@@ -12,6 +12,16 @@ impl<const D: usize> LabelingEngine<D> {
         threshold: f64,
         scan: bool,
     ) -> bool {
+        // Unknown incidence cannot justify deleting a caller-supplied label.
+        if self.cuts.presence.active()
+            && self
+                .cuts
+                .presence
+                .join_correction_lower_bound(&label.presence_state)
+                .is_err()
+        {
+            return true;
+        }
         let vertex = self.grid.internal[label.vertex];
         let mut q = self.grid.coordinate(label.resources());
         let opposite = self.consumption_joins || !forward;
@@ -29,10 +39,17 @@ impl<const D: usize> LabelingEngine<D> {
                 .cuts
                 .knapsack
                 .partial_cost(g, label.resources(), forward);
+        let key = self
+            .ctx()
+            .presence_completion_key(key, &label.presence_state);
         let mut work = vec![(bucket, 0usize)];
         while let Some((k, min)) = work.pop() {
             let row = &storage.buckets[vertex][k];
-            if key + row.completion_bound(self.cuts.knapsack.active) >= threshold {
+            if self
+                .ctx()
+                .completion_sum(key, row.completion_bound(self.cuts.knapsack.active))
+                >= threshold
+            {
                 continue;
             }
             if !scan {
@@ -40,7 +57,7 @@ impl<const D: usize> LabelingEngine<D> {
             }
             for &id in &row.active {
                 let other = storage.labels.view(id);
-                if key + other.key() >= threshold {
+                if self.ctx().completion_sum(key, other.key()) >= threshold {
                     break;
                 }
                 let cost = if forward {
@@ -110,6 +127,7 @@ impl<const D: usize> LabelingEngine<D> {
             resources: label.resources.clone(),
             ng,
             branch_state: None,
+            presence_state: label.presence_state.clone(),
             parent: None,
             arc: None,
             hops: label.hops,

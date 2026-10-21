@@ -97,7 +97,7 @@ impl KnapsackSeparator {
         }
 
         let mut result: Vec<_> = self
-            .separate_totals(&[(totals, rhs)])
+            .separate_totals(&[(totals, rhs)])?
             .into_iter()
             .map(|(_, cut)| cut)
             .collect();
@@ -117,7 +117,7 @@ impl KnapsackSeparator {
     pub(super) fn separate_totals(
         &self,
         rows: &[(BTreeMap<i32, f64>, i32)],
-    ) -> Vec<(usize, RouteLoadKnapsackCut)> {
+    ) -> Result<Vec<(usize, RouteLoadKnapsackCut)>> {
         let mut candidates = CandidateTree::default();
         for (row, (totals, rhs)) in rows.iter().enumerate() {
             if self.parameters.use_rounding {
@@ -146,7 +146,24 @@ impl KnapsackSeparator {
             cut.violation = cut.lhs - (cut.rhs as f64);
             result.push((cand.row, cut));
         }
-        result
+        if let Some(options) = &self.parameters.fenchel {
+            let started = std::time::Instant::now();
+            for (row, (totals, rhs)) in rows.iter().enumerate() {
+                let mut limits = options.clone();
+                limits.time_limit = limits.time_limit.saturating_sub(started.elapsed());
+                if limits.time_limit.is_zero() { break; }
+                let report = FenchelSeparator::with_parameters(limits)?.separate_totals(totals, *rhs)?;
+                if let Some(cut) = report.cut { result.push((row, cut)); }
+            }
+            // Rank by scale-independent violation when families are combined.
+            result.sort_by(|(left_row, left), (right_row, right)| {
+                let score = |cut: &RouteLoadKnapsackCut| cut.violation / f64::from(cut.rhs.max(1));
+                score(right).total_cmp(&score(left)).then(left_row.cmp(right_row))
+                    .then(left.coefficients.cmp(&right.coefficients))
+            });
+            result.truncate(self.parameters.max_cuts_per_round);
+        }
+        Ok(result)
     }
 
     fn separation_by_rounding(

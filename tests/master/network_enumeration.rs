@@ -1,11 +1,11 @@
 use baldes::master::{
     column_generation::{BoundMode, Status},
-    networks::{self, format::Model, EnumerationOptions, Options},
+    multi_pricing::{self, format::Model, EnumerationOptions, Options},
     root::Row,
     RowSense,
 };
 use std::time::Duration;
-fn problem() -> networks::Problem<2> {
+fn problem() -> multi_pricing::Problem<2> {
     Model::from_json(include_str!("../../examples/networks/triangle.json"))
         .unwrap()
         .problem()
@@ -19,7 +19,7 @@ fn options() -> Options {
 }
 #[test]
 fn complete_transfer_is_atomic_repeatable_and_resumable() {
-    let parent = networks::solve(problem(), options()).unwrap();
+    let parent = multi_pricing::solve(problem(), options()).unwrap();
     let prepared = parent
         .snapshot
         .enumerate(&EnumerationOptions::default())
@@ -44,7 +44,7 @@ fn complete_transfer_is_atomic_repeatable_and_resumable() {
 }
 #[test]
 fn any_network_or_budget_failure_leaves_pricing_available() {
-    let parent = networks::solve(problem(), options()).unwrap();
+    let parent = multi_pricing::solve(problem(), options()).unwrap();
     for limits in [
         EnumerationOptions {
             max_routes: 5,
@@ -77,13 +77,13 @@ fn explicit_root_transfer_and_additive_descendants_keep_all_coefficients() {
     let mut configured = options();
     configured.enumeration = Some(EnumerationOptions::default());
     configured.cg.bound_mode = BoundMode::Certified;
-    let parent = networks::solve(problem(), configured).unwrap();
+    let parent = multi_pricing::solve(problem(), configured).unwrap();
     assert_eq!(parent.master.status, Status::Optimal);
     assert!(parent.snapshot.enumeration_report().complete);
     let coeffs = problem()
         .networks
         .iter()
-        .map(|n| networks::RowCoefficients {
+        .map(|n| multi_pricing::RowCoefficients {
             network: n.id,
             arcs: vec![0.; n.graph.arcs.len()],
             per_route: 1.,
@@ -117,7 +117,7 @@ mod mip {
     };
     #[test]
     fn all_network_integer_master_matches_exhaustive_optimum_and_keeps_fixed_rows() {
-        let parent = networks::solve(problem(), options()).unwrap();
+        let parent = multi_pricing::solve(problem(), options()).unwrap();
         assert!(parent
             .snapshot
             .solve_enumerated_mip(&MipOptions::default())
@@ -152,7 +152,7 @@ mod mip {
         let coeffs = problem()
             .networks
             .iter()
-            .map(|n| networks::RowCoefficients {
+            .map(|n| multi_pricing::RowCoefficients {
                 network: n.id,
                 arcs: vec![0.; n.graph.arcs.len()],
                 per_route: 1.,
@@ -187,7 +187,7 @@ mod mip {
     }
     #[test]
     fn cutoff_limits_and_retry_never_change_the_source() {
-        let parent = networks::solve(problem(), options()).unwrap();
+        let parent = multi_pricing::solve(problem(), options()).unwrap();
         let node = parent
             .snapshot
             .enumerate(&EnumerationOptions::default())
@@ -232,10 +232,10 @@ mod mip {
     }
     #[test]
     fn tree_uses_full_transfer_and_falls_back_on_partial_enumeration() {
-        let mut configured = networks::AssignmentTreeOptions::default();
+        let mut configured = multi_pricing::AssignmentTreeOptions::default();
         configured.node = options();
         configured.enumerated_mip = Some(MipOptions::default());
-        let tree = networks::solve_assignment_tree(problem(), configured.clone()).unwrap();
+        let tree = multi_pricing::solve_assignment_tree(problem(), configured.clone()).unwrap();
         assert_eq!(tree.status, TreeStatus::Optimal);
         assert_eq!(tree.incumbent, 2.);
         assert_eq!(tree.nodes, 1);
@@ -244,7 +244,7 @@ mod mip {
             max_routes: 5,
             ..Default::default()
         });
-        let fallback = networks::solve_assignment_tree(problem(), configured).unwrap();
+        let fallback = multi_pricing::solve_assignment_tree(problem(), configured).unwrap();
         assert_eq!(fallback.status, TreeStatus::Optimal);
         assert_eq!(fallback.incumbent, 2.);
         assert_eq!(fallback.nodes, 3);
@@ -253,8 +253,8 @@ mod mip {
 }
 
 #[test]
-fn global_limit_equality_and_unsupported_resources_are_explicit() {
-    let root = networks::solve(problem(), options()).unwrap();
+fn global_limit_and_equality_relaxation_are_explicit() {
+    let root = multi_pricing::solve(problem(), options()).unwrap();
     assert!(
         root.snapshot
             .enumerate(&EnumerationOptions {
@@ -276,26 +276,22 @@ fn global_limit_equality_and_unsupported_resources_are_explicit() {
             .enumeration_report()
             .complete
     );
-    let mut unsupported = problem();
-    unsupported.networks[1].graph.resources[0] = baldes::graph::ResourceKind::Equality;
-    for vertex in 0..unsupported.networks[1].graph.vertices.len() {
-        unsupported.networks[1]
+    let mut equality = problem();
+    equality.networks[1].graph.resources[0] = baldes::graph::ResourceKind::Equality;
+    for vertex in 0..equality.networks[1].graph.vertices.len() {
+        equality.networks[1]
             .graph
             .set_bounds(vertex, 0, 0., 0.)
             .unwrap();
     }
-    let root = networks::solve(unsupported, options()).unwrap();
+    let root = multi_pricing::solve(equality, options()).unwrap();
     let prepared = root
         .snapshot
         .enumerate(&EnumerationOptions::default())
         .unwrap();
-    assert!(!prepared.enumeration_report().complete);
-    assert!(prepared
-        .enumeration_report()
-        .failure
-        .as_ref()
-        .unwrap()
-        .contains("UnsupportedResources"));
+    assert!(prepared.enumeration_report().complete);
+    assert_eq!(prepared.enumeration_report().routes, 9);
+    assert!(prepared.enumeration_report().failure.is_none());
     assert_eq!(
         prepared.solve(options()).unwrap().master.status,
         Status::Optimal
@@ -304,7 +300,7 @@ fn global_limit_equality_and_unsupported_resources_are_explicit() {
 
 #[cfg(feature = "highs")]
 #[test]
-fn enumeration_mip_closes_a_fractional_node_without_assignment_candidates() {
+fn enumeration_mip_closes_unproved_original_activity_children() {
     use baldes::master::{solvers::mip::MipOptions, tree::TreeStatus};
     let mut model = problem();
     // Merge every path into one pricing graph while retaining distinct path IDs.
@@ -317,17 +313,18 @@ fn enumeration_mip_closes_a_fractional_node_without_assignment_candidates() {
     entries.push(vec![(0, 1.), (2, 1.)]);
     // The new direct-to-route-vertex path reaches the same sink through arc 5.
     assert_eq!(graph.arcs[5].head, old_sink);
-    model.networks = vec![networks::Network {
+    model.networks = vec![multi_pricing::Network {
         graph,
         arc_entries: entries,
         ..first
     }];
-    let mut configured = networks::AssignmentTreeOptions::default();
+    let mut configured = multi_pricing::AssignmentTreeOptions::default();
     configured.node = options();
-    let plain = networks::solve_assignment_tree(model.clone(), configured.clone()).unwrap();
+    let plain = multi_pricing::solve_assignment_tree(model.clone(), configured.clone()).unwrap();
     assert_eq!(plain.status, TreeStatus::Incomplete);
+    assert!(plain.open_nodes > 0);
     configured.enumerated_mip = Some(MipOptions::default());
-    let solved = networks::solve_assignment_tree(model, configured).unwrap();
+    let solved = multi_pricing::solve_assignment_tree(model, configured).unwrap();
     assert_eq!(solved.status, TreeStatus::Optimal);
     assert_eq!(solved.incumbent, 2.);
     assert_eq!(solved.nodes, 1);
@@ -337,12 +334,12 @@ fn enumeration_mip_closes_a_fractional_node_without_assignment_candidates() {
 fn direct_source_sink_routes_are_not_silently_omitted_from_coverage() {
     let mut graph = baldes::Graph::<2>::new(2, 0).unwrap();
     graph.add_arc(0, 1, 1.).unwrap();
-    let model = networks::Problem {
+    let model = multi_pricing::Problem {
         rows: vec![Row {
             sense: RowSense::Equal,
             rhs: 1.,
         }],
-        networks: vec![networks::Network {
+        networks: vec![multi_pricing::Network {
             id: 7,
             graph,
             multiplicity: baldes::graph::Window::new(0., 1.).unwrap(),
@@ -350,7 +347,7 @@ fn direct_source_sink_routes_are_not_silently_omitted_from_coverage() {
             route_entries: vec![(0, 1.)],
         }],
     };
-    let parent = networks::solve(model, options()).unwrap();
+    let parent = multi_pricing::solve(model, options()).unwrap();
     assert_eq!(parent.master.status, Status::Optimal);
     let prepared = parent
         .snapshot
@@ -374,12 +371,12 @@ fn material_objective_rounding_does_not_publish_a_false_integer_proof() {
     graph.add_arc(0, 1, 1e16).unwrap();
     graph.add_arc(1, 2, 1.).unwrap();
     graph.add_arc(2, 3, -1e16).unwrap();
-    let model = networks::Problem {
+    let model = multi_pricing::Problem {
         rows: vec![Row {
             sense: RowSense::Equal,
             rhs: 1.,
         }],
-        networks: vec![networks::Network {
+        networks: vec![multi_pricing::Network {
             id: 7,
             graph,
             multiplicity: baldes::graph::Window::new(0., 1.).unwrap(),
@@ -387,7 +384,7 @@ fn material_objective_rounding_does_not_publish_a_false_integer_proof() {
             route_entries: vec![],
         }],
     };
-    let parent = networks::solve(model, options()).unwrap();
+    let parent = multi_pricing::solve(model, options()).unwrap();
     let node = parent
         .snapshot
         .enumerate(&EnumerationOptions::default())

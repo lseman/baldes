@@ -12,10 +12,11 @@ pub mod api;
 pub mod core;
 pub mod cuts;
 pub mod enumeration;
-/// Specialized solver extensions.
+/// Optional algorithms, numerical backends and specialized routing models.
 pub mod extensions;
+// Compatibility paths for callers predating the extensions namespace.
+pub use extensions::{evrp, hgs, ipm};
 pub mod graph;
-pub mod ipm;
 pub mod labeling;
 pub mod master;
 pub mod pricing;
@@ -37,5 +38,4 @@ pub(crate) fn incomplete(message: impl Into<String>) -> core::error::OrError {
     }
 }
 
-pub mod hgs;
 pub mod inputs;

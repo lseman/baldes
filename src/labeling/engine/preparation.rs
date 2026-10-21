@@ -135,6 +135,7 @@ impl<const D: usize> LabelingEngine<D> {
             resources,
             ng: self.ng.vertex_bits[vertex],
             branch_state: None,
+            presence_state: self.cuts.presence.empty_state(),
             parent: None,
             arc: None,
             hops: 0,
@@ -176,9 +177,11 @@ impl<const D: usize> LabelingEngine<D> {
         if !self.consumption_joins {
             return Ok(());
         }
-        if let Some(costs) = crate::graph::symmetry::reversal_costs(g, &self.reverse) {
-            self.symmetric_costs = costs;
-            return Ok(());
+        if !self.cuts.presence.active() {
+            if let Some(costs) = crate::graph::symmetry::reversal_costs(g, &self.reverse) {
+                self.symmetric_costs = costs;
+                return Ok(());
+            }
         }
         let mut controls = self.controls.clone();
         controls.use_symmetric_execution = false;
@@ -186,6 +189,7 @@ impl<const D: usize> LabelingEngine<D> {
         rebuilt.branching = self.branching.clone();
         rebuilt.forbidden_arcs = self.forbidden_arcs.clone();
         rebuilt.cuts.knapsack = self.cuts.knapsack.clone();
+        rebuilt.cuts.presence = self.cuts.presence.clone();
         if !rebuilt.load_cuts(g, self.cuts.inputs.clone(), self.cuts.kpath.clone()) {
             return Err(invalid(
                 "cut memory exceeds capacity after symmetry fallback",

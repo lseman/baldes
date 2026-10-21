@@ -150,6 +150,7 @@ fn equality_dominance_retains_binary_interval_endpoints() {
         resources: [resource, 0.].into(),
         ng: 0,
         branch_state: None,
+        presence_state: None,
         parent: None,
         arc: None,
         hops: 1,
@@ -314,6 +315,7 @@ fn owned_insertion_moves_branch_state_and_borrowed_insertion_clones_on_acceptanc
         resources: [0.; 2].into(),
         ng: 0,
         branch_state: Some(Box::new([5; 16])),
+        presence_state: None,
         parent: None,
         arc: None,
         hops: 1,
@@ -385,6 +387,7 @@ fn general_dominance_checks_all_fixed_array_coordinates() {
         resources: vec![0., 0., 9.].into(),
         ng: 0,
         branch_state: None,
+        presence_state: None,
         parent: None,
         arc: None,
         hops: 1,
@@ -436,4 +439,116 @@ fn general_dominance_checks_all_fixed_array_coordinates() {
         &[],
         || panic!("an empty cut list does not need cut words")
     ));
+}
+
+#[test]
+fn presence_states_survive_arena_promotion_and_prevent_false_dominance() {
+    use crate::cuts::soft_conflicts::{Mode, PresenceRow};
+    use crate::labeling::arena::OrdinaryLabel;
+    let graph = Graph::<2>::new(3, 1).unwrap();
+    let row = PresenceRow::new(3, vec![(0, 2)], Mode::AnyPair).unwrap();
+    let mut a = row.empty_state();
+    let mut b = row.empty_state();
+    row.visit(&mut a, 0).unwrap();
+    row.visit(&mut b, 1).unwrap();
+    assert_eq!(row.coefficient(&a).unwrap(), row.coefficient(&b).unwrap());
+    let make = |state, cost| StoredLabel {
+        id: 0,
+        local_id: 0,
+        bucket: BucketId {
+            vertex: 1,
+            bucket: 0,
+        },
+        vertex: 1,
+        cost,
+        original_cost: 0.,
+        resources: [0.; 2].into(),
+        ng: 0,
+        branch_state: None,
+        presence_state: Some(vec![state].into_boxed_slice()),
+        parent: None,
+        arc: None,
+        hops: 1,
+        expanded: false,
+        cut_words: [0; LIMITED_WORDS],
+        additional_cost: 0.,
+        half_potential: 0.,
+    };
+    for forward in [false, true] {
+        for test in [
+            InsertionTest::Full,
+            InsertionTest::ResourcesAndCost,
+            InsertionTest::ResourcesAndNg,
+            InsertionTest::Resources,
+        ] {
+            let mut storage = LabelStorage::new([1, 1, 1]);
+            storage.labels.set_mode(true, false);
+            let mut stats = Statistics::default();
+            let first = make(a.clone(), 0.);
+            let ptr = first.presence_state.as_ref().unwrap().as_ptr();
+            let hot = HotLabel::of(&first);
+            assert!(storage.insert_label::<false, OrdinaryLabel<2>, _>(
+                &graph,
+                first,
+                hot,
+                forward,
+                test,
+                10,
+                false,
+                &[],
+                &mut stats
+            ));
+            assert_eq!(
+                storage
+                    .labels
+                    .view(0)
+                    .presence_state()
+                    .as_ref()
+                    .unwrap()
+                    .as_ptr(),
+                ptr
+            );
+            let other = make(b.clone(), -1.);
+            assert!(!LabelStorage::dominates(
+                &graph,
+                &other,
+                &make(a.clone(), 0.),
+                forward,
+                test,
+                false,
+                &[]
+            ));
+            let hot = HotLabel::of(&other);
+            assert!(storage.insert_label::<false, OrdinaryLabel<2>, _>(
+                &graph,
+                other,
+                hot,
+                forward,
+                test,
+                10,
+                false,
+                &[],
+                &mut stats
+            ));
+            assert_eq!(storage.buckets[1][0].active.len(), 2);
+            let duplicate = make(b.clone(), 1.);
+            let hot = HotLabel::of(&duplicate);
+            assert!(!storage.insert_label::<false, OrdinaryLabel<2>, _>(
+                &graph,
+                duplicate,
+                hot,
+                forward,
+                test,
+                10,
+                false,
+                &[],
+                &mut stats
+            ));
+            assert_eq!(storage.buckets[1][0].active.len(), 2);
+            assert_eq!(
+                storage.labels.view(0).presence_state(),
+                &Some(vec![a.clone()].into_boxed_slice())
+            );
+        }
+    }
 }

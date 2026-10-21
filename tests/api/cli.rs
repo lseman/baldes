@@ -7,6 +7,27 @@ fn command() -> Command {
 }
 
 #[test]
+fn fenchel_cli_separates_and_rejects_noninteger_demands() {
+    let file = std::env::temp_dir().join(format!("baldes-fenchel-cli-{}.txt", std::process::id()));
+    let json = file.with_extension("json");
+    let text = "fenchel-cli\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n";
+    std::fs::write(&file, text).unwrap();
+    let output = command().arg("cvrp").arg(&file).args(["--fenchel-cuts", "--json"]).arg(&json).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let report: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+    assert_eq!(report["status"], "Optimal");
+    assert!(report["cuts"].as_u64().unwrap() > 0);
+    assert!((report["bound"].as_f64().unwrap()-(4.0+2.0_f64.sqrt())).abs() < 1e-7);
+    std::fs::write(&file, text.replace("1 1 0 1 0", "1 1 0 0.5 0")).unwrap();
+    let output = command().arg("cvrp").arg(&file).arg("--fenchel-cuts").output().unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("integer demands"));
+    assert!(!command().arg("hgs").arg(&file).arg("--fenchel-cuts").output().unwrap().status.success());
+    std::fs::remove_file(file).unwrap();
+    std::fs::remove_file(json).unwrap();
+}
+
+#[test]
 fn pstep_parallel_command_and_validation() {
     let output = command().args(["pstep", "--help"]).output().unwrap();
     assert!(output.status.success());

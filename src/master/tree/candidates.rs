@@ -216,34 +216,33 @@ fn resource_candidates<const D: usize>(
         }
         samples.sort_by(|a, b| a.0.total_cmp(&b.0));
         let (low, high) = (samples.first().unwrap().0, samples.last().unwrap().0);
-        let threshold = low * 0.5 + high * 0.5;
-        if threshold <= low || threshold >= high {
-            continue;
-        }
-        let id = problem.graph.arcs[arc].id;
-        if history.iter().any(|c| {
-            matches!(c, BranchConstraint::AccumulatedResource(b)
-            if b.arc == id && b.resource == resource && b.threshold == threshold)
-        }) {
-            continue;
-        }
+        // Encode the intended midpoint in the stored-threshold convention.
+        // Check the decoded boundary too: adding/subtracting the offset can
+        // round to an observed endpoint for very narrow resource intervals.
+        let threshold = low * 0.5 + high * 0.5 + AccumulatedResourceBranch::THRESHOLD_OFFSET;
         let up = AccumulatedResourceBranch {
-            arc: id,
+            arc: problem.graph.arcs[arc].id,
             resource,
             threshold,
             upper: true,
         };
+        let boundary = up.boundary();
+        if !threshold.is_finite() || boundary <= low || boundary >= high {
+            continue;
+        }
+        if history.iter().any(|c| {
+            matches!(c, BranchConstraint::AccumulatedResource(b)
+            if b.arc == up.arc && b.resource == resource && b.boundary() == boundary)
+        }) {
+            continue;
+        }
         let down = AccumulatedResourceBranch { upper: false, ..up };
         if !matches!(up.window(&problem.graph), Ok(Some(_)))
             || !matches!(down.window(&problem.graph), Ok(Some(_)))
         {
             continue;
         }
-        let value: f64 = samples
-            .iter()
-            .filter(|x| x.0 > threshold)
-            .map(|x| x.1)
-            .sum();
+        let value: f64 = samples.iter().filter(|x| x.0 > boundary).map(|x| x.1).sum();
         if value > 1e-6 && value < 1. - 1e-6 {
             candidates.push(BranchCandidate {
                 down: BranchConstraint::AccumulatedResource(down),
@@ -253,4 +252,63 @@ fn resource_candidates<const D: usize>(
         }
     }
     candidates
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pricing::{restrictions::AccumulatedResourceBranch, Solver};
+
+    #[test]
+    fn resource_midpoints_decode_inside_the_observed_interval() {
+        let mut s = Solver::<5>::new(3, 5).unwrap();
+        for v in 0..3 {
+            for r in 0..5 {
+                s.graph.set_bounds(v, r, 0., 3.).unwrap();
+            }
+        }
+        let arc = s.graph.add_arc(0, 1, 0.).unwrap();
+        let end = s.graph.add_arc(1, 2, 0.).unwrap();
+        let problem = RootProblem::set_partitioning(s.graph, 1.).unwrap();
+        let route = |q| {
+            let mut head = vec![0.; 5];
+            head[4] = q;
+            Route {
+                nodes: vec![0, 1, 2],
+                arcs: vec![arc, end],
+                cost: 0.,
+                original_cost: 0.,
+                resources: vec![3.; 5],
+                resource_profile: vec![vec![0.; 5], head, vec![3.; 5]],
+            }
+        };
+        let low = route(1. - 0.5e-6);
+        let high = route(1. + 0.5e-6);
+        let observations = [(&low, 0.25), (&high, 0.75)];
+        let candidates = resource_candidates(&problem, &observations, &[]);
+        assert_eq!(candidates.len(), 1);
+        let BranchConstraint::AccumulatedResource(up) = candidates[0].up else {
+            panic!()
+        };
+        let BranchConstraint::AccumulatedResource(down) = candidates[0].down else {
+            panic!()
+        };
+        assert_eq!(up.resource, 4);
+        assert_eq!(
+            up.threshold,
+            1. + AccumulatedResourceBranch::THRESHOLD_OFFSET
+        );
+        assert_eq!(up.boundary(), down.boundary());
+        assert!(!up.satisfied_by(low.resource_profile[1][4]));
+        assert!(!down.satisfied_by(high.resource_profile[1][4]));
+        assert_eq!(candidates[0].value, 0.75);
+        for previous in [candidates[0].down.clone(), candidates[0].up.clone()] {
+            assert!(resource_candidates(&problem, &observations, &[previous]).is_empty());
+        }
+        // At this scale the offset loses the midpoint during round-trip
+        // conversion. Skip a degenerate split instead of proposing it forever.
+        let low = route(0.);
+        let high = route(1e-30);
+        assert!(resource_candidates(&problem, &[(&low, 0.5), (&high, 0.5)], &[]).is_empty());
+    }
 }

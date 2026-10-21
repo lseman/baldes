@@ -1,0 +1,49 @@
+  StringID      Type         x         y    demand ReadyTime   DueDateServiceTime
+        D1         d         0         0         0         0      1440         0
+        D2         d       200         0         0         0      1440         0
+        D3         d         0       400         0         0      1440         0
+        D4         d       200       400         0         0      1440         0
+        S1         f       100         0         0         0      1440         0
+        S2         f         0       100         0         0      1440         0
+        S3         f       100       100         0         0      1440         0
+        S4         f       200       100         0         0      1440         0
+        S5         f         0       200         0         0      1440         0
+        S6         f       100       200         0         0      1440         0
+        S7         f       200       200         0         0      1440         0
+        S8         f         0       300         0         0      1440         0
+        S9         f       100       300         0         0      1440         0
+       S10         f       200       300         0         0      1440         0
+       S11         f       100       400         0         0      1440         0
+        C1         c        38         1         0       286       646         0
+        C2         c        81       130         0       325       685         0
+        C3         c        41       242         0       188       548         0
+        C4         c        20       336         0       224       584         0
+        C5         c       125        67         0       997      1357         0
+        C6         c       197       178         0       771      1131         0
+        C7         c       132       214         0       841      1201         0
+        C8         c       106       333         0       827      1187         0
+        C9         c        25        98         0       220       580         0
+       C10         c        83       195         0       162       522         0
+       C11         c        84       281         0       240       600         0
+       C12         c        67       369         0       112       472         0
+       C13         c       120        20         0       954      1314         0
+       C14         c       174       154         0       731      1091         0
+       C15         c       110       232         0      1010      1370         0
+       C16         c       143       323         0      1055      1415         0
+
+Vehicle fuel tank capacity /200.0/
+Vehicle load capacity /70/
+Fuel consumption rate /1.0/
+Inverse refueling rate /0.2/
+Average Velocity /1.0/
+
+Vehicle start locations
+D1:    5
+D2:    0
+D3:    5
+D4:    0
+Vehicle end locations
+D1:    0
+D2:    1
+D3:    0
+D4:    1

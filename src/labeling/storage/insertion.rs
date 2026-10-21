@@ -109,7 +109,8 @@ impl<const D: usize> LabelStorage<D> {
             stats.dominance_checks += 1;
             let previous = bucket.active[position];
             let hot = bucket.hot.get(position);
-            if (!BRANCHING || labels.branch_for::<R>(previous) == &label.branch_state)
+            if labels.presence_for::<R>(previous) == &label.presence_state
+                && (!BRANCHING || labels.branch_for::<R>(previous) == &label.branch_state)
                 && Self::dominates_hot_slices(
                     g,
                     &hot,
@@ -170,7 +171,8 @@ impl<const D: usize> LabelStorage<D> {
             read = next + 1;
             let id = bucket.active[next];
             let hot = bucket.hot.get(next);
-            if (!BRANCHING || labels.branch_for::<R>(inserted) == labels.branch_for::<R>(id))
+            if labels.presence_for::<R>(inserted) == labels.presence_for::<R>(id)
+                && (!BRANCHING || labels.branch_for::<R>(inserted) == labels.branch_for::<R>(id))
                 && Self::dominates_hot_slices(
                     g,
                     &candidate,

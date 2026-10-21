@@ -1,0 +1,27 @@
+Total cost:                242245
+No. of recharges:              11
+No. of vehicles:                3
+
+Route  1: Cost       121584
+    D3
+    C4   C16   C39   C15   S12
+   C27    C3    S7
+   C38    C2   C14    C6    S8
+   C43   C31    C7    C8   C20   S13
+   C44   C32   C36   S13
+   C35   C11   C47   C23   S14
+   C48   C24   C12    D4
+
+Route  2: Cost       104321
+    D1
+   C37   C25    C1   C13   C26    S4
+   C41   C29    C5   C17    S5
+   C30   C42   C18   C19    S9
+   C46   C22   C10   C34    S6
+    C9   C21    S2
+   C33   C45    D2
+
+Route  3: Cost        16340
+    D3
+   C40   C28    D3
+

@@ -11,7 +11,8 @@ impl<const D: usize> LabelStorage<D> {
         hop_limit: bool,
         cuts: &[DominanceDescriptor],
     ) -> bool {
-        a.branch_state == b.branch_state
+        a.presence_state == b.presence_state
+            && a.branch_state == b.branch_state
             && Self::dominates_hot_slices(
                 g,
                 &HotLabel::of(a),

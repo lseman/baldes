@@ -6,8 +6,52 @@ use super::*;
 pub struct KnapsackPricing {
     pub active: bool,
     pub resources: BTreeMap<usize, BTreeMap<i32, f64>>,
+    /// Scaled, unrounded penalties for coefficient-consistent pricing.
+    exact_terms: Vec<(usize, f64, RouteLoadKnapsackCut, f64)>,
 }
 impl KnapsackPricing {
+    /// Prepare nonnegative pricing penalties using the master coefficient's
+    /// graph scale and unrounded dual. Unlike `retrieve`, no small dual is
+    /// discarded. Positive master duals require a separate dominance contract.
+    /// Failure leaves the previous cache unchanged.
+    pub fn retrieve_exact(
+        &mut self,
+        cuts: &[ResourceKnapsackCut],
+        graph: i32,
+        resource_indices: &BTreeMap<usize, usize>,
+    ) -> Result<()> {
+        let mut next = Self::default();
+        for &slot in resource_indices.values() {
+            next.resources.entry(slot).or_default();
+        }
+        for cut in cuts {
+            let Some(&(resource, scale)) = cut.graph_resources.get(&graph) else {
+                continue;
+            };
+            if !cut.dual.is_finite() || cut.dual > 0. || !scale.is_finite() || scale <= 0. {
+                return Err(invalid("exact knapsack dual or scale"));
+            }
+            let &slot = resource_indices
+                .get(&resource)
+                .ok_or_else(|| invalid("exact knapsack resource mapping"))?;
+            let mut previous = 0;
+            for &coefficient in cut.cut.coefficients.values() {
+                if coefficient < previous {
+                    return Err(invalid(
+                        "exact knapsack coefficients must be nonnegative and monotone",
+                    ));
+                }
+                previous = coefficient;
+            }
+            if cut.dual != 0. {
+                next.active = true;
+                next.exact_terms
+                    .push((slot, scale, cut.cut.clone(), -cut.dual));
+            }
+        }
+        *self = next;
+        Ok(())
+    }
     pub fn prepare(
         cuts: &[ResourceKnapsackCut],
         graph: i32,
@@ -27,6 +71,7 @@ impl KnapsackPricing {
         graph: i32,
         resource_indices: &BTreeMap<usize, usize>,
     ) -> Result<()> {
+        self.exact_terms.clear();
         for &resource in resource_indices.values() {
             self.resources.entry(resource).or_default();
         }
@@ -65,6 +110,10 @@ impl KnapsackPricing {
     }
     pub fn cost(&self, resources: &[f64]) -> f64 {
         let mut result = 0.;
+        for (resource, scale, cut, penalty) in &self.exact_terms {
+            let load = (resources[*resource] * scale + 1e-6).floor() as i32;
+            result += cut.coefficient(load) as f64 * penalty;
+        }
         for (&resource, steps) in &self.resources {
             if steps.is_empty() {
                 continue;

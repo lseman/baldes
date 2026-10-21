@@ -9,7 +9,7 @@ fn command() -> Command {
 }
 fn solve(flags: &[&str]) -> Value {
     let output = command()
-        .arg("networks")
+        .arg("multi-pricing")
         .arg(fixture())
         .args(flags)
         .args(["--json", "-"])

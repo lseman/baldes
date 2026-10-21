@@ -1,0 +1,938 @@
+{
+  "dimension": 6,
+  "groups": [
+    {
+      "id": 7,
+      "vectors": [
+        [
+          1,
+          1,
+          0,
+          1,
+          1,
+          0.5
+        ],
+        [
+          0,
+          1,
+          1,
+          1,
+          0,
+          -0.5
+        ],
+        [
+          1,
+          0,
+          0,
+          1,
+          0,
+          0.5
+        ],
+        [
+          0,
+          1,
+          0,
+          1,
+          0,
+          0.0
+        ],
+        [
+          0,
+          0,
+          1,
+          1,
+          0,
+          -0.5
+        ]
+      ]
+    },
+    {
+      "id": 42,
+      "vectors": [
+        [
+          1,
+          0,
+          1,
+          1,
+          1,
+          0.0
+        ],
+        [
+          1,
+          0,
+          0,
+          1,
+          0,
+          0.5
+        ],
+        [
+          0,
+          1,
+          0,
+          1,
+          0,
+          0.0
+        ],
+        [
+          0,
+          0,
+          1,
+          1,
+          0,
+          -0.5
+        ]
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "name": "base",
+      "rows": [],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "3/2",
+        "integer": "2",
+        "lp_value": 1.5,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "1/2",
+          "1/2",
+          "0",
+          "0",
+          "0",
+          "1/2",
+          "0",
+          "0",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "original_zero",
+      "rows": [
+        {
+          "entries": [
+            [
+              0,
+              1
+            ]
+          ],
+          "sense": "=",
+          "rhs": 0
+        }
+      ],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "2",
+        "integer": "2",
+        "lp_value": 2.0,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "0",
+          "1",
+          "0",
+          "0",
+          "0",
+          "0",
+          "1",
+          "0",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "original_one",
+      "rows": [
+        {
+          "entries": [
+            [
+              0,
+              1
+            ]
+          ],
+          "sense": "=",
+          "rhs": 1
+        }
+      ],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "2",
+        "integer": "2",
+        "lp_value": 2.0,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "0",
+          "1",
+          "1",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "family_disabled",
+      "rows": [],
+      "multiplicity": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "2",
+        "integer": "2",
+        "lp_value": 2.0,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "0",
+          "0",
+          "0",
+          "0",
+          "0",
+          "1",
+          "0",
+          "1",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "family_two_copies",
+      "rows": [],
+      "multiplicity": [
+        [
+          2,
+          2
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "2",
+        "integer": "2",
+        "lp_value": 2.0,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "0",
+          "1",
+          "1",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "equal_counts",
+      "rows": [
+        {
+          "entries": [
+            [
+              3,
+              1
+            ],
+            [
+              9,
+              -1
+            ]
+          ],
+          "sense": "=",
+          "rhs": 0
+        }
+      ],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "8/5",
+        "integer": "2",
+        "lp_value": 1.6,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "2/5",
+          "2/5",
+          "0",
+          "0",
+          "0",
+          "3/5",
+          "0",
+          "1/5",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "double_count_link",
+      "rows": [
+        {
+          "entries": [
+            [
+              3,
+              1
+            ],
+            [
+              9,
+              -2
+            ]
+          ],
+          "sense": "=",
+          "rhs": 0
+        }
+      ],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "3/2",
+        "integer": "3",
+        "lp_value": 1.5,
+        "integer_value": 3.0,
+        "lp_witness": [
+          "1/2",
+          "1/2",
+          "0",
+          "0",
+          "0",
+          "1/2",
+          "0",
+          "0",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "nonlinear_half",
+      "rows": [
+        {
+          "entries": [
+            [
+              4,
+              1
+            ],
+            [
+              10,
+              1
+            ]
+          ],
+          "sense": "<=",
+          "rhs": 0.5
+        }
+      ],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "7/4",
+        "integer": "2",
+        "lp_value": 1.75,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "1/4",
+          "3/4",
+          "1/2",
+          "0",
+          "0",
+          "1/4",
+          "0",
+          "0",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "nonlinear_zero",
+      "rows": [
+        {
+          "entries": [
+            [
+              4,
+              1
+            ],
+            [
+              10,
+              1
+            ]
+          ],
+          "sense": "<=",
+          "rhs": 0
+        }
+      ],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "2",
+        "integer": "2",
+        "lp_value": 2.0,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "0",
+          "1",
+          "1",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "nonlinear_fixed",
+      "rows": [
+        {
+          "entries": [
+            [
+              4,
+              1
+            ]
+          ],
+          "sense": "=",
+          "rhs": 1
+        }
+      ],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "2",
+        "integer": "2",
+        "lp_value": 2.0,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "1",
+          "0",
+          "0",
+          "0",
+          "1",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "integer_witness": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "name": "signed_positive",
+      "rows": [
+        {
+          "entries": [
+            [
+              5,
+              1
+            ]
+          ],
+          "sense": "=",
+          "rhs": 0.5
+        }
+      ],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "2",
+        "integer": "2",
+        "lp_value": 2.0,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "1",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0",
+          "1"
+        ],
+        "integer_witness": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "name": "signed_negative",
+      "rows": [
+        {
+          "entries": [
+            [
+              5,
+              1
+            ]
+          ],
+          "sense": "=",
+          "rhs": -0.5
+        }
+      ],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "2",
+        "integer": "2",
+        "lp_value": 2.0,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "0",
+          "1",
+          "0",
+          "0",
+          "0",
+          "0",
+          "1",
+          "0",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "nonlinear_objective",
+      "rows": [],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.25,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "7/4",
+        "integer": "2",
+        "lp_value": 1.75,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "1/2",
+          "1/2",
+          "0",
+          "0",
+          "0",
+          "1/2",
+          "0",
+          "0",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "heterogeneous_costs",
+      "rows": [],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.5
+      ],
+      "expected": {
+        "lp": "7/4",
+        "integer": "2",
+        "lp_value": 1.75,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "1/2",
+          "1/2",
+          "0",
+          "0",
+          "0",
+          "1/2",
+          "0",
+          "0",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "joint_link_and_nonlinear",
+      "rows": [
+        {
+          "entries": [
+            [
+              3,
+              1
+            ],
+            [
+              9,
+              -1
+            ]
+          ],
+          "sense": "=",
+          "rhs": 0
+        },
+        {
+          "entries": [
+            [
+              4,
+              1
+            ],
+            [
+              10,
+              1
+            ]
+          ],
+          "sense": "<=",
+          "rhs": 0.5
+        }
+      ],
+      "multiplicity": [
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "feature_cost": 0.0,
+      "counter_cost": [
+        1.0,
+        1.0
+      ],
+      "expected": {
+        "lp": "9/5",
+        "integer": "2",
+        "lp_value": 1.8,
+        "integer_value": 2.0,
+        "lp_witness": [
+          "1/5",
+          "7/10",
+          "0",
+          "0",
+          "0",
+          "3/10",
+          "1/2",
+          "1/10",
+          "0"
+        ],
+        "integer_witness": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0
+        ]
+      }
+    }
+  ]
+}

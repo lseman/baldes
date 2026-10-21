@@ -151,6 +151,10 @@ impl<const D: usize> LabelData for StoredLabel<D> {
         self.ng
     }
     #[inline(always)]
+    fn presence_state(&self) -> &crate::cuts::soft_conflicts::LabelState {
+        &self.presence_state
+    }
+    #[inline(always)]
     fn branch_state(&self) -> &BranchState {
         &self.branch_state
     }
@@ -192,6 +196,10 @@ impl<const D: usize> LabelData for LabelRef<'_, D> {
     #[inline(always)]
     fn ng(&self) -> u16 {
         (*self).ng()
+    }
+    #[inline(always)]
+    fn presence_state(&self) -> &crate::cuts::soft_conflicts::LabelState {
+        (*self).presence_state()
     }
     #[inline(always)]
     fn branch_state(&self) -> &BranchState {

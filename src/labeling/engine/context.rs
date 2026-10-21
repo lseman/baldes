@@ -118,16 +118,29 @@ impl<'a, const D: usize> Context<'a, D> {
         if overlap != 0 {
             return (false, cost);
         }
-        if !self.has_cuts() {
-            return (true, cost);
+        let cost = if self.has_cuts() {
+            state::concatenation_cost(
+                &self.cuts.info,
+                vertex,
+                (f.cut_words(), f.additional_cost()),
+                (b.cut_words(), b.additional_cost()),
+                cost,
+            )
+        } else if self.cuts.presence.active() {
+            cost + f.additional_cost() + b.additional_cost()
+        } else {
+            cost
+        };
+        if self.cuts.presence.active() {
+            let Ok(correction) = self
+                .cuts
+                .presence
+                .join_cost(f.presence_state(), b.presence_state())
+            else {
+                return (false, f64::INFINITY);
+            };
+            return (true, cost + correction);
         }
-        let cost = state::concatenation_cost(
-            &self.cuts.info,
-            vertex,
-            (f.cut_words(), f.additional_cost()),
-            (b.cut_words(), b.additional_cost()),
-            cost,
-        );
         (true, cost)
     }
     pub fn join_cost(
@@ -146,7 +159,7 @@ impl<'a, const D: usize> Context<'a, D> {
     /// the backward root, or the forward one for symmetric joins; backward: the
     /// forward root at the source). The join's result is not tested.
     pub(super) fn terminal_cost(&self, g: &Graph<D>, forward: bool, label: &StoredLabel<D>) -> f64 {
-        if !self.has_cuts() && !self.cuts.knapsack.active {
+        if !self.has_cuts() && !self.cuts.knapsack.active && !self.cuts.presence.active() {
             return label.cost;
         }
         let root_forward = !forward || self.consumption_joins;
@@ -156,6 +169,7 @@ impl<'a, const D: usize> Context<'a, D> {
         root.cost = 0.;
         root.ng = self.ng.vertex_bits[root_vertex];
         root.branch_state = None;
+        root.presence_state = self.cuts.presence.empty_state();
         for (r, _) in g.resources.iter().enumerate() {
             let w = g.vertices[root_vertex].bounds[r];
             root.resources[r] = if root_forward {
@@ -306,6 +320,17 @@ impl<'a, const D: usize> Context<'a, D> {
             words[..from.cut_words().len()].copy_from_slice(from.cut_words());
             words
         };
+        let presence_state = if self.cuts.presence.active() {
+            let (next, increment) = self
+                .cuts
+                .presence
+                .extend(from.presence_state(), arc.physical)
+                .expect("validated engine presence state and cost range");
+            additional_cost += increment;
+            next
+        } else {
+            from.presence_state().clone()
+        };
         Some((
             StoredLabel {
                 id: 0,
@@ -330,6 +355,7 @@ impl<'a, const D: usize> Context<'a, D> {
                 } else {
                     None
                 },
+                presence_state,
                 parent: Some(id),
                 arc: Some(arc.physical),
                 hops: from.hops() + 1,

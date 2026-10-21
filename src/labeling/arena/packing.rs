@@ -17,7 +17,7 @@ impl<const D: usize> OrdinaryLabel<D> {
     }
     #[inline(always)]
     pub(super) fn pack_metadata(label: &StoredLabel<D>, id: usize) -> Option<Self> {
-        if label.id != id {
+        if label.id != id || label.presence_state.is_some() {
             return None;
         }
         let optional = |value: Option<usize>| match value {
@@ -57,6 +57,7 @@ impl<const D: usize> OrdinaryLabel<D> {
             resources: self.resources.into(),
             ng: self.ng,
             branch_state: None,
+            presence_state: None,
             parent: (self.parent != NONE).then_some(self.parent as usize),
             arc: (self.arc != NONE).then_some(self.arc as usize),
             hops: self.hops as usize,

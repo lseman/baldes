@@ -140,8 +140,9 @@ methods and the paper's full computational experiment are not implemented.
 
 `--branching resource` adds schedule candidates, retaining arc-flow fallback.
 A constraint identifies a **public arc ID**, a resource coordinate, a threshold,
-and a side. It restricts the resource at that arc's head **after consumption and
-waiting** to `<= threshold` or `>= threshold`. Equality belongs to both children;
+and a side. `threshold` is stored with an offset: the effective boundary is
+`threshold - 1e-6`. It restricts the resource at that arc's head **after consumption
+and waiting** to `<= boundary` or `>= boundary`. Equality belongs to both children;
 there is no gap between their schedule domains. This is a continuous resource
 split, not a floor/ceiling split of the resource value. Other routes need not
 use the selected arc. An empty window intersection forbids that arc.
@@ -156,12 +157,17 @@ in effect. The existing requirement for backward equality resources to have a
 fixed sink window still applies.
 
 Candidates split distinct observed resource profiles on arcs with unit LP
-flow. They use the midpoint of the observed minimum and maximum; ordinary
-fractional arcs retain arc-flow candidates. This is an initial selection rule,
+flow. They encode the midpoint of the observed minimum and maximum as a stored
+threshold (midpoint plus `1e-6`) and check the decoded boundary before using it.
+Ordinary fractional arcs retain arc-flow candidates. This is an initial selection rule,
 not a reproduction of VRPSolver's separator or a measured performance claim.
-The C add/clear accumulated-resource APIs now install and restore actual window
-restrictions instead of marking the feature unsupported. The Rust pricing API
-exposes `AccumulatedResourceBranch` and the add/clear methods on `Solver`.
+The C add/clear accumulated-resource APIs install and restore window
+restrictions. The Rust pricing API exposes `AccumulatedResourceBranch`, its `boundary()` and `satisfied_by()`
+methods, and the add/clear methods on `Solver`. The C API uses the same stored
+threshold convention. To request a split near resource value `t`, pass
+`threshold = t + 1e-6`; `boundary()` reports the actual floating-point split.
+Older builds used the supplied threshold directly. Existing callers that need
+to preserve their split must account for the offset when upgrading.
 
 `--branching hybrid` enables both new families alongside the native families.
 Vehicle count keeps its first priority; remaining enabled aggregate families

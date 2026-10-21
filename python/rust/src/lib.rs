@@ -22,7 +22,7 @@ use std::ffi::CString;
 
 mod root;
 #[cfg(feature = "clp")]
-mod networks;
+mod multi_pricing;
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -541,6 +541,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     root::register(m)?;
     #[cfg(feature = "clp")]
-    networks::register(m)?;
+    multi_pricing::register(m)?;
     Ok(())
 }

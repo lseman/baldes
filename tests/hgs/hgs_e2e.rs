@@ -1,4 +1,4 @@
-use baldes::hgs::driver::{run_hgs, HgsOptions};
+use baldes::extensions::hgs::driver::{run_hgs, HgsOptions};
 use baldes::inputs::Instance;
 
 /// Check every customer once, capacity and time windows in the selected metric.

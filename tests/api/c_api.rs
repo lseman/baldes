@@ -318,13 +318,13 @@ fn accumulated_resource_c_api_installs_restrictions_and_clear_restores_them() {
             assert_eq!(or_rcsp_set_vertex_bounds(solver, v, 0, 0., 5.), 0);
         }
         let restricted = or_rcsp_new_arc(solver, 0, 1, -5.);
-        or_rcsp_set_arc_consumption(solver, restricted, 0, 1., 1.);
+        or_rcsp_set_arc_consumption(solver, restricted, 0, 1. - 0.5e-6, 1. - 0.5e-6);
         or_rcsp_new_arc(solver, 1, 3, 0.);
         let other = or_rcsp_new_arc(solver, 0, 2, -2.);
         or_rcsp_set_arc_consumption(solver, other, 0, 1., 1.);
         or_rcsp_new_arc(solver, 2, 3, 0.);
         assert_eq!(
-            or_rcsp_add_accumulated_resource_branch(solver, restricted, 0, 0., 0),
+            or_rcsp_add_accumulated_resource_branch(solver, restricted, 0, 1., 0),
             0
         );
         let mut routes = [ptr::null_mut(); 10];

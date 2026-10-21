@@ -101,6 +101,7 @@ impl ClpMaster {
             model,
             solver: self.solver,
             clp_options: self.clp_options,
+            ipm: self.ipm.clone(),
             #[cfg(feature = "highs")]
             highs_backend,
             primal_tolerance: self.primal_tolerance,
@@ -109,6 +110,7 @@ impl ClpMaster {
             senses: self.senses.clone(),
             costs: self.costs.clone(),
             upper: self.upper.clone(),
+            column_default_upper: self.column_default_upper,
             duals: self.duals.clone(),
             values: self.values.clone(),
             reduced_costs: self.reduced_costs.clone(),
@@ -133,6 +135,16 @@ impl ClpMaster {
         self.values.clone()
     }
 
+    /// Set the backend bound for newly created columns only. Original-domain
+    /// proof state remains the owning controller's responsibility.
+    pub(crate) fn set_column_default_upper(&mut self, upper: f64) -> Result<()> {
+        if !upper.is_finite() || upper < 0. {
+            return Err(invalid("default column upper bound"));
+        }
+        self.column_default_upper = upper;
+        Ok(())
+    }
+
     pub fn new() -> Result<Self> {
         // SAFETY: Clp returns an exclusively owned model, freed by Drop below.
         let model = NonNull::new(unsafe { Clp_newModel() })
@@ -146,6 +158,7 @@ impl ClpMaster {
             model,
             solver: MasterSolver::Clp,
             clp_options: ClpOptions::default(),
+            ipm: Default::default(),
             highs_row_basic: vec![],
             #[cfg(feature = "highs")]
             highs_backend: None,
@@ -154,6 +167,7 @@ impl ClpMaster {
             senses: vec![],
             costs: vec![],
             upper: vec![],
+            column_default_upper: 1e12,
             duals: vec![],
             values: vec![],
             reduced_costs: vec![],

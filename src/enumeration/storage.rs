@@ -28,7 +28,8 @@ impl<const D: usize> Storage<D> {
         })
     }
     fn dominates(g: &Graph<D>, a: &Label<D>, b: &Label<D>, forward: bool) -> bool {
-        a.vertex == b.vertex
+        a.presence_state == b.presence_state
+            && a.vertex == b.vertex
             && a.visited == b.visited
             && a.original_cost - b.original_cost < EPSILON
             && g.resources.iter().enumerate().all(|(r, k)| match k {
@@ -123,6 +124,7 @@ mod tests {
             hops: 1,
             cut_words: [0; FULL_WORDS],
             cut_cost: 0.,
+            presence_state: None,
         };
         for forward in [true, false] {
             for (a, b) in [

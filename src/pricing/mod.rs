@@ -42,8 +42,13 @@ pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub cuts: CutRegistry,
     /// Original knapsack resource ID -> solver coordinate. Empty is identity.
     pub knapsack_resource_indices: std::collections::BTreeMap<usize, usize>,
+    /// Use graph-scaled knapsack coefficients and unrounded nonpositive duals.
+    /// This does not by itself provide a directed-rounding certificate.
+    pub knapsack_exact_coefficients: bool,
     /// Cut inputs the engine was last prepared with.
     knapsack_pricing: crate::cuts::knapsack::KnapsackPricing,
+    /// Owned physical-arc presence rows survive engine replacement and forks.
+    presence_pricing: crate::cuts::soft_conflicts::PresencePricing,
     applied_cuts: (
         Vec<LimitedInput>,
         Vec<LimitedKPathInput>,
@@ -78,7 +83,9 @@ impl<const D: usize> Solver<D> {
             enumeration_snapshot: None,
             cuts: CutRegistry::default(),
             knapsack_resource_indices: Default::default(),
+            knapsack_exact_coefficients: false,
             knapsack_pricing: Default::default(),
+            presence_pricing: Default::default(),
             applied_cuts: (vec![], vec![], vec![], vec![]),
         })
     }
@@ -141,7 +148,9 @@ impl<const D: usize> Solver<D> {
             },
             cuts: self.cuts.clone(),
             knapsack_resource_indices: self.knapsack_resource_indices.clone(),
+            knapsack_exact_coefficients: self.knapsack_exact_coefficients,
             knapsack_pricing: self.knapsack_pricing.clone(),
+            presence_pricing: self.presence_pricing.clone(),
             applied_cuts: self.applied_cuts.clone(),
         }
     }
@@ -290,7 +299,8 @@ impl<const D: usize> Solver<D> {
         }
     }
     pub fn has_cuts(&self) -> bool {
-        self.knapsack_pricing.active
+        self.presence_pricing.active()
+            || self.knapsack_pricing.active
             || !self.applied_cuts.0.is_empty()
             || !self.applied_cuts.1.is_empty()
             || !self.applied_cuts.2.is_empty()
@@ -314,11 +324,20 @@ impl<const D: usize> Solver<D> {
                 "knapsack resource mapping exceeds solver coordinates",
             ));
         }
-        knapsack.retrieve(
-            &self.cuts.knapsack_cuts,
-            self.graph.graph_id.max(0),
-            &resource_indices,
-        )?;
+        if self.knapsack_exact_coefficients || self.cuts.knapsack_cuts.iter().any(|cut|
+            cut.cut.kind == crate::cuts::knapsack::KnapsackKind::Fenchel) {
+            knapsack.retrieve_exact(
+                &self.cuts.knapsack_cuts,
+                self.graph.graph_id.max(0),
+                &resource_indices,
+            )?;
+        } else {
+            knapsack.retrieve(
+                &self.cuts.knapsack_cuts,
+                self.graph.graph_id.max(0),
+                &resource_indices,
+            )?;
+        }
         if knapsack != self.knapsack_pricing {
             if let Some(engine) = &mut self.engine {
                 engine.cuts.knapsack = knapsack.clone();
@@ -398,6 +417,7 @@ impl<const D: usize> Solver<D> {
                 "rank-one cut memory exceeds the native label words",
             ));
         }
+        engine.load_presence(&self.graph, self.presence_pricing.inputs().to_vec())?;
         Ok(engine)
     }
     pub fn set_option(&mut self, name: &str, value: f64) -> Result<()> {
@@ -576,6 +596,7 @@ impl<const D: usize> Solver<D> {
 
 mod completion;
 mod fixing_workflow;
+mod presence;
 mod relaxation;
 mod solve;
 mod universe;

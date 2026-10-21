@@ -287,9 +287,9 @@ impl Default for Options {
 impl Options {
     fn matches(info: &OptionInfo, name: &str) -> bool {
         info.name == name
-            || name.strip_prefix("RCSP").is_some_and(|suffix| {
-                info.name.strip_prefix("BALDES") == Some(suffix)
-            })
+            || name
+                .strip_prefix("RCSP")
+                .is_some_and(|suffix| info.name.strip_prefix("BALDES") == Some(suffix))
     }
 
     fn definition(name: &str) -> Result<&'static OptionInfo> {
@@ -309,7 +309,11 @@ impl Options {
         OPTION_TABLE
             .iter()
             .position(|info| Self::matches(info, name))
-            .ok_or_else(|| invalid(format!("BALDES option is not available in this build: {name}")))
+            .ok_or_else(|| {
+                invalid(format!(
+                    "BALDES option is not available in this build: {name}"
+                ))
+            })
     }
 
     pub fn get(&self, name: &str) -> Result<f64> {

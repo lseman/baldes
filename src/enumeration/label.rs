@@ -15,6 +15,7 @@ pub struct Label<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     /// Full-memory cut state (State<FullMemSBCutsResources>).
     pub cut_words: [u32; FULL_WORDS],
     pub cut_cost: f64,
+    pub presence_state: crate::cuts::soft_conflicts::LabelState,
 }
 /// Full-memory cut tables of an enumeration with cuts.
 #[derive(Clone, Copy, Debug)]
@@ -22,6 +23,7 @@ pub struct CutTables<'a> {
     pub info: &'a CutResourceInfo,
     pub full: &'a FullPreparation,
     pub knapsack: &'a crate::cuts::knapsack::KnapsackPricing,
+    pub presence: Option<&'a crate::cuts::soft_conflicts::PresencePricing>,
 }
 impl<'a> CutTables<'a> {
     pub(super) fn along_arc<const D: usize>(
@@ -29,7 +31,12 @@ impl<'a> CutTables<'a> {
         label: &mut Label<D>,
         forward: bool,
         arc: usize,
-    ) {
+    ) -> Result<()> {
+        if let Some(presence) = self.presence.filter(|p| p.active()) {
+            let (next, cost) = presence.extend(&label.presence_state, arc)?;
+            label.presence_state = next;
+            label.cut_cost += cost;
+        }
         let table = if forward {
             &self.info.forward
         } else {
@@ -54,6 +61,7 @@ impl<'a> CutTables<'a> {
                 std::slice::from_ref(&transition),
             );
         }
+        Ok(())
     }
     pub(super) fn to_vertex<const D: usize>(&self, label: &mut Label<D>) {
         state::apply_vertex_support(
@@ -70,19 +78,24 @@ impl<'a> CutTables<'a> {
         f: &Label<D>,
         b: &Label<D>,
         cost: f64,
-    ) -> f64 {
+    ) -> Result<f64> {
         let cost = cost
             + self
                 .knapsack
                 .join_cost(g, &f.resources, &b.resources, symmetric);
-        state::full_memory_concatenation_cost(
+        let cost = state::full_memory_concatenation_cost(
             self.info,
             self.full,
             f.vertex,
             (&f.cut_words, f.cut_cost),
             (&b.cut_words, b.cut_cost),
             cost,
-        )
+        );
+        if let Some(presence) = self.presence.filter(|p| p.active()) {
+            Ok(cost + presence.join_cost(&f.presence_state, &b.presence_state)?)
+        } else {
+            Ok(cost)
+        }
     }
 }
 impl<const D: usize> Label<D> {

@@ -9,7 +9,7 @@ impl<'a, const D: usize> From<&'a StoredLabel<D>> for LabelRef<'a, D> {
 
 impl<'a, const D: usize> LabelRef<'a, D> {
     view_accessors!(vertex: usize, cost: f64, original_cost: f64, additional_cost: f64, ng: u16, resources: &'a [f64],
-        branch_state: &'a BranchState, hops: usize,
+        branch_state: &'a BranchState, presence_state: &'a crate::cuts::soft_conflicts::LabelState, hops: usize,
         cut_words: &'a [u32], key: f64);
     #[inline(always)]
     pub fn expanded(self) -> bool {

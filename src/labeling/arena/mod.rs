@@ -10,6 +10,7 @@ use std::sync::OnceLock;
 const NONE: u32 = u32::MAX;
 static EMPTY_WORDS: [u32; LIMITED_WORDS] = [0; LIMITED_WORDS];
 static EMPTY_BRANCH: BranchState = None;
+static EMPTY_PRESENCE: crate::cuts::soft_conflicts::LabelState = None;
 
 /// Only ordinary-label state. IDs remain stable across arena reallocations;
 /// identifiers that cannot be represented exactly select full records.
@@ -61,6 +62,9 @@ pub(crate) trait LabelData {
     fn resources(&self) -> &[f64];
     fn ng(&self) -> u16;
     fn branch_state(&self) -> &BranchState;
+    fn presence_state(&self) -> &crate::cuts::soft_conflicts::LabelState {
+        &EMPTY_PRESENCE
+    }
     fn hops(&self) -> usize;
     fn cut_words(&self) -> &[u32];
     fn additional_cost(&self) -> f64;

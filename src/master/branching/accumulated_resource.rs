@@ -24,14 +24,7 @@ pub(super) fn coefficient(rule: AccumulatedResourceBranch, route: &Route) -> f64
                 .resource_profile
                 .get(i + 1)
                 .and_then(|q| q.get(rule.resource))
-                .map_or(true, |&q| {
-                    !q.is_finite()
-                        || if rule.upper {
-                            q < rule.threshold
-                        } else {
-                            q > rule.threshold
-                        }
-                })
+                .map_or(true, |&q| !rule.satisfied_by(q))
         })
         .count() as f64
 }

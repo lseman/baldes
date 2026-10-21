@@ -96,6 +96,7 @@ impl ClpMaster {
             self.rhs.push(rhs);
             self.senses.push(sense);
         }
+        self.ipm.matrix_dirty = true;
         self.solved = false;
         #[cfg(feature = "highs")]
         self.edit_highs(|backend| backend.add_rows(rows).map(|_| ()))?;
@@ -141,7 +142,7 @@ impl ClpMaster {
             costs.push(cost);
         }
         let lower = vec![0.; columns.len()];
-        let upper = vec![1e12; columns.len()];
+        let upper = vec![self.column_default_upper; columns.len()];
         // SAFETY: Model is exclusively borrowed, Clp copies the supplied arrays.
         unsafe {
             Clp_addColumns(
@@ -160,7 +161,18 @@ impl ClpMaster {
         self.solved = preserve;
         self.values.resize(self.values.len() + preserved, 0.);
         #[cfg(feature = "highs")]
-        self.edit_highs(|backend| backend.add_columns(columns).map(|_| ()))?;
+        {
+            let default_upper = self.column_default_upper;
+            self.edit_highs(|backend| {
+                let added = backend.add_columns(columns)?;
+                if default_upper != 1e12 {
+                    for column in added {
+                        backend.set_upper(column, default_upper)?;
+                    }
+                }
+                Ok(())
+            })?;
+        }
         Ok(first..self.costs.len())
     }
 
@@ -173,6 +185,7 @@ impl ClpMaster {
         }
         #[cfg(feature = "highs")]
         self.edit_highs(|backend| backend.set_coefficient(row, column, value))?;
+        self.ipm.matrix_dirty = true;
         self.solved = false;
         Ok(())
     }
@@ -195,13 +208,23 @@ impl ClpMaster {
         if column >= self.upper.len() || !upper.is_finite() || upper < 0. {
             return Err(invalid("master upper bound"));
         }
+        // Restricting an LP while retaining its optimum retains optimality.
+        // This matters when a controller installs an implied route-count cap
+        // after a CG solve. Widening, or cutting off the cached point, requires
+        // reoptimization.
+        let preserve = self.solved
+            && upper <= self.upper[column]
+            && self
+                .values
+                .get(column)
+                .is_some_and(|v| v.is_finite() && *v <= upper);
         self.upper[column] = upper;
         unsafe {
             Clp_chgColumnUpper(self.model.as_ptr(), self.upper.as_ptr());
         }
         #[cfg(feature = "highs")]
         self.edit_highs(|backend| backend.set_upper(column, upper))?;
-        self.solved = false;
+        self.solved = preserve;
         Ok(())
     }
 
@@ -353,6 +376,7 @@ impl ClpMaster {
             .zip(&cm)
             .filter_map(|(&x, m)| m.map(|_| x))
             .collect();
+        self.ipm.matrix_dirty = true;
         self.solved = false;
         Ok((rm, cm))
     }

@@ -854,3 +854,72 @@ fn highs_recovers_the_r201_hundred_customer_warm_basis_failure() {
     assert!((result.master.lp - 1140.130144533555).abs() < 1e-6, "{}", result.master.lp);
     assert!(result.master.artificials.iter().all(|&column| result.values[column] <= 1e-6));
 }
+
+#[test]
+fn closing_exact_bound_keeps_feasible_master_before_empty_enumeration() {
+    use column_generation::Controller;
+    struct ClosingBound {
+        enumeration_calls: usize,
+    }
+    impl Controller<ClpMaster> for ClosingBound {
+        fn incumbent(&self) -> f64 {
+            1.
+        }
+        fn pricing_bound(&self, _: &ClpMaster, _: &[f64]) -> baldes::Result<Option<f64>> {
+            Ok(Some(1.))
+        }
+        fn enumerated_universe(
+            &mut self,
+            _: &[f64],
+            _: f64,
+        ) -> baldes::Result<Option<Vec<Column>>> {
+            self.enumeration_calls += 1;
+            // No column can strictly improve the incumbent. Replacing the
+            // feasible master with this empty universe loses its LP point.
+            Ok((self.enumeration_calls == 1).then(Vec::new))
+        }
+    }
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, 1., &[]).unwrap();
+    master.add_column(1., &[(0, 1.)]).unwrap();
+    let mut controller = ClosingBound {
+        enumeration_calls: 0,
+    };
+    let out = column_generation::optimize(
+        &mut master,
+        &[baldes::pricing::phases::Phase {
+            check_ng: true,
+            jump_arcs: true,
+            labels_per_bucket: i64::MAX,
+        }],
+        |_, _| {
+            Ok(Answer {
+                columns: vec![],
+                minimum: 0.,
+                exact: true,
+                bound_minimum: None,
+            })
+        },
+        &mut controller,
+        Options {
+            stabilize: false,
+            known: vec![Column {
+                cost: 1.,
+                reduced_cost: 0.,
+                entries: vec![(0, 1.)],
+                acceptable: true,
+                tag: 0,
+                identity: "incumbent-column".into(),
+            }],
+            ..Options::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(out.status, Status::Optimal);
+    assert!(out.pruned_by_bound);
+    assert_eq!(out.lp, 1.);
+    assert_eq!(out.bound, 1.);
+    assert_eq!(controller.enumeration_calls, 0);
+    assert_eq!(master.values()[0], 1.);
+    assert!(out.warm_start.columns.iter().any(Option::is_some));
+}

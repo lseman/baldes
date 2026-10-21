@@ -54,6 +54,8 @@ pub struct EngineCuts {
     pub inputs: Vec<LimitedInput>,
     pub kpath: Vec<LimitedKPathInput>,
     pub knapsack: crate::cuts::knapsack::KnapsackPricing,
+    /// Presence rows; use `load_presence` to invalidate cached labels safely.
+    pub presence: crate::cuts::soft_conflicts::PresencePricing,
     pub info: CutResourceInfo,
     pub limited: LimitedPreparation,
     /// Full-memory enumeration tables, prepared before an enumeration.
@@ -106,6 +108,7 @@ mod context;
 mod cuts;
 mod fixing;
 mod preparation;
+mod presence;
 mod reconstruction;
 mod solve;
 mod sweep;

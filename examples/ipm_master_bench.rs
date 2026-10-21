@@ -1,5 +1,5 @@
 //! Captured R201 LP: measure Newton iterations independently of column generation.
-use baldes::ipm::{solve, ModelData, Options, Sense, SolverType, SparseMatrix, Status};
+use baldes::extensions::ipm::{solve, ModelData, Options, Sense, Solver, SolverType, SparseMatrix, Status};
 use std::time::Instant;
 
 fn main() {
@@ -11,7 +11,17 @@ fn main() {
         "normal" => SolverType::NormalEquations,
         other => panic!("unknown backend: {other}"),
     };
-    let model = fixture();
+    let mode = args.next().unwrap_or_default();
+    let text = if mode == "c202-sequence" {
+        include_str!("../tests/ipm/fixtures/c202_rank1_master.txt")
+    } else {
+        include_str!("../tests/ipm/fixtures/r201_master.txt")
+    };
+    let model = fixture(text);
+    if mode.ends_with("sequence") {
+        sequence(&model, backend, repeats);
+        return;
+    }
     for gap_tolerance in [Some(0.5), None] {
         let mut times = Vec::new();
         let mut iterations = Vec::new();
@@ -46,8 +56,8 @@ fn main() {
     }
 }
 
-fn fixture() -> ModelData {
-    let mut lines = include_str!("../tests/ipm/fixtures/r201_master.txt").lines();
+fn fixture(text: &str) -> ModelData {
+    let mut lines = text.lines();
     let mut shape = lines.next().unwrap().split_whitespace();
     let m = shape.next().unwrap().parse().unwrap();
     let n = shape.next().unwrap().parse().unwrap();
@@ -87,5 +97,64 @@ fn fixture() -> ModelData {
         lower,
         upper,
         sense,
+    }
+}
+
+/// Compare the same eight growing masters, excluding matrix construction.
+fn sequence(full: &ModelData, backend: SolverType, repeats: usize) {
+    let mut models = Vec::new();
+    for step in 0..8 {
+        let columns = full.c.len() - (7 - step) * 30;
+        let entries: Vec<_> = (0..columns)
+            .flat_map(|j| full.a.column(j).map(move |(i, v)| (i, j, v)))
+            .collect();
+        models.push(ModelData {
+            a: SparseMatrix::from_triplets(full.b.len(), columns, &entries).unwrap(),
+            b: full.b.clone(),
+            c: full.c[..columns].to_vec(),
+            lower: full.lower[..columns].to_vec(),
+            upper: full.upper[..columns].to_vec(),
+            sense: full.sense.clone(),
+        });
+    }
+    let options = Options {
+        tolerance: 1e-9,
+        solver: backend,
+        ..Options::default()
+    };
+    let references: Vec<_> = models
+        .iter()
+        .map(|m| solve(m, &options).unwrap().objective)
+        .collect();
+    for persistent in [false, true] {
+        let mut times = Vec::new();
+        let mut statistics = Default::default();
+        let mut iterations = 0;
+        for rep in 0..=repeats {
+            let mut solver = Solver::default();
+            let started = Instant::now();
+            iterations = 0;
+            for (model, expected) in models.iter().zip(&references) {
+                let solution = if persistent {
+                    solver.solve(model, &options)
+                } else {
+                    solve(model, &options)
+                }
+                .unwrap();
+                assert_eq!(solution.status, Status::Optimal);
+                assert!(solution.primal_residual <= 1e-9);
+                assert!(solution.dual_residual <= 1e-9);
+                assert!(solution.relative_gap <= 1e-9);
+                assert!((solution.objective - expected).abs() < 2e-6);
+                iterations += solution.iterations;
+            }
+            let elapsed = started.elapsed().as_secs_f64();
+            statistics = solver.statistics();
+            if rep > 0 {
+                times.push(elapsed);
+            }
+        }
+        times.sort_by(f64::total_cmp);
+        println!("sequence persistent={persistent} backend={backend:?} median_ms={:.3} newton_iterations={iterations} stats={statistics:?}", times[repeats / 2] * 1000.);
     }
 }

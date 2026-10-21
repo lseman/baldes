@@ -75,10 +75,10 @@ fn key(c: &BranchConstraint) -> String {
             "resource:{}:{}:{:016x}",
             c.arc,
             c.resource,
-            if c.threshold == 0. {
+            if c.boundary() == 0. {
                 0
             } else {
-                c.threshold.to_bits()
+                c.boundary().to_bits()
             }
         ),
     }

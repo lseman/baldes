@@ -1,5 +1,5 @@
-use baldes::ipm::{
-    solve, HiPOLDLT, ModelData, NormalEqLDLT, Options, Sense, SolverType, SparseMatrix, Status,
+use baldes::extensions::ipm::{
+    solve, HiPOLDLT, ModelData, NormalEqLDLT, Options, Sense, Solver, SolverType, SparseMatrix, Status,
 };
 
 fn model(
@@ -329,11 +329,11 @@ fn csr_canonicalization_and_fill_estimate() {
     // A single dense column produces a dense 4x4 normal matrix.
     let a = SparseMatrix::from_triplets(4, 1, &[(0, 0, 1.), (1, 0, 1.), (2, 0, 1.), (3, 0, 1.)])
         .unwrap();
-    let fill = baldes::ipm::estimate_fill(&a);
+    let fill = baldes::extensions::ipm::estimate_fill(&a);
     assert_eq!(fill.normal_eq_nnz, 10);
     assert_eq!(fill.augmented_nnz, 9);
     assert_eq!(
-        baldes::ipm::SparseSolver::new(a, SolverType::Auto)
+        baldes::extensions::ipm::SparseSolver::new(a, SolverType::Auto)
             .unwrap()
             .active_solver_type(),
         SolverType::HiPO
@@ -422,7 +422,7 @@ fn seeded_sparse_kkt_residuals() {
                 .map(|(i, v)| v + rd[i] * expected[n + i]),
         );
         for kind in [SolverType::HiPO, SolverType::NormalEquations] {
-            let mut s = baldes::ipm::SparseSolver::new(a.clone(), kind).unwrap();
+            let mut s = baldes::extensions::ipm::SparseSolver::new(a.clone(), kind).unwrap();
             s.factorize(&theta, &rp, &rd).unwrap();
             let result = s.solve(&rhs).unwrap();
             for (r, e) in result.iter().zip(&expected) {
@@ -465,11 +465,8 @@ fn relaxed_optimality_keeps_primal_and_dual_feasibility_tight() {
     }
 }
 
-/// Exact master captured immediately before the R201 strict-interior failure.
-/// The simplex reference objective is recorded in fixtures/README.md.
-#[test]
-fn r201_master_with_wide_bounds_converges() {
-    let mut lines = include_str!("fixtures/r201_master.txt").lines();
+fn captured_master(text: &str) -> (ModelData, f64) {
+    let mut lines = text.lines();
     let mut header = lines.next().unwrap().split_whitespace();
     let m: usize = header.next().unwrap().parse().unwrap();
     let n: usize = header.next().unwrap().parse().unwrap();
@@ -514,6 +511,14 @@ fn r201_master_with_wide_bounds_converges() {
         upper,
         sense,
     };
+    (lp, gap)
+}
+
+/// Exact master captured immediately before the R201 strict-interior failure.
+/// The simplex reference objective is recorded in fixtures/README.md.
+#[test]
+fn r201_master_with_wide_bounds_converges() {
+    let (lp, gap) = captured_master(include_str!("fixtures/r201_master.txt"));
     for gap_tolerance in [Some(gap), None] {
         let s = solve(
             &lp,
@@ -568,4 +573,167 @@ fn objective_scaling_recovers_original_duals() {
             }
         }
     }
+}
+
+/// Master captured before the C202 rank-1 triangular solve overflow.
+/// The simplex reference objective is recorded in fixtures/README.md.
+#[test]
+fn c202_rank1_master_converges() {
+    let (lp, gap) = captured_master(include_str!("fixtures/c202_rank1_master.txt"));
+    for gap_tolerance in [Some(gap), None] {
+        let s = solve(
+            &lp,
+            &Options {
+                tolerance: 1e-9,
+                gap_tolerance,
+                ..Options::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(s.status, Status::Optimal, "{s:?}");
+        assert!(s.iterations < 100, "iterations={}", s.iterations);
+        assert!(s.primal_residual <= 1e-9, "{}", s.primal_residual);
+        assert!(s.dual_residual <= 1e-9, "{}", s.dual_residual);
+        assert!(s.relative_gap <= gap_tolerance.unwrap_or(1e-9));
+        assert!((s.objective - 618.2263546557791).abs() < 2e-6, "{}", s.objective);
+    }
+}
+
+#[test]
+fn persistent_solver_reuses_analysis_and_invalidates_changed_coordinates() {
+    for kind in [SolverType::HiPO, SolverType::NormalEquations, SolverType::Auto] {
+        let mut solver = Solver::default();
+        let mut options = Options { tolerance: 1e-9, solver: kind, ..Options::default() };
+        let mut lp = model(&[&[2., 1.]], &[2.], &[3., 2.], &[0., 0.], &[10., 10.], &[Sense::Equal]);
+        let first = solver.solve(&lp, &options).unwrap();
+        assert_eq!(first.status, Status::Optimal);
+        let repeated = solver.solve(&lp, &options).unwrap();
+        assert_eq!(repeated.status, Status::Optimal);
+        assert_eq!(repeated.iterations, 0);
+        assert_eq!(solver.statistics().symbolic_analyses, 1);
+        assert_eq!(solver.statistics().warm_starts, 1);
+        lp.c[0] = 5.;
+        lp.b[0] = 3.;
+        let edited = solver.solve(&lp, &options).unwrap();
+        assert_eq!(edited.status, Status::Optimal);
+        assert!((edited.objective - 6.).abs() < 1e-7);
+        assert_eq!(solver.statistics().symbolic_analyses, 1);
+        assert_eq!(solver.statistics().warm_starts, 1);
+        lp.upper[1] = 0.; // fixes a variable and changes recovery indices
+        let fixed = solver.solve(&lp, &options).unwrap();
+        assert_eq!(fixed.status, Status::Optimal);
+        assert!((fixed.objective - 7.5).abs() < 1e-7);
+        assert_eq!(solver.statistics().symbolic_analyses, 2);
+        options.scaling_iterations = 0;
+        assert_eq!(solver.solve(&lp, &options).unwrap().status, Status::Optimal);
+        assert_eq!(solver.statistics().symbolic_analyses, 3);
+        assert_eq!(solver.statistics().warm_starts, 1);
+        lp.a = SparseMatrix::from_triplets(1, 2, &[(0, 0, 3.), (0, 1, 1.)]).unwrap();
+        let changed = solver.solve(&lp, &options).unwrap();
+        assert_eq!(changed.status, Status::Optimal);
+        assert!((changed.objective - 5.).abs() < 1e-7);
+        assert_eq!(solver.statistics().symbolic_analyses, 4);
+    }
+}
+
+#[test]
+fn persistent_solver_invalidates_appended_columns_and_inequality_slacks() {
+    for kind in [SolverType::HiPO, SolverType::NormalEquations] {
+        let options = Options { tolerance: 1e-9, solver: kind, ..Options::default() };
+        let mut solver = Solver::default();
+        let first = model(&[&[2., 1.], &[1., 0.]], &[2., 0.8], &[3., 2.],
+            &[0., 0.], &[10., 10.], &[Sense::Equal, Sense::LessEqual]);
+        assert_eq!(solver.solve(&first, &options).unwrap().status, Status::Optimal);
+        // New column also changes equilibration; old slack indices move.
+        let grown = model(&[&[2., 1., 100.], &[1., 0., 2.]], &[2., 0.8], &[3., 2., 1.],
+            &[0., 0., 0.], &[10., 10., 10.], &[Sense::Equal, Sense::LessEqual]);
+        let warm = solver.solve(&grown, &options).unwrap();
+        let cold = solve(&grown, &options).unwrap();
+        assert_eq!(warm.status, Status::Optimal);
+        assert!(warm.primal_residual <= 1e-9);
+        assert!(warm.dual_residual <= 1e-9);
+        assert!((warm.objective - cold.objective).abs() < 1e-7);
+        assert_eq!(solver.statistics().warm_starts, 0);
+        assert_eq!(solver.statistics().symbolic_analyses + solver.statistics().symbolic_extensions, 2);
+        let mut fork = solver.clone();
+        let mut edited = grown.clone();
+        edited.c[2] = 1000.;
+        let changed = fork.solve(&edited, &options).unwrap();
+        assert_eq!(changed.status, Status::Optimal);
+        assert!((changed.objective - warm.objective).abs() > 1.);
+        assert_eq!(solver.solve(&grown, &options).unwrap().iterations, 0);
+    }
+}
+
+#[test]
+fn persistent_solver_preserves_budget_and_recovers_after_failed_calls() {
+    let mut solver = Solver::default();
+    let lp = model(&[&[1.]], &[1.], &[1.], &[0.], &[10.], &[Sense::Equal]);
+    let options = Options { tolerance: 1e-9, ..Options::default() };
+    assert_eq!(solver.solve(&lp, &options).unwrap().status, Status::Optimal);
+    let mut grown = model(&[&[1., 1.]], &[1.], &[1., 0.5], &[0., 0.], &[10., 10.], &[Sense::Equal]);
+    let limited = solver.solve(&grown, &Options { max_iterations: 1, ..options.clone() }).unwrap();
+    assert_eq!(limited.status, Status::IterationLimit);
+    assert!(limited.iterations <= 1);
+    assert_eq!(solver.solve(&grown, &options).unwrap().status, Status::Optimal);
+    let timed = solver.solve(&grown, &Options { time_limit: Some(std::time::Duration::ZERO), ..options.clone() }).unwrap();
+    assert_eq!(timed.status, Status::TimeLimit);
+    grown.b[0] = f64::NAN;
+    assert!(solver.solve(&grown, &options).is_err());
+    grown.b[0] = 1.;
+    assert_eq!(solver.solve(&grown, &options).unwrap().status, Status::Optimal);
+}
+
+#[test]
+fn persistent_rhs_and_cost_updates_preserve_bound_transformations() {
+    for (lower, upper) in [(2., 5.), (f64::NEG_INFINITY, 5.), (f64::NEG_INFINITY, f64::INFINITY)] {
+        let mut solver = Solver::default();
+        let mut lp = model(&[&[2.]], &[6.], &[3.], &[lower], &[upper], &[Sense::Equal]);
+        let options = Options { tolerance: 1e-9, ..Options::default() };
+        assert_eq!(solver.solve(&lp, &options).unwrap().status, Status::Optimal);
+        lp.b[0] = 8.; lp.c[0] = -2.;
+        let solution = solver.solve(&lp, &options).unwrap();
+        assert_eq!(solution.status, Status::Optimal);
+        assert!((solution.objective + 8.).abs() < 1e-7);
+        assert!((solution.dual[0] + 1.).abs() < 1e-7);
+        assert_eq!(solver.statistics().symbolic_analyses, 1);
+    }
+}
+
+#[test]
+fn persistent_solver_extends_covered_column_cliques_without_new_analysis() {
+    let mut solver = Solver::default();
+    let options = Options { tolerance: 1e-9, ..Options::default() };
+    let first = model(&[&[1., 1.], &[1., -1.]], &[2., 0.], &[3., 2.],
+        &[0., 0.], &[10., 10.], &[Sense::Equal, Sense::Equal]);
+    assert_eq!(solver.solve(&first, &options).unwrap().status, Status::Optimal);
+    let grown = model(&[&[1., 1., 2.], &[1., -1., 0.]], &[2., 0.], &[3., 2., 0.5],
+        &[0., 0., 0.], &[10., 10., 10.], &[Sense::Equal, Sense::Equal]);
+    let solution = solver.solve(&grown, &options).unwrap();
+    assert_eq!(solution.status, Status::Optimal);
+    assert!((solution.objective - 0.5).abs() < 1e-7);
+    assert_eq!(solver.statistics().symbolic_analyses, 1);
+    assert_eq!(solver.statistics().symbolic_extensions, 1);
+    assert_eq!(solver.statistics().warm_starts, 0);
+}
+
+#[test]
+fn persistent_column_order_preserves_free_fixed_and_slack_recovery() {
+    let mut solver = Solver::default();
+    let options = Options { tolerance: 1e-9, ..Options::default() };
+    let initial = model(&[&[1., 1., 1.], &[0., 0., 1.]], &[4., 10.], &[1., 2., 3.],
+        &[f64::NEG_INFINITY, 2., 0.], &[f64::INFINITY, 2., 10.],
+        &[Sense::Equal, Sense::LessEqual]);
+    assert_eq!(solver.solve(&initial, &options).unwrap().status, Status::Optimal);
+    let grown = model(&[&[1., 1., 1., 100.], &[0., 0., 1., 0.]], &[4., 10.], &[1., 2., 3., 40.],
+        &[f64::NEG_INFINITY, 2., 0., 0.], &[f64::INFINITY, 2., 10., 0.01],
+        &[Sense::Equal, Sense::LessEqual]);
+    let solution = solver.solve(&grown, &options).unwrap();
+    assert_eq!(solution.status, Status::Optimal);
+    assert!(solution.primal_residual <= 1e-9);
+    assert!((solution.objective - 5.4).abs() < 1e-7);
+    assert!((solution.primal[0] - 1.).abs() < 1e-7);
+    assert_eq!(solution.primal[1], 2.);
+    assert_eq!(solver.statistics().symbolic_extensions, 1);
+    assert_eq!(solver.solve(&grown, &options).unwrap().iterations, 0);
 }

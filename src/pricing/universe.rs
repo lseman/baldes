@@ -1,7 +1,21 @@
 //! Elementary enumeration, inspection, and reduced-cost fixing.
 use super::*;
 impl<const D: usize> Solver<D> {
+    pub(super) fn check_presence_universe(&self) -> Result<()> {
+        if self
+            .engine
+            .as_ref()
+            .is_some_and(|e| e.cuts.presence.inputs() != self.presence_pricing.inputs())
+        {
+            return Err(incomplete(
+                "unowned presence pricing rows require enumeration state integration",
+            ));
+        }
+        Ok(())
+    }
+
     pub fn enumerate(&mut self, cutoff: f64) -> Result<Vec<crate::Route>> {
+        self.check_presence_universe()?;
         if self.engine.is_none() {
             self.price_phase(0, 1, false)?;
         }
@@ -33,11 +47,14 @@ impl<const D: usize> Solver<D> {
                 .max(1.) as usize,
             time_limit: self.controls.time_limit,
             max_route_arcs: self.controls.max_route_arcs,
-            preserve_arc_paths: self.enumeration_preserve_arc_paths || !self.ryan_foster.is_empty(),
+            preserve_arc_paths: self.enumeration_preserve_arc_paths
+                || !self.ryan_foster.is_empty()
+                || self.presence_pricing.active(),
             // Dominance needs only one working partition. Path export tracks
             // native hash activation and candidate order independently.
             partitions: 1,
         };
+        let enumerated_kpath = self.enumerated_kpath_inputs();
         let has_cuts = self.has_cuts();
         if has_cuts {
             let engine = self.engine.as_mut().unwrap();
@@ -71,6 +88,11 @@ impl<const D: usize> Solver<D> {
                     info: &engine.cuts.info,
                     full,
                     knapsack: &engine.cuts.knapsack,
+                    presence: engine
+                        .cuts
+                        .presence
+                        .active()
+                        .then_some(&engine.cuts.presence),
                 });
         let mut universe = Enumeration::run_with_symmetry(
             &self.graph,
@@ -94,21 +116,33 @@ impl<const D: usize> Solver<D> {
                 )
             })
         });
+        if self.presence_pricing.active() {
+            universe.paths.inspect_with_presence(
+                &self.graph,
+                cutoff,
+                &self.applied_cuts.0,
+                &enumerated_kpath,
+                &self.knapsack_pricing,
+                &self.presence_pricing,
+            )?;
+        }
         let routes = universe.paths.routes(&self.graph)?;
         self.enumeration_snapshot = Some(self.topology());
         self.enumeration = Some(universe);
         Ok(routes)
     }
     pub fn inspect_enumeration(&mut self, cutoff: f64) -> Result<Option<Vec<crate::Route>>> {
+        self.check_presence_universe()?;
         self.refresh_cuts()?;
         let enumerated_kpath = self.enumerated_kpath_inputs();
         if let Some(universe) = &mut self.enumeration {
-            universe.paths.inspect_with_knapsack(
+            universe.paths.inspect_with_presence(
                 &self.graph,
                 cutoff,
                 &self.applied_cuts.0,
                 &enumerated_kpath,
                 &self.knapsack_pricing,
+                &self.presence_pricing,
             )?;
             return Ok(Some(universe.paths.routes(&self.graph)?));
         }

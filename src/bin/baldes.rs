@@ -1,11 +1,10 @@
-mod networks_cli;
+mod multi_pricing_cli;
 mod pstep_cli;
 use baldes::master::root::RootOptions;
 use baldes::inputs::{Instance, Rounding};
 const HELP: &str = "Usage: baldes <vrptw|cvrp|hgs> INSTANCE [OPTIONS]
 
-Additional command: baldes networks MODEL.json [OPTIONS] (see networks --help)
-
+Additional command: baldes multi-pricing MODEL.json [OPTIONS] (see multi-pricing --help; networks is an alias)
 Additional command: baldes pstep INSTANCE --p P --threads N (see pstep --help)
 
 Instance types (Solomon-format or CVRPLIB .vrp input):
@@ -20,6 +19,7 @@ Options:
   --rounding MODE       Distances: none, nearest, tenth or ceil (default: the
                         file's convention; none for Solomon, nearest for EUC_2D)
   --rank1               Enable rank-one cuts
+  --fenchel-cuts        Enable Fenchel cuts on the gcd-scaled integer-demand row
   --capacity-cuts        Enable capacity cuts (alias: --capacity)
   --two-path-cuts        Enable capacity and Kohl 2-path cuts using time windows
   --tree                Run branch-and-price with a restricted-master MIP heuristic
@@ -62,7 +62,7 @@ fn run() -> std::result::Result<(), String> {
         println!("{HELP}");
         return Ok(());
     }
-    if kind == "networks" { return networks_cli::run(args.collect()); }
+    if kind == "multi-pricing" || kind == "networks" { return multi_pricing_cli::run(args.collect()); }
     if kind == "pstep" { return pstep_cli::run(args.collect()); }
     if kind != "vrptw" && kind != "cvrp" && kind != "hgs" {
         return Err(format!("unknown instance type: {kind}\n\n{HELP}"));
@@ -81,6 +81,7 @@ fn run() -> std::result::Result<(), String> {
     let mut ng = 8;
     let mut options = RootOptions::default();
     let mut rank1 = false;
+    let mut fenchel = false;
     let mut capacity = false;
     let mut two_path = false;
     let mut tree = false;
@@ -190,6 +191,7 @@ fn run() -> std::result::Result<(), String> {
                 )
             }
             "--rank1" => rank1 = true,
+            "--fenchel-cuts" => fenchel = true,
             "--capacity" | "--capacity-cuts" => capacity = true,
             "--two-path-cuts" => { capacity = true; two_path = true; }
             "--tree" => tree = true,
@@ -257,7 +259,8 @@ fn run() -> std::result::Result<(), String> {
         return Err("--enumerated-mip requires --tree".into());
     }
     if kind == "hgs" {
-        use baldes::hgs::{HgsOptions, run_hgs};
+        if fenchel { return Err("--fenchel-cuts requires cvrp or vrptw".into()); }
+        use baldes::extensions::hgs::{HgsOptions, run_hgs};
         if let Some(rounding) = rounding {
             instance.rounding = rounding;
         }
@@ -311,6 +314,9 @@ fn run() -> std::result::Result<(), String> {
 
     let rounding = rounding.unwrap_or(instance.rounding);
     if two_path && kind == "cvrp" { return Err("Kohl 2-path cuts require vrptw time windows".into()); }
+    if fenchel {
+        options = options.with_knapsack_cuts(instance.fenchel_cut_config().map_err(|e| e.to_string())?);
+    }
     if capacity {
         options = options.with_capacity_cuts(instance.capacity_cut_config(rounding, two_path));
     }

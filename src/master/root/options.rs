@@ -115,6 +115,12 @@ pub struct KnapsackCutConfig {
     pub parameters: KnapsackParameters,
 }
 impl KnapsackCutConfig {
+    /// Opt in to independently validated Fenchel load-table cuts. The original
+    /// rows must hold for every feasible integer master solution.
+    pub fn with_fenchel(mut self, parameters: crate::cuts::knapsack::FenchelParameters) -> Self {
+        self.parameters.fenchel = Some(parameters);
+        self
+    }
     pub fn new(rows: Vec<KnapsackRow>) -> Self {
         Self {
             rows,

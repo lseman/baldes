@@ -21,6 +21,11 @@ impl<const D: usize> Enumeration<D> {
         completion: F,
     ) -> Result<Self> {
         let consumption = !reverse.is_empty();
+        if consumption && cuts.and_then(|c| c.presence).is_some_and(|p| p.active()) {
+            return Err(invalid(
+                "presence enumeration requires ordinary directional buckets",
+            ));
+        }
         if consumption && !crate::graph::symmetry::reduced_costs_symmetric(g, reverse) {
             let costs = crate::graph::symmetry::reversal_costs(g, reverse).ok_or_else(|| {
                 invalid("nonconservative reduced costs cannot use symmetric enumeration")
@@ -42,14 +47,19 @@ impl<const D: usize> Enumeration<D> {
         if controls.label_limit == 0 || controls.path_limit == 0 || !controls.cutoff.is_finite() {
             return Err(invalid("invalid enumeration controls"));
         }
+        if let Some(presence) = cuts.and_then(|c| c.presence) {
+            presence.validate_engine(g.arcs.len())?;
+        }
+        let preserve = controls.preserve_arc_paths
+            || cuts.and_then(|c| c.presence).is_some_and(|p| p.active());
         let started = Instant::now();
         let mut forward = Storage::new(controls.partitions)?;
         let mut backward = Storage::new(controls.partitions)?;
-        forward.preserve_arc_paths = controls.preserve_arc_paths;
-        backward.preserve_arc_paths = controls.preserve_arc_paths;
-        let mut pruning = PruningFrontier::for_run(controls.preserve_arc_paths);
+        forward.preserve_arc_paths = preserve;
+        backward.preserve_arc_paths = preserve;
+        let mut pruning = PruningFrontier::for_run(preserve);
         let mut paths = PathStorage::new(controls.partitions)?;
-        paths.preserve_arc_paths = controls.preserve_arc_paths;
+        paths.preserve_arc_paths = preserve;
         let mut crossing = vec![vec![]; g.vertices.len()];
         let mut roots = vec![];
         for direction in [true, false] {
@@ -67,6 +77,7 @@ impl<const D: usize> Enumeration<D> {
                 hops: 0,
                 cut_words: [0; FULL_WORDS],
                 cut_cost: 0.,
+                presence_state: cuts.and_then(|c| c.presence).and_then(|p| p.empty_state()),
             };
             for r in 0..g.resources.len() {
                 root.resources[r] = if direction {
@@ -158,7 +169,7 @@ impl<const D: usize> Enumeration<D> {
                     };
                     next.resources = q.clone();
                     if let Some(c) = &cuts {
-                        c.along_arc(&mut next, direction, arc.physical);
+                        c.along_arc(&mut next, direction, arc.physical)?;
                     }
                     let terminal = next.vertex == if direction { g.sink } else { g.source };
                     if !terminal {
@@ -202,7 +213,7 @@ impl<const D: usize> Enumeration<D> {
                                     &next,
                                     opposite_root,
                                     ((next.reduced_cost + 0.0) + 0.0) + 0.0,
-                                )
+                                )?
                             } else {
                                 c.join(
                                     g,
@@ -210,7 +221,7 @@ impl<const D: usize> Enumeration<D> {
                                     opposite_root,
                                     &next,
                                     ((0.0 + next.reduced_cost) + 0.0) + 0.0,
-                                )
+                                )?
                             };
                         }
                         // Symmetric cost joins use the forward source seed,
@@ -330,7 +341,22 @@ impl<const D: usize> Enumeration<D> {
                     let key = label_key(f);
                     for &id in &buckets[vertex][bucket] {
                         let b = &opposite.arena[id];
-                        let ordered_bound = key + label_key(b) + minimum_cut_join;
+                        let ordered_bound = if let Some(presence) =
+                            cuts.and_then(|c| c.presence).filter(|p| p.active())
+                        {
+                            presence
+                                .join_correction_lower_bound(&f.presence_state)?
+                                .and_then(|bound| {
+                                    crate::core::rounding::add_down(key, label_key(b))
+                                        .and_then(|n| {
+                                            crate::core::rounding::add_down(n, minimum_cut_join)
+                                        })
+                                        .and_then(|n| crate::core::rounding::add_down(n, bound))
+                                })
+                                .unwrap_or(f64::NEG_INFINITY)
+                        } else {
+                            key + label_key(b) + minimum_cut_join
+                        };
                         if ordered_bound > controls.cutoff - EPSILON {
                             pruning.ordered(ordered_bound);
                             break;
@@ -342,7 +368,7 @@ impl<const D: usize> Enumeration<D> {
                                 f,
                                 b,
                                 ((f.reduced_cost + b.reduced_cost) + 0.0) + 0.0,
-                            ),
+                            )?,
                             None => f.reduced_cost + b.reduced_cost,
                         };
                         if cost > controls.cutoff - EPSILON {

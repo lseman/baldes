@@ -13,11 +13,16 @@ impl<const D: usize> Enumeration<D> {
         if controls.label_limit == 0 || controls.path_limit == 0 || !controls.cutoff.is_finite() {
             return Err(invalid("invalid enumeration controls"));
         }
+        let preserve = controls.preserve_arc_paths
+            || cuts.and_then(|c| c.presence).is_some_and(|p| p.active());
         let mut labels = Storage::new(controls.partitions)?;
-        labels.preserve_arc_paths = controls.preserve_arc_paths;
-        let mut pruning = PruningFrontier::for_run(controls.preserve_arc_paths);
+        labels.preserve_arc_paths = preserve;
+        let mut pruning = PruningFrontier::for_run(preserve);
         let mut paths = PathStorage::new(controls.partitions)?;
-        paths.preserve_arc_paths = controls.preserve_arc_paths;
+        paths.preserve_arc_paths = preserve;
+        if let Some(presence) = cuts.and_then(|c| c.presence) {
+            presence.validate_engine(g.arcs.len())?;
+        }
         let started = Instant::now();
         let mut root = Label {
             id: 0,
@@ -32,6 +37,7 @@ impl<const D: usize> Enumeration<D> {
             hops: 0,
             cut_words: [0; FULL_WORDS],
             cut_cost: 0.,
+            presence_state: cuts.and_then(|c| c.presence).and_then(|p| p.empty_state()),
         };
         for r in 0..g.resources.len() {
             root.resources[r] = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower);
@@ -96,7 +102,7 @@ impl<const D: usize> Enumeration<D> {
                 };
                 next.resources = q;
                 if let Some(c) = &cuts {
-                    c.along_arc(&mut next, true, arc.physical);
+                    c.along_arc(&mut next, true, arc.physical)?;
                 }
                 if !next.add_elements(&g.vertices[next.vertex].elements) {
                     continue;
@@ -109,11 +115,12 @@ impl<const D: usize> Enumeration<D> {
                         let mut empty = next.clone();
                         empty.cut_words = [0; FULL_WORDS];
                         empty.cut_cost = 0.;
+                        empty.presence_state = c.presence.and_then(|p| p.empty_state());
                         for r in 0..g.resources.len() {
                             empty.resources[r] = g.vertices[g.sink].bounds[r].upper;
                         }
                         next.reduced_cost =
-                            c.join(g, false, &next, &empty, (next.reduced_cost + 0.0) + 0.0);
+                            c.join(g, false, &next, &empty, (next.reduced_cost + 0.0) + 0.0)?;
                     }
                     if next.reduced_cost > controls.cutoff - EPSILON {
                         pruning.terminal(next.reduced_cost);

@@ -2,6 +2,7 @@ use super::*;
 
 impl<const D: usize> LabelingEngine<D> {
     pub fn solve(&mut self, g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
+        self.cuts.presence.validate_engine(g.arcs.len())?;
         self.ensure_reversal_costs(g)?;
         if controls.max_columns == 0 || controls.max_labels == 0 {
             return Err(invalid("positive pricing limits required"));
@@ -78,15 +79,22 @@ impl<const D: usize> LabelingEngine<D> {
                     };
                     let key =
                         label.key() + self.cuts.knapsack.partial_cost(g, label.resources(), true);
+                    let key = self
+                        .ctx()
+                        .presence_completion_key(key, label.presence_state());
                     let mut work = vec![(bucket, 0usize)];
                     while let Some((k, min)) = work.pop() {
                         let row = &self.storage(self.consumption_joins).buckets[internal][k];
-                        if key + row.completion_bound(self.cuts.knapsack.active) >= cutoff {
+                        if self
+                            .ctx()
+                            .completion_sum(key, row.completion_bound(self.cuts.knapsack.active))
+                            >= cutoff
+                        {
                             continue;
                         }
                         for &b in &row.active {
                             let other = self.storage(self.consumption_joins).labels.view(b);
-                            if key + other.key() >= cutoff {
+                            if self.ctx().completion_sum(key, other.key()) >= cutoff {
                                 break;
                             }
                             concatenation_tests += 1;

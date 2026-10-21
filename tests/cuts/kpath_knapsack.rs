@@ -1246,6 +1246,15 @@ fn knapsack_root_cuts_close_fractional_capacity_gap_and_survive_snapshot() {
 
 #[test]
 fn knapsack_pricing_matches_exhaustive_routes_with_two_resources() {
+    check_knapsack_pricing_against_exhaustive_routes(false);
+}
+
+#[test]
+fn scaled_unrounded_knapsack_pricing_matches_exhaustive_routes_with_two_resources() {
+    check_knapsack_pricing_against_exhaustive_routes(true);
+}
+
+fn check_knapsack_pricing_against_exhaustive_routes(exact: bool) {
     use baldes::cuts::knapsack::{KnapsackColumn, KnapsackRow, ResourceKnapsackSeparator};
     fn visit(
         g: &Graph<2>,
@@ -1304,8 +1313,13 @@ fn knapsack_pricing_matches_exhaustive_routes_with_two_resources() {
         assert_eq!(cuts.len(), 2);
         for c in &mut cuts {
             c.dual = -rng.randint(1, 4) as f64;
+            if exact {
+                c.dual -= 0.123456789;
+                c.graph_resources.get_mut(&0).unwrap().1 = if c.row == 0 { 2. } else { 0.5 };
+            }
         }
         let mut solver = Solver::<2>::new(6, 2).unwrap();
+        solver.knapsack_exact_coefficients = exact;
         solver
             .set_option(
                 "BALDESuseBidirectionalSearch",
@@ -1353,6 +1367,18 @@ fn knapsack_pricing_matches_exhaustive_routes_with_two_resources() {
             "trial {trial}: {} != {best}",
             result.minimum_reduced_cost
         );
+        if exact {
+            let mut child = solver.fork_for_node();
+            assert!(child.knapsack_exact_coefficients);
+            let routes = child.enumerate(1000.).unwrap();
+            let enumerated_best = routes.iter().map(|r| r.cost).fold(f64::INFINITY, f64::min);
+            assert!((enumerated_best - best).abs() < 1e-9, "enumeration trial {trial}");
+            for route in routes {
+                let penalty: f64 = child.cuts.knapsack_cuts.iter()
+                    .map(|c| -c.dual * c.coefficient(0, &route.resources) as f64).sum();
+                assert!((route.cost - route.original_cost - penalty).abs() < 1e-9);
+            }
+        }
         for route in result.columns {
             let penalty: f64 = solver
                 .cuts
@@ -1497,4 +1523,38 @@ fn original_knapsack_ids_survive_pricing_and_enumeration() {
         );
         assert!(solver.enumeration.is_some());
     }
+}
+
+#[test]
+fn exact_knapsack_cache_matches_scaled_master_coefficients_and_retains_small_duals() {
+    use baldes::cuts::knapsack::{KnapsackPricing, ResourceKnapsackCut, RouteLoadKnapsackCut};
+    let mapping = BTreeMap::from([(7, 0)]);
+    let mut cut = ResourceKnapsackCut {
+        id: 0, row: 0, cut_class: 0,
+        graph_resources: BTreeMap::from([(4, (7, 2.))]), dual: -0.123456789,
+        cut: RouteLoadKnapsackCut {
+            kind: KnapsackKind::Steps, numerator: 1, denominator: 1,
+            rhs: 1, lhs: 0., violation: 0., thresholds: vec![2],
+            coefficients: BTreeMap::from([(2, 1), (4, 3)]),
+        },
+    };
+    let mut cache = KnapsackPricing::default();
+    for scale in [0.5, 1., 2., 3.] {
+        cut.graph_resources.insert(4, (7, scale));
+        for dual in [-0.123456789, -1e-12] {
+            cut.dual = dual;
+            cache.retrieve_exact(&[cut.clone()], 4, &mapping).unwrap();
+            for q in [0., 0.5, 1., 1.999999, 2., 3., 4., 8.] {
+                let expected = -dual * cut.coefficient_mapped(4, &[q], &mapping) as f64;
+                assert_eq!(cache.cost(&[q]), expected);
+            }
+        }
+    }
+    let previous = cache.clone();
+    cut.dual = 1.;
+    assert!(cache.retrieve_exact(&[cut], 4, &mapping).is_err());
+    assert_eq!(cache, previous);
+    cache.retrieve(&[], 4, &mapping).unwrap();
+    assert!(!cache.active);
+    assert_eq!(cache.cost(&[8.]), 0.);
 }

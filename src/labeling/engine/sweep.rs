@@ -121,9 +121,11 @@ impl<'a, const D: usize> Sweep<'a, D> {
                             break;
                         }
                         self.statistics.other_dominance_checks += 1;
-                        if (!BRANCHING
-                            || storage.labels.view(other).branch_state()
-                                == candidate_label.branch_state())
+                        if storage.labels.view(other).presence_state()
+                            == candidate_label.presence_state()
+                            && (!BRANCHING
+                                || storage.labels.view(other).branch_state()
+                                    == candidate_label.branch_state())
                             && LabelStorage::dominates_hot_slices(
                                 g,
                                 hot,
@@ -445,3 +447,6 @@ impl<'a, const D: usize> Sweep<'a, D> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod presence_tests;

@@ -87,6 +87,18 @@ impl<const D: usize> LabelArena<D> {
         }
     }
 
+    #[inline(always)]
+    pub(crate) fn presence_for<R: ArenaRecord<D>>(
+        &self,
+        id: usize,
+    ) -> &crate::cuts::soft_conflicts::LabelState {
+        if let Some(label) = R::get(self, id) {
+            label.presence_state()
+        } else {
+            self.view(id).presence_state()
+        }
+    }
+
     /// Borrow ordinary metadata directly in the sweep. Promotion remains safe:
     /// once an identifier needs wide storage, callers use the general view.
     #[inline(always)]

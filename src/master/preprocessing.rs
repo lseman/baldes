@@ -23,6 +23,9 @@ pub struct Report {
     pub infeasible: bool,
     pub bound_updates: usize,
     pub rows_processed: usize,
+    /// Logical budget spent: row visits for `propagate`, arithmetic work units
+    /// for conservative propagation and its network policy coordinator.
+    pub work_used: usize,
     /// False means the work budget stopped propagation; all returned bounds
     /// remain valid, but more deductions may be possible.
     pub complete: bool,
@@ -87,6 +90,7 @@ pub fn propagate(
         }
         queued[r] = false;
         report.rows_processed += 1;
+        report.work_used += 1;
         let row = &rows[r];
         let c = &constraints[r];
         // Count infinite contributions separately to avoid infinity-infinity
@@ -184,3 +188,6 @@ pub fn propagate(
     report.complete = true;
     Ok(report)
 }
+
+mod conservative;
+pub use conservative::{propagate_conservative, propagate_mixed_conservative};

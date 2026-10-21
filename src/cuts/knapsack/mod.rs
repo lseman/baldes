@@ -9,6 +9,8 @@ pub struct KnapsackParameters {
     pub use_rounding: bool,
     pub max_one_k: i32,
     pub violation_tolerance: f64,
+    /// Opt-in Fenchel separation of integer, nonnegative route-load rows.
+    pub fenchel: Option<FenchelParameters>,
 }
 
 impl Default for KnapsackParameters {
@@ -18,6 +20,7 @@ impl Default for KnapsackParameters {
             use_rounding: false,
             max_one_k: 1,
             violation_tolerance: 0.02,
+            fenchel: None,
         }
     }
 }
@@ -51,6 +54,10 @@ fn validate_parameters(parameters: &KnapsackParameters) -> Result<()> {
     if !parameters.violation_tolerance.is_finite() || parameters.violation_tolerance < 0.0 {
         return Err(invalid("knapsack violation_tolerance must be non-negative"));
     }
+    if let Some(options) = &parameters.fenchel {
+        options.validate()?;
+        if !cfg!(feature = "clp") { return Err(invalid("Fenchel separation requires the clp feature")); }
+    }
     Ok(())
 }
 
@@ -58,7 +65,11 @@ fn validate_parameters(parameters: &KnapsackParameters) -> Result<()> {
 pub enum KnapsackKind {
     Rounding,
     Steps,
+    Fenchel,
 }
+
+mod fenchel;
+pub use fenchel::{FenchelParameters, FenchelResult, FenchelSeparator, FenchelStatus};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RouteLoadKnapsackCut {

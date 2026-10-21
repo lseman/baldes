@@ -327,6 +327,9 @@ pub unsafe extern "C" fn or_rcsp_configure_arc_ng(
     })
 }
 #[no_mangle]
+/// Restrict an arc-head resource at `threshold - 1e-6` (stored threshold).
+/// `upper = 1` keeps values at or above the boundary; zero keeps values below
+/// or equal to it. Both sides include the same boundary.
 pub unsafe extern "C" fn or_rcsp_add_accumulated_resource_branch(
     p: *mut ORECSP,
     arc: i32,

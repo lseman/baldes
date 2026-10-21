@@ -118,5 +118,5 @@ python -m pip install . --config-settings=build-args="--features highs"
 
 `NetworkProblem` and `solve_networks` expose a shared master with independent
 pricing graphs, root snapshots, assignment branching, additive rows and fixed
-routes. The same model JSON is accepted by `baldes networks MODEL.json`.
-See [multi-network inputs and examples](networks.md#python).
+routes. The same model JSON is accepted by `baldes multi-pricing MODEL.json`.
+See [multi-network inputs and examples](multi-pricing.md#python).

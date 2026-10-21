@@ -287,3 +287,56 @@ fn continuation_rejects_a_different_model_without_mutation() {
     assert_eq!(previous.objective, 2.);
     assert!(previous.solved);
 }
+
+#[test]
+fn per_model_column_infinity_default_survives_clones_and_solver_switches() {
+    let mut solvers = vec![MasterSolver::Clp, MasterSolver::Ipm];
+    #[cfg(feature = "highs")]
+    solvers.push(MasterSolver::Highs);
+    for solver in solvers {
+        let mut parent = ClpMaster::new().unwrap();
+        parent.set_column_default_upper(f64::MAX).unwrap();
+        parent.set_solver(solver);
+        parent.add_row(RowSense::Equal, 1., &[]).unwrap();
+        let first = parent.add_column(1., &[(0, 1.)]).unwrap();
+        assert_eq!(parent.upper[first], f64::MAX);
+        assert!(parent.solve(), "{solver:?}");
+        let mut child = parent.try_clone().unwrap();
+        let second = child.add_column(0.5, &[(0, 1.)]).unwrap();
+        assert_eq!(child.upper[second], f64::MAX);
+        assert!(child.solve(), "{solver:?}");
+        assert!((child.objective - 0.5).abs() < 1e-7);
+        assert_eq!(parent.costs.len(), 1);
+        assert!((parent.objective - 1.).abs() < 1e-7);
+        #[cfg(feature = "highs")]
+        if solver == MasterSolver::Highs {
+            assert_eq!(
+                child.highs_backend.as_ref().unwrap().upper[second],
+                f64::MAX
+            );
+        }
+    }
+    let mut legacy = ClpMaster::new().unwrap();
+    legacy.add_column(1., &[]).unwrap();
+    assert_eq!(legacy.upper[0], 1e12);
+}
+
+#[test]
+fn tightening_a_bound_preserves_only_a_retained_optimum() {
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, 1., &[]).unwrap();
+    let cheap = master.add_column(1., &[(0, 1.)]).unwrap();
+    master.add_column(2., &[(0, 1.)]).unwrap();
+    assert!(master.solve());
+    master.set_upper(cheap, 2.).unwrap();
+    assert!(master.solved());
+    assert_eq!(master.objective, 1.);
+    master.set_upper(cheap, 0.5).unwrap();
+    assert!(!master.solved());
+    assert!(master.solve());
+    assert_eq!(master.objective, 1.5);
+    master.set_upper(cheap, 2.).unwrap();
+    assert!(!master.solved());
+    assert!(master.solve());
+    assert_eq!(master.objective, 1.);
+}
