@@ -7,6 +7,196 @@ fn command() -> Command {
 }
 
 #[test]
+fn ce_command_solves_route_lp_and_reports_limits() {
+    let file = std::env::temp_dir().join(format!("baldes-ce-cli-{}.txt", std::process::id()));
+    let json = file.with_extension("json");
+    std::fs::write(&file, "ce-cli\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 1 0 1 0 100 0\n3 1 0 1 0 100 0\n").unwrap();
+    let output = command()
+        .arg("ce")
+        .arg(&file)
+        .arg("--json")
+        .arg(&json)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+    assert_eq!(report["status"], "Converged");
+    assert_eq!(report["relaxation"], "route_lp");
+    assert!((report["lp_bound"].as_f64().unwrap() - 3.0).abs() < 1e-6);
+    assert_eq!(report["max_vehicles"], 3.0);
+    assert!(!report["routes"].as_array().unwrap().is_empty());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("lower_bound=3.000000"));
+
+    let output = command()
+        .arg("ce")
+        .arg(&file)
+        .args([
+            "--customers",
+            "2",
+            "--rounding",
+            "nearest",
+            "--unlimited-fleet",
+            "--json",
+        ])
+        .arg(&json)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+    assert_eq!(report["customers"], 2);
+    assert_eq!(report["status"], "Converged");
+    assert!(report["max_vehicles"].is_null());
+    assert!((report["lp_bound"].as_f64().unwrap() - 2.0).abs() < 1e-6);
+
+    for (flag, value, status) in [
+        ("--time", "0", "TimeLimit"),
+        ("--iterations", "0", "IterationLimit"),
+        ("--nodes", "11", "DiagramLimit"),
+    ] {
+        let output = command()
+            .arg("ce")
+            .arg(&file)
+            .args([flag, value, "--json"])
+            .arg(&json)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let report: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+        assert_eq!(report["status"], status);
+        assert!(report["lp_bound"].is_null());
+        assert!(report["routes"].as_array().unwrap().is_empty());
+    }
+    std::fs::remove_file(file).unwrap();
+    std::fs::remove_file(json).unwrap();
+}
+
+#[test]
+fn ce_help_and_option_validation() {
+    let output = command().args(["ce", "--help"]).output().unwrap();
+    assert!(output.status.success());
+    let help = String::from_utf8_lossy(&output.stdout);
+    assert!(help.contains("Usage: baldes ce INSTANCE"));
+    assert!(help.contains("--unlimited-fleet"));
+    let output = command().arg("--help").output().unwrap();
+    assert!(String::from_utf8_lossy(&output.stdout).contains("ce"));
+    for args in [
+        vec!["ce"],
+        vec!["ce", "missing", "--time"],
+        vec!["ce", "missing", "--time", "NaN"],
+        vec!["ce", "missing", "--time", "-1"],
+        vec!["ce", "missing", "--nodes", "bad"],
+        vec!["ce", "missing", "--unknown"],
+        vec!["ce", "missing", "--rounding", "bad"],
+        vec!["ce", "missing", "--log-interval", "0"],
+    ] {
+        let output = command().args(&args).output().unwrap();
+        assert!(!output.status.success(), "{args:?}");
+        assert!(!String::from_utf8_lossy(&output.stderr).contains("panicked"));
+    }
+}
+
+#[test]
+fn ce_vrptw_windows_and_progress_logging() {
+    let file = std::env::temp_dir().join(format!("baldes-ce-vrptw-{}.txt", std::process::id()));
+    let json = file.with_extension("json");
+    // Same location and simultaneous windows: service duration prevents a
+    // shared route, although the corresponding CVRP can use just one vehicle.
+    std::fs::write(&file, "ce-vrptw\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 1 1 1\n2 1 0 1 1 1 1\n").unwrap();
+    let mut expected_stdout = None;
+    for flags in [
+        vec![],
+        vec!["--log"],
+        vec!["--log-interval", "2"],
+        vec!["-v"],
+        vec!["--verbose"],
+    ] {
+        let output = command()
+            .arg("ce")
+            .arg(&file)
+            .args(&flags)
+            .arg("--json")
+            .arg(&json)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let report: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+        assert_eq!(report["status"], "Converged");
+        assert!((report["lp_bound"].as_f64().unwrap() - 4.0).abs() < 1e-6);
+        assert_eq!(report["routes"].as_array().unwrap().len(), 2);
+        // Remove nondeterministic wall time before comparing stdout.
+        let stdout = String::from_utf8_lossy(&output.stdout)
+            .split(" elapsed=")
+            .next()
+            .unwrap()
+            .to_owned();
+        if let Some(expected) = &expected_stdout {
+            assert_eq!(&stdout, expected);
+        } else {
+            expected_stdout = Some(stdout);
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if flags.is_empty() {
+            assert!(stderr.is_empty(), "{stderr}");
+        } else {
+            assert!(
+                stderr.contains("Lower bound") && stderr.contains("Infeasible"),
+                "{stderr}"
+            );
+            assert!(stderr.contains("CE finished: Converged"), "{stderr}");
+            let rows: Vec<_> = stderr
+                .lines()
+                .filter(|line| {
+                    line.split_whitespace()
+                        .next()
+                        .is_some_and(|v| v.parse::<usize>().is_ok())
+                })
+                .collect();
+            assert!(!rows.is_empty());
+            assert_eq!(
+                rows.last()
+                    .unwrap()
+                    .split_whitespace()
+                    .next()
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap(),
+                report["iterations"].as_u64().unwrap()
+            );
+        }
+    }
+    let output = command()
+        .arg("ce")
+        .arg(&file)
+        .args(["--time", "0", "--log"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("CE finished: TimeLimit"));
+    std::fs::remove_file(file).unwrap();
+    std::fs::remove_file(json).unwrap();
+}
+
+#[test]
 fn fenchel_cli_separates_and_rejects_noninteger_demands() {
     let file = std::env::temp_dir().join(format!("baldes-fenchel-cli-{}.txt", std::process::id()));
     let json = file.with_extension("json");
@@ -149,7 +339,7 @@ fn help_and_invalid_instance_types() {
     ] {
         let output = command().args(args).output().unwrap();
         assert!(output.status.success());
-        assert!(String::from_utf8_lossy(&output.stdout).contains("baldes <vrptw|cvrp|hgs>"));
+        assert!(String::from_utf8_lossy(&output.stdout).contains("baldes <vrptw|cvrp|hgs|ce>"));
     }
     for args in [
         vec![],

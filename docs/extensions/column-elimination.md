@@ -62,6 +62,33 @@ returns an error. The initial diagram has `O(n²)` nodes and `O(n³)` arcs, and
 refinement can grow exponentially. The time budget is checked between stages
 and passed to the backend; backend support determines solve interruption.
 
+Run an instance from the CLI (Solomon or CVRPLIB):
+
+```sh
+cargo run --release --features clp -- ce instances/cvrplib/P-n16-k8.vrp --customers 5 --time 60 --log --json ce.json
+baldes ce --help
+```
+
+The command respects the instance fleet size; `--unlimited-fleet` removes
+that limit. `--nodes`, `--arcs` and `--iterations` set diagram and solve
+budgets. JSON includes the last `lower_bound`, the converged `lp_bound`
+(null before convergence), status, statistics and fractional route flows.
+
+For VRPTW, pass a Solomon instance directly:
+
+```sh
+cargo run --release --features clp -- ce instances/C101.txt --customers 5 --time 60 --log
+```
+
+Time windows and service durations are enforced automatically. The command
+still solves the continuous route LP, with potentially fractional routes.
+`--log` (also `-v` or `--verbose`) writes progress every 10 iterations to
+stderr; `--log-interval N` selects a positive interval. The first and last
+solved iterations are always logged, followed by the final status, including
+limit stops. Columns show the LP lower bound, decomposed path count,
+infeasible path count, diagram size and elapsed time. Stdout retains the
+final result summary. The Rust API exposes `Options::log_interval` as well.
+
 Run the small demonstration with:
 
 ```sh
