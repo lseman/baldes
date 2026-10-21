@@ -173,3 +173,14 @@ scan applies when the model activates one or two disposable resources and
 the compiled capacity is at least two.
 This feature does not require `target-cpu=native` and does not change numerical
 comparison tolerances or certification policy.
+
+For eight-label AVX-512F dominance scans, use
+`cargo build --release --features clp,simd-avx512` (or pass the same features
+to maturin). This feature includes `simd` and requires Rust 1.89 or newer;
+the default and AVX2-only builds retain the package's existing Rust requirement.
+Runtime dispatch prefers AVX-512F on supported x86-64 CPUs, then AVX2, then
+the portable implementation. No global CPU flags are required. The AVX-512
+kernel needs only AVX-512F, including for the packed NG masks, and preserves
+first-candidate ordering and the original floating-point comparison order.
+See [SIMD dispatch and optimization targets](simd.md) for kernel measurements
+and additional vectorization opportunities.

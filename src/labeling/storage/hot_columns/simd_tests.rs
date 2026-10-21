@@ -66,6 +66,13 @@ fn compare<const P: bool, const F: bool, const R: usize, const N: bool>() {
                         let actual =
                             unsafe { c.next_candidate_avx2::<P, F, R, N>(from, a, a, b, ng) };
                         assert_eq!(actual, expected);
+                        #[cfg(feature = "simd-avx512")]
+                        if std::is_x86_feature_detected!("avx512f") {
+                            // SAFETY: CPU support checked; kernel validates lengths.
+                            let wide =
+                                unsafe { c.next_candidate_avx512::<P, F, R, N>(from, a, a, b, ng) };
+                            assert_eq!(wide, expected);
+                        }
                         assert_eq!(c.next_candidate::<P, F, R, N>(from, a, a, b, ng), expected);
                     }
                 }
@@ -101,19 +108,54 @@ fn measure_dispatch() {
                     ng: 0,
                 });
             }
-            for simd in [false, true] {
+            for backend in ["scalar", "avx2", "avx512", "dispatch"] {
+                if backend == "avx2" && !std::is_x86_feature_detected!("avx2") {
+                    continue;
+                }
+                if backend == "avx512"
+                    && (!cfg!(feature = "simd-avx512") || !std::is_x86_feature_detected!("avx512f"))
+                {
+                    continue;
+                }
                 let start = Instant::now();
                 for _ in 0..200_000 {
                     let c = black_box(&c);
-                    let result = if simd {
-                        c.next_candidate::<true, true, 2, true>(0, f64::INFINITY, 0., 0., 0)
-                    } else {
-                        c.next_candidate_scalar::<true, true, 2, true>(0, f64::INFINITY, 0., 0., 0)
+                    // SAFETY: each backend's CPU features were checked above.
+                    let result = match backend {
+                        "avx2" => unsafe {
+                            c.next_candidate_avx2::<true, true, 2, true>(
+                                0,
+                                f64::INFINITY,
+                                0.,
+                                0.,
+                                0,
+                            )
+                        },
+                        #[cfg(feature = "simd-avx512")]
+                        "avx512" => unsafe {
+                            c.next_candidate_avx512::<true, true, 2, true>(
+                                0,
+                                f64::INFINITY,
+                                0.,
+                                0.,
+                                0,
+                            )
+                        },
+                        "dispatch" => {
+                            c.next_candidate::<true, true, 2, true>(0, f64::INFINITY, 0., 0., 0)
+                        }
+                        _ => c.next_candidate_scalar::<true, true, 2, true>(
+                            0,
+                            f64::INFINITY,
+                            0.,
+                            0.,
+                            0,
+                        ),
                     };
                     black_box(result);
                 }
                 println!(
-                    "n={n} early={early} simd={simd} ns={}",
+                    "n={n} early={early} backend={backend} ns={}",
                     start.elapsed().as_nanos() / 200_000
                 );
             }
@@ -122,7 +164,7 @@ fn measure_dispatch() {
 }
 
 #[test]
-fn avx2_matches_ordered_scalar_comparisons() {
+fn simd_matches_ordered_scalar_comparisons() {
     compare::<true, true, 1, true>();
     compare::<true, true, 1, false>();
     compare::<true, true, 2, true>();

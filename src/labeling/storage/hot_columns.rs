@@ -77,6 +77,23 @@ impl<const D: usize> HotColumns<D> {
         candidate_r1: f64,
         candidate_ng: u16,
     ) -> usize {
+        #[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
+        if D >= 2
+            && self.key.len().saturating_sub(from) >= 16
+            && std::is_x86_feature_detected!("avx512f")
+        {
+            // SAFETY: runtime detection establishes AVX-512F; the kernel
+            // validates all loaded columns and uses unaligned loads.
+            return unsafe {
+                self.next_candidate_avx512::<PREFIX, FORWARD, RESOURCES, NG>(
+                    from,
+                    threshold,
+                    candidate_r0,
+                    candidate_r1,
+                    candidate_ng,
+                )
+            };
+        }
         #[cfg(all(feature = "simd", target_arch = "x86_64"))]
         if D >= 2
             && self.key.len().saturating_sub(from) >= 16
@@ -186,3 +203,6 @@ impl<const D: usize> HotColumns<D> {
 mod avx2;
 #[cfg(all(test, feature = "simd", target_arch = "x86_64"))]
 mod simd_tests;
+
+#[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
+mod avx512;
