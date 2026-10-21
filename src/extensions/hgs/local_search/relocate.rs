@@ -36,6 +36,16 @@ impl<'p> HGSLocalSearch<'p> {
                 return false;
             }
 
+            // Time-window penalties are nonnegative. Reject using distance and
+            // capacity alone before merging any candidate time-window segments.
+            let load_pen_u = self.penalty_excess_load(self.routes[r_u].load - load_u);
+            let load_pen_v = self.penalty_excess_load(self.routes[r_v].load + load_u);
+            let lower_bound = (cost_supp_u + (load_pen_u - self.routes[r_u].penalty))
+                + (cost_supp_v + (load_pen_v - self.routes[r_v].penalty));
+            if lower_bound > MY_EPSILON {
+                return false;
+            }
+
             let route_u_tw = TimeWindowData::merge(
                 &self.nodes[u_prev].prefix_tw_data,
                 &self.nodes[x].postfix_tw_data,
@@ -49,12 +59,10 @@ impl<'p> HGSLocalSearch<'p> {
             let route_v_tw =
                 TimeWindowData::merge(&v_prefix_u, &self.nodes[y].postfix_tw_data, self.params);
 
-            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load - load_u)
-                + self.penalty_time_windows(&route_u_tw)
-                - self.routes[r_u].penalty;
-            cost_supp_v += self.penalty_excess_load(self.routes[r_v].load + load_u)
-                + self.penalty_time_windows(&route_v_tw)
-                - self.routes[r_v].penalty;
+            cost_supp_u +=
+                load_pen_u + self.penalty_time_windows(&route_u_tw) - self.routes[r_u].penalty;
+            cost_supp_v +=
+                load_pen_v + self.penalty_time_windows(&route_v_tw) - self.routes[r_v].penalty;
         } else {
             if !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
                 return false;
@@ -137,6 +145,16 @@ impl<'p> HGSLocalSearch<'p> {
                 return false;
             }
 
+            // Time-window penalties are nonnegative. Reject using distance and
+            // capacity alone before merging any candidate time-window segments.
+            let load_pen_u = self.penalty_excess_load(self.routes[r_u].load - load_ux);
+            let load_pen_v = self.penalty_excess_load(self.routes[r_v].load + load_ux);
+            let lower_bound = (cost_supp_u + (load_pen_u - self.routes[r_u].penalty))
+                + (cost_supp_v + (load_pen_v - self.routes[r_v].penalty));
+            if lower_bound > MY_EPSILON {
+                return false;
+            }
+
             let route_u_tw = TimeWindowData::merge(
                 &self.nodes[u_prev].prefix_tw_data,
                 &self.nodes[x_next].postfix_tw_data,
@@ -148,12 +166,10 @@ impl<'p> HGSLocalSearch<'p> {
             let route_v_tw =
                 TimeWindowData::merge(&v_ux, &self.nodes[y].postfix_tw_data, self.params);
 
-            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load - load_ux)
-                + self.penalty_time_windows(&route_u_tw)
-                - self.routes[r_u].penalty;
-            cost_supp_v += self.penalty_excess_load(self.routes[r_v].load + load_ux)
-                + self.penalty_time_windows(&route_v_tw)
-                - self.routes[r_v].penalty;
+            cost_supp_u +=
+                load_pen_u + self.penalty_time_windows(&route_u_tw) - self.routes[r_u].penalty;
+            cost_supp_v +=
+                load_pen_v + self.penalty_time_windows(&route_v_tw) - self.routes[r_v].penalty;
         } else {
             if !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
                 return false;
@@ -237,6 +253,16 @@ impl<'p> HGSLocalSearch<'p> {
                 return false;
             }
 
+            // Time-window penalties are nonnegative. Reject using distance and
+            // capacity alone before merging any candidate time-window segments.
+            let load_pen_u = self.penalty_excess_load(self.routes[r_u].load - load_ux);
+            let load_pen_v = self.penalty_excess_load(self.routes[r_v].load + load_ux);
+            let lower_bound = (cost_supp_u + (load_pen_u - self.routes[r_u].penalty))
+                + (cost_supp_v + (load_pen_v - self.routes[r_v].penalty));
+            if lower_bound > MY_EPSILON {
+                return false;
+            }
+
             let route_u_tw = TimeWindowData::merge(
                 &self.nodes[u_prev].prefix_tw_data,
                 &self.nodes[x_next].postfix_tw_data,
@@ -248,12 +274,10 @@ impl<'p> HGSLocalSearch<'p> {
             let route_v_tw =
                 TimeWindowData::merge(&v_xu, &self.nodes[y].postfix_tw_data, self.params);
 
-            cost_supp_u += self.penalty_excess_load(self.routes[r_u].load - load_ux)
-                + self.penalty_time_windows(&route_u_tw)
-                - self.routes[r_u].penalty;
-            cost_supp_v += self.penalty_excess_load(self.routes[r_v].load + load_ux)
-                + self.penalty_time_windows(&route_v_tw)
-                - self.routes[r_v].penalty;
+            cost_supp_u +=
+                load_pen_u + self.penalty_time_windows(&route_u_tw) - self.routes[r_u].penalty;
+            cost_supp_v +=
+                load_pen_v + self.penalty_time_windows(&route_v_tw) - self.routes[r_v].penalty;
         } else {
             if !route_u_tw_pen && cost_supp_u + cost_supp_v > -MY_EPSILON {
                 return false;

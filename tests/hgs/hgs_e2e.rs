@@ -45,3 +45,22 @@ fn hgs_is_deterministic_without_time_limit() {
     assert_eq!(first.routes, second.routes);
     assert_eq!(first.generations, second.generations);
 }
+
+#[test]
+fn hgs_fixed_work_preserves_search_results() {
+    // Baselines captured before adding distance/capacity bounds to local search.
+    // Fixed work catches pruning that changes the search trajectory, even when
+    // the resulting solution remains feasible or has a similar objective.
+    for (name, seed, generations, expected_cost) in [
+        ("C201", 0, 300, 591.5565566715014),
+        ("R201", 0, 1013, 1147.803772621077),
+        ("R201", 2, 943, 1148.165514469302),
+    ] {
+        let instance = Instance::read(format!("{}/instances/{name}.txt", env!("CARGO_MANIFEST_DIR"))).unwrap();
+        let options = HgsOptions { time_limit: 0.0, nb_iter: 300, seed, ..Default::default() };
+        let result = run_hgs(&instance, &options).unwrap();
+        assert_feasible(&instance, &result.routes);
+        assert_eq!(result.generations, generations, "{name}, seed {seed}");
+        assert!((result.best_cost.unwrap() - expected_cost).abs() < 1e-8, "{name}, seed {seed}");
+    }
+}
