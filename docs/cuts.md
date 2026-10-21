@@ -128,7 +128,7 @@ in pricing and enumeration, including child solvers and integer transfer.
 Defaults limit separation to 128 load types, 128 LP iterations, and two seconds
 per separation call. A limit or failure to find a representable violated cut
 does not certify membership in the integer hull. Separation is opt-in and
-requires `clp`. See the [port comparison and native execution limitation](../internal/docs/fenchel-port-comparison-20261020.md).
+requires `clp`.
 
 ## Configuration boundaries
 
