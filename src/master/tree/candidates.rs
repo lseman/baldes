@@ -1,5 +1,6 @@
 //! Fractional candidates of the native routing branch families.
 use super::*;
+pub(crate) mod resource_groups;
 
 #[derive(Clone, Debug)]
 pub struct BranchCandidate {
@@ -69,7 +70,7 @@ pub fn candidates_with_history<const D: usize>(
         vec![]
     };
     if options.accumulated_resource {
-        candidates.extend(resource_candidates(problem, &routes, history));
+        candidates.extend(resource_groups::candidates(problem, &routes, history));
     }
     let aggregate_candidates = !candidates.is_empty();
 
@@ -177,138 +178,4 @@ pub fn candidates_with_history<const D: usize>(
     }
     order(&mut candidates);
     candidates
-}
-
-/// Split the observed head-resource schedules of an arc with unit LP flow.
-/// Fractional arc flows remain handled by the ordinary arc-flow fallback.
-fn resource_candidates<const D: usize>(
-    problem: &RootProblem<D>,
-    routes: &[(&crate::Route, f64)],
-    history: &[BranchConstraint],
-) -> Vec<BranchCandidate> {
-    use crate::pricing::restrictions::AccumulatedResourceBranch;
-    let mut observations = BTreeMap::<(usize, usize), Vec<(f64, f64)>>::new();
-    for &(route, value) in routes {
-        for (i, &id) in route.arcs.iter().enumerate() {
-            let Some(arc) = problem.arc_position(id) else {
-                continue;
-            };
-            for resource in 0..problem.graph.resources.len() {
-                if let Some(&q) = route
-                    .resource_profile
-                    .get(i + 1)
-                    .and_then(|q| q.get(resource))
-                {
-                    if q.is_finite() {
-                        observations
-                            .entry((arc, resource))
-                            .or_default()
-                            .push((q, value));
-                    }
-                }
-            }
-        }
-    }
-    let mut candidates = vec![];
-    for ((arc, resource), mut samples) in observations {
-        if (samples.iter().map(|x| x.1).sum::<f64>() - 1.).abs() > 1e-6 {
-            continue;
-        }
-        samples.sort_by(|a, b| a.0.total_cmp(&b.0));
-        let (low, high) = (samples.first().unwrap().0, samples.last().unwrap().0);
-        // Encode the intended midpoint in the stored-threshold convention.
-        // Check the decoded boundary too: adding/subtracting the offset can
-        // round to an observed endpoint for very narrow resource intervals.
-        let threshold = low * 0.5 + high * 0.5 + AccumulatedResourceBranch::THRESHOLD_OFFSET;
-        let up = AccumulatedResourceBranch {
-            arc: problem.graph.arcs[arc].id,
-            resource,
-            threshold,
-            upper: true,
-        };
-        let boundary = up.boundary();
-        if !threshold.is_finite() || boundary <= low || boundary >= high {
-            continue;
-        }
-        if history.iter().any(|c| {
-            matches!(c, BranchConstraint::AccumulatedResource(b)
-            if b.arc == up.arc && b.resource == resource && b.boundary() == boundary)
-        }) {
-            continue;
-        }
-        let down = AccumulatedResourceBranch { upper: false, ..up };
-        if !matches!(up.window(&problem.graph), Ok(Some(_)))
-            || !matches!(down.window(&problem.graph), Ok(Some(_)))
-        {
-            continue;
-        }
-        let value: f64 = samples.iter().filter(|x| x.0 > boundary).map(|x| x.1).sum();
-        if value > 1e-6 && value < 1. - 1e-6 {
-            candidates.push(BranchCandidate {
-                down: BranchConstraint::AccumulatedResource(down),
-                up: BranchConstraint::AccumulatedResource(up),
-                value,
-            });
-        }
-    }
-    candidates
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::pricing::{restrictions::AccumulatedResourceBranch, Solver};
-
-    #[test]
-    fn resource_midpoints_decode_inside_the_observed_interval() {
-        let mut s = Solver::<5>::new(3, 5).unwrap();
-        for v in 0..3 {
-            for r in 0..5 {
-                s.graph.set_bounds(v, r, 0., 3.).unwrap();
-            }
-        }
-        let arc = s.graph.add_arc(0, 1, 0.).unwrap();
-        let end = s.graph.add_arc(1, 2, 0.).unwrap();
-        let problem = RootProblem::set_partitioning(s.graph, 1.).unwrap();
-        let route = |q| {
-            let mut head = vec![0.; 5];
-            head[4] = q;
-            Route {
-                nodes: vec![0, 1, 2],
-                arcs: vec![arc, end],
-                cost: 0.,
-                original_cost: 0.,
-                resources: vec![3.; 5],
-                resource_profile: vec![vec![0.; 5], head, vec![3.; 5]],
-            }
-        };
-        let low = route(1. - 0.5e-6);
-        let high = route(1. + 0.5e-6);
-        let observations = [(&low, 0.25), (&high, 0.75)];
-        let candidates = resource_candidates(&problem, &observations, &[]);
-        assert_eq!(candidates.len(), 1);
-        let BranchConstraint::AccumulatedResource(up) = candidates[0].up else {
-            panic!()
-        };
-        let BranchConstraint::AccumulatedResource(down) = candidates[0].down else {
-            panic!()
-        };
-        assert_eq!(up.resource, 4);
-        assert_eq!(
-            up.threshold,
-            1. + AccumulatedResourceBranch::THRESHOLD_OFFSET
-        );
-        assert_eq!(up.boundary(), down.boundary());
-        assert!(!up.satisfied_by(low.resource_profile[1][4]));
-        assert!(!down.satisfied_by(high.resource_profile[1][4]));
-        assert_eq!(candidates[0].value, 0.75);
-        for previous in [candidates[0].down.clone(), candidates[0].up.clone()] {
-            assert!(resource_candidates(&problem, &observations, &[previous]).is_empty());
-        }
-        // At this scale the offset loses the midpoint during round-trip
-        // conversion. Skip a degenerate split instead of proposing it forever.
-        let low = route(0.);
-        let high = route(1e-30);
-        assert!(resource_candidates(&problem, &[(&low, 0.5), (&high, 0.5)], &[]).is_empty());
-    }
 }

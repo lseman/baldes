@@ -196,3 +196,88 @@ fn enumeration_reporting_is_shared_with_python_and_partial_transfer_falls_back()
         assert_eq!(mip["enumerated_mip_calls"], 1);
     }
 }
+
+#[cfg(feature = "highs")]
+#[test]
+fn cutoff_pool_is_explicit_and_cannot_claim_original_infeasibility() {
+    let tree = solve(&[
+        "--tree",
+        "--enumerated-mip",
+        "--mip-cutoff",
+        "1.75",
+        "--enumeration-route-limit",
+        "3",
+        "--nodes",
+        "1",
+        "--no-stabilization",
+    ]);
+    assert_eq!(tree["status"], "NodeLimit");
+    assert!(tree["incumbent"].is_null());
+    assert!(tree["open_nodes"].as_u64().unwrap() > 0);
+    assert_eq!(tree["enumerated_mip_calls"], 1);
+    assert!(tree["enumeration_reports"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|r| r["complete"] == true && r["coverage_cutoff"] == 1.75));
+    for flags in [
+        vec!["--mip-cutoff", "3"],
+        vec!["--tree", "--enumerated-mip", "--mip-cutoff", "NaN"],
+    ] {
+        assert!(!command()
+            .arg("multi-pricing")
+            .arg(fixture())
+            .args(flags)
+            .output()
+            .unwrap()
+            .status
+            .success());
+    }
+}
+
+#[test]
+fn resource_group_files_restrict_both_pricing_networks_and_tree_descendants() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    for tree in [false, true] {
+        for enumerate in [false, true] {
+            let mut command = command();
+            command
+                .arg("multi-pricing")
+                .arg(root.join("examples/networks/resource_groups.json"))
+                .arg("--resource-branches")
+                .arg(root.join("examples/networks/resource_group_upper.json"))
+                .args([
+                    "--bound-mode",
+                    "certified",
+                    "--no-stabilization",
+                    "--json",
+                    "-",
+                ]);
+            if tree {
+                command.arg("--tree");
+            }
+            if enumerate {
+                command.arg("--enumerate");
+            }
+            let output = command.output().unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(result["status"], "Optimal");
+            assert_eq!(result["bound"], 4.);
+            assert_eq!(result[if tree { "incumbent" } else { "lp" }], 4.);
+            for route in result["routes"].as_array().unwrap() {
+                if route["value"].as_f64().unwrap() <= 1e-6 {
+                    continue;
+                }
+                let arcs = route["arcs"].as_array().unwrap();
+                if arcs.contains(&json!(0)) || arcs.contains(&json!(2)) {
+                    assert!(route["resource_profile"][1][0].as_f64().unwrap() >= 1.5 - 1e-6);
+                }
+            }
+        }
+    }
+}

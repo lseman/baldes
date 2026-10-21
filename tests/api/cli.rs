@@ -12,17 +12,63 @@ fn fenchel_cli_separates_and_rejects_noninteger_demands() {
     let json = file.with_extension("json");
     let text = "fenchel-cli\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n";
     std::fs::write(&file, text).unwrap();
-    let output = command().arg("cvrp").arg(&file).args(["--fenchel-cuts", "--json"]).arg(&json).output().unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    let report: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+    let output = command()
+        .arg("cvrp")
+        .arg(&file)
+        .args(["--fenchel-cuts", "--log", "--json"])
+        .arg(&json)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
     assert_eq!(report["status"], "Optimal");
     assert!(report["cuts"].as_u64().unwrap() > 0);
-    assert!((report["bound"].as_f64().unwrap()-(4.0+2.0_f64.sqrt())).abs() < 1e-7);
+    let log = String::from_utf8_lossy(&output.stderr);
+    let header = log.lines().find(|line| line.contains("RMP obj")).unwrap();
+    assert!(header.contains("Fenchel"), "{log}");
+    assert!(
+        !header.contains("Knapsack") && !header.contains("Rank1") && !header.contains("Capacity"),
+        "{log}"
+    );
+    let last = log
+        .lines()
+        .filter(|line| {
+            line.split_whitespace()
+                .next()
+                .and_then(|s| s.parse::<usize>().ok())
+                .is_some()
+        })
+        .last()
+        .unwrap();
+    let fields: Vec<_> = last.split_whitespace().collect();
+    assert_eq!(
+        fields[8].parse::<u64>().unwrap(),
+        report["cuts"].as_u64().unwrap(),
+        "{log}"
+    );
+    assert!((report["bound"].as_f64().unwrap() - (4.0 + 2.0_f64.sqrt())).abs() < 1e-7);
     std::fs::write(&file, text.replace("1 1 0 1 0", "1 1 0 0.5 0")).unwrap();
-    let output = command().arg("cvrp").arg(&file).arg("--fenchel-cuts").output().unwrap();
+    let output = command()
+        .arg("cvrp")
+        .arg(&file)
+        .arg("--fenchel-cuts")
+        .output()
+        .unwrap();
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("integer demands"));
-    assert!(!command().arg("hgs").arg(&file).arg("--fenchel-cuts").output().unwrap().status.success());
+    assert!(!command()
+        .arg("hgs")
+        .arg(&file)
+        .arg("--fenchel-cuts")
+        .output()
+        .unwrap()
+        .status
+        .success());
     std::fs::remove_file(file).unwrap();
     std::fs::remove_file(json).unwrap();
 }
@@ -32,24 +78,64 @@ fn pstep_parallel_command_and_validation() {
     let output = command().args(["pstep", "--help"]).output().unwrap();
     assert!(output.status.success());
     assert!(String::from_utf8_lossy(&output.stdout).contains("--threads"));
-    let instance = concat!(env!("CARGO_MANIFEST_DIR"), "/instances/cvrplib/P-n16-k8.vrp");
+    let instance = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/instances/cvrplib/P-n16-k8.vrp"
+    );
     let json = std::env::temp_dir().join(format!("baldes-pstep-cli-{}.json", std::process::id()));
-    let output = command().args(["pstep", instance, "--p", "2", "--threads", "3", "--enumerate", "--json"])
-        .arg(&json).output().unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    let report: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+    let output = command()
+        .args([
+            "pstep",
+            instance,
+            "--p",
+            "2",
+            "--threads",
+            "3",
+            "--enumerate",
+            "--json",
+        ])
+        .arg(&json)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
     assert_eq!(report["status"], "Converged");
     assert_eq!(report["pricing_workers"], 3);
-    assert!((report["lp_bound"].as_f64().unwrap() - report["enumerated_bound"].as_f64().unwrap()).abs() < 1e-6);
+    assert!(
+        (report["lp_bound"].as_f64().unwrap() - report["enumerated_bound"].as_f64().unwrap()).abs()
+            < 1e-6
+    );
     std::fs::remove_file(&json).unwrap();
-    let output = command().args(["pstep", instance, "--iterations", "0", "--json"]).arg(&json).output().unwrap();
+    let output = command()
+        .args(["pstep", instance, "--iterations", "0", "--json"])
+        .arg(&json)
+        .output()
+        .unwrap();
     assert!(output.status.success());
-    let report: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+    let report: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
     assert_eq!(report["status"], "IterationLimit");
     assert!(report["lp_bound"].is_null());
     std::fs::remove_file(&json).unwrap();
-    for flags in [vec!["--threads", "0"], vec!["--p", "0"], vec!["--time", "-1"], vec!["--p"], vec!["--unknown"]] {
-        assert!(!command().args(["pstep", instance]).args(flags).output().unwrap().status.success());
+    for flags in [
+        vec!["--threads", "0"],
+        vec!["--p", "0"],
+        vec!["--time", "-1"],
+        vec!["--p"],
+        vec!["--unknown"],
+    ] {
+        assert!(!command()
+            .args(["pstep", instance])
+            .args(flags)
+            .output()
+            .unwrap()
+            .status
+            .success());
     }
 }
 
@@ -65,7 +151,13 @@ fn help_and_invalid_instance_types() {
         assert!(output.status.success());
         assert!(String::from_utf8_lossy(&output.stdout).contains("baldes <vrptw|cvrp|hgs>"));
     }
-    for args in [vec![], vec!["evrp"], vec!["vrptw"], vec!["cvrp"], vec!["hgs"]] {
+    for args in [
+        vec![],
+        vec!["evrp"],
+        vec!["vrptw"],
+        vec!["cvrp"],
+        vec!["hgs"],
+    ] {
         let output = command().args(args).output().unwrap();
         assert!(!output.status.success());
         assert!(String::from_utf8_lossy(&output.stderr).contains("Usage:"));
@@ -170,35 +262,106 @@ fn hgs_respects_time_windows() {
         "tiny\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 1.1 0\n2 0 1 1 0 1.1 0\n",
     )
     .unwrap();
-    let output = command().arg("hgs").arg(&path).args(["--time", "0.2"]).output().unwrap();
+    let output = command()
+        .arg("hgs")
+        .arg(&path)
+        .args(["--time", "0.2"])
+        .output()
+        .unwrap();
     std::fs::remove_file(path).unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("status=Found cost=4.00"), "{stdout}");
 }
 
 #[test]
 fn tree_and_kohl_controls_reach_integer_solve_and_reject_cvrp_time_resource() {
-    let output = command().args(["vrptw", "instances/R101.txt", "--customers", "10",
-        "--tree", "--two-path-cuts", "--time", "10"]).output().unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let output = command()
+        .args([
+            "vrptw",
+            "instances/R101.txt",
+            "--customers",
+            "10",
+            "--tree",
+            "--two-path-cuts",
+            "--time",
+            "10",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("status=Optimal incumbent=269.533140900"), "{stdout}");
-    let output = command().args(["cvrp", "instances/R101.txt", "--two-path-cuts"]).output().unwrap();
+    assert!(
+        stdout.contains("status=Optimal incumbent=269.533140900"),
+        "{stdout}"
+    );
+    let output = command()
+        .args(["cvrp", "instances/R101.txt", "--two-path-cuts"])
+        .output()
+        .unwrap();
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("require vrptw time windows"));
 }
 
 #[test]
 fn tree_branching_mode_is_explicit_and_validated() {
-    let path=std::env::temp_dir().join(format!("baldes-branching-cli-{}.txt",std::process::id()));
+    let path =
+        std::env::temp_dir().join(format!("baldes-branching-cli-{}.txt", std::process::id()));
     std::fs::write(&path,"triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
-    for mode in ["native","vehicles","ryan-foster","arc","cluster","resource","hybrid"] {
-        let output=command().arg("vrptw").arg(&path).args(["--tree","--branching",mode,"--no-stabilization"]).output().unwrap();
-        assert!(output.status.success(),"{mode}: {}",String::from_utf8_lossy(&output.stderr));
+    for mode in [
+        "native",
+        "vehicles",
+        "ryan-foster",
+        "arc",
+        "cluster",
+        "resource",
+        "hybrid",
+    ] {
+        let output = command()
+            .arg("vrptw")
+            .arg(&path)
+            .args(["--tree", "--branching", mode, "--no-stabilization"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{mode}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         assert!(String::from_utf8_lossy(&output.stdout).contains("Optimal"));
     }
-    let output=command().arg("vrptw").arg(&path).args(["--tree","--branching","invalid"]).output().unwrap();
+    let json = path.with_extension("no-history.json");
+    let output = command()
+        .arg("vrptw")
+        .arg(&path)
+        .args(["--tree", "--no-branch-history", "--json"])
+        .arg(&json)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+    assert!(report["branch_evaluations"].as_array().unwrap().is_empty());
+    assert_eq!(report["branch_history_ranked"], 0);
+    std::fs::remove_file(json).unwrap();
+    let output = command()
+        .arg("vrptw")
+        .arg(&path)
+        .args(["--tree", "--branching", "invalid"])
+        .output()
+        .unwrap();
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("unknown branching mode"));
     std::fs::remove_file(path).unwrap();
@@ -206,20 +369,47 @@ fn tree_branching_mode_is_explicit_and_validated() {
 
 #[test]
 fn enumerated_mip_flag_requires_tree_and_uses_the_available_backend() {
-    let path=std::env::temp_dir().join(format!("baldes-enumerated-mip-{}.txt",std::process::id()));
+    let path =
+        std::env::temp_dir().join(format!("baldes-enumerated-mip-{}.txt", std::process::id()));
     std::fs::write(&path,"triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
-    let invalid=command().arg("vrptw").arg(&path).arg("--enumerated-mip").output().unwrap();
-    assert!(!invalid.status.success());assert!(String::from_utf8_lossy(&invalid.stderr).contains("requires --tree"));
-    let json=path.with_extension("json");
+    let invalid = command()
+        .arg("vrptw")
+        .arg(&path)
+        .arg("--enumerated-mip")
+        .output()
+        .unwrap();
+    assert!(!invalid.status.success());
+    assert!(String::from_utf8_lossy(&invalid.stderr).contains("requires --tree"));
+    let json = path.with_extension("json");
     // A finite witness from the heuristic triggers automatic enumeration.
-    let result=command().arg("vrptw").arg(&path).args(["--tree","--enumerated-mip","--no-strong-branching","--no-diving","--no-stabilization","--json"]).arg(&json).output().unwrap();
-    if cfg!(feature="highs") {
-        assert!(result.status.success(),"{}",String::from_utf8_lossy(&result.stderr));
-        assert!(std::fs::read_to_string(&json).unwrap().contains("\"enumerated_mip_calls\":1"));
+    let result = command()
+        .arg("vrptw")
+        .arg(&path)
+        .args([
+            "--tree",
+            "--enumerated-mip",
+            "--no-strong-branching",
+            "--no-diving",
+            "--no-stabilization",
+            "--json",
+        ])
+        .arg(&json)
+        .output()
+        .unwrap();
+    if cfg!(feature = "highs") {
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        assert!(std::fs::read_to_string(&json)
+            .unwrap()
+            .contains("\"enumerated_mip_calls\":1"));
     } else {
-        assert!(!result.status.success());assert!(String::from_utf8_lossy(&result.stderr).contains("requires the highs feature"));
+        assert!(!result.status.success());
+        assert!(String::from_utf8_lossy(&result.stderr).contains("requires the highs feature"));
     }
-    let _=std::fs::remove_file(json);
+    let _ = std::fs::remove_file(json);
     std::fs::remove_file(path).unwrap();
 }
 
@@ -227,110 +417,251 @@ fn enumerated_mip_flag_requires_tree_and_uses_the_available_backend() {
 fn canonical_and_legacy_option_names_reach_the_same_root_and_tree_controls() {
     for prefix in ["BALDES", "RCSP"] {
         for tree in [false, true] {
-            let mut args = vec!["vrptw".to_owned(), "instances/R101.txt".to_owned(),
-                "--customers".to_owned(), "4".to_owned(), "--time".to_owned(), "10".to_owned(),
-                "--option".to_owned(), format!("{prefix}labelDominanceStrategy=1"),
-                "--option".to_owned(), format!("{prefix}hardTimeThresholdInPricing=1")];
-            if tree { args.push("--tree".to_owned()); }
+            let mut args = vec![
+                "vrptw".to_owned(),
+                "instances/R101.txt".to_owned(),
+                "--customers".to_owned(),
+                "4".to_owned(),
+                "--time".to_owned(),
+                "10".to_owned(),
+                "--option".to_owned(),
+                format!("{prefix}labelDominanceStrategy=1"),
+                "--option".to_owned(),
+                format!("{prefix}hardTimeThresholdInPricing=1"),
+            ];
+            if tree {
+                args.push("--tree".to_owned());
+            }
             let output = command().args(&args).output().unwrap();
-            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
             assert!(String::from_utf8_lossy(&output.stdout).contains("status=Optimal"));
-            args.extend(["--option".to_owned(), format!("{prefix}labelDominanceStrategy=2")]);
+            args.extend([
+                "--option".to_owned(),
+                format!("{prefix}labelDominanceStrategy=2"),
+            ]);
             let invalid = command().args(&args).output().unwrap();
             assert!(!invalid.status.success());
-            assert!(String::from_utf8_lossy(&invalid.stderr).contains("unsupported label dominance strategy"));
+            assert!(String::from_utf8_lossy(&invalid.stderr)
+                .contains("unsupported label dominance strategy"));
         }
     }
 }
 
 #[test]
 fn hgs_warm_start_and_ipm_flags_reach_the_routing_master() {
-    let path = std::env::temp_dir().join(format!("baldes-ipm-hgs-{}.txt",std::process::id()));
+    let path = std::env::temp_dir().join(format!("baldes-ipm-hgs-{}.txt", std::process::id()));
     std::fs::write(&path,"tiny\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n").unwrap();
     for columns in ["best", "all", "1"] {
-        let output = command().arg("vrptw").arg(&path)
-            .args(["--master","ipm","--hgs-time","0.03","--hgs-columns",columns,"--no-enumeration","--time","5"])
-            .output().unwrap();
-        assert!(output.status.success(),"{}",String::from_utf8_lossy(&output.stderr));
-        let stdout=String::from_utf8_lossy(&output.stdout);
-        let lp: f64=stdout.split_whitespace().find_map(|w|w.strip_prefix("lp=")).unwrap().parse().unwrap();
-        assert!((lp-(2.+2_f64.sqrt())).abs()<1e-6,"{stdout}");
+        let output = command()
+            .arg("vrptw")
+            .arg(&path)
+            .args([
+                "--master",
+                "ipm",
+                "--hgs-time",
+                "0.03",
+                "--hgs-columns",
+                columns,
+                "--no-enumeration",
+                "--time",
+                "5",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let lp: f64 = stdout
+            .split_whitespace()
+            .find_map(|w| w.strip_prefix("lp="))
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!((lp - (2. + 2_f64.sqrt())).abs() < 1e-6, "{stdout}");
         assert!(String::from_utf8_lossy(&output.stderr).contains("HGS seed: columns="));
     }
-    for flags in [vec!["--master","wrong"],vec!["--hgs-columns","wrong"],vec!["--hgs-columns","0"],vec!["--hgs-time","0"],vec!["--hgs-time","NaN"]] {
-        assert!(!command().arg("vrptw").arg(&path).args(flags).output().unwrap().status.success());
+    for flags in [
+        vec!["--master", "wrong"],
+        vec!["--hgs-columns", "wrong"],
+        vec!["--hgs-columns", "0"],
+        vec!["--hgs-time", "0"],
+        vec!["--hgs-time", "NaN"],
+    ] {
+        assert!(!command()
+            .arg("vrptw")
+            .arg(&path)
+            .args(flags)
+            .output()
+            .unwrap()
+            .status
+            .success());
     }
     std::fs::remove_file(path).unwrap();
 }
 
 #[test]
 fn cg_progress_is_opt_in_periodic_and_separate_from_results() {
-    let base = ["vrptw", "instances/R101.txt", "--customers", "5", "--no-enumeration", "--no-stabilization", "--time", "5"];
+    let base = [
+        "vrptw",
+        "instances/R101.txt",
+        "--customers",
+        "5",
+        "--no-enumeration",
+        "--no-stabilization",
+        "--time",
+        "5",
+    ];
     let quiet = command().args(base).output().unwrap();
     assert!(quiet.status.success());
     assert!(!String::from_utf8_lossy(&quiet.stderr).contains("COLUMN GENERATION"));
-    let logged = command().args(base).args(["--log-interval","2"]).output().unwrap();
-    assert!(logged.status.success(),"{}",String::from_utf8_lossy(&logged.stderr));
+    let logged = command()
+        .args(base)
+        .args(["--log-interval", "2"])
+        .output()
+        .unwrap();
+    assert!(
+        logged.status.success(),
+        "{}",
+        String::from_utf8_lossy(&logged.stderr)
+    );
     let log = String::from_utf8_lossy(&logged.stderr);
     assert!(log.contains("BALDES | COLUMN GENERATION"));
     assert!(log.contains("RMP obj") && log.contains("Lower bound") && log.contains("CG Optimal"));
     assert!(!String::from_utf8_lossy(&logged.stdout).contains("COLUMN GENERATION"));
-    let iterations: Vec<usize> = log.lines().filter_map(|line|line.split_whitespace().next()?.parse().ok()).collect();
-    assert!(iterations.len() >= 3,"{log}");
-    assert_eq!(iterations[0],1);
-    assert!(iterations[1..iterations.len()-1].iter().all(|n|n%2==0),"{log}");
-    let lp = |bytes: &[u8]| String::from_utf8_lossy(bytes).split_whitespace()
-        .find_map(|s|s.strip_prefix("lp=")).unwrap().parse::<f64>().unwrap();
-    assert_eq!(lp(&logged.stdout),lp(&quiet.stdout));
+    let iterations: Vec<usize> = log
+        .lines()
+        .filter_map(|line| line.split_whitespace().next()?.parse().ok())
+        .collect();
+    assert!(iterations.len() >= 3, "{log}");
+    assert_eq!(iterations[0], 1);
+    assert!(
+        iterations[1..iterations.len() - 1]
+            .iter()
+            .all(|n| n % 2 == 0),
+        "{log}"
+    );
+    let lp = |bytes: &[u8]| {
+        String::from_utf8_lossy(bytes)
+            .split_whitespace()
+            .find_map(|s| s.strip_prefix("lp="))
+            .unwrap()
+            .parse::<f64>()
+            .unwrap()
+    };
+    assert_eq!(lp(&logged.stdout), lp(&quiet.stdout));
     for alias in ["--verbose", "--log", "-v"] {
         let output = command().args(base).arg(alias).output().unwrap();
         assert!(output.status.success());
         assert!(String::from_utf8_lossy(&output.stderr).contains("COLUMN GENERATION"));
     }
-    assert!(!command().args(base).args(["--log-interval","0"]).output().unwrap().status.success());
+    assert!(!command()
+        .args(base)
+        .args(["--log-interval", "0"])
+        .output()
+        .unwrap()
+        .status
+        .success());
 }
 
 #[test]
 fn highs_master_selection_respects_the_build_features() {
-    let result=command().args(["vrptw","instances/R101.txt","--customers","5","--master","highs","--no-enumeration","--time","5","--log"]).output().unwrap();
-    let stderr=String::from_utf8_lossy(&result.stderr);
-    if cfg!(feature="highs") {
-        assert!(result.status.success(),"{stderr}");
-        assert!(stderr.contains("Master: Highs"),"{stderr}");
+    let result = command()
+        .args([
+            "vrptw",
+            "instances/R101.txt",
+            "--customers",
+            "5",
+            "--master",
+            "highs",
+            "--no-enumeration",
+            "--time",
+            "5",
+            "--log",
+        ])
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    if cfg!(feature = "highs") {
+        assert!(result.status.success(), "{stderr}");
+        assert!(stderr.contains("Master: Highs"), "{stderr}");
         assert!(String::from_utf8_lossy(&result.stdout).contains("status=Optimal"));
     } else {
         assert!(!result.status.success());
-        assert!(stderr.contains("highs build feature"),"{stderr}");
+        assert!(stderr.contains("highs build feature"), "{stderr}");
     }
 }
 
 #[test]
 fn hgs_solver_log_precedes_column_generation_and_preserves_stdout() {
-    let output = command().args([
-        "vrptw", "instances/R101.txt", "--customers", "5", "--hgs-time", "0.05",
-        "--no-enumeration", "--time", "5", "--log",
-    ]).output().unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let output = command()
+        .args([
+            "vrptw",
+            "instances/R101.txt",
+            "--customers",
+            "5",
+            "--hgs-time",
+            "0.05",
+            "--no-enumeration",
+            "--time",
+            "5",
+            "--log",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let log = String::from_utf8_lossy(&output.stderr);
-    let hgs = log.find("BALDES | HYBRID GENETIC SEARCH").expect("HGS banner");
+    let hgs = log
+        .find("BALDES | HYBRID GENETIC SEARCH")
+        .expect("HGS banner");
     let finish = log.find("HGS Feasible").expect("HGS summary");
     let cg = log.find("BALDES | COLUMN GENERATION").expect("CG banner");
     assert!(hgs < finish && finish < cg, "{log}");
-    assert!(log.contains("Incumbent") && log.contains("Best infeas"), "{log}");
+    assert!(
+        log.contains("Incumbent") && log.contains("Best infeas"),
+        "{log}"
+    );
     assert!(!log.contains("| It "), "{log}");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("instance="));
     assert!(!stdout.contains("HYBRID GENETIC SEARCH"));
 
-    let quiet = command().args([
-        "hgs", "instances/R101.txt", "--customers", "5", "--time", "0.05",
-    ]).output().unwrap();
+    let quiet = command()
+        .args([
+            "hgs",
+            "instances/R101.txt",
+            "--customers",
+            "5",
+            "--time",
+            "0.05",
+        ])
+        .output()
+        .unwrap();
     assert!(quiet.status.success());
     assert!(!String::from_utf8_lossy(&quiet.stderr).contains("HYBRID GENETIC SEARCH"));
 
-    let standalone = command().args([
-        "hgs", "instances/R101.txt", "--customers", "5", "--time", "0.05", "--log",
-    ]).output().unwrap();
+    let standalone = command()
+        .args([
+            "hgs",
+            "instances/R101.txt",
+            "--customers",
+            "5",
+            "--time",
+            "0.05",
+            "--log",
+        ])
+        .output()
+        .unwrap();
     assert!(standalone.status.success());
     assert!(String::from_utf8_lossy(&standalone.stderr).contains("HGS Feasible"));
     assert!(!String::from_utf8_lossy(&standalone.stdout).contains("Best infeas"));
@@ -338,8 +669,14 @@ fn hgs_solver_log_precedes_column_generation_and_preserves_stdout() {
 
 #[test]
 fn clp_runtime_policy_modes_are_validated() {
-    for (flag, value) in [("--clp-scaling", "invalid"), ("--clp-work-areas", "invalid")] {
-        let output = command().args(["vrptw", "instances/C101.txt", flag, value]).output().unwrap();
+    for (flag, value) in [
+        ("--clp-scaling", "invalid"),
+        ("--clp-work-areas", "invalid"),
+    ] {
+        let output = command()
+            .args(["vrptw", "instances/C101.txt", flag, value])
+            .output()
+            .unwrap();
         assert!(!output.status.success());
         assert!(String::from_utf8_lossy(&output.stderr).contains("Clp"));
     }
@@ -347,11 +684,84 @@ fn clp_runtime_policy_modes_are_validated() {
     std::fs::write(&path, "tiny\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n").unwrap();
     for scaling in ["auto", "geometric", "equilibrium", "off"] {
         for areas in ["retain", "discard"] {
-            let output = command().arg("vrptw").arg(&path)
-                .args(["--clp-scaling", scaling, "--clp-work-areas", areas, "--no-enumeration"]).output().unwrap();
-            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            let output = command()
+                .arg("vrptw")
+                .arg(&path)
+                .args([
+                    "--clp-scaling",
+                    scaling,
+                    "--clp-work-areas",
+                    areas,
+                    "--no-enumeration",
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
             assert!(String::from_utf8_lossy(&output.stdout).contains("status=Optimal"));
         }
     }
     std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn cg_progress_shows_only_enabled_cut_families() {
+    for (flags, expected) in [
+        (vec![], vec![]),
+        (vec!["--rank1"], vec!["Rank1"]),
+        (vec!["--capacity-cuts"], vec!["Capacity"]),
+        (vec!["--two-path-cuts"], vec!["Capacity", "2Path"]),
+        (
+            vec!["--rank1", "--capacity-cuts"],
+            vec!["Rank1", "Capacity"],
+        ),
+    ] {
+        let output = command()
+            .args([
+                "vrptw",
+                "instances/R101.txt",
+                "--customers",
+                "5",
+                "--no-enumeration",
+                "--no-stabilization",
+                "--log-interval",
+                "2",
+                "--time",
+                "5",
+            ])
+            .args(&flags)
+            .output()
+            .unwrap();
+        let log = String::from_utf8_lossy(&output.stderr);
+        assert!(output.status.success(), "{flags:?}: {log}");
+        let header = log.lines().find(|line| line.contains("RMP obj")).unwrap();
+        for family in ["Rank1", "Capacity", "2Path", "KPath", "Knapsack", "Fenchel"] {
+            assert_eq!(
+                header.split_whitespace().any(|s| s == family),
+                expected.contains(&family),
+                "{flags:?}: {header}"
+            );
+        }
+        let rows: Vec<_> = log
+            .lines()
+            .filter(|line| {
+                line.split_whitespace()
+                    .next()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .is_some()
+            })
+            .collect();
+        assert!(!rows.is_empty(), "{log}");
+        for row in rows {
+            let fields: Vec<_> = row.split_whitespace().collect();
+            assert_eq!(fields.len(), 10 + expected.len(), "{row}");
+            for field in &fields[8..8 + expected.len()] {
+                assert!(field.parse::<usize>().is_ok(), "{row}");
+            }
+        }
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("COLUMN GENERATION"));
+    }
 }

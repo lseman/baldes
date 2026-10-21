@@ -1,0 +1,24 @@
+[
+  {
+    "packing_row": 0,
+    "resource": 0,
+    "threshold": 1.5,
+    "upper": true,
+    "members": [
+      {
+        "network": 7,
+        "arcs": [
+          0,
+          2
+        ]
+      },
+      {
+        "network": 42,
+        "arcs": [
+          0,
+          2
+        ]
+      }
+    ]
+  }
+]

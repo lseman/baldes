@@ -288,7 +288,9 @@ pub(super) fn solve_seeded<const D: usize>(
         None
     } else if let Some(mut config) = options.knapsack_cuts.take() {
         let graph = problem.graph.graph_id.max(0);
-        if config.parameters.fenchel.is_some() { solver.knapsack_exact_coefficients = true; }
+        if config.parameters.fenchel.is_some() {
+            solver.knapsack_exact_coefficients = true;
+        }
         solver.knapsack_resource_indices = config.resource_indices;
         let indices = solver.knapsack_indices();
         if indices
@@ -461,6 +463,7 @@ pub(super) fn solve_seeded<const D: usize>(
         problem: problem.clone(),
         state: state.clone(),
         checkpoint: None,
+        enumeration_checkpoint: None,
         certificate_search: certificate::SearchCache::default(),
     };
     let initial_rows = options

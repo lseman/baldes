@@ -45,7 +45,7 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         name: "BALDESnumberOfBucketsPerVertex",
         kind: OptionKind::Int,
         default: 25.0,
-        support: OptionSupport::Implemented("src/pricing/mod.rs; src/api/options.rs"),
+        support: OptionSupport::Implemented("src/pricing/mod.rs"),
     },
     OptionInfo {
         name: "BALDESdynamicBucketSteps",
@@ -57,7 +57,7 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         name: "BALDESuseBidirectionalSearch",
         kind: OptionKind::Int,
         default: 2.0,
-        support: OptionSupport::Implemented("src/pricing/mod.rs; src/api/options.rs"),
+        support: OptionSupport::Implemented("src/pricing/mod.rs"),
     },
     OptionInfo {
         name: "BALDESapplyReducedCostFixing",
@@ -107,13 +107,13 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         name: "BALDESinitNGneighbourhoodSize",
         kind: OptionKind::Int,
         default: 8.0,
-        support: OptionSupport::Implemented("src/api/relaxation.rs"),
+        support: OptionSupport::Implemented("src/graph/ng.rs"),
     },
     OptionInfo {
         name: "BALDESmaxNGneighbourhoodSize",
         kind: OptionKind::Int,
         default: 0.0,
-        support: OptionSupport::Implemented("src/api/relaxation.rs; src/master/root/controller/relaxation.rs"),
+        support: OptionSupport::Implemented("src/master/root/controller/relaxation.rs"),
     },
     OptionInfo {
         name: "BALDESrankOneCutsMaxNumRows",
@@ -185,25 +185,25 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         name: "BALDESdynamicNGmode",
         kind: OptionKind::Int,
         default: -1.0,
-        support: OptionSupport::Implemented("src/api/relaxation.rs; src/master/root/controller/relaxation.rs"),
+        support: OptionSupport::Implemented("src/master/root/controller/relaxation.rs"),
     },
     OptionInfo {
         name: "BALDESmaxNumOfColumnsInDynamicNG",
         kind: OptionKind::Int,
         default: 100.0,
-        support: OptionSupport::Implemented("src/api/relaxation.rs; src/master/root/controller/relaxation.rs"),
+        support: OptionSupport::Implemented("src/master/root/controller/relaxation.rs"),
     },
     OptionInfo {
         name: "BALDESmaxCycleSizeInDynamicNG",
         kind: OptionKind::Int,
         default: 5.0,
-        support: OptionSupport::Implemented("src/api/relaxation.rs; src/master/root/controller/relaxation.rs"),
+        support: OptionSupport::Implemented("src/master/root/controller/relaxation.rs"),
     },
     OptionInfo {
         name: "BALDESmaxNGaverNeighbourhoodSize",
         kind: OptionKind::Int,
         default: 0.0,
-        support: OptionSupport::Implemented("src/api/relaxation.rs; src/master/root/controller/relaxation.rs"),
+        support: OptionSupport::Implemented("src/master/root/controller/relaxation.rs"),
     },
     OptionInfo {
         name: "BALDESuseCapacityCuts",

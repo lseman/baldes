@@ -1,27 +1,86 @@
 //! Enumeration and regeneration of admissible cached columns.
 use super::*;
 
+pub(in crate::master::root) struct EnumerationCheckpoint<const D: usize> {
+    pricing: Solver<D>,
+    cut: CutState,
+    row_map: Vec<usize>,
+    route_count: usize,
+    previous_fixing_gap: f64,
+    enumerated_routes: usize,
+}
+
+fn eligible_gap<const D: usize>(state: &State<D>, bound: f64) -> Option<f64> {
+    if !state.enumerate || !bound.is_finite() {
+        return None;
+    }
+    let upper = if state.incumbent.is_finite() {
+        state.incumbent
+    } else {
+        1e12
+    };
+    let gap = upper - bound;
+    let ratio = gap / state.previous_fixing_gap;
+    let fixing_ratio = 0.9f32 as f64;
+    (ratio < fixing_ratio - (fixing_ratio.abs().max(ratio.abs()) * 1e-10 + 1e-6)).then_some(gap)
+}
+
 impl<const D: usize> RootController<D> {
+    pub(super) fn begin_enumeration(&mut self, bound: f64) -> Result<bool> {
+        let mut state = self.state.borrow_mut();
+        if eligible_gap(&state, bound).is_none() {
+            return Ok(false);
+        }
+        if self.enumeration_checkpoint.is_some() {
+            return Err(invalid("nested enumeration transaction"));
+        }
+        // Keep the original engine, including its complete working state,
+        // untouched. Tentative fixing operates on an independent node fork.
+        let tentative = state.solver.fork_for_node();
+        self.enumeration_checkpoint = Some(EnumerationCheckpoint {
+            pricing: std::mem::replace(&mut state.solver, tentative),
+            cut: state.cut.clone(),
+            row_map: self.problem.row_map.borrow().clone(),
+            route_count: state.routes.len(),
+            previous_fixing_gap: state.previous_fixing_gap,
+            enumerated_routes: state.enumerated_routes,
+        });
+        Ok(true)
+    }
+
+    pub(super) fn finish_enumeration(&mut self, commit: bool) {
+        let Some(saved) = self.enumeration_checkpoint.take() else {
+            return;
+        };
+        if commit {
+            return;
+        }
+        let mut state = self.state.borrow_mut();
+        state.solver = saved.pricing;
+        state.cut = saved.cut;
+        state.routes.truncate(saved.route_count);
+        state
+            .route_tags
+            .retain(|_, tag| *tag >= 0 && (*tag as usize) < saved.route_count);
+        state.previous_fixing_gap = saved.previous_fixing_gap;
+        state.enumerated_routes = saved.enumerated_routes;
+        *self.problem.row_map.borrow_mut() = saved.row_map;
+    }
+
     pub(super) fn enumerate_columns(
         &mut self,
         duals: &[f64],
         bound: f64,
     ) -> Result<Option<Vec<Column>>> {
         let mut state = self.state.borrow_mut();
-        if !state.enumerate || !bound.is_finite() {
+        let Some(gap) = eligible_gap(&state, bound) else {
             return Ok(None);
-        }
+        };
         let upper = if state.incumbent.is_finite() {
             state.incumbent
         } else {
             1e12
         };
-        let gap = upper - bound;
-        let ratio = gap / state.previous_fixing_gap;
-        let fixing_ratio = 0.9f32 as f64;
-        if !(ratio < fixing_ratio - (fixing_ratio.abs().max(ratio.abs()) * 1e-10 + 1e-6)) {
-            return Ok(None);
-        }
         state.previous_fixing_gap = gap;
         let relative = gap / upper.abs();
         let mode = if relative - (1f64.max(relative.abs()) * 1e-10 + 1e-6) > 1. {

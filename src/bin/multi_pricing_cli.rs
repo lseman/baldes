@@ -1,18 +1,20 @@
 use baldes::master::multi_pricing::{
     self,
-    format::{Model, SolveOptions, SolveResult},
+    format::{Model, ResourceGroupRestriction, SolveOptions, SolveResult},
 };
 
 const HELP: &str = "Usage: baldes multi-pricing MODEL.json [OPTIONS]
 
 Solve shared master rows with multiple pricing networks (Clp).
   --tree                 Run the assignment branch-and-price tree
+  --resource-branches FILE  Apply a JSON array of grouped-resource restrictions
   --enumerate            Attempt bounded full-domain all-network transfer
   --enumerated-mip       Solve transferred nodes with HiGHS (--tree; highs feature)
   --enumeration-route-limit N  Global enumeration candidate limit (default: 10000)
   --enumeration-time SECONDS   Enumeration budget per attempt (default: 1)
   --mip-time SECONDS     MIP budget per node (default: 1)
   --mip-nodes N          MIP search-node budget per call (default: 100000)
+  --mip-cutoff X         Search for objectives below X; no incumbent is implied
   --time SECONDS         Total time budget (default: 120)
   --iterations N         Column-generation iteration limit per node
   --nodes N              Assignment tree node limit
@@ -25,7 +27,7 @@ Solve shared master rows with multiple pricing networks (Clp).
   --json FILE            Write structured results; '-' writes JSON to stdout
   -h, --help             Print help
 
-Model schema and examples: docs/multi-pricing.md";
+Model schema and examples: docs/extensions/multi-pricing.md";
 
 pub fn run(args: Vec<String>) -> Result<(), String> {
     let mut args = args.into_iter();
@@ -39,6 +41,7 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
     }
     let mut options = SolveOptions::default();
     let mut json = None;
+    let mut resource_branches = None;
     while let Some(arg) = args.next() {
         let mut value = || {
             args.next()
@@ -50,6 +53,7 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
                 return Ok(());
             }
             "--tree" => options.tree = true,
+            "--resource-branches" => resource_branches = Some(value()?),
             "--enumerate" => options.enumerate = true,
             "--enumerated-mip" => options.enumerated_mip = true,
             "--enumeration-route-limit" => {
@@ -62,6 +66,10 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
             }
             "--mip-time" => {
                 options.mip_time_limit = value()?.parse::<f64>().map_err(|e| e.to_string())?
+            }
+            "--mip-cutoff" => {
+                options.mip_objective_cutoff =
+                    Some(value()?.parse::<f64>().map_err(|e| e.to_string())?);
             }
             "--mip-nodes" => {
                 options.mip_node_limit = value()?.parse::<usize>().map_err(|e| e.to_string())?
@@ -101,7 +109,35 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
         .and_then(Model::problem::<{ baldes::DEFAULT_RESOURCE_DIMENSIONS }>)
         .map_err(|e| e.to_string())?;
     let started = std::time::Instant::now();
-    let result = if options.tree {
+    let result = if let Some(path) = resource_branches {
+        let requests: Vec<ResourceGroupRestriction> =
+            serde_json::from_str(&std::fs::read_to_string(path).map_err(|e| e.to_string())?)
+                .map_err(|e| format!("resource branches JSON: {e}"))?;
+        // Construct the master without spending a preliminary LP solve. Each
+        // restriction validates and forks it before the requested root/tree.
+        let mut initial = node_options.clone();
+        initial.cg.time_limit = std::time::Duration::ZERO;
+        initial.enumeration = None;
+        let mut node = multi_pricing::solve(problem, initial)
+            .map_err(|e| e.to_string())?
+            .snapshot;
+        for request in requests {
+            node = request.apply(&node).map_err(|e| e.to_string())?;
+        }
+        if options.tree {
+            let mut configured = options.tree_options().map_err(|e| e.to_string())?;
+            configured.time_limit = configured.time_limit.saturating_sub(started.elapsed());
+            let output = node
+                .solve_assignment_tree(configured)
+                .map_err(|e| e.to_string())?;
+            SolveResult::tree(&output, started.elapsed().as_secs_f64())
+        } else {
+            let mut configured = node_options;
+            configured.cg.time_limit = configured.cg.time_limit.saturating_sub(started.elapsed());
+            let output = node.solve(configured).map_err(|e| e.to_string())?;
+            SolveResult::root(&output, started.elapsed().as_secs_f64())
+        }
+    } else if options.tree {
         let output = multi_pricing::solve_assignment_tree(
             problem,
             options.tree_options().map_err(|e| e.to_string())?,

@@ -77,6 +77,7 @@ impl ClpMaster {
         options: &crate::extensions::ipm::Options,
     ) -> Result<crate::extensions::ipm::Solution> {
         let started = Instant::now();
+        self.ensure_backend()?;
         self.refresh_ipm_model()?;
         let mut options = options.clone();
         options.time_limit = options

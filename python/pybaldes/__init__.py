@@ -9,11 +9,11 @@ __all__ = [
 
 from .networks import (
     NetworkAssignment, NetworkEnumerationReport, NetworkNode, NetworkProblem, NetworkResult, NetworkRoute,
-    NetworkRowCoefficients, PricingArc, PricingNetwork, PricingResource, SharedRow,
+    NetworkRowCoefficients, NetworkResourceGroupMember, PricingArc, PricingNetwork, PricingResource, SharedRow,
     solve_networks,
 )
 __all__ += [
     "NetworkAssignment", "NetworkEnumerationReport", "NetworkNode", "NetworkProblem", "NetworkResult", "NetworkRoute",
-    "NetworkRowCoefficients", "PricingArc", "PricingNetwork", "PricingResource", "SharedRow",
+    "NetworkRowCoefficients", "NetworkResourceGroupMember", "PricingArc", "PricingNetwork", "PricingResource", "SharedRow",
     "solve_networks",
 ]

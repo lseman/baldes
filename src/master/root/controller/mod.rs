@@ -6,6 +6,7 @@ mod enumeration;
 mod knapsack;
 mod kpath;
 mod pool;
+mod progress;
 mod rank_one;
 mod relaxation;
 mod separation;
@@ -22,10 +23,18 @@ pub(super) struct RootController<const D: usize = { crate::DEFAULT_RESOURCE_DIME
     pub(super) problem: Rc<RootProblem<D>>,
     pub(super) state: Rc<RefCell<State<D>>>,
     pub(super) checkpoint: Option<PricingCheckpoint<D>>,
+    pub(super) enumeration_checkpoint: Option<enumeration::EnumerationCheckpoint<D>>,
     pub(super) certificate_search: super::certificate::SearchCache,
 }
 
 impl<const D: usize> Controller<ClpMaster> for RootController<D> {
+    fn begin_enumeration_transaction(&mut self, bound: f64) -> Result<bool> {
+        self.begin_enumeration(bound)
+    }
+
+    fn finish_enumeration_transaction(&mut self, commit: bool) {
+        self.finish_enumeration(commit);
+    }
     fn restore_feasible_columns(&mut self, duals: &[f64]) -> Result<Vec<Column>> {
         super::restoration::columns(&self.problem, &mut self.state.borrow_mut(), duals)
     }
@@ -87,6 +96,11 @@ impl<const D: usize> Controller<ClpMaster> for RootController<D> {
 
     fn incumbent(&self) -> f64 {
         self.state.borrow().incumbent
+    }
+
+    fn cut_counts(&self) -> Vec<(&'static str, usize)> {
+        let state = self.state.borrow();
+        state.cut.progress_counts(&state.solver.cuts.knapsack_cuts)
     }
 
     fn refresh_generated_columns(&mut self, pool: &mut [Column]) -> Result<()> {

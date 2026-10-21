@@ -38,6 +38,7 @@ pub(super) fn entries<const D: usize>(
     if oracle.nonlinear_rows.is_empty()
         && oracle.knapsack_rows.is_empty()
         && oracle.presence_rows.is_empty()
+        && oracle.resource_groups.is_empty()
     {
         return Ok(vec![]);
     }
@@ -72,6 +73,7 @@ pub(super) fn entries<const D: usize>(
     let mut result: Vec<_> = sums.into_iter().map(|(r, a)| (r, a as f64)).collect();
     result.extend(super::resource_rows::entries(oracle, route)?);
     result.extend(super::presence_rows::entries(oracle, route)?);
+    result.extend(super::resource_groups::entries(oracle, route));
     Ok(result)
 }
 

@@ -115,6 +115,15 @@ class NetworkRowCoefficients:
 
 
 @dataclass(frozen=True)
+class NetworkResourceGroupMember:
+    network: int
+    arcs: Tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "arcs", tuple(self.arcs))
+
+
+@dataclass(frozen=True)
 class NetworkAssignment:
     shared_row: int
     network: int
@@ -146,6 +155,7 @@ class NetworkEnumerationReport:
     routes: int
     transferred: int
     failure: Optional[str]
+    coverage_cutoff: Optional[float] = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "networks", tuple(tuple(n) for n in self.networks))
@@ -165,6 +175,14 @@ class NetworkNode:
     def with_row(self, row: SharedRow, coefficients: Tuple[NetworkRowCoefficients, ...]) -> NetworkNode:
         data = {"row": asdict(row), "coefficients": [asdict(c) for c in coefficients]}
         return NetworkNode(self._native.with_row(json.dumps(data, allow_nan=False)))
+
+    def with_resource_group_branch(
+        self, packing_row: int, resource: int, threshold: float, upper: bool,
+        members: Tuple[NetworkResourceGroupMember, ...],
+    ) -> NetworkNode:
+        data = dict(packing_row=packing_row, resource=resource, threshold=threshold,
+                    upper=upper, members=[asdict(m) for m in members])
+        return NetworkNode(self._native.with_resource_group_branch(json.dumps(data, allow_nan=False)))
 
     def fix_route(self, route_index: int, quantity: int = 1) -> NetworkNode:
         if isinstance(quantity, bool) or not isinstance(quantity, int):
@@ -245,6 +263,7 @@ def solve_networks(
     enumerated_mip: bool = False,
     mip_time_limit: float = 1.0,
     mip_node_limit: int = 100000,
+    mip_objective_cutoff: Optional[float] = None,
     time_limit: float = 120.0,
     max_iterations: int = 100000,
     node_limit: int = 10000,
@@ -268,6 +287,7 @@ def solve_networks(
                    enumeration_work_limit=enumeration_work_limit, enumeration_stored_arc_limit=enumeration_stored_arc_limit,
                    enumeration_time_limit=enumeration_time_limit, enumerated_mip=enumerated_mip,
                    mip_time_limit=mip_time_limit, mip_node_limit=mip_node_limit,
+                   mip_objective_cutoff=mip_objective_cutoff,
                    time_limit=time_limit, max_iterations=max_iterations,
                    node_limit=node_limit, stabilize=stabilize, bound_mode=bound_mode,
                    artificial_cost=artificial_cost, log_interval=log_interval,

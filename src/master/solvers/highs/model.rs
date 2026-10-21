@@ -7,6 +7,7 @@ impl HighsMaster {
             .ok_or_else(|| incomplete("HiGHS model allocation failed"))?;
         let master = Self {
             highs,
+            matrix_cache: OnceCell::new(),
             rhs: vec![],
             senses: vec![],
             costs: vec![],
@@ -56,64 +57,22 @@ impl HighsMaster {
         copy.add_rows(&rows)?;
         let count = self.costs.len();
         if count > 0 {
-            let mut num_col = 0;
-            let mut nnz = 0;
-            let mut costs = vec![0.; count];
-            let mut lower = vec![0.; count];
-            let mut upper = vec![0.; count];
-            // SAFETY: first call sizes the sparse matrix, second fills arrays
-            // of that size. The destination copies the complete CSC in one call.
+            let matrix = self.sparse_columns()?;
+            let lower = vec![0.; count];
+            // SAFETY: the immutable CSC snapshot has one start per column and
+            // the declared nonzeros. HiGHS copies it into the child's own model.
             unsafe {
-                Self::check(
-                    Highs_getColsByRange(
-                        self.highs.as_ptr(),
-                        0,
-                        count as HighsInt - 1,
-                        &mut num_col,
-                        costs.as_mut_ptr(),
-                        lower.as_mut_ptr(),
-                        upper.as_mut_ptr(),
-                        &mut nnz,
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                    ),
-                    "size clone columns",
-                )?;
-                if nnz < 0 || num_col != count as HighsInt {
-                    return Err(incomplete("HiGHS clone matrix dimensions"));
-                }
-                let mut starts = vec![0; count + 1];
-                let mut index = vec![0; nnz as usize];
-                let mut values = vec![0.; nnz as usize];
-                Self::check(
-                    Highs_getColsByRange(
-                        self.highs.as_ptr(),
-                        0,
-                        count as HighsInt - 1,
-                        &mut num_col,
-                        costs.as_mut_ptr(),
-                        lower.as_mut_ptr(),
-                        upper.as_mut_ptr(),
-                        &mut nnz,
-                        starts.as_mut_ptr(),
-                        index.as_mut_ptr(),
-                        values.as_mut_ptr(),
-                    ),
-                    "copy clone columns",
-                )?;
-                starts[count] = nnz;
                 Self::check(
                     Highs_addCols(
                         copy.highs.as_ptr(),
                         count as HighsInt,
-                        costs.as_ptr(),
+                        self.costs.as_ptr(),
                         lower.as_ptr(),
-                        upper.as_ptr(),
-                        nnz,
-                        starts.as_ptr(),
-                        index.as_ptr(),
-                        values.as_ptr(),
+                        self.upper.as_ptr(),
+                        matrix.indices.len() as HighsInt,
+                        matrix.starts.as_ptr(),
+                        matrix.indices.as_ptr(),
+                        matrix.values.as_ptr(),
                     ),
                     "add clone columns",
                 )?;
@@ -145,6 +104,72 @@ impl HighsMaster {
         copy.status = self.status;
         copy.solved = self.solved;
         Ok(copy)
+    }
+
+    /// HiGHS range queries have substantial per-call overhead on large LPs.
+    /// Snapshot the CSC once per matrix revision instead of querying each column
+    /// separately during cut replay, cleanup, certification, or node restoration.
+    pub(super) fn sparse_columns(&self) -> Result<&SparseColumns> {
+        if self.matrix_cache.get().is_none() {
+            let count = self.costs.len();
+            let mut matrix = SparseColumns {
+                starts: vec![0; count + 1],
+                indices: vec![],
+                values: vec![],
+            };
+            if count > 0 {
+                let (mut num_col, mut nnz) = (0, 0);
+                let mut costs = vec![0.; count];
+                let mut lower = vec![0.; count];
+                let mut upper = vec![0.; count];
+                // SAFETY: the source is immutably borrowed. The first query
+                // sizes the CSC; the second fills exactly those owned buffers.
+                unsafe {
+                    Self::check(
+                        Highs_getColsByRange(
+                            self.highs.as_ptr(),
+                            0,
+                            count as HighsInt - 1,
+                            &mut num_col,
+                            costs.as_mut_ptr(),
+                            lower.as_mut_ptr(),
+                            upper.as_mut_ptr(),
+                            &mut nnz,
+                            std::ptr::null_mut(),
+                            std::ptr::null_mut(),
+                            std::ptr::null_mut(),
+                        ),
+                        "size matrix snapshot",
+                    )?;
+                    if nnz < 0 || num_col != count as HighsInt {
+                        return Err(incomplete("HiGHS matrix snapshot dimensions"));
+                    }
+                    matrix.indices.resize(nnz as usize, 0);
+                    matrix.values.resize(nnz as usize, 0.);
+                    Self::check(
+                        Highs_getColsByRange(
+                            self.highs.as_ptr(),
+                            0,
+                            count as HighsInt - 1,
+                            &mut num_col,
+                            costs.as_mut_ptr(),
+                            lower.as_mut_ptr(),
+                            upper.as_mut_ptr(),
+                            &mut nnz,
+                            matrix.starts.as_mut_ptr(),
+                            matrix.indices.as_mut_ptr(),
+                            matrix.values.as_mut_ptr(),
+                        ),
+                        "read matrix snapshot",
+                    )?;
+                }
+                matrix.starts[count] = nnz;
+            }
+            // No reentrant callbacks or concurrent mutation can populate it
+            // between these calls; native edits require an exclusive borrow.
+            let _ = self.matrix_cache.set(matrix);
+        }
+        Ok(self.matrix_cache.get().expect("matrix snapshot populated"))
     }
 
     /// Replace RHS values without rebuilding the model or discarding the basis.

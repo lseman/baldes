@@ -4,50 +4,30 @@
 use super::*;
 
 use crate::master::rounding::{add_down as add, multiply_down as multiply};
+mod cutoff;
 mod presence;
 mod resource;
+mod resource_groups;
+pub(super) use cutoff::{cutoff_plan, NetworkCutoff};
 
 fn subtract_product(value: f64, a: f64, b: f64) -> Option<f64> {
     // Negate an input so the subtraction itself is rounded downward.
     add(value, multiply(-a, b)?)
 }
 
-fn network_minimum<const D: usize>(
+fn arc_cost_lower_bounds<const D: usize>(
     oracle: &Oracle<D>,
     offset: usize,
     duals: &[f64],
-    resource_work: &mut usize,
-    deadline: Instant,
-) -> Option<Option<f64>> {
-    // Resource step rows have nonnegative coefficients and <= sense. Dropping
-    // their nonnegative reduced-cost penalty is a valid lower relaxation.
-    // A sign-incompatible dual cannot use this argument.
+) -> Option<Vec<f64>> {
     if oracle
-        .knapsack_rows
+        .resource_groups
         .iter()
-        .any(|&(_, row)| duals[offset + row] > 0.)
+        .any(|&(row, _)| duals[offset + row] > 0.)
     {
         return None;
     }
     let graph = &oracle.network.graph;
-    // Only cycles on a source-to-sink walk can affect the relaxation.
-    let mut reaches_sink = vec![false; graph.vertices.len()];
-    reaches_sink[graph.sink] = true;
-    for _ in 0..graph.vertices.len() {
-        let mut changed = false;
-        for (a, arc) in graph.arcs.iter().enumerate() {
-            if oracle.proved_zero_arcs.get(a).copied().unwrap_or(false) {
-                continue;
-            }
-            if reaches_sink[arc.head] && !reaches_sink[arc.tail] {
-                reaches_sink[arc.tail] = true;
-                changed = true;
-            }
-        }
-        if !changed {
-            break;
-        }
-    }
     let mut weights = vec![];
     for (index, (arc, coefficients)) in graph
         .arcs
@@ -73,15 +53,80 @@ fn network_minimum<const D: usize>(
         }
         weights.push(weight);
     }
+    Some(weights)
+}
+
+fn network_minimum<const D: usize>(
+    oracle: &Oracle<D>,
+    offset: usize,
+    duals: &[f64],
+    resource_work: &mut usize,
+    deadline: Instant,
+) -> Option<Option<f64>> {
+    // Resource step rows have nonnegative coefficients and <= sense. Dropping
+    // their nonnegative reduced-cost penalty is a valid lower relaxation.
+    // A sign-incompatible dual cannot use this argument.
+    if oracle
+        .knapsack_rows
+        .iter()
+        .any(|&(_, row)| duals[offset + row] > 0.)
+    {
+        return None;
+    }
+    let domain = super::resource_groups::residual_domain_graph(oracle).ok()?;
+    let graph = domain.as_ref();
+    let positions = (graph.arcs.len() != oracle.network.graph.arcs.len()).then(|| {
+        graph
+            .arcs
+            .iter()
+            .map(|a| oracle.index[&a.id])
+            .collect::<Vec<_>>()
+    });
+    let position = |a| positions.as_ref().map_or(a, |p| p[a]);
+    // Only cycles on a source-to-sink walk can affect the relaxation.
+    let mut reaches_sink = vec![false; graph.vertices.len()];
+    reaches_sink[graph.sink] = true;
+    for _ in 0..graph.vertices.len() {
+        let mut changed = false;
+        for (a, arc) in graph.arcs.iter().enumerate() {
+            if oracle
+                .proved_zero_arcs
+                .get(position(a))
+                .copied()
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            if reaches_sink[arc.head] && !reaches_sink[arc.tail] {
+                reaches_sink[arc.tail] = true;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    let original_weights = arc_cost_lower_bounds(oracle, offset, duals)?;
+    let weights: std::borrow::Cow<'_, [f64]> = match &positions {
+        Some(positions) => {
+            std::borrow::Cow::Owned(positions.iter().map(|&i| original_weights[i]).collect())
+        }
+        None => std::borrow::Cow::Borrowed(&original_weights),
+    };
     let mut distances = vec![None; graph.vertices.len()];
     distances[graph.source] = Some(0.);
     let mut cyclic = false;
     for pass in 0..graph.vertices.len() {
         let mut changed = false;
-        for (a, (arc, &weight)) in graph.arcs.iter().zip(&weights).enumerate() {
+        for (a, (arc, &weight)) in graph.arcs.iter().zip(weights.iter()).enumerate() {
             // These flags have an exact original-row activity proof. They are
             // separate from heuristic or reduced-cost pricing restrictions.
-            if oracle.proved_zero_arcs.get(a).copied().unwrap_or(false) {
+            if oracle
+                .proved_zero_arcs
+                .get(position(a))
+                .copied()
+                .unwrap_or(false)
+            {
                 continue;
             }
             if !reaches_sink[arc.head] {
@@ -110,6 +155,13 @@ fn network_minimum<const D: usize>(
         Some(value) => value,
         None => return Some(None),
     };
+    if !oracle.resource_groups.is_empty() {
+        match resource_groups::minimum(graph, &weights, resource_work, deadline) {
+            Some(Some(value)) => minimum = minimum.max(value),
+            Some(None) => return Some(None),
+            None => {}
+        }
+    }
     // Keep all active presence rows jointly, so event overlap, duplicate pairs
     // and repeated emissions cannot be priced independently by mistake.
     let inputs: Vec<_> = oracle
@@ -130,7 +182,13 @@ fn network_minimum<const D: usize>(
             graph,
             &weights,
             &inputs,
-            |a| oracle.proved_zero_arcs.get(a).copied().unwrap_or(false),
+            |a| {
+                oracle
+                    .proved_zero_arcs
+                    .get(position(a))
+                    .copied()
+                    .unwrap_or(false)
+            },
             &mut remaining,
             deadline,
         );
@@ -181,7 +239,7 @@ pub(super) fn extension_certificate<const D: usize>(
     certificate_inner(state, master, duals, false)
 }
 
-fn certificate_inner<const D: usize>(
+fn master_dual_base<const D: usize>(
     state: &State<D>,
     master: &ClpMaster,
     duals: &[f64],
@@ -231,6 +289,16 @@ fn certificate_inner<const D: usize>(
             }
         }
     }
+    Some(value)
+}
+
+fn certificate_inner<const D: usize>(
+    state: &State<D>,
+    master: &ClpMaster,
+    duals: &[f64],
+    allow_projection: bool,
+) -> Option<f64> {
+    let mut value = master_dual_base(state, master, duals, allow_projection)?;
     if state.universe.is_some() {
         return add(value, super::route_bounds::certificate(state, duals)?);
     }
@@ -276,6 +344,13 @@ pub(super) fn exact_contributions<const D: usize>(
     state: &State<D>,
     routes: &[FixedRoute],
 ) -> Result<Option<Contributions>> {
+    exact_contributions_in_domain(state, routes, true)
+}
+fn exact_contributions_in_domain<const D: usize>(
+    state: &State<D>,
+    routes: &[FixedRoute],
+    branch_domain: bool,
+) -> Result<Option<Contributions>> {
     use crate::master::root::ExactSum;
     let mut rows = vec![ExactSum::default(); state.shared_rows.len()];
     let mut objective = ExactSum::default();
@@ -287,7 +362,12 @@ pub(super) fn exact_contributions<const D: usize>(
             .position(|o| o.network.id == fixed.route.network)
             .ok_or_else(|| invalid("unknown witness network"))?;
         let oracle = &state.oracles[index];
-        if !super::lifecycle::integer_route_feasible(oracle, &fixed.route.route)? {
+        let feasible = if branch_domain {
+            super::lifecycle::integer_route_feasible(oracle, &fixed.route.route)?
+        } else {
+            super::lifecycle::original_route_feasible(oracle, &fixed.route.route)?
+        };
+        if !feasible {
             return Ok(None);
         }
         if counts[index].add(fixed.quantity).is_none() {
@@ -330,7 +410,8 @@ pub(super) fn exact_fixed_reduction<const D: usize>(
     if state.fixed_routes.is_empty() {
         return Ok(true);
     }
-    let Some((rows, mut objective, counts)) = exact_contributions(state, &state.fixed_routes)?
+    let Some((rows, mut objective, counts)) =
+        exact_contributions_in_domain(state, &state.fixed_routes, false)?
     else {
         return Ok(false);
     };

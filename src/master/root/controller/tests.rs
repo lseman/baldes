@@ -88,6 +88,7 @@ fn owned_checkpoint_restores_warm_pool_rows_and_routes_after_pricing_timeout() {
         problem: problem.clone(),
         state: state.clone(),
         checkpoint: None,
+        enumeration_checkpoint: None,
         certificate_search: Default::default(),
     };
     let expected_warm = format!("{:?}", result.master.warm_start);
@@ -198,4 +199,89 @@ fn owned_checkpoint_restores_warm_pool_rows_and_routes_after_pricing_timeout() {
     let mut signed_zero = original.clone();
     signed_zero.resource_profile[0][0] = -0.;
     assert_eq!(register(&mut restored, &signed_zero).unwrap(), original_tag);
+}
+
+#[test]
+fn enumeration_rollback_restores_pricing_registry_windows_and_pending_metadata() {
+    let mut graph = Graph::<5>::new(3, 5).unwrap();
+    for vertex in 0..3 {
+        graph.set_bounds(vertex, 4, 0., 10.).unwrap();
+    }
+    graph.add_arc(0, 1, 1.).unwrap();
+    graph.add_arc(1, 2, 1.).unwrap();
+    let mut options = RootOptions::default();
+    options.capture_state = true;
+    options.enumerate = false;
+    let result =
+        super::super::solve(RootProblem::set_partitioning(graph, 1.).unwrap(), options).unwrap();
+    let snapshot = result.snapshot.unwrap();
+    let state = Rc::new(RefCell::new(State {
+        solver: snapshot.pricing.fork_for_node(),
+        route_tags: snapshot
+            .routes
+            .iter()
+            .enumerate()
+            .map(|(i, r)| (r.identity(), i as i32))
+            .collect(),
+        routes: snapshot.routes.clone(),
+        incumbent: 10.,
+        enumerate: true,
+        rounded: true,
+        previous_fixing_gap: 42.,
+        deadline: None,
+        pricing_seconds: 0.,
+        cut: snapshot.cut.clone(),
+        fixing_calls: 0,
+        enumerated_routes: 7,
+    }));
+    let problem = Rc::new(snapshot.problem.clone());
+    let mut controller = RootController {
+        problem: problem.clone(),
+        state: state.clone(),
+        checkpoint: None,
+        enumeration_checkpoint: None,
+        certificate_search: Default::default(),
+    };
+    let original_tags = state.borrow().route_tags.clone();
+    let original_windows = state.borrow().solver.graph.vertices[1].bounds.clone();
+    let original_forbidden = state.borrow().solver.forbidden_arcs.clone();
+    let original_rows = problem.row_map.borrow().clone();
+    assert!(controller.begin_enumeration_transaction(2.).unwrap());
+    {
+        let mut tentative = state.borrow_mut();
+        let mut abandoned = tentative.routes[0].clone();
+        abandoned.resource_profile[1][4] = 1.;
+        register(&mut tentative, &abandoned).unwrap();
+        tentative.solver.graph.set_bounds(1, 4, 5., 6.).unwrap();
+        tentative.solver.forbidden_arcs[0] = true;
+        tentative.solver.requires_rollback = true;
+        tentative.cut.enumerated.insert(vec![999]);
+        tentative.cut.removed_columns.push(999);
+        tentative.previous_fixing_gap = 0.;
+        tentative.enumerated_routes = 999;
+    }
+    problem.row_map.borrow_mut().reverse();
+    controller.finish_enumeration_transaction(false);
+    {
+        let restored = state.borrow();
+        assert_eq!(restored.route_tags, original_tags);
+        assert_eq!(restored.routes.len(), snapshot.routes.len());
+        assert_eq!(restored.solver.graph.vertices[1].bounds, original_windows);
+        assert_eq!(restored.solver.forbidden_arcs, original_forbidden);
+        assert!(!restored.solver.requires_rollback);
+        assert_eq!(restored.cut.enumerated, snapshot.cut.enumerated);
+        assert_eq!(restored.cut.removed_columns, snapshot.cut.removed_columns);
+        assert_eq!(restored.previous_fixing_gap, 42.);
+        assert_eq!(restored.enumerated_routes, 7);
+        assert_eq!(*problem.row_map.borrow(), original_rows);
+    }
+    assert!(controller.enumeration_checkpoint.is_none());
+    // Partial, valid fixing with no universe commits its scheduling state;
+    // dropping it would repeat the same expensive attempt at the same gap.
+    assert!(controller.begin_enumeration_transaction(2.).unwrap());
+    state.borrow_mut().previous_fixing_gap = 8.;
+    controller.finish_enumeration_transaction(true);
+    assert_eq!(state.borrow().previous_fixing_gap, 8.);
+    assert!(!controller.begin_enumeration_transaction(2.).unwrap());
+    assert!(controller.enumeration_checkpoint.is_none());
 }

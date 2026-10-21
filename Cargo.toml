@@ -27,8 +27,7 @@ exclude = [
 [lib]
 name = "baldes"
 path = "src/lib.rs"
-# cdylib/staticlib expose the ported no-cut C API entry points.
-crate-type = ["cdylib", "staticlib", "rlib"]
+crate-type = ["rlib"]
 
 [features]
 default = []
@@ -69,10 +68,6 @@ path = "src/bin/baldes.rs"
 required-features = ["clp"]
 
 # API integration tests.
-
-[[test]]
-name = "c_api"
-path = "tests/api/c_api.rs"
 
 [[test]]
 name = "cli"

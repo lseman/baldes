@@ -45,7 +45,7 @@ fn clone_preserves_sparse_layout_through_column_insertion() {
         // SAFETY: live Clp models expose n+1 starts and n column lengths;
         // both buffers are copied before the model can be mutated.
         unsafe {
-            let model = master.model.as_ptr();
+            let model = master.model.unwrap().as_ptr();
             (
                 std::slice::from_raw_parts(Clp_getVectorStarts(model), master.costs.len() + 1)
                     .to_vec(),
@@ -94,7 +94,7 @@ fn limits(master: &ClpMaster) -> [f64; 3] {
     let mut values = [0.; 3];
     // SAFETY: The native getter writes exactly three values for this model.
     unsafe {
-        baldes_clp_solve_limits(master.model.as_ptr(), values.as_mut_ptr());
+        baldes_clp_solve_limits(master.model.unwrap().as_ptr(), values.as_mut_ptr());
     }
     values
 }
@@ -104,7 +104,7 @@ fn limited_solve_preserves_absolute_deadlines_and_can_resume() {
     let mut master = base();
     // SAFETY: This exclusively owned model accepts a relative CPU limit.
     unsafe {
-        Clp_setMaximumSeconds(master.model.as_ptr(), 60.);
+        Clp_setMaximumSeconds(master.model.unwrap().as_ptr(), 60.);
     }
     let before = limits(&master);
     for (iterations, time) in [
@@ -165,7 +165,7 @@ fn cg_time_stop_preserves_bound_and_does_not_price() {
     }
     // SAFETY: expire the CPU budget of this exclusively owned model.
     unsafe {
-        Clp_setMaximumSeconds(master.model.as_ptr(), 0.);
+        Clp_setMaximumSeconds(master.model.unwrap().as_ptr(), 0.);
     }
     let before = limits(&master);
     let mut options = cg::Options::default();
@@ -187,7 +187,7 @@ fn cg_time_stop_preserves_bound_and_does_not_price() {
     assert_eq!(limits(&master), before);
     // SAFETY: remove the explicit test budget before resuming the model.
     unsafe {
-        Clp_setMaximumSeconds(master.model.as_ptr(), -1.);
+        Clp_setMaximumSeconds(master.model.unwrap().as_ptr(), -1.);
     }
     assert!(master.solve());
     assert_eq!(master.objective, 128.);

@@ -17,6 +17,92 @@ fn options() -> Options {
     options.cg.stabilize = false;
     options
 }
+
+#[test]
+fn adaptive_transfer_runs_after_pricing_and_preserves_global_counters() {
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let mut configured = options();
+        configured.enumeration = Some(EnumerationOptions::default());
+        configured.cg.bound_mode = mode;
+        let output = multi_pricing::solve(problem(), configured).unwrap();
+        assert_eq!(output.master.status, Status::Optimal);
+        assert!(!output.master.enumeration_requested);
+        assert!(output.snapshot.enumeration_report().complete);
+        assert_eq!(output.snapshot.enumeration_report().attempts, 1);
+        // A pre-CG transfer bypasses all routing oracle calls. This handoff
+        // must instead follow an actual exact pricing point.
+        assert!(output.oracle_calls.iter().all(|(_, calls)| *calls > 0));
+        assert!((output.master.lp - 1.5).abs() < 1e-8);
+        assert_eq!(output.master.iterations, output.master.history.len());
+        assert_eq!(
+            output.master.history.last().unwrap().pricing_calls,
+            output.master.pricing_calls
+        );
+        for (index, row) in output.master.history.iter().enumerate() {
+            assert_eq!(row.iteration, index + 1);
+        }
+        let mut resumed_options = options();
+        resumed_options.enumeration = Some(EnumerationOptions::default());
+        let resumed = output.snapshot.solve(resumed_options).unwrap();
+        assert_eq!(resumed.snapshot.enumeration_report().attempts, 1);
+        assert_eq!(resumed.master.status, Status::Optimal);
+    }
+}
+
+#[test]
+fn adaptive_budget_declines_once_then_resumes_and_can_retry() {
+    for limits in [
+        EnumerationOptions {
+            max_routes: 5,
+            ..Default::default()
+        },
+        EnumerationOptions {
+            max_work: 1,
+            ..Default::default()
+        },
+        EnumerationOptions {
+            time_limit: Duration::ZERO,
+            ..Default::default()
+        },
+    ] {
+        let mut configured = options();
+        configured.enumeration = Some(limits);
+        let output = multi_pricing::solve(problem(), configured).unwrap();
+        assert_eq!(output.master.status, Status::Optimal);
+        assert!((output.master.lp - 1.5).abs() < 1e-8);
+        let report = output.snapshot.enumeration_report();
+        assert_eq!(report.attempts, 1);
+        assert!(!report.complete);
+        assert!(report.failure.is_some());
+        assert_eq!(report.transferred, 0);
+        let mut retry = options();
+        retry.enumeration = Some(EnumerationOptions::default());
+        let resumed = output.snapshot.solve(retry).unwrap();
+        assert_eq!(resumed.master.status, Status::Optimal);
+        assert!(resumed.snapshot.enumeration_report().complete);
+        assert_eq!(resumed.snapshot.enumeration_report().attempts, 2);
+    }
+}
+
+#[test]
+fn adaptive_transfer_does_not_extend_iteration_or_time_limits() {
+    let baseline = multi_pricing::solve(problem(), options()).unwrap();
+    let mut configured = options();
+    configured.enumeration = Some(EnumerationOptions::default());
+    configured.cg.max_iterations = baseline.master.iterations;
+    let limited = multi_pricing::solve(problem(), configured).unwrap();
+    assert_eq!(limited.master.status, Status::IterationLimit);
+    assert_eq!(limited.master.iterations, baseline.master.iterations);
+    assert!(!limited.snapshot.enumeration_report().complete);
+    assert!(!limited.master.enumeration_requested);
+    let mut configured = options();
+    configured.enumeration = Some(EnumerationOptions::default());
+    configured.cg.time_limit = Duration::ZERO;
+    let limited = multi_pricing::solve(problem(), configured).unwrap();
+    assert_eq!(limited.master.status, Status::TimeLimit);
+    assert_eq!(limited.master.iterations, 0);
+    assert_eq!(limited.snapshot.enumeration_report().attempts, 0);
+}
 #[test]
 fn complete_transfer_is_atomic_repeatable_and_resumable() {
     let parent = multi_pricing::solve(problem(), options()).unwrap();
@@ -405,4 +491,213 @@ fn material_objective_rounding_does_not_publish_a_false_integer_proof() {
         .unwrap();
     assert_eq!(cutoff.mip.status, MipStatus::Incomplete);
     assert!(cutoff.mip.solution.is_none());
+}
+
+#[cfg(feature = "highs")]
+#[test]
+fn tree_cutoff_fallback_solves_when_full_storage_limit_is_exceeded() {
+    use baldes::master::{solvers::mip::MipOptions, tree::TreeStatus};
+    let mut problem = problem();
+    let first = &mut problem.networks[0];
+    let old = first.graph.arcs[0].clone();
+    first.graph.add_arc(old.tail, old.head, 20.).unwrap();
+    first.arc_entries.push(first.arc_entries[0].clone());
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let mut configured = multi_pricing::AssignmentTreeOptions::default();
+        configured.node = options();
+        configured.node.cg.bound_mode = mode;
+        configured.node.enumeration = Some(EnumerationOptions {
+            max_routes: 9,
+            ..Default::default()
+        });
+        configured.enumerated_mip = Some(MipOptions {
+            objective_cutoff: 3.,
+            ..Default::default()
+        });
+        configured.node_limit = 1;
+        let tree = multi_pricing::solve_assignment_tree(problem.clone(), configured).unwrap();
+        assert_eq!(tree.incumbent, 2.);
+        assert_eq!(tree.enumerated_mip_calls, 1);
+        assert!(tree
+            .enumeration_reports
+            .iter()
+            .any(|r| !r.complete && r.coverage_cutoff.is_none()));
+        let cutoff = tree
+            .enumeration_reports
+            .iter()
+            .find(|r| r.complete && r.coverage_cutoff == Some(3.))
+            .unwrap();
+        assert_eq!(cutoff.routes, 9);
+        if mode == BoundMode::Numerical {
+            assert_eq!(tree.status, TreeStatus::Optimal);
+            assert_eq!(tree.open_nodes, 0);
+        } else {
+            assert_eq!(tree.status, TreeStatus::NodeLimit);
+            assert!(tree.open_nodes > 0);
+            assert!(tree.bound < tree.incumbent);
+        }
+    }
+}
+
+#[cfg(feature = "highs")]
+#[test]
+fn tree_cutoff_without_incumbent_never_means_original_infeasibility() {
+    use baldes::master::{solvers::mip::MipOptions, tree::TreeStatus};
+    let mut configured = multi_pricing::AssignmentTreeOptions::default();
+    configured.node = options();
+    configured.node.enumeration = Some(EnumerationOptions {
+        max_routes: 3,
+        ..Default::default()
+    });
+    configured.enumerated_mip = Some(MipOptions {
+        objective_cutoff: 1.75,
+        ..Default::default()
+    });
+    configured.node_limit = 1;
+    let tree = multi_pricing::solve_assignment_tree(problem(), configured.clone()).unwrap();
+    assert_eq!(tree.status, TreeStatus::NodeLimit);
+    assert!(tree.incumbent.is_infinite());
+    assert!(tree.open_nodes > 0);
+    assert_eq!(tree.enumerated_mip_calls, 1);
+    assert!(tree
+        .enumeration_reports
+        .iter()
+        .any(|r| r.complete && r.coverage_cutoff == Some(1.75) && r.routes == 3));
+    // Exhausting enumeration proof work must leave ordinary branching usable.
+    configured.node.enumeration.as_mut().unwrap().max_work = 0;
+    configured.node_limit = 20;
+    let fallback = multi_pricing::solve_assignment_tree(problem(), configured).unwrap();
+    assert_eq!(fallback.status, TreeStatus::Optimal);
+    assert_eq!(fallback.incumbent, 2.);
+    assert_eq!(fallback.enumerated_mip_calls, 0);
+    assert!(fallback
+        .enumeration_reports
+        .iter()
+        .any(|r| r.coverage_cutoff == Some(1.75) && r.failure.is_some()));
+}
+
+#[cfg(feature = "highs")]
+#[test]
+fn equality_with_free_sink_uses_forward_pricing_and_original_enumeration() {
+    use baldes::master::solvers::mip::{MipOptions, MipStatus};
+    let text = r#"{"rows":[{"sense":"eq","rhs":1}],"networks":[{
+        "id":7,"vertices":4,"multiplicity":[0,1],
+        "resources":[{"kind":"equality","initial":1,"bounds":[[0,10],[5,10],[0,10],[0,10]]}],
+        "arcs":[{"tail":0,"head":1,"cost":1,"consumption":[2],"entries":[[0,1]]},
+        {"tail":1,"head":3,"cost":0,"consumption":[0]},
+        {"tail":0,"head":2,"cost":3,"consumption":[1],"entries":[[0,1]]},
+        {"tail":2,"head":3,"cost":0,"consumption":[0]}]}]}"#;
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        for direction in [0., 1., 2.] {
+            let problem = Model::from_json(text).unwrap().problem::<5>().unwrap();
+            let mut configured = options();
+            configured.cg.bound_mode = mode;
+            configured.enumeration = Some(EnumerationOptions::default());
+            configured
+                .pricing_options
+                .push(("BALDESuseBidirectionalSearch".into(), direction));
+            let root = multi_pricing::solve(problem, configured).unwrap();
+            assert_eq!(root.master.status, Status::Optimal);
+            assert_eq!(root.master.lp, 3.);
+            assert_eq!(root.master.bound, 3.);
+            assert_eq!(root.snapshot.enumeration_report().routes, 1);
+            assert!(root
+                .routes
+                .iter()
+                .zip(&root.values)
+                .all(|(r, &x)| x == 0. || r.route.arcs == [2, 3]));
+            let mip = root
+                .snapshot
+                .solve_enumerated_mip(&MipOptions::default())
+                .unwrap()
+                .unwrap();
+            assert_eq!(mip.mip.status, MipStatus::Optimal);
+            assert_eq!(mip.mip.solution.unwrap().objective, 3.);
+        }
+    }
+}
+
+#[cfg(feature = "highs")]
+#[test]
+fn rounded_up_route_objective_cannot_prove_no_original_improvement() {
+    use baldes::master::solvers::mip::{MipOptions, MipStatus};
+    let mut graph = baldes::Graph::<2>::new(4, 0).unwrap();
+    graph.add_arc(0, 1, 1e16).unwrap();
+    graph.add_arc(1, 2, 1.5).unwrap();
+    graph.add_arc(2, 3, -1e16).unwrap();
+    let problem = multi_pricing::Problem {
+        rows: vec![Row {
+            sense: RowSense::Equal,
+            rhs: 1.,
+        }],
+        networks: vec![multi_pricing::Network {
+            id: 7,
+            graph,
+            multiplicity: baldes::graph::Window::new(0., 1.).unwrap(),
+            arc_entries: vec![vec![(0, 1.)], vec![], vec![]],
+            route_entries: vec![],
+        }],
+    };
+    let root = multi_pricing::solve(problem, options()).unwrap();
+    let node = root
+        .snapshot
+        .enumerate(&EnumerationOptions::default())
+        .unwrap();
+    let result = node
+        .solve_enumerated_mip(&MipOptions {
+            objective_cutoff: 1.75,
+            ..Default::default()
+        })
+        .unwrap()
+        .unwrap();
+    // The rounded route coefficient is two, but its original arc sum is 1.5.
+    // No returned witness means replay alone cannot detect this false cutoff.
+    assert_eq!(result.mip.status, MipStatus::Incomplete);
+    assert_eq!(result.mip.bound, f64::NEG_INFINITY);
+    let cutoff = root
+        .snapshot
+        .enumerate_below(1.75, &EnumerationOptions::default())
+        .unwrap();
+    let scoped = cutoff.solve_mip(&MipOptions::default()).unwrap();
+    assert_eq!(scoped.mip.status, MipStatus::Incomplete);
+    assert_eq!(scoped.mip.bound, f64::NEG_INFINITY);
+}
+
+#[cfg(feature = "highs")]
+#[test]
+fn rounded_route_coefficient_cannot_prove_original_integer_infeasibility() {
+    use baldes::master::solvers::mip::{MipOptions, MipStatus};
+    let mut graph = baldes::Graph::<2>::new(4, 0).unwrap();
+    graph.add_arc(0, 1, 1.).unwrap();
+    graph.add_arc(1, 2, 0.).unwrap();
+    graph.add_arc(2, 3, 0.).unwrap();
+    let problem = multi_pricing::Problem {
+        rows: vec![Row {
+            sense: RowSense::Equal,
+            rhs: 1.5,
+        }],
+        networks: vec![multi_pricing::Network {
+            id: 7,
+            graph,
+            multiplicity: baldes::graph::Window::new(0., 1.).unwrap(),
+            arc_entries: vec![vec![(0, 1e16)], vec![(0, 1.5)], vec![(0, -1e16)]],
+            route_entries: vec![],
+        }],
+    };
+    let mut configured = options();
+    configured.preprocessing.enabled = false;
+    let root = multi_pricing::solve(problem, configured).unwrap();
+    let node = root
+        .snapshot
+        .enumerate(&EnumerationOptions::default())
+        .unwrap();
+    let result = node
+        .solve_enumerated_mip(&MipOptions::default())
+        .unwrap()
+        .unwrap();
+    // Original coefficient 1.5 admits quantity one. Its encoded coefficient
+    // two forces quantity 0.75, so rounded-model infeasibility proves nothing.
+    assert_eq!(result.mip.status, MipStatus::Incomplete);
+    assert_eq!(result.mip.bound, f64::NEG_INFINITY);
+    assert!(result.mip.solution.is_none());
 }

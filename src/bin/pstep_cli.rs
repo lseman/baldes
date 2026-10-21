@@ -1,19 +1,22 @@
-use baldes::extensions::pstep::{ColumnGenerationOptions, EnumerationOptions, Problem};
+use baldes::extensions::pstep::{
+    ColumnGenerationOptions, EnumerationOptions, PricingMethod, Problem,
+};
 use baldes::inputs::{Instance, Rounding};
 use baldes::master::{clp::ClpMaster, LpMaster};
 use std::time::Duration;
 
 const HELP: &str = "Usage: baldes pstep INSTANCE [OPTIONS]
 
-Solve the unlimited-fleet CVRP p-step LP using parallel bucket-graph pricing.
+Solve the unlimited-fleet CVRP p-step LP using exact parallel pricing.
 This command computes a numerical LP bound, not an integer routing solution.
 
 Options:
   --p N                 Arcs per step (default: 2; depot starts may be shorter)
   --threads N           Parallel endpoint/extreme pricing workers (default: up to 8)
+  --pricing METHOD      auto, enumeration or bucket (default: auto)
   --time SECONDS        Overall solve time limit (default: 300)
   --iterations N        LP solve limit (default: 1000)
-  --labels N            Label limit per pricing job (default: 1000000)
+  --labels N            Label/extension limit per pricing job (default: 1000000)
   --customers N         Keep the first N customers
   --rounding MODE       none, nearest, tenth or ceil (default: file convention)
   --enumerate           Cross-check against the full column pool (small cases)
@@ -46,7 +49,7 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
         }
         let value = match arg.as_str() {
             "--p" | "--threads" | "--time" | "--iterations" | "--labels" | "--customers"
-            | "--rounding" | "--json" => args
+            | "--rounding" | "--json" | "--pricing" => args
                 .next()
                 .ok_or_else(|| format!("missing value for {arg}"))?,
             _ => return Err(format!("unknown pstep option: {arg}\n{HELP}")),
@@ -58,6 +61,14 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
         };
         match arg.as_str() {
             "--p" => options.pricing.p = integer()?,
+            "--pricing" => {
+                options.pricing.method = match value.as_str() {
+                    "auto" => PricingMethod::Auto,
+                    "enumeration" => PricingMethod::Enumeration,
+                    "bucket" => PricingMethod::Bucket,
+                    _ => return Err(format!("invalid pricing method: {value}")),
+                }
+            }
             "--threads" => options.pricing.threads = integer()?,
             "--iterations" => options.max_iterations = integer()?,
             "--labels" => options.pricing.max_labels_per_job = integer()?,
@@ -86,6 +97,7 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
     let problem = Problem::from_instance(&instance).map_err(|e| e.to_string())?;
     let p = options.pricing.p;
     let threads = options.pricing.threads;
+    let pricing_method = options.pricing.method;
     let result = problem
         .solve_column_generation(ClpMaster::new().map_err(|e| e.to_string())?, options)
         .map_err(|e| e.to_string())?;
@@ -118,6 +130,9 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
         "restricted_objective": result.restricted_objective, "enumerated_bound": enumerated_bound,
         "iterations": result.iterations, "columns": result.columns,
         "pricing_jobs": result.pricing_jobs, "generated_labels": result.generated_labels,
+        "enumerated_extensions": result.enumerated_extensions,
+        "requested_pricing_method": format!("{pricing_method:?}"),
+        "pricing_method": result.pricing_method.map(|m| format!("{m:?}")),
         "elapsed_seconds": result.elapsed_seconds, "pricing_seconds": result.pricing_seconds,
         "lp_seconds": result.lp_seconds, "fleet": "unlimited", "bound_mode": "numerical"
     });

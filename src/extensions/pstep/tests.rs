@@ -121,6 +121,89 @@ fn sparse_directed_paths_and_capacity() {
 }
 
 #[test]
+fn streaming_enumeration_matches_bucket_jobs_on_directed_sparse_instances() {
+    for seed in 0..3 {
+        let n = 5;
+        let problem = Problem {
+            demands: vec![0.5, 1.25, 0.75, 1.0, 1.5],
+            capacity: 4.0,
+            costs: (0..n + 2)
+                .map(|i| {
+                    (0..n + 2)
+                        .map(|j| {
+                            if (i * 7 + j * 3 + seed) % 7 == 0 {
+                                None
+                            } else {
+                                Some(((i * 11 + j * 5 + seed) % 13) as f64 * 0.25)
+                            }
+                        })
+                        .collect()
+                })
+                .collect(),
+        };
+        let duals: Vec<_> = (0..3 * n)
+            .map(|i| ((i * 7 + seed * 11) % 17) as f64 - 8.0)
+            .collect();
+        for p in 1..=7 {
+            for weight in [0.0, 1.0] {
+                let settings = PricingOptions {
+                    p,
+                    threads: 1,
+                    method: PricingMethod::Bucket,
+                    ..Default::default()
+                };
+                let bucket = problem.price_steps(&duals, weight, &settings).unwrap();
+                let enumeration = problem
+                    .price_steps(
+                        &duals,
+                        weight,
+                        &PricingOptions {
+                            method: PricingMethod::Enumeration,
+                            threads: 3,
+                            ..settings
+                        },
+                    )
+                    .unwrap();
+                assert_eq!(bucket.jobs, enumeration.jobs);
+                assert_eq!(bucket.steps.len(), enumeration.steps.len());
+                assert_eq!(enumeration.generated_labels, 0);
+                for (a, b) in bucket.steps.iter().zip(&enumeration.steps) {
+                    assert_eq!(a.path.first(), b.path.first());
+                    assert_eq!(a.path.last(), b.path.last());
+                    let rc = |step: &Step| {
+                        weight * step.cost
+                            - step_entries(&problem.demands, step)
+                                .iter()
+                                .map(|&(r, a)| a * duals[r])
+                                .sum::<f64>()
+                    };
+                    assert!(
+                        (rc(a) - rc(b)).abs() < 1e-7,
+                        "seed={seed} p={p} weight={weight}"
+                    );
+                    let unique: std::collections::BTreeSet<_> = b.path.iter().collect();
+                    assert_eq!(unique.len(), b.path.len());
+                }
+            }
+        }
+    }
+    for settings in [
+        PricingOptions {
+            method: PricingMethod::Enumeration,
+            max_labels_per_job: 1,
+            ..Default::default()
+        },
+        PricingOptions {
+            method: PricingMethod::Enumeration,
+            time_limit: std::time::Duration::ZERO,
+            ..Default::default()
+        },
+    ] {
+        assert!(problem().price_steps(&[0.0; 9], 1.0, &settings).is_err());
+    }
+}
+
+#[test]
 fn bucket_pricing_matches_every_enumerated_job_and_parallel_order() {
     let mut problem = problem();
     // Deterministic varying duals of both signs expose all load-cost terms.
@@ -147,6 +230,7 @@ fn bucket_pricing_matches_every_enumerated_job_and_parallel_order() {
                     })
                     .fold(f64::INFINITY, f64::min);
                 let settings = PricingOptions {
+                    method: PricingMethod::Bucket,
                     p,
                     threads: 1,
                     ..Default::default()
@@ -261,6 +345,7 @@ fn long_steps_exclude_profitable_cycles_exactly() {
                 &duals,
                 1.0,
                 &PricingOptions {
+                    method: PricingMethod::Bucket,
                     p,
                     threads: 3,
                     ..Default::default()
@@ -277,6 +362,7 @@ fn long_steps_exclude_profitable_cycles_exactly() {
                 &duals,
                 1.0,
                 &PricingOptions {
+                    method: PricingMethod::Bucket,
                     p,
                     threads: 2,
                     max_subproblems_per_job: 1,

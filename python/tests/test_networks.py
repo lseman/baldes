@@ -127,8 +127,7 @@ def test_invalid_models_and_snapshot_operations():
     node = model.solve().snapshot
     with pytest.raises(ValueError):
         node.branch_assignment(0, 99, True)
-    with pytest.raises(ValueError):
-        node.solve(tree=True)
+    assert node.solve(tree=True).incumbent == pytest.approx(2.)
     with pytest.raises(ValueError, match="unknown field"):
         node.solve(typo=True)
     with pytest.raises(TypeError):
@@ -247,3 +246,63 @@ def test_generic_integer_tree_without_fractional_assignment_candidates(kind, bou
     assert tree.status == "Optimal" and tree.incumbent == pytest.approx(1.)
     assert tree.nodes == 3 and tree.open_nodes == 0
     assert all(r.value.is_integer() for r in tree.routes)
+
+
+@pytest.mark.skipif(not __import__("pybaldes").has_highs, reason="HiGHS required")
+def test_cutoff_tree_report_and_missing_incumbent_preserve_original_feasibility():
+    result = triangle().solve(
+        tree=True, enumerated_mip=True, mip_objective_cutoff=1.75,
+        enumeration_route_limit=3, node_limit=1, stabilize=False,
+    )
+    assert result.status == "NodeLimit"
+    assert result.incumbent is None and result.open_nodes > 0
+    assert result.enumerated_mip_calls == 1
+    scoped = [r for r in result.enumeration_reports if r.coverage_cutoff is not None]
+    assert len(scoped) == 1 and scoped[0].complete
+    assert scoped[0].coverage_cutoff == 1.75 and scoped[0].routes == 3
+    data = json.loads(result.to_json())
+    assert any(r["coverage_cutoff"] == 1.75 for r in data["enumeration_reports"])
+    root = triangle().solve(stabilize=False)
+    assert root.lp == pytest.approx(1.5)
+    assert all(r.coverage_cutoff is None for r in root.enumeration_reports)
+    with pytest.raises(ValueError, match="requires enumerated MIP"):
+        triangle().solve(mip_objective_cutoff=3.)
+
+
+@pytest.mark.parametrize("waiting", [False, True])
+@pytest.mark.parametrize("complete", [False, True])
+def test_grouped_resource_children_and_restricted_trees(waiting, complete):
+    from pybaldes import NetworkResourceGroupMember
+    networks = []
+    for ident, costs, extra in [(7, (1., 4.), False), (42, (2., 3.), True)]:
+        sink = 4 if extra else 3
+        bounds = [(0., 3.)] * (sink + 1)
+        if not waiting:
+            bounds[1], bounds[2] = (0., .5), (0., 2.5)
+        arcs = []
+        for vertex, cost, q in [(1, costs[0], .5), (2, costs[1], 2.5)]:
+            arcs.extend([
+                PricingArc(0, vertex, cost, consumption=(q,), entries=((0, 1.),)),
+                PricingArc(vertex, sink, 0.),
+            ])
+        if extra:
+            arcs.extend([PricingArc(0, 3, 1., entries=((1, 1.),)), PricingArc(3, sink, 0.)])
+        networks.append(PricingNetwork(ident, sink + 1, (0, 3), arcs,
+                                       resources=(PricingResource(bounds=bounds),)))
+    model = NetworkProblem((SharedRow("eq", 1.), SharedRow("eq", 1.)), networks)
+    parent = model.solve(stabilize=False, enumerate=complete)
+    members = (NetworkResourceGroupMember(7, [0, 2]), NetworkResourceGroupMember(42, [0, 2]))
+    for upper in [False, True]:
+        child = parent.snapshot.with_resource_group_branch(0, 0, 1.5, upper, members)
+        expected = 4. if upper and not waiting else 2.
+        solved = child.solve(stabilize=False, enumerate=True)
+        assert solved.lp == pytest.approx(expected)
+        assert child.solve(tree=True, stabilize=False).incumbent == pytest.approx(expected)
+        if complete:
+            capped = child.with_row(SharedRow("le", .25),
+                                    (NetworkRowCoefficients(7, (1., 0., 0., 0.)),)).solve()
+            if waiting:
+                assert capped.lp == pytest.approx(2.75)
+    with pytest.raises(ValueError, match="duplicate"):
+        parent.snapshot.with_resource_group_branch(0, 0, 1.5, True, members + members[:1])
+    assert parent.snapshot.solve().lp == pytest.approx(2.)

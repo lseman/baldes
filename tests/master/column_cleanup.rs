@@ -180,3 +180,102 @@ fn controller_caps_cover_initial_and_newly_priced_columns() {
         assert_eq!(master.values()[column], 0.25);
     }
 }
+
+#[test]
+fn enumeration_checkpoint_is_resumable_and_never_requests_with_positive_artificials() {
+    use baldes::master::{
+        clp::ClpMaster,
+        column_generation::{self as cg, Answer, Column, Controller, LpMaster, Options},
+        RowSense,
+    };
+    use baldes::pricing::phases::Phase;
+    struct Checkpoint(usize);
+    impl Controller<ClpMaster> for Checkpoint {
+        fn request_enumeration_checkpoint(&mut self, _: &ClpMaster) -> baldes::Result<bool> {
+            self.0 += 1;
+            Ok(true)
+        }
+    }
+    let phases = [Phase {
+        check_ng: true,
+        jump_arcs: true,
+        labels_per_bucket: i64::MAX,
+    }];
+    let price = |_, _: &[f64]| {
+        Ok(Answer {
+            columns: vec![],
+            minimum: 0.,
+            exact: true,
+            bound_minimum: None,
+        })
+    };
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, 1., &[]).unwrap();
+    master.add_column(3., &[(0, 1.)]).unwrap();
+    let mut controller = Checkpoint(0);
+    let checkpoint = cg::optimize(
+        &mut master,
+        &phases,
+        price,
+        &mut controller,
+        Options {
+            stabilize: false,
+            known: vec![Column {
+                cost: 3.,
+                reduced_cost: 0.,
+                entries: vec![(0, 1.)],
+                acceptable: true,
+                tag: 42,
+                identity: "checkpoint-route".into(),
+            }],
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(controller.0, 1);
+    assert!(checkpoint.enumeration_requested);
+    assert_eq!(checkpoint.status, Status::IterationLimit);
+    assert_eq!(checkpoint.warm_start.columns.len(), master.costs().len());
+    assert_eq!(checkpoint.warm_start.columns[0].as_ref().unwrap().tag, 42);
+    assert!(checkpoint
+        .warm_start
+        .generated_pool
+        .iter()
+        .any(|c| c.tag == 42));
+    let resumed = cg::optimize(
+        &mut master,
+        &phases,
+        price,
+        &mut cg::NoController,
+        Options {
+            stabilize: false,
+            warm_start: Some(checkpoint.warm_start),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(!resumed.enumeration_requested);
+    assert_eq!(resumed.status, Status::Optimal);
+    assert_eq!(resumed.lp, 3.);
+    assert_eq!(master.values()[0], 1.);
+
+    let mut infeasible = ClpMaster::new().unwrap();
+    infeasible.add_row(RowSense::Equal, 1., &[]).unwrap();
+    let mut controller = Checkpoint(0);
+    let output = cg::optimize(
+        &mut infeasible,
+        &phases,
+        price,
+        &mut controller,
+        Options {
+            stabilize: false,
+            artificial_cost: 100.,
+            max_penalty_updates: 0,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(output.status, Status::Stalled);
+    assert!(!output.enumeration_requested);
+    assert_eq!(controller.0, 0);
+}

@@ -60,14 +60,17 @@ impl ClpMaster {
     /// also clear native scale factors before the next solve.
     pub fn set_clp_options(&mut self, options: ClpOptions) {
         if self.clp_options != options {
-            if self.clp_options.scaling != options.scaling {
+            if let Some(model) = self
+                .model
+                .filter(|_| self.clp_options.scaling != options.scaling)
+            {
                 // SAFETY: live, exclusively borrowed native model. Clear old
                 // row/column factors as well as the scaled matrix before a
                 // positive-to-positive mode change on a retained model.
                 unsafe {
-                    Clp_scaling(self.model.as_ptr(), 0);
+                    Clp_scaling(model.as_ptr(), 0);
                     if options.scaling != ClpScaling::Off {
-                        Clp_scaling(self.model.as_ptr(), options.scaling.code());
+                        Clp_scaling(model.as_ptr(), options.scaling.code());
                     }
                 }
             }

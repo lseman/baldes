@@ -24,12 +24,12 @@ It reads Solomon VRPTW and CVRPLIB CVRP instances. See the
 Root relaxation solve times against **VRPSolver / BaPCod** on Solomon VRPTW
 instances with 100 customers:
 
-![BALDES vs VRPSolver / BaPCod root relaxation solve times](docs/benchmark.svg)
+![BALDES vs VRPSolver / BaPCod root relaxation solve times](docs/benchmarks/benchmark.svg)
 
 Times are medians of three runs on an AMD Ryzen 9 9950X, using the same graph,
 NG neighborhoods, and Clp master, with reduced-cost fixing and enumeration
 disabled. The reference uses one thread; BALDES is measured on one and two
-cores. See the [benchmark guide](docs/benchmarks.md) for the full setup.
+cores. See the [benchmark guide](docs/benchmarks/root.md) for the full setup.
 
 ## Install
 
@@ -51,7 +51,7 @@ cargo build --release --features clp
 
 The executable is `target/release/baldes`. You can also use `make config`
 and `make` for an interactive build setup. Optional backends and library-only
-builds are covered in the [build guide](docs/build.md).
+builds are covered in the [build guide](docs/guides/build.md).
 
 ### Python
 
@@ -88,7 +88,7 @@ Routing commands solve the root LP relaxation by default; add `--tree` for
 integer routing. A root result with status `Optimal` means the relaxation
 converged. HGS is a heuristic and does not prove optimality.
 
-Use `--json result.json` to save results. The [CLI guide](docs/cli.md) covers
+Use `--json result.json` to save results. The [CLI guide](docs/guides/cli.md) covers
 input formats and options, including cuts, master solvers, HGS seeding,
 and progress logging.
 
@@ -116,16 +116,16 @@ Use `problem_type="cvrp"` for capacitated routing without time windows.
 
 You can also construct an `Instance` in memory, configure cuts and master
 solvers, or use the low-level `Solver` for pricing. See the
-[Python guide](docs/python.md) for examples, options, and result export.
+[Python guide](docs/guides/python.md) for examples, options, and result export.
 
 ## Documentation
 
-- [Build and installation](docs/build.md)
-- [CLI usage and options](docs/cli.md)
-- [Python API](docs/python.md)
-- [Branch-and-price](docs/tree.md)
-- [Pricing controls](docs/options.md)
-- [Algorithms and references](docs/algorithms.md)
+- [Build and installation](docs/guides/build.md)
+- [CLI usage and options](docs/guides/cli.md)
+- [Python API](docs/guides/python.md)
+- [Branch-and-price](docs/solver/tree.md)
+- [Pricing controls](docs/reference/options.md)
+- [Algorithms and references](docs/reference/algorithms.md)
 - [All guides](docs/README.md)
 
 ## Citation

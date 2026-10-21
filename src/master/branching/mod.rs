@@ -2,14 +2,17 @@
 mod accumulated_resource;
 mod arc_flow;
 mod cluster;
+mod grouped_resource;
 mod number_of_vehicles;
 mod options;
 mod packing_set_assignment;
+pub mod resource_intervals;
 mod ryan_foster;
 
 use crate::master::{root::RootProblem, RowSense};
 use crate::{invalid, pricing::restrictions::RyanFosterConstraint, Result, Route};
 pub use cluster::ClusterBranchingOptions;
+pub use grouped_resource::AccumulatedResourceGroupBranch;
 pub use options::BranchingOptions;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -45,6 +48,7 @@ pub enum BranchConstraint {
         rhs: f64,
     },
     AccumulatedResource(crate::pricing::restrictions::AccumulatedResourceBranch),
+    AccumulatedResourceGroup(AccumulatedResourceGroupBranch),
 }
 impl BranchConstraint {
     pub fn row(&self) -> (RowSense, f64) {
@@ -55,7 +59,9 @@ impl BranchConstraint {
             | Self::ClusterPair { sense, rhs, .. } => (sense, rhs),
             Self::PackingSetAssignment { assigned, .. } => packing_set_assignment::row(assigned),
             // Nonnegative route-violation rows for resource-based rules.
-            Self::RyanFoster(_) | Self::AccumulatedResource(_) => (RowSense::LessEqual, 0.),
+            Self::RyanFoster(_)
+            | Self::AccumulatedResource(_)
+            | Self::AccumulatedResourceGroup(_) => (RowSense::LessEqual, 0.),
         }
     }
     pub fn validate<const D: usize>(&self, p: &RootProblem<D>) -> Result<()> {
@@ -74,6 +80,7 @@ impl BranchConstraint {
             Self::ClusterBoundary { vertices, .. } => cluster::validate(p, vertices),
             Self::ClusterPair { first, second, .. } => cluster::validate_pair(p, first, second),
             Self::AccumulatedResource(c) => accumulated_resource::validate(p, *c),
+            Self::AccumulatedResourceGroup(c) => c.validate(p),
         }
     }
     /// Per-arc contribution, so new columns and pricing receive identical rows.
@@ -87,6 +94,7 @@ impl BranchConstraint {
                 vertex, graph_id, ..
             } => packing_set_assignment::coefficient(p, arc, *vertex, *graph_id),
             Self::RyanFoster(_) | Self::AccumulatedResource(_) => 0.,
+            Self::AccumulatedResourceGroup(c) => c.additive(p.graph.arcs[arc].id),
             Self::ClusterBoundary { vertices, .. } => cluster::boundary_coefficient(
                 vertices,
                 p.graph.arcs[arc].tail,
@@ -104,6 +112,7 @@ impl BranchConstraint {
         match self {
             Self::RyanFoster(c) => ryan_foster::coefficient(*c, route),
             Self::AccumulatedResource(c) => accumulated_resource::coefficient(*c, route),
+            Self::AccumulatedResourceGroup(c) => c.coefficient(route, false),
             _ => route
                 .arcs
                 .iter()
@@ -114,6 +123,9 @@ impl BranchConstraint {
         }
     }
     pub(crate) fn nonlinear(&self) -> bool {
-        matches!(self, Self::RyanFoster(_) | Self::AccumulatedResource(_))
+        matches!(
+            self,
+            Self::RyanFoster(_) | Self::AccumulatedResource(_) | Self::AccumulatedResourceGroup(_)
+        )
     }
 }

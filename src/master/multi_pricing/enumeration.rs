@@ -2,10 +2,12 @@
 pub(super) use super::route_bounds::upper as route_upper;
 use super::*;
 use crate::{
-    enumeration::{CompleteResourceRelaxation, PathDomainLimits},
+    enumeration::{CompleteResourceRelaxation, CostBoundedResourceRelaxation, PathDomainLimits},
     master::solvers::mip::{MipOptions, MipOutput},
 };
 use std::time::Duration;
+mod cutoff;
+pub use cutoff::{CutoffCostBound, CutoffEnumeration};
 
 #[derive(Clone, Debug)]
 pub struct EnumerationOptions {
@@ -28,6 +30,8 @@ impl Default for EnumerationOptions {
 pub struct EnumerationReport {
     pub attempts: usize,
     pub complete: bool,
+    /// None covers the full domain; Some covers only objectives below this cutoff.
+    pub coverage_cutoff: Option<f64>,
     pub networks: Vec<(i32, usize)>,
     pub routes: usize,
     pub transferred: usize,
@@ -46,6 +50,13 @@ fn collect<const D: usize>(
     state: &State<D>,
     options: &EnumerationOptions,
 ) -> std::result::Result<(Vec<NetworkRoute>, Vec<(i32, usize)>), String> {
+    collect_with_plan(state, options, None)
+}
+fn collect_with_plan<const D: usize>(
+    state: &State<D>,
+    options: &EnumerationOptions,
+    plan: Option<&[super::bounds::NetworkCutoff]>,
+) -> std::result::Result<(Vec<NetworkRoute>, Vec<(i32, usize)>), String> {
     let deadline = Instant::now()
         .checked_add(options.time_limit)
         .ok_or("enumeration deadline overflow")?
@@ -55,7 +66,7 @@ fn collect<const D: usize>(
     let mut arcs_left = options.max_stored_arcs;
     let mut routes = vec![];
     let mut counts = vec![];
-    for oracle in &state.oracles {
+    for (network_index, oracle) in state.oracles.iter().enumerate() {
         if Instant::now() >= deadline {
             return Err("TimeLimit".into());
         }
@@ -63,7 +74,17 @@ fn collect<const D: usize>(
             counts.push((oracle.network.id, 0));
             continue;
         }
-        let graph = &oracle.network.graph;
+        let cutoff = plan.map(|p| &p[network_index]);
+        if let Some(super::bounds::NetworkCutoff::Empty { network }) = cutoff {
+            if *network != oracle.network.id {
+                return Err("cutoff network mismatch".into());
+            }
+            counts.push((oracle.network.id, 0));
+            continue;
+        }
+        let domain =
+            super::resource_groups::residual_domain_graph(oracle).map_err(|e| e.to_string())?;
+        let graph = domain.as_ref();
         // The current integer witness contract requires an interior visit.
         // A direct source/sink route may be meaningful in a generic model;
         // decline rather than silently exclude it from a completeness claim.
@@ -88,23 +109,62 @@ fn collect<const D: usize>(
                     .fill(crate::graph::ResourceKind::Disposable);
                 relaxed
             });
-        let domain = CompleteResourceRelaxation::collect(
-            relaxed.as_ref().unwrap_or(graph),
-            PathDomainLimits {
-                max_paths: paths_left,
-                max_work: work_left,
-                max_stored_arcs: arcs_left,
-                deadline: Some(deadline),
-            },
-        )
-        .map_err(|e| e.to_string())?;
-        paths_left -= domain.paths().len();
-        work_left -= domain.work_used();
-        arcs_left -= domain.stored_arcs();
+        let limits = PathDomainLimits {
+            max_paths: paths_left,
+            max_work: work_left,
+            max_stored_arcs: arcs_left,
+            deadline: Some(deadline),
+        };
+        let full_domain;
+        let pruned_domain;
+        let costs;
+        let (paths, work_used, stored_arcs) = match cutoff {
+            Some(super::bounds::NetworkCutoff::Cost {
+                network,
+                arc_cost_lower_bounds,
+                arc_ceiling,
+                ..
+            }) => {
+                if *network != oracle.network.id {
+                    return Err("cutoff network mismatch".into());
+                }
+                costs = graph
+                    .arcs
+                    .iter()
+                    .map(|a| arc_cost_lower_bounds[oracle.index[&a.id]])
+                    .collect::<Vec<_>>();
+                pruned_domain = CostBoundedResourceRelaxation::collect(
+                    relaxed.as_ref().unwrap_or(graph),
+                    &costs,
+                    *arc_ceiling,
+                    limits,
+                )
+                .map_err(|e| e.to_string())?;
+                (
+                    pruned_domain.paths(),
+                    pruned_domain.work_used(),
+                    pruned_domain.stored_arcs(),
+                )
+            }
+            None => {
+                full_domain =
+                    CompleteResourceRelaxation::collect(relaxed.as_ref().unwrap_or(graph), limits)
+                        .map_err(|e| e.to_string())?;
+                (
+                    full_domain.paths(),
+                    full_domain.work_used(),
+                    full_domain.stored_arcs(),
+                )
+            }
+            Some(super::bounds::NetworkCutoff::Empty { .. }) => unreachable!(),
+        };
+        paths_left -= paths.len();
+        work_left -= work_used;
+        arcs_left -= stored_arcs;
         let problem = crate::master::root::RootProblem::set_partitioning(graph.clone(), 1.)
             .map_err(|e| e.to_string())?;
         let before = routes.len();
-        for path in domain.paths() {
+        for path in paths {
             if Instant::now() >= deadline {
                 return Err("TimeLimit".into());
             }
@@ -130,8 +190,10 @@ fn collect<const D: usize>(
                 resources: vec![],
                 resource_profile: vec![],
             };
-            if crate::master::root::exact_route_feasible(&problem, &probe).is_none() {
-                continue;
+            match crate::master::root::exact_route_feasibility(&problem, &probe) {
+                Some(false) => continue,
+                Some(true) => {}
+                None => return Err("Arithmetic: exact resource replay is unknown".into()),
             }
             if !oracle
                 .solver
@@ -149,7 +211,10 @@ fn collect<const D: usize>(
             probe.resource_profile = canonical.resource_profile;
             let mut ids = probe.arcs.clone();
             ids.sort_unstable();
-            probe.original_cost = ids.iter().map(|id| graph.arcs[oracle.index[id]].cost).sum();
+            probe.original_cost = ids
+                .iter()
+                .map(|id| oracle.network.graph.arcs[oracle.index[id]].cost)
+                .sum();
             probe.cost = probe.original_cost;
             if !probe.cost.is_finite() {
                 return Err("Arithmetic: route cost".into());
@@ -176,11 +241,33 @@ pub(super) fn transfer<const D: usize>(
     cg: &mut cg::Options,
     options: &EnumerationOptions,
 ) -> Result<()> {
+    transfer_with(
+        master,
+        state,
+        cg,
+        options,
+        |destination, column| {
+            destination
+                .add_column(column.cost, &column.entries)
+                .map(|_| ())
+        },
+        Instant::now,
+    )
+}
+
+fn transfer_with<const D: usize>(
+    master: &mut ClpMaster,
+    state: &mut State<D>,
+    cg: &mut cg::Options,
+    options: &EnumerationOptions,
+    insert: impl FnMut(&mut ClpMaster, &cg::Column) -> Result<()>,
+    mut now: impl FnMut() -> Instant,
+) -> Result<()> {
     if state.universe.is_some() {
         return Ok(());
     }
     state.enumeration_report.attempts += 1;
-    let deadline = Instant::now()
+    let deadline = now()
         .checked_add(options.time_limit)
         .ok_or_else(|| invalid("enumeration time limit"))?
         .min(state.deadline);
@@ -191,6 +278,18 @@ pub(super) fn transfer<const D: usize>(
             return Ok(());
         }
     };
+    install_collected_with(master, state, cg, routes, counts, deadline, insert, now)
+}
+fn install_collected_with<const D: usize>(
+    master: &mut ClpMaster,
+    state: &mut State<D>,
+    cg: &mut cg::Options,
+    routes: Vec<NetworkRoute>,
+    counts: Vec<(i32, usize)>,
+    deadline: Instant,
+    mut insert: impl FnMut(&mut ClpMaster, &cg::Column) -> Result<()>,
+    mut now: impl FnMut() -> Instant,
+) -> Result<()> {
     // All budgets passed before modifying the destination. Keep a private copy
     // so a failed model insertion cannot leave half an all-network transfer.
     let mut destination = master.try_clone()?;
@@ -257,7 +356,7 @@ pub(super) fn transfer<const D: usize>(
     }
     let mut transferred = 0;
     for route in routes {
-        if Instant::now() >= deadline {
+        if now() >= deadline {
             state.enumeration_report.failure = Some("TimeLimit".into());
             return Ok(());
         }
@@ -290,7 +389,7 @@ pub(super) fn transfer<const D: usize>(
             tag: tag as i32,
             identity: format!("{}:{}", route.network, route.route.identity()),
         };
-        destination.add_column(column.cost, &column.entries)?;
+        insert(&mut destination, &column)?;
         if let Some(warm) = &mut warm {
             warm.columns.push(Some(column.clone()));
             warm.generated_pool.push(column);
@@ -299,7 +398,7 @@ pub(super) fn transfer<const D: usize>(
         }
         transferred += 1;
     }
-    if Instant::now() >= deadline {
+    if now() >= deadline {
         state.enumeration_report.failure = Some("TimeLimit".into());
         return Ok(());
     }
@@ -412,6 +511,114 @@ pub(super) fn price<const D: usize>(state: &mut State<D>, duals: &[f64]) -> Resu
     })
 }
 
+// Proof outcomes require the finite LP encoding to preserve original costs,
+// coefficients and fixed reductions. Witness replay cannot detect a route
+// which the rounded model excluded before returning any solution.
+#[cfg(feature = "highs")]
+fn exact_integer_encoding<const D: usize>(
+    state: &State<D>,
+    master: &ClpMaster,
+    columns: &[Option<cg::Column>],
+    deadline: Instant,
+) -> Result<bool> {
+    use crate::master::{root::ExactSum, LpMaster};
+    if !super::bounds::exact_fixed_reduction(state, master)? {
+        return Ok(false);
+    }
+    for (column, metadata) in columns.iter().enumerate() {
+        if Instant::now() >= deadline {
+            return Ok(false);
+        }
+        if master.upper[column] == 0. {
+            continue;
+        }
+        let Some(metadata) = metadata else {
+            return Ok(false);
+        };
+        let mut cost = ExactSum::default();
+        let mut rows = BTreeMap::<usize, ExactSum>::new();
+        if let Some((index, sign)) = super::master_variables::decode(metadata.tag) {
+            let variable = &state.master_variables[index];
+            if cost.product(sign, variable.cost).is_none() {
+                return Ok(false);
+            }
+            for &(row, a) in &variable.entries {
+                if rows
+                    .entry(state.shared_offset + row)
+                    .or_default()
+                    .product(sign, a)
+                    .is_none()
+                {
+                    return Ok(false);
+                }
+            }
+        } else {
+            let Some(route) = usize::try_from(metadata.tag)
+                .ok()
+                .and_then(|tag| state.routes.get(tag))
+            else {
+                return Ok(false);
+            };
+            let Some(oracle) = state.oracles.iter().find(|o| o.network.id == route.network) else {
+                return Ok(false);
+            };
+            for &arc in &route.route.arcs {
+                let position = oracle.index[&arc];
+                if cost.add(oracle.network.graph.arcs[position].cost).is_none() {
+                    return Ok(false);
+                }
+                for &(row, a) in &oracle.network.arc_entries[position] {
+                    if rows
+                        .entry(state.shared_offset + row)
+                        .or_default()
+                        .add(a)
+                        .is_none()
+                    {
+                        return Ok(false);
+                    }
+                }
+            }
+            for &(row, a) in &oracle.route_entries {
+                if rows.entry(row).or_default().add(a).is_none() {
+                    return Ok(false);
+                }
+            }
+            for &(row, a) in &oracle.network.route_entries {
+                if rows
+                    .entry(state.shared_offset + row)
+                    .or_default()
+                    .add(a)
+                    .is_none()
+                {
+                    return Ok(false);
+                }
+            }
+            for (row, a) in super::nonlinear::entries(oracle, &route.route)? {
+                if rows
+                    .entry(state.shared_offset + row)
+                    .or_default()
+                    .add(a)
+                    .is_none()
+                {
+                    return Ok(false);
+                }
+            }
+        }
+        if cost.add(-master.costs[column]).is_none() || cost.sign() != 0. {
+            return Ok(false);
+        }
+        for (row, a) in master.column_entries(column)? {
+            if rows.entry(row).or_default().add(-a).is_none() {
+                return Ok(false);
+            }
+        }
+        if rows.values().any(|value| value.sign() != 0.) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 impl<const D: usize> NodeSnapshot<D> {
     pub fn enumeration_report(&self) -> &EnumerationReport {
         &self.state.enumeration_report
@@ -514,10 +721,27 @@ impl<const D: usize> NodeSnapshot<D> {
                     })
                 })
                 .collect::<Vec<_>>();
+            let encoding_exact = exact_integer_encoding(
+                &self.state,
+                &master,
+                &columns,
+                started
+                    .checked_add(options.time_limit)
+                    .ok_or_else(|| invalid("MIP deadline"))?,
+            )?;
             let mut options = options.clone();
             options.time_limit = options.time_limit.saturating_sub(started.elapsed());
             let mut mip =
                 crate::master::solvers::highs::solve_integer(&master, &integers, &options)?;
+            if !encoding_exact {
+                mip.bound = f64::NEG_INFINITY;
+                if matches!(
+                    mip.status,
+                    MipStatus::Optimal | MipStatus::Infeasible | MipStatus::ObjectiveCutoff
+                ) {
+                    mip.status = MipStatus::Incomplete;
+                }
+            }
             let mut routes = vec![];
             let mut master_values: Vec<_> = self
                 .state
@@ -608,7 +832,126 @@ impl<const D: usize> NodeSnapshot<D> {
 #[cfg(all(test, feature = "highs"))]
 mod tests {
     use super::*;
+    use crate::master::column_generation::LpMaster;
     use crate::master::solvers::mip::MipStatus;
+    #[test]
+    fn backend_failure_after_private_insertion_preserves_checkpoint_and_retry() {
+        let problem = super::super::format::Model::from_json(include_str!(
+            "../../../examples/networks/triangle.json"
+        ))
+        .unwrap()
+        .problem::<2>()
+        .unwrap();
+        let root = solve(problem, Options::default()).unwrap();
+        let mut node = root.snapshot.fork().unwrap();
+        // Retire real columns while retaining their route registry and pool.
+        // Transfer must then perform actual backend insertions, not only reuse
+        // a tiny root that happened to generate its entire universe already.
+        let removed: Vec<_> = node
+            .warm
+            .columns
+            .iter()
+            .enumerate()
+            .filter_map(|(index, column)| column.as_ref().map(|_| index))
+            .collect();
+        let (_, map) = node.master.remove(&[], &removed).unwrap();
+        node.warm.columns = node
+            .warm
+            .columns
+            .into_iter()
+            .zip(&map)
+            .filter_map(|(column, retained)| retained.map(|_| column))
+            .collect();
+        for column in &mut node.warm.artificials {
+            *column = map[*column].unwrap();
+        }
+        for (_, column) in &mut node.warm.cut_artificials {
+            *column = map[*column].unwrap();
+        }
+        let columns = node.master.costs().to_vec();
+        let route_count = node.state.routes.len();
+        let tags = node.state.tags.clone();
+        let caps = node.state.route_upper_bounds.clone();
+        let mut configured = cg::Options {
+            warm_start: Some(node.warm.clone()),
+            ..Default::default()
+        };
+        let mut inserted = 0;
+        let failed = transfer_with(
+            &mut node.master,
+            &mut node.state,
+            &mut configured,
+            &EnumerationOptions::default(),
+            |destination, column| {
+                inserted += 1;
+                if inserted == 2 {
+                    return Err(invalid("injected backend insertion failure"));
+                }
+                destination.add_column(column.cost, &column.entries)?;
+                Ok(())
+            },
+            Instant::now,
+        );
+        assert!(failed.is_err());
+        assert_eq!(inserted, 2);
+        assert_eq!(node.master.costs(), columns);
+        assert_eq!(node.state.routes.len(), route_count);
+        assert_eq!(node.state.tags, tags);
+        assert_eq!(node.state.route_upper_bounds, caps);
+        assert!(node.state.universe.is_none());
+        assert_eq!(
+            configured.warm_start.as_ref().unwrap().columns.len(),
+            columns.len()
+        );
+        // Advance the handoff's clock only after one actual private insertion.
+        // This exercises a mid-transfer timeout without sleeps or load-sensitive
+        // assumptions about how long the tiny graph takes to enumerate.
+        let inserted = std::cell::Cell::new(0);
+        let started = Instant::now();
+        transfer_with(
+            &mut node.master,
+            &mut node.state,
+            &mut configured,
+            &EnumerationOptions {
+                time_limit: std::time::Duration::from_secs(30),
+                ..Default::default()
+            },
+            |destination, column| {
+                destination.add_column(column.cost, &column.entries)?;
+                inserted.set(inserted.get() + 1);
+                Ok(())
+            },
+            || {
+                if inserted.get() == 0 {
+                    started
+                } else {
+                    started + std::time::Duration::from_secs(60)
+                }
+            },
+        )
+        .unwrap();
+        assert_eq!(inserted.get(), 1);
+        assert_eq!(
+            node.state.enumeration_report.failure.as_deref(),
+            Some("TimeLimit")
+        );
+        assert_eq!(node.master.costs(), columns);
+        assert_eq!(node.state.routes.len(), route_count);
+        assert_eq!(node.state.tags, tags);
+        assert_eq!(node.state.route_upper_bounds, caps);
+        assert!(node.state.universe.is_none());
+        assert_eq!(
+            configured.warm_start.as_ref().unwrap().columns.len(),
+            columns.len()
+        );
+        let resumed = node.solve(Options::default()).unwrap();
+        assert_eq!(resumed.master.status, cg::Status::Optimal);
+        assert!((resumed.master.lp - 1.5).abs() < 1e-8);
+        let retried = node.enumerate(&EnumerationOptions::default()).unwrap();
+        assert!(retried.enumeration_report().complete);
+        assert_eq!(retried.enumeration_report().attempts, 3);
+        assert!(!root.snapshot.enumeration_report().complete);
+    }
     #[test]
     fn transfer_preserves_loaded_column_upper_bounds_and_artificials_stay_zero() {
         let problem = super::super::format::Model::from_json(include_str!(

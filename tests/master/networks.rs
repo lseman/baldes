@@ -992,5 +992,8 @@ mod imported_nonlinear_tests;
 #[path = "networks/resource_fractional.rs"]
 mod fractional_resource_tests;
 
+#[path = "networks/resource_groups.rs"]
+mod resource_group_tests;
+
 #[path = "networks/registered_propagation.rs"]
 mod registered_propagation_tests;

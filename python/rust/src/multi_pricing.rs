@@ -1,7 +1,7 @@
 //! Thread-bound owned node handles; no borrowed C pointers cross this API.
 use baldes::master::multi_pricing::{
     self,
-    format::{AddRow, Model, SolveOptions, SolveResult},
+    format::{AddRow, Model, ResourceGroupRestriction, SolveOptions, SolveResult},
 };
 use pyo3::{exceptions::PyValueError, prelude::*};
 use std::time::Instant;
@@ -29,17 +29,23 @@ fn pack_root(output: multi_pricing::Output, started: Instant) -> PyResult<(Strin
 
 #[pymethods]
 impl NetworkNode {
-    fn solve(&self, options_json: &str) -> PyResult<(String, NetworkNode)> {
+    fn solve(&self, options_json: &str) -> PyResult<(String, Option<NetworkNode>)> {
         let options = SolveOptions::from_json(options_json).map_err(error)?;
+        let started = Instant::now();
         if options.tree {
-            return Err(error(
-                "resume solves a node; tree=True is only supported for a fresh model",
-            ));
+            let output = self
+                .snapshot
+                .solve_assignment_tree(options.tree_options().map_err(error)?)
+                .map_err(error)?;
+            let json = SolveResult::tree(&output, started.elapsed().as_secs_f64())
+                .to_json()
+                .map_err(error)?;
+            return Ok((json, None));
         }
         let options = options.node_options().map_err(error)?;
-        let started = Instant::now();
         let output = self.snapshot.solve(options).map_err(error)?;
-        pack_root(output, started)
+        let (json, node) = pack_root(output, started)?;
+        Ok((json, Some(node)))
     }
     fn branch_assignment(&self, shared_row: usize, network: i32, assigned: bool) -> PyResult<Self> {
         Ok(Self {
@@ -61,6 +67,12 @@ impl NetworkNode {
                 .snapshot
                 .with_row(input.row.row(), &coefficients)
                 .map_err(error)?,
+        })
+    }
+    fn with_resource_group_branch(&self, restriction_json: &str) -> PyResult<Self> {
+        let input = ResourceGroupRestriction::from_json(restriction_json).map_err(error)?;
+        Ok(Self {
+            snapshot: input.apply(&self.snapshot).map_err(error)?,
         })
     }
     fn fix_route(&self, route_index: usize, quantity: f64) -> PyResult<Self> {

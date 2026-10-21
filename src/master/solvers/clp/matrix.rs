@@ -6,6 +6,14 @@ impl ClpMaster {
         if rhs.len() != self.rhs.len() || rhs.iter().any(|x| !x.is_finite()) {
             return Err(invalid("Clp RHS dimensions or values"));
         }
+        self.ensure_backend()?;
+        #[cfg(feature = "highs")]
+        if let Some(backend) = self.highs_backend.as_mut() {
+            backend.set_rhs(rhs)?;
+            self.rhs.copy_from_slice(rhs);
+            self.solved = false;
+            return Ok(());
+        }
         let lower: Vec<_> = rhs
             .iter()
             .zip(&self.senses)
@@ -30,13 +38,13 @@ impl ClpMaster {
             .collect();
         // SAFETY: both buffers contain one bound for every live model row;
         // Clp copies them during these calls and the model is exclusively owned.
-        unsafe {
-            Clp_chgRowLower(self.model.as_ptr(), lower.as_ptr());
-            Clp_chgRowUpper(self.model.as_ptr(), upper.as_ptr());
+        if let Some(model) = self.model {
+            unsafe {
+                Clp_chgRowLower(model.as_ptr(), lower.as_ptr());
+                Clp_chgRowUpper(model.as_ptr(), upper.as_ptr());
+            }
         }
         self.rhs.copy_from_slice(rhs);
-        #[cfg(feature = "highs")]
-        self.edit_highs(|backend| backend.set_rhs(rhs))?;
         self.solved = false;
         Ok(())
     }
@@ -58,6 +66,15 @@ impl ClpMaster {
         let first = self.rhs.len();
         if rows.is_empty() {
             return Ok(first..first);
+        }
+        self.ensure_backend()?;
+        #[cfg(feature = "highs")]
+        if let Some(backend) = self.highs_backend.as_mut() {
+            let added = backend.add_rows(rows)?;
+            self.rhs.extend(rows.iter().map(|&(_, rhs, _)| rhs));
+            self.senses.extend(rows.iter().map(|&(sense, _, _)| sense));
+            self.solved = false;
+            return Ok(added);
         }
         let (mut lower, mut upper, mut starts) = (vec![], vec![], vec![0i32]);
         let (mut indices, mut values) = (vec![], vec![]);
@@ -83,7 +100,7 @@ impl ClpMaster {
         // SAFETY: All arrays contain the declared row and nonzero counts; Clp copies them.
         unsafe {
             Clp_addRows(
-                self.model.as_ptr(),
+                self.model.expect("Clp backend is active").as_ptr(),
                 rows.len() as i32,
                 lower.as_ptr(),
                 upper.as_ptr(),
@@ -98,8 +115,6 @@ impl ClpMaster {
         }
         self.ipm.matrix_dirty = true;
         self.solved = false;
-        #[cfg(feature = "highs")]
-        self.edit_highs(|backend| backend.add_rows(rows).map(|_| ()))?;
         Ok(first..self.rhs.len())
     }
 
@@ -117,6 +132,39 @@ impl ClpMaster {
         let first = self.costs.len();
         if columns.is_empty() {
             return Ok(first..first);
+        }
+        self.ensure_backend()?;
+        #[cfg(feature = "highs")]
+        if let Some(backend) = self.highs_backend.as_mut() {
+            // The wrapper may retain a valid optimum after cut cleanup even
+            // when native solution info is invalid. Preserve its own compacted
+            // cache, rather than resizing it from stale native solution arrays.
+            let mut preserve = self.solved;
+            let mut preserved = 0;
+            for &(cost, entries) in columns {
+                if !preserve {
+                    break;
+                }
+                let (rows, values) = entries_of(entries, self.rhs.len())?;
+                let reduced = rows.iter().zip(values).fold(cost, |rc, (&r, a)| {
+                    rc - self.duals.get(r as usize).copied().unwrap_or(0.) * a
+                });
+                preserve = reduced >= -self.dual_tolerance;
+                preserved += usize::from(preserve);
+            }
+            let added = backend.add_columns(columns)?;
+            // Route-count caps are per-model, not a solver-global infinity.
+            if self.column_default_upper != 1e12 {
+                for column in added.clone() {
+                    backend.set_upper(column, self.column_default_upper)?;
+                }
+            }
+            self.costs.extend(columns.iter().map(|&(cost, _)| cost));
+            self.upper
+                .resize(self.costs.len(), self.column_default_upper);
+            self.solved = preserve;
+            self.values.resize(self.values.len() + preserved, 0.);
+            return Ok(added);
         }
         let mut starts = vec![0i32];
         let mut indices = vec![];
@@ -146,7 +194,7 @@ impl ClpMaster {
         // SAFETY: Model is exclusively borrowed, Clp copies the supplied arrays.
         unsafe {
             Clp_addColumns(
-                self.model.as_ptr(),
+                self.model.expect("Clp backend is active").as_ptr(),
                 columns.len() as i32,
                 lower.as_ptr(),
                 upper.as_ptr(),
@@ -160,19 +208,6 @@ impl ClpMaster {
         self.upper.extend(&upper);
         self.solved = preserve;
         self.values.resize(self.values.len() + preserved, 0.);
-        #[cfg(feature = "highs")]
-        {
-            let default_upper = self.column_default_upper;
-            self.edit_highs(|backend| {
-                let added = backend.add_columns(columns)?;
-                if default_upper != 1e12 {
-                    for column in added {
-                        backend.set_upper(column, default_upper)?;
-                    }
-                }
-                Ok(())
-            })?;
-        }
         Ok(first..self.costs.len())
     }
 
@@ -180,8 +215,11 @@ impl ClpMaster {
         if row >= self.rhs.len() || column >= self.costs.len() || !value.is_finite() {
             return Err(invalid("master coefficient index/value"));
         }
-        unsafe {
-            Clp_modifyCoefficient(self.model.as_ptr(), row as i32, column as i32, value, true);
+        self.ensure_backend()?;
+        if let Some(model) = self.model {
+            unsafe {
+                Clp_modifyCoefficient(model.as_ptr(), row as i32, column as i32, value, true);
+            }
         }
         #[cfg(feature = "highs")]
         self.edit_highs(|backend| backend.set_coefficient(row, column, value))?;
@@ -194,12 +232,15 @@ impl ClpMaster {
         if column >= self.costs.len() || !cost.is_finite() {
             return Err(invalid("master cost index/value"));
         }
-        self.costs[column] = cost;
-        unsafe {
-            Clp_chgObjCoefficients(self.model.as_ptr(), self.costs.as_ptr());
-        }
+        self.ensure_backend()?;
         #[cfg(feature = "highs")]
         self.edit_highs(|backend| backend.set_cost(column, cost))?;
+        self.costs[column] = cost;
+        if let Some(model) = self.model {
+            unsafe {
+                Clp_chgObjCoefficients(model.as_ptr(), self.costs.as_ptr());
+            }
+        }
         self.solved = false;
         Ok(())
     }
@@ -208,6 +249,7 @@ impl ClpMaster {
         if column >= self.upper.len() || !upper.is_finite() || upper < 0. {
             return Err(invalid("master upper bound"));
         }
+        self.ensure_backend()?;
         // Restricting an LP while retaining its optimum retains optimality.
         // This matters when a controller installs an implied route-count cap
         // after a CG solve. Widening, or cutting off the cached point, requires
@@ -218,12 +260,14 @@ impl ClpMaster {
                 .values
                 .get(column)
                 .is_some_and(|v| v.is_finite() && *v <= upper);
-        self.upper[column] = upper;
-        unsafe {
-            Clp_chgColumnUpper(self.model.as_ptr(), self.upper.as_ptr());
-        }
         #[cfg(feature = "highs")]
         self.edit_highs(|backend| backend.set_upper(column, upper))?;
+        self.upper[column] = upper;
+        if let Some(model) = self.model {
+            unsafe {
+                Clp_chgColumnUpper(model.as_ptr(), self.upper.as_ptr());
+            }
+        }
         self.solved = preserve;
         Ok(())
     }
@@ -242,7 +286,10 @@ impl ClpMaster {
                 .copied()
                 .ok_or_else(|| invalid("HiGHS basis requires a solved master"));
         }
-        Ok(unsafe { Clp_getRowStatus(self.model.as_ptr(), row as i32) } == 1)
+        let model = self
+            .model
+            .ok_or_else(|| invalid("Clp basis requires a solved master"))?;
+        Ok(unsafe { Clp_getRowStatus(model.as_ptr(), row as i32) } == 1)
     }
 
     /// Cut cleanup with default threshold 1
@@ -257,7 +304,11 @@ impl ClpMaster {
         if column >= self.costs.len() {
             return Err(invalid("master column index"));
         }
-        let m = self.model.as_ptr();
+        #[cfg(feature = "highs")]
+        if let Some(backend) = self.highs_backend.as_ref() {
+            return backend.column_entries(column);
+        }
+        let m = self.model.expect("Clp backend is active").as_ptr();
         let mut entries = unsafe {
             let start = *Clp_getVectorStarts(m).add(column) as usize;
             let length = *Clp_getVectorLengths(m).add(column) as usize;
@@ -332,16 +383,19 @@ impl ClpMaster {
                 .collect();
             Ok((map, ids.into_iter().map(|i| i as i32).collect()))
         }
+        self.ensure_backend()?;
         let (rm, ri) = mapping(self.rhs.len(), rows)?;
         let (cm, ci) = mapping(self.costs.len(), columns)?;
         // Skip empty deletions: a Clp call
         // with no index still resets internal state.
-        unsafe {
-            if !ri.is_empty() {
-                Clp_deleteRows(self.model.as_ptr(), ri.len() as i32, ri.as_ptr());
-            }
-            if !ci.is_empty() {
-                Clp_deleteColumns(self.model.as_ptr(), ci.len() as i32, ci.as_ptr());
+        if let Some(model) = self.model {
+            unsafe {
+                if !ri.is_empty() {
+                    Clp_deleteRows(model.as_ptr(), ri.len() as i32, ri.as_ptr());
+                }
+                if !ci.is_empty() {
+                    Clp_deleteColumns(model.as_ptr(), ci.len() as i32, ci.as_ptr());
+                }
             }
         }
         #[cfg(feature = "highs")]

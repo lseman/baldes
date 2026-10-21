@@ -13,10 +13,15 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
         return Err(invalid("CG log interval must be positive"));
     }
     let logging = options.log_interval.is_some();
-    let mut progress = crate::master::progress::ProgressLog::new(options.log_interval);
+    let counts = if logging {
+        controller.cut_counts()
+    } else {
+        vec![]
+    };
+    let mut progress = crate::master::progress::ProgressLog::new(options.log_interval, counts);
     let result = optimize_inner(master, supplied, price, controller, options, &mut progress);
     if logging {
-        progress.finish(&result, controller.incumbent());
+        progress.finish(&result, controller.incumbent(), controller.cut_counts());
     }
     result
 }
@@ -90,6 +95,9 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     // a stronger relaxation than the pricing LP. Keep its convergence estimate
     // separate: an integer bound cannot prove that LP pricing is exhausted.
     let mut pricing_estimate = f64::NEG_INFINITY;
+    // A successful universe handoff applies once to this formulation. A new
+    // row, coefficient/domain change or remapping makes it eligible again.
+    let mut enumeration_transferred = false;
     let mut ipm_accuracy = IpmAccuracy::new();
     let mut accurate_next = false;
     let mut round_lower_bound = if inherited_bound.is_finite() {
@@ -129,6 +137,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     pool.extend(missing);
     let mut out = Output {
         status: Status::IterationLimit,
+        enumeration_requested: false,
+        enumeration_failure: None,
         lp: 0.,
         bound: inherited_bound,
         bound_mode: options.bound_mode,
@@ -542,6 +552,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 out.history.last().unwrap(),
                 out.bound,
                 controller.incumbent(),
+                controller.cut_counts(),
             );
         }
         // An exact bound can close the incumbent gap even without a fresh
@@ -596,64 +607,41 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         }
         accurate_next = false;
         if fresh == 0 && exact {
-            if !positive && !converged {
-                if let Some(universe) = controller.enumerated_universe(&raw, out.bound)? {
-                    // Reconsider the generated pool, including columns that
-                    // never entered the master, rather than restricting old
-                    // paths to the representative universe's exact identities.
-                    let regenerated = controller
-                        .regenerate_enumerated_columns(&pool, &raw, out.bound, &universe)?;
-                    let mut loaded_set = seen.clone();
-                    let removed: Vec<usize> =
-                        (0..loaded.len()).filter(|&i| loaded[i].is_some()).collect();
-                    let (_, map) = master.remove(&[], &removed)?;
-                    loaded = loaded
-                        .into_iter()
-                        .zip(&map)
-                        .filter_map(|(c, m)| m.map(|_| c))
-                        .collect();
-                    out.column_tags = out
-                        .column_tags
-                        .iter()
-                        .zip(&map)
-                        .filter_map(|(&t, m)| m.map(|_| t))
-                        .collect();
-                    out.artificials = out.artificials.iter().filter_map(|&i| map[i]).collect();
-                    for (_, column) in &mut cut_artificials {
-                        *column = map[*column].unwrap();
+            if !positive && controller.request_enumeration_checkpoint(master)? {
+                out.enumeration_requested = true;
+                return finish(out, loaded, cut_artificials, pool, smoothing);
+            }
+            if !positive && !converged && !enumeration_transferred {
+                let transferred = match super::enumeration::transfer(
+                    master,
+                    controller,
+                    &raw,
+                    &out,
+                    &loaded,
+                    &cut_artificials,
+                    &seen,
+                    &pool,
+                    &pool_seen,
+                    options.enumerated_columns_added,
+                ) {
+                    Ok(transferred) => transferred,
+                    Err(error) => {
+                        // The optional handoff restored pricing state and left
+                        // the live LP untouched. Continue ordinary CG/separation.
+                        out.enumeration_failure = Some(error.to_string());
+                        None
                     }
-                    controller.remap_columns(&map)?;
-                    for column in regenerated {
-                        let index = master.add_column(column.cost, &column.entries)?;
-                        apply_column_cap(master, controller, index, column.tag)?;
-                        loaded_set.insert(column.signature());
-                        seen.insert(column.signature());
-                        out.column_tags.push(column.tag);
-                        loaded.push(Some(column));
-                    }
-                    let mut missing: Vec<&Column> = universe
-                        .iter()
-                        .filter(|c| !loaded_set.contains(&c.signature()))
-                        .collect();
-                    missing.sort_by(|a, b| a.reduced_cost.total_cmp(&b.reduced_cost));
-                    missing.truncate(options.enumerated_columns_added);
-                    for column in missing {
-                        let identity = column.signature();
-                        if !loaded_set.insert(identity.clone()) {
-                            continue;
-                        }
-                        let index = master.add_column(column.cost, &column.entries)?;
-                        apply_column_cap(master, controller, index, column.tag)?;
-                        out.column_tags.push(column.tag);
-                        out.inserted_tags.push(column.tag);
-                        seen.insert(identity);
-                        if pool_seen.insert(column.signature()) {
-                            pool.push(column.clone());
-                        }
-                        loaded.push(Some(column.clone()));
-                    }
+                };
+                if let Some(next) = transferred {
+                    enumeration_transferred = true;
+                    *master = next.master;
+                    out = next.output;
+                    loaded = next.loaded;
+                    cut_artificials = next.cut_artificials;
+                    seen = next.seen;
+                    pool = next.pool;
+                    pool_seen = next.pool_seen;
                     // eval restarts the phase walk whether or not the master changed.
-                    out.columns = master.costs().len();
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
                     if pricing_estimate.is_finite() {
                         round_lower_bound = pricing_estimate.max(round_lower_bound);
@@ -827,6 +815,9 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                         .flatten()
                         .any(|column| column.identity.is_empty())
                 {
+                    if coefficients_changed || rows_remapped || !removed.is_empty() {
+                        enumeration_transferred = false;
+                    }
                     seen = loaded.iter().flatten().map(Column::signature).collect();
                 }
                 if coefficients_changed || rows_remapped {

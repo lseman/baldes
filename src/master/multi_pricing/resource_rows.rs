@@ -97,6 +97,7 @@ pub(super) fn validate_row<const D: usize>(
         if !seen.insert(c.network) {
             return Err(invalid("duplicate resource knapsack network"));
         }
+        super::resource_groups::check_load_rows(state, c.network, c.resource)?;
         validate(&oracle.network.graph, c)?;
     }
     Ok(())

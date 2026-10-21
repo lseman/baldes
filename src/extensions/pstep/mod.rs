@@ -1,7 +1,7 @@
 //! Compact p-step CVRP LP of Dollevoet, Munari and Spliet (EI-2020-01),
 //! Proposition 1: degree, endpoint flow and cumulative-load inequalities.
 //!
-//! Solve by parallel bucket-graph column generation or build the full pool
+//! Solve by exact parallel column generation or build the full pool
 //! by enumeration for validation. Both compute the LP relaxation. Integer
 //! optimization requires binary **arc flows**, not binary extreme columns.
 
@@ -11,7 +11,7 @@ use crate::{incomplete, invalid, Result};
 mod master;
 mod pricing;
 pub use master::{ColumnGenerationOptions, ColumnGenerationResult, ColumnGenerationStatus};
-pub use pricing::{PricingOptions, PricingRound};
+pub use pricing::{PricingMethod, PricingOptions, PricingRound};
 
 /// Directed CVRP with start depot 0, customers 1..=n and end depot n+1.
 /// `None` denotes a missing arc; diagonal and depot-invalid arcs are ignored.

@@ -14,6 +14,61 @@ use build_config_ui::{Item, State, View};
 
 type Result<T> = std::result::Result<T, String>;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SimdMode {
+    Off,
+    Avx2,
+    Avx512,
+}
+
+#[derive(Clone, Copy)]
+struct CpuSimd {
+    avx2: bool,
+    avx512: bool,
+}
+
+impl CpuSimd {
+    fn detect() -> Self {
+        #[cfg(target_arch = "x86_64")]
+        return Self {
+            avx2: std::is_x86_feature_detected!("avx2"),
+            avx512: std::is_x86_feature_detected!("avx512f"),
+        };
+        #[cfg(not(target_arch = "x86_64"))]
+        Self {
+            avx2: false,
+            avx512: false,
+        }
+    }
+
+    fn supports(self, mode: SimdMode) -> bool {
+        match mode {
+            SimdMode::Off => true,
+            SimdMode::Avx2 => self.avx2,
+            SimdMode::Avx512 => self.avx512,
+        }
+    }
+}
+
+impl SimdMode {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::Avx2 => "avx2",
+            Self::Avx512 => "avx512",
+        }
+    }
+
+    fn next(self, cpu: CpuSimd, host: bool) -> Self {
+        let modes = [Self::Off, Self::Avx2, Self::Avx512];
+        let current = modes.iter().position(|&mode| mode == self).unwrap();
+        (1..=3)
+            .map(|step| modes[(current + step) % 3])
+            .find(|&mode| mode == Self::Off || (host && cpu.supports(mode)))
+            .unwrap()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Config {
     clp: bool,
@@ -21,7 +76,7 @@ struct Config {
     cli: bool,
     release: bool,
     native_cpu: bool,
-    simd: bool,
+    simd: SimdMode,
     release_debug: bool,
     offline: bool,
     locked: bool,
@@ -39,7 +94,7 @@ impl Default for Config {
             cli: false,
             release: true,
             native_cpu: false,
-            simd: false,
+            simd: SimdMode::Off,
             release_debug: false,
             offline: false,
             locked: true,
@@ -77,7 +132,14 @@ impl Config {
                 "CONFIG_CLP" => config.clp = boolean()?,
                 "CONFIG_HIGHS" => config.highs = boolean()?,
                 "CONFIG_CLI" => config.cli = boolean()?,
-                "CONFIG_SIMD" => config.simd = boolean()?,
+                "CONFIG_SIMD" => {
+                    config.simd = match value {
+                        "off" | "n" => SimdMode::Off,
+                        "avx2" | "y" => SimdMode::Avx2,
+                        "avx512" => SimdMode::Avx512,
+                        _ => return Err("CONFIG_SIMD must be off, avx2 or avx512".into()),
+                    }
+                }
                 "CONFIG_NATIVE_CPU" => config.native_cpu = boolean()?,
                 "CONFIG_RELEASE_DEBUG" => config.release_debug = boolean()?,
                 "CONFIG_OFFLINE" => config.offline = boolean()?,
@@ -109,6 +171,7 @@ impl Config {
     }
 
     fn validate(&self) -> Result<()> {
+        self.validate_simd(CpuSimd::detect())?;
         if self.cli && !self.clp {
             return Err("the baldes CLI requires CONFIG_CLP=y".into());
         }
@@ -132,6 +195,21 @@ impl Config {
         Ok(())
     }
 
+    fn validate_simd(&self, cpu: CpuSimd) -> Result<()> {
+        if self.simd != SimdMode::Off && !self.target.is_empty() {
+            return Err(
+                "SIMD modes require the host target; clear Target triple or select Off".into(),
+            );
+        }
+        if !cpu.supports(self.simd) {
+            return Err(format!(
+                "SIMD mode {} is not supported by this CPU; select off",
+                self.simd.name()
+            ));
+        }
+        Ok(())
+    }
+
     fn load(path: &Path) -> Result<Self> {
         match fs::read_to_string(path) {
             Ok(text) => Self::parse(&text).map_err(|e| format!("{}: {e}", path.display())),
@@ -151,7 +229,7 @@ impl Config {
             yn(self.clp),
             yn(self.highs),
             yn(self.cli),
-            yn(self.simd),
+            self.simd.name(),
             yn(self.native_cpu),
             yn(self.release_debug),
             yn(self.offline),
@@ -209,7 +287,8 @@ impl Config {
         let features = [
             (self.clp, "clp"),
             (self.highs, "highs"),
-            (self.simd, "simd"),
+            (self.simd == SimdMode::Avx2, "simd"),
+            (self.simd == SimdMode::Avx512, "simd-avx512"),
         ]
         .into_iter()
         .filter_map(|(enabled, name)| enabled.then_some(name))
@@ -318,7 +397,7 @@ impl Config {
                         .map_err(|_| "Resource dimensions must be a nonnegative usize")?;
                 }
             }
-            12 => self.simd = !self.simd,
+            12 => self.simd = self.simd.next(CpuSimd::detect(), self.target.is_empty()),
             _ => {}
         }
         Ok(())
@@ -330,11 +409,11 @@ impl Config {
             Item::toggle(3, "BUILD", "Command-line program", self.cli, "Build the baldes executable alongside the library. Enabling the CLI selects Clp; disabling Clp also disables the CLI."),
             Item::toggle(1, "BUILD", "Clp backend", self.clp, "LP solver and routing model store. Builds the Clp and CoinUtils submodules; requires a C++14 compiler."),
             Item::toggle(2, "BUILD", "HiGHS backend", self.highs, "LP and mixed-integer solver. Requires libhighs with 32-bit HighsInt, discovered through the installation path, pkg-config or system libraries."),
-            Item::toggle(12, "PERFORMANCE", "SIMD acceleration", self.simd, "Enable runtime-dispatched AVX2 dominance scans. Other CPUs use the portable implementation. This opt-in feature does not require native CPU optimization."),
+            Item::value(12, "PERFORMANCE", "SIMD acceleration", self.simd.name(), "Cycle Off / AVX2 / AVX-512, skipping modes unsupported by this CPU. Host target only. AVX-512 requires Rust 1.89+. Runtime detection keeps portable fallback."),
             Item::toggle(4, "PERFORMANCE", "Native CPU", self.native_cpu, "Optimize for this computer with target-cpu=native. Clear the target triple before enabling; use portable builds for distribution."),
             Item::toggle(5, "PERFORMANCE", "Release debug symbols", self.release_debug, "Keep debug symbols in release builds for perf and other profilers. The development profile retains Cargo's normal debug settings."),
             Item::value(8, "PERFORMANCE", "Parallel jobs", if self.jobs == 0 { "Automatic".into() } else { self.jobs.to_string() }, "Maximum parallel Cargo compilation jobs. Enter 0 to let Cargo choose automatically."),
-            Item::value(11, "TOOLCHAIN", "Resource dimensions", self.resource_dimensions.to_string(), "Compiled scalar capacity for C/Python and default Rust types. Explicit const-generic Rust capacities remain independent. Default: 2."),
+            Item::value(11, "TOOLCHAIN", "Resource dimensions", self.resource_dimensions.to_string(), "Compiled scalar capacity for Python and default Rust types. Explicit const-generic Rust capacities remain independent. Default: 2."),
             Item::value(9, "TOOLCHAIN", "Target triple", if self.target.is_empty() { "Host" } else { &self.target }, "Leave empty to build for this host. Cross compilation requires the Rust target, a linker and compatible native solver libraries."),
             Item::value(10, "TOOLCHAIN", "HiGHS installation", if self.highs_dir.is_empty() { "Automatic" } else { &self.highs_dir }, "Optional installation root containing lib/libhighs. Leave empty to preserve HIGHS_DIR and normal library discovery."),
             Item::toggle(6, "CARGO", "Offline builds", self.offline, "Use Cargo's offline mode. All dependencies must already be available in the local cache."),
@@ -742,20 +821,70 @@ mod tests {
     }
 
     #[test]
+    fn simd_modes_follow_cpu_support() {
+        for (cpu, expected) in [
+            (
+                CpuSimd {
+                    avx2: false,
+                    avx512: false,
+                },
+                vec![SimdMode::Off],
+            ),
+            (
+                CpuSimd {
+                    avx2: true,
+                    avx512: false,
+                },
+                vec![SimdMode::Off, SimdMode::Avx2],
+            ),
+            (
+                CpuSimd {
+                    avx2: true,
+                    avx512: true,
+                },
+                vec![SimdMode::Off, SimdMode::Avx2, SimdMode::Avx512],
+            ),
+        ] {
+            let mut mode = SimdMode::Off;
+            for &next in expected.iter().cycle().skip(1).take(expected.len()) {
+                mode = mode.next(cpu, true);
+                assert_eq!(mode, next);
+            }
+            for mode in [SimdMode::Off, SimdMode::Avx2, SimdMode::Avx512] {
+                let c = Config {
+                    simd: mode,
+                    ..Config::default()
+                };
+                assert_eq!(c.validate_simd(cpu).is_ok(), cpu.supports(mode));
+                assert_eq!(mode.next(cpu, false), SimdMode::Off);
+            }
+        }
+    }
+
+    #[test]
     fn optional_simd_round_trips_and_reaches_cargo() {
-        let mut c = Config::default();
-        assert!(!c.simd);
-        c.edit(12, None).unwrap();
-        assert_eq!(Config::parse(&c.text()).unwrap(), c);
-        assert!(args(&c, "build")
-            .windows(2)
-            .any(|w| w == ["--features", "simd"]));
-        c.clp = true;
-        assert!(args(&c, "test")
-            .windows(2)
-            .any(|w| w == ["--features", "clp,simd"]));
-        c.edit(12, None).unwrap();
-        assert!(!c.simd);
+        for (mode, feature) in [(SimdMode::Avx2, "simd"), (SimdMode::Avx512, "simd-avx512")] {
+            let mut c = Config {
+                simd: mode,
+                ..Config::default()
+            };
+            if !CpuSimd::detect().supports(mode) {
+                assert!(Config::parse(&c.text()).is_err());
+                assert!(c.cargo("build").is_err());
+                continue;
+            }
+            assert_eq!(Config::parse(&c.text()).unwrap(), c);
+            assert!(args(&c, "build")
+                .windows(2)
+                .any(|w| w == ["--features", feature]));
+            c.target = "aarch64-unknown-linux-gnu".into();
+            assert!(c.validate().is_err());
+        }
+        assert_eq!(Config::parse("CONFIG_SIMD=n").unwrap().simd, SimdMode::Off);
+        if CpuSimd::detect().avx2 {
+            assert_eq!(Config::parse("CONFIG_SIMD=y").unwrap().simd, SimdMode::Avx2);
+        }
+        assert!(Config::parse("CONFIG_SIMD=unknown").is_err());
     }
 
     #[test]

@@ -238,6 +238,8 @@ pub(super) fn infeasible_output<const D: usize>(
         inherited_cuts: 0,
         master: Output {
             status: column_generation::Status::Infeasible,
+            enumeration_requested: false,
+            enumeration_failure: None,
             lp: f64::INFINITY,
             bound: f64::INFINITY,
             bound_mode,

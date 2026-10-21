@@ -53,7 +53,7 @@ iterations, so a factorization can finish after the deadline.
 `abs(primal - dual) / (1 + abs(primal))`; primal and dual feasibility still use
 `tolerance`. The default `None` retains the original stopping rule. The routing
 IPM master chooses epsilon from LP bounds during column generation, following
-Munari and Gondzio (2013), Algorithm 1; see [master options](../../docs/options.md).
+Munari and Gondzio (2013), Algorithm 1; see [master options](../../../docs/reference/options.md).
 `SolverType::{HiPO, NormalEquations, Auto}` selects the backend; HiPO is the
 default. `SparseSolver`, `HiPOLDLT`, and `NormalEqLDLT` also expose the linear
 systems independently. Construct a new solver when matrix values or its pattern

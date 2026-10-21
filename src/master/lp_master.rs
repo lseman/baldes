@@ -25,19 +25,28 @@ pub enum LpSolveOutcome {
 
 /// The operations the column generation algorithm needs from an LP backend.
 pub trait LpMaster: Sized + 'static {
+    /// Independent model/basis copy for an optional atomic CG handoff.
+    /// None declines the handoff without changing pricing or the live model.
+    fn try_clone_for_transaction(&self) -> Result<Option<Self>> {
+        Ok(None)
+    }
     /// Add a constraint row to the master problem.
     fn add_row(&mut self, sense: RowSense, rhs: f64, entries: &[(usize, f64)]) -> Result<usize>;
 
     /// Add several constraint rows in one call, in order. Returns their
     /// index range. Must leave the model as adding them one by one would.
-    fn add_rows(&mut self, rows: &[(RowSense, f64, &[(usize, f64)])]) -> Result<std::ops::Range<usize>>;
+    fn add_rows(
+        &mut self,
+        rows: &[(RowSense, f64, &[(usize, f64)])],
+    ) -> Result<std::ops::Range<usize>>;
 
     /// Add a single variable (column), with lower bound zero.
     fn add_column(&mut self, cost: f64, entries: &[(usize, f64)]) -> Result<usize>;
 
     /// Add several columns in one call, in order. Returns their index range.
     /// Must leave the model and bookkeeping as adding them one by one would.
-    fn add_columns(&mut self, columns: &[(f64, &[(usize, f64)])]) -> Result<std::ops::Range<usize>>;
+    fn add_columns(&mut self, columns: &[(f64, &[(usize, f64)])])
+        -> Result<std::ops::Range<usize>>;
 
     /// Modify a single matrix coefficient.
     fn set_coefficient(&mut self, row: usize, column: usize, value: f64) -> Result<()>;
@@ -59,8 +68,12 @@ pub trait LpMaster: Sized + 'static {
     /// zero budgets only. Only Optimal authorizes new solution vectors here;
     /// solve_for_column_generation also permits Suboptimal pricing points.
     fn solve_with_time_limit(&mut self, remaining: Duration) -> Result<LpSolveOutcome> {
-        if remaining.is_zero() { return Ok(LpSolveOutcome::TimeLimit); }
-        Ok(if self.solve() { LpSolveOutcome::Optimal } else {
+        if remaining.is_zero() {
+            return Ok(LpSolveOutcome::TimeLimit);
+        }
+        Ok(if self.solve() {
+            LpSolveOutcome::Optimal
+        } else {
             match self.status() {
                 1 => LpSolveOutcome::PrimalInfeasible,
                 2 => LpSolveOutcome::DualInfeasible,
@@ -75,7 +88,9 @@ pub trait LpMaster: Sized + 'static {
     /// an accurate solve, required before declaring column generation complete.
     /// Simplex backends keep their usual solve and return Optimal.
     fn solve_for_column_generation(
-        &mut self, remaining: Duration, _gap_tolerance: Option<f64>,
+        &mut self,
+        remaining: Duration,
+        _gap_tolerance: Option<f64>,
     ) -> Result<LpSolveOutcome> {
         self.solve_with_time_limit(remaining)
     }
@@ -89,7 +104,9 @@ pub trait LpMaster: Sized + 'static {
     /// Objective value of the last solve.
     fn objective(&self) -> f64;
     /// Constant contribution from variables removed into a fixed solution.
-    fn objective_offset(&self) -> f64 { 0. }
+    fn objective_offset(&self) -> f64 {
+        0.
+    }
     /// Normalized status: 0 optimal, 1 primal infeasible, 2 dual infeasible,
     /// 3 stopped, 4 failed; other values mean unknown.
     fn status(&self) -> i32;
@@ -141,7 +158,9 @@ pub trait LpMaster: Sized + 'static {
 pub fn cleanup_cut_rows<M: LpMaster>(master: &M, initial_rows: usize) -> Result<Vec<usize>> {
     let (rhs, senses, values) = (master.rhs(), master.senses(), master.values());
     if initial_rows > rhs.len() || !master.solved() {
-        return Err(invalid("cut cleanup requires a solved master and valid base rows"));
+        return Err(invalid(
+            "cut cleanup requires a solved master and valid base rows",
+        ));
     }
     let count = rhs.len() - initial_rows;
     if count <= 1 {
@@ -197,7 +216,11 @@ pub fn cleanup_cut_rows<M: LpMaster>(master: &M, initial_rows: usize) -> Result<
             }
         });
     }
-    let mut rows: Vec<_> = candidates.into_iter().skip(target.saturating_sub(kept)).map(|(row, _)| row).collect();
+    let mut rows: Vec<_> = candidates
+        .into_iter()
+        .skip(target.saturating_sub(kept))
+        .map(|(row, _)| row)
+        .collect();
     rows.sort_unstable();
     Ok(rows)
 }

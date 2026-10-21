@@ -189,11 +189,12 @@ pub fn solve<const D: usize>(
                 .all(|&c| result.values.get(c).copied().unwrap_or(0.) <= 1e-6)
         {
             if let Some((candidate, side, parent_bound)) = &node.observation {
-                output.branch_history.record(
+                output.branch_history.record_at_stage(
                     candidate,
                     *side,
                     node.branches.len().saturating_sub(1),
                     history::EvaluationKind::NodePricing,
+                    None,
                     *parent_bound,
                     result.master.lp,
                     result.solver_seconds,
@@ -260,12 +261,29 @@ pub fn solve<const D: usize>(
                 *flows.entry(problem.arc_position(id).unwrap()).or_default() += value;
             }
         }
-        let candidates = candidates::candidates_with_history(
+        let mut candidates = candidates::candidates_with_history(
             &problem,
             &result,
             &options.branching,
             &node.branches,
         );
+        if !node.branches.is_empty()
+            && options.branching.accumulated_resource
+            && options
+                .branch_history
+                .as_ref()
+                .is_some_and(|history| history.policy == BranchHistoryPolicy::ObservedNative)
+            && !candidates
+                .iter()
+                .any(|c| matches!(c.down, BranchConstraint::NumberOfVehicles { .. }))
+        {
+            output.branch_history.refresh_resource_generators(
+                &problem,
+                &result.route_values(),
+                &node.branches,
+                &mut candidates,
+            );
+        }
         // Capture this node's solved snapshot before moving result into diving.
         let parent_snapshot = result.snapshot.clone();
         diving::run(

@@ -107,9 +107,19 @@ fn enumeration_rewrites_existing_master_coefficients() {
     };
     struct Transition {
         done: bool,
+        saved_done: bool,
         column: Column,
     }
     impl Controller<ClpMaster> for Transition {
+        fn begin_enumeration_transaction(&mut self, _: f64) -> baldes::Result<bool> {
+            self.saved_done = self.done;
+            Ok(!self.done)
+        }
+        fn finish_enumeration_transaction(&mut self, commit: bool) {
+            if !commit {
+                self.done = self.saved_done;
+            }
+        }
         fn enumerated_universe(
             &mut self,
             _: &[f64],
@@ -137,6 +147,7 @@ fn enumeration_rewrites_existing_master_coefficients() {
     updated.entries = vec![(0, 2.)];
     let mut controller = Transition {
         done: false,
+        saved_done: false,
         column: updated,
     };
     let options = Options {
@@ -161,17 +172,18 @@ fn enumeration_rewrites_existing_master_coefficients() {
     .unwrap();
     assert!(controller.done);
     assert_eq!(master.column_entries(0).unwrap(), vec![(0, 2.)]);
+    assert_eq!(result.warm_start.generated_pool[0].entries, vec![(0, 2.)]);
     assert_eq!(result.lp, 10.);
 }
 
 #[cfg(feature = "clp")]
 #[test]
 fn enumerated_snapshot_survives_siblings_grandchildren_and_failed_setup() {
+    use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         root::{self, RootOptions, RootProblem},
         RowSense,
     };
-    use baldes::inputs::{Instance, Rounding};
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let problem =
         RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
@@ -248,11 +260,11 @@ fn enumerated_snapshot_survives_siblings_grandchildren_and_failed_setup() {
 #[cfg(feature = "clp")]
 #[test]
 fn tree_honors_enumeration_control_during_node_processing() {
+    use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         root::{RootOptions, RootProblem},
         tree::{self, TreeOptions, TreeStatus},
     };
-    use baldes::inputs::{Instance, Rounding};
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for enumerate in [false, true] {
         let problem =
@@ -306,8 +318,20 @@ fn warm_starts_preserve_uninserted_columns_and_same_batch_duplicates() {
     };
     struct EnumerateOnce {
         universe: Option<Vec<Column>>,
+        saved: Option<Vec<Column>>,
     }
     impl Controller<ClpMaster> for EnumerateOnce {
+        fn begin_enumeration_transaction(&mut self, _: f64) -> baldes::Result<bool> {
+            self.saved = self.universe.clone();
+            Ok(self.universe.is_some())
+        }
+        fn finish_enumeration_transaction(&mut self, commit: bool) {
+            if commit {
+                self.saved = None;
+            } else {
+                self.universe = self.saved.take();
+            }
+        }
         fn enumerated_universe(
             &mut self,
             _: &[f64],
@@ -374,6 +398,7 @@ fn warm_starts_preserve_uninserted_columns_and_same_batch_duplicates() {
             },
             &mut EnumerateOnce {
                 universe: Some(universe),
+                saved: None,
             },
             Options {
                 warm_start: Some(warm),
@@ -404,12 +429,12 @@ fn warm_starts_preserve_uninserted_columns_and_same_batch_duplicates() {
 #[cfg(feature = "clp")]
 #[test]
 fn snapshots_keep_cached_columns_and_extend_branch_rows_without_aliasing() {
+    use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         column_generation::Status,
         root::{self, RootOptions, RootProblem},
         RowSense,
     };
-    use baldes::inputs::{Instance, Rounding};
     let mut instance = Instance::read("instances/R201.txt").unwrap();
     instance.truncate(10).unwrap();
     let graph = instance.graph(12, Rounding::None).unwrap();
@@ -469,11 +494,11 @@ fn snapshots_keep_cached_columns_and_extend_branch_rows_without_aliasing() {
 #[cfg(feature = "clp")]
 #[test]
 fn child_enumeration_never_reactivates_a_forbidden_cached_arc() {
+    use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         root::{self, RootOptions, RootProblem},
         RowSense,
     };
-    use baldes::inputs::{Instance, Rounding};
     let instance = Instance::read("tests/master/fixtures/fractional.txt").unwrap();
     let graph = instance.graph(5, Rounding::None).unwrap();
     let arc = graph
@@ -648,12 +673,12 @@ fn cut_cleanup_remaps_loaded_and_uninserted_pool_rows_before_resume() {
 #[cfg(feature = "clp")]
 #[test]
 fn child_regeneration_rechecks_ryan_foster_for_cached_columns() {
+    use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         branching::BranchConstraint,
         root::{self, RootOptions, RootProblem},
     };
     use baldes::pricing::restrictions::RyanFosterConstraint;
-    use baldes::inputs::{Instance, Rounding};
     // Two odd clusters keep one fractional triangle after branching on the
     // other, so both children actually reach fixing/enumeration.
     let instance = Instance::parse("clusters\nVEHICLE\nNUMBER CAPACITY\n6 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 1 .1 1 0 100 0\n3 1 -.1 1 0 100 0\n4 -1 0 1 0 100 0\n5 -1 .1 1 0 100 0\n6 -1 -.1 1 0 100 0\n").unwrap();
@@ -742,3 +767,6 @@ fn ng_strengthening_cannot_stamp_a_stale_resource_grid_as_current() {
     let mut sibling = parent.fork_for_node();
     assert_eq!(paths(sibling.enumerate(10.).unwrap()), vec![vec![0, 5]]);
 }
+#[cfg(feature = "clp")]
+#[path = "node_lifecycle/enumeration_transaction.rs"]
+mod enumeration_transaction;

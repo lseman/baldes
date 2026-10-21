@@ -275,3 +275,210 @@ fn relaxed_collection_has_atomic_limits_and_explicit_unknown_arithmetic() {
         PathDomainFailure::UnsupportedResources
     );
 }
+
+#[test]
+fn deadline_after_a_materialized_path_discards_the_partial_collection() {
+    let mut graph = Graph::<5>::new(80, 5).unwrap();
+    let sink = graph.sink;
+    graph.add_arc(0, 1, 0.).unwrap();
+    graph.add_arc(1, sink, 0.).unwrap();
+    graph.add_arc(0, 2, 0.).unwrap();
+    for vertex in 2..sink {
+        graph.add_arc(vertex, vertex + 1, 0.).unwrap();
+    }
+    let original = graph.clone();
+    let created = std::cell::Cell::new(0);
+    let extensions = std::cell::Cell::new(0);
+    let started = Instant::now();
+    let failed = collect_paths_with_clock(
+        &graph,
+        PathDomainLimits {
+            deadline: Some(started + Duration::from_secs(1)),
+            ..limits()
+        },
+        |graph, arc, quantities| {
+            extensions.set(extensions.get() + 1);
+            extend_resource_lower_bounds(graph, arc, quantities)
+        },
+        |arcs, _| {
+            created.set(created.get() + 1);
+            arcs
+        },
+        || {
+            if created.get() == 0 {
+                started
+            } else {
+                started + Duration::from_secs(2)
+            }
+        },
+    );
+    assert!(matches!(failed, Err(PathDomainFailure::TimeLimit)));
+    assert_eq!(created.get(), 1);
+    assert!(
+        extensions.get() > 2,
+        "must interrupt the second path's traversal"
+    );
+    assert_eq!(graph, original);
+    let retried = CompleteResourceRelaxation::collect(&graph, limits()).unwrap();
+    assert_eq!(retried.paths().len(), 2);
+    assert_eq!(retried.paths()[0].arc_positions(), [0, 1]);
+}
+
+#[test]
+fn cost_bounded_relaxation_matches_exhaustive_signed_parallel_cycle_domains() {
+    use std::collections::BTreeSet;
+    let graph = graph();
+    // Independently listed feasible simple paths for this resource schedule.
+    let paths = [vec![0, 4], vec![1, 4], vec![6, 3, 4], vec![6, 5]];
+    for code in 0..3usize.pow(7) {
+        let mut remaining = code;
+        let mut weights = vec![];
+        for _ in 0..7 {
+            weights.push((remaining % 3) as f64 - 1.);
+            remaining /= 3;
+        }
+        for ceiling in -3..=3 {
+            let domain =
+                CostBoundedResourceRelaxation::collect(&graph, &weights, ceiling as f64, limits())
+                    .unwrap();
+            assert_eq!(domain.coverage_ceiling(), ceiling as f64);
+            let expected: BTreeSet<_> = paths
+                .iter()
+                .filter(|p| p.iter().map(|&i| weights[i]).sum::<f64>() <= ceiling as f64)
+                .cloned()
+                .collect();
+            let actual: BTreeSet<_> = domain
+                .paths()
+                .iter()
+                .map(|p| p.arc_positions().to_vec())
+                .collect();
+            assert_eq!(actual, expected, "weights={weights:?}, ceiling={ceiling}");
+        }
+    }
+}
+
+#[test]
+fn cost_pruning_precedes_storage_limits_and_keeps_negative_suffixes() {
+    let mut graph = Graph::<7>::new(4, 0).unwrap();
+    for (tail, head, cost) in [(0, 1, 1.), (1, 3, 1.), (2, 3, 0.)] {
+        graph.add_arc(tail, head, cost).unwrap();
+    }
+    for _ in 0..32 {
+        graph.add_arc(0, 2, 100.).unwrap();
+    }
+    let weights: Vec<_> = graph.arcs.iter().map(|a| a.cost).collect();
+    let small = PathDomainLimits {
+        max_paths: 1,
+        max_stored_arcs: 2,
+        ..limits()
+    };
+    assert!(matches!(
+        CompleteResourceRelaxation::collect(&graph, small),
+        Err(PathDomainFailure::PathLimit)
+    ));
+    let domain = CostBoundedResourceRelaxation::collect(&graph, &weights, 2., small).unwrap();
+    assert_eq!(domain.paths().len(), 1);
+    assert_eq!(domain.paths()[0].arc_positions(), &[0, 1]);
+    assert_eq!(domain.stored_arcs(), 2);
+    let exact = PathDomainLimits {
+        max_work: domain.work_used(),
+        ..small
+    };
+    assert!(CostBoundedResourceRelaxation::collect(&graph, &weights, 2., exact).is_ok());
+    assert!(matches!(
+        CostBoundedResourceRelaxation::collect(
+            &graph,
+            &weights,
+            2.,
+            PathDomainLimits {
+                max_work: exact.max_work - 1,
+                ..exact
+            }
+        ),
+        Err(PathDomainFailure::WorkLimit)
+    ));
+    let mut signed = weights;
+    signed[0] = 100.;
+    signed[1] = -101.;
+    let domain = CostBoundedResourceRelaxation::collect(&graph, &signed, -1., small).unwrap();
+    assert_eq!(domain.paths()[0].arc_positions(), &[0, 1]);
+}
+
+#[test]
+fn cost_coverage_is_outward_and_invalid_or_partial_searches_return_no_domain() {
+    let mut graph = Graph::<2>::new(3, 0).unwrap();
+    graph.add_arc(0, 1, 0.).unwrap();
+    graph.add_arc(1, 2, 0.).unwrap();
+    let at = 0.3f64;
+    let above = f64::from_bits(at.to_bits() + 1);
+    // Exact binary64 0.1 + 0.2 is below `above`; downward pruning must keep it.
+    let weights = [0.1, 0.2];
+    assert_eq!(
+        CostBoundedResourceRelaxation::collect(&graph, &weights, above, limits())
+            .unwrap()
+            .paths()
+            .len(),
+        1
+    );
+    let below = f64::from_bits(at.to_bits() - 1);
+    assert_eq!(
+        CostBoundedResourceRelaxation::collect(&graph, &weights, below, limits())
+            .unwrap()
+            .paths()
+            .len(),
+        0
+    );
+    for (costs, ceiling) in [
+        (vec![], 1.),
+        (vec![f64::NAN, 0.], 1.),
+        (vec![0., f64::INFINITY], 1.),
+        (vec![0., 0.], f64::INFINITY),
+    ] {
+        assert!(matches!(
+            CostBoundedResourceRelaxation::collect(&graph, &costs, ceiling, limits()),
+            Err(PathDomainFailure::Arithmetic)
+        ));
+    }
+    assert!(matches!(
+        CostBoundedResourceRelaxation::collect(
+            &graph,
+            &weights,
+            1.,
+            PathDomainLimits {
+                deadline: Some(Instant::now()),
+                ..limits()
+            }
+        ),
+        Err(PathDomainFailure::TimeLimit)
+    ));
+    assert!(matches!(
+        CostBoundedResourceRelaxation::collect(
+            &graph,
+            &weights,
+            1.,
+            PathDomainLimits {
+                max_paths: 0,
+                ..limits()
+            }
+        ),
+        Err(PathDomainFailure::PathLimit)
+    ));
+    assert!(matches!(
+        CostBoundedResourceRelaxation::collect(
+            &graph,
+            &weights,
+            1.,
+            PathDomainLimits {
+                max_stored_arcs: 1,
+                ..limits()
+            }
+        ),
+        Err(PathDomainFailure::StoredArcLimit)
+    ));
+    let mut equality = graph;
+    equality.resources.push(ResourceKind::Equality);
+    assert!(matches!(
+        CostBoundedResourceRelaxation::collect(&equality, &weights, 1., limits()),
+        Err(PathDomainFailure::UnsupportedResources)
+    ));
+}

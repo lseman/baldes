@@ -1,6 +1,13 @@
 use super::*;
 
 impl LpMaster for ClpMaster {
+    fn try_clone_for_transaction(&self) -> Result<Option<Self>> {
+        let mut copy = self.try_clone()?;
+        // This continues one solve rather than starting a descendant's counters.
+        copy.simplex_iterations = self.simplex_iterations;
+        copy.ipm_iterations = self.ipm_iterations;
+        Ok(Some(copy))
+    }
     fn add_row(&mut self, sense: RowSense, rhs: f64, entries: &[(usize, f64)]) -> Result<usize> {
         Self::add_row(self, sense, rhs, entries)
     }
@@ -83,7 +90,9 @@ impl LpMaster for ClpMaster {
                 if remaining.is_zero()
                     || started.elapsed() >= remaining
                     || (self.solver == MasterSolver::Clp
-                        && unsafe { Clp_secondaryStatus(self.model.as_ptr()) } == 9)
+                        && unsafe {
+                            Clp_secondaryStatus(self.model.expect("Clp backend is active").as_ptr())
+                        } == 9)
                 {
                     LpSolveOutcome::TimeLimit
                 } else {

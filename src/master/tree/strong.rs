@@ -182,9 +182,12 @@ pub(super) fn choose<const D: usize>(
                 .map_or(supplied.len().saturating_mul(2), |strong| {
                     strong.phases.first().map_or(0, |p| p.candidates)
                 });
-            output
-                .branch_history
-                .prioritize(&mut supplied, limit, history);
+            output.branch_history.prioritize(
+                &mut supplied,
+                limit,
+                history,
+                output.incumbent - node.bound,
+            );
         }
     }
     let mut candidates: Vec<_> = supplied
@@ -201,7 +204,7 @@ pub(super) fn choose<const D: usize>(
         return Ok(candidates.first().map(|c| (c.branch.clone(), c.bounds)));
     };
     let end = deadline.min(Instant::now() + config.time_limit);
-    for phase in &config.phases {
+    for (phase_index, phase) in config.phases.iter().enumerate() {
         candidates.truncate(phase.candidates);
         if candidates.is_empty() || Instant::now() >= end {
             break;
@@ -282,11 +285,12 @@ pub(super) fn choose<const D: usize>(
                 }
                 if options.branch_history.is_some() {
                     if let Some(kind) = observation {
-                        output.branch_history.record(
+                        output.branch_history.record_at_stage(
                             &candidate.branch,
                             side,
                             node.branches.len(),
                             kind,
+                            Some(phase_index + 1),
                             node.bound,
                             estimates[side],
                             trial_started.elapsed().as_secs_f64(),

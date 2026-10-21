@@ -269,3 +269,48 @@ def test_clp_runtime_policy_preserves_routing_solution(scaling, keep, rank_one):
 def test_invalid_clp_scaling_is_rejected():
     with pytest.raises(ValueError, match="Clp scaling"):
         solve_root(triangle(), clp_scaling="invalid")
+
+
+def test_direct_rust_solver_validates_ids_and_preserves_phase_keywords():
+    solver = pybaldes.Solver(2, 1)
+    for call in [
+        lambda: solver.set_source(-1),
+        lambda: solver.set_sink(2),
+        lambda: solver.set_resource_type(1, 0),
+        lambda: solver.set_resource_type(0, 2),
+        lambda: solver.set_initial_resource(0, math.inf),
+        lambda: solver.set_ng_neighborhood(0, [0, 0]),
+        lambda: solver.attach_elementarity_to_node(0, 999),
+        lambda: solver.get_phase(index=-1),
+        lambda: solver.get_enumerated(index=0),
+    ]:
+        with pytest.raises(RuntimeError):
+            call()
+    assert solver.get_phase(index=0).labels_per_bucket > 0
+    assert solver.enumerated_count == 0
+    arc = solver.new_arc(0, 1, -3)
+    solver.set_arc_consumption(arc, 0, 1)
+    solver.set_vertex_bounds(0, 0, 0, 2)
+    solver.set_vertex_bounds(1, 0, 0, 2)
+    solver.build_default_resource_buckets()
+    minimum, routes = solver.price(10)
+    assert minimum == -3
+    assert routes[0].arcs() == [arc]
+    # The default pricing schedule starts with a heuristic phase.
+    assert not routes[0].is_certified
+    _, _, exact_routes = solver.enumerate(10)
+    assert exact_routes[0].is_certified
+    assert routes[0].resource_consumption(0) == 1
+    with pytest.raises(RuntimeError):
+        routes[0].resource_consumption(1)
+
+
+def test_direct_rust_solver_can_move_to_another_python_thread():
+    from concurrent.futures import ThreadPoolExecutor
+
+    solver = pybaldes.Solver(2, 0)
+    solver.new_arc(0, 1, -1)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        cost, route = pool.submit(solver.solve).result()
+    assert cost == -1
+    assert route.nodes() == [0, 1]

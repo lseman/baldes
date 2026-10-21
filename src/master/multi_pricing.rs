@@ -19,8 +19,10 @@ pub mod imported;
 mod lifecycle;
 mod nonlinear;
 mod presence_rows;
+mod resource_groups;
 mod resource_rows;
 pub use presence_rows::PresenceCoefficients;
+pub use resource_groups::ResourceGroupMember;
 pub use resource_rows::ResourceKnapsackCoefficients;
 mod preprocessing;
 mod preprocessing_flow;
@@ -28,7 +30,9 @@ mod route_bounds;
 pub use preprocessing::{NetworkActivityBounds, PreprocessingOptions, PreprocessingReport};
 mod master_variables;
 mod variables;
-pub use enumeration::{EnumeratedMipOutput, EnumerationOptions, EnumerationReport};
+pub use enumeration::{
+    CutoffCostBound, CutoffEnumeration, EnumeratedMipOutput, EnumerationOptions, EnumerationReport,
+};
 pub use master_variables::MasterVariable;
 pub use nonlinear::{RankOneCoefficients, RegisteredCutCoefficients};
 mod tree;
@@ -137,6 +141,7 @@ struct Oracle<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     nonlinear_rows: Vec<(usize, usize)>,
     knapsack_rows: Vec<(usize, usize)>,
     presence_rows: Vec<(usize, usize)>,
+    resource_groups: Vec<(usize, super::branching::AccumulatedResourceGroupBranch)>,
     proved_zero_arcs: Vec<bool>,
     proved_multiplicity_upper: Option<f64>,
 }
@@ -165,8 +170,18 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     master_variables: Vec<MasterVariable>,
     route_upper_bounds: HashMap<usize, f64>,
 }
-struct Coordinator<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>(Rc<RefCell<State<D>>>);
+struct Coordinator<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>(
+    Rc<RefCell<State<D>>>,
+    bool,
+);
 impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
+    fn request_enumeration_checkpoint(&mut self, _master: &ClpMaster) -> Result<bool> {
+        let requested = self.1 && self.0.borrow().universe.is_none();
+        // A failed attempt must resume ordinary pricing, not request another
+        // checkpoint at the same point. A later solve may retry with new limits.
+        self.1 = false;
+        Ok(requested)
+    }
     fn column_upper_bound(&self, tag: i32) -> Option<f64> {
         let state = self.0.borrow();
         if tag >= 0 {
@@ -535,6 +550,7 @@ fn solve_with_seed_routes<const D: usize>(
             nonlinear_rows: vec![],
             knapsack_rows: vec![],
             presence_rows: vec![],
+            resource_groups: vec![],
             proved_zero_arcs: vec![],
             proved_multiplicity_upper: None,
         });
@@ -585,16 +601,25 @@ fn run<const D: usize>(
         for (name, value) in &options.pricing_options {
             oracle.solver.set_option(name, *value)?;
         }
-        if resource_rows::requires_forward(oracle) {
-            // Backward complement loads do not reproduce waiting or initial
-            // usage. Keep the row's forward coefficient contract authoritative.
+        let equality_sink_is_free =
+            oracle
+                .network
+                .graph
+                .resources
+                .iter()
+                .enumerate()
+                .any(|(r, kind)| {
+                    let sink = oracle.network.graph.vertices[oracle.network.graph.sink].bounds[r];
+                    *kind == crate::graph::ResourceKind::Equality && sink.lower != sink.upper
+                });
+        if resource_rows::requires_forward(oracle) || equality_sink_is_free {
+            // Backward equality needs a fixed terminal value. Resource-row
+            // complements also cannot reproduce general waiting/initial usage.
+            // Apply these model contracts after caller direction options.
             oracle
                 .solver
                 .set_option("BALDESuseBidirectionalSearch", 0.)?;
         }
-    }
-    if let Some(configured) = &options.enumeration {
-        enumeration::transfer(&mut master, &mut state, &mut options.cg, configured)?;
     }
     let loaded: Vec<_> = if let Some(warm) = &options.cg.warm_start {
         warm.columns
@@ -636,15 +661,99 @@ fn run<const D: usize>(
         |oracle| oracle.solver.phases.clone(),
     );
     let state = Rc::new(RefCell::new(state));
-    let mut controller = Coordinator(state.clone());
+    let mut controller = Coordinator(state.clone(), options.enumeration.is_some());
     let gap = (options.cg.gap_absolute, options.cg.gap_relative);
-    let mut result = cg::optimize(
-        &mut master,
-        &schedule,
-        |phase, duals| state.borrow_mut().price(phase, duals),
-        &mut controller,
-        options.cg,
-    )?;
+    let started = Instant::now();
+    let time_limit = options.cg.time_limit;
+    let max_iterations = options.cg.max_iterations;
+    let mut previous: Option<cg::Output> = None;
+    let mut result = loop {
+        let spent = previous.as_ref().map_or(0, |out| out.iterations);
+        options.cg.max_iterations = max_iterations - spent;
+        options.cg.time_limit = time_limit.saturating_sub(started.elapsed()).min(
+            state
+                .borrow()
+                .deadline
+                .saturating_duration_since(Instant::now()),
+        );
+        let mut current = cg::optimize(
+            &mut master,
+            &schedule,
+            |phase, duals| state.borrow_mut().price(phase, duals),
+            &mut controller,
+            options.cg.clone(),
+        )?;
+        if let Some(mut prior) = previous.take() {
+            if current.enumeration_failure.is_none() {
+                current.enumeration_failure = prior.enumeration_failure.take();
+            }
+            for row in &mut current.history {
+                row.iteration += prior.iterations;
+                row.pricing_calls += prior.pricing_calls;
+            }
+            current.iterations += prior.iterations;
+            current.pricing_calls += prior.pricing_calls;
+            current.penalty_updates += prior.penalty_updates;
+            current.cut_rounds += prior.cut_rounds;
+            prior.history.append(&mut current.history);
+            current.history = prior.history;
+            prior.inserted_tags.append(&mut current.inserted_tags);
+            current.inserted_tags = prior.inserted_tags;
+        }
+        if !current.enumeration_requested {
+            break current;
+        }
+        current.enumeration_requested = false;
+        if current.iterations >= max_iterations {
+            break current;
+        }
+        if started.elapsed() >= time_limit || Instant::now() >= state.borrow().deadline {
+            current.status = cg::Status::TimeLimit;
+            break current;
+        }
+        options.cg.warm_start = Some(current.warm_start.clone());
+        // transfer stages every model/registry change on private copies. On a
+        // backend failure the checkpoint is still valid for ordinary pricing.
+        if let Err(error) = enumeration::transfer(
+            &mut master,
+            &mut state.borrow_mut(),
+            &mut options.cg,
+            options.enumeration.as_ref().unwrap(),
+        ) {
+            state.borrow_mut().enumeration_report.failure = Some(error.to_string());
+        }
+        if state.borrow().universe.is_some() {
+            // Complete-domain deductions need the newly registered routes.
+            // They previously ran after the eager transfer; preserve that
+            // ordering here before any resumed pricing or bound publication.
+            let mut state = state.borrow_mut();
+            let loaded: Vec<_> = options
+                .cg
+                .warm_start
+                .as_ref()
+                .unwrap()
+                .columns
+                .iter()
+                .enumerate()
+                .filter_map(|(column, metadata)| {
+                    metadata
+                        .as_ref()
+                        .filter(|metadata| metadata.tag >= 0)
+                        .map(|metadata| (column, metadata.tag as usize))
+                })
+                .collect();
+            let previous_bounds: Vec<_> = state.master_variables.iter().map(|v| v.bounds).collect();
+            preprocessing::apply(&mut master, &mut state, &loaded, &options.preprocessing)?;
+            master_variables::publish::bounds(
+                &mut master,
+                &mut state,
+                &previous_bounds,
+                &mut options.cg.known,
+                options.cg.warm_start.as_mut(),
+            )?;
+        }
+        previous = Some(current);
+    };
     // A finite artificial penalty cannot prove original-model infeasibility.
     if result.status == cg::Status::Infeasible {
         result.status = cg::Status::Stalled;

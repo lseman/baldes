@@ -217,6 +217,11 @@ impl Default for Options {
 #[derive(Clone, Debug)]
 pub struct Output {
     pub status: Status,
+    /// The controller requested a resumable handoff, rather than termination.
+    /// `status` remains a limit status; this flag never certifies enumeration.
+    pub enumeration_requested: bool,
+    /// Most recent declined in-loop transfer error; ordinary pricing remains usable.
+    pub enumeration_failure: Option<String>,
     pub lp: f64,
     /// Selected bound; its guarantee is identified by `bound_mode`.
     pub bound: f64,
@@ -244,6 +249,7 @@ pub use controller::{Controller, NoController};
 
 mod driver;
 pub use driver::optimize;
+mod enumeration;
 
 mod bounds;
 pub use bounds::gap_smaller_than_tolerance;

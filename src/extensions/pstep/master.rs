@@ -1,5 +1,5 @@
 //! Two-phase column generation; LP stays on the calling thread.
-use super::{step_entries, Formulation, PricingOptions, Problem, Step};
+use super::{step_entries, Formulation, PricingMethod, PricingOptions, Problem, Step};
 use crate::master::{LpMaster, LpSolveOutcome};
 use crate::{incomplete, invalid, Result};
 use std::collections::BTreeSet;
@@ -48,13 +48,15 @@ pub struct ColumnGenerationResult {
     pub pricing_jobs: usize,
     pub pricing_workers: usize,
     pub generated_labels: usize,
+    pub enumerated_extensions: usize,
+    pub pricing_method: Option<PricingMethod>,
     pub lp_seconds: f64,
     pub pricing_seconds: f64,
     pub elapsed_seconds: f64,
 }
 
 impl Problem {
-    /// Solve the unlimited-fleet CVRP p-step LP by exact, parallel bucket-graph
+    /// Solve the unlimited-fleet CVRP p-step LP by exact, parallel
     /// pricing. Consumes an empty backend. All worker threads join before the
     /// master is updated; errors/limits never return a certified LP objective.
     pub fn solve_column_generation<M: LpMaster>(
@@ -98,6 +100,8 @@ impl Problem {
             pricing_jobs: 0,
             pricing_workers: 0,
             generated_labels: 0,
+            enumerated_extensions: 0,
+            pricing_method: None,
             lp_seconds: 0.0,
             pricing_seconds: 0.0,
             elapsed_seconds: 0.0,
@@ -149,6 +153,8 @@ impl Problem {
             result.pricing_jobs += round.jobs;
             result.pricing_workers = result.pricing_workers.max(round.workers);
             result.generated_labels += round.generated_labels;
+            result.enumerated_extensions += round.enumerated_extensions;
+            result.pricing_method = Some(round.method);
             if started.elapsed() >= options.time_limit {
                 result.status = ColumnGenerationStatus::TimeLimit;
                 break;

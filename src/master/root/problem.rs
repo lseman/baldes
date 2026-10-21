@@ -128,7 +128,9 @@ impl<const D: usize> RootProblem<D> {
         constraint.validate(self)?;
         // An empty intersection forbids this optional arc, rather than the
         // whole node. Express it as an additive zero-flow row for propagation.
-        let constraint = if let BranchConstraint::AccumulatedResource(c) = &constraint {
+        let constraint = if let BranchConstraint::AccumulatedResourceGroup(c) = constraint {
+            BranchConstraint::AccumulatedResourceGroup(c.prepare(&self.graph)?)
+        } else if let BranchConstraint::AccumulatedResource(c) = &constraint {
             if c.window(&self.graph)?.is_none() {
                 BranchConstraint::ArcFlow {
                     arc: self.arc_position(c.arc).unwrap(),
@@ -147,6 +149,8 @@ impl<const D: usize> RootProblem<D> {
         if let BranchConstraint::AccumulatedResource(c) = &constraint {
             let window = c.window(&self.graph)?.expect("nonempty resource branch");
             self.graph.arc_mut(c.arc)?.bounds[c.resource] = Some(window);
+        } else if let BranchConstraint::AccumulatedResourceGroup(c) = &constraint {
+            c.install(&mut self.graph)?;
         }
 
         for a in 0..self.graph.arcs.len() {
@@ -176,7 +180,7 @@ impl<const D: usize> RootProblem<D> {
         }
         for (r, c) in &self.branch_constraints {
             if c.nonlinear() {
-                let value = c.coefficient(self, route);
+                let value = c.nonlinear_coefficient(self, route);
                 if value != 0. {
                     *coefficients.entry(map[*r]).or_insert(0.) += value;
                 }

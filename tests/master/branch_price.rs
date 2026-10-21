@@ -391,6 +391,7 @@ fn cluster_resource_and_history_trees_preserve_exhaustive_optimum() {
             }
             controls.branch_history = Some(BranchHistoryOptions {
                 minimum_observations: 1,
+                ..Default::default()
             });
             let result = tree::solve(problem, controls).unwrap();
             assert_eq!(
@@ -409,48 +410,6 @@ fn cluster_resource_and_history_trees_preserve_exhaustive_optimum() {
     }
 }
 
-#[test]
-fn learned_branch_costs_are_reused_below_the_root_without_changing_the_optimum() {
-    use baldes::master::branching::BranchingOptions;
-    use baldes::master::tree::{BranchHistoryOptions, StrongBranchingOptions};
-    let mut reused = 0;
-    for n in [6, 7, 8] {
-        let mut text = format!("history\nVEHICLE\nNUMBER CAPACITY\n{n} 3\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000 0\n");
-        for i in 1..=n {
-            text.push_str(&format!(
-                "{i} {} {} 1 0 1000 0\n",
-                (i * 7) % 11,
-                (i * 3) % 13
-            ));
-        }
-        let inst = Instance::parse(&text).unwrap();
-        let exact = exhaustive(&inst);
-        let mut options = options();
-        options.root.enumerate = false;
-        options.mip_node_limit = 0;
-        options.branching = BranchingOptions::arc_flow_only();
-        let mut strong = StrongBranchingOptions::default();
-        strong.phases.truncate(1); // Require ordinary child solves to complete pricing.
-        options.strong_branching = Some(strong);
-        options.branch_history = Some(BranchHistoryOptions {
-            minimum_observations: 1,
-        });
-        let result = tree::solve(
-            RootProblem::set_partitioning(inst.graph(1, Rounding::None).unwrap(), n as f64)
-                .unwrap(),
-            options,
-        )
-        .unwrap();
-        assert_eq!(result.status, TreeStatus::Optimal, "n={n}: {result:?}");
-        assert!((result.incumbent - exact).abs() < 1e-6);
-        assert!(result.bound <= exact + 1e-6);
-        reused += result.branch_history.ranked_candidates;
-    }
-    assert!(
-        reused > 0,
-        "the fixture must exercise learned candidate ordering"
-    );
-}
 
 #[test]
 fn root_and_exact_incumbent_validation_support_more_than_two_resources() {

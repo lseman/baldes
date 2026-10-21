@@ -1,6 +1,9 @@
 use super::*;
 
 impl LpMaster for HighsMaster {
+    fn try_clone_for_transaction(&self) -> Result<Option<Self>> {
+        self.try_clone().map(Some)
+    }
     fn add_row(&mut self, sense: RowSense, rhs: f64, entries: &[(usize, f64)]) -> Result<usize> {
         Ok(self.add_rows(&[(sense, rhs, entries)])?.start)
     }
@@ -38,6 +41,7 @@ impl LpMaster for HighsMaster {
             values.extend(v);
             starts.push(indices.len() as HighsInt);
         }
+        self.matrix_cache.take();
         // SAFETY: buffers contain all row bounds and declared sparse entries;
         // HiGHS copies them without invalidating the surviving basis columns.
         unsafe {
@@ -103,6 +107,7 @@ impl LpMaster for HighsMaster {
         }
         let lower = vec![0.; columns.len()];
         let upper = vec![COLUMN_UPPER; columns.len()];
+        self.matrix_cache.take();
         // SAFETY: `starts` has one entry per column, `indices`/`values` the
         // declared nonzeros; HiGHS copies them.
         let rc = unsafe {
@@ -131,6 +136,7 @@ impl LpMaster for HighsMaster {
         if row >= self.rhs.len() || column >= self.costs.len() || !value.is_finite() {
             return Err(invalid("master coefficient index/value"));
         }
+        self.matrix_cache.take();
         // SAFETY: indices checked above.
         let rc = unsafe {
             Highs_changeCoeff(
@@ -396,56 +402,16 @@ impl LpMaster for HighsMaster {
         if column >= self.costs.len() {
             return Err(invalid("master column index"));
         }
-        let h = self.highs.as_ptr();
-        let col = column as HighsInt;
-        let (mut num_col, mut num_nz) = (0, 0);
-        let (mut cost, mut lower, mut upper) = (0., 0., 0.);
-        let mut start = 0;
-        // SAFETY: first call sizes the column; the second fills buffers of that size.
-        unsafe {
-            Self::check(
-                Highs_getColsByRange(
-                    h,
-                    col,
-                    col,
-                    &mut num_col,
-                    &mut cost,
-                    &mut lower,
-                    &mut upper,
-                    &mut num_nz,
-                    std::ptr::null_mut(),
-                    std::ptr::null_mut(),
-                    std::ptr::null_mut(),
-                ),
-                "getColsByRange",
-            )?;
-            let mut index = vec![0; num_nz as usize];
-            let mut value = vec![0.; num_nz as usize];
-            Self::check(
-                Highs_getColsByRange(
-                    h,
-                    col,
-                    col,
-                    &mut num_col,
-                    &mut cost,
-                    &mut lower,
-                    &mut upper,
-                    &mut num_nz,
-                    &mut start,
-                    index.as_mut_ptr(),
-                    value.as_mut_ptr(),
-                ),
-                "getColsByRange",
-            )?;
-            let mut entries: Vec<(usize, f64)> = index
-                .into_iter()
-                .zip(value)
-                .filter(|&(_, v)| v != 0.)
-                .map(|(r, v)| (r as usize, v))
-                .collect();
-            entries.sort_by_key(|&(r, _)| r);
-            Ok(entries)
-        }
+        let matrix = self.sparse_columns()?;
+        let range = matrix.starts[column] as usize..matrix.starts[column + 1] as usize;
+        let mut entries: Vec<_> = matrix.indices[range.clone()]
+            .iter()
+            .zip(&matrix.values[range])
+            .filter(|&(_, &v)| v != 0.)
+            .map(|(&r, &v)| (r as usize, v))
+            .collect();
+        entries.sort_by_key(|&(r, _)| r);
+        Ok(entries)
     }
 
     fn remove(
@@ -455,6 +421,9 @@ impl LpMaster for HighsMaster {
     ) -> Result<(Vec<Option<usize>>, Vec<Option<usize>>)> {
         let (rm, ri) = mapping(self.rhs.len(), rows)?;
         let (cm, ci) = mapping(self.costs.len(), columns)?;
+        if !ri.is_empty() || !ci.is_empty() {
+            self.matrix_cache.take();
+        }
         // SAFETY: sets hold distinct, in-range, ascending indices.
         unsafe {
             if !ri.is_empty() {

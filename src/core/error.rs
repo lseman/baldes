@@ -1,12 +1,7 @@
-//! Exception model of the C++ port.
+//! Solver errors and panic conversion helpers for language bindings.
 //!
-//! The C++ code throws standard exceptions (invalid_argument, out_of_range,
-//! logic_error, overflow_error, runtime_error) that are never caught inside
-//! the algorithms: they unwind to the C API guard, which stores `what()` as
-//! the last error and returns -1. This crate keeps that control flow: `throw!`
-//! unwinds with an [`OrError`] payload and `guarded` (api/internal.rs)
-//! catches it at the boundary. Rust bounds-check panics (the `.at()` cases)
-//! are caught the same way.
+//! Rust operations return `Result`; translated exception paths use an
+//! `OrError` panic payload that bindings can convert with [`catch`].
 
 use std::fmt;
 use std::sync::Once;

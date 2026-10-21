@@ -164,3 +164,74 @@ fn fractional_resource_steps_propagate_original_zero_penalties_without_enumerati
         }
     }
 }
+
+#[cfg(feature = "highs")]
+#[test]
+fn cutoff_resource_rows_preserve_fractional_waiting_equality_and_fixing() {
+    use baldes::master::solvers::mip::{MipOptions, MipStatus};
+    for divisor in [2., 262_144.] {
+        for variant in ["plain", "initial", "vertex_wait", "arc_wait", "equality"] {
+            let (problem, coefficients) = fixture(divisor, variant);
+            let root = multi_pricing::solve(problem, options()).unwrap();
+            let child = root
+                .snapshot
+                .with_resource_knapsack_row(
+                    Row {
+                        sense: RowSense::LessEqual,
+                        rhs: 1.,
+                    },
+                    &coefficients,
+                )
+                .unwrap();
+            let solved = child.solve(options()).unwrap();
+            optimal(&solved, 4.);
+            let cut = solved
+                .snapshot
+                .enumerate_below(5., &EnumerationOptions::default())
+                .unwrap();
+            assert_eq!(
+                cut.solve_mip(&MipOptions::default())
+                    .unwrap()
+                    .mip
+                    .solution
+                    .unwrap()
+                    .objective,
+                4.
+            );
+            assert_eq!(
+                cut.solve_mip(&MipOptions {
+                    objective_cutoff: 4.,
+                    ..Default::default()
+                })
+                .unwrap()
+                .mip
+                .status,
+                MipStatus::ObjectiveCutoff
+            );
+            let cheap = root
+                .routes
+                .iter()
+                .position(|r| r.network == 7 && r.route.arcs == [0, 1])
+                .unwrap();
+            let fixed = child
+                .fix_route(cheap, 1.)
+                .unwrap()
+                .solve(options())
+                .unwrap();
+            let view = fixed
+                .snapshot
+                .enumerate_below(5., &EnumerationOptions::default())
+                .unwrap();
+            assert_eq!(
+                view.solve_mip(&MipOptions::default())
+                    .unwrap()
+                    .mip
+                    .solution
+                    .unwrap()
+                    .objective,
+                4.
+            );
+            optimal(&root.snapshot.solve(options()).unwrap(), 2.);
+        }
+    }
+}

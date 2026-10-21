@@ -302,14 +302,45 @@ fn solve<const D: usize>(
             continue;
         }
         if let Some(configured) = &options.enumerated_mip {
-            if output.snapshot.enumeration_report().complete {
-                let mut configured = configured.clone();
-                configured.time_limit = configured
+            let mut configured = configured.clone();
+            configured.time_limit = configured
+                .time_limit
+                .min(deadline.saturating_duration_since(Instant::now()));
+            configured.objective_cutoff = configured.objective_cutoff.min(result.incumbent);
+            let attempt = if output.snapshot.enumeration_report().complete {
+                Some(output.snapshot.solve_enumerated_mip(&configured))
+            } else if configured.objective_cutoff.is_finite() {
+                let mut limits = options.node.enumeration.clone().unwrap_or_default();
+                limits.time_limit = limits
                     .time_limit
                     .min(deadline.saturating_duration_since(Instant::now()));
-                configured.objective_cutoff = configured.objective_cutoff.min(result.incumbent);
+                match output
+                    .snapshot
+                    .enumerate_below(configured.objective_cutoff, &limits)
+                {
+                    Ok(view) => {
+                        result.enumeration_reports.push(view.report().clone());
+                        configured.time_limit = configured
+                            .time_limit
+                            .min(deadline.saturating_duration_since(Instant::now()));
+                        Some(view.solve_mip(&configured).map(Some))
+                    }
+                    Err(error) => {
+                        result.enumeration_reports.push(EnumerationReport {
+                            attempts: 1,
+                            coverage_cutoff: Some(configured.objective_cutoff),
+                            failure: Some(error.to_string()),
+                            ..Default::default()
+                        });
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+            if let Some(attempt) = attempt {
                 result.enumerated_mip_calls += 1;
-                match output.snapshot.solve_enumerated_mip(&configured) {
+                match attempt {
                     Ok(Some(mip)) => {
                         use crate::master::solvers::mip::MipStatus;
                         result.enumerated_mip_nodes += mip.mip.nodes;

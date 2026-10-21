@@ -1,28 +1,39 @@
 # BALDES documentation
 
 Start with the [project README](../README.md) for installation and quick examples.
-Use the [CLI guide](cli.md) and [Python guide](python.md) for detailed usage. Commands here run from the repository
-root. These guides cover installing, configuring and using BALDES.
+Commands in these guides run from the repository root.
 
-## Guides
+## Getting started
 
-| Guide | Use it to |
-| --- | --- |
-| [Command-line usage](cli.md) | Run routing and HGS, interpret output, and look up CLI flags |
-| [Python API](python.md) | Install pybaldes, construct inputs, configure solves, and export results |
-| [Algorithms and references](algorithms.md) | Review solver components and research references |
-| [Build configuration](build.md) | Configure optional backends and compiler options in the terminal menu, then build with Make |
-| [Tree and node lifecycle](tree.md) | Run integer routing, understand node inheritance, bounds, limits, and result status |
-| [Multi-pricing](multi-pricing.md) | Model a shared master, resume or fork snapshots, and run assignment branching |
-| [Finite column imports](column-imports.md) | Import original-vector patterns, fix columns and constrain multiplicities without routing graphs |
-| [P-step CVRP](pstep.md) | Build and solve the compact p-step LP relaxation |
-| [Scalar resources](resources.md) | Configure general scalar dimensions and bucket indexing |
-| [Branching](branching.md) | Choose vehicle-count, Ryan–Foster, or arc-flow branching and understand the single-network assignment limitation |
-| [Cuts](cuts.md) | Configure cut families and keep coefficients consistent across pricing, enumeration, and child nodes |
-| [Enumerated MIP](enumerated-mip.md) | Enable HiGHS integer solving and interpret its route-count gate and proof coverage |
-| [BALDES options](options.md) | Look up supported controls, defaults, types, and scope |
-| [Stabilization](stabilization.md) | Configure dual smoothing and understand center updates and pricing retries |
-| [Root benchmarks](benchmarks.md) | Review root relaxation timings and benchmark configuration |
+- [Build and installation](guides/build.md): dependencies, optional backends, and Make configuration.
+- [Command-line usage](guides/cli.md): routing solves, HGS, flags, and output.
+- [Python API](guides/python.md): installation, model inputs, solver options, and result export.
+
+## Solver
+
+- [Tree and node lifecycle](solver/tree.md): integer routing, inherited state, bounds, and limits.
+- [Branching](solver/branching.md): branching families and selection.
+- [Cuts](solver/cuts.md): cut configuration and coefficient consistency.
+- [Dual-price stabilization](solver/stabilization.md): smoothing, center updates, and retries.
+- [Enumerated MIP](solver/enumerated-mip.md): optional HiGHS integer solving and proof coverage.
+
+## Reference
+
+- [Algorithms and references](reference/algorithms.md): solver components and research references.
+- [BALDES options](reference/options.md): supported controls, defaults, types, and scope.
+- [Scalar resources](reference/resources.md): resource dimensions and bucket indexing.
+- [SIMD dispatch](reference/simd.md): optional kernels and runtime portability.
+
+## Extensions and modeling
+
+- [Multi-pricing](extensions/multi-pricing.md): shared masters, multiple route families, and assignment branching.
+- [Finite column imports](extensions/column-imports.md): original-vector patterns and multiplicity constraints.
+- [P-step CVRP](extensions/pstep.md): compact p-step LP relaxation.
+- [Electric-vehicle routing](extensions/evrp.md): charging models, schedule replay, and current limitations.
+
+## Benchmarks
+
+- [Root benchmarks](benchmarks/root.md): published root relaxation timings and measurement setup.
 
 ## Capabilities and interfaces
 
@@ -35,7 +46,7 @@ root. These guides cover installing, configuring and using BALDES.
 | Generic mixed-integer master solve | `highs::solve_integer` | Not exposed directly | Not exposed | HiGHS |
 
 The `vrptw` and `cvrp` routing tree uses one pricing network. For models with
-multiple route families, use the [multi-pricing interface](multi-pricing.md),
+multiple route families, use the [multi-pricing interface](extensions/multi-pricing.md),
 including its CLI and Python APIs and assignment tree. Its supported branching
 families and solve limitations differ from the single-network routing tree.
 

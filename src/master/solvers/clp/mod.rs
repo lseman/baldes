@@ -73,8 +73,8 @@ pub enum ClpSolveOutcome {
     Stopped,
     Failed,
 }
-/// Algorithm used for restricted-master LP solves. Clp retains the mutable
-/// matrix and snapshot storage; IPM and HiGHS compute their own solutions.
+/// Algorithm used for restricted-master LP solves. The selected native backend
+/// owns the mutable matrix; IPM uses Clp storage and computes its own solutions.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum MasterSolver {
     #[default]
@@ -96,7 +96,9 @@ impl MasterSolver {
 
 #[derive(Debug)]
 pub struct ClpMaster {
-    model: NonNull<Model>,
+    // Exactly one native matrix is owned: Clp here, or highs_backend below.
+    // A requested solver change is materialized by ensure_backend.
+    model: Option<NonNull<Model>>,
     solver: MasterSolver,
     clp_options: ClpOptions,
     ipm: ipm_state::IpmState,
@@ -128,8 +130,8 @@ pub struct ClpMaster {
 
 impl Drop for ClpMaster {
     fn drop(&mut self) {
-        unsafe {
-            Clp_deleteModel(self.model.as_ptr());
+        if let Some(model) = self.model {
+            unsafe { Clp_deleteModel(model.as_ptr()) };
         }
     }
 }
@@ -175,10 +177,10 @@ mod continuation_tests;
 #[cfg(all(test, feature = "highs"))]
 mod highs_warm_tests;
 
+mod ipm_state;
 mod matrix;
 mod model;
 mod solve;
-mod ipm_state;
 
 #[cfg(test)]
 mod ipm_warm_tests;

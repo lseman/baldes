@@ -322,3 +322,48 @@ fn enumeration_rebuilds_completion_after_resource_relaxation() {
     // Both unit extensions now fit; the old grid must not hide the route.
     assert_eq!(solver.enumerate(10.).unwrap().len(), 1);
 }
+
+
+
+#[test]
+fn incomplete_retained_universe_never_closes_pricing_or_inspection() {
+    use baldes::pricing::phases::Phase;
+    use baldes::Graph;
+    for inspect_first in [false, true] {
+        let mut solver = Solver::<5>::new(4, 5).unwrap();
+        let mut graph = Graph::<5>::new(4, 5).unwrap();
+        for vertex in 0..4 {
+            for resource in 0..5 {
+                graph.set_bounds(vertex, resource, 0., 10.).unwrap();
+            }
+        }
+        graph.add_arc(0, 1, -5.).unwrap();
+        graph.add_arc(1, 3, 0.).unwrap();
+        graph.add_arc(0, 2, -1.).unwrap();
+        graph.add_arc(2, 3, 0.).unwrap();
+        solver.graph = graph;
+        solver.phases = vec![Phase {
+            check_ng: true,
+            jump_arcs: true,
+            labels_per_bucket: i64::MAX,
+        }];
+        solver.price_phase(0, 10, false).unwrap();
+        let routes = solver.enumerate(0.).unwrap();
+        assert_eq!(routes.len(), 2);
+        let universe = solver.enumeration.as_mut().unwrap();
+        universe.paths.retain(|path| !path.arcs.contains(&0));
+        universe.completed = false;
+        assert_eq!(universe.paths.len, 1);
+        if inspect_first {
+            assert!(solver.inspect_enumeration(0.).unwrap().is_none());
+        }
+        let resumed = solver.price_phase(0, 10, false).unwrap();
+        assert!(resumed.exact);
+        assert_eq!(resumed.minimum_reduced_cost, -5.);
+        assert!(resumed.columns.iter().any(|route| route.arcs == [0, 1]));
+        assert!(solver.enumeration.is_none());
+        let complete = solver.enumerate(0.).unwrap();
+        assert_eq!(complete.len(), 2);
+        assert!(solver.enumeration.as_ref().unwrap().completed);
+    }
+}

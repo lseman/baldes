@@ -5,14 +5,17 @@ impl ClpMaster {
         if !primal.is_finite() || !dual.is_finite() || primal <= 0. || dual <= 0. {
             return Err(invalid("positive finite Clp tolerances required"));
         }
-        unsafe {
-            Clp_setPrimalTolerance(self.model.as_ptr(), primal);
-            Clp_setDualTolerance(self.model.as_ptr(), dual);
+        self.ensure_backend()?;
+        if let Some(model) = self.model {
+            unsafe {
+                Clp_setPrimalTolerance(model.as_ptr(), primal);
+                Clp_setDualTolerance(model.as_ptr(), dual);
+            }
         }
-        self.dual_tolerance = dual;
-        self.primal_tolerance = primal;
         #[cfg(feature = "highs")]
         self.edit_highs(|backend| backend.set_tolerances(primal, dual))?;
+        self.dual_tolerance = dual;
+        self.primal_tolerance = primal;
         Ok(())
     }
 
@@ -65,11 +68,12 @@ impl ClpMaster {
             self.solved = false;
             return Ok(ClpSolveOutcome::Stopped);
         }
+        self.ensure_backend()?;
         // SAFETY: The native scope guard restores this owned model's limits
         // before returning, including on caught C++ exceptions.
         let failed = unsafe {
             baldes_clp_dual_limited(
-                self.model.as_ptr(),
+                self.model.expect("Clp backend is active").as_ptr(),
                 iterations,
                 time_limit.as_secs_f64(),
                 i32::from(self.clp_options.keep_work_areas),
@@ -114,33 +118,7 @@ impl ClpMaster {
         #[cfg(feature = "highs")]
         {
             let started = Instant::now();
-            if self.highs_backend.is_none() {
-                let mut backend = crate::master::solvers::highs::HighsMaster::new()?;
-                backend.set_tolerances(self.primal_tolerance, self.dual_tolerance)?;
-                let rows = self
-                    .senses
-                    .iter()
-                    .zip(&self.rhs)
-                    .map(|(&sense, &rhs)| (sense, rhs, &[][..]))
-                    .collect::<Vec<_>>();
-                backend.add_rows(&rows)?;
-                let columns = (0..self.costs.len())
-                    .map(|j| self.column_entries(j))
-                    .collect::<Result<Vec<_>>>()?;
-                let batch = self
-                    .costs
-                    .iter()
-                    .zip(&columns)
-                    .map(|(&cost, entries)| (cost, entries.as_slice()))
-                    .collect::<Vec<_>>();
-                backend.add_columns(&batch)?;
-                for (column, &upper) in self.upper.iter().enumerate() {
-                    if backend.upper[column] != upper {
-                        backend.set_upper(column, upper)?;
-                    }
-                }
-                self.highs_backend = Some(backend);
-            }
+            self.ensure_backend()?;
             let backend = self.highs_backend.as_mut().unwrap();
             backend.set_lp_iteration_limit(iterations)?;
             let reuse_solution = backend.solved
@@ -241,39 +219,29 @@ impl ClpMaster {
     }
 
     pub(super) fn read_solution(&mut self) -> bool {
+        let model = self.model.expect("Clp backend is active").as_ptr();
         // SAFETY: All returned arrays are owned by this model. Copy before further mutation.
         unsafe {
-            self.simplex_iterations += Clp_numberIterations(self.model.as_ptr()).max(0) as usize;
-            self.status = Clp_status(self.model.as_ptr());
+            self.simplex_iterations += Clp_numberIterations(model).max(0) as usize;
+            self.status = Clp_status(model);
             self.solved = self.status == 0;
             if self.solved {
-                self.objective = Clp_objectiveValue(self.model.as_ptr()) + self.objective_offset;
+                self.objective = Clp_objectiveValue(model) + self.objective_offset;
                 self.duals = if self.rhs.is_empty() {
                     vec![]
                 } else {
-                    std::slice::from_raw_parts(
-                        Clp_dualRowSolution(self.model.as_ptr()),
-                        self.rhs.len(),
-                    )
-                    .to_vec()
+                    std::slice::from_raw_parts(Clp_dualRowSolution(model), self.rhs.len()).to_vec()
                 };
                 self.values = if self.costs.is_empty() {
                     vec![]
                 } else {
-                    std::slice::from_raw_parts(
-                        Clp_primalColumnSolution(self.model.as_ptr()),
-                        self.costs.len(),
-                    )
-                    .to_vec()
+                    std::slice::from_raw_parts(Clp_primalColumnSolution(model), self.costs.len())
+                        .to_vec()
                 };
                 self.reduced_costs = if self.costs.is_empty() {
                     vec![]
                 } else {
-                    std::slice::from_raw_parts(
-                        Clp_getReducedCost(self.model.as_ptr()),
-                        self.costs.len(),
-                    )
-                    .to_vec()
+                    std::slice::from_raw_parts(Clp_getReducedCost(model), self.costs.len()).to_vec()
                 };
                 let tolerance = self.zero_tolerance;
                 if tolerance > 0. {

@@ -1,4 +1,4 @@
-//! Independent endpoint/extreme jobs, solved by the core bucket graph engine.
+//! Independent endpoint/extreme jobs with exact enumeration or bucket labeling.
 use super::{step_entries, Problem, Step};
 use crate::graph::{Graph, ResourceKind};
 use crate::labeling::engine::{EngineControls, LabelingEngine};
@@ -8,11 +8,25 @@ use crate::{incomplete, invalid, Result};
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
+mod enumeration;
+
+/// Exact pricing backend. Enumeration keeps only the best path per job,
+/// rather than materializing the complete p-step column pool.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PricingMethod {
+    #[default]
+    Auto,
+    Enumeration,
+    Bucket,
+}
+
 #[derive(Clone, Debug)]
 pub struct PricingOptions {
     pub p: usize,
-    /// CPU workers; each owns its graph, labels and result buffer.
+    pub method: PricingMethod,
+    /// CPU workers; each owns its search storage and result buffer.
     pub threads: usize,
+    /// Generated labels (bucket) or attempted path extensions (enumeration).
     pub max_labels_per_job: usize,
     /// Bucket solves per job, including exact cycle-exclusion branches.
     pub max_subproblems_per_job: usize,
@@ -23,6 +37,7 @@ impl Default for PricingOptions {
     fn default() -> Self {
         Self {
             p: 2,
+            method: PricingMethod::Auto,
             threads: std::thread::available_parallelism().map_or(1, |n| n.get().min(8)),
             max_labels_per_job: 1_000_000,
             max_subproblems_per_job: 10_000,
@@ -40,6 +55,8 @@ pub struct PricingRound {
     pub jobs: usize,
     pub workers: usize,
     pub generated_labels: usize,
+    pub enumerated_extensions: usize,
+    pub method: PricingMethod,
 }
 
 #[derive(Clone, Copy)]
@@ -74,6 +91,7 @@ impl Problem {
         // An elementary path has at most n+1 arcs. Clamping also keeps the
         // resource windows small when the caller supplies a very large p.
         let p = options.p.min(n + 1);
+        let method = enumeration::select_method(n, p, options.method);
         let mut jobs = Vec::new();
         for start in 0..=n {
             for end in 1..=n + 1 {
@@ -118,6 +136,8 @@ impl Problem {
                 jobs: 0,
                 workers: 0,
                 generated_labels: 0,
+                enumerated_extensions: 0,
+                method,
             });
         }
         let chunk_size = (jobs.len() + workers - 1) / workers;
@@ -135,14 +155,19 @@ impl Problem {
                             if remaining.is_zero() {
                                 return Err(incomplete("p-step pricing time limit"));
                             }
-                            output.push(self.price_job(
-                                job,
-                                p,
-                                duals,
-                                objective_weight,
-                                options,
-                                remaining,
-                            )?);
+                            output.push(if method == PricingMethod::Enumeration {
+                                enumeration::price_job(
+                                    self,
+                                    job,
+                                    p,
+                                    duals,
+                                    objective_weight,
+                                    options,
+                                    remaining,
+                                )?
+                            } else {
+                                self.price_job(job, p, duals, objective_weight, options, remaining)?
+                            });
                         }
                         Ok(output)
                     })
@@ -165,10 +190,16 @@ impl Problem {
             jobs: jobs.len(),
             workers,
             generated_labels: 0,
+            enumerated_extensions: 0,
+            method,
         };
         for batch in batches {
             for (step, labels) in batch? {
-                result.generated_labels += labels;
+                if method == PricingMethod::Enumeration {
+                    result.enumerated_extensions += labels;
+                } else {
+                    result.generated_labels += labels;
+                }
                 if let Some(step) = step {
                     let rc = objective_weight * step.cost
                         - step_entries(&self.demands, &step)

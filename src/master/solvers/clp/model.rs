@@ -5,33 +5,109 @@ impl ClpMaster {
         self.solver
     }
 
-    /// Changing algorithms invalidates the cached solution.
+    /// Changing algorithms invalidates the cached solution. Switching between
+    /// Clp/IPM and HiGHS converts storage on the next edit or solve and starts
+    /// a fresh native basis; edits within one backend retain its warm basis.
     pub fn set_solver(&mut self, solver: MasterSolver) {
         if self.solver != solver {
             self.solved = false;
             self.highs_row_basic.clear();
-            #[cfg(feature = "highs")]
-            {
-                self.highs_backend = None;
-            }
         }
         self.solver = solver;
     }
 
-    /// Mutations mirror into an existing HiGHS model, preserving its basis.
-    /// On a mirror error discard that backend: the canonical model is retained
-    /// and a subsequent solve can reconstruct it without using stale state.
+    /// Materialize the requested backend before a mutation or solve. Conversion
+    /// copies the matrix once, then releases the previous native model. Merely
+    /// selecting a solver remains infallible; allocation errors surface here.
+    pub(super) fn ensure_backend(&mut self) -> Result<()> {
+        self.solver.ensure_available()?;
+        #[cfg(feature = "highs")]
+        if self.solver == MasterSolver::Highs {
+            if self.highs_backend.is_none() {
+                let mut backend = super::super::highs::HighsMaster::new()?;
+                backend.set_tolerances(self.primal_tolerance, self.dual_tolerance)?;
+                let rows = self
+                    .senses
+                    .iter()
+                    .zip(&self.rhs)
+                    .map(|(&s, &b)| (s, b, &[][..]))
+                    .collect::<Vec<_>>();
+                backend.add_rows(&rows)?;
+                let columns = (0..self.costs.len())
+                    .map(|j| self.column_entries(j))
+                    .collect::<Result<Vec<_>>>()?;
+                let batch = self
+                    .costs
+                    .iter()
+                    .zip(&columns)
+                    .map(|(&c, e)| (c, e.as_slice()))
+                    .collect::<Vec<_>>();
+                backend.add_columns(&batch)?;
+                for (j, &upper) in self.upper.iter().enumerate() {
+                    if backend.upper[j] != upper {
+                        backend.set_upper(j, upper)?;
+                    }
+                }
+                self.highs_backend = Some(backend);
+                if let Some(model) = self.model.take() {
+                    // SAFETY: ownership has moved to the new backend; no Clp
+                    // pointers escape the wrapper.
+                    unsafe { Clp_deleteModel(model.as_ptr()) };
+                }
+                self.ipm = Default::default();
+                self.solved = false;
+            }
+            return Ok(());
+        }
+        if self.model.is_none() {
+            let mut copy = Self::new()?;
+            copy.set_clp_options(self.clp_options);
+            copy.set_tolerances(self.primal_tolerance, self.dual_tolerance)?;
+            let rows = self
+                .senses
+                .iter()
+                .zip(&self.rhs)
+                .map(|(&s, &b)| (s, b, &[][..]))
+                .collect::<Vec<_>>();
+            copy.add_rows(&rows)?;
+            let columns = (0..self.costs.len())
+                .map(|j| self.column_entries(j))
+                .collect::<Result<Vec<_>>>()?;
+            let batch = self
+                .costs
+                .iter()
+                .zip(&columns)
+                .map(|(&c, e)| (c, e.as_slice()))
+                .collect::<Vec<_>>();
+            copy.add_columns(&batch)?;
+            for (j, &upper) in self.upper.iter().enumerate() {
+                if copy.upper[j] != upper {
+                    copy.set_upper(j, upper)?;
+                }
+            }
+            self.model = copy.model.take();
+            #[cfg(feature = "highs")]
+            {
+                self.highs_backend = None;
+            }
+            self.ipm = Default::default();
+            self.solved = false;
+        }
+        Ok(())
+    }
+
+    /// Apply an edit to the sole HiGHS matrix. Keep it on failure: there is
+    /// no shadow matrix from which to reconstruct this backend.
     #[cfg(feature = "highs")]
     pub(super) fn edit_highs(
         &mut self,
-        edit: impl FnOnce(&mut crate::master::solvers::highs::HighsMaster) -> Result<()>,
+        edit: impl FnOnce(&mut super::super::highs::HighsMaster) -> Result<()>,
     ) -> Result<()> {
-        if let Some(mut backend) = self.highs_backend.take() {
-            if let Err(error) = edit(&mut backend) {
+        if let Some(backend) = self.highs_backend.as_mut() {
+            if let Err(error) = edit(backend) {
                 self.solved = false;
                 return Err(error);
             }
-            self.highs_backend = Some(backend);
         }
         Ok(())
     }
@@ -76,15 +152,15 @@ impl ClpMaster {
             }
         }
         continued.set_clp_options(self.clp_options);
-        continued.solver = self.solver;
+        continued.set_solver(self.solver);
         continued.zero_tolerance = self.zero_tolerance;
         continued.set_tolerances(1e-7, self.dual_tolerance)?;
         *self = continued;
         Ok(true)
     }
 
-    /// Fork the model through Clp's deep-copy operation, retaining its basis,
-    /// primal/dual solution, scaling and simplex state. The fork owns all data.
+    /// Fork only the active native backend, retaining its basis and solution.
+    /// The fork owns all data independently.
     pub fn try_clone(&self) -> Result<Self> {
         #[cfg(feature = "highs")]
         let highs_backend = self
@@ -94,9 +170,15 @@ impl ClpMaster {
             .transpose()?;
         // SAFETY: source stays alive and is not mutated; the C++ bridge returns
         // an independently owned Clp wrapper, released by this type's Drop.
-        let model = NonNull::new(unsafe { baldes_clp_clone(self.model.as_ptr()) })
-            .ok_or_else(|| incomplete("Clp model copy failed"))?;
-        unsafe { Clp_setLogLevel(model.as_ptr(), 0) };
+        let model = self
+            .model
+            .map(|model| {
+                let copy = NonNull::new(unsafe { baldes_clp_clone(model.as_ptr()) })
+                    .ok_or_else(|| incomplete("Clp model copy failed"))?;
+                unsafe { Clp_setLogLevel(copy.as_ptr(), 0) };
+                Ok(copy)
+            })
+            .transpose()?;
         Ok(Self {
             model,
             solver: self.solver,
@@ -155,7 +237,7 @@ impl ClpMaster {
             Clp_scaling(model.as_ptr(), ClpOptions::default().scaling.code());
         }
         Ok(Self {
-            model,
+            model: Some(model),
             solver: MasterSolver::Clp,
             clp_options: ClpOptions::default(),
             ipm: Default::default(),

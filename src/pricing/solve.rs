@@ -49,6 +49,7 @@ impl<const D: usize> Solver<D> {
             .phases
             .get(index)
             .ok_or_else(|| invalid("pricing phase out of range"))?;
+        self.discard_incomplete_enumeration();
         if self.enumeration.is_some() {
             self.check_presence_universe()?;
         }

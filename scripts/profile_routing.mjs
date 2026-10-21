@@ -1,4 +1,4 @@
-// Root timing and perf sampling. Run from repository root; see docs/routing-profile.md.
+// Root timing and perf sampling. Run from the repository root.
 import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import crypto from 'node:crypto';

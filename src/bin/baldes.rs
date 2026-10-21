@@ -1,7 +1,7 @@
 mod multi_pricing_cli;
 mod pstep_cli;
-use baldes::master::root::RootOptions;
 use baldes::inputs::{Instance, Rounding};
+use baldes::master::root::RootOptions;
 const HELP: &str = "Usage: baldes <vrptw|cvrp|hgs> INSTANCE [OPTIONS]
 
 Additional command: baldes multi-pricing MODEL.json [OPTIONS] (see multi-pricing --help; networks is an alias)
@@ -25,8 +25,9 @@ Options:
   --tree                Run branch-and-price with a restricted-master MIP heuristic
   --nodes N             Tree node limit (default: 10000)
   --branching MODE      native (default), vehicles, ryan-foster, arc, cluster, resource, hybrid
-  --branch-history      Record branch evaluations and use reliable pseudo-costs
-  --no-strong-branching  Use fractionality instead of phased strong branching
+  --branch-history      Enable branch history (default; observed native rules)
+  --no-branch-history   Disable history-based candidate ranking and recording
+  --no-strong-branching  Skip strong trials; history may still rank candidates
   --no-diving           Disable strong diving in the tree
   --no-mip-heuristic    Disable restricted-master integer search
   --mip-nodes N         Restricted-master integer-search node budget per call
@@ -62,8 +63,12 @@ fn run() -> std::result::Result<(), String> {
         println!("{HELP}");
         return Ok(());
     }
-    if kind == "multi-pricing" || kind == "networks" { return multi_pricing_cli::run(args.collect()); }
-    if kind == "pstep" { return pstep_cli::run(args.collect()); }
+    if kind == "multi-pricing" || kind == "networks" {
+        return multi_pricing_cli::run(args.collect());
+    }
+    if kind == "pstep" {
+        return pstep_cli::run(args.collect());
+    }
     if kind != "vrptw" && kind != "cvrp" && kind != "hgs" {
         return Err(format!("unknown instance type: {kind}\n\n{HELP}"));
     }
@@ -99,16 +104,27 @@ fn run() -> std::result::Result<(), String> {
                 println!("{HELP}");
                 return Ok(());
             }
-            "--verbose" | "--log" | "-v" => { options.cg.log_interval.get_or_insert(10); }
+            "--verbose" | "--log" | "-v" => {
+                options.cg.log_interval.get_or_insert(10);
+            }
             "--log-interval" => {
-                let interval = args.next().ok_or("missing log interval")?.parse::<usize>().map_err(|e|e.to_string())?;
-                if interval == 0 { return Err("log interval must be positive".into()); }
+                let interval = args
+                    .next()
+                    .ok_or("missing log interval")?
+                    .parse::<usize>()
+                    .map_err(|e| e.to_string())?;
+                if interval == 0 {
+                    return Err("log interval must be positive".into());
+                }
                 options.cg.log_interval = Some(interval);
             }
             "--reference-ng" => reference_ng = true,
-            "--bound-mode" => options.bound_mode = baldes::master::root::BoundMode::parse(
-                &args.next().ok_or("missing bound mode")?
-            ).map_err(|e| e.to_string())?,
+            "--bound-mode" => {
+                options.bound_mode = baldes::master::root::BoundMode::parse(
+                    &args.next().ok_or("missing bound mode")?,
+                )
+                .map_err(|e| e.to_string())?
+            }
             "--json" => json_path = Some(args.next().ok_or("missing JSON path")?),
             "--customers" => {
                 customers = Some(
@@ -141,34 +157,52 @@ fn run() -> std::result::Result<(), String> {
                 )
                 .map_err(|e| e.to_string())?
             }
-            "--clp-scaling" => options.clp_options.scaling = args.next()
-                .ok_or("missing Clp scaling mode")?.parse::<baldes::master::root::ClpScaling>()
-                .map_err(|e| e.to_string())?,
-            "--clp-work-areas" => options.clp_options.keep_work_areas = match args.next()
-                .ok_or("missing Clp work-area mode")?.as_str() {
-                    "retain" => true,
-                    "discard" => false,
-                    mode => return Err(format!("unknown Clp work-area mode: {mode}")),
-                },
-            "--master" => options.master_solver = match args.next().ok_or("missing master mode")?.as_str() {
-                "clp" => baldes::master::root::MasterSolver::Clp,
-                "ipm" => baldes::master::root::MasterSolver::Ipm,
-                "highs" => {
-                    let solver = baldes::master::root::MasterSolver::Highs;
-                    solver.ensure_available().map_err(|e|e.to_string())?;
-                    solver
+            "--clp-scaling" => {
+                options.clp_options.scaling = args
+                    .next()
+                    .ok_or("missing Clp scaling mode")?
+                    .parse::<baldes::master::root::ClpScaling>()
+                    .map_err(|e| e.to_string())?
+            }
+            "--clp-work-areas" => {
+                options.clp_options.keep_work_areas =
+                    match args.next().ok_or("missing Clp work-area mode")?.as_str() {
+                        "retain" => true,
+                        "discard" => false,
+                        mode => return Err(format!("unknown Clp work-area mode: {mode}")),
+                    }
+            }
+            "--master" => {
+                options.master_solver = match args.next().ok_or("missing master mode")?.as_str() {
+                    "clp" => baldes::master::root::MasterSolver::Clp,
+                    "ipm" => baldes::master::root::MasterSolver::Ipm,
+                    "highs" => {
+                        let solver = baldes::master::root::MasterSolver::Highs;
+                        solver.ensure_available().map_err(|e| e.to_string())?;
+                        solver
+                    }
+                    mode => return Err(format!("unknown master mode: {mode}")),
                 }
-                mode => return Err(format!("unknown master mode: {mode}")),
-            },
+            }
             "--hgs-time" => {
-                let seconds = args.next().ok_or("missing HGS time")?.parse::<f64>().map_err(|e|e.to_string())?;
-                let duration = std::time::Duration::try_from_secs_f64(seconds).map_err(|e|e.to_string())?;
-                if duration.is_zero() { return Err("HGS time must be positive".into()); }
+                let seconds = args
+                    .next()
+                    .ok_or("missing HGS time")?
+                    .parse::<f64>()
+                    .map_err(|e| e.to_string())?;
+                let duration =
+                    std::time::Duration::try_from_secs_f64(seconds).map_err(|e| e.to_string())?;
+                if duration.is_zero() {
+                    return Err("HGS time must be positive".into());
+                }
                 hgs_time = Some(duration);
             }
-            "--hgs-columns" => hgs_columns = baldes::inputs::HgsColumns::parse(
-                &args.next().ok_or("missing HGS columns mode")?
-            ).map_err(|e|e.to_string())?,
+            "--hgs-columns" => {
+                hgs_columns = baldes::inputs::HgsColumns::parse(
+                    &args.next().ok_or("missing HGS columns mode")?,
+                )
+                .map_err(|e| e.to_string())?
+            }
             "--no-stabilization" => options.cg.stabilize = false,
             "--dynamic-ng" => {
                 options.relaxation_improvement_priority = args
@@ -180,40 +214,76 @@ fn run() -> std::result::Result<(), String> {
             "--option" => {
                 let setting = args.next().ok_or("missing NAME=VALUE")?;
                 let (name, value) = setting.split_once('=').ok_or("option must be NAME=VALUE")?;
-                let value = value.parse().map_err(|e: std::num::ParseFloatError| e.to_string())?;
+                let value = value
+                    .parse()
+                    .map_err(|e: std::num::ParseFloatError| e.to_string())?;
                 options.pricing_options.push((name.to_string(), value));
             }
             "--no-enumeration" => options.enumerate = false,
             "--enumerated-mip" => tree_options.enumerated_mip = Some(Default::default()),
             "--rounding" => {
                 rounding = Some(
-                    Rounding::parse(&args.next().ok_or("missing rounding")?).map_err(|e| e.to_string())?,
+                    Rounding::parse(&args.next().ok_or("missing rounding")?)
+                        .map_err(|e| e.to_string())?,
                 )
             }
             "--rank1" => rank1 = true,
             "--fenchel-cuts" => fenchel = true,
             "--capacity" | "--capacity-cuts" => capacity = true,
-            "--two-path-cuts" => { capacity = true; two_path = true; }
+            "--two-path-cuts" => {
+                capacity = true;
+                two_path = true;
+            }
             "--tree" => tree = true,
             "--branching" => {
                 use baldes::master::branching::BranchingOptions;
-                tree_options.branching=match args.next().ok_or("missing branching mode")?.as_str() {
-                    "native"=>BranchingOptions::default(),
-                    "arc"=>BranchingOptions::arc_flow_only(),
-                    "cluster"=>BranchingOptions { clusters:Some(Default::default()), ..BranchingOptions::arc_flow_only() },
-                    "resource"=>BranchingOptions { accumulated_resource:true, ..BranchingOptions::arc_flow_only() },
-                    "hybrid"=>BranchingOptions { clusters:Some(Default::default()), accumulated_resource:true, ..BranchingOptions::default() },
-                    "ryan-foster"=>BranchingOptions {ryan_foster:true,..BranchingOptions::arc_flow_only()},
-                    "vehicles"=>BranchingOptions {number_of_vehicles:true,..BranchingOptions::arc_flow_only()},
-                    mode=>return Err(format!("unknown branching mode: {mode}")),
+                tree_options.branching = match args.next().ok_or("missing branching mode")?.as_str()
+                {
+                    "native" => BranchingOptions::default(),
+                    "arc" => BranchingOptions::arc_flow_only(),
+                    "cluster" => BranchingOptions {
+                        clusters: Some(Default::default()),
+                        ..BranchingOptions::arc_flow_only()
+                    },
+                    "resource" => BranchingOptions {
+                        accumulated_resource: true,
+                        ..BranchingOptions::arc_flow_only()
+                    },
+                    "hybrid" => BranchingOptions {
+                        clusters: Some(Default::default()),
+                        accumulated_resource: true,
+                        ..BranchingOptions::default()
+                    },
+                    "ryan-foster" => BranchingOptions {
+                        ryan_foster: true,
+                        ..BranchingOptions::arc_flow_only()
+                    },
+                    "vehicles" => BranchingOptions {
+                        number_of_vehicles: true,
+                        ..BranchingOptions::arc_flow_only()
+                    },
+                    mode => return Err(format!("unknown branching mode: {mode}")),
                 };
             }
             "--branch-history" => tree_options.branch_history = Some(Default::default()),
+            "--no-branch-history" => tree_options.branch_history = None,
             "--no-strong-branching" => tree_options.strong_branching = None,
             "--no-diving" => tree_options.diving = None,
             "--no-mip-heuristic" => tree_options.mip_node_limit = 0,
-            "--mip-nodes" => tree_options.mip_node_limit = args.next().ok_or("missing MIP node budget")?.parse::<usize>().map_err(|e|e.to_string())?,
-            "--nodes" => node_limit = args.next().ok_or("missing node limit")?.parse::<usize>().map_err(|e| e.to_string())?,
+            "--mip-nodes" => {
+                tree_options.mip_node_limit = args
+                    .next()
+                    .ok_or("missing MIP node budget")?
+                    .parse::<usize>()
+                    .map_err(|e| e.to_string())?
+            }
+            "--nodes" => {
+                node_limit = args
+                    .next()
+                    .ok_or("missing node limit")?
+                    .parse::<usize>()
+                    .map_err(|e| e.to_string())?
+            }
             "--upper-bound" => {
                 options.incumbent = args
                     .next()
@@ -259,8 +329,10 @@ fn run() -> std::result::Result<(), String> {
         return Err("--enumerated-mip requires --tree".into());
     }
     if kind == "hgs" {
-        if fenchel { return Err("--fenchel-cuts requires cvrp or vrptw".into()); }
-        use baldes::extensions::hgs::{HgsOptions, run_hgs};
+        if fenchel {
+            return Err("--fenchel-cuts requires cvrp or vrptw".into());
+        }
+        use baldes::extensions::hgs::{run_hgs, HgsOptions};
         if let Some(rounding) = rounding {
             instance.rounding = rounding;
         }
@@ -281,11 +353,18 @@ fn run() -> std::result::Result<(), String> {
         let elapsed = started.elapsed().as_secs_f64();
         if let Some(path) = json_path {
             fn number(v: f64) -> String {
-                if v.is_finite() { v.to_string() } else { "null".into() }
+                if v.is_finite() {
+                    v.to_string()
+                } else {
+                    "null".into()
+                }
             }
-            let routes_json: Vec<_> = result.routes.iter().enumerate().map(|(i, r)| {
-                format!("{{\"route\":{},\"customers\":{:?}}}", i, r)
-            }).collect();
+            let routes_json: Vec<_> = result
+                .routes
+                .iter()
+                .enumerate()
+                .map(|(i, r)| format!("{{\"route\":{},\"customers\":{:?}}}", i, r))
+                .collect();
             let json = format!("{{\"instance\":{:?},\"status\":\"{}\",\"cost\":{},\"generations\":{},\"seconds\":{},\"routes\":[{}]}}\n",
                 instance.name,
                 if result.best_cost.is_some() { "Found" } else { "None" },
@@ -299,8 +378,14 @@ fn run() -> std::result::Result<(), String> {
         println!(
             "instance={} status={} cost={} generations={} seconds={}",
             instance.name,
-            if result.best_cost.is_some() { "Found" } else { "None" },
-            result.best_cost.map_or("null".into(), |c| format!("{:.2}", c)),
+            if result.best_cost.is_some() {
+                "Found"
+            } else {
+                "None"
+            },
+            result
+                .best_cost
+                .map_or("null".into(), |c| format!("{:.2}", c)),
             result.generations,
             elapsed
         );
@@ -313,9 +398,12 @@ fn run() -> std::result::Result<(), String> {
     }
 
     let rounding = rounding.unwrap_or(instance.rounding);
-    if two_path && kind == "cvrp" { return Err("Kohl 2-path cuts require vrptw time windows".into()); }
+    if two_path && kind == "cvrp" {
+        return Err("Kohl 2-path cuts require vrptw time windows".into());
+    }
     if fenchel {
-        options = options.with_knapsack_cuts(instance.fenchel_cut_config().map_err(|e| e.to_string())?);
+        options =
+            options.with_knapsack_cuts(instance.fenchel_cut_config().map_err(|e| e.to_string())?);
     }
     if capacity {
         options = options.with_capacity_cuts(instance.capacity_cut_config(rounding, two_path));
@@ -345,31 +433,64 @@ fn run() -> std::result::Result<(), String> {
                 ids
             };
             neighbours.sort_unstable();
-            let elements: Vec<_> = neighbours.iter()
-                .flat_map(|&vertex| graph.vertices[vertex].elements.iter().copied()).collect();
+            let elements: Vec<_> = neighbours
+                .iter()
+                .flat_map(|&vertex| graph.vertices[vertex].elements.iter().copied())
+                .collect();
             graph.set_ng(v, &elements).map_err(|e| e.to_string())?;
         }
     }
     options.cg.multiplicity = n as f64;
-    let fleet = if tree { instance.vehicles as f64 } else { n as f64 };
+    let fleet = if tree {
+        instance.vehicles as f64
+    } else {
+        n as f64
+    };
     let problem = baldes::master::root::RootProblem::set_partitioning(graph, fleet)
         .map_err(|e| e.to_string())?;
     if let Some(time_limit) = hgs_time {
-        let summary = instance.seed_hgs(&problem, rounding, &mut options, &baldes::inputs::HgsWarmStart {
-            time_limit, columns: hgs_columns, seed: hgs_seed,
-        }).map_err(|e| e.to_string())?;
-        eprintln!("HGS seed: columns={} rejected={} incumbent={:?} seconds={:.3}",
-            summary.inserted_columns, summary.rejected_columns, summary.incumbent, summary.elapsed_secs);
+        let summary = instance
+            .seed_hgs(
+                &problem,
+                rounding,
+                &mut options,
+                &baldes::inputs::HgsWarmStart {
+                    time_limit,
+                    columns: hgs_columns,
+                    seed: hgs_seed,
+                },
+            )
+            .map_err(|e| e.to_string())?;
+        eprintln!(
+            "HGS seed: columns={} rejected={} incumbent={:?} seconds={:.3}",
+            summary.inserted_columns,
+            summary.rejected_columns,
+            summary.incumbent,
+            summary.elapsed_secs
+        );
     }
     if tree {
         tree_options.node_limit = node_limit;
         tree_options.time_limit = options.cg.time_limit;
         tree_options.root = options;
-        let result = baldes::master::tree::solve(problem, tree_options).map_err(|e| e.to_string())?;
-        if let Some(path) = json_path { std::fs::write(path, result.to_json(&instance.name)).map_err(|e| e.to_string())?; }
-        println!("instance={} status={:?} incumbent={} bound={} nodes={} pricing_calls={} bound_mode={}",
-            instance.name, result.status, result.incumbent, result.bound, result.nodes, result.pricing_calls, result.bound_mode.as_str());
-        for route in &result.routes { println!("cost={} nodes={:?}", route.original_cost, route.nodes); }
+        let result =
+            baldes::master::tree::solve(problem, tree_options).map_err(|e| e.to_string())?;
+        if let Some(path) = json_path {
+            std::fs::write(path, result.to_json(&instance.name)).map_err(|e| e.to_string())?;
+        }
+        println!(
+            "instance={} status={:?} incumbent={} bound={} nodes={} pricing_calls={} bound_mode={}",
+            instance.name,
+            result.status,
+            result.incumbent,
+            result.bound,
+            result.nodes,
+            result.pricing_calls,
+            result.bound_mode.as_str()
+        );
+        for route in &result.routes {
+            println!("cost={} nodes={:?}", route.original_cost, route.nodes);
+        }
         return Ok(());
     }
     let output = baldes::master::root::solve(problem, options).map_err(|e| e.to_string())?;

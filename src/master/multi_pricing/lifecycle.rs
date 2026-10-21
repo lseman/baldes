@@ -44,7 +44,7 @@ impl<const D: usize> std::fmt::Debug for NodeSnapshot<D> {
 }
 
 impl<const D: usize> NodeSnapshot<D> {
-    pub(super) fn fork(&self) -> Result<Self> {
+    pub(crate) fn fork(&self) -> Result<Self> {
         Ok(Self {
             master: self.master.try_clone()?,
             warm: self.warm.clone(),
@@ -63,6 +63,7 @@ impl<const D: usize> NodeSnapshot<D> {
                         nonlinear_rows: o.nonlinear_rows.clone(),
                         knapsack_rows: o.knapsack_rows.clone(),
                         presence_rows: o.presence_rows.clone(),
+                        resource_groups: o.resource_groups.clone(),
                         proved_zero_arcs: o.proved_zero_arcs.clone(),
                         proved_multiplicity_upper: o.proved_multiplicity_upper,
                     })
@@ -435,6 +436,25 @@ impl<const D: usize> NodeSnapshot<D> {
 // Reuse the routing validator's exact-real resource replay rather than trusting
 // the rounded resource profile returned by labeling.
 pub(super) fn integer_route_feasible<const D: usize>(
+    oracle: &Oracle<D>,
+    route: &Route,
+) -> Result<bool> {
+    let problem = crate::master::root::RootProblem::set_partitioning(
+        super::resource_groups::domain_graph(oracle)?.into_owned(),
+        1.,
+    )?;
+    Ok(
+        crate::master::root::exact_route_feasible(&problem, route).is_some()
+            && oracle
+                .solver
+                .route_satisfies_relaxation(&route.nodes, &route.arcs)?,
+    )
+}
+
+/// Fixed reductions replay original contributions even when a later branch
+/// contradicts the fixed schedule. That contradiction can prove infeasibility;
+/// it must not be mistaken for an inexact arithmetic reduction.
+pub(super) fn original_route_feasible<const D: usize>(
     oracle: &Oracle<D>,
     route: &Route,
 ) -> Result<bool> {

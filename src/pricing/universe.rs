@@ -1,6 +1,21 @@
 //! Elementary enumeration, inspection, and reduced-cost fixing.
 use super::*;
 impl<const D: usize> Solver<D> {
+    /// A partial store cannot replace the original pricing domain. Rebuild
+    /// cost-dependent working state rather than retaining an enumeration's
+    /// possibly restricted bucket graph or completion bounds.
+    pub(super) fn discard_incomplete_enumeration(&mut self) {
+        if self
+            .enumeration
+            .as_ref()
+            .is_some_and(|universe| !universe.completed)
+        {
+            self.enumeration = None;
+            self.enumeration_snapshot = None;
+            self.engine = None;
+            self.prepared = None;
+        }
+    }
     pub(super) fn check_presence_universe(&self) -> Result<()> {
         if self
             .engine
@@ -132,6 +147,7 @@ impl<const D: usize> Solver<D> {
         Ok(routes)
     }
     pub fn inspect_enumeration(&mut self, cutoff: f64) -> Result<Option<Vec<crate::Route>>> {
+        self.discard_incomplete_enumeration();
         self.check_presence_universe()?;
         self.refresh_cuts()?;
         let enumerated_kpath = self.enumerated_kpath_inputs();

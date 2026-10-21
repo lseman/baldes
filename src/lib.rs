@@ -6,9 +6,8 @@
 //! (`--features clp`). The reference implementation is the C++ OpenRSCP
 //! RCSP engine.
 // Scalar capacity used when a const dimension is not explicitly selected.
-// The C/Python ABI uses this library build's capacity.
+// Python bindings use this library build's capacity.
 include!(concat!(env!("OUT_DIR"), "/resource_dimensions.rs"));
-pub mod api;
 pub mod core;
 pub mod cuts;
 pub mod enumeration;

@@ -5,7 +5,11 @@ use baldes::pricing::Solver;
 fn public_metadata_lists_only_supported_canonical_names_and_consistent_indices() {
     let mut options = Options::default();
     let mut solver = Solver::<2>::new(2, 0).unwrap();
-    let expected = if cfg!(all(feature = "clp", feature = "highs")) { 41 } else { 39 };
+    let expected = if cfg!(all(feature = "clp", feature = "highs")) {
+        41
+    } else {
+        39
+    };
     assert_eq!(OPTION_TABLE.len(), expected);
     let mut names = std::collections::HashSet::new();
     for (index, info) in OPTION_TABLE.iter().enumerate() {
@@ -38,14 +42,21 @@ fn unregistered_options_are_rejected_without_changing_supported_values() {
     assert!(Options::default_of(name).is_err());
     assert!(options.get(name).is_err());
     for value in [0., 1.] {
-        assert!(options.set(name, value).unwrap_err().message.contains("unknown BALDES option"));
+        assert!(options
+            .set(name, value)
+            .unwrap_err()
+            .message
+            .contains("unknown BALDES option"));
         assert!(solver.set_option(name, value).is_err());
     }
     for info in OPTION_TABLE {
         assert_eq!(options.get(info.name).unwrap(), info.default);
         assert_eq!(solver.options.get(info.name).unwrap(), info.default);
     }
-    for name in ["BALDESmaxNumOfEnumSolutionsForMIP", "BALDESmaxNumOfEnumSolsForEndOfNodeMIP"] {
+    for name in [
+        "BALDESmaxNumOfEnumSolutionsForMIP",
+        "BALDESmaxNumOfEnumSolsForEndOfNodeMIP",
+    ] {
         let enabled = cfg!(all(feature = "clp", feature = "highs"));
         assert_eq!(Options::index(name).is_ok(), enabled);
         assert_eq!(Options::support(name).is_ok(), enabled);
@@ -71,7 +82,10 @@ fn legacy_aliases_share_storage_and_reach_runtime_validation() {
     assert_eq!(solver.dominance_mode, 1);
     assert!(solver.set_option("RCSPlabelDominanceStrategy", 2.).is_err());
     assert_eq!(solver.dominance_mode, 1);
-    assert_eq!(solver.options.get("BALDESlabelDominanceStrategy").unwrap(), 1.);
+    assert_eq!(
+        solver.options.get("BALDESlabelDominanceStrategy").unwrap(),
+        1.
+    );
 }
 
 #[test]
@@ -120,10 +134,12 @@ fn failed_solver_setters_preserve_options_controls_phases_and_prepared_engine() 
 }
 
 #[test]
-fn named_dominance_option_reaches_labeling_and_the_c_setter_stays_synchronized() {
+fn named_dominance_option_reaches_labeling() {
     let mut solver = Solver::<2>::new(2, 0).unwrap();
     solver.graph.add_arc(0, 1, -2.).unwrap();
-    solver.set_option("BALDESlabelDominanceStrategy", 1.).unwrap();
+    solver
+        .set_option("BALDESlabelDominanceStrategy", 1.)
+        .unwrap();
     assert_eq!(solver.dominance_mode, 1);
     assert_eq!(
         solver
@@ -133,61 +149,13 @@ fn named_dominance_option_reaches_labeling_and_the_c_setter_stays_synchronized()
         -2.
     );
     assert_eq!(solver.engine.as_ref().unwrap().controls.dominance_mode, 1);
-    // SAFETY: Local live handle, NUL-terminated names, and writable output.
-    unsafe {
-        use baldes::api::*;
-        let p = or_rcsp_new(2, 0);
-        let mut value = -1.;
-        assert_eq!(or_rcsp_set_label_dominance_strategy(p, 1), 0);
-        assert_eq!(
-            or_rcsp_get_option(p, c"BALDESlabelDominanceStrategy".as_ptr(), &mut value),
-            0
-        );
-        assert_eq!(value, 1.);
-        assert_eq!(or_rcsp_set_label_dominance_strategy(p, 2), -1);
-        assert_eq!(
-            or_rcsp_get_option(p, c"BALDESlabelDominanceStrategy".as_ptr(), &mut value),
-            0
-        );
-        assert_eq!(value, 1.);
-        or_rcsp_delete(p);
-    }
-}
-
-#[test]
-fn c_api_lists_supported_canonical_names_and_accepts_legacy_inputs() {
-    use baldes::api::*;
-    use std::ffi::CStr;
-    // SAFETY: Live local handles, static NUL-terminated names and writable outputs.
-    unsafe {
-        assert_eq!(or_rcsp_option_count() as usize, OPTION_TABLE.len());
-        for (i, info) in OPTION_TABLE.iter().enumerate() {
-            assert_eq!(CStr::from_ptr(or_rcsp_option_name(i as i32)).to_str().unwrap(), info.name);
-        }
-        assert!(or_rcsp_option_name(-1).is_null());
-        assert!(or_rcsp_option_name(OPTION_TABLE.len() as i32).is_null());
-        let p = or_rcsp_new(2, 0);
-        assert_eq!(or_rcsp_set_option(p, c"RCSPlabelDominanceStrategy".as_ptr(), 1.), 0);
-        let mut value = f64::NAN;
-        assert_eq!(or_rcsp_get_option(p, c"BALDESlabelDominanceStrategy".as_ptr(), &mut value), 0);
-        assert_eq!(value, 1.);
-        assert_eq!(or_rcsp_set_option(p, c"BALDESlabelDominanceStrategy".as_ptr(), 0.), 0);
-        assert_eq!(or_rcsp_get_option(p, c"RCSPlabelDominanceStrategy".as_ptr(), &mut value), 0);
-        assert_eq!(value, 0.);
-        assert_eq!(or_rcsp_set_option(p, c"BALDESnotARealOption".as_ptr(), 0.), -1);
-        assert!(CStr::from_ptr(or_rcsp_last_error()).to_str().unwrap().contains("unknown BALDES option"));
-        value = 123.;
-        assert_eq!(or_rcsp_get_option(p, c"BALDESnotARealOption".as_ptr(), &mut value), -1);
-        assert_eq!(value, 123.);
-        or_rcsp_delete(p);
-    }
 }
 
 #[cfg(feature = "clp")]
 #[test]
 fn capacity_option_controls_separation_in_fresh_and_inherited_nodes() {
-    use baldes::master::root::{self, CapacityCutConfig, RootOptions};
     use baldes::inputs::{Instance, Rounding};
+    use baldes::master::root::{self, CapacityCutConfig, RootOptions};
     let instance = Instance::parse("option-test\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let mut options =
         RootOptions::default().with_capacity_cuts(CapacityCutConfig::new(vec![0., 1., 1., 1.], 2.));
@@ -222,8 +190,8 @@ fn capacity_option_controls_separation_in_fresh_and_inherited_nodes() {
 #[cfg(feature = "clp")]
 #[test]
 fn capacity_per_round_option_caps_the_number_of_generated_rows() {
-    use baldes::master::root::RootOptions;
     use baldes::inputs::{Instance, Rounding};
+    use baldes::master::root::RootOptions;
     // Two distant odd customer groups each need their own capacity cut.
     let instance = Instance::parse("two-triangles\nVEHICLE\nNUMBER CAPACITY\n6 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000 0\n1 10 10 1 0 1000 0\n2 11 10 1 0 1000 0\n3 10 11 1 0 1000 0\n4 -10 -10 1 0 1000 0\n5 -11 -10 1 0 1000 0\n6 -10 -11 1 0 1000 0\n").unwrap();
     let mut options = RootOptions::default()

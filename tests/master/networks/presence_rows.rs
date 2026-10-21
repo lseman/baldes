@@ -399,3 +399,126 @@ fn joint_presence_certificates_close_shared_roots_and_fixed_descendants_without_
         optimal(&root.snapshot.solve(configured).unwrap(), 2.);
     }
 }
+
+#[cfg(feature = "highs")]
+#[test]
+fn cutoff_presence_rows_keep_both_dual_signs_fixed_copies_and_descendants() {
+    use baldes::master::solvers::mip::{MipOptions, MipStatus};
+    for mode in [Mode::PairCount, Mode::AnyPair] {
+        for lower in [false, true] {
+            let root = multi_pricing::solve(problem(), options()).unwrap();
+            let mut coefficients = coefficients(mode);
+            if lower {
+                // Require one expensive route; its presence dual is positive.
+                for c in &mut coefficients {
+                    c.arc_events.swap(0, 2);
+                }
+            }
+            let row = Row {
+                sense: if lower {
+                    RowSense::GreaterEqual
+                } else {
+                    RowSense::LessEqual
+                },
+                rhs: 1.,
+            };
+            let child = root.snapshot.with_presence_row(row, &coefficients).unwrap();
+            let priced = child.solve(options()).unwrap();
+            optimal(&priced, 4.);
+            let presence_dual = *priced.duals.last().unwrap();
+            assert!(if lower {
+                presence_dual > 0.
+            } else {
+                presence_dual < 0.
+            });
+            let cut = priced
+                .snapshot
+                .enumerate_below(5., &EnumerationOptions::default())
+                .unwrap();
+            assert_eq!(cut.report().coverage_cutoff, Some(5.));
+            if lower {
+                assert!(cut
+                    .cost_bounds()
+                    .iter()
+                    .any(|b| b.route_constant_lower_bound < 0.));
+            }
+            assert_eq!(
+                cut.solve_mip(&MipOptions::default())
+                    .unwrap()
+                    .mip
+                    .solution
+                    .unwrap()
+                    .objective,
+                4.
+            );
+            assert_eq!(
+                cut.solve_mip(&MipOptions {
+                    objective_cutoff: 4.,
+                    ..Default::default()
+                })
+                .unwrap()
+                .mip
+                .status,
+                MipStatus::ObjectiveCutoff
+            );
+            let cheap = root
+                .routes
+                .iter()
+                .position(|r| r.network == 7 && r.route.arcs == [0, 1])
+                .unwrap();
+            let fixed = child
+                .fix_route(cheap, 1.)
+                .unwrap()
+                .solve(options())
+                .unwrap();
+            let fixed_cut = fixed
+                .snapshot
+                .enumerate_below(5., &EnumerationOptions::default())
+                .unwrap();
+            let mip = fixed_cut.solve_mip(&MipOptions::default()).unwrap();
+            assert_eq!(mip.mip.solution.unwrap().objective, 4.);
+            assert!(mip
+                .route_values
+                .iter()
+                .any(|r| r.route.network == 7 && r.route.route.arcs == [0, 1] && r.quantity >= 1.));
+            if !lower {
+                let descendant = child
+                    .with_presence_row(
+                        Row {
+                            sense: RowSense::LessEqual,
+                            rhs: 0.,
+                        },
+                        &coefficients,
+                    )
+                    .unwrap()
+                    .solve(options())
+                    .unwrap();
+                optimal(&descendant, 6.);
+                let next = descendant
+                    .snapshot
+                    .enumerate_below(7., &EnumerationOptions::default())
+                    .unwrap();
+                assert_eq!(
+                    next.solve_mip(&MipOptions::default())
+                        .unwrap()
+                        .mip
+                        .solution
+                        .unwrap()
+                        .objective,
+                    6.
+                );
+                // The old view retains its own rows and source, not the descendant's.
+                assert_eq!(
+                    cut.solve_mip(&MipOptions::default())
+                        .unwrap()
+                        .mip
+                        .solution
+                        .unwrap()
+                        .objective,
+                    4.
+                );
+            }
+            optimal(&root.snapshot.solve(options()).unwrap(), 2.);
+        }
+    }
+}

@@ -40,6 +40,11 @@ pub trait Controller<M> {
     fn incumbent(&self) -> f64 {
         f64::INFINITY
     }
+    /// Enabled cut families and their current master-row counts for progress
+    /// logging. Keep names and order stable during a solve; omit disabled families.
+    fn cut_counts(&self) -> Vec<(&'static str, usize)> {
+        vec![]
+    }
     /// Optional original-model feasible columns after exact pricing leaves
     /// positive artificials. These columns do not certify a bound or prove
     /// infeasibility. The controller must validate their original constraints.
@@ -48,8 +53,27 @@ pub trait Controller<M> {
     fn restore_feasible_columns(&mut self, _duals: &[f64]) -> Result<Vec<Column>> {
         Ok(vec![])
     }
+    /// Save every controller/pricing field that enumeration, regeneration,
+    /// column remapping and retained-pool synchronization can change.
+    /// False declines the optional handoff.
+    /// An error must leave state unchanged. Mutable enumeration callbacks must
+    /// opt in and implement `finish_enumeration_transaction` for rollback.
+    fn begin_enumeration_transaction(&mut self, _bound: f64) -> Result<bool> {
+        Ok(false)
+    }
+    /// Commit on success (including a partial fixing pass returning no universe),
+    /// or restore the saved state on any failed preparation/model edit.
+    /// Rollback must be infallible and must not retain invalidated route tags.
+    fn finish_enumeration_transaction(&mut self, _commit: bool) {}
     fn enumerated_universe(&mut self, _duals: &[f64], _bound: f64) -> Result<Option<Vec<Column>>> {
         Ok(None)
+    }
+    /// Yield a warm checkpoint before termination or in-place enumeration.
+    /// Called only after accurate, exact pricing with no improving columns or
+    /// positive artificials. The owner may atomically replace the model and
+    /// resume with the returned warm start. This request proves no coverage.
+    fn request_enumeration_checkpoint(&mut self, _master: &M) -> Result<bool> {
+        Ok(false)
     }
     /// Update cached, possibly unloaded columns after a cut-row change.
     fn refresh_generated_columns(&mut self, _pool: &mut [Column]) -> Result<()> {

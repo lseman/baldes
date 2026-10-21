@@ -10,6 +10,7 @@
 //! copy of that basis in a child model.
 use crate::master::{LpMaster, LpSolveOutcome, RowSense};
 use crate::{incomplete, invalid, Result};
+use std::cell::OnceCell;
 use std::ffi::{c_char, c_double, c_void, CString};
 use std::ptr::NonNull;
 use std::time::{Duration, Instant};
@@ -191,9 +192,19 @@ impl Drop for ScopedTimeLimit {
 /// Column upper bound, as the Clp master (columns carry 1e12).
 const COLUMN_UPPER: f64 = 1e12;
 
+/// Immutable CSC snapshot, populated in bulk only when matrix reads are needed.
+/// Native edits invalidate it; it owns no solver state or factorization.
+#[derive(Debug)]
+struct SparseColumns {
+    starts: Vec<HighsInt>,
+    indices: Vec<HighsInt>,
+    values: Vec<f64>,
+}
+
 #[derive(Debug)]
 pub struct HighsMaster {
     highs: NonNull<c_void>,
+    matrix_cache: OnceCell<SparseColumns>,
     pub rhs: Vec<f64>,
     pub senses: Vec<RowSense>,
     pub costs: Vec<f64>,

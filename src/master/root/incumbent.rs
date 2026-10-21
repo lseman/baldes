@@ -91,17 +91,28 @@ pub(crate) fn exact_route_feasible<const D: usize>(
     problem: &RootProblem<D>,
     route: &Route,
 ) -> Option<()> {
+    exact_route_feasibility(problem, route)?.then_some(())
+}
+
+/// Distinguish a proved invalid path from unsupported arithmetic/resource rules.
+/// `None` must not be used to discard paths from an original-domain proof.
+pub(crate) fn exact_route_feasibility<const D: usize>(
+    problem: &RootProblem<D>,
+    route: &Route,
+) -> Option<bool> {
     use crate::graph::ResourceKind;
     use std::cmp::Ordering::{Greater, Less};
     let g = &problem.graph;
-    if g.resources.len() > D
-        || g.source == g.sink
+    if g.resources.len() > D {
+        return None;
+    }
+    if g.source == g.sink
         || g.sink >= g.vertices.len()
         || route.arcs.len() >= g.vertices.len()
         || route.nodes.len() != route.arcs.len().checked_add(1)?
         || route.nodes.first().copied() != Some(i32::try_from(g.source).ok()?)
     {
-        return None;
+        return Some(false);
     }
     let source = g.vertices.get(g.source)?;
     let mut resources =
@@ -115,24 +126,27 @@ pub(crate) fn exact_route_feasible<const D: usize>(
         }
         value.add(g.initial.get(r)?.unwrap_or(bounds.lower))?;
         if value.compare(bounds.lower)? == Less || value.compare(bounds.upper)? == Greater {
-            return None;
+            return Some(false);
         }
     }
     let mut at = g.source;
     let mut visited = HashSet::new();
     for (position, &id) in route.arcs.iter().enumerate() {
-        let arc = g.arcs.get(problem.arc_position(id)?)?;
+        let Some(index) = problem.arc_position(id) else {
+            return Some(false);
+        };
+        let arc = g.arcs.get(index)?;
         if arc.id != id
             || arc.tail != at
             || at == g.sink
             || arc.head == g.source
             || route.nodes[position + 1] != i32::try_from(arc.head).ok()?
         {
-            return None;
+            return Some(false);
         }
         let head = g.vertices.get(arc.head)?;
         if arc.head != g.sink && !visited.insert(arc.head) {
-            return None;
+            return Some(false);
         }
         for (r, value) in resources.iter_mut().enumerate().take(g.resources.len()) {
             let mut bounds = *head.bounds.get(r)?;
@@ -153,18 +167,18 @@ pub(crate) fn exact_route_feasible<const D: usize>(
             value.add(consumption)?;
             if value.compare(bounds.lower)? == Less {
                 if g.resources[r] == ResourceKind::Equality {
-                    return None;
+                    return Some(false);
                 }
                 value.0.clear();
                 value.add(bounds.lower)?;
             }
             if value.compare(bounds.upper)? == Greater {
-                return None;
+                return Some(false);
             }
         }
         at = arc.head;
     }
-    (at == g.sink && !visited.is_empty()).then_some(())
+    Some(at == g.sink && !visited.is_empty())
 }
 
 pub(super) fn validated_upper<const D: usize>(

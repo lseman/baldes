@@ -4,6 +4,9 @@ use crate::graph::Graph;
 use crate::labeling::extend_resources;
 use std::time::{Duration, Instant};
 
+mod cost;
+pub use cost::CostBoundedResourceRelaxation;
+
 #[derive(Clone, Copy, Debug)]
 pub struct PathDomainLimits {
     pub max_paths: usize,
@@ -172,17 +175,18 @@ struct CollectedPaths<'g, P, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIO
     work_used: usize,
     stored_arcs: usize,
 }
-struct Budget {
+struct Budget<C> {
     remaining: usize,
     deadline: Option<Instant>,
     until_clock_check: usize,
+    clock: C,
 }
-impl Budget {
+impl<C: FnMut() -> Instant> Budget<C> {
     fn spend(&mut self, work: usize) -> Result<(), PathDomainFailure> {
         // Collection is cooperatively timed. Poll once per small batch of
         // work, and always at explicit validation/completion checkpoints.
         if work == 0 || work >= self.until_clock_check {
-            if self.deadline.is_some_and(|end| Instant::now() >= end) {
+            if self.deadline.is_some_and(|end| (self.clock)() >= end) {
                 return Err(PathDomainFailure::TimeLimit);
             }
             self.until_clock_check = 64;
@@ -209,17 +213,47 @@ fn reserve<T>(values: &mut Vec<T>, additional: usize) -> Result<(), PathDomainFa
 fn collect_paths<'g, P, const D: usize>(
     graph: &'g Graph<D>,
     limits: PathDomainLimits,
+    extend: impl FnMut(
+        &Graph<D>,
+        &crate::graph::Arc<D>,
+        crate::graph::ResourceValues<D>,
+    ) -> Result<Option<crate::graph::ResourceValues<D>>, PathDomainFailure>,
+    make_path: impl FnMut(Vec<usize>, Vec<crate::graph::ResourceValues<D>>) -> P,
+) -> Result<CollectedPaths<'g, P, D>, PathDomainFailure> {
+    collect_paths_with_clock(graph, limits, extend, make_path, Instant::now)
+}
+
+fn collect_paths_with_clock<'g, P, const D: usize>(
+    graph: &'g Graph<D>,
+    limits: PathDomainLimits,
+    extend: impl FnMut(
+        &Graph<D>,
+        &crate::graph::Arc<D>,
+        crate::graph::ResourceValues<D>,
+    ) -> Result<Option<crate::graph::ResourceValues<D>>, PathDomainFailure>,
+    make_path: impl FnMut(Vec<usize>, Vec<crate::graph::ResourceValues<D>>) -> P,
+    clock: impl FnMut() -> Instant,
+) -> Result<CollectedPaths<'g, P, D>, PathDomainFailure> {
+    collect_paths_with_clock_and_cost(graph, limits, extend, make_path, clock, None)
+}
+
+fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
+    graph: &'g Graph<D>,
+    limits: PathDomainLimits,
     mut extend: impl FnMut(
         &Graph<D>,
         &crate::graph::Arc<D>,
         crate::graph::ResourceValues<D>,
     ) -> Result<Option<crate::graph::ResourceValues<D>>, PathDomainFailure>,
     mut make_path: impl FnMut(Vec<usize>, Vec<crate::graph::ResourceValues<D>>) -> P,
+    clock: impl FnMut() -> Instant,
+    cost_bounds: Option<(&[f64], f64)>,
 ) -> Result<CollectedPaths<'g, P, D>, PathDomainFailure> {
     let mut budget = Budget {
         remaining: limits.max_work,
         deadline: limits.deadline,
         until_clock_check: 0,
+        clock,
     };
     budget.spend(
         graph
@@ -266,6 +300,9 @@ fn collect_paths<'g, P, const D: usize>(
         outgoing[arc.tail].push(position);
     }
     budget.spend(0)?;
+    let cost_pruning = cost_bounds
+        .map(|(costs, ceiling)| cost::CostPruning::new(graph, costs, ceiling, &mut budget))
+        .transpose()?;
     let mut visited = vec![];
     reserve(&mut visited, n)?;
     visited.resize(n, false);
@@ -295,6 +332,11 @@ fn collect_paths<'g, P, const D: usize>(
         let arc = &graph.arcs[physical];
         if visited[arc.head] {
             continue;
+        }
+        if let Some(pruning) = &cost_pruning {
+            if !pruning.permits(&prefix, physical, arc.head, &mut budget)? {
+                continue;
+            }
         }
         let Some(resources) = extend(graph, arc, frame.resources.clone())? else {
             continue;

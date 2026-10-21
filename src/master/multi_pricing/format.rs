@@ -63,6 +63,7 @@ pub struct Arc {
 pub struct PricingNetwork {
     pub id: i32,
     pub vertices: usize,
+    #[serde(deserialize_with = "multiplicity_bounds")]
     pub multiplicity: [f64; 2],
     #[serde(default)]
     pub source: usize,
@@ -75,6 +76,15 @@ pub struct PricingNetwork {
     pub route_entries: Vec<(usize, f64)>,
     #[serde(default)]
     pub ng: Option<Vec<Vec<usize>>>,
+}
+
+fn multiplicity_bounds<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<[f64; 2], D::Error> {
+    let [lower, upper] = <[Option<f64>; 2]>::deserialize(deserializer)?;
+    let lower =
+        lower.ok_or_else(|| serde::de::Error::custom("multiplicity lower bound must be finite"))?;
+    Ok([lower, upper.unwrap_or(f64::INFINITY)])
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -143,7 +153,12 @@ impl Model {
             networks.push(Network {
                 id: input.id,
                 graph,
-                multiplicity: Window::new(input.multiplicity[0], input.multiplicity[1])?,
+                // Multiplicity is an aggregate count domain, not a resource
+                // window. The shared validator permits an infinite upper cap.
+                multiplicity: Window {
+                    lower: input.multiplicity[0],
+                    upper: input.multiplicity[1],
+                },
                 arc_entries,
                 route_entries: input.route_entries,
             });
@@ -169,6 +184,7 @@ pub struct SolveOptions {
     pub enumerated_mip: bool,
     pub mip_time_limit: f64,
     pub mip_node_limit: usize,
+    pub mip_objective_cutoff: Option<f64>,
     pub time_limit: f64,
     pub max_iterations: usize,
     pub node_limit: usize,
@@ -190,6 +206,7 @@ impl Default for SolveOptions {
             enumerated_mip: false,
             mip_time_limit: 1.,
             mip_node_limit: 100000,
+            mip_objective_cutoff: None,
             time_limit: 120.,
             max_iterations: 100000,
             node_limit: 10000,
@@ -211,6 +228,13 @@ impl SolveOptions {
             return Err(invalid(
                 "enumerated MIP requires tree=True and the highs feature",
             ));
+        }
+        if let Some(cutoff) = self.mip_objective_cutoff {
+            if !cutoff.is_finite() || !self.enumerated_mip {
+                return Err(invalid(
+                    "mip_objective_cutoff must be finite and requires enumerated MIP",
+                ));
+            }
         }
         let enumeration_time = Duration::try_from_secs_f64(self.enumeration_time_limit)
             .map_err(|_| invalid("enumeration_time_limit must be finite and nonnegative"))?;
@@ -256,7 +280,7 @@ impl SolveOptions {
                     time_limit: Duration::try_from_secs_f64(self.mip_time_limit)
                         .map_err(|_| invalid("MIP time limit"))?,
                     node_limit: self.mip_node_limit,
-                    ..Default::default()
+                    objective_cutoff: self.mip_objective_cutoff.unwrap_or(f64::INFINITY),
                 })
             } else {
                 None
@@ -271,6 +295,31 @@ impl SolveOptions {
 pub struct AddRow {
     pub row: SharedRow,
     pub coefficients: Vec<Coefficients>,
+}
+
+/// The same owned grouped-resource restriction used by Rust, CLI and Python.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResourceGroupRestriction {
+    pub packing_row: usize,
+    pub resource: usize,
+    pub threshold: f64,
+    pub upper: bool,
+    pub members: Vec<ResourceGroupMember>,
+}
+impl ResourceGroupRestriction {
+    pub fn from_json(text: &str) -> Result<Self> {
+        serde_json::from_str(text).map_err(|e| invalid(format!("resource group JSON: {e}")))
+    }
+    pub fn apply<const D: usize>(&self, node: &NodeSnapshot<D>) -> Result<NodeSnapshot<D>> {
+        node.with_resource_group_branch(
+            self.packing_row,
+            self.resource,
+            self.threshold,
+            self.upper,
+            &self.members,
+        )
+    }
 }
 impl AddRow {
     pub fn from_json(text: &str) -> Result<Self> {
@@ -460,6 +509,33 @@ impl SolveResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn multiplicity_json_round_trips_unbounded_upper_without_clipping_finite_counts() {
+        let fixture = include_str!("../../../examples/networks/triangle.json");
+        let mut model = Model::from_json(fixture).unwrap();
+        for upper in [1e13, f64::INFINITY] {
+            model.networks[0].multiplicity = [0., upper];
+            let text = serde_json::to_string(&model).unwrap();
+            let parsed = Model::from_json(&text).unwrap();
+            assert_eq!(parsed.networks[0].multiplicity, [0., upper]);
+            assert_eq!(
+                parsed.problem::<2>().unwrap().networks[0]
+                    .multiplicity
+                    .upper,
+                upper
+            );
+        }
+        let mut bad = serde_json::to_value(&model).unwrap();
+        bad["networks"][0]["multiplicity"][0] = serde_json::Value::Null;
+        assert!(Model::from_json(&bad.to_string()).is_err());
+        for bounds in [[-1., 1.], [2., 1.]] {
+            bad["networks"][0]["multiplicity"] = serde_json::json!(bounds);
+            assert!(Model::from_json(&bad.to_string())
+                .unwrap()
+                .problem::<2>()
+                .is_err());
+        }
+    }
     #[test]
     fn model_json_preserves_f64_costs_at_representable_boundaries() {
         let fixture = include_str!("../../../examples/networks/triangle.json");

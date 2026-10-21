@@ -22,7 +22,7 @@ use std::time::{Duration, Instant};
 pub mod candidates;
 pub mod clusters;
 pub mod history;
-pub use history::{BranchEvaluationHistory, BranchHistoryOptions};
+pub use history::{BranchEvaluationHistory, BranchHistoryOptions, BranchHistoryPolicy};
 mod diving;
 #[cfg(feature = "highs")]
 mod integer;
@@ -62,7 +62,7 @@ impl Default for TreeOptions {
             absolute_gap: 1e-6,
             relative_gap: 1e-9,
             strong_branching: Some(StrongBranchingOptions::default()),
-            branch_history: None,
+            branch_history: Some(BranchHistoryOptions::default()),
             diving: Some(DivingOptions::default()),
         }
     }

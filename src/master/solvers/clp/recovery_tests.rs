@@ -43,7 +43,7 @@ fn primal_recovery_shares_the_iteration_budget_and_restores_native_limits() {
         let mut values = [0.; 3];
         // SAFETY: live owned model; helper writes exactly three doubles.
         unsafe {
-            baldes_clp_solve_limits(master.model.as_ptr(), values.as_mut_ptr());
+            baldes_clp_solve_limits(master.model.unwrap().as_ptr(), values.as_mut_ptr());
         }
         values
     }
