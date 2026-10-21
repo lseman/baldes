@@ -441,7 +441,7 @@ fn run() -> std::result::Result<(), String> {
         if tag >= 0 && value > 1e-6 {
             let route = &output.routes[tag as usize];
             println!(
-                "value={:.12} cost={:.12} nodes={:?}",
+                "value={:.2} cost={:.12} nodes={:?}",
                 value, route.original_cost, route.nodes
             );
         }
