@@ -46,16 +46,47 @@ impl CutState {
         route: &Route,
         enumerated: bool,
     ) -> Result<Vec<(usize, f64)>> {
-        let mut entries = vec![];
-        let customers = State::<D>::customers(route);
-        for (cut, row) in self.capacity_cuts.iter().zip(&self.capacity_rows) {
-            if let Some(row) = row {
-                let coefficient = cut.coefficient(&customers);
-                if coefficient != 0 {
-                    entries.push((*row, coefficient as f64));
+        self.entries_with_capacity(solver, route, enumerated, None)
+    }
+
+    pub(super) fn cached_entries<const D: usize>(
+        &self,
+        problem: &RootProblem<D>,
+        solver: &Solver<D>,
+        route: &Route,
+        enumerated: bool,
+    ) -> Result<Vec<(usize, f64)>> {
+        let capacity = capacity_entries_from_arcs(
+            problem,
+            route,
+            &self.capacity_rows,
+            &self.capacity_arc_entries,
+        );
+        self.entries_with_capacity(solver, route, enumerated, capacity)
+    }
+
+    fn entries_with_capacity<const D: usize>(
+        &self,
+        solver: &Solver<D>,
+        route: &Route,
+        enumerated: bool,
+        capacity: Option<Vec<(usize, f64)>>,
+    ) -> Result<Vec<(usize, f64)>> {
+        let mut entries = if let Some(capacity) = capacity {
+            capacity
+        } else {
+            let mut entries = vec![];
+            let customers = State::<D>::customers(route);
+            for (cut, row) in self.capacity_cuts.iter().zip(&self.capacity_rows) {
+                if let Some(row) = row {
+                    let coefficient = cut.coefficient(&customers);
+                    if coefficient != 0 {
+                        entries.push((*row, coefficient as f64));
+                    }
                 }
             }
-        }
+            entries
+        };
         for (cut, row) in solver.cuts.knapsack_cuts.iter().zip(&self.knapsack_rows) {
             if let Some(row) = row {
                 let coefficient = solver.knapsack_coefficient(cut, &route.resources);
@@ -84,3 +115,49 @@ impl CutState {
         Ok(entries)
     }
 }
+
+/// Accumulate prepared physical-arc weights in route order, then round once per
+/// cut, just like CapacityCut::coefficient. Unsupported route representations
+/// return None so the customer-sequence calculation remains the fallback.
+fn capacity_entries_from_arcs<const D: usize>(
+    problem: &RootProblem<D>,
+    route: &Route,
+    rows: &[Option<usize>],
+    arc_entries: &[Vec<(usize, f64)>],
+) -> Option<Vec<(usize, f64)>> {
+    let Some(last_row) = rows.iter().flatten().max() else {
+        return Some(vec![]);
+    };
+    let graph = &problem.graph;
+    if graph.source != 0
+        || route.nodes.len() < 2
+        || route.arcs.len() != route.nodes.len() - 1
+        || route.nodes.first().copied() != Some(0)
+        || route.nodes.last().copied() != Some(graph.sink as i32)
+        || route.nodes[1..route.nodes.len() - 1].contains(&(graph.sink as i32))
+    {
+        return None;
+    }
+    let mut sums = vec![0.; last_row.checked_add(1)?];
+    for (edge, &id) in route.arcs.iter().enumerate() {
+        let index = problem.arc_position(id)?;
+        let arc = &graph.arcs[index];
+        if arc.tail as i32 != route.nodes[edge] || arc.head as i32 != route.nodes[edge + 1] {
+            return None;
+        }
+        for &(row, weight) in arc_entries.get(index)? {
+            *sums.get_mut(row)? += weight;
+        }
+    }
+    let mut entries = vec![];
+    for &row in rows.iter().flatten() {
+        let coefficient = sums[row].round() as i32;
+        if coefficient != 0 {
+            entries.push((row, coefficient as f64));
+        }
+    }
+    Some(entries)
+}
+
+#[cfg(test)]
+mod tests;

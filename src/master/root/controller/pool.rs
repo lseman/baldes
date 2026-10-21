@@ -53,7 +53,7 @@ impl<const D: usize> RootController<D> {
                 .get(usize::try_from(column.tag).map_err(|_| invalid("cached route tag"))?)
                 .ok_or_else(|| invalid("cached route tag"))?;
             let mut entries = self.problem.base_entries(route)?;
-            entries.extend(state.cut_entries(route)?);
+            entries.extend(state.cut_entries(&self.problem, route)?);
             entries.sort_by_key(|&(row, _)| row);
             column.entries = entries;
         }
