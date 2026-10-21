@@ -40,7 +40,9 @@ impl<const D: usize> Enumeration<D> {
             presence_state: cuts.and_then(|c| c.presence).and_then(|p| p.empty_state()),
         };
         for r in 0..g.resources.len() {
-            root.resources[r] = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower);
+            root.resources[r] = g
+                .root_resource(r, true)
+                .ok_or_else(|| invalid("initial resource outside source windows"))?;
         }
         if !root.add_elements(&g.vertices[g.source].elements) {
             return Err(invalid("invalid source elementarity sets"));

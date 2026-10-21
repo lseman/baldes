@@ -39,7 +39,8 @@ fn exponent(value: f64) -> i32 {
 /// the resulting candidate is infeasible. Waiting selects an exact endpoint.
 pub(super) fn validate<const D: usize>(g: &Graph<D>, r: usize) -> Result<()> {
     let mut unit_exponent = 0;
-    for value in values(g, r) {
+    let inputs = || values(g, r).chain(g.time_window_endpoints(r));
+    for value in inputs() {
         if !value.is_finite() || value < 0. {
             return Err(invalid(
                 "resource knapsack requires nonnegative finite loads and windows",
@@ -55,7 +56,7 @@ pub(super) fn validate<const D: usize>(g: &Graph<D>, r: usize) -> Result<()> {
         ));
     }
     let quantum = f64::from_bits(((unit_exponent + 1023) as u64) << 52);
-    if values(g, r).any(|value| value / quantum > MAX_UNITS) {
+    if inputs().any(|value| value / quantum > MAX_UNITS) {
         return Err(invalid(
             "resource knapsack binary grid exceeds the exact additive range",
         ));
@@ -94,6 +95,26 @@ mod tests {
         let mut g = graph(1., 10.);
         g.arcs[0].bounds[0] = Some(Window::new(0.1, 1.).unwrap());
         assert!(validate(&g, 0).is_err());
+    }
+
+    #[cfg(feature = "multi-time-windows")]
+    #[test]
+    fn resource_grid_checks_interior_window_endpoints() {
+        let mut g = graph(1., 10.);
+        g.set_time_windows(
+            1,
+            0,
+            &[Window::new(0., 0.1).unwrap(), Window::new(2., 10.).unwrap()],
+        )
+        .unwrap();
+        assert!(validate(&g, 0).is_err());
+        g.set_time_windows(
+            1,
+            0,
+            &[Window::new(0., 0.5).unwrap(), Window::new(2., 10.).unwrap()],
+        )
+        .unwrap();
+        assert!(validate(&g, 0).is_ok());
     }
 
     #[test]

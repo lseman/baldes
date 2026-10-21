@@ -39,6 +39,10 @@ pub struct Resource {
     /// One [lower, upper] pair per vertex; None uses Graph defaults.
     #[serde(default)]
     pub bounds: Option<Vec<[f64; 2]>>,
+    /// Optional disjoint service-start windows per vertex (null uses bounds).
+    #[cfg(feature = "multi-time-windows")]
+    #[serde(default)]
+    pub time_windows: Option<Vec<Option<Vec<[f64; 2]>>>>,
 }
 fn disposable() -> String {
     "disposable".into()
@@ -112,6 +116,21 @@ impl Model {
                     _ => return Err(invalid("resource kind must be disposable or equality")),
                 };
                 graph.initial[r] = resource.initial;
+                #[cfg(feature = "multi-time-windows")]
+                if let Some(unions) = resource.time_windows {
+                    if unions.len() != input.vertices {
+                        return Err(invalid("time_windows must have one entry per vertex"));
+                    }
+                    for (vertex, union) in unions.into_iter().enumerate() {
+                        if let Some(union) = union {
+                            let windows = union
+                                .into_iter()
+                                .map(|[a, b]| Window::new(a, b))
+                                .collect::<Result<Vec<_>>>()?;
+                            graph.set_time_windows(vertex, r, &windows)?;
+                        }
+                    }
+                }
                 if let Some(bounds) = resource.bounds {
                     if bounds.len() != input.vertices {
                         return Err(invalid("resource bounds must have one pair per vertex"));

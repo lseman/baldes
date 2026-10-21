@@ -61,8 +61,13 @@ impl BucketGraph {
         let mut upper = lower.clone();
         for (v, &id) in order.iter().enumerate() {
             for (r, &slot) in resource_slots.iter().enumerate() {
-                lower[v][r] = g.vertices[id].bounds[slot].lower;
-                upper[v][r] = g.vertices[id].bounds[slot].upper;
+                let bounds = g.vertices[id].bounds[slot];
+                lower[v][r] = g
+                    .project_resource(id, slot, bounds, bounds.lower, true)
+                    .unwrap_or(bounds.lower);
+                upper[v][r] = g
+                    .project_resource(id, slot, bounds, bounds.upper, false)
+                    .unwrap_or(bounds.upper);
             }
         }
         for (r, &slot) in resource_slots.iter().enumerate() {
@@ -100,6 +105,34 @@ impl BucketGraph {
                 }
                 if incoming_upper.is_finite() {
                     upper[v][r] = upper[v][r].min(incoming_upper);
+                }
+            }
+        }
+        if g.has_time_windows() {
+            // Incoming arc hulls can end inside a gap. Reproject both grid
+            // endpoints so the first terminal bucket contains its root.
+            // If the hull intersection is empty, retain the vertex domain;
+            // exact transitions will reject every incoming arc instead.
+            for (v, &id) in order.iter().enumerate() {
+                for (axis, &slot) in resource_slots.iter().enumerate() {
+                    let effective = crate::graph::Window {
+                        lower: lower[v][axis],
+                        upper: upper[v][axis],
+                    };
+                    let first = g.project_resource(id, slot, effective, effective.lower, true);
+                    let last = g.project_resource(id, slot, effective, effective.upper, false);
+                    if let (Some(first), Some(last)) = (first, last) {
+                        lower[v][axis] = first;
+                        upper[v][axis] = last;
+                    } else {
+                        let original = g.vertices[id].bounds[slot];
+                        lower[v][axis] = g
+                            .project_resource(id, slot, original, original.lower, true)
+                            .unwrap_or(original.lower);
+                        upper[v][axis] = g
+                            .project_resource(id, slot, original, original.upper, false)
+                            .unwrap_or(original.upper);
+                    }
                 }
             }
         }

@@ -21,6 +21,11 @@ impl<const D: usize> Enumeration<D> {
         completion: F,
     ) -> Result<Self> {
         let consumption = !reverse.is_empty();
+        if consumption && g.has_time_windows() {
+            return Err(invalid(
+                "multi-time-window enumeration requires ordinary directional buckets",
+            ));
+        }
         if consumption && cuts.and_then(|c| c.presence).is_some_and(|p| p.active()) {
             return Err(invalid(
                 "presence enumeration requires ordinary directional buckets",
@@ -80,11 +85,23 @@ impl<const D: usize> Enumeration<D> {
                 presence_state: cuts.and_then(|c| c.presence).and_then(|p| p.empty_state()),
             };
             for r in 0..g.resources.len() {
-                root.resources[r] = if direction {
-                    g.initial[r].unwrap_or(g.vertices[vertex].bounds[r].lower)
-                } else {
-                    g.vertices[vertex].bounds[r].upper
-                };
+                root.resources[r] = g
+                    .root_resource(r, direction)
+                    .ok_or_else(|| invalid("enumeration root outside vertex windows"))?;
+            }
+            if g.has_time_windows() && !direction {
+                let internal = grid.internal[vertex];
+                for (axis, &slot) in grid.resource_slots.iter().enumerate() {
+                    root.resources[slot] = g
+                        .project_resource(
+                            vertex,
+                            slot,
+                            g.vertices[vertex].bounds[slot],
+                            root.resources[slot].min(grid.upper[internal][axis]),
+                            false,
+                        )
+                        .ok_or_else(|| invalid("enumeration root outside effective windows"))?;
+                }
             }
             if !root.add_elements(&g.vertices[vertex].elements) {
                 return Err(invalid("invalid enumeration root elements"));

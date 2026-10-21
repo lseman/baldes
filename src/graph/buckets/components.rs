@@ -26,6 +26,52 @@ impl BucketGraph {
                 let Some(mut high) = self.propagate(g, forward, a.physical, corner) else {
                     continue;
                 };
+                if g.has_time_windows() {
+                    // Waiting across a gap is monotone but discontinuous.
+                    // Bound its image by propagating both cell endpoints.
+                    // If the far endpoint is infeasible, use the target hull
+                    // as a conservative bound rather than deleting the cell.
+                    let mut far = corner;
+                    for (r, value) in far.iter_mut().enumerate().take(self.dimensions) {
+                        *value = if forward {
+                            (*value + self.step[r]).min(self.upper[id.vertex][r])
+                        } else {
+                            (*value - self.step[r]).max(self.lower[id.vertex][r])
+                        };
+                        if let Some(jump) = a.jump {
+                            let point = d.corners[id.vertex][jump][r];
+                            *value = if forward {
+                                value.max(point)
+                            } else {
+                                value.min(point)
+                            };
+                        }
+                    }
+                    let far = self
+                        .propagate(g, forward, a.physical, far)
+                        .unwrap_or(if forward {
+                            self.upper[target]
+                        } else {
+                            self.lower[target]
+                        });
+                    let (low, high) = if forward { (high, far) } else { (far, high) };
+                    let corners = &d.corners[target];
+                    for (k, point) in corners.iter().enumerate() {
+                        let intersects = (0..self.dimensions).all(|r| {
+                            if forward {
+                                point[r] + self.step[r] >= low[r] - 1e-6
+                                    && point[r] <= high[r] + 1e-6
+                            } else {
+                                point[r] - self.step[r] <= high[r] + 1e-6
+                                    && point[r] >= low[r] - 1e-6
+                            }
+                        });
+                        if intersects {
+                            edges[source].push(offsets[target] + k);
+                        }
+                    }
+                    continue;
+                }
                 let mut low = high;
                 let cons = self.consumption[a.physical];
                 let lo = self.arc_lower[a.physical];

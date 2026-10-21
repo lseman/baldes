@@ -124,7 +124,10 @@ pub(crate) fn exact_route_feasibility<const D: usize>(
         if !valid_window(bounds) {
             return None;
         }
-        value.add(g.initial.get(r)?.unwrap_or(bounds.lower))?;
+        let Some(initial) = g.root_resource(r, true) else {
+            return Some(false);
+        };
+        value.add(initial)?;
         if value.compare(bounds.lower)? == Less || value.compare(bounds.upper)? == Greater {
             return Some(false);
         }
@@ -165,6 +168,29 @@ pub(crate) fn exact_route_feasibility<const D: usize>(
                 return None;
             }
             value.add(consumption)?;
+            #[cfg(feature = "multi-time-windows")]
+            if !g.time_windows(arc.head, r).is_empty() {
+                if g.resources[r] != ResourceKind::Disposable {
+                    return None;
+                }
+                let mut feasible = false;
+                for window in g.time_windows(arc.head, r) {
+                    let lower = window.lower.max(bounds.lower);
+                    let upper = window.upper.min(bounds.upper);
+                    if lower <= upper && value.compare(upper)? != Greater {
+                        if value.compare(lower)? == Less {
+                            value.0.clear();
+                            value.add(lower)?;
+                        }
+                        feasible = true;
+                        break;
+                    }
+                }
+                if !feasible {
+                    return Some(false);
+                }
+                continue;
+            }
             if value.compare(bounds.lower)? == Less {
                 if g.resources[r] == ResourceKind::Equality {
                     return Some(false);
@@ -352,6 +378,29 @@ mod tests {
         p.graph.set_bounds(2, 0, 0., 1.).unwrap();
         assert!(exact_route_feasible(&p, &r).is_none());
     }
+    #[cfg(feature = "multi-time-windows")]
+    #[test]
+    fn exact_witness_waits_across_gaps_and_checks_arc_intersections() {
+        let (mut problem, route) = chain(&[4., 2.], 20.);
+        problem
+            .graph
+            .set_time_windows(
+                1,
+                0,
+                &[
+                    crate::Window::new(0., 2.).unwrap(),
+                    crate::Window::new(8., 12.).unwrap(),
+                ],
+            )
+            .unwrap();
+        assert_eq!(exact_route_feasibility(&problem, &route), Some(true));
+        problem.graph.set_bounds(2, 0, 0., 9.).unwrap();
+        assert_eq!(exact_route_feasibility(&problem, &route), Some(false));
+        problem.graph.set_bounds(2, 0, 0., 20.).unwrap();
+        problem.graph.arcs[0].bounds[0] = Some(crate::Window::new(3., 7.).unwrap());
+        assert_eq!(exact_route_feasibility(&problem, &route), Some(false));
+    }
+
     #[test]
     fn fixed_resource_paths_and_recorded_node_chains_are_revalidated() {
         let (mut p, r) = chain(&[1., f64::EPSILON / 2.], 1.);

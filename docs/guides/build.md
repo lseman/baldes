@@ -26,6 +26,12 @@ shared library and use `cargo build --release --features clp,highs`.
 The CLI and routing tree require `clp`; `highs` alone provides the library's
 HiGHS backend and generic MIP API. See below for library discovery details.
 
+Disjoint service-start windows are optional: use
+`cargo build --release --features multi-time-windows` for the library, or
+`--features clp,multi-time-windows` for network JSON and the CLI. See
+[multiple time windows](../extensions/multi-time-windows.md) for the Rust,
+Python and JSON APIs.
+
 Python installation is covered in the [pybaldes guide](python.md).
 
 ## Interactive configuration

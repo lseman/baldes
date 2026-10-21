@@ -13,6 +13,7 @@ default = ["clp"]
 clp = ["baldes/clp"]
 highs = ["baldes/highs"]
 simd = ["baldes/simd"]
+multi-time-windows = ["baldes/multi-time-windows"]
 
 [dependencies]
 baldes = { path = "../.." }

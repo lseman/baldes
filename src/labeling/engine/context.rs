@@ -171,12 +171,9 @@ impl<'a, const D: usize> Context<'a, D> {
         root.branch_state = None;
         root.presence_state = self.cuts.presence.empty_state();
         for (r, _) in g.resources.iter().enumerate() {
-            let w = g.vertices[root_vertex].bounds[r];
-            root.resources[r] = if root_forward {
-                g.initial[r].unwrap_or(w.lower)
-            } else {
-                w.upper
-            };
+            root.resources[r] = g
+                .root_resource(r, root_forward)
+                .expect("validated terminal resource");
         }
         (root.cut_words, root.additional_cost) = self.root_cut_state(root_vertex);
         if forward {

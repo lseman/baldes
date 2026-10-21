@@ -206,6 +206,29 @@ impl Solver {
                 .set_bounds(v, r, lower, upper)
         })
     }
+    /// Set disjoint closed service-start windows on a disposable resource.
+    /// Requires the ``multi-time-windows`` build feature.
+    #[cfg(feature = "multi-time-windows")]
+    fn set_vertex_time_windows(
+        &mut self,
+        vertex_id: i32,
+        resource_id: i32,
+        windows: Vec<(f64, f64)>,
+    ) -> PyResult<()> {
+        let v = self.vertex(vertex_id)?;
+        let r = self.resource(resource_id)?;
+        run(|| {
+            let windows = windows
+                .into_iter()
+                .map(|(a, b)| baldes::graph::Window::new(a, b))
+                .collect::<baldes::Result<Vec<_>>>()?;
+            self.solver
+                .get_mut()
+                .unwrap()
+                .graph
+                .set_time_windows(v, r, &windows)
+        })
+    }
     /// Set the initial resource value at the source.
     fn set_initial_resource(&mut self, resource_id: i32, value: f64) -> PyResult<()> {
         let r = self.resource(resource_id)?;

@@ -33,6 +33,8 @@ crate-type = ["rlib"]
 default = []
 # Runtime-dispatched AVX2 dominance scans; portable fallback on other CPUs.
 simd = []
+# Disjoint service-start windows on disposable scalar resources.
+multi-time-windows = []
 # Eight-label AVX-512F scans (Rust >= 1.89); AVX2/scalar fallback at runtime.
 simd-avx512 = ["simd"]
 # Clp restricted master and column-generation loop. Builds Clp 1.17.10 and
@@ -179,3 +181,8 @@ required-features = ["clp"]
 [[test]]
 name = "accumulated_resource"
 path = "tests/master/accumulated_resource.rs"
+
+[[test]]
+name = "multi_time_windows"
+path = "tests/pricing/multi_time_windows.rs"
+required-features = ["multi-time-windows"]

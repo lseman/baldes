@@ -221,30 +221,20 @@ pub fn extend_resources<const D: usize>(
     ScalarResourceKernel::<D>::extend_active(g, a, values, forward).map(Into::into)
 }
 #[inline(always)]
-fn extend_resource<const D: usize>(
+pub(crate) fn extend_resource<const D: usize>(
     g: &Graph<D>,
     a: &Arc<D>,
     r: usize,
-    mut q: f64,
+    q: f64,
     forward: bool,
 ) -> Option<f64> {
-    let equality = g.resources[r] == ResourceKind::Equality;
     let mut head = g.vertices[a.head].bounds[r];
     if let Some(window) = a.bounds[r] {
         head.lower = head.lower.max(window.lower);
         head.upper = head.upper.min(window.upper);
     }
     if forward {
-        q += a.consumption[r];
-        if q < head.lower {
-            if equality {
-                return None;
-            }
-            q = head.lower;
-        }
-        if q > head.upper {
-            return None;
-        }
+        g.project_resource(a.head, r, head, q + a.consumption[r], true)
     } else {
         let mut tail = g.vertices[a.tail].bounds[r];
         if a.tail == g.source {
@@ -252,31 +242,11 @@ fn extend_resource<const D: usize>(
                 tail.lower = tail.lower.max(initial);
             }
         }
-        if q > head.upper {
-            if equality {
-                return None;
-            }
-            q = head.upper;
-        }
-        if q < head.lower {
-            return None;
-        }
-        q -= a.consumption[r];
-        if q > tail.upper {
-            if equality {
-                return None;
-            }
-            q = tail.upper;
-        }
-        if q < tail.lower {
-            return None;
-        }
+        let head_value = g.project_resource(a.head, r, head, q, false)?;
+        g.project_resource(a.tail, r, tail, head_value - a.consumption[r], false)
     }
-    if !q.is_finite() {
-        return None;
-    }
-    Some(q)
 }
+
 fn dominates<const D: usize>(g: &Graph<D>, a: &Label<D>, b: &Label<D>, hop_limit: bool) -> bool {
     if a.vertex != b.vertex
         || a.cost - b.cost >= EPSILON
@@ -334,7 +304,9 @@ pub fn reference_price<const D: usize>(g: &Graph<D>, controls: &Controls) -> Res
     }
     let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
     for (r, value) in q.iter_mut().enumerate().take(g.resources.len()) {
-        *value = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower);
+        *value = g
+            .root_resource(r, true)
+            .ok_or_else(|| invalid("initial resource outside source windows"))?;
         let w = g.vertices[g.source].bounds[r];
         if *value < w.lower || *value > w.upper {
             return Err(invalid("initial resource outside source window"));

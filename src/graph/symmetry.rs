@@ -38,7 +38,8 @@ pub fn consumption_symmetric<const D: usize>(
     if !depot_elements_symmetric(g) || reversal_costs(g, reverse).is_none() {
         return false;
     }
-    if g.resources.iter().any(|k| *k != ResourceKind::Disposable) {
+    // A hull cannot establish time-reversal symmetry of disjoint domains.
+    if g.has_time_windows() || g.resources.iter().any(|k| *k != ResourceKind::Disposable) {
         return false;
     }
     for (i, a) in g.arcs.iter().enumerate() {

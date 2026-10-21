@@ -11,6 +11,15 @@ impl BucketGraph {
         let a = &g.arcs[physical];
         let tail = self.internal[a.tail];
         for r in 0..self.dimensions {
+            if self
+                .resource_slots
+                .get(r)
+                .is_some_and(|&slot| g.resource_has_time_windows(slot))
+            {
+                q[r] =
+                    crate::labeling::extend_resource(g, a, self.resource_slots[r], q[r], forward)?;
+                continue;
+            }
             if forward {
                 q[r] += self.consumption[physical][r];
                 if q[r] < self.arc_lower[physical][r] {
@@ -54,6 +63,12 @@ impl BucketGraph {
         let Some(q) = self.propagate(g, forward, a.physical, q) else {
             return 0;
         };
+        // A backward projection can cross an arbitrarily large window gap
+        // inside one input cell. `q - step` is not a lower image bound;
+        // retain both phase flags and let actual label resources choose.
+        if !forward && g.has_time_windows() {
+            return 3;
+        }
         let border = self.middle + 1e-6;
         if forward {
             let c = d.corners[a.from.vertex][a.from.bucket][0];

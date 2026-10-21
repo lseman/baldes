@@ -275,7 +275,11 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
     let mut initial = crate::graph::ResourceValues::filled(graph.resources.len(), 0.);
     for (r, value) in initial.iter_mut().enumerate().take(graph.resources.len()) {
         let bounds = graph.vertices[graph.source].bounds[r];
-        *value = graph.initial[r].unwrap_or(bounds.lower);
+        let Some(root) = graph.root_resource(r, true) else {
+            result.work_used = limits.max_work - budget.remaining;
+            return Ok(result);
+        };
+        *value = root;
         if *value < bounds.lower || *value > bounds.upper {
             budget.spend(0)?;
             result.work_used = limits.max_work - budget.remaining;

@@ -7,6 +7,7 @@ pub mod symmetry;
 use crate::{invalid, Result};
 use std::collections::HashSet;
 pub mod ng;
+mod time_windows;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ResourceKind {
@@ -66,6 +67,8 @@ pub struct Graph<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub graph_id: i32,
     pub main_resource: Option<usize>,
     grouped: bool,
+    #[cfg(feature = "multi-time-windows")]
+    time_windows: std::collections::BTreeMap<(usize, usize), Vec<Window>>,
 }
 impl<const D: usize> Graph<D> {
     /// `self == other` with every arc's `reduced_cost` ignored, without
@@ -83,6 +86,8 @@ impl<const D: usize> Graph<D> {
             graph_id,
             main_resource,
             grouped,
+            #[cfg(feature = "multi-time-windows")]
+            time_windows,
         } = self;
         if !(*source == other.source
             && *sink == other.sink
@@ -96,6 +101,10 @@ impl<const D: usize> Graph<D> {
             && vertices.len() == other.vertices.len()
             && arcs.len() == other.arcs.len())
         {
+            return false;
+        }
+        #[cfg(feature = "multi-time-windows")]
+        if time_windows != &other.time_windows {
             return false;
         }
         let same_arc_scalars = |a: &Arc<D>, b: &Arc<D>| {
@@ -162,6 +171,8 @@ impl<const D: usize> Graph<D> {
             graph_id: -1,
             main_resource: None,
             grouped: false,
+            #[cfg(feature = "multi-time-windows")]
+            time_windows: Default::default(),
         })
     }
     /// Append a scalar resource and initialize existing vertices and arcs.
@@ -323,6 +334,7 @@ impl<const D: usize> Graph<D> {
         {
             return Err(invalid("invalid graph dimensions or distinct terminals"));
         }
+        self.validate_time_windows()?;
         let mut ids = HashSet::new();
         for a in &self.arcs {
             if a.consumption.len() < self.resources.len()

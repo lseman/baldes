@@ -143,7 +143,9 @@ impl PathStorage {
                 if knapsack.active {
                     let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
                     for r in 0..g.resources.len() {
-                        q[r] = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower);
+                        q[r] = g
+                            .root_resource(r, true)
+                            .ok_or_else(|| invalid("initial resource outside source windows"))?;
                     }
                     for &arc in &path.arcs {
                         q = extend_resources(g, &g.arcs[arc], &q, true)
@@ -199,7 +201,9 @@ impl PathStorage {
         for path in ordered.into_iter().flatten() {
             let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
             for r in 0..g.resources.len() {
-                q[r] = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower);
+                q[r] = g
+                    .root_resource(r, true)
+                    .ok_or_else(|| invalid("initial resource outside source windows"))?;
             }
             let mut nodes = vec![g.source as i32];
             let mut resource_profile = vec![q[..g.resources.len()].to_vec()];

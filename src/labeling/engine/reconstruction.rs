@@ -53,7 +53,9 @@ impl<const D: usize> LabelingEngine<D> {
         let mut nodes = vec![g.source as i32];
         let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
         for r in 0..g.resources.len() {
-            q[r] = g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower);
+            q[r] = g
+                .root_resource(r, true)
+                .ok_or_else(|| invalid("initial resource outside source windows"))?;
         }
         let mut prefix_states = vec![];
         let mut current = pair.0;

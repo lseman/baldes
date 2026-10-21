@@ -242,7 +242,7 @@ impl<const D: usize> RootProblem<D> {
         let mut visited = HashSet::new();
         let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
         for (r, value) in q.iter_mut().enumerate().take(g.resources.len()) {
-            *value = g.initial[r].unwrap_or(g.vertices[at].bounds[r].lower);
+            *value = g.root_resource(r, true)?;
             if *value < g.vertices[at].bounds[r].lower || *value > g.vertices[at].bounds[r].upper {
                 return None;
             }

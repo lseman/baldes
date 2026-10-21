@@ -103,11 +103,9 @@ impl<const D: usize> LabelingEngine<D> {
         let mut resources = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
         for (r, kind) in g.resources.iter().enumerate() {
             let w = g.vertices[vertex].bounds[r];
-            resources[r] = if forward {
-                g.initial[r].unwrap_or(w.lower)
-            } else {
-                w.upper
-            };
+            resources[r] = g
+                .root_resource(r, forward)
+                .ok_or_else(|| invalid("root resource outside vertex windows"))?;
             if resources[r] < w.lower || resources[r] > w.upper {
                 return Err(invalid("root resource outside vertex window"));
             }
@@ -118,6 +116,19 @@ impl<const D: usize> LabelingEngine<D> {
             }
         }
         let internal = self.grid.internal[vertex];
+        if g.has_time_windows() && !forward {
+            for (axis, &slot) in self.grid.resource_slots.iter().enumerate() {
+                resources[slot] = g
+                    .project_resource(
+                        vertex,
+                        slot,
+                        g.vertices[vertex].bounds[slot],
+                        resources[slot].min(self.grid.upper[internal][axis]),
+                        false,
+                    )
+                    .ok_or_else(|| invalid("backward root outside effective windows"))?;
+            }
+        }
         let bucket = self
             .grid
             .bucket_id(forward, internal, self.grid.coordinate(&resources))

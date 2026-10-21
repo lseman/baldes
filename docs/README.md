@@ -26,6 +26,8 @@ Commands in these guides run from the repository root.
 
 ## Extensions and modeling
 
+- [Multiple time windows](extensions/multi-time-windows.md): disjoint service-start domains for scalar pricing resources.
+
 - [Multi-pricing](extensions/multi-pricing.md): shared masters, multiple route families, and assignment branching.
 - [Finite column imports](extensions/column-imports.md): original-vector patterns and multiplicity constraints.
 - [P-step CVRP](extensions/pstep.md): compact p-step LP relaxation.
