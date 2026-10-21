@@ -53,6 +53,7 @@ impl Problem {
     ) -> Result<SolveResult> {
         self.validate()?;
         if options.max_nodes < 2
+            || options.log_interval == Some(0)
             || options.max_arcs == 0
             || !options.tolerance.is_finite()
             || options.tolerance < 1e-9
@@ -62,6 +63,7 @@ impl Problem {
         }
         let started = Instant::now();
         let mut dd = Diagram::new(self, &options)?;
+        let mut progress = super::progress::ProgressLog::new(options.log_interval, started);
         let mut result = SolveResult {
             status: Status::IterationLimit,
             lower_bound: None,
@@ -97,9 +99,17 @@ impl Problem {
             }
             let paths = dd.decompose(lp.values(), options.tolerance)?;
             result.lower_bound = Some(lp.objective());
-            let conflict = paths
-                .iter()
-                .find_map(|(ids, route)| self.conflict(&route.path).map(|i| ids[..=i].to_vec()));
+            let mut conflict = None;
+            let mut infeasible = 0;
+            for (ids, route) in &paths {
+                if let Some(i) = self.conflict(&route.path) {
+                    infeasible += 1;
+                    if conflict.is_none() {
+                        conflict = Some(ids[..=i].to_vec());
+                    }
+                }
+            }
+            progress.iteration(&result, paths.len(), infeasible);
             if let Some(prefix) = conflict {
                 if started.elapsed() >= options.time_limit {
                     result.status = Status::TimeLimit;
@@ -141,6 +151,7 @@ impl Problem {
                 break;
             }
         }
+        progress.finish(&result);
         Ok(result)
     }
 }

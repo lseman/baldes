@@ -11,6 +11,7 @@ use crate::{invalid, Result};
 use std::time::Duration;
 
 mod diagram;
+mod progress;
 mod solve;
 pub use solve::{RouteFlow, SolveResult, Status};
 
@@ -36,6 +37,8 @@ pub struct Options {
     pub max_arcs: usize,
     pub time_limit: Duration,
     pub tolerance: f64,
+    /// Print progress to stderr every N LP iterations; None disables logging.
+    pub log_interval: Option<usize>,
 }
 
 impl Default for Options {
@@ -46,6 +49,7 @@ impl Default for Options {
             max_arcs: 1_000_000,
             time_limit: Duration::from_secs(300),
             tolerance: 1e-7,
+            log_interval: None,
         }
     }
 }

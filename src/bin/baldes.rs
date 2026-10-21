@@ -1,16 +1,19 @@
+mod ce_cli;
 mod multi_pricing_cli;
 mod pstep_cli;
 use baldes::inputs::{Instance, Rounding};
 use baldes::master::root::RootOptions;
-const HELP: &str = "Usage: baldes <vrptw|cvrp|hgs> INSTANCE [OPTIONS]
+const HELP: &str = "Usage: baldes <vrptw|cvrp|hgs|ce> INSTANCE [OPTIONS]
 
 Additional command: baldes multi-pricing MODEL.json [OPTIONS] (see multi-pricing --help; networks is an alias)
 Additional command: baldes pstep INSTANCE --p P --threads N (see pstep --help)
+Additional command: baldes ce INSTANCE [OPTIONS] (see ce --help)
 
 Instance types (Solomon-format or CVRPLIB .vrp input):
   vrptw                 Vehicle routing with time windows
   cvrp                  Capacitated vehicle routing; ignores time windows and service times
   hgs                   Hybrid Genetic Search heuristic
+  ce                    Column elimination CVRP/VRPTW route LP
 
 Options:
   --customers N         Keep the first N customers
@@ -68,6 +71,9 @@ fn run() -> std::result::Result<(), String> {
     }
     if kind == "pstep" {
         return pstep_cli::run(args.collect());
+    }
+    if kind == "ce" {
+        return ce_cli::run(args.collect());
     }
     if kind != "vrptw" && kind != "cvrp" && kind != "hgs" {
         return Err(format!("unknown instance type: {kind}\n\n{HELP}"));
