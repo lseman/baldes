@@ -24,9 +24,13 @@ impl<const D: usize> State<D> {
         arcs.sort_unstable();
         self.cut.enumerated.contains(&arcs)
     }
-    pub(super) fn cut_entries(&self, route: &Route) -> Result<Vec<(usize, f64)>> {
+    pub(super) fn cut_entries(
+        &self,
+        problem: &RootProblem<D>,
+        route: &Route,
+    ) -> Result<Vec<(usize, f64)>> {
         self.cut
-            .entries(&self.solver, route, self.is_enumerated(route))
+            .cached_entries(problem, &self.solver, route, self.is_enumerated(route))
     }
     pub(super) fn column(
         &self,
@@ -36,7 +40,7 @@ impl<const D: usize> State<D> {
         tag: i32,
     ) -> Result<Column> {
         let mut entries = problem.base_entries(route)?;
-        entries.extend(self.cut_entries(route)?);
+        entries.extend(self.cut_entries(problem, route)?);
         entries.sort_by_key(|&(row, _)| row);
         let (cost, _) = problem.route_cost(route);
         let mut reduced_cost = cost;
