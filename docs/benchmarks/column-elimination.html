@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Column elimination model reductions Measured on 2026-10-21. The comparison baseline is the working implementationafter bulk LP loading, local feasibility pruning and batched refine">
+<meta name="theme-color" content="#0b0e11">
+<title>Column elimination model reductions — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/benchmarks/column-elimination.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="root.html">Root benchmarks</a><a href="column-elimination.html" aria-current="page">Column elimination model reductions</a><a href="../extensions/column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/benchmarks/column-elimination.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="column-elimination-model-reductions">Column elimination model reductions</h1>
+<p>Measured on 2026-10-21. The comparison baseline is the working implementation
+after bulk LP loading, local feasibility pruning and batched refinement were
+added. The candidate adds resource propagation, graph compaction, exact-state
+sharing and a capacity-indexed ng relaxation. Both solve the continuous
+elementary route LP with Clp; integer solution costs are not the comparison
+target.</p>
+<h2 id="reference-audit">Reference audit</h2>
+<p>The reference implementation was inspected at
+<a href="https://github.com/amkarahalios/dd_vrptw/blob/main/vrptwdecisiondiagram.cpp"><code>vrptwdecisiondiagram.cpp</code></a>
+and <a href="https://github.com/amkarahalios/dd_vrptw/blob/main/vrptwddsolver.cpp"><code>vrptwddsolver.cpp</code></a>.</p>
+<table>
+<thead>
+<tr>
+<th>Reference mechanism</th>
+<th>Result in this implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>generateNewStateRelaxation</code>, <code>compileNgRoute</code>: load, time and ng visit memory</td>
+<td>Added capacity-indexed states with two-customer ng memory for bounded integer-demand CVRP cases; general instances use forward resource bounds and layered states. Initial time bucketing remains unimplemented.</td>
+</tr>
+<tr>
+<td><code>addNode</code>, <code>separateRoute</code>: state reuse and outgoing exact-feasibility checks</td>
+<td>Added exact state sharing by location, complete visited set and bitwise load/time; new states filter every outgoing action.</td>
+</tr>
+<tr>
+<td><code>fixArcs</code>: forward/backward reduced-cost distances and an incumbent cutoff</td>
+<td>Not copied into the continuous LP mode. An integer incumbent cutoff does not justify setting every positive fractional use of an expensive arc to zero.</td>
+</tr>
+<tr>
+<td><code>findMergeNodesReducedCost</code>: relaxed dominance merging above a reduced-cost threshold</td>
+<td>Not enabled; this differs from sharing equal exact states and can weaken the relaxation.</td>
+</tr>
+<tr>
+<td>Flow-model dual starts; Lagrangian/subgradient solving; RCC/SRC separation and primal heuristics</td>
+<td>Remain separate future work. These require additional backend/state mapping or a stronger, explicitly different optimization mode.</td>
+</tr>
+</tbody>
+</table>
+<p>The candidate also physically removes unreachable nodes and disabled arcs,
+so dead rows/columns no longer enter subsequent LPs or occupy persistent
+diagram budgets. Every retained internal node lies on a root-to-sink path.</p>
+<h2 id="preservation-rules">Preservation rules</h2>
+<p>Forward load/time labels are independent minima, not a claim that one path
+attains both. A transition is removed only if an optimistic label already
+violates a resource constraint. A reverse connectivity pass removes dead
+regions. The same floating-point operation order as route replay is used for
+each forward resource update; no triangle inequality is assumed.</p>
+<p>Exact refinement uses the complete visited set, including zero-demand
+customers. Bitwise active-resource matching avoids approximate state merging.
+Arrival time is omitted only when every deadline is infinite and a monotone
+upper-bound calculation proves all elementary route times remain finite.
+The preflight accounts for reused states and filtered successors, so a
+refinement that does not fit leaves the diagram untouched.</p>
+<p>The capacity initial model is used automatically for at least 20 customers
+when demands are positive bounded integers and every window upper bound is
+infinite. Demand GCD scaling is exact. Scaled capacity must be at most <code>4n</code>,
+and conservative dense state/arc estimates must fit the requested budgets.
+Zero/fractional demand or finite windows use the general construction.</p>
+<h2 id="reproduction">Reproduction</h2>
+<pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes
+<span class="c1"># Preserve each binary before rebuilding the other implementation.</span>
+node<span class="w"> </span>scripts/benchmark_column_elimination.mjs<span class="w"> </span><span class="nv">baseline</span><span class="o">=</span>/path/to/baseline<span class="w"> </span><span class="nv">reduced</span><span class="o">=</span>/path/to/reduced
+</code></pre>
+<p>The script warms up both binaries, alternates their order between trials,
+and runs three trials per case. C101, R101, P-n16-k8 and its first ten
+customers have a ten-second budget. A-n32-k5 has thirty seconds because its
+capacity-indexed model needs a longer first LP solve. <code>CE_BENCH_TIME</code>,
+<code>CE_BENCH_RUNS</code> and <code>CE_BENCH_OUT</code> override the defaults. JSON reports under
+<code>target/ce-reduction-benchmark/</code> include CPU/compiler metadata, binary hashes,
+individual wall times, solve statuses, bounds, sizes and iteration counts.
+Timeouts are compared by the last optimal bound, not by an asserted speedup.</p>
+<h2 id="results">Results</h2>
+<p>Three interleaved trials on an AMD Ryzen 9 9950X, Rust 1.97.1, default release
+profile and single-threaded Clp. Times below are medians of solver elapsed
+time. Each row had the same outcome in all three trials.</p>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Previous implementation</th>
+<th>Reduced model</th>
+<th style="text-align:right">Reduced-model LP bound</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C101, 100 customers</td>
+<td>Converged, 6.171 s</td>
+<td>Converged, 0.029 s</td>
+<td style="text-align:right">828.936867</td>
+</tr>
+<tr>
+<td>R101, 100 customers</td>
+<td>10 s timeout, no optimal LP bound</td>
+<td>Converged, 0.283 s</td>
+<td style="text-align:right">1636.388655</td>
+</tr>
+<tr>
+<td>P-n16-k8, all 15 customers</td>
+<td>10 s timeout, bound 167.598496</td>
+<td>Converged, 0.039 s</td>
+<td style="text-align:right">441.000000</td>
+</tr>
+<tr>
+<td>P-n16-k8, first 10 customers</td>
+<td>10 s timeout, bound 186.375000</td>
+<td>Converged, 0.00135 s</td>
+<td style="text-align:right">319.000000</td>
+</tr>
+<tr>
+<td>A-n32-k5, all 31 customers</td>
+<td>30 s timeout, bound 398.015973</td>
+<td>30 s timeout, bound 745.623824</td>
+<td style="text-align:right">Not converged</td>
+</tr>
+</tbody>
+</table>
+<p>C101 preserves its bound and reduces final graph size from 10,028 nodes /
+438,238 arcs to 565 nodes / 16,351 arcs. It now needs one LP solve instead of
+two. P-n16-k8 finishes with 171 nodes / 655 arcs instead of growing to 2,014
+nodes / 25,408 arcs at the previous timeout. Runtime ratios are meaningful
+only for completed solves; the timed-out rows demonstrate different progress
+within the same budget, not a measured convergence speedup.</p>
+<p>A-n32-k5 is the remaining hard case. Its stronger initial capacity-state
+model has 5,025 nodes and 129,255 arcs, so its first LP solve is more expensive
+than that of the weaker layered model. At the thirty-second cutoff it has
+5,119 nodes / 131,756 arcs and four LP calls, with three completed optimal LP
+solves. The retained bound is valid but does not establish LP convergence.</p>
+<h2 id="parallel-lp-experiment">Parallel LP experiment</h2>
+<p>A diagnostic export of the candidate's initial A-n32-k5 diagram produced one
+fixed LP with 5,055 rows, 129,255 columns and 377,719 nonzeros. All thread
+configurations used the same saved MPS, with the same nonnegative variables,
+<code>1e12</code> default column bounds and fleet constraint as the Clp formulation.
+The snapshot is <code>target/ce-reduction-benchmark/a32-initial.mps</code>, SHA-256
+<code>cdd979061b51515b91357bb6da4d6f7a0a22c053b12f7ab5de6d84e211106b8c</code>.</p>
+<p>HiGHS 1.15.1 was measured with a twenty-second solve budget, three interleaved
+trials and a fresh process each time. Serial dual simplex used strategy 1;
+the parallel PAMI configurations used strategy 3 and concurrency 2 or 4.
+Native logs confirm the requested parallel solver and concurrency were used.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:right">Threads</th>
+<th style="text-align:right">Median HiGHS solve time</th>
+<th style="text-align:right">Median process wall time</th>
+<th style="text-align:right">Speedup vs serial HiGHS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right">1</td>
+<td style="text-align:right">13.14 s</td>
+<td style="text-align:right">13.332 s</td>
+<td style="text-align:right">1.00×</td>
+</tr>
+<tr>
+<td style="text-align:right">2</td>
+<td style="text-align:right">10.99 s</td>
+<td style="text-align:right">11.175 s</td>
+<td style="text-align:right">1.20×</td>
+</tr>
+<tr>
+<td style="text-align:right">4</td>
+<td style="text-align:right">6.59 s</td>
+<td style="text-align:right">6.771 s</td>
+<td style="text-align:right">1.99×</td>
+</tr>
+</tbody>
+</table>
+<p>All nine solves finished optimal at objective <code>741.3618123</code>, matching the
+candidate's initial Clp relaxation within reporting precision. This is an
+LP-only experiment: it predates the optional <code>--solver highs --threads N</code>
+CE integration, and no end-to-end speedup follows from this snapshot alone.
+Clp remains the default backend. The speedup compares supported
+serial/parallel HiGHS configurations, not HiGHS against Clp. It does not
+establish a universal thread count or justify threading the much smaller
+route-check loop. HiGHS also describes its parallel dual simplex as
+<a href="https://ergo-code.github.io/HiGHS/dev/parallel/">memory-bound</a>.</p>
+<p>HiPO was attempted but this installed HiGHS build lacks its required <code>amd</code>,
+<code>blas</code>, <code>metis</code> and <code>rcm</code> features, so no HiPO timing is reported.</p>
+<pre><code class="language-sh">node<span class="w"> </span>scripts/benchmark_ce_lp_threads.mjs<span class="w"> </span>target/ce-reduction-benchmark/a32-initial.mps
+</code></pre>
+<p>Raw solver logs, options and measurements are saved under
+<code>target/ce-lp-threads/</code>. The script accepts any provided MPS and records
+unavailable solver builds explicitly.</p>
+<h3 id="all-cpu-worker-selection">All-CPU worker selection</h3>
+<p>The CE CLI now supports <code>--solver highs --threads 0</code>, resolving zero to all
+CPUs available to the process, and preserves explicit positive worker limits.
+On this host that requests 32 worker threads. The linked HiGHS 1.15.1 reports
+an eight-task limit for PAMI simplex; the constructor queries this option
+limit and configures the maximum supported concurrency. Logs and JSON expose
+both counts. No global scheduler reset is performed.</p>
+<p>Three further fixed-LP trials compared worker pools above the earlier
+four-thread setting. Both requested eight PAMI tasks and all six solves
+finished optimal at the same objective <code>741.3618123</code>:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:right">Worker threads</th>
+<th style="text-align:right">Simplex task limit</th>
+<th style="text-align:right">Median LP solve time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right">8</td>
+<td style="text-align:right">8</td>
+<td style="text-align:right">5.69 s</td>
+</tr>
+<tr>
+<td style="text-align:right">32</td>
+<td style="text-align:right">8</td>
+<td style="text-align:right">7.12 s</td>
+</tr>
+</tbody>
+</table>
+<p>Using all logical CPUs did not improve this LP. Eight workers were faster
+in this comparison, and the larger pool provided no additional PAMI
+concurrency. These measurements support retaining explicit thread
+controls rather than treating the available CPU count as universally fastest.
+Raw records are under <code>target/ce-lp-full-cores/</code>.</p>
+<p>End-to-end CLI smoke checks with <code>--solver highs --threads 0</code> reported 32
+workers / eight maximum simplex tasks. C101 converged to <code>828.936867</code>, and
+P-n16-k8 converged to <code>441.000000</code>. A-n32-k5 reached bound <code>745.711111</code> at a
+thirty-second timeout (five LP calls, four completed optimal solves). These
+are functional integration checks, not a repeated end-to-end speedup study.</p>
+<pre><code class="language-sh">node<span class="w"> </span>scripts/benchmark_ce_lp_threads.mjs<span class="w"> </span>target/ce-reduction-benchmark/a32-initial.mps<span class="w"> </span>target/ce-lp-full-cores<span class="w"> </span><span class="m">8</span>,32
+</code></pre>
+<h2 id="r201-time-window-diagram">R201 time-window diagram</h2>
+<p>R201's broad windows leave many cheap repeated-customer paths in the layered
+relaxation. Backward deadlines and identical-suffix merging alone made little
+difference. A time-bucket initial diagram uses service-time lower bounds in
+place of visit layers, with exact prefix refinement preserving the original
+resource constraints. R201 selects an eight-unit bucket width automatically.</p>
+<p>The final binary and baseline were compared with 100 customers, HiGHS eight
+workers and a 15-second budget after compilation and validation completed:</p>
+<table>
+<thead>
+<tr>
+<th>Measurement</th>
+<th style="text-align:right">Layered</th>
+<th style="text-align:right">Time buckets</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Initial nodes</td>
+<td style="text-align:right">3,282</td>
+<td style="text-align:right">1,497</td>
+</tr>
+<tr>
+<td>Initial arcs</td>
+<td style="text-align:right">144,994</td>
+<td style="text-align:right">82,654</td>
+</tr>
+<tr>
+<td>Elapsed to first optimal LP</td>
+<td style="text-align:right">3.06 s</td>
+<td style="text-align:right">0.41 s</td>
+</tr>
+<tr>
+<td>First LP bound</td>
+<td style="text-align:right">987.356913</td>
+<td style="text-align:right">1073.347020</td>
+</tr>
+<tr>
+<td>Bound at 15 seconds</td>
+<td style="text-align:right">994.083774</td>
+<td style="text-align:right">1098.205427</td>
+</tr>
+<tr>
+<td>LP calls</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">15</td>
+</tr>
+</tbody>
+</table>
+<p>Raw JSON and per-iteration logs are in <code>target/ce-r201-benchmark/</code>.
+Three earlier alternating trials overlapped some validation compilation:
+their median first-LP times were 3.12 seconds and 0.43 seconds. All three
+time-bucket runs reached the same last bound; the layered bounds ranged
+from 991.998838 to 994.083774. Neither version
+converged within this budget. Exact refinement still grows the new graph:
+the final time-bucket graph had 2,714 nodes and 159,262 arcs.
+R101 and C101 smoke checks preserved their converged bounds of 1636.388655
+and 828.936867 respectively.</p>
+<h2 id="validation">Validation</h2>
+<pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--offline<span class="w"> </span>--lib<span class="w"> </span>extensions::column_elimination<span class="w"> </span>--features<span class="w"> </span>clp
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--offline<span class="w"> </span>--lib<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>thread
+cargo<span class="w"> </span>check<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--offline<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--features<span class="w"> </span>clp
+cargo<span class="w"> </span>clippy<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--offline<span class="w"> </span>--lib<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--features<span class="w"> </span>clp,highs
+</code></pre>
+<p>Nineteen focused tests cover independent elementary-route enumeration,
+fractional LP agreement, directed nonmetric travel, forbidden arcs,
+zero/fractional demands, floating-point boundaries, exact state sharing,
+compaction, atomic limits and the automatic capacity-state mode.
+Additional thread-option tests read the actual native settings, verify clone
+preservation and reject invalid CLI combinations before input loading. CLI
+smoke runs check serial and all-CPU HiGHS solving and the JSON thread fields.</p>
+<p>The remaining large-model costs include repeated LP solves and eventual
+growth of exact visit-history states. Capacity states can produce a stronger
+initial bound while taking longer to solve their first LP. These changes do
+not establish an integer optimum or remove worst-case exponential growth.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="root.html"><small>Previous guide</small>Root benchmarks <span aria-hidden="true">↗</span></a><a href="../extensions/column-elimination.html"><small>Next guide</small>Column elimination <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#reference-audit">Reference audit</a><a class="toc-level-2" href="#preservation-rules">Preservation rules</a><a class="toc-level-2" href="#reproduction">Reproduction</a><a class="toc-level-2" href="#results">Results</a><a class="toc-level-2" href="#parallel-lp-experiment">Parallel LP experiment</a><a class="toc-level-3" href="#all-cpu-worker-selection">All-CPU worker selection</a><a class="toc-level-2" href="#r201-time-window-diagram">R201 time-window diagram</a><a class="toc-level-2" href="#validation">Validation</a></nav></aside>
+</div>
+</body></html>

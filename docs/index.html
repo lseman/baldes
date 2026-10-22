@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="BALDES documentation Start with the project README for installation and quick examples.Use the CLI guide and Python guide for detailed usage. Commands here run from the repositoryr">
+<meta name="description" content="BALDES documentation Start with the project README for installation and quick examples.Commands in these guides run from the repository root. Getting started Build and installation">
 <meta name="theme-color" content="#0b0e11">
 <title>BALDES documentation — BALDES docs</title>
 <link rel="canonical" href="https://laioseman.com/baldes/docs/index.html">
@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html" aria-current="page">Overview</a><a href="cli.html">Command-line usage</a><a href="python.html">Python: pybaldes</a><a href="algorithms.html">Algorithms and references</a><a href="build.html">Configuring and building BALDES</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="benchmarks.html">Root benchmarks</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html" aria-current="page">Overview</a><a href="guides/build.html">Configuring and building BALDES</a><a href="guides/source-layout.html">Source layout</a><a href="guides/cli.html">Command-line usage</a><a href="guides/python.html">Python: pybaldes</a><a href="solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="solver/branching.html">Routing branching</a><a href="solver/cuts.html">Routing cuts</a><a href="solver/stabilization.html">Dual-price stabilization</a><a href="solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="reference/algorithms.html">Algorithms and references</a><a href="reference/options.html">BALDES pricing options</a><a href="reference/resources.html">Scalar resources</a><a href="reference/simd.html">SIMD dispatch</a><a href="extensions/multi-time-windows.html">Multiple time windows</a><a href="extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="extensions/column-imports.html">Finite column imports</a><a href="extensions/pstep.html">P-step CVRP extension</a><a href="extensions/evrp.html">EVRP implementation status</a><a href="extensions/ipm.html">BALDES IPM in Rust</a><a href="benchmarks/root.html">Root benchmarks</a><a href="benchmarks/column-elimination.html">Column elimination model reductions</a><a href="extensions/column-elimination.html">Column elimination</a></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/README.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -29,75 +29,54 @@
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="baldes-documentation">BALDES documentation</h1>
 <p>Start with the <a href="https://github.com/lseman/baldes/blob/main/README.md">project README</a> for installation and quick examples.
-Use the <a href="cli.html">CLI guide</a> and <a href="python.html">Python guide</a> for detailed usage. Commands here run from the repository
-root. The guides below describe the current Rust implementation.</p>
-<h2 id="guides">Guides</h2>
-<table>
-<thead>
-<tr>
-<th>Guide</th>
-<th>Use it to</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="cli.html">Command-line usage</a></td>
-<td>Run routing and HGS, interpret output, and look up CLI flags</td>
-</tr>
-<tr>
-<td><a href="python.html">Python API</a></td>
-<td>Install pybaldes, construct inputs, configure solves, and export results</td>
-</tr>
-<tr>
-<td><a href="algorithms.html">Algorithms and references</a></td>
-<td>Review solver components and research references</td>
-</tr>
-<tr>
-<td><a href="build.html">Build configuration</a></td>
-<td>Configure optional backends and compiler options in the terminal menu, then build with Make</td>
-</tr>
-<tr>
-<td><a href="tree.html">Tree and node lifecycle</a></td>
-<td>Run integer routing, understand node inheritance, bounds, limits, and result status</td>
-</tr>
-<tr>
-<td><a href="branching.html">Branching</a></td>
-<td>Choose vehicle-count, Ryan–Foster, or arc-flow branching and understand the single-network assignment limitation</td>
-</tr>
-<tr>
-<td><a href="cuts.html">Cuts</a></td>
-<td>Configure cut families and keep coefficients consistent across pricing, enumeration, and child nodes</td>
-</tr>
-<tr>
-<td><a href="enumerated-mip.html">Enumerated MIP</a></td>
-<td>Enable HiGHS integer solving and interpret its route-count gate and proof coverage</td>
-</tr>
-<tr>
-<td><a href="options.html">BALDES options</a></td>
-<td>Look up supported controls, defaults, types, and scope</td>
-</tr>
-<tr>
-<td><a href="stabilization.html">Stabilization</a></td>
-<td>Configure dual smoothing and understand center updates and pricing retries</td>
-</tr>
-<tr>
-<td><a href="source-layout.html">Source layout</a></td>
-<td>Find the module responsible for a change</td>
-</tr>
-<tr>
-<td><a href="website.html">Website publishing</a></td>
-<td>Compile Markdown to HTML and preview or deploy the site</td>
-</tr>
-<tr>
-<td><a href="benchmarks.html">Root benchmarks</a></td>
-<td>Review root relaxation timings and benchmark configuration</td>
-</tr>
-<tr>
-<td><a href="testing.html">Build and validation</a></td>
-<td>Select feature combinations and run the relevant checks</td>
-</tr>
-</tbody>
-</table>
+Commands in these guides run from the repository root.</p>
+<h2 id="getting-started">Getting started</h2>
+<ul>
+<li><a href="guides/build.html">Build and installation</a>: dependencies, optional backends, and Make configuration.</li>
+<li><a href="guides/source-layout.html">Source layout</a>: production modules, CLI commands, and test organization.</li>
+<li><a href="guides/cli.html">Command-line usage</a>: routing solves, HGS, flags, and output.</li>
+<li><a href="guides/python.html">Python API</a>: installation, model inputs, solver options, and result export.</li>
+</ul>
+<h2 id="solver">Solver</h2>
+<ul>
+<li><a href="solver/tree.html">Tree and node lifecycle</a>: integer routing, inherited state, bounds, and limits.</li>
+<li><a href="solver/branching.html">Branching</a>: branching families and selection.</li>
+<li><a href="solver/cuts.html">Cuts</a>: cut configuration and coefficient consistency.</li>
+<li><a href="solver/stabilization.html">Dual-price stabilization</a>: smoothing, center updates, and retries.</li>
+<li><a href="solver/enumerated-mip.html">Enumerated MIP</a>: optional HiGHS integer solving and proof coverage.</li>
+</ul>
+<h2 id="reference">Reference</h2>
+<ul>
+<li><a href="reference/algorithms.html">Algorithms and references</a>: solver components and research references.</li>
+<li><a href="reference/options.html">BALDES options</a>: supported controls, defaults, types, and scope.</li>
+<li><a href="reference/resources.html">Scalar resources</a>: resource dimensions and bucket indexing.</li>
+<li><a href="reference/simd.html">SIMD dispatch</a>: optional kernels and runtime portability.</li>
+</ul>
+<h2 id="extensions-and-modeling">Extensions and modeling</h2>
+<ul>
+<li>
+<p><a href="extensions/multi-time-windows.html">Multiple time windows</a>: disjoint service-start domains for scalar pricing resources.</p>
+</li>
+<li>
+<p><a href="extensions/multi-pricing.html">Multi-pricing</a>: shared masters, multiple route families, and assignment branching.</p>
+</li>
+<li>
+<p><a href="extensions/column-imports.html">Finite column imports</a>: original-vector patterns and multiplicity constraints.</p>
+</li>
+<li>
+<p><a href="extensions/pstep.html">P-step CVRP</a>: compact p-step LP relaxation.</p>
+</li>
+<li>
+<p><a href="extensions/evrp.html">Electric-vehicle routing</a>: charging models, schedule replay, and current limitations.</p>
+</li>
+<li>
+<p><a href="extensions/ipm.html">Interior-point solver</a>: native LP backend, interfaces, and implementation details.</p>
+</li>
+</ul>
+<h2 id="benchmarks">Benchmarks</h2>
+<ul>
+<li><a href="benchmarks/root.html">Root benchmarks</a>: published root relaxation timings and measurement setup.</li>
+</ul>
 <h2 id="capabilities-and-interfaces">Capabilities and interfaces</h2>
 <table>
 <thead>
@@ -147,25 +126,59 @@ root. The guides below describe the current Rust implementation.</p>
 </tr>
 </tbody>
 </table>
-<p>The routing tree currently models <strong>one pricing network</strong>. A network is a
-separate routing subproblem, such as a vehicle type or depot. Forward and
-backward labeling within one graph do not create multiple networks.
-Ryan–Foster branching works with one network. Packing-set assignment rows are
-supported, but useful fractional assignment branching requires multiple
-networks; see <a href="branching.html#packing-set-assignment">Branching</a>.</p>
+<p>The <code>vrptw</code> and <code>cvrp</code> routing tree uses one pricing network. For models with
+multiple route families, use the <a href="extensions/multi-pricing.html">multi-pricing interface</a>,
+including its CLI and Python APIs and assignment tree. Its supported branching
+families and solve limitations differ from the single-network routing tree.</p>
 <p>Root <code>Optimal</code> means the LP relaxation converged. Tree <code>Optimal</code> means the
 integer routing gap closed within the configured tolerances. A feasible
 restricted-column solution supplies an incumbent; its objective alone does
 not prove a lower bound for the full routing problem.</p>
-<h2 id="keeping-the-guides-current">Keeping the guides current</h2>
-<p>When changing behavior, update the owning guide and its linked source/tests.
-For BALDES options, keep <code>OPTION_TABLE</code> support metadata and the reference table
-in sync. Check documented commands and links rather than treating a historical
-test count as a permanent guarantee.</p>
+<h2 id="rust-module-organization">Rust module organization</h2>
+<p>Core modules implement graphs, labeling, pricing, cuts, enumeration and the
+master. <code>master::multi_pricing</code> coordinates one master with multiple pricing
+subproblems and belongs to the core master framework. Rust callers can also use
+<code>master::multi_pricing::solve_master</code> for original master variables with no
+pricing subproblems.</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>extensions::hgs</code></td>
+<td>Hybrid Genetic Search and primal heuristics</td>
+</tr>
+<tr>
+<td><code>extensions::ipm</code></td>
+<td>Native interior-point LP backend</td>
+</tr>
+<tr>
+<td><code>extensions::evrp</code></td>
+<td>Electric-vehicle routing models and charging schedules</td>
+</tr>
+<tr>
+<td><code>extensions::pstep</code></td>
+<td>P-step CVRP LP with parallel bucket pricing and reference enumeration</td>
+</tr>
+<tr>
+<td><code>master::multi_pricing</code></td>
+<td>Shared rows, per-subproblem multiplicities and node lifecycle</td>
+</tr>
+</tbody>
+</table>
+<p><code>extensions</code> groups algorithms and specialized models in the same crate; it
+does not imply runtime plugins or new build features. Existing <code>baldes::hgs</code>,
+<code>baldes::ipm</code>, <code>baldes::evrp</code> and <code>master::networks</code> paths remain compatibility
+re-exports. New Rust code should use the module paths above. CLI JSON fields
+and Python names such as <code>NetworkProblem</code> and <code>solve_networks</code> stay compatible.</p>
 </article>
-<nav class="page-turn" aria-label="Adjacent guides"><a href="cli.html"><small>Next guide</small>Command-line usage <span aria-hidden="true">↗</span></a></nav>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="guides/build.html"><small>Next guide</small>Configuring and building BALDES <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#guides">Guides</a><a class="toc-level-2" href="#capabilities-and-interfaces">Capabilities and interfaces</a><a class="toc-level-2" href="#keeping-the-guides-current">Keeping the guides current</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#getting-started">Getting started</a><a class="toc-level-2" href="#solver">Solver</a><a class="toc-level-2" href="#reference">Reference</a><a class="toc-level-2" href="#extensions-and-modeling">Extensions and modeling</a><a class="toc-level-2" href="#benchmarks">Benchmarks</a><a class="toc-level-2" href="#capabilities-and-interfaces">Capabilities and interfaces</a><a class="toc-level-2" href="#rust-module-organization">Rust module organization</a></nav></aside>
 </div>
 </body></html>

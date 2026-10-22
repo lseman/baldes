@@ -6,30 +6,30 @@
 <meta name="description" content="Enumerated node MIP with HiGHS Documentation index · Tree lifecycle ·BALDES options BALDES can solve a complete enumerated node master with HiGHS, while keepingClp for column gener">
 <meta name="theme-color" content="#0b0e11">
 <title>Enumerated node MIP with HiGHS — BALDES docs</title>
-<link rel="canonical" href="https://laioseman.com/baldes/docs/enumerated-mip.html">
-<link rel="icon" href="_static/mark.svg" type="image/svg+xml">
-<link rel="stylesheet" href="_static/site.css">
-<link rel="stylesheet" href="_static/docs.css">
-<link rel="stylesheet" href="_static/syntax.css">
-<script src="_static/app.js" defer></script>
-<script src="_static/docs.js" defer></script>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/solver/enumerated-mip.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
 </head>
-<body class="landing-dark docs-body" data-docs-root="./">
+<body class="landing-dark docs-body" data-docs-root="../">
 <a class="skip-link" href="#content">Skip to content</a>
-<header class="site-header docs-header"><a class="brand" href="../"><img src="_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
-<nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="cli.html">Command-line usage</a><a href="python.html">Python: pybaldes</a><a href="algorithms.html">Algorithms and references</a><a href="build.html">Configuring and building BALDES</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html" aria-current="page">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="benchmarks.html">Root benchmarks</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
-<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/enumerated-mip.md">View Markdown source ↗</a>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="stabilization.html">Dual-price stabilization</a><a href="enumerated-mip.html" aria-current="page">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="../extensions/column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/solver/enumerated-mip.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="enumerated-node-mip-with-highs">Enumerated node MIP with HiGHS</h1>
-<p><a href="index.html">Documentation index</a> · <a href="tree.html">Tree lifecycle</a> ·
-<a href="options.html">BALDES options</a></p>
+<p><a href="../index.html">Documentation index</a> · <a href="tree.html">Tree lifecycle</a> ·
+<a href="../reference/options.html">BALDES options</a></p>
 <p>BALDES can solve a complete enumerated node master with <strong>HiGHS</strong>, while keeping
 Clp for column generation. The integer solve uses a separate HiGHS instance
 and leaves the source LP, its solution/basis, and sibling snapshots untouched.</p>
@@ -145,31 +145,35 @@ silent matrix changes in HiGHS.</p>
 retained in <code>MipOutput::solver_status</code>, with solution, dual bound, node count,
 simplex iterations, and elapsed time. Tree JSON adds <code>enumerated_mip_calls</code> and
 <code>enumerated_mip_nodes</code>; its existing <code>mip_nodes</code> includes this work too.</p>
-<h2 id="validation-and-remaining-gaps">Validation and remaining gaps</h2>
-<p><code>tests/master/highs_mip.rs</code> covers generic Clp/HiGHS model transfer, source isolation,
-rows and upper bounds, mixed integrality, infeasibility, cutoffs, zero budgets,
-50 independent exhaustive integer comparisons, threshold boundaries and time
-reserve, and complete snapshot solves across all five existing cut-family
-configurations. Child tests enforce vehicle count, together/apart, arc-flow and
-assignment rows and then re-solve the parent to check isolation. Tree and CLI
-tests exercise opt-in MIP, disabled enumeration, exhausted budgets, and missing
-backend support.</p>
-<p>Run the MIP and command-line checks with both backends:</p>
-<pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>--test<span class="w"> </span>highs_mip<span class="w"> </span>--test<span class="w"> </span>cli
-</code></pre>
-<p>See <a href="testing.html">Build and validation</a> for the full feature matrix and Python
-checks. The implementation lives in the
-<a href="https://github.com/lseman/baldes/blob/main/src/master/solvers/highs/integer.rs">HiGHS model transfer</a>,
-<a href="https://github.com/lseman/baldes/blob/main/src/master/root/integer.rs">snapshot adapter</a>, and
-<a href="https://github.com/lseman/baldes/blob/main/src/master/tree/integer.rs">tree integration</a>.</p>
+<h2 id="limitations">Limitations</h2>
 <p>BALDES currently runs the optional solve after node evaluation. A handoff
 inside column generation, new cut separation during integer solving, and
 multiple pricing networks remain outside this implementation. Active rows
 are all retained.</p>
+<h2 id="custom-cg-enumeration-controllers">Custom CG enumeration controllers</h2>
+<p>The built-in routing controller transfers enumerated columns through an atomic
+LP copy. If enumeration, regeneration, insertion or remapping fails, it restores
+pricing state and continues ordinary CG. <code>column_generation::Output::enumeration_failure</code>
+retains the last transfer error; it does not itself change the solve status.
+Incomplete retained enumerations are discarded before pricing or inspection.
+Within a CG solve, a successful handoff is not repeated for an unchanged
+formulation. Reported row, coefficient or domain changes permit another handoff.
+Retained generated columns are synchronized before the transaction commits.</p>
+<p>A custom Rust <code>Controller</code> that implements <code>enumerated_universe</code> must also
+implement <code>begin_enumeration_transaction</code> and <code>finish_enumeration_transaction</code>.
+The begin hook saves all mutable state used by enumeration, regeneration,
+column remapping and retained-pool synchronization, then returns <code>true</code>.
+The finish hook commits on <code>true</code> and
+restores that saved state on <code>false</code>; restoration must be infallible. A successful
+fixing pass returning no universe may commit valid partial deductions.
+Controllers without these hooks decline the optional transfer. Custom LP
+backends must implement <code>LpMaster::try_clone_for_transaction</code>; Clp and HiGHS
+already provide independent copies. The live LP is replaced only after every
+fallible operation succeeds.</p>
 </article>
-<nav class="page-turn" aria-label="Adjacent guides"><a href="cuts.html"><small>Previous guide</small>Routing cuts <span aria-hidden="true">↗</span></a><a href="options.html"><small>Next guide</small>BALDES pricing options <span aria-hidden="true">↗</span></a></nav>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="stabilization.html"><small>Previous guide</small>Dual-price stabilization <span aria-hidden="true">↗</span></a><a href="../reference/algorithms.html"><small>Next guide</small>Algorithms and references <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#controls-and-api">Controls and API</a><a class="toc-level-2" href="#enumeration-gate">Enumeration gate</a><a class="toc-level-2" href="#preserving-node-semantics">Preserving node semantics</a><a class="toc-level-2" href="#outcomes">Outcomes</a><a class="toc-level-2" href="#validation-and-remaining-gaps">Validation and remaining gaps</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#controls-and-api">Controls and API</a><a class="toc-level-2" href="#enumeration-gate">Enumeration gate</a><a class="toc-level-2" href="#preserving-node-semantics">Preserving node semantics</a><a class="toc-level-2" href="#outcomes">Outcomes</a><a class="toc-level-2" href="#limitations">Limitations</a><a class="toc-level-2" href="#custom-cg-enumeration-controllers">Custom CG enumeration controllers</a></nav></aside>
 </div>
 </body></html>

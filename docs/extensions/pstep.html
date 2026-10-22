@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="P-step CVRP extension Documentation index baldes::extensions::pstep implements the compact continuous relaxation inProposition 1 of A p-step Formulation for the Capacitated Vehicle">
+<meta name="theme-color" content="#0b0e11">
+<title>P-step CVRP extension — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/pstep.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="multi-time-windows.html">Multiple time windows</a><a href="multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html" aria-current="page">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/pstep.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="p-step-cvrp-extension">P-step CVRP extension</h1>
+<p><a href="../index.html">Documentation index</a></p>
+<p><code>baldes::extensions::pstep</code> implements the compact continuous relaxation in
+Proposition 1 of <a href="https://repub.eur.nl/pub/123411/EI-2020-01.pdf">A p-step Formulation for the Capacitated Vehicle Routing
+Problem, Dollevoet, Munari and Spliet</a>.</p>
+<p>The extension is available without Cargo features. Solving requires an
+implementation of Baldes's <code>LpMaster</code>, such as Clp (<code>--features clp</code>).</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes
+./target/release/baldes<span class="w"> </span>pstep<span class="w"> </span>instances/cvrplib/P-n16-k8.vrp<span class="w"> </span>--p<span class="w"> </span><span class="m">2</span><span class="w"> </span>--threads<span class="w"> </span><span class="m">4</span>
+./target/release/baldes<span class="w"> </span>pstep<span class="w"> </span>instances/cvrplib/P-n16-k8.vrp<span class="w"> </span>--p<span class="w"> </span><span class="m">3</span><span class="w"> </span>--threads<span class="w"> </span><span class="m">4</span><span class="w"> </span>--enumerate<span class="w"> </span>--json<span class="w"> </span>pstep.json
+</code></pre>
+<p>Use <code>baldes pstep --help</code> for time, iteration and label limits. <code>--enumerate</code>
+checks the bound against the complete column pool; use it on small cases.
+The JSON separates a converged full-model <code>lp_bound</code> from a potentially
+nonconverged <code>restricted_objective</code>. A work-limit error cannot certify a bound.
+Neither output is an integer routing solution. The fleet is unlimited even if
+the CVRPLIB instance name or header specifies a conventional truck count.</p>
+<p>Rust callers can use <code>Problem::from_instance</code> on a parsed <code>inputs::Instance</code>.
+It preserves the input's distance rounding. Then call
+<code>Problem::solve_column_generation</code> with an empty <code>LpMaster</code> and
+<code>ColumnGenerationOptions</code>; <code>pricing.p</code> and <code>pricing.threads</code> control the step
+size and CPU parallelism; <code>pricing.method</code> selects <code>Auto</code> (default),
+<code>Enumeration</code>, or <code>Bucket</code>. The older <code>examples/pstep.rs</code> illustrates full-pool
+construction, and <code>examples/pstep_cvrp.rs</code> produces CSV benchmark records.</p>
+<p>Create a <code>Problem</code> with customer demands, vehicle capacity and a directed cost
+matrix. Matrix indices are start depot <code>0</code>, customers <code>1..=n</code>, end depot <code>n+1</code>.
+For a conventional single-depot instance, copy depot-to-customer costs into
+row 0 and customer-to-depot costs into column n+1. <code>None</code> means no arc.
+Customer demands must be strictly positive; capacity and supplied costs must
+be finite, with nonnegative costs. The model has an unlimited homogeneous fleet.</p>
+<p><code>Problem::enumerate</code> builds the complete column pool for a supplied positive
+<code>p</code>. Every partial path is elementary and capacity feasible. Paths have exactly
+<code>p</code> arcs, except those starting at the depot, which may be shorter. Empty depot
+routes are omitted. At large <code>p</code>, the pool contains full routes and depot
+prefixes; flow conservation forces incomplete prefixes to zero.</p>
+<p>The compact prior-demand choices are zero for depot starts, maximum feasible
+prior demand for depot ends, and both extremes for internal paths. Coincident
+extremes are stored once. A junction customer's demand belongs to both adjacent
+paths; the load coefficients account for this overlap.</p>
+<p><code>Formulation::entries</code> exposes sparse columns in this row order:</p>
+<table>
+<thead>
+<tr>
+<th>Rows</th>
+<th>Coefficient</th>
+<th>Sense / RHS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0..n</code></td>
+<td>Customer degree (1 at endpoints, 2 internally)</td>
+<td><code>= 2</code></td>
+</tr>
+<tr>
+<td><code>n..2n</code></td>
+<td>Start +1, end -1</td>
+<td><code>= 0</code></td>
+</tr>
+<tr>
+<td><code>2n..3n</code></td>
+<td>Start <code>d + q_i</code>, end <code>-(d + q(path))</code></td>
+<td><code>&gt;= 0</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>Formulation::into_master</code> populates an empty LP backend with nonnegative
+continuous columns. Solve through the backend's status and time-limit API.
+An optimal solve gives the full p-step LP bound to solver tolerance. At <code>p=1</code>
+this has the single-commodity flow bound; at <code>p&gt;=n+1</code> it has the set-partitioning
+bound. Bounds need not increase at every successive p; the paper guarantees
+nondecrease when p is replaced by an integer multiple.</p>
+<p>The reference <code>enumerate</code> implementation has combinatorial cost. Both column
+count and search work are bounded by <code>EnumerationOptions</code>. Hitting a limit
+returns an error instead of returning a restricted pool as a complete model.
+It is intended as an exact column-pool reference for small instances and small p.</p>
+<p><code>price_steps</code> solves independent jobs for each start, end and prior-demand
+extreme. The default <code>Auto</code> method uses streaming elementary enumeration when
+p&lt;=6 and the dense prefix estimate 1+n+...+n^(p-1) is at most 100,000;
+otherwise it uses the core bucket-graph labeling engine. This is a bounded
+size heuristic, not a prediction that one backend always wins. Capacity and
+missing arcs prune enumeration further. Enumeration retains just the best
+path per job, so it does not build the full column pool. Both methods solve
+the same exact pricing problem and enforce work/time limits.</p>
+<p>Use <code>--pricing enumeration</code> or <code>--pricing bucket</code> to compare a specific case;
+<code>--enumerate</code> remains the independent full-pool LP cross-check. <code>--labels</code>
+limits generated labels for bucket pricing and attempted extensions for
+streaming enumeration. JSON reports these separately as <code>generated_labels</code>
+and <code>enumerated_extensions</code>, and records the requested and selected methods.
+Exceeding either budget aborts pricing without certifying convergence.</p>
+<p>For bucket pricing, hop count is an equality
+resource, preventing artificial waiting from creating extra arcs. Capacity is
+disposable: every load window has lower bound zero, so waiting never helps and
+a cheaper label using less capacity safely dominates. Reduced costs use actual
+customer demands, not any resource waiting. Customer starts
+require exactly p arcs; depot starts allow 1..p. The fixed endpoints and extreme
+make the reduced cost additive along arcs, including degree, endpoint and load
+duals. Each returned path is replayed against the master coefficients.</p>
+<p>Workers share immutable instance costs and duals. Each owns its search
+storage and results. Results are merged in fixed job order and all threads
+join before the main thread updates the LP. <code>threads=1</code> runs the same pricing
+algorithm, making serial/parallel results reproducible. Parallel overhead may
+outweigh the benefit on very small cases.</p>
+<p>The solver starts with degree artificials, uses exact pricing to complete phase
+I, and then switches to travel costs. Convergence requires every pricing job
+to finish without a negative reduced-cost step at the requested tolerance.
+Steps are deduplicated by node order and prior demand. LP columns are added in
+batches. Restricted-master objectives are not full-model lower bounds until
+pricing converges. Reported bounds are numerical, not independently certified.</p>
+<p>For p&lt;=3 the path topology itself enforces elementarity. For p=4, a relaxed
+bucket solve is sufficient when its minimum is elementary. Otherwise, pricing
+partitions by the first arc and forbids later returns to its head. Each resulting
+four-arc path is elementary; every feasible elementary step belongs to one
+partition. The relaxed minimum also bounds these partitions. Longer steps use
+exact cycle exclusion around bucket solves: a cyclic relaxed minimum branches on
+forbidding each arc of a detected cycle. Every elementary path lies in at least
+one child; relaxed costs bound each child. This avoids the core's 15-element
+local NG mask limit. It can still require exponential work for larger p.
+<code>PricingOptions</code> bounds total labels and bucket subproblems per endpoint job,
+as well as worker count and time. Exceeding a pricing limit returns an error.</p>
+<p>Time windows, cuts, integer solving and integration with Baldes's
+branch-and-price tree are not implemented here. For integer
+optimization of this compact model, impose binary aggregate <strong>arc flows</strong>, as
+in equations (7)–(9); making extreme p-step columns binary is not equivalent.
+The exposed paths and coefficients provide the data needed for a separate
+arc-flow integrality implementation.</p>
+<p>Run <code>node scripts/benchmark_pstep.mjs ./target/release/baldes</code> from the repository
+root to repeat the known-instance validation and serial/parallel timing checks.
+It writes raw JSON and CSV records under <code>results/pstep-20261020/</code> and compares
+every bound with full column enumeration.</p>
+<p>Add <code>--grid</code> to run p=2,3,4 on all three bundled CVRPLIB instances, with four
+workers, 120 seconds per solve and five million labels per endpoint job. Grid
+records go under <code>results/pstep-20261020/p234/</code>. Reference enumeration is omitted
+for the larger p=4 pools and A-n32-k5 at p=3, whose pool exceeds the CLI's column
+limit. Pricing stops are recorded explicitly, without a claimed LP bound.</p>
+<p>The validation runs gave these numerical bounds (four workers, development
+profile). The normal CVRP column uses default root NG-route pricing; the integer
+values were obtained separately with the normal tree solver.</p>
+<table>
+<thead>
+<tr>
+<th>Instance</th>
+<th style="text-align:right">p=2 LP</th>
+<th style="text-align:right">p=3 LP</th>
+<th style="text-align:right">p=4 LP</th>
+<th style="text-align:right">Normal CVRP root LP</th>
+<th style="text-align:right">Integer optimum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P-n16-k8</td>
+<td style="text-align:right">408.968169</td>
+<td style="text-align:right">434.947541</td>
+<td style="text-align:right">441.000000</td>
+<td style="text-align:right">441.000000</td>
+<td style="text-align:right">450</td>
+</tr>
+<tr>
+<td>E-n22-k4</td>
+<td style="text-align:right">336.229510</td>
+<td style="text-align:right">344.079301</td>
+<td style="text-align:right">351.662163</td>
+<td style="text-align:right">373.500000</td>
+<td style="text-align:right">375</td>
+</tr>
+<tr>
+<td>A-n32-k5</td>
+<td style="text-align:right">672.464631</td>
+<td style="text-align:right">678.388776</td>
+<td style="text-align:right">Time limit</td>
+<td style="text-align:right">757.983333</td>
+<td style="text-align:right">784</td>
+</tr>
+</tbody>
+</table>
+<p>The A-n32-k5 p=4 run stopped at 120 seconds without a full LP bound. The other
+eight cases converged; six also matched complete-column enumeration within
+1e-5. The A-n32-k5 integer solve used capacity cuts, rank-one cuts and a
+one-second HGS warm start before closing the gap at 784.</p>
+<p>Compare backends with <code>node scripts/benchmark_pstep_pricing.mjs</code>. It alternates
+backend order over three repetitions, checks converged bounds agree, and writes
+raw JSON and CSV to <code>results/pstep-pricing-20261021/</code>. Set <code>PSTEP_RUNS</code>,
+<code>PSTEP_SECONDS</code>, or <code>PSTEP_THREADS</code> to change repetitions, per-solve limits,
+or worker count. An optional binary path and output directory are accepted.</p>
+<p>The 2026-10-21 release comparison used an AMD Ryzen 9 9950X, four workers,
+three repetitions with alternating backend order, no warmup runs, and five
+million labels/extensions per job. The binary was built with
+<code>cargo build --release --features clp --bin baldes</code> (opt-level 3, thin LTO).
+These are end-to-end solve medians, including the LP; they are local timings,
+not a guarantee for larger or different instances.</p>
+<table>
+<thead>
+<tr>
+<th>Instance</th>
+<th style="text-align:right">p</th>
+<th style="text-align:right">Bucket seconds</th>
+<th style="text-align:right">Streaming enumeration seconds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P-n16-k8</td>
+<td style="text-align:right">2</td>
+<td style="text-align:right">0.0262</td>
+<td style="text-align:right">0.0033</td>
+</tr>
+<tr>
+<td>P-n16-k8</td>
+<td style="text-align:right">3</td>
+<td style="text-align:right">0.1658</td>
+<td style="text-align:right">0.0044</td>
+</tr>
+<tr>
+<td>P-n16-k8</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">0.5595</td>
+<td style="text-align:right">0.0089</td>
+</tr>
+<tr>
+<td>E-n22-k4</td>
+<td style="text-align:right">2</td>
+<td style="text-align:right">0.1812</td>
+<td style="text-align:right">0.0372</td>
+</tr>
+<tr>
+<td>E-n22-k4</td>
+<td style="text-align:right">3</td>
+<td style="text-align:right">1.7307</td>
+<td style="text-align:right">0.0658</td>
+</tr>
+<tr>
+<td>E-n22-k4</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">18.36</td>
+<td style="text-align:right">0.32</td>
+</tr>
+<tr>
+<td>A-n32-k5</td>
+<td style="text-align:right">2</td>
+<td style="text-align:right">0.6490</td>
+<td style="text-align:right">0.1771</td>
+</tr>
+<tr>
+<td>A-n32-k5</td>
+<td style="text-align:right">3</td>
+<td style="text-align:right">10.7781</td>
+<td style="text-align:right">0.3635</td>
+</tr>
+<tr>
+<td>A-n32-k5</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">Time limit</td>
+<td style="text-align:right">2.47</td>
+</tr>
+</tbody>
+</table>
+<p>The initial run used a 15-second limit; the extended run allowed 20 seconds.
+E-n22 p=4 needed the extended limit. Converged backend bounds agreed within
+1e-5. Enumeration also converged for A-n32 p=4 at 691.463021739; this is a
+numerical p-step LP bound. The larger p=4 full-pool model was not independently
+solved for that instance. Raw records, binary/input hashes, and compiler
+metadata are under <code>results/pstep-pricing-20261021/final/</code> and <code>verified/</code>.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="column-imports.html"><small>Previous guide</small>Finite column imports <span aria-hidden="true">↗</span></a><a href="evrp.html"><small>Next guide</small>EVRP implementation status <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p></nav></aside>
+</div>
+</body></html>

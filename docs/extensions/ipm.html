@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="BALDES IPM in Rust baldes::extensions::ipm is a native Rust port of the active solver in/home/seman/dev/solvers/ipm and its optimization loop insolvers/src/ipm/ip_solver.cpp. It is">
+<meta name="theme-color" content="#0b0e11">
+<title>BALDES IPM in Rust — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/ipm.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="multi-time-windows.html">Multiple time windows</a><a href="multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html" aria-current="page">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/ipm.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="baldes-ipm-in-rust">BALDES IPM in Rust</h1>
+<p><code>baldes::extensions::ipm</code> is a native Rust port of the active solver in
+<code>/home/seman/dev/solvers/ipm</code> and its optimization loop in
+<code>solvers/src/ipm/ip_solver.cpp</code>. It is part of the main <code>baldes</code> crate, lives
+under <code>src/extensions/ipm</code>, requires Rust 1.70+, and has no external dependencies,
+C++ bindings, BLAS requirement, or unsafe code.</p>
+<p>From the BALDES repository root:</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--example<span class="w"> </span>ipm<span class="w"> </span>--offline
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--test<span class="w"> </span>ipm<span class="w"> </span>--offline
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--lib<span class="w"> </span>ipm::<span class="w"> </span>--offline
+cargo<span class="w"> </span>fmt<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--check
+</code></pre>
+<p>The example minimizes <code>-x - 2y</code>, with <code>x + y &lt;= 3</code> and <code>x &gt;= 1</code>, and
+returns objective <code>-5</code> at approximately <code>[1, 2]</code>.</p>
+<h2 id="api">API</h2>
+<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">ipm</span><span class="p">::{</span><span class="n">solve</span><span class="p">,</span><span class="w"> </span><span class="n">ModelData</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">Sense</span><span class="p">,</span><span class="w"> </span><span class="n">SparseMatrix</span><span class="p">,</span><span class="w"> </span><span class="n">Status</span><span class="p">};</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ModelData</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">SparseMatrix</span><span class="p">::</span><span class="n">from_triplets</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.</span><span class="p">),</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mf">1.</span><span class="p">)])</span><span class="o">?</span><span class="p">,</span>
+<span class="w">    </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="mf">3.</span><span class="p">],</span>
+<span class="w">    </span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="mf">1.</span><span class="p">,</span><span class="w"> </span><span class="mf">2.</span><span class="p">],</span>
+<span class="w">    </span><span class="n">lower</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="mf">0.</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">],</span>
+<span class="w">    </span><span class="n">upper</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="kt">f64</span><span class="p">::</span><span class="n">INFINITY</span><span class="p">;</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span>
+<span class="w">    </span><span class="n">sense</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="n">Sense</span><span class="p">::</span><span class="n">Equal</span><span class="p">],</span>
+<span class="p">};</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">solution</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solve</span><span class="p">(</span><span class="o">&amp;</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="fm">assert_eq!</span><span class="p">(</span><span class="n">solution</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">Status</span><span class="p">::</span><span class="n">Optimal</span><span class="p">);</span>
+<span class="fm">assert!</span><span class="p">((</span><span class="n">solution</span><span class="p">.</span><span class="n">objective</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">3.</span><span class="p">).</span><span class="n">abs</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mf">1e-6</span><span class="p">);</span>
+<span class="p">#</span><span class="w"> </span><span class="nb">Ok</span><span class="p">::</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">ipm</span><span class="p">::</span><span class="n">Error</span><span class="o">&gt;</span><span class="p">(())</span>
+</code></pre>
+<p>Objectives are minimized. Matrices accept triplets or CSR input; duplicate
+entries are summed, columns are sorted, and explicit zeros are removed.
+<code>ModelData::validate</code> checks dimensions, finite coefficients and valid bounds.
+Row senses use an enum instead of numerical codes. Both original primal values
+and original row multipliers are returned. Multipliers use the convention
+<code>c - Aᵀy</code> for reduced costs: <code>&lt;=</code> row multipliers are nonpositive, and <code>&gt;=</code>
+row multipliers are nonnegative.</p>
+<p><code>Options</code> controls tolerance, iteration limit, backend, Ruiz scaling passes, and
+an optional cooperative wall-time budget. <code>Status::TimeLimit</code> preserves the
+distinction from iteration exhaustion; budgets are checked between Newton
+iterations, so a factorization can finish after the deadline.
+<code>gap_tolerance: Some(epsilon)</code> independently relaxes optimality using
+<code>abs(primal - dual) / (1 + abs(primal))</code>; primal and dual feasibility still use
+<code>tolerance</code>. The default <code>None</code> retains the original stopping rule. The routing
+IPM master chooses epsilon from LP bounds during column generation, following
+Munari and Gondzio (2013), Algorithm 1; see <a href="../reference/options.html">master options</a>.
+<code>SolverType::{HiPO, NormalEquations, Auto}</code> selects the backend; HiPO is the
+default. <code>SparseSolver</code>, <code>HiPOLDLT</code>, and <code>NormalEqLDLT</code> also expose the linear
+systems independently. Construct a new solver when matrix values or its pattern
+change; numerical <code>factorize</code> calls reuse symbolic analysis for a fixed A.
+Failed refactorization invalidates the previous factor.</p>
+<p><code>Solver::default().solve(&amp;model, &amp;options)</code> provides a persistent alternative
+to the one-shot <code>solve</code> function. Retain the <code>Solver</code> between related LPs:</p>
+<pre><code class="language-rust"><span class="p">#</span><span class="w"> </span><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">ipm</span><span class="p">::{</span><span class="n">ModelData</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">Solver</span><span class="p">};</span>
+<span class="p">#</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">example</span><span class="p">(</span><span class="n">model</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="nc">ModelData</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">ipm</span><span class="p">::</span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Solver</span><span class="p">::</span><span class="n">default</span><span class="p">();</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">first</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">repeated</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">statistics</span><span class="p">());</span>
+<span class="p">#</span><span class="w"> </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">#</span><span class="w"> </span><span class="p">}</span>
+</code></pre>
+<p>An unchanged LP can retain its interior iterate; all stopping tests still run,
+including when a later call tightens the requested accuracy. Cost/RHS edits
+reuse standard-form storage, scaling and symbolic analysis, with a cold iterate.
+Matrix, bounds, senses, backend or scaling-option changes rebuild preparation
+and discard the old iterate. For the explicit HiPO backend, appended columns
+can extend the existing symbolic factorization when their row cliques fit its
+filled dual graph. Existing inequality-slack indices are retained across these
+appends. New fill falls back to full symbolic analysis. Numerical factors are
+always recomputed before solving a changed LP.</p>
+<p>Warm attempts are bounded and can retry cold within the caller's remaining
+iteration and time budgets. Only optimal interior iterates are retained.
+<code>SolverStatistics</code> counts fresh analyses, symbolic extensions, warm attempts,
+cold retries, and completed Newton iterations. Cloning a solver creates an
+independent mutable state with its existing statistics and immutable shared
+factor patterns.</p>
+<p>The persistent solver also retains scratch for KKT right-hand sides,
+permutations, solutions, residuals and refinement corrections. Initialization
+and Newton directions use the same workspace, including after model growth;
+buffers are resized and overwritten before use. Refinement computes <code>K*x</code> and
+<code>abs(K)*abs(x)</code> in one CSC scan with the same per-row accumulation order as
+the separate products. Its <code>1e-10</code> backward-error acceptance test and numerical
+recovery remain unchanged. The public allocating linear-solve APIs remain
+available, and solver clones own independent mutable scratch.</p>
+<p>The IPM master adapter retains this solver and a CSC model mirror. Column
+appends copy only the new columns; coefficient edits and row/column removals
+invalidate the matrix mirror. Metadata is synchronized on every solve. Master
+forks copy their IPM state independently.</p>
+<p><code>Optimal</code> requires primal feasibility (also checked in original coordinates),
+dual feasibility and relative gap below tolerance. Primal residuals include
+both rows and bounds in original coordinates; dual residuals use the unscaled
+standard-form stationarity equations. <code>IterationLimit</code> returns the last iterate
+without claiming convergence. <code>Infeasible</code> and <code>Unbounded</code> require a checked
+approximate Farkas certificate or primal ray; the certificate vector refers to
+the equilibrated standard form, as documented on <code>Solution::certificate</code>.
+For these statuses, primal/dual values and objective describe the last iterate,
+not an optimum. Invalid inputs and numerical breakdowns return <code>Error</code>.
+Certificate detection is conservative: some difficult infeasible/unbounded
+problems may instead reach the iteration limit or return a numerical error.</p>
+<h2 id="source-mapping-and-implementation">Source mapping and implementation</h2>
+<table>
+<thead>
+<tr>
+<th>C++ source</th>
+<th>Rust module</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ip_solver.h</code>, <code>src/ipm/ip_solver.cpp</code></td>
+<td><code>model.rs</code>, <code>solver/</code></td>
+<td>Standard form, homogeneous self-dual Mehrotra loop, upper-bound elimination, adaptive regularization, predictor/corrector and centrality corrections, recovery</td>
+</tr>
+<tr>
+<td><code>hipo_ldlt.h</code></td>
+<td><code>factor/mod.rs</code>, <code>sparse_solver.rs::HiPOLDLT</code></td>
+<td>Block ordering, symbolic fill, fundamental supernodes, elimination forest, frontal assembly, child Schur updates, restricted 1x1/2x2 Bunch–Kaufman pivots, sign-preserving small-pivot regularization, refinement</td>
+</tr>
+<tr>
+<td><code>normal_eq_ldlt.h</code></td>
+<td><code>sparse_solver.rs::NormalEqLDLT</code></td>
+<td>SPD normal equations <code>A D⁻¹ Aᵀ + Rd</code>, followed by primal recovery</td>
+</tr>
+<tr>
+<td><code>sparse_solver.h</code></td>
+<td><code>sparse_solver.rs::SparseSolver</code></td>
+<td>Backend dispatch and structural fill estimate</td>
+</tr>
+<tr>
+<td>Eigen sparse/dense plumbing</td>
+<td><code>matrix.rs</code>, <code>factor/mod.rs</code></td>
+<td>Owned sparse CSC input and factors stored as sparse columns; dense arrays only for individual fronts and Schur updates</td>
+</tr>
+</tbody>
+</table>
+<p>The augmented matrix is <code>[-(theta + Rp), Aᵀ; A, Rd]</code>. The ordering preserves
+the primal/dual boundary, and fundamental supernodes cannot cross it. Fronts
+are processed in increasing elimination order, a valid child-before-parent
+order, and child Schur buffers are released after parent assembly. Child updates
+store only the lower triangle, packed by row; parents assemble that triangle
+without copying an unused upper half.
+Sparse augmented factors may use an up-looking row-update path when the
+primal block has at least twice as many variables as rows and symbolic L has
+at most 32 off-diagonal entries per system variable on average. This path
+expects negative primal and positive dual pivots; small, non-finite or wrongly
+signed pivots retry the existing pivoted multifrontal factorization. Original
+KKT refinement remains enabled. Sparse factor columns use contiguous CSC values
+and share an immutable pattern across numerical refactors and clones.</p>
+<p>Numeric pivot swaps are composed with the symbolic permutation and applied to
+rows of previously assembled factor columns. Iterative refinement uses
+<code>|b - Kx| / (|b| + |K||x|)</code> with at most two correction solves.</p>
+<p>Deliberate differences from C++:</p>
+<ul>
+<li>Ordering keeps the independent diagonal primal block in natural order.
+Eliminating these vertices cannot connect other primal vertices, so building
+a primal column-intersection graph cannot reduce fill. The dual Schur graph
+uses deterministic <strong>exact minimum degree with explicit graph updates</strong>,
+rather than the shared C++ approximate minimum degree quotient graph.
+Complete remaining graphs are emitted directly; dense intersection graphs
+use packed adjacency (at most 32 MiB), while sparse or larger graphs retain
+tree sets. Those graph representations produce the same ordering. Primal
+reordering preserves structural fill but can change floating-point sums.</li>
+<li>The normal-equations path uses this crate's multifrontal factorization,
+rather than the external C++ supernodal implementation. Its fixed CSC pattern
+and row-to-column source positions are cached; refactors accumulate values
+directly without duplicate triplets or repeated sorting.</li>
+<li>The comparison backends <code>LDLT</code>, <code>SUPERNOODAL</code>, and <code>FRONTAL</code> from the sibling
+<code>linear_system</code> directory are not separately ported or aliased to HiPO.</li>
+<li>Fixed variables are eliminated. Free variables, upper-only bounds, shifted
+bounds, zero columns, mixed senses, objective offsets and row dual signs
+are tracked explicitly through recovery.</li>
+<li>Complementarity includes the upper-bound slack/multiplier product. Success
+checks primal feasibility as well as dual feasibility and gap.</li>
+<li>Centrality corrections are added to the current Newton direction instead
+of overwriting it. The homogeneous Schur denominator uses its equivalent
+positive quadratic form to avoid subtractive cancellation.</li>
+<li>A singular 2x2 pivot returns a numerical error instead of replacing only
+its determinant, which would be inconsistent with the stored D block.</li>
+<li>Ruiz equilibration is implemented and enabled by default (five passes).
+The C++ header declares scaling routines, but its optimization loop does
+not invoke them. Set <code>scaling_iterations: 0</code> to disable scaling.</li>
+<li>The internal objective is normalized after equilibration. Dual recovery and
+dual/gap checks undo objective scaling, retaining tolerances in original
+units. Wide upper bounds start with feasible slacks and unit complementarity
+products, avoiding a large artificial residual from bounds such as <code>1e12</code>.</li>
+<li>A regularized least-squares starting estimate reduces initial row and dual
+residuals before positive shifts for the HSD variables. Finite upper bounds
+retain unit complementarity. Unsafe estimates, empty systems and very tight
+bounds retain the unit initializer. This adds one factorization and two solves
+per eligible LP; it is not a warm start from the previous CG solve.</li>
+</ul>
+<p>The restricted master selects this solver with <code>--master ipm</code>; the API is also
+usable independently. Performance parity with the
+C++ solver and large-instance robustness have not been established; there is
+no parallel factorization, relaxed supernode amalgamation or nested dissection.</p>
+<h2 id="validation">Validation</h2>
+<p>The tests cover mixed row senses, shifted/one-sided/free/fixed bounds, multiple
+free variables, zero columns, empty dimensions, malformed input, repeated
+factorization, failure invalidation, pivot interchanges, 2x2 pivots,
+infeasibility/unboundedness certificates, and iteration limits.</p>
+<p>Thirty seeded LPs are constructed from known KKT witnesses and solved with
+each backend, both with and without equilibration. Forty additional seeded
+sparse KKT systems check both numerical backends against known solution
+vectors. The three LP fixtures from <code>solvers/tests/test_ip_solver.cpp</code> are
+included as Rust regressions. The original C++ test executable was also built
+with C++20/Eigen/BLAS and run successfully during the port. These tests verify
+numerical results and residuals, not identical iteration histories or factors.</p>
+<p>A captured R201 master checks convergence at <code>1e-9</code> feasibility with both
+relaxed and strict gap tolerances, against an independent simplex objective.
+Objective-scale tests check original-unit dual recovery with both backends.</p>
+<h2 id="performance-investigation">Performance investigation</h2>
+<p><code>cargo run --offline --release --example ipm_sparse_bench -- 20</code> measures setup,
+numeric refactorization and triangular solves on synthetic matrices and the
+captured R201 master sparsity pattern. Every solve is checked against a known
+KKT witness; factorization diagonals change between repetitions.</p>
+<p><code>cargo run --offline --release --example ipm_master_bench -- 3 hipo r201-sequence</code>
+compares fresh solves with a persistent solver on eight growing prefixes of
+the captured R201 master. Use <code>c202-sequence</code> for C202. Matrix construction is
+outside the timed region; every result is checked for optimality, <code>1e-9</code>
+primal/dual feasibility and gap, and agreement with fresh-solve objectives.
+One warmup precedes the requested number of measured sequences.</p>
+<p>Root CLI JSON and Python <code>RootResult.ipm_iterations</code> report completed Newton
+iterations separately from CG <code>iterations</code> and Clp <code>simplex_iterations</code>.
+The master counter resets on a fork, like the simplex counter. Centering now
+adapts to the affine step, bounded between <code>1e-4</code> and <code>0.1</code>; the previous
+expression was always <code>0.1</code> for valid step lengths. Stopping tolerances and
+original-coordinate feasibility checks are unchanged.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="evrp.html"><small>Previous guide</small>EVRP implementation status <span aria-hidden="true">↗</span></a><a href="../benchmarks/root.html"><small>Next guide</small>Root benchmarks <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#api">API</a><a class="toc-level-2" href="#source-mapping-and-implementation">Source mapping and implementation</a><a class="toc-level-2" href="#validation">Validation</a><a class="toc-level-2" href="#performance-investigation">Performance investigation</a></nav></aside>
+</div>
+</body></html>

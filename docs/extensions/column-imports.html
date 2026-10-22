@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Finite column imports Documentation index With clp, Rust callers can import finite column domains throughmaster::multi_pricing::imported. Routing networks are optional. Importedcol">
+<meta name="theme-color" content="#0b0e11">
+<title>Finite column imports — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/column-imports.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="multi-time-windows.html">Multiple time windows</a><a href="multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html" aria-current="page">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/column-imports.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="finite-column-imports">Finite column imports</h1>
+<p><a href="../index.html">Documentation index</a></p>
+<p>With <code>clp</code>, Rust callers can import finite column domains through
+<code>master::multi_pricing::imported</code>. Routing networks are optional. Imported
+columns are original-vector patterns, so this interface also supports finite
+non-routing models without constructing synthetic routes.</p>
+<h2 id="model-contract">Model contract</h2>
+<p>Supply the ordinary shared <code>Problem&lt;D&gt;</code>, original <code>MasterVariable</code> definitions
+and a list of <code>imported::Subproblem</code> definitions. Each subproblem declares:</p>
+<ul>
+<li>A nonnegative ID, distinct from other imported subproblems and routing IDs.</li>
+<li>The original variable IDs in its coordinate support.</li>
+<li>Nonnegative total multiplicity bounds, with an optional infinite upper bound.</li>
+<li>Its complete declared list of columns.</li>
+</ul>
+<p>Each <code>imported::Column</code> has a local ID, additional objective cost, nonnegative
+quantity bounds, an integrality flag and coalesced <code>(original_variable_id, coefficient)</code> entries. IDs need only be unique within their subproblem. Entries
+may be signed or fractional. An omitted entry has coefficient zero.</p>
+<p>For every original variable declared by any imported subproblem, the interface
+adds the equality <code>x = sum(coefficient * column_quantity)</code> over all participating
+imports. Several subproblems may contribute to the same original variable.
+Declared supports with no columns still imply zero contribution. Original
+variables outside all imported supports remain independent master variables.
+Original shared rows and original-variable bounds constrain these aggregate
+values. Routing networks continue to contribute their own ordinary shared-row
+coefficients.</p>
+<p>The objective includes both original-variable costs and each column's additional
+cost. To supply the whole pattern cost in <code>Column::cost</code>, set the corresponding
+original-variable costs to zero. If an original variable represents a nonlinear
+per-pattern feature, callers supply that feature's actual coefficient in each
+column; this interface does not discover or separate nonlinear cuts.</p>
+<p>The declared columns define this finite domain. Importing a subset of an
+external pricing problem does not establish completeness for that larger
+problem. Every declared column is loaded immediately; this is not a dynamic
+pricing callback.</p>
+<h2 id="solving-and-restricting-snapshots">Solving and restricting snapshots</h2>
+<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::{</span>
+<span class="w">    </span><span class="n">multi_pricing</span><span class="p">::{</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">imported</span><span class="p">,</span><span class="w"> </span><span class="n">MasterVariable</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">Problem</span><span class="p">},</span>
+<span class="w">    </span><span class="n">preprocessing</span><span class="p">::</span><span class="n">Bounds</span><span class="p">,</span>
+<span class="w">    </span><span class="n">root</span><span class="p">::</span><span class="n">Row</span><span class="p">,</span>
+<span class="w">    </span><span class="n">RowSense</span><span class="p">,</span>
+<span class="p">};</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">nonnegative</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Bounds</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">lower</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="n">upper</span><span class="p">:</span><span class="w"> </span><span class="kt">f64</span><span class="p">::</span><span class="n">INFINITY</span><span class="w"> </span><span class="p">};</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">imported</span><span class="p">::</span><span class="n">solve</span><span class="p">(</span>
+<span class="w">    </span><span class="n">Problem</span><span class="p">::</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">rows</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="n">Row</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">sense</span><span class="p">:</span><span class="w"> </span><span class="nc">RowSense</span><span class="p">::</span><span class="n">GreaterEqual</span><span class="p">,</span><span class="w"> </span><span class="n">rhs</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="w"> </span><span class="p">}],</span>
+<span class="w">        </span><span class="n">networks</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[],</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="fm">vec!</span><span class="p">[</span><span class="n">MasterVariable</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">id</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="n">cost</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="n">bounds</span><span class="p">:</span><span class="w"> </span><span class="nc">nonnegative</span><span class="p">,</span><span class="w"> </span><span class="n">integer</span><span class="p">:</span><span class="w"> </span><span class="nc">false</span><span class="p">,</span>
+<span class="w">        </span><span class="n">entries</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">)],</span>
+<span class="w">    </span><span class="p">}],</span>
+<span class="w">    </span><span class="fm">vec!</span><span class="p">[</span><span class="n">imported</span><span class="p">::</span><span class="n">Subproblem</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">id</span><span class="p">:</span><span class="w"> </span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="n">variables</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="mi">10</span><span class="p">],</span><span class="w"> </span><span class="n">multiplicity</span><span class="p">:</span><span class="w"> </span><span class="nc">nonnegative</span><span class="p">,</span>
+<span class="w">        </span><span class="n">columns</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="n">imported</span><span class="p">::</span><span class="n">Column</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">id</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">cost</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0</span><span class="p">,</span><span class="w"> </span><span class="n">bounds</span><span class="p">:</span><span class="w"> </span><span class="nc">nonnegative</span><span class="p">,</span><span class="w"> </span><span class="n">integer</span><span class="p">:</span><span class="w"> </span><span class="nc">true</span><span class="p">,</span>
+<span class="w">            </span><span class="n">entries</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">)],</span>
+<span class="w">        </span><span class="p">}],</span>
+<span class="w">    </span><span class="p">}],</span>
+<span class="w">    </span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">(),</span>
+<span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">node</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">fixed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">node</span><span class="p">.</span><span class="n">with_column_bounds</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">Bounds</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">lower</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="n">upper</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="w"> </span><span class="p">})</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">child</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fixed</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+</code></pre>
+<p><code>ImportedOutput.output</code> contains ordinary solver status, bounds and routing
+results. <code>ImportedOutput.values.original</code> contains the caller's original
+variable IDs and values. <code>values.columns</code> identifies each quantity by subproblem
+and local column ID. Internal master-variable IDs in low-level diagnostics are
+not imported column IDs.</p>
+<p>Snapshots offer <code>with_variable_bounds</code>, <code>with_column_bounds</code> and
+<code>with_multiplicity</code>. Restrictions intersect the parent's domain. Fixed columns
+keep their full objective, original-vector and multiplicity contributions;
+they are not removed from the model. Parent and sibling snapshots remain
+independent.</p>
+<h2 id="extending-a-declared-domain">Extending a declared domain</h2>
+<p><code>node.solve_with_columns(subproblem_id, additional_columns, options)</code> solves a
+new declared model containing the old and additional columns. IDs must be new
+within that existing subproblem, and entries must use its declared original
+coordinate support. Repeated extensions are supported; duplicate IDs and
+invalid definitions are errors that leave the parent usable.</p>
+<p>Explicit <code>with_variable_bounds</code>, <code>with_column_bounds</code>, <code>with_multiplicity</code>,
+<code>with_routing_multiplicity</code>, <code>with_row</code>, <code>with_presence_row</code>,
+<code>with_registered_cut_row</code>, <code>with_composite_cut_row</code>,
+<code>with_resource_knapsack_row</code> and <code>fix_route</code>
+restrictions survive the rebuild. They are replayed by original IDs and
+qualified column IDs, so a changed internal allocation does not retarget a fix.
+<code>with_multiplicity</code> addresses imported groups; <code>with_routing_multiplicity</code>
+addresses total route use in a routing subproblem. <code>fix_route(route_index, quantity)</code>
+fixes additional integer copies of a registered routing path. Rebuilds preserve
+its physical arc path and quantity, subtract its contribution from every shared
+row and remaining route multiplicity, and retain its objective contribution.
+Fixed copies still count against group multiplicity and contribute their costs
+and original vectors. Ordinary low-level child snapshots obtained through
+<code>node.node()</code> are separate objects; only the import wrapper's explicit
+restrictions are replayed by this extension operation.</p>
+<p>Use <code>node.with_row(row, routing_coefficients, original_coefficients)</code> to add a
+shared restriction. Original coefficients are <code>(original_variable_id, value)</code>
+pairs; generated imported-column IDs are rejected. Routing coefficients use
+<code>multi_pricing::RowCoefficients</code>, with physical arc order and an optional
+once-per-route term. Omitted coordinates and routing families contribute zero.
+Coefficients must be finite and coalesced. The caller supplies a valid cut or
+branch restriction. Original-coordinate links apply the row to new imported
+vectors automatically. Rebuilds replay the row and subtract any fixed routing
+contribution, whether the row was added before or after fixing.</p>
+<p><code>node.with_presence_row(row, presence_coefficients, original_coefficients)</code>
+couples nonlinear routing-event presence to original coordinates. It uses
+<code>multi_pricing::PresenceCoefficients</code>, with event lists aligned to physical
+arcs, and supports both pair-count and any-pair semantics. The original
+presence descriptor survives extension. Fixed routes contribute their exact
+presence coefficient before preprocessing the rebuilt model; imported vectors
+contribute through the specified original-coordinate coefficients.</p>
+<p>The import snapshot and multi-group session also expose
+<code>with_registered_cut_row(row, routing, original)</code>,
+<code>with_composite_cut_row(row, routing, original)</code> and
+<code>with_resource_knapsack_row(row, routing, original)</code>. These accept the same
+registered cut or resource-load descriptors as ordinary routing snapshots,
+plus coefficients on original imported coordinates. Composite rows sum every
+supplied kernel, including repeated descriptors on one routing group. Resource
+rows retain the routing adapter's monotone binary-grid load and &lt;= requirements.
+Their descriptors survive source batches, phase-I recovery, domain extension
+and tree descendants. Original-domain certificates may remain weak for these
+kernels. A correct restricted LP does not establish certified optimality; complete
+routing enumeration can supply the finite-domain proof after external sources
+are complete. Rebuilds install all routing kernels before replaying
+fixed-route contributions or running preprocessing. Callers remain responsible
+for the validity of the supplied row.</p>
+<p>Adding columns can invalidate bounds, zero fixings and infeasibility deductions
+made from the previous finite domain. The implementation therefore retains the
+original input definition, rebuilds the model, replays explicit restrictions and
+reruns preprocessing and routing pricing. It starts with unknown lower bounds
+and discards old certificates, smoothing, cached columns and derived bounds.
+Even a zero-time solve of the expanded domain cannot inherit a narrower-domain
+certificate. The supplied options configure this fresh solve. An empty addition
+resumes the unchanged snapshot and preserves its valid bounds.</p>
+<p>This operation rebuilds and reloads the declared model; it is not an incremental
+pricing callback or a claim that an external pricing problem is exhausted. The
+original definition is retained once and shared between snapshots for this
+purpose. Callers obtain values through the returned output's new identity map.</p>
+<p><code>node.node()</code> exposes the ordinary immutable snapshot for preprocessing, trees,
+additional shared rows and MIP. Use <code>node.values(&amp;output.master_values)</code> to decode
+values returned by those operations on this snapshot's descendants. Root solves
+relax declared integrality; tree or MIP enforces it. Pure imports have a complete
+column domain immediately, so <code>solve_enumerated_mip</code> needs no enumeration step.</p>
+<h3 id="incremental-domain-sources">Incremental domain sources</h3>
+<p><code>node.begin_import(subproblem_id)</code> creates an immutable collection session for
+one existing group. Call <code>session.collect(&amp;ImportOptions, callback)</code> to receive
+batches from an external source. The callback receives the group definition,
+including all currently known columns, and the remaining time. Return
+<code>ColumnBatch { columns, complete }</code>; set <code>complete: true</code> only when the source
+has supplied its entire intended domain. All other groups retain their declared
+domains. This protocol enumerates a domain; it supplies no reduced-cost pricing
+or external optimality certificate.</p>
+<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">multi_pricing</span><span class="p">::</span><span class="n">imported</span><span class="p">::{</span><span class="n">ColumnBatch</span><span class="p">,</span><span class="w"> </span><span class="n">ImportOptions</span><span class="p">,</span><span class="w"> </span><span class="n">ImportStatus</span><span class="p">};</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">node</span><span class="p">.</span><span class="n">begin_import</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">progress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="n">collect</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ImportOptions</span><span class="p">::</span><span class="n">default</span><span class="p">(),</span><span class="w"> </span><span class="o">|</span><span class="n">known</span><span class="p">,</span><span class="w"> </span><span class="n">remaining</span><span class="o">|</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Enumerate additional columns using known.columns as the authoritative</span>
+<span class="w">    </span><span class="c1">// accepted set. Respect remaining when accessing the external source.</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(</span><span class="n">ColumnBatch</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">columns</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[],</span><span class="w"> </span><span class="n">complete</span><span class="p">:</span><span class="w"> </span><span class="nc">true</span><span class="w"> </span><span class="p">})</span>
+<span class="p">})</span><span class="o">?</span><span class="p">;</span>
+<span class="k">if</span><span class="w"> </span><span class="n">progress</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">ImportStatus</span><span class="p">::</span><span class="n">Complete</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">solved</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">progress</span><span class="p">.</span><span class="n">session</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+<p>A batch or time limit returns a resumable <code>progress.session</code>. Incomplete
+sessions reject <code>solve</code> and inherit no finite-parent bounds or infeasibility
+conclusion. Explicit envelope-covered certificate requests are described below.
+Completion triggers a fresh solve with all explicit restrictions replayed.
+Batches are validated before acceptance; duplicate IDs, invalid vectors or a
+source error leave the input session usable. A failed collection call does not
+commit its earlier batches. External callback side effects are not rolled back;
+use the supplied known columns as authoritative when retrying. Time limits are
+checked between synchronous callbacks, so sources must cooperate with the
+remaining-time argument.</p>
+<h3 id="numerical-pricing-requests">Numerical pricing requests</h3>
+<p><code>session.pricing(options)</code> optimizes the currently known restricted master and
+returns <code>ImportPricing</code>. It disables finite-domain preprocessing, smoothing and
+enumeration so deductions from the known columns cannot become assumptions
+about future columns. A pricing point carries no bound or completion flag.</p>
+<p><code>point.costs()</code> exports an <code>ImportCosts</code> objective: additional column cost plus
+<code>per_column</code> plus the sum of each original vector entry times its coordinate
+price. The constant includes base and explicit multiplicity restrictions.
+<code>point.reduced_cost(column)</code> validates a proposed new, zero-lower-bound column
+and evaluates its numerical reduced cost with the same reconstructed row maps.
+Original-coordinate objective costs enter through these duals; do not add them
+a second time. These are numerical search signals, not certified lower bounds.</p>
+<p><code>point.reduced_cost_bounds(column)</code> returns an enclosure of that candidate's
+exact-real reduced cost at the stored binary64 dual point. Exact expansions
+preserve cancellation; directed intervals handle fractional underflow. <code>None</code>
+means arithmetic could not establish a finite enclosure; invalid candidates
+remain errors. An upper endpoint below zero establishes a negative reduced cost
+for that candidate. A nonnegative lower endpoint establishes nonnegativity for
+that candidate only. Neither result covers other columns or completes an
+external domain. Phase-I requests automatically omit original objective costs.</p>
+<p>Objective pricing fixes artificial quantities to zero before accepting duals.
+If the objective pass did not retain necessary routing paths, recovery obtains
+feasible paths from phase I and rebuilds their identities and original costs.
+A small finite artificial penalty therefore cannot by itself block an otherwise
+feasible restricted-domain pricing request.</p>
+<p>A pricing request requires an optimal feasible restricted master. An empty or
+infeasible restricted domain may need additional feasibility columns; the API
+returns an error rather than concluding that the external domain is infeasible.
+Numerical pricing requests publish no external-domain bound. Separate opt-in
+certificate requests are described below. Use the collection protocol to accept columns;
+only explicit enumeration completion permits the final declared-domain solve.</p>
+<p>For a restricted domain missing feasibility columns, use
+<code>session.feasibility_pricing(options)</code>. It minimizes artificial activity with
+all real objective costs zero, including imported columns, original coordinates,
+routing arcs and fixed route costs. The returned point has
+<code>kind() == ImportPricingKind::Feasibility</code>; <code>restricted_violation()</code> reports
+numerical artificial activity in the current restricted master. Positive
+activity does not prove the external domain infeasible, and zero activity does
+not complete that domain.</p>
+<p><code>ImportCosts.kind</code> identifies the pricing objective. In feasibility mode,
+ignore additional column costs and minimize only <code>per_column</code> plus the vector
+entries times coordinate prices. <code>reduced_cost</code> handles this distinction
+automatically. After generating feasibility columns, request ordinary objective
+prices to continue optimization. These phase-I signals are numerical; they do
+not constitute an exact Farkas certificate for an unknown domain. Time-limited
+or unsolved augmented masters return an error instead of a stale pricing point.</p>
+<h3 id="permitted-column-envelopes">Permitted column envelopes</h3>
+<p><code>session.with_envelope(ColumnEnvelope { cost_lower, coordinates })</code> declares
+restrictions on every column in that imported group, including future columns.
+<code>cost_lower</code> bounds the additional <code>Column.cost</code>; each <code>(original_id, Bounds)</code>
+entry bounds one vector coordinate. Declare every coordinate in the group's
+support exactly once. Omitted column entries mean zero. Known columns must
+already satisfy the declaration. Repeated envelopes intersect, preserving
+previous restrictions.</p>
+<p>Collection and direct extension reject violations, and envelopes persist through
+completion, snapshots and later extensions. A declaration is model input; it
+must describe the intended domain. It is not inferred from the known columns.</p>
+<p><code>point.envelope_reduced_cost_bound()</code> encloses the minimum reduced cost over the
+permitted feature box and cost floor at the stored dual point. It relaxes
+correlations, so it also covers unseen permitted columns. Objective pricing
+uses the additional-cost floor; phase-I pricing uses zero real cost. An adverse
+unbounded coordinate or missing cost floor can yield negative infinity. <code>None</code>
+means no envelope was declared or arithmetic could not establish a bound.</p>
+<p>Algebraic candidate queries may evaluate symbolic vectors outside the envelope;
+model acceptance still enforces it. This is useful for constructing the affine
+objective intercept. An envelope reduced-cost bound alone does not establish a
+full-master bound, external feasibility or enumeration completion.</p>
+<h3 id="certificates-for-open-domains">Certificates for open domains</h3>
+<p><code>session.objective_certificate(options)</code> requests a conservative objective lower
+bound over the retained finite imports, original routing domains, and every
+future column permitted by this open group's envelope.
+<code>session.feasibility_certificate(options)</code> instead bounds the zero-real-cost
+feasibility model. Its strict positivity proves infeasibility for that declared
+model. <code>session.infeasibility_certificate(options)</code> returns <code>Some</code> only when
+that strictly positive proof is available. Otherwise it returns <code>None</code>.</p>
+<p><code>ImportCertificate</code> exposes <code>kind()</code>, <code>lower_bound()</code> and <code>proves_infeasible()</code>.
+These requests are opt-in; ordinary pricing remains numerical. They do not mark
+a collection complete or enable a final finite-domain solve while it is open.</p>
+<p>Publication requires coverage of future columns, valid dual signs and exact
+fixed-route reductions. Adverse residuals at unbounded original-variable
+endpoints, unsupported arithmetic or an adverse missing-column price without
+a finite total multiplicity cap leave the bound unknown. Declared and explicit
+group multiplicity limits both apply. A zero total cap needs no envelope; a
+nonnegative missing-column price needs no finite cap. Corrections use the full
+total cap, which is conservative even when known copies already consume it.</p>
+<p>Bounds inferred by projecting only the known columns are excluded from these
+certificates: future vectors can invalidate those bounds. <code>begin_import</code> opens one group; <code>begin_imports</code> below opens several together.
+Unselected groups retain their declared finite domains.</p>
+<h3 id="several-open-imported-groups">Several open imported groups</h3>
+<p><code>node.begin_imports(&amp;[group_ids])</code> creates <code>MultiImport</code> over one shared model.
+Use <code>with_envelope(group_id, envelope)</code> for each selected group. Unknown or
+duplicate IDs are rejected. Empty selections are already complete.</p>
+<p><code>collect</code> and <code>collect_priced</code> visit unfinished groups in the requested order,
+round-robin, under a shared deadline and batch budget. Every pricing request
+sees all accepted columns from every group. <code>ColumnBatch.complete</code> completes
+only the requested group. <code>pending_groups()</code> reports the remaining groups;
+<code>solve</code> is available only after all selected domains complete. Empty nonterminal
+batches consume budget and cannot starve the other groups. Errors preserve the
+input session, including batches accepted earlier in the failed call.</p>
+<p>The objective/feasibility/infeasibility certificate methods cover <strong>every</strong>
+unfinished group at the shared dual point. Missing coverage for any such group
+keeps publication unknown. <code>ImportCertificate::open_groups()</code> identifies the
+unfinished domains covered by that certificate. Completed groups use their
+actual finite columns, even if their envelopes were coarse. Once all selected
+groups complete, finite-domain projections may be used again. An empty selection
+needs no pricing callback; use its ordinary solved output for certificates.</p>
+<h3 id="automatic-pricing-requests-during-collection">Automatic pricing requests during collection</h3>
+<p><code>session.collect_priced(&amp;limits, options, callback)</code> runs a fresh restricted
+phase-I request for each batch. Positive restricted artificial activity selects
+feasibility prices; zero selects ordinary objective prices. The callback
+receives <code>&amp;ImportPricing</code> and the remaining time, with all previously accepted
+columns visible through <code>point.subproblem()</code>.</p>
+<p>Both LP requests share the collection deadline and respect stricter LP time
+limits. A batch/time limit returns a resumable session; the next call rebuilds
+prices for its accepted domain. Empty nonterminal batches consume the batch
+budget. Invalid data or callback errors preserve the input session, with the
+same external-side-effect caveat as ordinary collection.</p>
+<p>The callback returns <code>ColumnBatch</code>. Its completion flag still declares full
+enumeration of the intended domain. Finding no negative reduced cost does not
+complete a session or authorize a bound. This driver automates feasibility and
+objective pricing requests; it supplies no global pricing certificate. As with
+ordinary collection, synchronous callbacks must cooperate with the remaining
+time argument.</p>
+<p>For mixed routing/import models, all routing families must also complete their
+enumeration before the MIP can claim full-domain coverage. MIP requires <code>highs</code>.</p>
+<p>This interface is currently Rust-only; CLI/Python input fields are unchanged.</p>
+<h3 id="trees-with-open-external-groups">Trees with open external groups</h3>
+<p><code>session.begin_tree()</code> creates an immutable <code>ImportTree</code>. Calling it declares
+that every unseen column has quantity lower bound zero; register mandatory
+columns before starting. Tree callbacks reject new positive-lower-bound
+columns. This makes an exactly validated solution using known columns a valid
+incumbent while external domains remain open.</p>
+<p>Call <code>tree.run(&amp;tree_options, &amp;import_limits, callback)</code> with ordinary
+<code>AssignmentTreeOptions</code> and <code>ImportOptions</code>. The callback receives fresh phase-I
+or objective prices for the current node. Original-variable, qualified-column,
+routing-multiplicity and physical-arc branches remain in the restriction journal
+when new patterns arrive. Accepted patterns are shared with siblings. A source
+completion flag must enumerate the group's entire intended domain, including
+patterns excluded by a node's aggregate restrictions; completion is shared with
+siblings too.</p>
+<p>Open nodes use directed envelope certificates for objective pruning and
+infeasibility. Missing or loose certificates keep the node open. An integral
+restricted solution alone never closes it. Once every group completes, fresh
+preprocessing and the existing finite-domain tree, enumeration and optional MIP
+become available. No finite-parent proof survives opening a domain.</p>
+<p>The result contains <code>tree</code>, <code>status</code>, <code>bound_mode</code>, <code>bound</code>, <code>incumbent</code>, <code>open_nodes</code> and
+per-invocation node/batch/column counts. Resume with <code>result.tree.run(...)</code> after
+a node, batch or time limit. Preserve the bound mode across resumptions.
+<code>tree.solution()</code> returns the best validated objective, physical routes and
+original/qualified column values from the incumbent's own lineage. Newly
+registered optional columns can be absent from those stored values.</p>
+<p>Empty nonterminal batches visit the other unfinished groups. A full round
+without additions or completion returns <code>Incomplete</code> with a reusable frontier.
+Callback errors or invalid batches preserve the input tree; external callback
+side effects remain caller-owned. Both budgets share one deadline, and
+synchronous callbacks must cooperate with the remaining-time argument.</p>
+<p>Open sessions also provide <code>with_variable_bounds</code>, <code>with_column_bounds</code>,
+<code>with_multiplicity</code>, <code>with_routing_multiplicity</code>, <code>with_row</code>,
+<code>with_presence_row</code>, <code>with_registered_cut_row</code>, <code>with_composite_cut_row</code> and
+<code>with_resource_knapsack_row</code>. These immutable restrictions apply during pricing and
+survive future source batches. Original-coordinate links automatically carry
+additive and nonlinear-row coupling to newly accepted vectors.</p>
+<h3 id="numerical-oracle-replies">Numerical oracle replies</h3>
+<p>Use <code>tree.run_with_oracles(&amp;tree_options, &amp;limits, callback)</code> when an external
+optimizer can bound its entire missing-column domain without enumerating it.
+The callback returns <code>ImportOracleReply</code> containing a <code>ColumnBatch</code> and an
+optional <code>ImportPricingMinimum</code>:</p>
+<pre><code class="language-rust,ignore"><span class="kd">let</span><span class="w"> </span><span class="n">minimum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">point</span><span class="p">.</span><span class="n">numerical_minimum</span><span class="p">(</span><span class="n">global_reduced_cost_lower_bound</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="nb">Ok</span><span class="p">(</span><span class="n">ImportOracleReply</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">batch</span><span class="p">:</span><span class="w"> </span><span class="nc">ColumnBatch</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">columns</span><span class="p">:</span><span class="w"> </span><span class="nc">generated_columns</span><span class="p">,</span><span class="w"> </span><span class="n">complete</span><span class="p">:</span><span class="w"> </span><span class="nc">false</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="n">minimum</span><span class="p">:</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">minimum</span><span class="p">),</span>
+<span class="p">})</span>
+</code></pre>
+<p>The supplied number must lower-bound the reduced cost of <strong>every permitted
+missing column</strong> in that group's intended domain, at the supplied objective or
+feasibility prices. A minimum over a heuristic candidate list does not satisfy
+this contract. An optimizer may instead bound the entire domain, including known
+patterns, which is conservative. Negative infinity means unknown; positive
+infinity declares an empty missing-column domain. Neither marks enumeration
+complete. The library checks request identity and direct contradictions with
+returned columns; the external optimizer supplies the global-domain guarantee.</p>
+<p>Minima are tied to the exact request, group and phase. Reusing one from an older
+solve, another group or another phase is rejected. A round queries every
+unfinished group at one stored dual point before branching. <code>for_subproblem</code>
+can retarget a point to another unfinished group without solving another LP;
+its clones retain the common request identity. Columns accepted during a round
+are visible in the next round; the current round keeps its original prices and
+known-column prefix.</p>
+<p>In numerical bound mode, all required group minima are combined with the
+retained-domain bound and total multiplicity caps. Existing declared envelopes
+can cover a group whose reply lacks a minimum. Missing coverage or an adverse
+minimum with unlimited quantity keeps the bound unknown. An unavailable
+retained-domain bound also leaves publication unknown. A positive full-domain
+phase-I numerical bound can close an infeasible node under that numerical
+oracle contract. The result's <code>bound_mode</code> identifies its guarantee.</p>
+<p>In certified mode, supplied numerical minima never contribute to publication or
+pruning. Directed envelope certificates remain required. A resumed tree cannot
+change bound mode. Plain-batch <code>run</code> requests no numerical minima; both methods
+retain previously published bounds under the unchanged bound mode.</p>
+<p>Callback, node and time limits remain resumable. A batch limit can stop partway
+through a round; those accepted columns persist, but minima from different
+request epochs are never mixed on resume. Allow enough callbacks to cover all
+unfinished groups in one round when requesting a joint numerical bound.
+A round that adds no columns and completes no domain either closes or branches
+the node, or returns <code>Incomplete</code> with an open frontier.
+Errors preserve the input tree, including batches accepted earlier in that
+failed invocation; callback side effects remain caller-owned.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="multi-pricing.html"><small>Previous guide</small>Multi-pricing: one master, multiple pricing subproblems <span aria-hidden="true">↗</span></a><a href="pstep.html"><small>Next guide</small>P-step CVRP extension <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#model-contract">Model contract</a><a class="toc-level-2" href="#solving-and-restricting-snapshots">Solving and restricting snapshots</a><a class="toc-level-2" href="#extending-a-declared-domain">Extending a declared domain</a><a class="toc-level-3" href="#incremental-domain-sources">Incremental domain sources</a><a class="toc-level-3" href="#numerical-pricing-requests">Numerical pricing requests</a><a class="toc-level-3" href="#permitted-column-envelopes">Permitted column envelopes</a><a class="toc-level-3" href="#certificates-for-open-domains">Certificates for open domains</a><a class="toc-level-3" href="#several-open-imported-groups">Several open imported groups</a><a class="toc-level-3" href="#automatic-pricing-requests-during-collection">Automatic pricing requests during collection</a><a class="toc-level-3" href="#trees-with-open-external-groups">Trees with open external groups</a><a class="toc-level-3" href="#numerical-oracle-replies">Numerical oracle replies</a></nav></aside>
+</div>
+</body></html>

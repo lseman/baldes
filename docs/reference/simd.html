@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="SIMD dispatch Documentation index The optional simd feature enables four-label AVX2 dominance scans.simd-avx512 includes it and enables eight-label AVX-512F scans on Rust 1.89+.Bot">
+<meta name="theme-color" content="#0b0e11">
+<title>SIMD dispatch — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/reference/simd.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="algorithms.html">Algorithms and references</a><a href="options.html">BALDES pricing options</a><a href="resources.html">Scalar resources</a><a href="simd.html" aria-current="page">SIMD dispatch</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="../extensions/column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/reference/simd.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="simd-dispatch">SIMD dispatch</h1>
+<p><a href="../index.html">Documentation index</a></p>
+<p>The optional <code>simd</code> feature enables four-label AVX2 dominance scans.
+<code>simd-avx512</code> includes it and enables eight-label AVX-512F scans on Rust 1.89+.
+Both features are off by default. Runtime detection keeps binaries portable:
+AVX-512F (when compiled in), AVX2, then the portable implementation. Scans
+shorter than 16 remaining labels use the portable implementation.</p>
+<p>The AVX-512F kernel uses ordered comparisons, retains the exact EPSILON
+addition/subtraction order, and returns the first matching label or prefix
+key stop in storage order. It widens eight packed u16 NG masks into eight
+u64 lanes without requiring AVX-512BW, VL, DQ or VPOPCNTDQ. All loaded
+columns are checked before pointer loads; tails use the scalar kernel.
+The comparison tests exercise direct AVX2/AVX-512 paths and runtime dispatch
+against an independent scalar reference, including NaNs, infinities,
+subnormals, signed zero, epsilon boundaries, offsets and incomplete blocks.</p>
+<h2 id="build-configuration">Build configuration</h2>
+<p>See the <a href="../guides/build.html">build guide</a> for Cargo features and saved Make settings.
+SIMD is optional and disabled by default; kernel timings alone do not establish
+an improvement in complete solver performance.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="resources.html"><small>Previous guide</small>Scalar resources <span aria-hidden="true">↗</span></a><a href="../extensions/multi-time-windows.html"><small>Next guide</small>Multiple time windows <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#build-configuration">Build configuration</a></nav></aside>
+</div>
+</body></html>

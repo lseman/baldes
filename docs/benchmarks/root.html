@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Root benchmarks Documentation index · Build configuration Root relaxations of Solomon VRPTW instances (100 customers), using split-depotgraphs, unrounded Euclidean distances, NG ne">
+<meta name="theme-color" content="#0b0e11">
+<title>Root benchmarks — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/benchmarks/root.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="root.html" aria-current="page">Root benchmarks</a><a href="column-elimination.html">Column elimination model reductions</a><a href="../extensions/column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/benchmarks/root.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="root-benchmarks">Root benchmarks</h1>
+<p><a href="../index.html">Documentation index</a> · <a href="../guides/build.html">Build configuration</a></p>
+<p>Root relaxations of Solomon VRPTW instances (100 customers), using split-depot
+graphs, unrounded Euclidean distances, NG neighbourhoods of the 8 nearest
+customers, the Clp master, and no reduced-cost fixing or enumeration. Times are
+the solvers' own root timers, reported as medians of three runs on an AMD
+Ryzen 9 9950X.</p>
+<p>The chart retains the <strong>historical VRPSolver one-thread measurements</strong> and
+refreshes <strong>both BALDES series on October 20, 2026</strong>. BALDES uses automatic Clp
+scaling, retained work areas and numerical bounds, with optional SIMD disabled.
+Its forward/backward exact pricing uses two threads; one-core and two-core runs
+are pinned to CPU 0 and CPUs 0/1 respectively (different physical cores).
+One warmup precedes three measured runs per case/core configuration, alternating
+core configurations. Other work was running on the machine, so the new times
+are indicative; the displayed speedups compare against historical reference
+values rather than a fresh paired reference run.</p>
+<p><img src="../_assets/docs/benchmarks/benchmark.svg" alt="Root relaxation solve times"></p>
+<p>On C101–C103, C201, C202 and R102, rank-one separation finds no violated cut,
+so those runs equal the ones without cuts.</p>
+<h2 id="results-october-20-2026">Results (October 20, 2026)</h2>
+<table>
+<thead>
+<tr>
+<th>Workload</th>
+<th style="text-align:right">One core</th>
+<th style="text-align:right">Two cores</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C101</td>
+<td style="text-align:right">0.0617 s</td>
+<td style="text-align:right">0.0616 s</td>
+</tr>
+<tr>
+<td>C102</td>
+<td style="text-align:right">0.3819 s</td>
+<td style="text-align:right">0.3652 s</td>
+</tr>
+<tr>
+<td>C103</td>
+<td style="text-align:right">1.0354 s</td>
+<td style="text-align:right">0.9654 s</td>
+</tr>
+<tr>
+<td>C201</td>
+<td style="text-align:right">0.1277 s</td>
+<td style="text-align:right">0.1264 s</td>
+</tr>
+<tr>
+<td>C202</td>
+<td style="text-align:right">10.6514 s</td>
+<td style="text-align:right">9.7075 s</td>
+</tr>
+<tr>
+<td>R101</td>
+<td style="text-align:right">0.0482 s</td>
+<td style="text-align:right">0.0481 s</td>
+</tr>
+<tr>
+<td>R101-rank1</td>
+<td style="text-align:right">1.1443 s</td>
+<td style="text-align:right">1.1409 s</td>
+</tr>
+<tr>
+<td>R102</td>
+<td style="text-align:right">0.2883 s</td>
+<td style="text-align:right">0.2839 s</td>
+</tr>
+<tr>
+<td>R103</td>
+<td style="text-align:right">0.8663 s</td>
+<td style="text-align:right">0.8486 s</td>
+</tr>
+<tr>
+<td>R103-rank1</td>
+<td style="text-align:right">1.7604 s</td>
+<td style="text-align:right">1.6963 s</td>
+</tr>
+<tr>
+<td>R201</td>
+<td style="text-align:right">1.4887 s</td>
+<td style="text-align:right">1.4657 s</td>
+</tr>
+<tr>
+<td>R201-rank1</td>
+<td style="text-align:right">6.8624 s</td>
+<td style="text-align:right">6.7643 s</td>
+</tr>
+<tr>
+<td>R202</td>
+<td style="text-align:right">5.8373 s</td>
+<td style="text-align:right">5.5827 s</td>
+</tr>
+<tr>
+<td>Geometric mean, all 13</td>
+<td style="text-align:right">0.7916 s</td>
+<td style="text-align:right">0.7693 s</td>
+</tr>
+</tbody>
+</table>
+<p>Root <code>Optimal</code> describes termination of the LP relaxation; these measurements
+are not integer routing solve times. The IPM backend is not represented in this
+chart. The SVG metadata records the executable hash, settings and full-precision
+medians.</p>
+<h2 id="run-the-same-configuration">Run the same configuration</h2>
+<p>Build the CLI with the Clp backend, then run from the repository root:</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp
+<span class="nv">OMP_NUM_THREADS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">OPENBLAS_NUM_THREADS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">MKL_NUM_THREADS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>taskset<span class="w"> </span>-c<span class="w"> </span><span class="m">0</span>,1<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>./target/release/baldes<span class="w"> </span>vrptw<span class="w"> </span>instances/R201.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--master<span class="w"> </span>clp<span class="w"> </span>--reference-ng<span class="w"> </span>--ng<span class="w"> </span><span class="m">8</span><span class="w"> </span>--rounding<span class="w"> </span>none<span class="w"> </span>--no-enumeration<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--bound-mode<span class="w"> </span>numerical<span class="w"> </span>--time<span class="w"> </span><span class="m">240</span><span class="w"> </span>--json<span class="w"> </span>/tmp/r201-root.json
+</code></pre>
+<p>Add <code>--rank1</code> for a rank-one workload. Use <code>taskset -c 0</code> for the one-core
+configuration. <code>taskset</code> is Linux-specific; select equivalent CPU affinity on
+other platforms. Run one warmup followed by three measured runs and report the
+median <code>seconds</code> field from the JSON output.</p>
+<p>Use the same instance, options, CPU placement and build features when comparing
+runs. Other hardware, background work, LP backends, rounding conventions and
+cut settings can produce different times. See the <a href="../guides/cli.html">CLI guide</a> for
+controls and result fields.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="../extensions/ipm.html"><small>Previous guide</small>BALDES IPM in Rust <span aria-hidden="true">↗</span></a><a href="column-elimination.html"><small>Next guide</small>Column elimination model reductions <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#results-october-20-2026">Results (October 20, 2026)</a><a class="toc-level-2" href="#run-the-same-configuration">Run the same configuration</a></nav></aside>
+</div>
+</body></html>

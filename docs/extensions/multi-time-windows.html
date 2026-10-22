@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Multiple time windows Build with --features multi-time-windows to attach a union of closedservice-start intervals to any disposable scalar resource. For example: A forward arrival ">
+<meta name="theme-color" content="#0b0e11">
+<title>Multiple time windows — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/multi-time-windows.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="multi-time-windows.html" aria-current="page">Multiple time windows</a><a href="multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/multi-time-windows.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="multiple-time-windows">Multiple time windows</h1>
+<p>Build with <code>--features multi-time-windows</code> to attach a union of closed
+service-start intervals to any disposable scalar resource. For example:</p>
+<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span><span class="n">Graph</span><span class="p">,</span><span class="w"> </span><span class="n">Window</span><span class="p">};</span>
+<span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">graph</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Graph</span><span class="p">::</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="n">graph</span><span class="p">.</span><span class="n">set_time_windows</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="p">[</span>
+<span class="w">    </span><span class="n">Window</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mf">8.</span><span class="p">,</span><span class="w"> </span><span class="mf">12.</span><span class="p">)</span><span class="o">?</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Window</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mf">16.</span><span class="p">,</span><span class="w"> </span><span class="mf">20.</span><span class="p">)</span><span class="o">?</span><span class="p">,</span>
+<span class="p">])</span><span class="o">?</span><span class="p">;</span>
+</code></pre>
+<p>A forward arrival at 13 waits until 16. A backward latest arrival of 15 projects
+to 12. Waiting is allowed between visits, including across service-window gaps;
+these windows constrain service starts, not the entire travel or waiting period.
+Service durations remain part of arc consumption, as in the single-window model.</p>
+<p><code>Graph::set_time_windows(vertex, resource, &amp;[Window])</code> validates all intervals,
+sorts them and merges touching or overlapping intervals. It replaces the ordinary
+vertex bound with their hull. Empty unions, nonfinite/reversed intervals, invalid
+IDs, and equality resources are rejected without changing the graph. A zero-width
+interval is valid. <code>time_windows</code> returns the normalized configured union;
+<code>clear_time_windows</code> removes it and retains the current ordinary bound.</p>
+<p>Subsequent <code>set_bounds</code> calls restrict the retained union. Incoming arc bounds
+also intersect that union, rather than filling its gaps. An explicitly specified
+initial source value must belong to its domain. Without one, initialization uses
+the earliest permitted source value. Backward initialization uses the latest
+permitted sink value within the effective bucket bounds.</p>
+<p>The feature does not add a new resource kind. Ordinary disposable dominance
+remains valid because forward projection is monotone and waiting is permitted.
+The existing scalar resource dimensions, NG/elementarity, arc-window constraints
+and resource-branch windows continue to apply.</p>
+<h2 id="python-and-network-json">Python and network JSON</h2>
+<p>Build Python with <code>maturin develop --features multi-time-windows</code> (or add that
+feature to the existing wheel build). The stateful solver exposes:</p>
+<pre><code class="language-python"><span class="n">solver</span><span class="o">.</span><span class="n">set_vertex_time_windows</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">[(</span><span class="mf">8.0</span><span class="p">,</span> <span class="mf">12.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">16.0</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">)])</span>
+</code></pre>
+<p>Network JSON, built with <code>clp,multi-time-windows</code>, accepts <code>time_windows</code> on a
+resource: one entry per vertex, each either null (ordinary bounds) or a nonempty
+list of [lower, upper] pairs. For a three-vertex network:</p>
+<pre><code class="language-json"><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;disposable&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;time_windows&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="p">[[</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">12</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">]],</span><span class="w"> </span><span class="kc">null</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;bounds&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">18</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="p">]]</span>
+<span class="p">}</span>
+</code></pre>
+<p>When both fields are supplied, <code>bounds</code> intersects the union; the second interval
+in this example is effectively [16, 18]. Without the build feature the JSON field
+is rejected as unknown, rather than silently ignored. Solomon and CVRPLIB file
+formats retain their existing input semantics; use the graph API or network JSON
+for disjoint windows.</p>
+<h2 id="implementation-and-validation">Implementation and validation</h2>
+<p>Forward transitions choose the first admissible value at or after arrival;
+backward transitions search from the last interval and clip at the head before
+subtracting consumption and projecting onto the tail domain. Both intersect
+vertex and arc restrictions. These transitions are shared by pricing, replay,
+canonical path collection and elementary enumeration. Exact incumbent validation
+also applies union membership using its exact arithmetic.</p>
+<p>Bucket propagation projects across gaps, and component/reachability construction
+includes the image of a whole bucket cell. A discontinuous waiting jump can thus
+reach a later interval without being pruned by an adjacency built for the hull.
+If a far cell endpoint is infeasible, the image uses a conservative hull bound.
+Backward bucket arcs retain both phase flags, since a gap can cross the
+halfway boundary inside one input cell. Actual label resources select the phase.
+This can create extra dependencies and increase preparation work; no performance
+improvement is claimed. Consumption-symmetric prefix reuse is disabled on graphs
+with configured unions, because hull symmetry alone does not justify time
+reversal. Ordinary forward/backward labeling remains available.</p>
+<p>Tests compare bucket pricing with independent exhaustive integer path schedules
+on randomized DAGs and elementary cyclic graphs. Regressions cover earliest and
+latest projection, gap rejection, arc intersections, terminal domains, effective
+sink bounds, zero-width windows, nonindexed resource coordinates, normalization,
+topology invalidation, halfway continuation, enumeration, JSON loading, and exact
+incumbent witnesses.</p>
+<p>Validation commands:</p>
+<pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--features<span class="w"> </span>clp,multi-time-windows,simd<span class="w"> </span>--lib<span class="w"> </span>--test<span class="w"> </span>multi_time_windows<span class="w"> </span>--test<span class="w"> </span>main_pricing<span class="w"> </span>--test<span class="w"> </span>fixing_enumeration<span class="w"> </span>--test<span class="w"> </span>accumulated_resource<span class="w"> </span>--test<span class="w"> </span>porting_regressions
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--lib<span class="w"> </span>--test<span class="w"> </span>main_pricing<span class="w"> </span>--test<span class="w"> </span>fixing_enumeration<span class="w"> </span>--test<span class="w"> </span>accumulated_resource<span class="w"> </span>--test<span class="w"> </span>porting_regressions
+cargo<span class="w"> </span>clippy<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--lib<span class="w"> </span>--test<span class="w"> </span>multi_time_windows<span class="w"> </span>--features<span class="w"> </span>clp,multi-time-windows,simd
+</code></pre>
+<p>The Python regression in <code>python/tests/test_multi_time_windows.py</code> passes against
+the feature-enabled extension and skips on wheels without it. Test builds used
+<code>CARGO_PROFILE_DEV_OPT_LEVEL=0</code>, <code>CARGO_PROFILE_DEV_DEBUG=0</code>, and
+<code>CARGO_INCREMENTAL=0</code>. Modified Rust files pass rustfmt. The broader Clippy run
+including all unit tests hits existing denied <code>approx_constant</code> and
+<code>absurd_extreme_comparisons</code> lints in unrelated tests; targeted Clippy completes
+with repository warnings.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="../reference/simd.html"><small>Previous guide</small>SIMD dispatch <span aria-hidden="true">↗</span></a><a href="multi-pricing.html"><small>Next guide</small>Multi-pricing: one master, multiple pricing subproblems <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#python-and-network-json">Python and network JSON</a><a class="toc-level-2" href="#implementation-and-validation">Implementation and validation</a></nav></aside>
+</div>
+</body></html>

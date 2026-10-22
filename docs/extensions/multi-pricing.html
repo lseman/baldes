@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Multi-pricing: one master, multiple pricing subproblems Documentation index With clp, master::multi_pricing::solve solves a shared root and returns an ownednode snapshot that can b">
+<meta name="theme-color" content="#0b0e11">
+<title>Multi-pricing: one master, multiple pricing subproblems — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/multi-pricing.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="multi-time-windows.html">Multiple time windows</a><a href="multi-pricing.html" aria-current="page">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/multi-pricing.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="multi-pricing-one-master-multiple-pricing-subproblems">Multi-pricing: one master, multiple pricing subproblems</h1>
+<p><a href="../index.html">Documentation index</a></p>
+<p>With <code>clp</code>, <code>master::multi_pricing::solve</code> solves a shared root and returns an owned
+node snapshot that can be resumed or forked. Its pricing graphs share master
+rows. Each <code>Network</code> owns a graph, a unique nonnegative ID and
+nonnegative multiplicity bounds. Rust models may use a finite lower bound and
+positive-infinite upper bound. Local arc IDs may overlap across
+networks: route identities include the network ID and resource schedule.</p>
+<p>The coordinator is called <strong>multi-pricing</strong> because one master coordinates
+multiple pricing subproblems. A <strong>network</strong> is an individual subproblem's graph
+and route family. Subproblems may share a vehicle type or represent different
+types, depots or resources; heterogeneity is optional. This is independent of
+using several CPU cores for a single pricing problem.</p>
+<p><code>Problem.rows</code> defines the shared constraints. <code>Network.arc_entries</code> contains
+one list of <code>(shared_row, coefficient)</code> pairs per physical arc, in graph order.
+<code>route_entries</code> adds coefficients charged once per route. The coordinator adds
+the network multiplicity rows separately; callers do not include them in the
+shared-row indices. Arc costs define original route costs. Variable-cost
+mapping used internally by pricing does not modify the supplied graphs.
+Physical multiplicity rows appear in input-network order: a finite upper row
+comes first, then a lower row when the lower bound is positive. An infinite
+upper bound adds no row. Shared rows follow these multiplicity rows in their
+original order.</p>
+<p>In Rust, use <code>Window { lower: 0., upper: f64::INFINITY }</code> for an unlimited route
+count; <code>Window::new</code> remains the finite scalar-resource window constructor.
+Original shared rows can prove a finite remaining count, which tightens future
+columns and bound compensation and survives forks/fixing. If a negative reduced
+cost has no finite count bound, the estimate remains unknown while pricing can
+continue. A zero reduced cost does not multiply infinity. Truly unbounded
+negative-cost route directions report an unbounded backend solve. JSON uses
+<code>&quot;multiplicity&quot;: [0, null]</code> for an unlimited upper count. The lower count must
+remain finite and nonnegative.</p>
+<p>The coordinator maintains independent pricing state, combines columns into one
+restricted master and aggregates each network's multiplicity contribution and
+stabilization subgradient. <code>Output.oracle_calls</code> counts individual oracle calls;
+<code>Output.master.pricing_calls</code> counts batches. <code>Output.values</code> gives the current
+restricted-master quantity for every route in <code>Output.routes</code>.</p>
+<p>Phase estimates guide stabilization. Published lower bounds additionally use
+graph-walk relaxations with downward arithmetic. If a negative cycle prevents
+a resource-free bound, nonnegative scalar consumption and bounded resource
+windows can justify a finite walk-length limit. The proof can combine dimensions
+with different units: it sums their individual positive-arc occurrence limits.
+Arcs consuming zero on every selected dimension must form an acyclic graph.
+Thus different cycles may consume different resources. The fallback uses a bounded work
+budget. Without a justified limit, or after arithmetic failure, budget exhaustion
+or an unavailable required path, the certificate remains unknown. A finite
+resource-aware bound can still be too weak to close the gap. In certified mode, unavailable certificates cannot close
+the gap; numerical mode retains its separate exact-pricing estimate. Finite
+artificial penalties
+also do not certify original-model infeasibility. A stalled restricted LP can
+still contain artificial variables; its objective and route quantities are
+not then an original feasible solution.</p>
+<h2 id="node-lifecycle">Node lifecycle</h2>
+<p><code>Output&lt;D&gt;::snapshot</code> owns the solved master, generated-column registry, row
+maps and one independent pricing solver per network. Its methods borrow the
+parent and return a new child or solve result; solving either child leaves the
+parent and sibling unchanged. Oracle counters in each output describe that
+solve, while column tags stay stable across descendants.</p>
+<ul>
+<li><code>snapshot.solve(options)</code> resumes all networks with a new work budget.</li>
+<li><code>snapshot.with_row(row, coefficients)</code> appends a shared additive row.
+<code>RowCoefficients</code> identifies a network, gives one coefficient per original
+physical arc and a once-per-route coefficient. Omitted networks contribute
+zero. Retained master columns, the generated pool and future pricing all use
+the row. Callers are responsible for the validity of supplied cuts.</li>
+<li><code>snapshot.fractional_assignments(tolerance)</code> aggregates each network's use of
+unit-cover shared rows. Assignment membership comes from row coefficients,
+so matching local arc or vertex IDs in different networks cannot alias.</li>
+<li><code>snapshot.branch_assignment(shared_row, network_id, assigned)</code> builds the
+<code>use &gt;= 1</code> or <code>use &lt;= 0</code> child. Assignment rows must be unit equalities with
+nonnegative integer contributions. Both children price every enabled network.</li>
+<li><code>snapshot.fix_route(route_index, quantity)</code> fixes additional integer copies
+of a registered original-feasible elementary route. It replays resources,
+subtracts every shared/branch/cut and multiplicity contribution, and carries
+the cost as an objective offset. Rows appended later also subtract this fixed
+contribution. <code>Output.fixed_routes</code> reports the fixed portion separately;
+<code>Output.values</code> contains only remaining quantities.</li>
+</ul>
+<p>For example, after obtaining a coupled root:</p>
+<pre><code class="language-rust"><span class="kd">let</span><span class="w"> </span><span class="n">candidate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">root</span><span class="p">.</span><span class="n">snapshot</span><span class="p">.</span><span class="n">fractional_assignments</span><span class="p">(</span><span class="mf">1e-6</span><span class="p">)</span><span class="o">?</span><span class="p">[</span><span class="mi">0</span><span class="p">];</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">assigned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">root</span><span class="p">.</span><span class="n">snapshot</span><span class="p">.</span><span class="n">branch_assignment</span><span class="p">(</span>
+<span class="w">    </span><span class="n">candidate</span><span class="p">.</span><span class="n">shared_row</span><span class="p">,</span><span class="w"> </span><span class="n">candidate</span><span class="p">.</span><span class="n">network</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">excluded</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">root</span><span class="p">.</span><span class="n">snapshot</span><span class="p">.</span><span class="n">branch_assignment</span><span class="p">(</span>
+<span class="w">    </span><span class="n">candidate</span><span class="p">.</span><span class="n">shared_row</span><span class="p">,</span><span class="w"> </span><span class="n">candidate</span><span class="p">.</span><span class="n">network</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">assigned_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">assigned</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">options</span><span class="p">.</span><span class="n">clone</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">excluded_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">excluded</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">options</span><span class="p">.</span><span class="n">clone</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">restored_parent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">root</span><span class="p">.</span><span class="n">snapshot</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">options</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</code></pre>
+<p>Fresh roots still require an empty column registry; descendants own their warm
+metadata internally. Pass pricing options through <code>Options.pricing_options</code>.
+Scalar resource capacity is a const generic, defaulting to two; see
+<a href="../reference/resources.html">scalar resources</a>.</p>
+<h2 id="assignment-tree">Assignment tree</h2>
+<p><code>solve_assignment_tree(problem, AssignmentTreeOptions)</code> runs a best-bound tree
+using network-aware snapshots. It tries assignment rows, declared integer master
+variables, total network multiplicities, then original physical-arc activities. It returns network-tagged
+integer route quantities, an incumbent, selected bound mode, frontier bound and
+node/work-limit status. Integer witnesses replay original graph resources,
+shared rows and original multiplicities with exact sums; objectives round upward.
+Fixed routes are included in this replay. A rounded labeling resource profile
+alone never authorizes an incumbent or fixed route.</p>
+<p>Rust callers can run <code>snapshot.solve_assignment_tree(options)</code> after installing
+shared nonlinear rows, fixing routes or restricting master variables. It forks
+the snapshot and retains cuts, bounds, fixed contributions and complete route
+universes. A zero-node run preserves only the inherited bound of the requested
+bound mode; a numerical bound is not promoted to a certificate.</p>
+<p>Every fallback split is an integer-valid floor/ceiling disjunction on an
+original quantity. Continuous master variables are never branched as integers.
+These families still do not cover every fractional route decomposition; such a
+node remains <code>Incomplete</code>. An exact whole-original-flow contradiction can close
+a node. Positive artificials, a stalled LP or incomplete certification alone do
+not prove infeasibility. Complete-master integer deductions retain the explicit
+integer-domain policy.
+Node/time limits retain the open-frontier bound. Bounds on fixed-route nodes
+are newly certified only when their RHS, offset and residual multiplicity
+reductions are exact; otherwise valid inherited certificates remain available,
+but a new original-domain bound stays unknown.</p>
+<h2 id="finite-column-imports">Finite column imports</h2>
+<p>Rust callers can combine routing networks with explicitly declared finite
+original-vector column domains using <code>multi_pricing::imported::solve</code>. See
+<a href="column-imports.html">finite column imports</a> for coordinate links, column fixing,
+multiplicity bounds, identity mapping and complete-domain MIP.</p>
+<h2 id="independent-master-variables">Independent master variables</h2>
+<p><code>solve_with_master_variables(problem, variables, options)</code> adds independent
+<code>MasterVariable</code> definitions to the shared master. Each definition has its own
+ID, objective cost, signed bounds (finite, one-sided or free), integrality flag and shared-row
+coefficients. IDs are independent of network and arc IDs. Root LPs relax
+integrality; complete-domain MIP retains it. <code>Output.master_values</code> returns
+original values by ID, separately from network-tagged routes.</p>
+<p>For a model with no pricing subproblems, Rust callers can use
+<code>solve_master(rows, variables, options)</code>. It solves the continuous relaxation and
+returns the same snapshot API. Signed, one-sided, free and integer variables
+retain their usual contracts. The empty pricing family is complete immediately:
+<code>snapshot.solve_enumerated_mip(options)</code> needs no preceding enumeration, and
+<code>snapshot.solve_assignment_tree(options)</code> branches integer master variables.
+No dummy network is required. A <code>Problem::&lt;D&gt;</code> with an empty <code>networks</code> list is
+also accepted by <code>solve_with_master_variables</code>, for any compile-time <code>D</code>.
+An empty model has objective zero; original-row contradictions are available to
+the tree as preprocessing proofs. This Rust API does not add master-variable
+fields to the CLI/Python JSON schema.</p>
+<p>Snapshots support <code>with_master_variable_bounds(id, bounds)</code> for restrictions or
+fixing. <code>with_master_row(row, network_coefficients, master_coefficients)</code> couples
+these variables to additive network activities;
+<code>with_rank_one_master_row(row, floor_coefficients, master_coefficients)</code> couples
+them to nonlinear floor rows. Existing parent restrictions remain in force.
+All operations preserve independent sibling snapshots. The corresponding tree
+entry point is <code>solve_assignment_tree_with_master_variables</code>.</p>
+<p>Signed variables retain their original coefficients and costs. Their bounds
+participate in joint propagation, and bounds tightened by original constraints
+reach static master columns and publication certificates. Inferred positive
+lower bounds and negative upper bounds are also published as original-variable
+rows, so the LP, warm snapshots and MIP enforce those bounds. A bounded exact
+row-reduction pass also combines shared constraints with linear equalities that
+link master variables. For example, <code>a + b &gt;= 1.5</code> and <code>m = a + b</code> imply
+<code>m &gt;= 1.5</code>; the optional integer policy strengthens this to <code>m &gt;= 2</code> when <code>m</code>
+is integer. The pass retains support-reducing sums/differences only, rejects
+rounded coefficients/RHS values, and reserves most work for ordinary propagation.
+It does not treat nonlinear row envelopes as equalities. Continuous master
+values remain continuous when route quantities are made integer in MIP and
+witness validation.</p>
+<p>Infinite endpoints represent mathematical domains. An adverse dual point on an
+unbounded component can leave the published bound unknown. Original shared rows
+may supply a finite proof-only bound even with preprocessing disabled; this does
+not change the snapshot or replace infinity with a finite modeling cap.</p>
+<h2 id="original-activities-multiplicities-and-nonlinear-rows">Original activities, multiplicities and nonlinear rows</h2>
+<p>Rust snapshots expose <code>with_activity_bounds(bounds, coefficients)</code> to restrict
+an aggregate original variable across networks. Each <code>RowCoefficients</code> supplies
+arc coefficients and a once-per-route coefficient for its network. Equal lower
+and upper bounds fix the activity. <code>with_multiplicity(network, bounds)</code> bounds
+the total route count, including fixed copies. Both operations fork the node
+and preserve restrictions in future pricing, descendants and enumeration.</p>
+<p>Activity bounds constrain the aggregate master activity. For example, an upper
+bound of <code>0.25</code> remains a fractional activity cap in the continuous relaxation.
+It is not an arc-availability flag. Opting into integer-domain preprocessing can
+strengthen a proved integer activity cap below one to zero. Pricing supports
+are defined separately by the graph and registered restrictions.</p>
+<p><code>with_rank_one_row(row, coefficients)</code> installs a shared nonlinear row. Each
+<code>RankOneCoefficients</code> defines a network's coefficient as
+<code>floor(sum of visited vertex weights / denominator)</code>. Weights count each visit,
+lie between zero and denominator minus one, and must be zero at both terminals.
+Supported denominators are 1–7. The caller supplies a valid row. Fixed routes subtract their nonlinear
+coefficient from its RHS, including when the row is installed after fixing.
+Pricing uses full memory; master coefficients retain the actual physical arcs.
+<code>with_registered_cut_row(row, coefficients)</code> accepts <code>RegisteredCutCoefficients</code>
+for existing packing, covering, limited-memory, arc-weighted and strong k-path
+descriptors. <code>with_registered_cut_master_row</code> also couples independent master
+variables. Use physical vertex/arc IDs for the selected network and consistent
+graph-specific supports. Weights must be nonnegative and below the denominator
+(1–7); unsupported original-set mappings and incompatible descriptors are
+rejected. The caller supplies a valid inequality; these methods do not separate
+cuts automatically. Fixed-route shifts and future-column coefficients use the
+registered memory contract.</p>
+<p><code>with_composite_cut_row(row, coefficients)</code> sums several registered descriptors
+into one shared row, including multiple terms from the same network.
+<code>with_composite_cut_master_row</code> couples this sum to independent master variables.
+Repeated descriptors contribute repeatedly. Pricing applies the shared row dual
+to every term; replay and fixed-route shifts use their summed coefficient.
+This API expresses a sum, not an indicator that any term is present. The original
+<code>with_registered_cut_row</code> still rejects duplicate network descriptors.</p>
+<p>These Rust methods are not currently exposed in the JSON or Python model schema.</p>
+<p><code>with_presence_row(row, coefficients)</code> installs a caller-supplied valid nonlinear
+row over original-variable events. Each <code>PresenceCoefficients</code> supplies a
+network ID, a <code>PresenceRow</code> and event lists aligned with physical graph arcs.
+<code>Mode::PairCount</code> counts satisfied stored pairs, including duplicates;
+<code>Mode::AnyPair</code> contributes at most one. Repeated emission of an event does not
+multiply its contribution. <code>with_presence_master_row</code> also couples independent
+master variables. All row senses are supported. Fixing replays the actual
+coefficient, including rows appended after the fix; pricing, snapshots and
+complete enumeration/MIP use the same event definition.</p>
+<p>Original-domain certificates keep active presence rows together in a bounded
+walk-state search. It charges actual event-pair increments using directed
+arithmetic, including duplicate pairs, repeated events and either dual sign.
+Event IDs are local to each row. Sparse event compression avoids allocating by
+the largest event ID. Resource-derived walk-length bounds can cover adverse
+cycles; otherwise an adverse cycle leaves this improvement unknown. Work or
+time exhaustion falls back to the existing conservative relaxation. These
+certificates do not require complete enumeration.</p>
+<p>Original-domain preprocessing drops nonnegative presence terms from <code>&lt;=</code>
+relaxations and bounds them by the maximum coefficient times multiplicity for
+<code>&gt;=</code> relaxations. When static terms exhaust the upper side of a <code>&lt;=</code> or equality
+row, preprocessing searches source-to-sink walks with zero presence coefficient.
+It considers all pairs in that descriptor jointly, including events spread over
+several arcs, and forbids physical arcs absent from every such walk. The search
+ignores resources and elementarity, so its walk domain contains every feasible
+route. Cycles and repeated events are supported; equivalent incidence states
+at the same vertex are merged. Sparse event IDs do not allocate the entire
+declared event domain. All searches share the preprocessing work budget. An
+unfinished search publishes no additional walk-support exclusions; previously
+proved exclusions remain valid. These deductions participate in the joint
+flow/static-variable fixed point across pricing subproblems.</p>
+<p>Certified bounds can be
+looser than the numerical LP because their original-domain relaxation drops
+positive presence penalties when joint presence-state certification exhausts its
+work/time allowance; such a run can remain <code>Stalled</code> until a stronger
+proof or complete enumeration closes the gap.</p>
+<p>Registered cut rows also support original-domain zero-coefficient propagation.
+When directed bounds prove that static contributions exhaust a nonnegative
+row's <code>&lt;=</code> budget, every registered kernel in that row must be zero. A bounded
+walk search keeps the kernels' packing remainders jointly, including vertex or
+physical-arc memory resets. Covering and strong-entry kernels reject support
+hits; repeated composite descriptors keep their sum semantics. Arcs absent
+from all zero-coefficient source-to-sink walks are forbidden before enumeration.
+The search ignores route resources and elementarity, so its walk domain is a
+safe superset. Interrupted searches publish no partial walk exclusions.</p>
+<p>These deductions share the flow/resource/presence work budget and repeat to a
+joint fixed point. Signed static compensation or a positive fractional row
+budget prevents unjustified zero deductions. This is a necessary zero-budget
+rule, not a general nonlinear optimizer or automatic cut separator.</p>
+<p><code>with_resource_knapsack_row(row, coefficients)</code> installs a shared <code>&lt;=</code> row
+using <code>ResourceKnapsackCoefficients</code> (network, resource coordinate, graph scale
+and monotone nonnegative step cut). <code>with_resource_knapsack_master_row</code> also
+couples independent master variables. This API supports nonnegative
+consumption, initial usage and vertex/arc windows on a common power-of-two grid.
+The grid spacing must lie between <code>2^-18</code> and <code>1</code>, and each value must use at
+most <code>2^52</code> grid units. Integer schedules retain their existing range; fractions
+such as <code>0.5</code> and <code>0.125</code> are supported when the complete schedule fits this
+range. Finer binary fractions, negative values, and schedules requiring more
+grid units are rejected before installation.
+Disposable resources may wait; equality resources must meet their windows
+without waiting. Coefficients use the earliest forward scalar schedule replayed
+from physical arcs; cached route profiles cannot change them. Pricing uses graph
+scaling and unrounded nonpositive duals.</p>
+<p>Fractional schedules, nonzero initial usage, waiting windows, intermediate
+capacity changes and equality resources select forward-only pricing for the
+affected network. This
+preserves the coefficient contract even if a caller requests bidirectional
+search. Zero-initial integer disposable loads with uniform capacity retain the
+existing bidirectional option.</p>
+<p>Fixed routes shift these rows, and descendants, enumeration and mixed MIP
+retain them. Complete-domain preprocessing can fix route quantities from the
+step coefficients. Before enumeration, a row that permits only zero resource
+penalty can also forbid original arcs whose consumption guarantees a positive
+step coefficient. Directed bounds on static variables must first prove that no
+negative static contribution can compensate those penalties. Flow conservation
+then propagates the arc fixings. The original-domain flow and resource-zero
+rules repeat while deductions enable each other, sharing one work budget.
+<code>preprocessing_report().propagation.work_used</code> reports the logical work spent.
+Incomplete budgeted passes retain valid partial deductions without claiming a
+fixed point. Before complete enumeration, the original-domain certificate
+may drop their nonnegative pricing penalty for a weaker valid lower bound;
+this need not close the LP gap. These methods require caller-supplied valid
+inequalities and do not automatically separate resource-knapsack cuts.</p>
+<p>Node solves automatically propagate a joint arc-flow relaxation across networks.
+It includes shared activities, flow conservation and route multiplicities;
+nonlinear rows contribute safe activity envelopes. Proved-zero arc usage forbids
+that arc in future pricing and fixes affected retained columns to zero. After
+complete enumeration, a second pass can also deduce zero route quantities from
+nonlinear coefficients. Missing future columns never justify these deductions.</p>
+<p>Use <code>options.preprocessing.enabled = false</code> to disable propagation, or adjust
+<code>options.preprocessing.work_limit</code>. <code>snapshot.preprocess()</code> runs the default
+policy on a fork; <code>preprocess_with_options()</code> supplies a separate budget.
+<code>preprocessing_report()</code> exposes aggregate arc and multiplicity bounds, work
+completion, route caps, zero fixings, and reasons for skipping unsafe arithmetic.
+Positive aggregate arc bounds are not per-route resource windows. After complete
+transfer, proved positive route-quantity caps are installed in the master and
+preserved through cleanup, regeneration and descendants. Fixing copies of a route
+reduces its remaining cap. Upper-active columns may have negative reduced costs;
+the numerical and certified bounds account for these caps. Inexact coefficient
+aggregation or fixed-route reductions skip deductions. Exhausted work preserves
+valid partial deductions. The default policy preserves the continuous LP and reports preprocessing
+infeasibility without independently pruning a tree node. Set
+<code>options.preprocessing.integer_domains = true</code> to use original integer route,
+arc-usage and multiplicity domains, together with each master variable's declared
+integrality. Continuous master variables remain continuous. With this explicit
+policy, a proved contradiction can close an integer tree node even when its LP
+relaxation is feasible. Reports distinguish inferred master-variable bounds
+from network activity bounds. Disabling propagation later does not widen a
+snapshot that already contains deductions; reuse an earlier ancestor for its
+original continuous relaxation.</p>
+<h2 id="limitations">Limitations</h2>
+<p>The supported lifecycle supports additive rows and explicit full-memory floor
+rows through Rust. Automatic nonlinear cut separation,
+reduced-cost-pruned enumeration with proved coverage,
+other branching families and broader resource-aware
+certificates remain open. Rust and Python expose the supported
+shared-master node lifecycle. The existing single-network routing entry
+points retain their current behavior.</p>
+<h2 id="cli">CLI</h2>
+<p>The <code>multi-pricing</code> command accepts an explicit JSON model, rather than a Solomon
+instance. It uses Clp and supports both shared roots and the assignment tree:</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--offline<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes
+target/debug/baldes<span class="w"> </span>multi-pricing<span class="w"> </span>examples/networks/triangle.json<span class="w"> </span>--json<span class="w"> </span>root.json
+target/debug/baldes<span class="w"> </span>multi-pricing<span class="w"> </span>examples/networks/triangle.json<span class="w"> </span>--tree<span class="w"> </span>--json<span class="w"> </span>tree.json
+<span class="c1"># JSON alone on stdout, suitable for a pipe:</span>
+target/debug/baldes<span class="w"> </span>multi-pricing<span class="w"> </span>examples/networks/triangle.json<span class="w"> </span>--tree<span class="w"> </span>--json<span class="w"> </span>-
+</code></pre>
+<p>The example has shared LP optimum <code>1.5</code> and integer optimum <code>2</code>. <code>--time</code>,
+<code>--iterations</code>, <code>--nodes</code>, <code>--bound-mode</code>, <code>--no-stabilization</code>,
+<code>--artificial-cost</code>, <code>--option NAME=VALUE</code>, and <code>--log-interval</code> control solves.
+Run <code>baldes multi-pricing --help</code> for details. The previous <code>networks</code> command remains an alias. Unsupported routing flags are errors.
+A successful command means the run completed and produced a result: inspect
+<code>status</code> and <code>open_nodes</code> for <code>NodeLimit</code>, <code>TimeLimit</code> or <code>Incomplete</code> outcomes.</p>
+<p>A model contains <code>rows</code> and <code>networks</code>. Rows use <code>sense: &quot;eq&quot; | &quot;le&quot; | &quot;ge&quot;</code>
+and a finite <code>rhs</code>. Each network has a unique nonnegative <code>id</code>, a <code>vertices</code>
+count, <code>[lower, upper]</code> fleet <code>multiplicity</code>, and an <code>arcs</code> list. Optional
+fields are <code>source</code> (default zero), <code>sink</code> (default last vertex), <code>resources</code>,
+<code>route_entries</code> and <code>ng</code>. Vertex indices and shared-row indices are zero based.
+Arc IDs are assigned consecutively in each network's input order, starting at
+zero; overlapping IDs in different networks are supported.</p>
+<p>Each arc provides <code>tail</code>, <code>head</code>, <code>cost</code> and optional <code>entries</code> pairs
+<code>[shared_row, coefficient]</code>. Its optional <code>consumption</code> and <code>bounds</code> arrays
+must match the resource count when nonempty. Arc bounds contain either
+<code>[lower, upper]</code> or <code>null</code> for each resource. Missing consumption is zero.
+Each resource has <code>kind: &quot;disposable&quot;</code> (default) or <code>&quot;equality&quot;</code>, an optional
+<code>initial</code> value, and optional <code>bounds</code> with one <code>[lower, upper]</code> pair per vertex.
+Default resource bounds are <code>[0, 100000]</code>. Network <code>route_entries</code> are charged
+once per route. Optional <code>ng</code> contains one neighborhood list per vertex.
+Resources may be empty; the maximum count is the build's scalar capacity.
+Unknown fields, nonfinite values and inconsistent dimensions are rejected.</p>
+<p>Result routes retain <code>network</code>, local <code>arcs</code>, <code>nodes</code>, cost, resource states and
+<code>value</code>. A root's <code>route_index</code> identifies its registry entry for later fixing;
+zero-valued registered routes are retained too. <code>fixed_routes</code> lists fixed
+quantities separately. Unknown/nonfinite bounds and absent objectives are JSON
+<code>null</code>, not <code>Infinity</code>. Root mode reports an LP relaxation; tree mode reports
+an independently replayed integer witness when available. Their <code>mode</code> and
+<code>bound_mode</code> fields preserve that distinction.</p>
+<h2 id="python">Python</h2>
+<p>Install the extension with Clp support (the Python build's default). The typed
+inputs use the same JSON schema as the CLI, allowing a single model to drive
+both interfaces:</p>
+<pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkProblem</span><span class="p">,</span> <span class="n">solve_networks</span>
+
+<span class="n">problem</span> <span class="o">=</span> <span class="n">NetworkProblem</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;examples/networks/triangle.json&quot;</span><span class="p">)</span>
+<span class="n">root</span> <span class="o">=</span> <span class="n">solve_networks</span><span class="p">(</span><span class="n">problem</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">lp</span> <span class="o">==</span> <span class="mf">1.5</span>
+<span class="n">integer</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">tree</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">integer</span><span class="o">.</span><span class="n">incumbent</span> <span class="o">==</span> <span class="mf">2.0</span>
+
+<span class="n">candidate</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">snapshot</span><span class="o">.</span><span class="n">fractional_assignments</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">left</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">snapshot</span><span class="o">.</span><span class="n">branch_assignment</span><span class="p">(</span>
+    <span class="n">candidate</span><span class="o">.</span><span class="n">shared_row</span><span class="p">,</span> <span class="n">candidate</span><span class="o">.</span><span class="n">network</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">right</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">snapshot</span><span class="o">.</span><span class="n">branch_assignment</span><span class="p">(</span>
+    <span class="n">candidate</span><span class="o">.</span><span class="n">shared_row</span><span class="p">,</span> <span class="n">candidate</span><span class="o">.</span><span class="n">network</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">assert</span> <span class="n">left</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span><span class="o">.</span><span class="n">lp</span> <span class="o">==</span> <span class="mf">2.0</span>
+<span class="k">assert</span> <span class="n">right</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span><span class="o">.</span><span class="n">lp</span> <span class="o">==</span> <span class="mf">2.0</span>
+<span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">snapshot</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span><span class="o">.</span><span class="n">lp</span> <span class="o">==</span> <span class="mf">1.5</span>
+</code></pre>
+<p>Models can also be constructed with <code>NetworkProblem</code>, <code>SharedRow</code>,
+<code>PricingNetwork</code>, <code>PricingArc</code> and <code>PricingResource</code> dataclasses. Use
+<code>problem.to_json()</code> to export them for the CLI. <code>NetworkResult.to_json()</code>
+serializes owned result data and excludes its native snapshot.</p>
+<p>Root snapshots additionally expose <code>with_row(SharedRow(...), coefficients)</code>
+with <code>NetworkRowCoefficients(network, arcs, per_route=0)</code>, and
+<code>fix_route(route_index, quantity=1)</code>. Child operations return independent
+<code>NetworkNode</code> objects; <code>node.solve(**options)</code> returns a new result and snapshot.
+Quantities fixed in Python must be positive integers. Node handles belong to
+one Python thread and root/node calls keep the GIL. Fresh <code>tree=True</code> calls
+release the GIL and return owned results without a resumable snapshot.</p>
+<p>The root/tree solve accepts <code>time_limit</code>, <code>max_iterations</code>, <code>node_limit</code>,
+<code>stabilize</code>, <code>bound_mode</code>, <code>artificial_cost</code>, <code>log_interval</code> and
+<code>pricing_options</code>. Resuming a snapshot accepts node options; <code>tree=True</code>
+requires a fresh model. Tree iteration, pricing-batch and individual oracle
+counts aggregate the evaluated nodes; <code>nodes</code> and <code>open_nodes</code> report tree work.</p>
+<h2 id="complete-enumeration-and-integer-transfer">Complete enumeration and integer transfer</h2>
+<p>Enumeration is opt-in. <code>Options.enumeration</code> in Rust, <code>enumerate=True</code> in
+Python, or <code>--enumerate</code> in the CLI attempts a bounded full-domain transfer
+at an accurate exact pricing checkpoint with no improving columns or positive
+artificials. This can strengthen an NG master to
+its elementary-route master. Every enabled network must complete before any
+columns are committed. Existing valid columns and their bounds remain; cyclic
+columns outside the integer domain are fixed to zero. All current physical
+rows, including additive cuts/branches, remain in place. Descendants reuse the
+complete route universe and evaluate new row coefficients on it.</p>
+<p>Transfer supports nonempty physically elementary paths with disposable and
+scalar equality resources. Equality paths are collected through a disposable
+superset, then checked against the original equality transitions; paths feasible
+only by waiting are excluded. Equality resources with a non-fixed sink
+window use forward pricing even if another direction was requested; backward
+pricing requires a fixed terminal resource value. Graphs containing direct source/sink routes
+decline transfer because empty-route integer semantics are not yet defined. Collection uses a downward resource relaxation
+that cannot discard an exact-feasible path, then independently replays original
+resources. Negative-consumption equality domains remain unavailable through
+this collector. Unsupported resources, ambiguous canonical replay, global work/path/
+storage limits or timeout leave the transfer unavailable. Normal pricing remains
+usable. Limits apply across all enabled networks, not independently per network.
+The default candidate limit is 10,000, work limit 10,000,000, stored-arc limit
+1,000,000 and attempt budget one second. Disabled networks contribute no routes.</p>
+<p><code>enumeration_reports</code> distinguishes no attempt, complete transfer and failure.
+Each report records attempts, per-network counts, route count, newly transferred
+columns and the failure reason. A repeated transfer on a complete snapshot does
+not duplicate columns. Failed transfers do not retain a partial universe.
+Each solve attempts at most one adaptive transfer, then resumes CG within the
+original time and iteration limits. Backend transfer failures retain the original
+master and warm start. A later solve can retry with different enumeration limits.
+The explicit Rust <code>snapshot.enumerate(...)</code> method attempts transfer immediately.</p>
+<p>No reduced-cost/objective cutoff removes paths during this collection; coverage
+is the full supported domain, including incumbent routes.</p>
+<p>Rust callers can separately request <code>snapshot.enumerate_below(cutoff, &amp;limits)</code>
+to collect routes needed by integer solutions strictly below a finite objective
+cutoff. This returns an immutable <code>CutoffEnumeration</code>, with <code>coverage_cutoff()</code>,
+<code>report()</code>, <code>routes()</code>, <code>dual_point()</code> and <code>cost_bounds()</code>. Limits cover all
+networks and proof preparation. Missing original-domain bounds, unsupported
+resource replay and exhausted budgets return an error; the source snapshot
+remains usable. This API currently requires a snapshot that has not already
+installed a full enumerated universe.</p>
+<p>With <code>highs</code>, call <code>view.solve_mip(&amp;MipOptions::default())</code> on that view. Its
+<code>ObjectiveCutoff</code> outcome means no integer solution improves the effective
+cutoff; it does not mean the original model is infeasible. Time/node limits remain explicit. A cutoff supplied by the caller
+does not itself establish a feasible incumbent. The view cannot be resumed as
+an original-domain LP or attached to a different snapshot. Its rows, fixed
+contributions and caps are frozen; derive a new view from each changed node.
+The adaptive CG handoff above continues to use full-domain enumeration.
+When tree <code>enumerated_mip</code> is enabled and full transfer is unavailable, the tree
+tries cutoff enumeration using its validated incumbent or the smaller supplied
+MIP cutoff. A failed attempt leaves normal branching available. Numerical mode
+can close a node from a sufficient MIP bound; certified mode uses returned
+witnesses without promoting a numerical MIP bound to a certificate.</p>
+<p>The CLI accepts <code>--mip-cutoff X</code> with <code>--tree --enumerated-mip</code>. The matching
+JSON solve option is <code>mip_objective_cutoff</code> (finite number, or null for no supplied
+cutoff). Reports include <code>coverage_cutoff</code>: null denotes full-domain coverage;
+a number denotes coverage only below that objective. A cutoff without an
+incumbent cannot close the original tree merely because its restricted pool
+has no improving integer solution.
+Python's <code>solve_networks(..., tree=True, enumerated_mip=True, mip_objective_cutoff=...)</code> uses the same policy. Each
+<code>NetworkEnumerationReport.coverage_cutoff</code> identifies the scope of its pool;
+<code>None</code> means full-domain coverage.</p>
+<p>With the optional <code>highs</code> feature, the tree can solve a complete transferred
+copy as an integer model. Artificial columns are fixed to zero, and route
+bounds, fleet rows, shared rows, inherited cuts/branches, fixed-route RHS
+contributions and objective offsets are retained. If LP cleanup retired a route,
+the private MIP model restores it from the complete universe and reapplies its
+cap before solving. The original snapshot remains unchanged. Positive integer routes are
+replayed against the original graph and original rows before an incumbent is
+published. Source masters and siblings remain unchanged after any MIP outcome.</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--offline<span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>--bin<span class="w"> </span>baldes
+target/debug/baldes<span class="w"> </span>multi-pricing<span class="w"> </span>examples/networks/triangle.json<span class="w"> </span>--tree<span class="w"> </span>--enumerated-mip<span class="w"> </span>--json<span class="w"> </span>-
+<span class="c1"># Force enumeration to decline and normal pricing/branching to continue:</span>
+target/debug/baldes<span class="w"> </span>multi-pricing<span class="w"> </span>examples/networks/triangle.json<span class="w"> </span>--tree<span class="w"> </span>--enumerated-mip<span class="w"> </span>--enumeration-route-limit<span class="w"> </span><span class="m">5</span><span class="w"> </span>--json<span class="w"> </span>-
+</code></pre>
+<p><code>--enumerated-mip</code> requires <code>--tree</code> and HiGHS support; it also enables enumeration.
+<code>--enumeration-time</code>, <code>--mip-time</code> and <code>--mip-nodes</code> control per-attempt budgets.
+MIP timeout/node limits/backend failure do not authorize pricing termination.
+<code>enumerated_mip_calls</code>, <code>enumerated_mip_nodes</code> and <code>enumerated_mip_failures</code> report
+work and fallback. Full-MIP numerical proof outcomes may close numerical-mode
+nodes; they never become certified-mode lower-bound certificates. A cutoff
+without a validated witness is not an incumbent or an infeasibility claim.</p>
+<p>Python uses the same options and reports:</p>
+<pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkProblem</span>
+<span class="n">problem</span> <span class="o">=</span> <span class="n">NetworkProblem</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;examples/networks/triangle.json&quot;</span><span class="p">)</span>
+<span class="n">root</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="nb">enumerate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">enumeration_reports</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">complete</span>
+<span class="n">integer</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">snapshot</span><span class="o">.</span><span class="n">solve_enumerated_mip</span><span class="p">(</span><span class="n">time_limit</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">integer</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;Optimal&quot;</span> <span class="ow">and</span> <span class="n">integer</span><span class="o">.</span><span class="n">incumbent</span> <span class="o">==</span> <span class="mf">2.0</span>
+<span class="c1"># Or combine node enumeration and MIP with the tree:</span>
+<span class="n">tree</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">tree</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">enumerated_mip</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">tree</span><span class="o">.</span><span class="n">nodes</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">tree</span><span class="o">.</span><span class="n">incumbent</span> <span class="o">==</span> <span class="mf">2.0</span>
+</code></pre>
+<p><code>node.solve(enumerate=True, enumeration_route_limit=..., enumeration_work_limit=..., enumeration_stored_arc_limit=..., enumeration_time_limit=...)</code> prepares a resumed
+node and returns a new snapshot. <code>solve_enumerated_mip</code> returns <code>None</code> when the
+node has not completed transfer. Its optional <code>objective_cutoff</code> filters improving
+witnesses without restricting enumeration; <code>ObjectiveCutoff</code> remains distinct
+from <code>Infeasible</code>. MIP calls on existing Python snapshots keep the GIL and their
+thread ownership. Fresh tree calls retain the existing GIL-release behavior.</p>
+<p>For Python, build with <code>maturin develop --features highs</code> (Clp is enabled by
+default). Clp-only builds still support complete enumeration; they reject MIP
+requests explicitly.</p>
+<h2 id="grouped-accumulated-resource-branches">Grouped accumulated-resource branches</h2>
+<p>A group can span several pricing networks. Name its original shared packing row,
+one resource coordinate, a stored threshold, and the physical arc IDs belonging
+to the group in each network. The packing row must prove at most one occurrence:
+its sense is <code>eq</code> or <code>le</code>, its RHS is at most one, all original contributions are
+nonnegative, and each member arc has a coefficient of at least one. Signed
+master-variable domains must also preserve nonnegative packing contributions.</p>
+<pre><code class="language-rust,ignore"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">multi_pricing</span><span class="p">::</span><span class="n">ResourceGroupMember</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">members</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="fm">vec!</span><span class="p">[</span>
+<span class="w">    </span><span class="n">ResourceGroupMember</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">network</span><span class="p">:</span><span class="w"> </span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="n">arcs</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="n">ResourceGroupMember</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">network</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="n">arcs</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="p">},</span>
+<span class="p">];</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">lower</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parent</span><span class="p">.</span><span class="n">with_resource_group_branch</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.5</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">members</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">upper</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parent</span><span class="p">.</span><span class="n">with_resource_group_branch</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.5</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">members</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</code></pre>
+<p>Both children include the boundary <code>threshold - 1e-6</code>. The lower child requires
+resource usage at most that boundary; the upper child requires usage at least
+it. Disposable resources can wait to satisfy an upper window. Equality resources
+cannot wait. Restrictions cover every occurrence of each listed physical arc,
+including parallel alternatives. Other networks and arcs remain available.</p>
+<p>Shared trees also generate disposable-resource groups automatically from original
+unit packing rows. They combine physical occurrences across networks, account for
+ancestor windows and use feasible forward/backward schedule intervals to select
+a threshold. Rust callers can inspect the current solved node with
+<code>parent.resource_group_candidates(1e-6)?</code> and attach either side with
+<code>candidate.apply(&amp;parent, upper)?</code>. The tree tries these candidates before its
+assignment and aggregate-activity fallbacks. A failed attachment leaves the
+parent reusable and causes the tree to try another disjunction.</p>
+<p>Children own their restrictions through solves, further branches, route fixing,
+enumeration and MIP. Parent and sibling snapshots remain reusable. Retained
+schedules refresh under their existing route tags and caps. Fixed schedules
+remain fixed; a contradictory child is infeasible. If exact feasibility can be
+proved but a scalar schedule cannot be reconstructed, attachment returns an
+error and preserves the parent.</p>
+<p>Resource-load rows on a disposable coordinate that an upper branch can re-time
+require complete enumeration before attachment. This keeps the rows' original
+path-load semantics. Call <code>parent.enumerate(&amp;limits)</code> first; the same condition
+applies when adding such a row after a branch. Rows on other coordinates and
+path-based additive or registered rows keep their usual workflow.</p>
+<p>Python exposes the same owned operation:</p>
+<pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkResourceGroupMember</span>
+<span class="n">members</span> <span class="o">=</span> <span class="p">(</span><span class="n">NetworkResourceGroupMember</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)),</span>
+           <span class="n">NetworkResourceGroupMember</span><span class="p">(</span><span class="mi">42</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)))</span>
+<span class="n">child</span> <span class="o">=</span> <span class="n">parent</span><span class="o">.</span><span class="n">with_resource_group_branch</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="n">members</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">child</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">stabilize</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">tree</span> <span class="o">=</span> <span class="n">child</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">tree</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">stabilize</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre>
+<p>For the CLI, pass a JSON array of these restrictions with
+<code>--resource-branches FILE</code>. Each object has <code>packing_row</code>, <code>resource</code>,
+<code>threshold</code>, <code>upper</code> and <code>members</code>; each member has <code>network</code> and <code>arcs</code>.
+The model is restricted before the requested root or tree solve.</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span>multi-pricing<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>examples/networks/resource_groups.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--resource-branches<span class="w"> </span>examples/networks/resource_group_upper.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tree<span class="w"> </span>--bound-mode<span class="w"> </span>certified<span class="w"> </span>--json<span class="w"> </span>-
+</code></pre>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="multi-time-windows.html"><small>Previous guide</small>Multiple time windows <span aria-hidden="true">↗</span></a><a href="column-imports.html"><small>Next guide</small>Finite column imports <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#node-lifecycle">Node lifecycle</a><a class="toc-level-2" href="#assignment-tree">Assignment tree</a><a class="toc-level-2" href="#finite-column-imports">Finite column imports</a><a class="toc-level-2" href="#independent-master-variables">Independent master variables</a><a class="toc-level-2" href="#original-activities-multiplicities-and-nonlinear-rows">Original activities, multiplicities and nonlinear rows</a><a class="toc-level-2" href="#limitations">Limitations</a><a class="toc-level-2" href="#cli">CLI</a><a class="toc-level-2" href="#python">Python</a><a class="toc-level-2" href="#complete-enumeration-and-integer-transfer">Complete enumeration and integer transfer</a><a class="toc-level-2" href="#grouped-accumulated-resource-branches">Grouped accumulated-resource branches</a></nav></aside>
+</div>
+</body></html>

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Scalar resources Documentation index · Branching Scalar capacity is a Rust const generic: Graph&lt;const D: usize&gt;,Solver&lt;D&gt;, and the labeling and enumeration engines carry the same d">
+<meta name="theme-color" content="#0b0e11">
+<title>Scalar resources — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/reference/resources.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="algorithms.html">Algorithms and references</a><a href="options.html">BALDES pricing options</a><a href="resources.html" aria-current="page">Scalar resources</a><a href="simd.html">SIMD dispatch</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="../extensions/column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/reference/resources.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="scalar-resources">Scalar resources</h1>
+<p><a href="../index.html">Documentation index</a> · <a href="../solver/branching.html">Branching</a></p>
+<p>Scalar capacity is a Rust const generic: <code>Graph&lt;const D: usize&gt;</code>,
+<code>Solver&lt;D&gt;</code>, and the labeling and enumeration engines carry the same dimension.
+The default is 2. Any <code>usize</code> count can be instantiated explicitly; there is no
+runtime dimension dispatch or heap-backed scalar fallback. Each scalar state,
+vertex window, arc consumption vector, and hot dominance cache uses a fixed array.</p>
+<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span><span class="n">Graph</span><span class="p">,</span><span class="w"> </span><span class="n">Controls</span><span class="p">,</span><span class="w"> </span><span class="n">price</span><span class="p">};</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">graph</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Graph</span><span class="p">::</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="k">for</span><span class="w"> </span><span class="n">vertex</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="mi">0</span><span class="o">..</span><span class="mi">3</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">resource</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="mi">0</span><span class="o">..</span><span class="mi">4</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">graph</span><span class="p">.</span><span class="n">set_bounds</span><span class="p">(</span><span class="n">vertex</span><span class="p">,</span><span class="w"> </span><span class="n">resource</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">,</span><span class="w"> </span><span class="mf">10.</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">first</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">graph</span><span class="p">.</span><span class="n">add_arc</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">2.</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">second</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">graph</span><span class="p">.</span><span class="n">add_arc</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">3.</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="n">graph</span><span class="p">.</span><span class="n">arc_mut</span><span class="p">(</span><span class="n">first</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">consumption</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mf">1.</span><span class="p">,</span><span class="w"> </span><span class="mf">2.</span><span class="p">,</span><span class="w"> </span><span class="mf">1.</span><span class="p">,</span><span class="w"> </span><span class="mf">3.</span><span class="p">].</span><span class="n">into</span><span class="p">();</span>
+<span class="n">graph</span><span class="p">.</span><span class="n">arc_mut</span><span class="p">(</span><span class="n">second</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">consumption</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mf">2.</span><span class="p">,</span><span class="w"> </span><span class="mf">1.</span><span class="p">,</span><span class="w"> </span><span class="mf">4.</span><span class="p">,</span><span class="w"> </span><span class="mf">2.</span><span class="p">].</span><span class="n">into</span><span class="p">();</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">price</span><span class="p">(</span><span class="o">&amp;</span><span class="n">graph</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">Controls</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="fm">assert_eq!</span><span class="p">(</span><span class="n">result</span><span class="p">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">resources</span><span class="p">,</span><span class="w"> </span><span class="fm">vec!</span><span class="p">[</span><span class="mf">3.</span><span class="p">,</span><span class="w"> </span><span class="mf">3.</span><span class="p">,</span><span class="w"> </span><span class="mf">5.</span><span class="p">,</span><span class="w"> </span><span class="mf">5.</span><span class="p">]);</span>
+<span class="p">#</span><span class="w"> </span><span class="nb">Ok</span><span class="p">::</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">core</span><span class="p">::</span><span class="n">error</span><span class="p">::</span><span class="n">OrError</span><span class="o">&gt;</span><span class="p">(())</span>
+</code></pre>
+<p>The constructor's resource count is the active count, at most <code>D</code>. This keeps
+zero- and one-resource models usable with capacity 2. <code>add_resource(kind)</code>
+initializes another coordinate within the compiled capacity and rejects overflow.
+Type annotations can use the default (<code>let graph: Graph = Graph::new(3, 2)?;</code>);
+standalone constructors should select it explicitly with <code>Graph::&lt;2&gt;::new</code>.
+<code>ScalarValues&lt;T, D&gt;</code> and <code>ResourceValues&lt;D&gt;</code> support indexing, slices, and array
+conversion with <code>.into()</code>. Exported routes contain only the active coordinates.</p>
+<h2 id="python-and-default-rust-builds">Python and default Rust builds</h2>
+<p>With <code>make config</code>, edit <strong>Scalar resource dimensions</strong>; the saved key is
+<code>CONFIG_RESOURCE_DIMENSIONS</code> (default <code>2</code>).</p>
+<p>These APIs use one capacity fixed when the library is compiled. Set
+<code>BALDES_RESOURCE_DIMENSIONS</code> to change it; leaving it unset selects 2:</p>
+<pre><code class="language-sh"><span class="nv">BALDES_RESOURCE_DIMENSIONS</span><span class="o">=</span><span class="m">5</span><span class="w"> </span>cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp
+<span class="nv">BALDES_RESOURCE_DIMENSIONS</span><span class="o">=</span><span class="m">5</span><span class="w"> </span>maturin<span class="w"> </span>develop<span class="w"> </span>--features<span class="w"> </span>clp
+</code></pre>
+<p>Use <code>baldes::DEFAULT_RESOURCE_DIMENSIONS</code> in Rust or
+<code>pybaldes.resource_dimensions</code> in Python to inspect that capacity. Creating or registering more resources returns
+an error. Rebuilding is required to change the capacity; there is no finite menu
+of runtime specializations. Explicit Rust types such as <code>Graph::&lt;9&gt;</code> work
+independently of this setting.</p>
+<h2 id="resource-semantics">Resource semantics</h2>
+<p>Every active coordinate participates in extension, dominance, forward/backward
+joins, route reconstruction, enumeration, branching, resource knapsack charges,
+conservative path domains, and exact incumbent checks.</p>
+<p>A disposable resource accumulates nonnegative arc consumption and may wait to
+reach a lower bound. An equality resource accumulates signed consumption without
+waiting. Arc windows constrain the head state after extension. Initial values
+default to source lower bounds. Backward equality search requires fixed sink
+windows; <code>price</code> selects forward search when those are not fixed.</p>
+<p>Bucket indexing uses at most two selected axes, independently of scalar capacity.
+A resource above index one can be the main axis through <code>Graph::main_resource</code>.
+Positive <code>EngineControls::steps</code> or <code>Solver::bucket_steps</code> select additional
+disposable axes; at most one joins the main axis. Unselected resources still
+participate in feasibility and dominance. More active resources can retain more
+nondominated labels and increase time and memory. Existing resource-kind,
+NG, budget, and certificate-eligibility restrictions still apply.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="options.html"><small>Previous guide</small>BALDES pricing options <span aria-hidden="true">↗</span></a><a href="simd.html"><small>Next guide</small>SIMD dispatch <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#python-and-default-rust-builds">Python and default Rust builds</a><a class="toc-level-2" href="#resource-semantics">Resource semantics</a></nav></aside>
+</div>
+</body></html>

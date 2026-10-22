@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="EVRP implementation status Documentation index baldes::extensions::evrp is the initial model and independent schedule replay layer.It supports deterministic directed travel with se">
+<meta name="theme-color" content="#0b0e11">
+<title>EVRP implementation status — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/evrp.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="multi-time-windows.html">Multiple time windows</a><a href="multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html" aria-current="page">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/evrp.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="evrp-implementation-status">EVRP implementation status</h1>
+<p><a href="../index.html">Documentation index</a></p>
+<p><code>baldes::extensions::evrp</code> is the initial model and independent schedule replay layer.
+It supports deterministic directed travel with separate time, energy and cost,
+delivery capacity, customer service-start windows, repeat charging-station
+visits, and explicit partial charging with station-specific piecewise-linear
+curves. Fixed-sequence charging optimization and reference bidirectional direct
+pricing and a two-phase subpath prototype are available. Both feed the same
+route-based LP master and column-generation adapter.</p>
+<p>Charging curves map energy to cumulative time from empty. Charging from <code>a</code>
+to <code>b</code> takes <code>T(b) - T(a)</code>; <code>charge_for</code> applies the inverse curve and caps at
+full charge. Knots must start at zero and increase strictly in both coordinates.
+Non-concave charging profiles are accepted. Energy and time units are supplied
+consistently by callers.</p>
+<p><code>Problem::replay</code> takes an explicit closed route with an amount charged per
+visit and an initial departure time. The vehicle starts full. It reports every
+arrival, service start, departure and arrival/departure energy, plus total
+travel cost and delivered load. Charging follows station service and must
+finish by closing; customers only require service start within their window.
+Waiting is allowed and consumes no energy. A route can cover a customer subset,
+but cannot repeat customers or contain intermediate depots. Comparisons use
+strict floating-point bounds with no implicit tolerance. Travel costs must be
+nonnegative; pricing reduced costs are not inputs to this validator.</p>
+<p>Replay checks feasibility of a supplied charging schedule, not optimality
+of its charging decisions. Tariffs, charger congestion, regeneration, mixed
+vehicle compatibility and station insertion are not implemented.</p>
+<h2 id="fixed-stop-sequence-optimizer">Fixed stop sequence optimizer</h2>
+<p><code>Problem::optimize_fixed_order(order, departure, ChargingOptions::default())</code>
+chooses continuous partial charging amounts on a supplied sequence of customers
+and stations. It minimizes completion time. Travel cost is fixed by that
+sequence, and charging has no separate monetary cost in the current model.
+Station visits may repeat; customer visits must be elementary.</p>
+<p>The algorithm propagates piecewise-affine earliest departure time as a function
+of exact remaining energy. At a station, for cumulative charging time <code>T</code> and
+incoming time function <code>F</code>, it evaluates
+<code>T(x) + min { F(q) - T(q) : q &lt;= x }</code>. On each affine interval the minimum is
+attained at an endpoint or at <code>q = x</code>. All these candidates are generated;
+their lower envelope is split at domain endpoints and function intersections.
+The construction permits non-concave charging curves without an energy grid.
+Time-window waiting is another piecewise-affine operation. Every retained piece
+keeps its predecessor and energy mapping for schedule reconstruction.</p>
+<p>The result distinguishes <code>Optimal</code>, <code>Infeasible</code>, <code>WorkLimit</code>, and
+<code>NumericalFailure</code>. <code>Optimal</code> is the optimizer's result in floating-point
+arithmetic, not an interval-arithmetic certificate. Every returned schedule
+passes independent strict replay. Reconstruction that fails replay reports
+<code>NumericalFailure</code>, never <code>Infeasible</code>. The work budget counts generated pieces
+and envelope comparisons; reaching it yields no feasibility or optimality claim.
+The envelope implementation prioritizes a transparent reference algorithm over
+large-instance speed.</p>
+<p>Tests compare charging allocations against independent quarter-energy grid
+enumeration on tiny heterogeneous/non-concave instances whose optimum lies on
+that grid, and check waiting, repeated stations, exact windows and work limits.
+These tests do not establish performance on published benchmarks.</p>
+<h2 id="direct-bidirectional-pricing">Direct bidirectional pricing</h2>
+<p><code>Problem::price_direct(duals, fleet_dual, departure, DirectOptions::default())</code>
+prices elementary customer routes with repeatable station visits. The dual
+vector has one entry per location and must be zero at stations and depots.
+Reduced cost is travel cost minus customer duals minus one fleet dual. The best
+replay-validated route is returned even when its reduced cost is nonnegative.
+No subset-row cuts, ng relaxation or branching restrictions are accepted yet.</p>
+<p>The implementation uses forward earliest-departure functions <code>F(e)</code> and
+backward latest-departure functions <code>B(e)</code> at exact departure energy <code>e</code>. Backward
+functions exclude processing at the meeting node, already processed by the
+forward label. Internally backward times are negated to share lower-envelope
+code. Backward extension undoes charging, station closing, service, customer
+windows and travel in the appropriate order. At a station the core operation
+is <code>max { B(y) - T(y) : y &gt;= q } + T(q) - service</code>, with station closing applied
+to departure before charging is undone.</p>
+<p>Dominance conservatively requires equal visited-customer sets, no greater
+reduced cost, no more used arcs and pointwise time dominance over the entire
+other function's domain. The function comparison covers domain gaps and
+interior crossings; endpoint-only scalar tests are insufficient. Joins require
+compatible customer sets, capacity, total arc count and some common energy
+with <code>F(e) &lt;= B(e)</code>. Both directions retain energy mappings for reconstruction;
+every returned complete route passes strict schedule replay.</p>
+<p>This is an E1-inspired reference implementation of the coherent function
+extension/dominance/join approach described by
+<a href="https://publications.polymtl.ca/64567/">Nafstad, Desaulniers and Stålhane (2025), Sections 3–4</a>.
+The prefix/suffix affine-envelope construction is specific to Baldes's model;
+the paper's faster PWL algorithm, midpoint-by-time stopping, unreachable-customer
+sets and acceleration techniques are not reproduced here. The current objective
+is travel cost, not the paper's separate route-duration extension.</p>
+<p>Pricing statuses are explicit:</p>
+<ul>
+<li><code>Bounded</code>: all customer-serving routes with at most <code>max_arcs</code> travel arcs
+were covered. This does not certify that longer routes have no negative cost.</li>
+<li><code>Complete</code>: that bound covers every relevant route, using customer
+elementarity when there are no stations, or a conservative depot-horizon
+bound when all available non-self travel times are strictly positive.</li>
+<li><code>WorkLimit</code> / <code>NumericalFailure</code>: no pricing completeness claim. Any returned
+incumbent remains independently replay-validated.</li>
+</ul>
+<p><code>Complete</code> describes exhaustive model coverage in f64 arithmetic, not a rigorous
+real-number reduced-cost certificate. No station-repeat bound is inferred from
+zero-time travel. Nonnegative-cost self loops are omitted because they cannot
+improve a schedule or customer coverage. Work/label limits and arc limits are
+configurable. Both directions currently grow to half the arc bound and compare
+compatible label pairs; this prioritizes correctness evidence on tiny cases
+over large-instance speed.</p>
+<p>Tests compare minimum reduced costs to exhaustive stop-order enumeration with
+the fixed-order optimizer, with dominance enabled and disabled. They also check
+capacity, customer elementarity, zero-time travel, work limits, bounded versus
+global coverage, and domain-interior dominance failures.</p>
+<h2 id="two-phase-subpath-prototype">Two-phase subpath prototype</h2>
+<p><code>Problem::price_subpaths(duals, fleet_dual, departure, SubpathOptions::default())</code>
+uses the same objective, dual convention, route arc limit and completeness
+statuses as direct pricing. Phase one generates elementary customer orders
+between depot/station endpoints with no interior charging. It retains all such
+orders fitting a full battery and load capacity, including direct charger-to-
+charger moves with no customers. <code>max_subpaths</code> caps this phase explicitly.</p>
+<p>Phase two composes these subpaths into complete routes. It propagates the
+entire continuous time/energy function through every constituent customer and
+endpoint, optimizes charging, and checks customer elementarity and capacity.
+It may prune a prefix only with equal customer history, no greater reduced cost,
+no more arcs and full function-domain dominance. Subpaths are never supplied
+as master columns. Both backends return the same complete-route representation
+with a replay-validated charging schedule.</p>
+<p>The decomposition is inspired by
+<a href="https://arxiv.org/html/2407.02640v3">Jacquillat and Lo, v3 (2026)</a>.
+The prototype deliberately retains distinct phase-one orders and carries full
+charging functions in phase two. It does not implement the paper's compressed
+resource vectors, two-sided subpath domination, adaptive ng relaxation or cuts.
+Thus it does not assume that scalar forward domination can replace the paper's
+domination requirements. Keeping the full prefix state makes composition an
+explicit dynamic program under this static model; the paper's speedups have
+not been reproduced.</p>
+<p>Tests compare both backends with exhaustive route-order evaluation, under the
+same data, duals and arc bounds, with dominance enabled and disabled. Fixtures
+include heterogeneous/non-concave charging, repeated stations, and a route with
+two consecutive charging stops in both directions. Global versus bounded
+coverage and phase-one/phase-two work limits have separate checks.</p>
+<h2 id="shared-route-master-and-column-generation">Shared route master and column generation</h2>
+<p><code>EvMaster&lt;M: LpMaster&gt;</code> uses Baldes's existing LP backend interface. Supply an
+empty backend, the EV problem, its initial departure time, and an optional
+nonnegative fleet limit. The master adds one set-partitioning equality per
+customer and an optional fleet upper-bound row. Only complete depot-to-depot
+customer-serving routes are columns. Every inserted route is independently
+replayed against the original problem, and its cost and customer coefficients
+are recomputed. The same stop order with different charging amounts is one
+travel-cost column.</p>
+<p>No seed routes are required. Phase I minimizes artificial customer coverage,
+pricing with zero travel cost and the current coverage/fleet duals. When
+artificial usage reaches zero to tolerance, artificials are fixed to zero and
+the original travel costs are restored. Phase II prices against that objective.
+The two EV backends use exactly these same rows, objectives and tolerances.</p>
+<p>Before pricing, the adapter checks the LP solution's primal row feasibility,
+dual signs, column reduced costs, objective and primal/dual agreement. A
+negative replay-validated column can improve the pool even after incomplete
+pricing. Convergence requires an optimal restricted LP and <code>Complete</code> pricing
+with no reduced cost below the requested tolerance. <code>Bounded</code>, work limits and
+numerical failures cannot establish full-model LP convergence or infeasibility.
+Positive phase-I usage establishes numerical infeasibility only after complete
+pricing and a positive adjusted dual objective; tolerance-sized negative reduced
+costs are accounted for by decreasing customer duals. This is still f64
+validation, not an interval-arithmetic certificate.</p>
+<p>Results distinguish convergence, phase-I infeasibility, incomplete pricing,
+LP stop, iteration/time limits and numerical failures. They retain phase and
+pricing statistics per pricing call, plus the last validated LP snapshot. A
+snapshot taken before the last column insertion is a feasible point with zero
+weight on later columns; it does not claim optimality of the updated pool.
+<code>travel_objective</code> is available only when artificial coverage is zero to
+tolerance. A restricted-pool objective is never labeled a full-model lower
+bound. <code>optimize</code> can be called again after a work/iteration/time limit, retaining
+the route pool and the current phase.</p>
+<p>The adapter is generic over <code>LpMaster</code>; the integration tests below use Clp.
+For example, with an existing <code>problem</code>:</p>
+<pre><code class="language-rust,ignore"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">evrp</span><span class="p">::{</span><span class="n">EvMaster</span><span class="p">,</span><span class="w"> </span><span class="n">EvColumnGenerationOptions</span><span class="p">};</span>
+<span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">clp</span><span class="p">::</span><span class="n">ClpMaster</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">master</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">EvMaster</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">problem</span><span class="p">,</span><span class="w"> </span><span class="n">ClpMaster</span><span class="p">::</span><span class="n">new</span><span class="p">()</span><span class="o">?</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="mf">3.0</span><span class="p">))</span><span class="o">?</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">master</span><span class="p">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">EvColumnGenerationOptions</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="c1">// Inspect result.status before interpreting its last LP snapshot.</span>
+</code></pre>
+<p>LP solves receive the remaining time budget. Pricing uses its work/label limits,
+with elapsed time checked before and after the call; the wall-time setting is
+not an interrupt inside an individual pricing operation.</p>
+<h2 id="reproducible-tiny-comparisons">Reproducible tiny comparisons</h2>
+<p>Run <code>cargo run --features clp --example evrp_compare</code> for a CSV comparison of
+both backends with identical data and tolerances (<code>1e-7</code> for LP and reduced
+cost). On the checked fixtures:</p>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th style="text-align:right">Direct LP</th>
+<th style="text-align:right">Subpath LP</th>
+<th style="text-align:right">Full route-pool LP</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Three customers, route capacity two, fleet limit two</td>
+<td style="text-align:right">4.5</td>
+<td style="text-align:right">4.5</td>
+<td style="text-align:right">4.5</td>
+<td>Fractional weights of 0.5 demonstrate LP rather than integer optimality.</td>
+</tr>
+<tr>
+<td>Two customers, nonlinear charging required, fleet limit one</td>
+<td style="text-align:right">5.0</td>
+<td style="text-align:right">5.0</td>
+<td style="text-align:right">5.0</td>
+<td>Returned routes require partial charging and pass replay.</td>
+</tr>
+</tbody>
+</table>
+<p>The test reference pool enumerates every tiny stop order and constructs charging
+schedules independently on an integer-energy grid. For these integral fixtures,
+every order with no grid witness is also checked for continuous infeasibility
+by the fixed-order optimizer. The full pool LP is built separately from column
+generation, and the fractional case also has an analytic objective of 4.5.
+Additional tests cover fleet/reachability infeasibility, an empty customer set,
+seed validation and deduplication, phase-I initialization without seeds,
+resuming after limits, and bounded/work-limited pricing without convergence.</p>
+<p>The CSV reports columns, pricing calls, labels, retained subpaths and algebra
+work. These tiny reference counts do not establish a runtime advantage or
+scalability on published instances.</p>
+<p>Run <code>cargo test --lib evrp::</code> for model/algebra/pricing tests and
+<code>cargo test --features clp --lib evrp::</code> to include shared-master comparisons.</p>
+<h2 id="supported-scope-and-remaining-extensions">Supported scope and remaining extensions</h2>
+<p>The raw ElectricRouting.jl multi-depot data is downloaded under
+<a href="https://github.com/lseman/baldes/blob/main/instances/evrp/electricrouting-jl/README.md"><code>instances/evrp/electricrouting-jl/</code></a>:
+161 instances and 312 upstream reference solutions, pinned to commit
+<code>102c9c90f6021d2dea664f0d8ad6990661c7668a</code> with per-file hashes. These files
+need a format reader and multi-depot integration before equivalent Baldes runs;
+they are not inputs to <code>evrp_compare</code>. Their nonlinear charging curves must be
+specified separately to match an upstream nonlinear experiment.</p>
+<p>This implements the initial static, single-vehicle-type travel-cost EV LP
+workflow. It is not an integer branch-and-price solver. Cuts, branching/ng
+state, mixed fleets, tariffs, congestion, time-dependent travel, external
+benchmark parsers and large-instance performance engineering remain extensions.
+The E1 reference backend and E2-inspired prototype do not reproduce every
+acceleration from either paper. Existing scalar resource pricing is not used
+to claim nonlinear EV pricing completeness.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="pstep.html"><small>Previous guide</small>P-step CVRP extension <span aria-hidden="true">↗</span></a><a href="ipm.html"><small>Next guide</small>BALDES IPM in Rust <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#fixed-stop-sequence-optimizer">Fixed stop sequence optimizer</a><a class="toc-level-2" href="#direct-bidirectional-pricing">Direct bidirectional pricing</a><a class="toc-level-2" href="#two-phase-subpath-prototype">Two-phase subpath prototype</a><a class="toc-level-2" href="#shared-route-master-and-column-generation">Shared route master and column generation</a><a class="toc-level-2" href="#reproducible-tiny-comparisons">Reproducible tiny comparisons</a><a class="toc-level-2" href="#supported-scope-and-remaining-extensions">Supported scope and remaining extensions</a></nav></aside>
+</div>
+</body></html>

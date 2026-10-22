@@ -6,29 +6,29 @@
 <meta name="description" content="Python: pybaldes Documentation index · Command-line usage Commands below run from the repository root. Python 3.9+, Rust/Cargo and aC++14 compiler are required to build the default">
 <meta name="theme-color" content="#0b0e11">
 <title>Python: pybaldes — BALDES docs</title>
-<link rel="canonical" href="https://laioseman.com/baldes/docs/python.html">
-<link rel="icon" href="_static/mark.svg" type="image/svg+xml">
-<link rel="stylesheet" href="_static/site.css">
-<link rel="stylesheet" href="_static/docs.css">
-<link rel="stylesheet" href="_static/syntax.css">
-<script src="_static/app.js" defer></script>
-<script src="_static/docs.js" defer></script>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/guides/python.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
 </head>
-<body class="landing-dark docs-body" data-docs-root="./">
+<body class="landing-dark docs-body" data-docs-root="../">
 <a class="skip-link" href="#content">Skip to content</a>
-<header class="site-header docs-header"><a class="brand" href="../"><img src="_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
-<nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="cli.html">Command-line usage</a><a href="python.html" aria-current="page">Python: pybaldes</a><a href="algorithms.html">Algorithms and references</a><a href="build.html">Configuring and building BALDES</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="benchmarks.html">Root benchmarks</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
-<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/python.md">View Markdown source ↗</a>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="build.html">Configuring and building BALDES</a><a href="source-layout.html">Source layout</a><a href="cli.html">Command-line usage</a><a href="python.html" aria-current="page">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="../extensions/column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/guides/python.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="python-pybaldes">Python: pybaldes</h1>
-<p><a href="index.html">Documentation index</a> · <a href="cli.html">Command-line usage</a></p>
+<p><a href="../index.html">Documentation index</a> · <a href="cli.html">Command-line usage</a></p>
 <p>Commands below run from the repository root. Python 3.9+, Rust/Cargo and a
 C++14 compiler are required to build the default package from source.</p>
 <p>The Python distribution and import are both named <code>pybaldes</code>. It contains the
@@ -141,22 +141,26 @@ numerical estimate to a certificate.</p>
 resource 0 for capacity-cut registration;
 ordinary capacity cuts retain the default resource -1. Both use the capacity
 family's priority 3 at root and 1 below it, complement form and persistent subset pool.</p>
-<h2 id="build-variants-and-development">Build variants and development</h2>
+<h2 id="build-variants">Build variants</h2>
 <p>For pricing alone, build without Clp:</p>
 <pre><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.<span class="w"> </span>--config-settings<span class="o">=</span>build-args<span class="o">=</span>--no-default-features
 </code></pre>
 <p><code>pybaldes.has_clp</code> reports backend availability; root solving raises a clear error
 in a pricing-only build. The wheel uses Python's stable ABI for Python 3.9+.
-For local development, <code>maturin develop --release</code> installs the mixed package.
-See the <a href="testing.html#python">Python validation guide</a> for test commands.</p>
+For local development, <code>maturin develop --release</code> installs the mixed package.</p>
 <p>To include HiGHS, install its shared library as described in the
 <a href="build.html">build guide</a>, then install with its feature:</p>
 <pre><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.<span class="w"> </span>--config-settings<span class="o">=</span>build-args<span class="o">=</span><span class="s2">&quot;--features highs&quot;</span>
 </code></pre>
+<h2 id="multiple-pricing-networks">Multiple pricing networks</h2>
+<p><code>NetworkProblem</code> and <code>solve_networks</code> expose a shared master with independent
+pricing graphs, root snapshots, assignment branching, additive rows and fixed
+routes. The same model JSON is accepted by <code>baldes multi-pricing MODEL.json</code>.
+See <a href="../extensions/multi-pricing.html#python">multi-network inputs and examples</a>.</p>
 </article>
-<nav class="page-turn" aria-label="Adjacent guides"><a href="cli.html"><small>Previous guide</small>Command-line usage <span aria-hidden="true">↗</span></a><a href="algorithms.html"><small>Next guide</small>Algorithms and references <span aria-hidden="true">↗</span></a></nav>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="cli.html"><small>Previous guide</small>Command-line usage <span aria-hidden="true">↗</span></a><a href="../solver/tree.html"><small>Next guide</small>Branch-and-price tree and node lifecycle <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#solve-options-and-results">Solve options and results</a><a class="toc-level-2" href="#build-variants-and-development">Build variants and development</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#solve-options-and-results">Solve options and results</a><a class="toc-level-2" href="#build-variants">Build variants</a><a class="toc-level-2" href="#multiple-pricing-networks">Multiple pricing networks</a></nav></aside>
 </div>
 </body></html>

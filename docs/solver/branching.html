@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Routing branching Documentation index · Tree lifecycle The tree branches on aggregate route quantities. Each child receives a typedconstraint, inherited master rows, and a compatib">
+<meta name="theme-color" content="#0b0e11">
+<title>Routing branching — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/solver/branching.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html" aria-current="page">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="stabilization.html">Dual-price stabilization</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="../extensions/column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/solver/branching.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="routing-branching">Routing branching</h1>
+<p><a href="../index.html">Documentation index</a> · <a href="tree.html">Tree lifecycle</a></p>
+<p>The tree branches on aggregate route quantities. Each child receives a typed
+constraint, inherited master rows, and a compatible pricing domain. The
+standard routing model uses customer vertices as packing sets and enforces
+unit customer coverage with equality rows.</p>
+<h2 id="choosing-families">Choosing families</h2>
+<table>
+<thead>
+<tr>
+<th>CLI mode</th>
+<th>Candidate families, in priority order</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--branching native</code> (default)</td>
+<td>Vehicle count, packing-set assignment, Ryan–Foster, arc flow</td>
+</tr>
+<tr>
+<td><code>--branching vehicles</code></td>
+<td>Vehicle count, then arc-flow fallback</td>
+</tr>
+<tr>
+<td><code>--branching ryan-foster</code></td>
+<td>Ryan–Foster, then arc-flow fallback</td>
+</tr>
+<tr>
+<td><code>--branching arc</code></td>
+<td>Arc flow</td>
+</tr>
+<tr>
+<td><code>--branching cluster</code></td>
+<td>Cluster boundary/pair variables, then arc-flow fallback</td>
+</tr>
+<tr>
+<td><code>--branching resource</code></td>
+<td>Accumulated-resource splits, then arc-flow fallback</td>
+</tr>
+<tr>
+<td><code>--branching hybrid</code></td>
+<td>Vehicle count, resource/cluster, assignment, Ryan–Foster, arc flow</td>
+</tr>
+</tbody>
+</table>
+<p>The default selector visits enabled families in descending model priority. Within
+an applicable family it orders candidates by closeness of the fractional part
+to 0.5, with stable ties. Phased strong branching then evaluates candidates
+when enabled. These are adapter priorities, not a combined ranking across all
+families. Families in the same integer priority group can contribute together.
+Rust callers can set <code>BranchingOptions::priorities</code>; its defaults are vehicle
+count 11, resource/cluster 10, assignment 3, Ryan–Foster 2 and arc flow 1.
+These are Baldes adapter settings; reference model interfaces also register
+priorities explicitly. Every supplied priority must be finite.</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span>--tree<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--branching<span class="w"> </span>ryan-foster<span class="w"> </span>--time<span class="w"> </span><span class="m">60</span>
+</code></pre>
+<p>Rust configures the family flags through <code>TreeOptions::branching</code>, whose type
+is <code>BranchingOptions</code>. Arc flow remains the fallback when all flags are false.</p>
+<h2 id="number-of-vehicles">Number of vehicles</h2>
+<p>Let <code>v</code> be the sum of LP values of nonempty routes in the selected network.
+For fractional <code>v</code>, the children enforce:</p>
+<pre><code class="language-text">down: number of nonempty routes &lt;= floor(v)
+up:   number of nonempty routes &gt;= ceil(v)
+</code></pre>
+<p>Pricing receives this row through nonempty-route return arcs to the sink.
+The split-depot source-to-sink arc contributes zero to this branch. The
+original fleet upper bound remains in the master.</p>
+<h2 id="ryanfoster">Ryan–Foster</h2>
+<p>For customers <code>i</code> and <code>j</code>, let <code>w(i,j)</code> be the sum of LP route values for routes
+visiting both customers. When <code>0 &lt; w(i,j) &lt; 1</code>, the children require:</p>
+<table>
+<thead>
+<tr>
+<th>Child</th>
+<th>Allowed routes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Apart</td>
+<td>A route can visit at most one of the pair</td>
+</tr>
+<tr>
+<td>Together</td>
+<td>A route visits both customers or neither</td>
+</tr>
+</tbody>
+</table>
+<p>Both children work with <strong>a single pricing network</strong>. The together condition
+applies to each route, rather than merely requiring both customers somewhere
+in the final solution.</p>
+<p>Binary resources enforce the rule during labeling and bidirectional joins.
+Retained enumeration is filtered by the same rule. Existing NG routes that
+repeat a pair endpoint are retired from the child master. A violation row also
+keeps inherited and newly added master columns consistent with the branch.</p>
+<p>An apart constraint consumes one binary resource; a together constraint
+consumes three. The current representation holds 512 resources. Candidate
+generation skips already-branched pairs and falls back to arc flow when it
+cannot reserve resources for both Ryan–Foster children.</p>
+<h2 id="packing-set-assignment">Packing-set assignment</h2>
+<p>This family branches on assigning a customer packing set to a particular
+pricing network. If its fractional assignment to network <code>k</code> is <code>y</code>, the
+children enforce assignment to that network as zero or at least one.
+For example, in a heterogeneous fleet this could decide whether customer 7
+uses the small-vehicle network.</p>
+<p>The current tree has <strong>one network</strong>. Its customer equality rows already fix
+each assignment to one. Assignment constraints can be constructed and enforced,
+but the normal single-network LP has no fractional assignment candidate. An
+unassigned child for a mandatory customer is infeasible.</p>
+<p>Useful assignment branching requires multiple route families/networks,
+network-specific costs and resources, and master columns carrying the network
+identity. Setting a graph ID alone does not add that modeling support.</p>
+<h2 id="directed-arc-flow">Directed arc flow</h2>
+<p>For a directed arc with fractional LP usage <code>f</code>, the children enforce flow at
+most <code>floor(f)</code> or at least <code>ceil(f)</code>. Route coefficients count traversals of
+the arc; branch duals also reach pricing through that arc.</p>
+<p><code>BranchConstraint::ArcFlow::arc</code> takes the arc's <strong>position in
+<code>problem.graph.arcs</code></strong>, while <code>Route::arcs</code> stores public arc IDs. Use
+<code>RootProblem::arc_position(id)</code> to convert an ID to a position.</p>
+<h2 id="strong-branching-and-diving">Strong branching and diving</h2>
+<p>Strong branching is enabled by default. Its three phases retain up to 100
+restricted-LP candidates, price three survivors heuristically, then evaluate
+one with exact pricing. An intermediate restricted-LP or heuristic phase is
+skipped when all remaining candidates fit in the next phase. Terminal phases
+still run their trials, including explicitly heuristic-only configurations.
+Each Rust <code>StrongPhase</code> also has a <code>subtree_ratio</code>: positive values limit
+branching work using the estimated remaining subtree size; zero disables that
+phase's adaptive limit. The defaults are 0.3, 0.1 and 1. Moving below the
+parent's stored branch-family priority cutoff restores the full fresh quota.
+These estimates schedule trials and never strengthen a pruning bound. The
+<code>Reliable</code> comparison policy retains its fixed budgets.
+Rust callers can enable <code>StrongBranchingOptions::use_history_subtree_size</code> to
+prefer completed subtree sizes at the current depth. Until that depth has an
+observation, the parent estimate remains the fallback. Partial or interrupted
+subtrees do not enter this average. The default keeps parent estimates.
+<code>StrongBranchingOptions</code> exposes the phase and time
+budgets. Disable it with <code>--no-strong-branching</code>.</p>
+<p>Strong round-up diving uses isolated route-fixing trials and depth,
+discrepancy, node, and time limits. Disable it with <code>--no-diving</code>.
+Heuristic trial objectives and dive bounds cannot certify the original node.
+See <a href="tree.html">Tree lifecycle</a> for bound and incumbent handling.</p>
+<h2 id="cluster-branching">Cluster branching</h2>
+<p><code>--branching cluster</code> enables the cluster variables of Silva, Uchoa and
+Subramanian, <em>Cluster Branching for Vehicle Routing Problems</em> (2024),
+Sections 3 and 4.1. For a customer cluster <code>C</code>, the boundary variable counts
+entries from outside <code>C</code>, equivalent to half the undirected cutset flow on a
+complete depot-to-depot route. For disjoint clusters <code>C,D</code>, the pair variable
+counts arc traversals in either direction between them. Both variables are
+integer in an integer routing solution. Children impose floor/ceiling bounds
+on their fractional LP values. The split source/sink form one depot cluster.</p>
+<p>Coefficients are additive over physical arcs, including repeated crossings.
+Branch duals therefore use the existing arc-cost pricing path, without extra
+label resources. Arc-flow candidates remain available because cluster
+variables alone do not ensure an integral directed solution.</p>
+<p><code>ClusterBranchingOptions::partition</code> accepts a partition of every customer
+exactly once. Otherwise a deterministic customer MST is cut at edges strictly
+above <code>mean + theta * standard_deviation</code>; <code>theta</code> defaults to 1. Distances use
+the cheaper physical arc in either direction. This matches geometric distances
+on symmetric routing graphs; for asymmetric/sparse graphs it is a heuristic
+similarity measure. A disconnected customer graph supplies no automatic
+customer clusters. The partition is constructed once per tree. Other clustering
+methods and the paper's full computational experiment are not implemented.</p>
+<h2 id="accumulated-resource-branching">Accumulated-resource branching</h2>
+<p><code>--branching resource</code> adds schedule candidates, retaining arc-flow fallback.
+An individual constraint identifies a <strong>public arc ID</strong>, a resource coordinate, a threshold,
+and a side. <code>threshold</code> is stored with an offset: the effective boundary is
+<code>threshold - 1e-6</code>. It restricts the resource at that arc's head <strong>after consumption
+and waiting</strong> to <code>&lt;= boundary</code> or <code>&gt;= boundary</code>. Equality belongs to both children;
+there is no gap between their schedule domains. This is a continuous resource
+split, not a floor/ceiling split of the resource value. Other routes need not
+use the selected arc. An empty window intersection forbids that arc.</p>
+<p>The implementation tightens the physical arc's resource window. Existing
+forward/backward extensions, resource replay and enumeration enforce it.
+Inherited columns also receive a nonnegative violation row, so an old schedule
+cannot satisfy the new master solely because its arc path is still present.
+Resource-domain changes discard inherited labels/enumeration before repricing;
+parent and sibling graphs remain independent. Original resource limits remain
+in effect. The existing requirement for backward equality resources to have a
+fixed sink window still applies.</p>
+<p>Automatic candidates group all arcs entering a covered customer, backed by its
+unit packing row. For disposable resources, they combine forward head quantities
+with backward feasible suffix upper bounds, including ancestor resource windows.
+A tolerance-merged weighted event walk selects an endpoint threshold;
+overlapping intervals can supply no useful split even when forward quantities
+differ. The event kernel is checked against 839 native separator cases. Ordinary
+fractional arcs retain arc-flow candidates; no speed improvement or complete
+native child-workflow equivalence is claimed.</p>
+<p>Rust master callers can construct <code>AccumulatedResourceGroupBranch</code> with a backing
+packing-row index and unique physical arc IDs. The row must have upper RHS at
+most one and nonnegative coefficients, with each member arc contributing at least
+one. This proves at most one group occurrence in an integer solution; arbitrary
+arc sets do not define a valid binary disjunction. Nonempty member windows are
+tightened together. Empty member windows contribute zero-flow enforcement for
+those arcs, while other members remain available. Parent and sibling states
+stay independent.</p>
+<p>Complete enumeration retains distinct physical paths even when their packing
+support is identical. A costlier path can have a different resource profile
+and remain necessary after fixing routes or applying a descendant restriction.</p>
+<p>The Rust pricing API exposes <code>AccumulatedResourceBranch</code>, its <code>boundary()</code> and <code>satisfied_by()</code>
+methods, and the add/clear methods on <code>Solver</code>. To request a split near resource value <code>t</code>, pass
+<code>threshold = t + 1e-6</code>; <code>boundary()</code> reports the actual floating-point split.
+Older builds used the supplied threshold directly. Existing callers that need
+to preserve their split must account for the offset when upgrading.</p>
+<p><code>--branching hybrid</code> enables both new families alongside the native families.
+Vehicle count keeps its first default priority. Resource/cluster candidates
+share the next priority; assignment, Ryan–Foster and arc flow remain fallbacks.
+<code>native</code> remains the default, with both new families disabled.</p>
+<h2 id="branch-evaluation-history">Branch evaluation history</h2>
+<p>Tree search enables branch evaluation history by default, using the recovered
+native ranking rules. No extra flag is required. <code>--no-branch-history</code> disables
+recording and history-based ranking; <code>--branch-history</code> explicitly enables them
+again. The last flag wins.</p>
+<p><code>TreeOutput::branch_history</code> records finite strong-trial and completed node
+evaluations, exported as <code>branch_evaluations</code> in JSON. Each record identifies
+the constraint, depth, evaluation kind, one-based evaluation stage (<code>stage</code>), parent bound, child estimate, fractional
+distance and elapsed time. Restricted-master, heuristic-pricing, exact-pricing
+and ordinary-node observations remain separately identified. Ordinary nodes have
+<code>stage: null</code>; they contribute to the Rust <code>Reliable</code> comparison policy but not
+the default strong-phase ranking. Unfinished exact trials and
+sentinel/infinite estimates do not supply observations. Restricted-master
+estimates can include artificial penalties.</p>
+<p>For each constraint and child direction, history averages signed objective gain
+divided by branching distance. It uses the latest local stage with either child
+observed; an unobserved child has mean zero. Each predicted child gain is capped
+by the incumbent-minus-parent gap, and their product supplies the score.
+Candidates are ordered by stage, then decreasing score, then lexical generator
+label. Resource groups use <code>ES_&lt;packing_row&gt;_rID_&lt;resource&gt;_&lt;threshold&gt;</code>, with
+the stored threshold displayed to six significant digits. Other families use
+canonical constraint names. Negative gains are retained and there is no positive score
+floor.</p>
+<p>At non-root nodes, half of the first strong-branching phase's budget is reserved
+for history. Fresh generation stops before a lower integer priority group once
+it has candidates, or when its quota fills. The stopping priority determines
+which stored generators can enter history ranking. Enabled empty families still
+affect this cutoff. Admission happens before stored activity is replayed; a high
+historical score cannot bypass it. The remainder retains fresh candidate order. Without strong
+trials, history can still rank candidates. History starts empty for each solve
+and never supplies a pruning bound or marks a node infeasible.</p>
+<p>With accumulated-resource branching enabled, the default policy also retains
+evaluated group thresholds and refreshes their fractional activity at later
+nodes. An older threshold can enter history selection even when fresh separation
+chooses another threshold for that group. Evaluated arc, vehicle, assignment,
+Ryan–Foster and cluster generators also refresh under their enabled family
+priorities; numeric bounds are rebuilt around the current activity. Already applied splits, integral
+activities and groups without a valid packing proof are excluded. The recorded
+resource activity is the route mass strictly below the threshold boundary;
+down/up history distances are that activity and its complement.</p>
+<p>The default policy indexes observations by the number of evaluations actually
+run on that candidate side at the current node, independently of whether a
+trial uses restricted-master, heuristic or exact pricing. Skipped phases consume
+no stage; an exact trial after skipped ranking phases is stage one. The <code>Reliable</code> policy keeps
+semantic evaluation kinds separate and retains the earlier adapter selection
+workflow for controlled comparisons. Custom priority scheduling applies to the
+default policy. Exact resource split identities remain
+distinct even when rounded display labels coincide. Rust adapters can register
+original model names with <code>branching.generator_names.insert(&amp;constraint, name)</code>.
+Registering either side names both sides of that exact generator. Display names
+only resolve equal-score ties and never merge histories; unnamed generators
+retain canonical labels. Automatic name mapping across native model interfaces
+remains unverified, so
+identical native candidate selection is not guaranteed. No speed improvement
+is claimed.</p>
+<p>Rust defaults select <code>BranchHistoryPolicy::ObservedNative</code> in
+<code>BranchHistoryOptions</code>. Per-network route-count branches remain fresh candidates;
+this policy excludes them from stored-history ranking and generator replay.
+Their trial measurements remain available in diagnostics. The earlier <code>Reliable</code> policy remains available through
+Rust for controlled comparisons: it requires <code>minimum_observations</code> on both
+sides, clamps negative gains, uses uncapped predictions with positive floors,
+and preserves supplied order on ties. <code>minimum_observations</code> does not affect
+the default observed-native policy. Set <code>TreeOptions::branch_history</code> to <code>None</code>
+to disable history. The public <code>score_with_gap</code> method accepts the current
+incumbent-minus-parent gap.</p>
+<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span>--tree<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--branching<span class="w"> </span>hybrid<span class="w"> </span>--time<span class="w"> </span><span class="m">60</span><span class="w"> </span>--json<span class="w"> </span>/tmp/tree.json
+</code></pre>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="tree.html"><small>Previous guide</small>Branch-and-price tree and node lifecycle <span aria-hidden="true">↗</span></a><a href="cuts.html"><small>Next guide</small>Routing cuts <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#choosing-families">Choosing families</a><a class="toc-level-2" href="#number-of-vehicles">Number of vehicles</a><a class="toc-level-2" href="#ryanfoster">Ryan–Foster</a><a class="toc-level-2" href="#packing-set-assignment">Packing-set assignment</a><a class="toc-level-2" href="#directed-arc-flow">Directed arc flow</a><a class="toc-level-2" href="#strong-branching-and-diving">Strong branching and diving</a><a class="toc-level-2" href="#cluster-branching">Cluster branching</a><a class="toc-level-2" href="#accumulated-resource-branching">Accumulated-resource branching</a><a class="toc-level-2" href="#branch-evaluation-history">Branch evaluation history</a></nav></aside>
+</div>
+</body></html>

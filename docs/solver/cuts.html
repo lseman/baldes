@@ -3,33 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Routing cuts Documentation index · BALDES options ·Source layout A cut must have consistent coefficients in the master, pricing, retainedroutes, and descendants. The root adapter i">
+<meta name="description" content="Routing cuts Documentation index · BALDES options A cut must have consistent coefficients in the master, pricing, retainedroutes, and descendants. The root adapter installs cut row">
 <meta name="theme-color" content="#0b0e11">
 <title>Routing cuts — BALDES docs</title>
-<link rel="canonical" href="https://laioseman.com/baldes/docs/cuts.html">
-<link rel="icon" href="_static/mark.svg" type="image/svg+xml">
-<link rel="stylesheet" href="_static/site.css">
-<link rel="stylesheet" href="_static/docs.css">
-<link rel="stylesheet" href="_static/syntax.css">
-<script src="_static/app.js" defer></script>
-<script src="_static/docs.js" defer></script>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/solver/cuts.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
 </head>
-<body class="landing-dark docs-body" data-docs-root="./">
+<body class="landing-dark docs-body" data-docs-root="../">
 <a class="skip-link" href="#content">Skip to content</a>
-<header class="site-header docs-header"><a class="brand" href="../"><img src="_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
-<nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html">Overview</a><a href="cli.html">Command-line usage</a><a href="python.html">Python: pybaldes</a><a href="algorithms.html">Algorithms and references</a><a href="build.html">Configuring and building BALDES</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html" aria-current="page">Routing cuts</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="options.html">BALDES pricing options</a><a href="stabilization.html">Dual-price stabilization</a><a href="source-layout.html">Source layout</a><a href="website.html">Website and documentation publishing</a><a href="benchmarks.html">Root benchmarks</a><a href="testing.html">Build and validation</a><a href="networks.html">Shared master with multiple pricing networks</a></nav></details>
-<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/cuts.md">View Markdown source ↗</a>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html" aria-current="page">Routing cuts</a><a href="stabilization.html">Dual-price stabilization</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="../extensions/column-elimination.html">Column elimination</a></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/solver/cuts.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="routing-cuts">Routing cuts</h1>
-<p><a href="index.html">Documentation index</a> · <a href="options.html">BALDES options</a> ·
-<a href="source-layout.html">Source layout</a></p>
+<p><a href="../index.html">Documentation index</a> · <a href="../reference/options.html">BALDES options</a></p>
 <p>A cut must have consistent coefficients in the master, pricing, retained
 routes, and descendants. The root adapter installs cut rows and dual effects;
 node snapshots retain active rows and the pricing state needed to use them.</p>
@@ -73,6 +72,12 @@ node snapshots retain active rows and the pricing state needed to use them.</p>
 <td>Separate inequalities on integer resource loads</td>
 <td><code>with_knapsack_cuts(config)</code></td>
 <td>Rust API</td>
+</tr>
+<tr>
+<td>Fenchel load cuts</td>
+<td>Search integer packing inequalities with an auxiliary LP</td>
+<td>Knapsack config <code>.with_fenchel(parameters)</code></td>
+<td><code>--fenchel-cuts</code> / Rust API</td>
 </tr>
 </tbody>
 </table>
@@ -133,13 +138,44 @@ enumeration, and child inheritance.</p>
 map is not a unit conversion. See the mapped-resource and load-dependent
 pricing cases in <a href="https://github.com/lseman/baldes/blob/main/tests/cuts/kpath_knapsack.rs">the integration tests</a> for
 complete fixtures.</p>
+<p>For direct Rust <code>pricing::Solver</code> use, set
+<code>knapsack_exact_coefficients = true</code> to evaluate graph-scaled coefficients with
+unrounded nonpositive master duals. The setting survives <code>fork_for_node()</code> and
+applies to pricing and enumeration. It rejects positive duals and non-monotone
+step tables. This option does not turn numerical route costs into directed
+certificates or automatically register shared-network rows. The default retains
+the existing rounded pricing convention.</p>
+<h2 id="fenchel-separation">Fenchel separation</h2>
+<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>cvrp<span class="w"> </span>instances/cvrplib/E-n22-k4.vrp<span class="w"> </span>--fenchel-cuts<span class="w"> </span>--time<span class="w"> </span><span class="m">30</span>
+</code></pre>
+<p>The CVRP/VRPTW switch builds an integer load row from total customer demand,
+divides demands by their greatest common divisor, and enables Fenchel alone.
+Demands must be nonnegative integers. The normalized total must not exceed
+4096; use explicit Rust resource rows and limits for larger domains.
+<code>Instance::fenchel_cut_config()</code> exposes the same configuration to Rust.</p>
+<p>For custom rows, use <code>KnapsackCutConfig::new(rows).with_fenchel(parameters)</code>,
+where <code>parameters</code> is <code>cuts::knapsack::FenchelParameters</code>. This builder retains
+the configured rounding/1K families. Each supplied row must be a valid integer
+packing inequality on additive, nonnegative route loads.</p>
+<p>An auxiliary CLP model solves the dual of the recovered bin-packing covering
+formulation; unbounded-knapsack dynamic programming generates pattern constraints.
+Extraction waits for auxiliary convergence. Before returning a cut,
+integer-profit dynamic programming certifies its integer coefficients and RHS.
+The monotone step extension also covers loads absent from the current master.
+Fenchel cuts automatically use graph-scaled coefficients and unrounded duals
+in pricing and enumeration, including child solvers and integer transfer.</p>
+<p>Defaults limit separation to 128 load types, 128 LP iterations, and two seconds
+per separation call. A limit or failure to find a representable violated cut
+does not certify membership in the integer hull. Separation is opt-in and
+requires <code>clp</code>.</p>
 <h2 id="configuration-boundaries">Configuration boundaries</h2>
 <p>Named BALDES options do not create model data. Enabling capacity separation
 still requires demands and vehicle capacity; setting a knapsack mode still
 requires resource rows. Explicit capacity enablement and per-round overrides
 are applied after inherited cut state is installed. Knapsack construction
 overrides do not reconfigure an existing inherited separator.</p>
-<p>See <a href="options.html">BALDES options</a> for supported values and setter errors.</p>
+<p>See <a href="../reference/options.html">BALDES options</a> for supported values and setter errors.</p>
 <h2 id="pricing-enumeration-and-integer-solving">Pricing, enumeration, and integer solving</h2>
 <ol>
 <li>Separation creates rows and registers their pricing state.</li>
@@ -150,21 +186,47 @@ updates to route columns already in the master.</li>
 <a href="enumerated-mip.html">HiGHS solve</a> rebuilds full-memory route columns against
 every active physical row and omits artificial columns.</li>
 </ol>
-<p>The cut registry and coefficient logic live under <a href="https://github.com/lseman/baldes/tree/main/src/cuts">src/cuts</a>.
-Root scheduling and row remapping live in the
-<a href="https://github.com/lseman/baldes/blob/main/src/master/root/controller.rs">root controller</a>.</p>
-<h2 id="validation">Validation</h2>
-<pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--test<span class="w"> </span>capacity_root<span class="w"> </span>--test<span class="w"> </span>kpath_knapsack
-cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>--test<span class="w"> </span>highs_mip
-</code></pre>
-<p>The suites cover small exhaustive validity checks, separation violations,
-bidirectional pricing, enumeration repricing, mapped resource IDs, time
-windows, and inherited cut rows. The HiGHS tests exercise complete node
-masters across the existing cut-family configurations.</p>
+<h2 id="presence-based-costs-in-the-labeling-engine">Presence-based costs in the labeling engine</h2>
+<p>The low-level Rust <code>LabelingEngine::load_presence(graph, rows)</code> interface accepts
+<code>cuts::soft_conflicts::PricingInput</code> descriptors. Each contains a <code>PresenceRow</code>,
+a dual, and one event list per physical arc in <code>graph.arcs</code> order. Events
+identify original variables: several arcs can emit the same event, and an arc
+can emit several events. Repeated visits emit presence once.</p>
+<p><code>Mode::PairCount</code> counts stored pairs whose two events occur on a route;
+<code>Mode::AnyPair</code> charges at most once across the entire row. Duplicate pairs
+count separately in pair-count mode. The engine subtracts dual times the
+coefficient from route cost; <code>original_cost</code> retains physical arc costs.
+Duals are unrounded. Invalid mappings, nonfinite duals or costs outside the
+engine's supported finite arithmetic range return an error without replacing
+its previous preparation.</p>
+<p>Presence incidence participates in dominance, forward/backward joins, completion
+bounds and reduced-cost fixing. Symmetric prefix reuse switches to ordinary
+bidirectional labeling to preserve physical event orientation. Installing or
+clearing rows invalidates cached labels; pass an empty list to clear them.</p>
+<p>For stateful pricing, use <code>pricing::Solver::set_presence_rows(rows)</code> and inspect
+its descriptors with <code>presence_rows()</code>. The solver owns these rows across
+engine rebuilds, node forks and raw variable-cost pricing. Changed rows or duals
+invalidate cost-dependent labels, bucket fixing and retained enumeration;
+identical inputs retain working state. Validation failures preserve the prior
+rows and caches. Logical branches and physical arc exclusions remain in force.
+Pass an empty list to clear the rows.</p>
+<p>These interfaces cover pricing, fixing, enumeration and retained-path repricing.
+Enumeration preserves distinct physical arc paths when presence rows are active,
+so different variable incidence cannot merge through customer-set equivalence.
+It follows the configured cutoff, route and work limits; a failed attempt does
+not publish a partial universe. Presence costs are replayed when retained paths
+are inspected or priced, including in node forks. Symmetric physical graphs use
+ordinary directional buckets for these rows.</p>
+<p>Use the solver setter to keep owned descriptors and engine costs consistent.
+Enumeration rejects conflicting rows installed only on its engine. Rust callers
+constructing <code>enumeration::Label</code> or <code>CutTables</code> literals should initialize the
+new presence fields to <code>None</code> for models without presence rows.</p>
+<p>Shared-master row registration remains under development. These numerical
+pricing costs do not by themselves publish a certified master bound.</p>
 </article>
-<nav class="page-turn" aria-label="Adjacent guides"><a href="branching.html"><small>Previous guide</small>Routing branching <span aria-hidden="true">↗</span></a><a href="enumerated-mip.html"><small>Next guide</small>Enumerated node MIP with HiGHS <span aria-hidden="true">↗</span></a></nav>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="branching.html"><small>Previous guide</small>Routing branching <span aria-hidden="true">↗</span></a><a href="stabilization.html"><small>Next guide</small>Dual-price stabilization <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#available-families">Available families</a><a class="toc-level-2" href="#start-with-capacity-and-rank-one-cuts">Start with capacity and rank-one cuts</a><a class="toc-level-2" href="#strong-k-path-adapters">Strong k-path adapters</a><a class="toc-level-2" href="#route-load-knapsack-and-resource-ids">Route-load knapsack and resource IDs</a><a class="toc-level-2" href="#configuration-boundaries">Configuration boundaries</a><a class="toc-level-2" href="#pricing-enumeration-and-integer-solving">Pricing, enumeration, and integer solving</a><a class="toc-level-2" href="#validation">Validation</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#available-families">Available families</a><a class="toc-level-2" href="#start-with-capacity-and-rank-one-cuts">Start with capacity and rank-one cuts</a><a class="toc-level-2" href="#strong-k-path-adapters">Strong k-path adapters</a><a class="toc-level-2" href="#route-load-knapsack-and-resource-ids">Route-load knapsack and resource IDs</a><a class="toc-level-2" href="#fenchel-separation">Fenchel separation</a><a class="toc-level-2" href="#configuration-boundaries">Configuration boundaries</a><a class="toc-level-2" href="#pricing-enumeration-and-integer-solving">Pricing, enumeration, and integer solving</a><a class="toc-level-2" href="#presence-based-costs-in-the-labeling-engine">Presence-based costs in the labeling engine</a></nav></aside>
 </div>
 </body></html>
