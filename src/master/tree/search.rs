@@ -4,6 +4,9 @@ pub fn solve<const D: usize>(
     problem: RootProblem<D>,
     mut options: TreeOptions,
 ) -> Result<TreeOutput> {
+    if options.deluxing.is_some() && options.enumerated_mip.is_none() {
+        return Err(invalid("DeLuxing requires enumerated MIP"));
+    }
     #[cfg(not(feature = "highs"))]
     if options.enumerated_mip.is_some() {
         return Err(invalid("enumerated MIP requires the highs feature"));

@@ -281,7 +281,7 @@ fn entries_of(entries: &[(usize, f64)], size: usize) -> Result<(Vec<HighsInt>, V
 }
 
 mod integer;
-pub use integer::solve_integer;
+pub use integer::{solve_integer, solve_integer_with_deluxing};
 
 #[cfg(test)]
 #[path = "../../../../tests/unit/master/solvers/highs/limit_tests.rs"]

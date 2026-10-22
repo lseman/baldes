@@ -183,6 +183,8 @@ detection. AVX-512 builds fall back to AVX2 when available. Other CPUs and small
 portable implementation. Scalar capacities remain arbitrary; the optimized
 scan applies when the model activates one or two disposable resources and
 the compiled capacity is at least two.
+The `simd` feature also enables runtime-dispatched AVX2 rank-one bitset
+accumulation for at least 16 words, independently of the resource dimension.
 This feature does not require `target-cpu=native` and does not change numerical
 comparison tolerances or certification policy.
 

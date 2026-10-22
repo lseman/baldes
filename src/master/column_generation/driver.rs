@@ -21,7 +21,12 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
     let mut progress = crate::master::progress::ProgressLog::new(options.log_interval, counts);
     let result = optimize_inner(master, supplied, price, controller, options, &mut progress);
     if logging {
-        progress.finish(&result, controller.incumbent(), controller.cut_counts());
+        progress.finish(
+            &result,
+            controller.incumbent(),
+            controller.cut_counts(),
+            controller.bucket_steps(),
+        );
     }
     result
 }
@@ -553,6 +558,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 out.bound,
                 controller.incumbent(),
                 controller.cut_counts(),
+                controller.bucket_steps(),
             );
         }
         // An exact bound can close the incumbent gap even without a fresh

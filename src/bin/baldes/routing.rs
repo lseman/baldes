@@ -1,24 +1,26 @@
 use super::{ce_cli, multi_pricing_cli, pstep_cli};
 use baldes::inputs::{Instance, Rounding};
 use baldes::master::root::RootOptions;
-const HELP: &str = "Usage: baldes <vrptw|cvrp|hgs|ce> INSTANCE [OPTIONS]
+const HELP: &str = "Usage: baldes <solve|hgs|ce> INSTANCE [OPTIONS]
 
 Additional command: baldes multi-pricing MODEL.json [OPTIONS] (see multi-pricing --help; networks is an alias)
 Additional command: baldes pstep INSTANCE --p P --threads N (see pstep --help)
 Additional command: baldes ce INSTANCE [OPTIONS] (see ce --help)
 
-Instance types (Solomon-format or CVRPLIB .vrp input):
-  vrptw                 Vehicle routing with time windows
-  cvrp                  Capacitated vehicle routing; ignores time windows and service times
+Commands (Solomon-format or CVRPLIB .vrp input):
+  solve                 Solve routing with constraints detected from the input
+  vrptw, cvrp           Compatibility aliases; cvrp ignores time windows and service times
   hgs                   Hybrid Genetic Search heuristic
   ce                    Column elimination CVRP/VRPTW route LP
 
 Options:
+  --ignore-time-windows Ignore time windows and service times (solve only)
   --customers N         Keep the first N customers
   --ng N                NG neighborhood size (default: 8)
   --reference-ng        Use reference-compatible customer neighborhoods
   --rounding MODE       Distances: none, nearest, tenth or ceil (default: the
                         file's convention; none for Solomon, nearest for EUC_2D)
+  --cuts                Enable all applicable cuts (2-path requires time windows)
   --rank1               Enable rank-one cuts
   --fenchel-cuts        Enable Fenchel cuts on the gcd-scaled integer-demand row
   --capacity-cuts        Enable capacity cuts (alias: --capacity)
@@ -33,13 +35,14 @@ Options:
   --no-mip-heuristic    Disable restricted-master integer search
   --mip-nodes N         Restricted-master integer-search node budget per call
   --master MODE         clp (default), highs, or ipm (disables stabilization)
-  --clp-scaling MODE    auto (default), geometric, equilibrium, or off
+  --clp-scaling MODE    equilibrium (default), auto, geometric, or off
   --clp-work-areas MODE retain (default) or discard after each LP solve
   --bound-mode MODE     numerical (default) or certified (independent bound validation)
   --hgs-time SECONDS    Run HGS before root/tree solve for this search budget
   --hgs-columns MODE    best (default), all, or N cheapest feasible HGS routes
   --no-stabilization    Disable dual stabilization
   --enumerated-mip      Solve complete enumerated node masters with HiGHS (--tree; highs feature)
+  --deluxing            Filter enumerated MIP columns (enables --enumerated-mip; requires --tree)
   --no-enumeration      Disable reduced-cost fixing and enumeration
   --upper-bound X       Initial incumbent
   --dynamic-ng P        Strengthen NG memories from master cycles at separator
@@ -49,8 +52,8 @@ Options:
   -v, --verbose, --log  Show solver progress (every 10 CG iterations)
   --log-interval N      Show progress every N CG iterations (enables logging)
   --iterations N        Master iteration limit
-  --time SECONDS        Time limit (BOTH vrptw/cvrp and hgs)
-  --json FILE           Write results as JSON (BOTH vrptw/cvrp and hgs)
+  --time SECONDS        Time limit (solve and hgs)
+  --json FILE           Write results as JSON (solve and hgs)
   --population-size N   HGS minimum population size (default: 25)
   --nb-iter N           HGS iterations without improvement before stopping, or
                         restarting under a time limit (default: 20000)
@@ -73,7 +76,7 @@ pub(super) fn run() -> std::result::Result<(), String> {
     if kind == "ce" {
         return ce_cli::run(args.collect());
     }
-    if kind != "vrptw" && kind != "cvrp" && kind != "hgs" {
+    if !matches!(kind.as_str(), "solve" | "vrptw" | "cvrp" | "hgs") {
         return Err(format!("unknown instance type: {kind}\n\n{HELP}"));
     }
     let file = args.next().ok_or(HELP)?;
@@ -84,11 +87,13 @@ pub(super) fn run() -> std::result::Result<(), String> {
     if file.starts_with('-') {
         return Err(format!("expected instance path, got {file}\n\n{HELP}"));
     }
+    let mut ignore_time_windows = false;
     let mut customers = None;
     let mut reference_ng = false;
     let mut json_path = None;
     let mut ng = 8;
     let mut options = RootOptions::default();
+    let mut all_cuts = false;
     let mut rank1 = false;
     let mut fenchel = false;
     let mut capacity = false;
@@ -121,6 +126,12 @@ pub(super) fn run() -> std::result::Result<(), String> {
                     return Err("log interval must be positive".into());
                 }
                 options.cg.log_interval = Some(interval);
+            }
+            "--ignore-time-windows" => {
+                if kind != "solve" {
+                    return Err("--ignore-time-windows requires solve".into());
+                }
+                ignore_time_windows = true;
             }
             "--reference-ng" => reference_ng = true,
             "--bound-mode" => {
@@ -225,11 +236,23 @@ pub(super) fn run() -> std::result::Result<(), String> {
             }
             "--no-enumeration" => options.enumerate = false,
             "--enumerated-mip" => tree_options.enumerated_mip = Some(Default::default()),
+            "--deluxing" => {
+                tree_options.deluxing = Some(Default::default());
+                tree_options
+                    .enumerated_mip
+                    .get_or_insert_with(Default::default);
+            }
             "--rounding" => {
                 rounding = Some(
                     Rounding::parse(&args.next().ok_or("missing rounding")?)
                         .map_err(|e| e.to_string())?,
                 )
+            }
+            "--cuts" => {
+                all_cuts = true;
+                rank1 = true;
+                fenchel = true;
+                capacity = true;
             }
             "--rank1" => rank1 = true,
             "--fenchel-cuts" => fenchel = true,
@@ -329,12 +352,26 @@ pub(super) fn run() -> std::result::Result<(), String> {
         instance.truncate(n).map_err(|e| e.to_string())?;
     }
     // HGS heuristic path
+    if tree_options.deluxing.is_some() {
+        if !tree {
+            return Err("--deluxing requires --tree".into());
+        }
+        if !options.enumerate {
+            return Err("--deluxing conflicts with --no-enumeration".into());
+        }
+        if kind == "hgs" {
+            return Err("--deluxing requires a routing solve, not hgs".into());
+        }
+    }
     if tree_options.enumerated_mip.is_some() && !tree {
         return Err("--enumerated-mip requires --tree".into());
     }
     if kind == "hgs" {
+        if all_cuts {
+            return Err("--cuts requires a routing solve, not hgs".into());
+        }
         if fenchel {
-            return Err("--fenchel-cuts requires cvrp or vrptw".into());
+            return Err("--fenchel-cuts requires solve".into());
         }
         use baldes::extensions::hgs::{run_hgs, HgsOptions};
         if let Some(rounding) = rounding {
@@ -402,18 +439,32 @@ pub(super) fn run() -> std::result::Result<(), String> {
     }
 
     let rounding = rounding.unwrap_or(instance.rounding);
-    if two_path && kind == "cvrp" {
+    let capacity_only = kind == "cvrp"
+        || (kind == "solve" && (ignore_time_windows || !instance.has_time_windows()));
+    two_path |= all_cuts && !capacity_only;
+    if two_path && capacity_only {
         return Err("Kohl 2-path cuts require vrptw time windows".into());
     }
     if fenchel {
-        options =
-            options.with_knapsack_cuts(instance.fenchel_cut_config().map_err(|e| e.to_string())?);
+        let mut config = instance.fenchel_cut_config().map_err(|e| e.to_string())?;
+        if all_cuts {
+            config.parameters.use_rounding = true;
+            config.parameters.max_one_k = 1;
+        }
+        options = options.with_knapsack_cuts(config);
     }
     if capacity {
-        options = options.with_capacity_cuts(instance.capacity_cut_config(rounding, two_path));
+        let config = instance.capacity_cut_config(rounding, two_path);
+        if all_cuts {
+            let mut kpath =
+                baldes::master::root::KPathCutConfig::new(config.demands.clone(), config.capacity);
+            kpath.time_windows = config.time_windows.clone();
+            options = options.with_kpath_cuts(kpath);
+        }
+        options = options.with_capacity_cuts(config);
     }
     let started = std::time::Instant::now();
-    let mut graph = if kind == "cvrp" {
+    let mut graph = if capacity_only {
         instance.capacity_graph(ng, rounding)
     } else {
         instance.graph(ng, rounding)
@@ -566,7 +617,7 @@ pub(super) fn run() -> std::result::Result<(), String> {
         if tag >= 0 && value > 1e-6 {
             let route = &output.routes[tag as usize];
             println!(
-                "value={:.2} cost={:.12} nodes={:?}",
+                "value={:.2} cost={:.2} nodes={:?}",
                 value, route.original_cost, route.nodes
             );
         }

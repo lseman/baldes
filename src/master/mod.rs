@@ -7,6 +7,7 @@ pub use solvers::clp;
 pub use solvers::highs;
 pub mod certificates;
 pub mod column_generation;
+pub mod deluxing;
 pub mod lp_master;
 pub mod preprocessing;
 mod progress;

@@ -5,16 +5,17 @@
 Commands below run from the repository root after building with `--features clp`.
 
 ```bash
-./target/release/baldes vrptw instances/R101.txt --customers 25 --rank1
-./target/release/baldes cvrp instances/cvrplib/A-n32-k5.vrp --capacity-cuts
+./target/release/baldes solve instances/R101.txt --customers 25 --rank1
+./target/release/baldes solve instances/cvrplib/A-n32-k5.vrp --capacity-cuts
 ./target/release/baldes hgs instances/R101.txt --population-size 50 --nb-iter 5000
 ```
 
-The first argument selects the instance type: `vrptw` (time windows), `cvrp`
-(capacitated, no time windows), or `hgs` (Hybrid Genetic Search heuristic).
-The routing commands read Solomon-format files and CVRPLIB (TSPLIB) `.vrp`
-files; the format is detected from the content. `vrptw` enforces time windows and service times;
-`cvrp` ignores them.
+Use `solve` for routing: Solomon inputs enforce time windows and service
+times, while CVRPLIB inputs use capacity constraints. The input format is
+detected from the content. Use `solve INSTANCE --ignore-time-windows` to
+solve a Solomon instance as CVRP. The legacy `vrptw` and `cvrp` commands
+remain available; `cvrp` always ignores time windows and service times.
+The `hgs` command runs the Hybrid Genetic Search heuristic.
 CVRPLIB instances have no time windows, so they are solved as `cvrp`. They use
 the file's distance convention: TSPLIB `nint` for `EUC_2D`, `ceil` for
 `CEIL_2D`, or the explicit `EDGE_WEIGHT_SECTION` (full or triangular). As for
@@ -25,11 +26,14 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 
 | Option | Meaning |
 | --- | --- |
+| `--ignore-time-windows` | ignore time windows and service times with `solve` |
 | `--customers N` | keep the first N customers |
 | `--ng N` | NG neighbourhood size (default 8) |
 | `--reference-ng` | the N nearest customers, ties by index (the comparison setup) |
 | `--rounding MODE` | distances `none`, `nearest`, `tenth` or `ceil` (default: the file's convention) |
+| `--cuts` | enable rank-one, capacity, k-path, knapsack (rounding/1K), and Fenchel cuts; also 2-path for models with time windows. Requires the integer-demand Fenchel configuration to be valid. |
 | `--rank1` | separate limited-memory rank-one cuts |
+| `--clp-scaling MODE` | equilibrium (default), auto, geometric, or off |
 | `--capacity` / `--capacity-cuts` | separate native rounded capacity cuts in the Clp root master |
 | `--two-path-cuts` | enable capacity cuts with Kohl's time resource attached (VRPTW only) |
 | `--tree` | run branch-and-price for integer routing |
@@ -40,6 +44,7 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--no-mip-heuristic` | disable restricted-master integer search |
 | `--mip-nodes N` | node budget per restricted-master integer-search call |
 | `--enumerated-mip` | solve complete enumerated node masters with HiGHS; requires `--tree` and the `highs` feature |
+| `--deluxing` | filter complete enumerated columns before MIP; enables `--enumerated-mip`, requires `--tree` and `highs`, conflicts with `--no-enumeration` |
 | `--no-enumeration` | no reduced-cost fixing or enumeration |
 | `--upper-bound X` | initial incumbent for fixing |
 | `--no-stabilization` | no dual-price smoothing |
@@ -81,7 +86,9 @@ Solomon instances are in [`instances/`](../../instances), and a few CVRPLIB ones
 
 Enable `--verbose` for an aligned progress table with the restricted-master
 objective, selected lower bound, incumbent, gap, reduced cost, column counts,
-pricing phase, and elapsed time. Use `--log-interval 5` for more frequent output.
+current bucket step size (in resource order, separated by `/`), pricing phase,
+and elapsed time. Bucket step changes are also printed between progress rows,
+independently of the log interval. Use `--log-interval 5` for more frequent output.
 When cut families are enabled, the table also shows their current cut counts;
 disabled families have no column.
 

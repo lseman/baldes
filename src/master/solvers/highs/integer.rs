@@ -49,6 +49,54 @@ extern "C" {
 fn count(n: usize) -> Result<HighsInt> {
     HighsInt::try_from(n).map_err(|_| invalid("HiGHS MIP index/count exceeds 32-bit build"))
 }
+
+/// Filter a complete all-integer column pool before solving an independent MIP.
+/// Requires a finite objective cutoff. The returned MIP values retain source
+/// column order. Bounds and infeasibility are qualified by that cutoff because
+/// fixing deliberately discards solutions above it.
+pub fn solve_integer_with_deluxing<M: LpMaster>(
+    source: &M,
+    options: &MipOptions,
+    fixing: &crate::master::deluxing::DeluxingOptions,
+) -> Result<(MipOutput, crate::master::deluxing::DeluxingOutput)> {
+    let started = Instant::now();
+    let mut fixing = fixing.clone();
+    fixing.time_limit = fixing.time_limit.min(options.time_limit);
+    let report = crate::master::deluxing::filter(
+        source,
+        options.objective_cutoff,
+        &fixing,
+        HighsMaster::new,
+    )?;
+    let mut copy = HighsMaster::new()?;
+    copy.objective_offset = source.objective_offset();
+    for (&sense, &rhs) in source.senses().iter().zip(source.rhs()) {
+        copy.add_row(sense, rhs, &[])?;
+    }
+    for (j, &cost) in source.costs().iter().enumerate() {
+        let c = copy.add_column(cost, &source.column_entries(j)?)?;
+        copy.set_upper(
+            c,
+            if report.fixed_columns.binary_search(&j).is_ok() {
+                0.
+            } else {
+                source.upper()[j]
+            },
+        )?;
+    }
+    let mut remaining = options.clone();
+    remaining.time_limit = options.time_limit.saturating_sub(started.elapsed());
+    let integers: Vec<_> = (0..source.costs().len()).collect();
+    let mut output = solve_integer(&copy, &integers, &remaining)?;
+    if !report.fixed_columns.is_empty() {
+        output.bound = output.bound.min(options.objective_cutoff);
+        if output.status == MipStatus::Infeasible {
+            output.status = MipStatus::ObjectiveCutoff;
+        }
+    }
+    output.seconds = started.elapsed().as_secs_f64();
+    Ok((output, report))
+}
 /// Solve an independent HiGHS copy of any current LP master. Every physical
 /// row, coefficient, cost and column upper bound is exported. Master columns
 /// have lower bound zero by the LpMaster contract. Unlisted columns remain

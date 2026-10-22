@@ -33,7 +33,7 @@ fn _read_instance(py: Python<'_>, path: PathBuf) -> PyResult<Py<PyDict>> {
 
 #[cfg(feature = "clp")]
 #[pyfunction]
-#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false, master_solver="clp", hgs_time=None, hgs_columns="best", hgs_seed=0, verbose=false, log_interval=10, bound_mode="numerical", clp_scaling="auto", clp_keep_work_areas=true))]
+#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false, master_solver="clp", hgs_time=None, hgs_columns="best", hgs_seed=0, verbose=false, log_interval=10, bound_mode="numerical", clp_scaling="equilibrium", clp_keep_work_areas=true))]
 #[allow(clippy::too_many_arguments)]
 fn _solve_root(
     py: Python<'_>,

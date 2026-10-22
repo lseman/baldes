@@ -31,7 +31,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-# Runtime-dispatched AVX2 dominance scans; portable fallback on other CPUs.
+# Runtime-dispatched AVX2 dominance scans and rank-one bitsets; portable fallback.
 simd = []
 # Disjoint service-start windows on disposable scalar resources.
 multi-time-windows = []

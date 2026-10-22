@@ -51,12 +51,12 @@ fn resource_grid_checks_interior_window_endpoints() {
 
 #[test]
 fn accepted_grid_additions_and_dominance_keep_distinct_resource_points() {
-    let mut seed = 73_u64;
+    let mut rng = crate::rng::Xoroshiro128Plus::from_seed(73_u64);
     for quantum in [MIN_QUANTUM, 0.125, 0.5, 1.] {
         for _ in 0..10_000 {
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let seed = rng.next();
             let left = seed & ((1_u64 << 52) - 1);
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let seed = rng.next();
             let right = seed & ((1_u64 << 52) - 1);
             let a = left as f64 * quantum;
             let b = right as f64 * quantum;

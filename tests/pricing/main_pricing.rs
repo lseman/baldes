@@ -309,12 +309,9 @@ fn oracle(g: &Graph<2>) -> Option<f64> {
 }
 #[test]
 fn randomized_small_graphs_match_independent_complete_enumeration() {
-    let mut seed = 0x9e3779b97f4a7c15u64;
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(0x9e3779b97f4a7c15u64);
     for case in 0..160 {
-        let mut next = || {
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
-            seed >> 32
-        };
+        let mut next = || rng.next() >> 32;
         let mut g = Graph::<2>::new(6, 2).unwrap();
         g.elementary = case >= 80;
         if case % 3 == 0 {
@@ -466,12 +463,9 @@ fn general_dimensions_match_independent_dag_path_search() {
     }
     fn check<const D: usize>() {
         let dimensions = D;
-        let mut seed = 739u64;
+        let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(739u64);
         for _ in 0..20 {
-            let mut next = || {
-                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
-                seed >> 32
-            };
+            let mut next = || rng.next() >> 32;
             let mut g = Graph::<D>::new(7, dimensions).unwrap();
             for v in 0..7 {
                 for r in 0..dimensions {

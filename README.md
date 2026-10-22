@@ -69,7 +69,7 @@ the Clp master needed for routing root solves.
 Solve a root relaxation with time windows:
 
 ```bash
-./target/release/baldes vrptw instances/R101.txt --customers 25 --time 60 --verbose
+./target/release/baldes solve instances/R101.txt --customers 25 --time 60 --verbose
 ```
 
 Find a feasible capacitated routing solution with HGS:
@@ -81,7 +81,7 @@ Find a feasible capacitated routing solution with HGS:
 Run branch-and-price for an integer routing solution:
 
 ```bash
-./target/release/baldes cvrp instances/cvrplib/A-n32-k5.vrp --tree --time 60
+./target/release/baldes solve instances/cvrplib/A-n32-k5.vrp --tree --time 60
 ```
 
 Routing commands solve the root LP relaxation by default; add `--tree` for

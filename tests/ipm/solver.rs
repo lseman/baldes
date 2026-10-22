@@ -1,5 +1,6 @@
 use baldes::extensions::ipm::{
-    solve, HiPOLDLT, ModelData, NormalEqLDLT, Options, Sense, Solver, SolverType, SparseMatrix, Status,
+    solve, HiPOLDLT, ModelData, NormalEqLDLT, Options, Sense, Solver, SolverType, SparseMatrix,
+    Status,
 };
 
 fn model(
@@ -201,7 +202,13 @@ fn kkt_backends_repeated_factorization() {
             .enumerate()
             .map(|(i, v)| v + 0.2 * expected[4 + i]),
     );
-    for (x, e) in hi.solve_with_refinement(&rhs).unwrap().0.iter().zip(&expected) {
+    for (x, e) in hi
+        .solve_with_refinement(&rhs)
+        .unwrap()
+        .0
+        .iter()
+        .zip(&expected)
+    {
         assert!((x - e).abs() < 1e-8);
     }
 }
@@ -290,14 +297,6 @@ fn cpp_shifted_bound_regression() {
     );
 }
 
-struct Random(u64);
-impl Random {
-    fn next(&mut self) -> f64 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1);
-        ((self.0 >> 32) as f64) / (u32::MAX as f64)
-    }
-}
-
 #[test]
 fn original_dual_signs_and_equilibration() {
     for (sense, cost, expected_dual) in
@@ -344,22 +343,22 @@ fn csr_canonicalization_and_fill_estimate() {
 // do not depend on either implementation of the interior-point algorithm.
 #[test]
 fn seeded_lps_with_known_kkt_witnesses() {
-    let mut rng = Random(42);
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(42);
     for case in 0..30 {
         let n = 5 + case % 11;
         let m = 2 + case % 5;
         let mut entries = vec![];
         for i in 0..m {
             for j in 0..n {
-                let v = 2. * rng.next() - 1.;
-                if rng.next() > 0.35 {
+                let v = 2. * rng.next_f64() - 1.;
+                if rng.next_f64() > 0.35 {
                     entries.push((i, j, v));
                 }
             }
         }
         let a = SparseMatrix::from_triplets(m, n, &entries).unwrap();
-        let lower: Vec<_> = (0..n).map(|_| -2. * rng.next()).collect();
-        let upper: Vec<_> = lower.iter().map(|l| l + 1. + 3. * rng.next()).collect();
+        let lower: Vec<_> = (0..n).map(|_| -2. * rng.next_f64()).collect();
+        let upper: Vec<_> = lower.iter().map(|l| l + 1. + 3. * rng.next_f64()).collect();
         let x: Vec<_> = (0..n)
             .map(|j| match j % 3 {
                 0 => lower[j],
@@ -367,12 +366,12 @@ fn seeded_lps_with_known_kkt_witnesses() {
                 _ => 0.5 * (lower[j] + upper[j]),
             })
             .collect();
-        let y: Vec<_> = (0..m).map(|_| 2. * rng.next() - 1.).collect();
+        let y: Vec<_> = (0..m).map(|_| 2. * rng.next_f64() - 1.).collect();
         let mut c = a.transpose_multiply(&y).unwrap();
         for (j, cj) in c.iter_mut().enumerate() {
             *cj += match j % 3 {
-                0 => 0.5 + rng.next(),
-                1 => -0.5 - rng.next(),
+                0 => 0.5 + rng.next_f64(),
+                1 => -0.5 - rng.next_f64(),
                 _ => 0.,
             };
         }
@@ -392,22 +391,22 @@ fn seeded_lps_with_known_kkt_witnesses() {
 
 #[test]
 fn seeded_sparse_kkt_residuals() {
-    let mut rng = Random(57);
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(57);
     for case in 0..40 {
         let n = 1 + case % 17;
         let m = 1 + case % 11;
         let mut entries = vec![];
         for j in 0..n {
             for i in 0..m {
-                let v = 2. * rng.next() - 1.;
-                if rng.next() > 0.6 {
+                let v = 2. * rng.next_f64() - 1.;
+                if rng.next_f64() > 0.6 {
                     entries.push((i, j, v));
                 }
             }
         }
         let a = SparseMatrix::from_triplets(m, n, &entries).unwrap();
-        let expected: Vec<_> = (0..n + m).map(|_| 2. * rng.next() - 1.).collect();
-        let theta: Vec<_> = (0..n).map(|_| 0.1 + 10. * rng.next()).collect();
+        let expected: Vec<_> = (0..n + m).map(|_| 2. * rng.next_f64() - 1.).collect();
+        let theta: Vec<_> = (0..n).map(|_| 0.1 + 10. * rng.next_f64()).collect();
         let rp = vec![0.1; n];
         let rd = vec![0.2; m];
         let mut rhs = a.transpose_multiply(&expected[n..]).unwrap();
@@ -435,9 +434,14 @@ fn seeded_sparse_kkt_residuals() {
 #[test]
 fn cooperative_time_limit_is_distinct_from_iteration_exhaustion() {
     let m = model(&[&[1.]], &[1.], &[1.], &[0.], &[2.], &[Sense::Equal]);
-    let result = solve(&m, &Options {
-        time_limit: Some(std::time::Duration::ZERO), ..Default::default()
-    }).unwrap();
+    let result = solve(
+        &m,
+        &Options {
+            time_limit: Some(std::time::Duration::ZERO),
+            ..Default::default()
+        },
+    )
+    .unwrap();
     assert_eq!(result.status, Status::TimeLimit);
     assert_eq!(result.iterations, 0);
 }
@@ -446,22 +450,49 @@ fn cooperative_time_limit_is_distinct_from_iteration_exhaustion() {
 fn relaxed_optimality_keeps_primal_and_dual_feasibility_tight() {
     // Separate cost and feasibility scales so relaxed and strict gap targets
     // remain distinguishable even with faster adaptive centering.
-    let m = model(&[&[1., 1., 1.]], &[1.], &[1., 2., 8e4], &[0.; 3],
-        &[f64::INFINITY; 3], &[Sense::Equal]);
-    let tight = solve(&m, &Options { tolerance: 1e-9, ..Default::default() }).unwrap();
-    let loose = solve(&m, &Options {
-        tolerance: 1e-9, gap_tolerance: Some(0.5), ..Default::default()
-    }).unwrap();
+    let m = model(
+        &[&[1., 1., 1.]],
+        &[1.],
+        &[1., 2., 8e4],
+        &[0.; 3],
+        &[f64::INFINITY; 3],
+        &[Sense::Equal],
+    );
+    let tight = solve(
+        &m,
+        &Options {
+            tolerance: 1e-9,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let loose = solve(
+        &m,
+        &Options {
+            tolerance: 1e-9,
+            gap_tolerance: Some(0.5),
+            ..Default::default()
+        },
+    )
+    .unwrap();
     assert_eq!(loose.status, Status::Optimal);
     assert!(loose.primal_residual <= 1e-9, "{loose:?}");
     assert!(loose.dual_residual <= 1e-9, "{loose:?}");
     assert!(loose.relative_gap <= 0.5);
-    assert!(loose.iterations < tight.iterations, "loose={loose:?}, tight={tight:?}");
+    assert!(
+        loose.iterations < tight.iterations,
+        "loose={loose:?}, tight={tight:?}"
+    );
     assert!(loose.relative_gap > 1e-9, "{loose:?}");
     for invalid in [0., -1., 1.1, f64::NAN, f64::INFINITY] {
-        assert!(solve(&m, &Options {
-            gap_tolerance: Some(invalid), ..Default::default()
-        }).is_err());
+        assert!(solve(
+            &m,
+            &Options {
+                gap_tolerance: Some(invalid),
+                ..Default::default()
+            }
+        )
+        .is_err());
     }
 }
 
@@ -595,16 +626,35 @@ fn c202_rank1_master_converges() {
         assert!(s.primal_residual <= 1e-9, "{}", s.primal_residual);
         assert!(s.dual_residual <= 1e-9, "{}", s.dual_residual);
         assert!(s.relative_gap <= gap_tolerance.unwrap_or(1e-9));
-        assert!((s.objective - 618.2263546557791).abs() < 2e-6, "{}", s.objective);
+        assert!(
+            (s.objective - 618.2263546557791).abs() < 2e-6,
+            "{}",
+            s.objective
+        );
     }
 }
 
 #[test]
 fn persistent_solver_reuses_analysis_and_invalidates_changed_coordinates() {
-    for kind in [SolverType::HiPO, SolverType::NormalEquations, SolverType::Auto] {
+    for kind in [
+        SolverType::HiPO,
+        SolverType::NormalEquations,
+        SolverType::Auto,
+    ] {
         let mut solver = Solver::default();
-        let mut options = Options { tolerance: 1e-9, solver: kind, ..Options::default() };
-        let mut lp = model(&[&[2., 1.]], &[2.], &[3., 2.], &[0., 0.], &[10., 10.], &[Sense::Equal]);
+        let mut options = Options {
+            tolerance: 1e-9,
+            solver: kind,
+            ..Options::default()
+        };
+        let mut lp = model(
+            &[&[2., 1.]],
+            &[2.],
+            &[3., 2.],
+            &[0., 0.],
+            &[10., 10.],
+            &[Sense::Equal],
+        );
         let first = solver.solve(&lp, &options).unwrap();
         assert_eq!(first.status, Status::Optimal);
         let repeated = solver.solve(&lp, &options).unwrap();
@@ -639,14 +689,33 @@ fn persistent_solver_reuses_analysis_and_invalidates_changed_coordinates() {
 #[test]
 fn persistent_solver_invalidates_appended_columns_and_inequality_slacks() {
     for kind in [SolverType::HiPO, SolverType::NormalEquations] {
-        let options = Options { tolerance: 1e-9, solver: kind, ..Options::default() };
+        let options = Options {
+            tolerance: 1e-9,
+            solver: kind,
+            ..Options::default()
+        };
         let mut solver = Solver::default();
-        let first = model(&[&[2., 1.], &[1., 0.]], &[2., 0.8], &[3., 2.],
-            &[0., 0.], &[10., 10.], &[Sense::Equal, Sense::LessEqual]);
-        assert_eq!(solver.solve(&first, &options).unwrap().status, Status::Optimal);
+        let first = model(
+            &[&[2., 1.], &[1., 0.]],
+            &[2., 0.8],
+            &[3., 2.],
+            &[0., 0.],
+            &[10., 10.],
+            &[Sense::Equal, Sense::LessEqual],
+        );
+        assert_eq!(
+            solver.solve(&first, &options).unwrap().status,
+            Status::Optimal
+        );
         // New column also changes equilibration; old slack indices move.
-        let grown = model(&[&[2., 1., 100.], &[1., 0., 2.]], &[2., 0.8], &[3., 2., 1.],
-            &[0., 0., 0.], &[10., 10., 10.], &[Sense::Equal, Sense::LessEqual]);
+        let grown = model(
+            &[&[2., 1., 100.], &[1., 0., 2.]],
+            &[2., 0.8],
+            &[3., 2., 1.],
+            &[0., 0., 0.],
+            &[10., 10., 10.],
+            &[Sense::Equal, Sense::LessEqual],
+        );
         let warm = solver.solve(&grown, &options).unwrap();
         let cold = solve(&grown, &options).unwrap();
         assert_eq!(warm.status, Status::Optimal);
@@ -654,7 +723,10 @@ fn persistent_solver_invalidates_appended_columns_and_inequality_slacks() {
         assert!(warm.dual_residual <= 1e-9);
         assert!((warm.objective - cold.objective).abs() < 1e-7);
         assert_eq!(solver.statistics().warm_starts, 0);
-        assert_eq!(solver.statistics().symbolic_analyses + solver.statistics().symbolic_extensions, 2);
+        assert_eq!(
+            solver.statistics().symbolic_analyses + solver.statistics().symbolic_extensions,
+            2
+        );
         let mut fork = solver.clone();
         let mut edited = grown.clone();
         edited.c[2] = 1000.;
@@ -669,29 +741,69 @@ fn persistent_solver_invalidates_appended_columns_and_inequality_slacks() {
 fn persistent_solver_preserves_budget_and_recovers_after_failed_calls() {
     let mut solver = Solver::default();
     let lp = model(&[&[1.]], &[1.], &[1.], &[0.], &[10.], &[Sense::Equal]);
-    let options = Options { tolerance: 1e-9, ..Options::default() };
+    let options = Options {
+        tolerance: 1e-9,
+        ..Options::default()
+    };
     assert_eq!(solver.solve(&lp, &options).unwrap().status, Status::Optimal);
-    let mut grown = model(&[&[1., 1.]], &[1.], &[1., 0.5], &[0., 0.], &[10., 10.], &[Sense::Equal]);
-    let limited = solver.solve(&grown, &Options { max_iterations: 1, ..options.clone() }).unwrap();
+    let mut grown = model(
+        &[&[1., 1.]],
+        &[1.],
+        &[1., 0.5],
+        &[0., 0.],
+        &[10., 10.],
+        &[Sense::Equal],
+    );
+    let limited = solver
+        .solve(
+            &grown,
+            &Options {
+                max_iterations: 1,
+                ..options.clone()
+            },
+        )
+        .unwrap();
     assert_eq!(limited.status, Status::IterationLimit);
     assert!(limited.iterations <= 1);
-    assert_eq!(solver.solve(&grown, &options).unwrap().status, Status::Optimal);
-    let timed = solver.solve(&grown, &Options { time_limit: Some(std::time::Duration::ZERO), ..options.clone() }).unwrap();
+    assert_eq!(
+        solver.solve(&grown, &options).unwrap().status,
+        Status::Optimal
+    );
+    let timed = solver
+        .solve(
+            &grown,
+            &Options {
+                time_limit: Some(std::time::Duration::ZERO),
+                ..options.clone()
+            },
+        )
+        .unwrap();
     assert_eq!(timed.status, Status::TimeLimit);
     grown.b[0] = f64::NAN;
     assert!(solver.solve(&grown, &options).is_err());
     grown.b[0] = 1.;
-    assert_eq!(solver.solve(&grown, &options).unwrap().status, Status::Optimal);
+    assert_eq!(
+        solver.solve(&grown, &options).unwrap().status,
+        Status::Optimal
+    );
 }
 
 #[test]
 fn persistent_rhs_and_cost_updates_preserve_bound_transformations() {
-    for (lower, upper) in [(2., 5.), (f64::NEG_INFINITY, 5.), (f64::NEG_INFINITY, f64::INFINITY)] {
+    for (lower, upper) in [
+        (2., 5.),
+        (f64::NEG_INFINITY, 5.),
+        (f64::NEG_INFINITY, f64::INFINITY),
+    ] {
         let mut solver = Solver::default();
         let mut lp = model(&[&[2.]], &[6.], &[3.], &[lower], &[upper], &[Sense::Equal]);
-        let options = Options { tolerance: 1e-9, ..Options::default() };
+        let options = Options {
+            tolerance: 1e-9,
+            ..Options::default()
+        };
         assert_eq!(solver.solve(&lp, &options).unwrap().status, Status::Optimal);
-        lp.b[0] = 8.; lp.c[0] = -2.;
+        lp.b[0] = 8.;
+        lp.c[0] = -2.;
         let solution = solver.solve(&lp, &options).unwrap();
         assert_eq!(solution.status, Status::Optimal);
         assert!((solution.objective + 8.).abs() < 1e-7);
@@ -703,12 +815,30 @@ fn persistent_rhs_and_cost_updates_preserve_bound_transformations() {
 #[test]
 fn persistent_solver_extends_covered_column_cliques_without_new_analysis() {
     let mut solver = Solver::default();
-    let options = Options { tolerance: 1e-9, ..Options::default() };
-    let first = model(&[&[1., 1.], &[1., -1.]], &[2., 0.], &[3., 2.],
-        &[0., 0.], &[10., 10.], &[Sense::Equal, Sense::Equal]);
-    assert_eq!(solver.solve(&first, &options).unwrap().status, Status::Optimal);
-    let grown = model(&[&[1., 1., 2.], &[1., -1., 0.]], &[2., 0.], &[3., 2., 0.5],
-        &[0., 0., 0.], &[10., 10., 10.], &[Sense::Equal, Sense::Equal]);
+    let options = Options {
+        tolerance: 1e-9,
+        ..Options::default()
+    };
+    let first = model(
+        &[&[1., 1.], &[1., -1.]],
+        &[2., 0.],
+        &[3., 2.],
+        &[0., 0.],
+        &[10., 10.],
+        &[Sense::Equal, Sense::Equal],
+    );
+    assert_eq!(
+        solver.solve(&first, &options).unwrap().status,
+        Status::Optimal
+    );
+    let grown = model(
+        &[&[1., 1., 2.], &[1., -1., 0.]],
+        &[2., 0.],
+        &[3., 2., 0.5],
+        &[0., 0., 0.],
+        &[10., 10., 10.],
+        &[Sense::Equal, Sense::Equal],
+    );
     let solution = solver.solve(&grown, &options).unwrap();
     assert_eq!(solution.status, Status::Optimal);
     assert!((solution.objective - 0.5).abs() < 1e-7);
@@ -720,14 +850,30 @@ fn persistent_solver_extends_covered_column_cliques_without_new_analysis() {
 #[test]
 fn persistent_column_order_preserves_free_fixed_and_slack_recovery() {
     let mut solver = Solver::default();
-    let options = Options { tolerance: 1e-9, ..Options::default() };
-    let initial = model(&[&[1., 1., 1.], &[0., 0., 1.]], &[4., 10.], &[1., 2., 3.],
-        &[f64::NEG_INFINITY, 2., 0.], &[f64::INFINITY, 2., 10.],
-        &[Sense::Equal, Sense::LessEqual]);
-    assert_eq!(solver.solve(&initial, &options).unwrap().status, Status::Optimal);
-    let grown = model(&[&[1., 1., 1., 100.], &[0., 0., 1., 0.]], &[4., 10.], &[1., 2., 3., 40.],
-        &[f64::NEG_INFINITY, 2., 0., 0.], &[f64::INFINITY, 2., 10., 0.01],
-        &[Sense::Equal, Sense::LessEqual]);
+    let options = Options {
+        tolerance: 1e-9,
+        ..Options::default()
+    };
+    let initial = model(
+        &[&[1., 1., 1.], &[0., 0., 1.]],
+        &[4., 10.],
+        &[1., 2., 3.],
+        &[f64::NEG_INFINITY, 2., 0.],
+        &[f64::INFINITY, 2., 10.],
+        &[Sense::Equal, Sense::LessEqual],
+    );
+    assert_eq!(
+        solver.solve(&initial, &options).unwrap().status,
+        Status::Optimal
+    );
+    let grown = model(
+        &[&[1., 1., 1., 100.], &[0., 0., 1., 0.]],
+        &[4., 10.],
+        &[1., 2., 3., 40.],
+        &[f64::NEG_INFINITY, 2., 0., 0.],
+        &[f64::INFINITY, 2., 10., 0.01],
+        &[Sense::Equal, Sense::LessEqual],
+    );
     let solution = solver.solve(&grown, &options).unwrap();
     assert_eq!(solution.status, Status::Optimal);
     assert!(solution.primal_residual <= 1e-9);

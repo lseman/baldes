@@ -1,21 +1,36 @@
 use super::*;
 
 impl Separation {
-    pub(super) fn kohl_greedy_procedure(&mut self, tp: &mut TwoPathCandidate) {
+    pub(super) fn kohl_greedy_procedure(
+        &mut self,
+        tp: &mut TwoPathCandidate,
+        visited: &mut std::collections::HashSet<Bits1024>,
+        remaining: &mut usize,
+    ) {
+        if *remaining == 0 || !visited.insert(tp.customers) {
+            return;
+        }
+        *remaining -= 1;
+        // A partial search still supplies valid candidate subsets. The usual
+        // violation/time-feasibility checks decide whether they yield cuts.
+        if *remaining == 0 {
+            self.two_path_subsets.insert(tp.customers);
+            return;
+        }
         if tp.size < self.params.max_kohl_set_size && self.n > 0 {
             let mut leaf = true;
             for j in 0..self.n {
+                if *remaining == 0 {
+                    break;
+                }
+                if tp.customers.test(j) || !(self.demands[j] > 1e-6) {
+                    continue;
+                }
                 let mut added = 0.0;
                 for &col in &self.customer_columns[j] {
                     if !tp.column_touched.get(col).copied().unwrap_or(false) {
                         added += self.columns[col].value;
                     }
-                }
-                if tp.customers.test(j) {
-                    continue;
-                }
-                if !(self.demands[j] > 1e-6) {
-                    continue;
                 }
                 let flow = tp.cut_weight + added;
                 if !(2.0 - self.params.violation_tolerance > flow) {
@@ -37,7 +52,7 @@ impl Separation {
                     pushed += 1;
                     tp.touched_columns.push(col);
                 }
-                self.kohl_greedy_procedure(tp);
+                self.kohl_greedy_procedure(tp, visited, remaining);
                 for _ in 0..pushed {
                     if let Some(col) = tp.touched_columns.pop() {
                         if let Some(b) = tp.column_touched.get_mut(col) {
@@ -69,7 +84,11 @@ impl Separation {
             touched_columns: Vec::with_capacity(self.n),
             customers: Bits1024::default(),
         };
-        self.kohl_greedy_procedure(&mut tp);
+        // A subset has the same touched-column union regardless of the order
+        // used to construct it. Traverse it once, preserving first-visit order.
+        let mut visited = std::collections::HashSet::new();
+        let mut remaining = self.params.max_kohl_states;
+        self.kohl_greedy_procedure(&mut tp, &mut visited, &mut remaining);
         for set in self.two_path_subsets.iter() {
             for i in 0..self.n {
                 if !set.test(i) {
@@ -93,3 +112,7 @@ impl Separation {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/cuts/kpath/two_path_tests.rs"]
+mod tests;

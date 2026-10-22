@@ -88,7 +88,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
             nwords,
             max_count,
             row_max_count,
-            rng: MinStd(1),
+            rng: Xoroshiro128Plus::new(1),
         }
     }
 
@@ -139,7 +139,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                 );
                 std::process::exit(1);
             }
-            let row = candidates[self.rng.uniform(0, candidates.len() as u64 - 1) as usize];
+            let row = candidates[self.rng.uniform_below(candidates.len() as u64) as usize];
             row_set.push(row);
             values[row as usize] = -1.0;
             if use_neighbours {
@@ -195,8 +195,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                 eprintln!("RCSP error: construction of rank-1 cut rowset is buggy! ");
                 std::process::exit(1);
             }
-            let rnd = unsafe { rand() } as i64 as u64;
-            let row = candidates[(rnd % candidates.len() as u64) as usize];
+            let row = candidates[self.rng.uniform_below(candidates.len() as u64) as usize];
             row_set.push(row);
             values[row as usize] = -1.0;
             for k in 0..self.column_indices.len() {

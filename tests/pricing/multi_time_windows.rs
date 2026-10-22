@@ -191,11 +191,8 @@ fn brute<const D: usize>(g: &Graph<D>) -> f64 {
 fn randomized_bucket_pricing_matches_independent_integer_path_search() {
     use baldes::labeling::engine::{EngineControls, LabelingEngine};
     use baldes::pricing::phases::Phase;
-    let mut seed = 0x4d54575f2026u64;
-    let mut random = |n: u64| {
-        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
-        (seed >> 32) % n
-    };
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(0x4d54575f2026u64);
+    let mut random = |n: u64| rng.uniform_below(n);
     for case in 0..120 {
         let mut g = Graph::<2>::new(7, 2).unwrap();
         g.elementary = true;

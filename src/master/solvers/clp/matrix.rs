@@ -310,8 +310,13 @@ impl ClpMaster {
         }
         let m = self.model.expect("Clp backend is active").as_ptr();
         let mut entries = unsafe {
-            let start = *Clp_getVectorStarts(m).add(column) as usize;
             let length = *Clp_getVectorLengths(m).add(column) as usize;
+            // Clp may return null element/index buffers for a zero-nonzero
+            // matrix. Rust slices require non-null pointers even at length 0.
+            if length == 0 {
+                return Ok(Vec::new());
+            }
+            let start = *Clp_getVectorStarts(m).add(column) as usize;
             let indices = std::slice::from_raw_parts(Clp_getIndices(m).add(start), length);
             let values = std::slice::from_raw_parts(Clp_getElements(m).add(start), length);
             indices

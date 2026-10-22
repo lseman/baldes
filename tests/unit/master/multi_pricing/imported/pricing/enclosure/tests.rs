@@ -17,13 +17,12 @@ fn compare(value: f64, numerator: i128, scale: i32) -> Ordering {
         signed.cmp(&(numerator << -shift))
     }
 }
-fn draw(state: &mut u64, n: i32) -> i32 {
-    *state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
-    ((*state >> 32) % n as u64) as i32
+fn draw(rng: &mut crate::rng::Xoroshiro128Plus, n: i32) -> i32 {
+    rng.uniform_below(n as u64) as i32
 }
 #[test]
 fn enclosures_match_independent_integer_rationals() {
-    let mut seed = 0x5035_cafe;
+    let mut seed = crate::rng::Xoroshiro128Plus::from_seed(0x5035_cafe);
     for _ in 0..10_000 {
         let c = draw(&mut seed, 2049) - 1024;
         let ce = draw(&mut seed, 21);
@@ -45,11 +44,11 @@ fn enclosures_match_independent_integer_rationals() {
 }
 #[test]
 fn full_mantissa_products_enclose_exact_104_bit_rationals() {
-    let mut seed = 0x5035_104_u64;
+    let mut rng = crate::rng::Xoroshiro128Plus::from_seed(0x5035_104_u64);
     for _ in 0..5_000 {
-        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+        let seed = rng.next();
         let a = f64::from_bits((1023_u64 << 52) | (seed & ((1_u64 << 52) - 1)));
-        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+        let seed = rng.next();
         let b = f64::from_bits((1023_u64 << 52) | (seed & ((1_u64 << 52) - 1)));
         let ma = ((a.to_bits() & ((1_u64 << 52) - 1)) | (1_u64 << 52)) as i128;
         let mb = ((b.to_bits() & ((1_u64 << 52) - 1)) | (1_u64 << 52)) as i128;

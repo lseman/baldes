@@ -45,6 +45,11 @@ pub trait Controller<M> {
     fn cut_counts(&self) -> Vec<(&'static str, usize)> {
         vec![]
     }
+    /// Current active bucket widths in resource order for progress logging.
+    /// Empty means the pricing implementation does not expose a bucket grid.
+    fn bucket_steps(&self) -> Vec<f64> {
+        vec![]
+    }
     /// Optional original-model feasible columns after exact pricing leaves
     /// positive artificials. These columns do not certify a bound or prove
     /// infeasibility. The controller must validate their original constraints.

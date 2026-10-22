@@ -36,8 +36,9 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
         let mut best = 0;
         let mut m = numerators.to_vec();
         m.sort();
+        let mut top = vec![0i32; k];
         for &c in &self.column_indices {
-            let mut top = vec![0i32; k];
+            top.fill(0);
             let cnt = Self::counts(&columns[c as usize]);
             for r in 0..self.num_rows as usize {
                 let v = cnt[r];
@@ -57,6 +58,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
     }
 
     /// Best-improvement multiplier swaps; returns the cut violation.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn run_local_search(
         &self,
         parent: &Separation,
@@ -65,8 +67,8 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
         multipliers: &mut Vec<i32>,
         denominator: i32,
         rhs: f64,
+        max_state: i32,
     ) -> f64 {
-        let max_state = self.compute_max_state(columns, rows.len(), multipliers);
         let max_rhs = Self::divide(max_state, denominator);
         let n = self.column_indices.len();
         let nbytes = n / 8 + (n & 7 != 0) as usize;
@@ -181,13 +183,12 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                             }
                             for c in 1..=cnt {
                                 let bits = self.difference(from, to, c as usize);
-                                for &(s, l) in &changes[(c * step) as usize] {
-                                    let st = &states[s as usize][..nwords];
-                                    let tg = &mut target[l as usize][..nwords];
-                                    for ((t, &b), &s) in tg.iter_mut().zip(bits).zip(st) {
-                                        *t |= b & s;
-                                    }
-                                }
+                                super::bitset::accumulate(
+                                    bits,
+                                    &changes[(c * step) as usize],
+                                    &states,
+                                    target,
+                                );
                             }
                         };
                     if delta > 0 {
@@ -197,27 +198,13 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                         accumulate(row_out, row_in, -delta, &increases, &mut increased);
                         accumulate(row_in, row_out, -delta, &decreases, &mut decreased);
                     }
-                    let mut gain = 0.0f64;
-                    let mut byte = 0;
-                    for w in 0..nwords {
-                        if byte >= nbytes {
-                            continue;
-                        }
-                        let mut j = 0;
-                        while j < 8 && byte < nbytes {
-                            if max_rhs > 0 {
-                                for l in 1..=max_rhs as usize {
-                                    let ld = l as f64;
-                                    let x1 = byte_sum(byte, increased[l][w], j) * ld;
-                                    let x2 = ld * byte_sum(byte, decreased[l][w], j);
-                                    gain = gain + x1;
-                                    gain = gain - x2;
-                                }
-                            }
-                            j += 1;
-                            byte += 1;
-                        }
-                    }
+                    let gain = super::gain::score(
+                        &self.byte_value_sums,
+                        &increased,
+                        &decreased,
+                        nbytes,
+                        max_rhs,
+                    );
                     let better = if COVERING {
                         best - 1e-6 > gain
                     } else {
@@ -276,6 +263,10 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
             return;
         }
         let mut seen: HashSet<Vec<i32>> = HashSet::new();
+        // The bound depends on the column counts and multiplier multiset,
+        // which stay fixed across restarts of this class. Initialize lazily
+        // so a search with no starts still performs no bound calculation.
+        let mut max_state = None;
         for _ in 0..self.num_iterations {
             let mut rows = vec![];
             if COVERING {
@@ -291,6 +282,8 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                 );
             }
             let mut multipliers: Vec<i32> = numerators[..num_rows_cut as usize].to_vec();
+            let max_state = *max_state
+                .get_or_insert_with(|| self.compute_max_state(columns, rows.len(), &multipliers));
             let violation = self.run_local_search(
                 parent,
                 columns,
@@ -298,6 +291,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                 &mut multipliers,
                 denominator,
                 rhs,
+                max_state,
             );
             let mut key = rows.clone();
             key.sort();

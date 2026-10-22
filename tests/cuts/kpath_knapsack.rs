@@ -70,31 +70,16 @@ fn brute_force_best_knapsack(loads: &[i32], values: &[f64], rhs: i32) -> Option<
     best
 }
 
-struct Lcg(u64);
-impl Lcg {
-    fn next_u32(&mut self) -> u32 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1);
-        (self.0 >> 32) as u32
-    }
-    fn randint(&mut self, lo: i32, hi: i32) -> i32 {
-        let span = (hi - lo + 1) as u32;
-        lo + (self.next_u32() % span) as i32
-    }
-    fn random(&mut self) -> f64 {
-        (self.next_u32() as f64) / (u32::MAX as f64)
-    }
-}
-
 #[test]
 fn matches_brute_force_over_all_multipliers() {
-    let mut rng = Lcg(4);
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(4);
     let mut cases = 0;
     let choices = [0.25, 0.5, 0.75, 1.0];
     for _ in 0..80 {
-        let n = rng.randint(2, 6) as usize;
-        let loads: Vec<i32> = (0..n).map(|_| rng.randint(1, 9)).collect();
+        let n = rng.uniform_i32(2, 6) as usize;
+        let loads: Vec<i32> = (0..n).map(|_| rng.uniform_i32(1, 9)).collect();
         let values: Vec<f64> = (0..n)
-            .map(|_| choices[rng.randint(0, 3) as usize])
+            .map(|_| choices[rng.uniform_i32(0, 3) as usize])
             .collect();
         let max_load = *loads.iter().max().unwrap();
         let total: f64 = loads
@@ -150,15 +135,15 @@ fn rounding_coefficients_above_capacity_match_reported_lhs() {
 
 #[test]
 fn knapsack_cuts_hold_for_every_integer_solution() {
-    let mut rng = Lcg(9);
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(9);
     let mut checked = 0;
     let choices = [0.5, 1.0, 1.5];
     for _ in 0..25 {
-        let rhs = rng.randint(6, 14);
-        let len = rng.randint(2, 5) as usize;
-        let loads: Vec<i32> = (0..len).map(|_| rng.randint(1, 7)).collect();
+        let rhs = rng.uniform_i32(6, 14);
+        let len = rng.uniform_i32(2, 5) as usize;
+        let loads: Vec<i32> = (0..len).map(|_| rng.uniform_i32(1, 7)).collect();
         let values: Vec<f64> = (0..len)
-            .map(|_| choices[rng.randint(0, 2) as usize])
+            .map(|_| choices[rng.uniform_i32(0, 2) as usize])
             .collect();
         let mut sep = KnapsackSeparator::new();
         sep.set_parameter("use_rounding", 1.0).unwrap();
@@ -229,15 +214,15 @@ fn one_k_cut_by_hand() {
 
 #[test]
 fn one_k_families_are_valid_and_gated_by_k() {
-    let mut rng = Lcg(21);
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(21);
     let mut counts = BTreeMap::from([(6, 0usize), (8, 0usize), (10, 0usize)]);
     let choices = [0.5, 1.0, 1.5, 2.0];
     for _ in 0..60 {
-        let rhs = rng.randint(12, 26);
-        let len = rng.randint(3, 7) as usize;
-        let loads: Vec<i32> = (0..len).map(|_| rng.randint(1, rhs)).collect();
+        let rhs = rng.uniform_i32(12, 26);
+        let len = rng.uniform_i32(3, 7) as usize;
+        let loads: Vec<i32> = (0..len).map(|_| rng.uniform_i32(1, rhs)).collect();
         let values: Vec<f64> = (0..len)
-            .map(|_| choices[rng.randint(0, 3) as usize])
+            .map(|_| choices[rng.uniform_i32(0, 3) as usize])
             .collect();
         for (k, allowed) in [(1, vec![6]), (8, vec![6, 8]), (10, vec![6, 8, 10])] {
             let mut sep = KnapsackSeparator::new();
@@ -298,7 +283,7 @@ fn a_column_is_counted_once_per_set() {
 
 
 fn random_fractional_point(
-    rng: &mut Lcg,
+    rng: &mut baldes::rng::Xoroshiro128Plus,
     n: usize,
     demand: &[f64],
     capacity: f64,
@@ -308,20 +293,17 @@ fn random_fractional_point(
     let mut columns = Vec::new();
     for _ in 0..routes {
         let mut pool: Vec<usize> = (1..=n).collect();
-        for i in (1..pool.len()).rev() {
-            let j = (rng.next_u32() as usize) % (i + 1);
-            pool.swap(i, j);
-        }
+        rng.shuffle(&mut pool);
         let mut route = Vec::new();
         let mut load = 0.0;
         for v in pool {
-            if load + demand[v] <= capacity && rng.random() < 0.6 {
+            if load + demand[v] <= capacity && rng.next_f64() < 0.6 {
                 route.push(v);
                 load += demand[v];
             }
         }
         if !route.is_empty() {
-            columns.push((route, choices[rng.randint(0, 3) as usize]));
+            columns.push((route, choices[rng.uniform_i32(0, 3) as usize]));
         }
     }
     columns
@@ -381,14 +363,15 @@ fn set_partitions(items: &[usize]) -> Vec<Vec<Vec<usize>>> {
 
 #[test]
 fn kpath_cuts_hold_for_every_integer_solution() {
-    let mut rng = Lcg(11);
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(11);
     let mut checked = 0;
-    for _ in 0..12 {
-        let n = rng.randint(4, 5) as usize;
-        let capacity = rng.randint(5, 9) as f64;
+    // Keep enough feasible cut/partition checks under the shared RNG stream.
+    for _ in 0..40 {
+        let n = rng.uniform_i32(4, 5) as usize;
+        let capacity = rng.uniform_i32(5, 9) as f64;
         let mut demand = vec![0.0];
         for _ in 0..n {
-            demand.push(rng.randint(1, 4) as f64);
+            demand.push(rng.uniform_i32(1, 4) as f64);
         }
         let mut sep = KPathSeparator::new(demand.clone(), capacity).unwrap();
         let cols = random_fractional_point(&mut rng, n, &demand, capacity, 6);
@@ -408,20 +391,23 @@ fn kpath_cuts_hold_for_every_integer_solution() {
             }
         }
     }
-    assert!(checked > 100);
+    assert!(
+        checked > 100,
+        "only {checked} feasible cut/partition checks"
+    );
 }
 
 #[test]
 fn detects_a_violation_whenever_one_exists() {
-    let mut rng = Lcg(5);
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(5);
     let mut cases = 0;
     let mut found = 0;
     for _ in 0..60 {
-        let n = rng.randint(4, 8) as usize;
-        let capacity = rng.randint(5, 10) as f64;
+        let n = rng.uniform_i32(4, 8) as usize;
+        let capacity = rng.uniform_i32(5, 10) as f64;
         let mut demand = vec![0.0];
         for _ in 0..n {
-            demand.push(rng.randint(1, 4) as f64);
+            demand.push(rng.uniform_i32(1, 4) as f64);
         }
         let columns = random_fractional_point(&mut rng, n, &demand, capacity, 6);
         let best = brute_force_best_kpath_violation(&columns, &demand, capacity, n);
@@ -444,15 +430,15 @@ fn detects_a_violation_whenever_one_exists() {
 
 #[test]
 fn exact_separation_finds_the_most_violated_unrounded_set() {
-    let mut rng = Lcg(23);
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(23);
     let mut hits = 0;
     let mut trials = 0;
     for _ in 0..40 {
-        let n = rng.randint(4, 7) as usize;
-        let capacity = rng.randint(6, 10) as f64;
+        let n = rng.uniform_i32(4, 7) as usize;
+        let capacity = rng.uniform_i32(6, 10) as f64;
         let mut demand = vec![0.0];
         for _ in 0..n {
-            demand.push(rng.randint(1, 4) as f64);
+            demand.push(rng.uniform_i32(1, 4) as f64);
         }
         let columns = random_fractional_point(&mut rng, n, &demand, capacity, 6);
         let best = brute_force_best_kpath_violation(&columns, &demand, capacity, n);
@@ -503,13 +489,13 @@ fn two_path_cut_needs_time_windows_and_uses_k_equal_two() {
 
 #[test]
 fn strong_k_path_implies_the_capacity_cut() {
-    let mut rng = Lcg(2);
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(2);
     for _ in 0..30 {
-        let n = rng.randint(4, 7) as usize;
-        let capacity = rng.randint(5, 9) as f64;
+        let n = rng.uniform_i32(4, 7) as usize;
+        let capacity = rng.uniform_i32(5, 9) as f64;
         let mut demand = vec![0.0];
         for _ in 0..n {
-            demand.push(rng.randint(1, 4) as f64);
+            demand.push(rng.uniform_i32(1, 4) as f64);
         }
         let columns = random_fractional_point(&mut rng, n, &demand, capacity, 6);
         let _cap_sep = CapacitySeparator::new(demand.clone(), capacity).unwrap();
@@ -1290,7 +1276,7 @@ fn check_knapsack_pricing_against_exhaustive_routes(exact: bool) {
             }
         }
     }
-    let mut rng = Lcg(0x5ba9);
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(0x5ba9);
     for trial in 0..40 {
         let mut sep = ResourceKnapsackSeparator {
             parameters: KnapsackParameters {
@@ -1312,7 +1298,7 @@ fn check_knapsack_pricing_against_exhaustive_routes(exact: bool) {
         cuts.retain(|c| rows.insert(c.row));
         assert_eq!(cuts.len(), 2);
         for c in &mut cuts {
-            c.dual = -rng.randint(1, 4) as f64;
+            c.dual = -rng.uniform_i32(1, 4) as f64;
             if exact {
                 c.dual -= 0.123456789;
                 c.graph_resources.get_mut(&0).unwrap().1 = if c.row == 0 { 2. } else { 0.5 };
@@ -1336,7 +1322,7 @@ fn check_knapsack_pricing_against_exhaustive_routes(exact: bool) {
                 if v == 0 || v == 5 {
                     [0., 0.]
                 } else {
-                    [rng.randint(1, 3) as f64, rng.randint(1, 3) as f64]
+                    [rng.uniform_i32(1, 3) as f64, rng.uniform_i32(1, 3) as f64]
                 }
             })
             .collect();
@@ -1345,7 +1331,7 @@ fn check_knapsack_pricing_against_exhaustive_routes(exact: bool) {
                 if u == v {
                     continue;
                 }
-                let cost = rng.randint(-5, 5) as f64;
+                let cost = rng.uniform_i32(-5, 5) as f64;
                 let id = solver.graph.add_arc(u, v, cost).unwrap();
                 solver.graph.arc_mut(id).unwrap().consumption = loads[v].into();
             }
@@ -1372,10 +1358,17 @@ fn check_knapsack_pricing_against_exhaustive_routes(exact: bool) {
             assert!(child.knapsack_exact_coefficients);
             let routes = child.enumerate(1000.).unwrap();
             let enumerated_best = routes.iter().map(|r| r.cost).fold(f64::INFINITY, f64::min);
-            assert!((enumerated_best - best).abs() < 1e-9, "enumeration trial {trial}");
+            assert!(
+                (enumerated_best - best).abs() < 1e-9,
+                "enumeration trial {trial}"
+            );
             for route in routes {
-                let penalty: f64 = child.cuts.knapsack_cuts.iter()
-                    .map(|c| -c.dual * c.coefficient(0, &route.resources) as f64).sum();
+                let penalty: f64 = child
+                    .cuts
+                    .knapsack_cuts
+                    .iter()
+                    .map(|c| -c.dual * c.coefficient(0, &route.resources) as f64)
+                    .sum();
                 assert!((route.cost - route.original_cost - penalty).abs() < 1e-9);
             }
         }
@@ -1530,11 +1523,19 @@ fn exact_knapsack_cache_matches_scaled_master_coefficients_and_retains_small_dua
     use baldes::cuts::knapsack::{KnapsackPricing, ResourceKnapsackCut, RouteLoadKnapsackCut};
     let mapping = BTreeMap::from([(7, 0)]);
     let mut cut = ResourceKnapsackCut {
-        id: 0, row: 0, cut_class: 0,
-        graph_resources: BTreeMap::from([(4, (7, 2.))]), dual: -0.123456789,
+        id: 0,
+        row: 0,
+        cut_class: 0,
+        graph_resources: BTreeMap::from([(4, (7, 2.))]),
+        dual: -0.123456789,
         cut: RouteLoadKnapsackCut {
-            kind: KnapsackKind::Steps, numerator: 1, denominator: 1,
-            rhs: 1, lhs: 0., violation: 0., thresholds: vec![2],
+            kind: KnapsackKind::Steps,
+            numerator: 1,
+            denominator: 1,
+            rhs: 1,
+            lhs: 0.,
+            violation: 0.,
+            thresholds: vec![2],
             coefficients: BTreeMap::from([(2, 1), (4, 3)]),
         },
     };

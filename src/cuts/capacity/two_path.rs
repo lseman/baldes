@@ -23,7 +23,7 @@ impl Separation {
                 c.cut_weight = (c.vector_30[j] - c.vector_18[j]) + c.cut_weight;
                 c.demand = c.demand + self.demands[j];
                 c.customers.set(j);
-                for &nb in &self.graph.neighbours[j].clone() {
+                for &nb in &self.graph.neighbours[j] {
                     if c.customers.test(nb) {
                         continue;
                     }
@@ -32,7 +32,7 @@ impl Separation {
                     c.vector_30[nb] = c.vector_30[nb] - w;
                 }
                 self.kohl_greedy(c);
-                for &nb in &self.graph.neighbours[j].clone() {
+                for &nb in &self.graph.neighbours[j] {
                     if c.customers.test(nb) {
                         continue;
                     }

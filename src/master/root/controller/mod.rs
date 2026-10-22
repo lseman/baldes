@@ -103,6 +103,17 @@ impl<const D: usize> Controller<ClpMaster> for RootController<D> {
         state.cut.progress_counts(&state.solver.cuts.knapsack_cuts)
     }
 
+    fn bucket_steps(&self) -> Vec<f64> {
+        let state = self.state.borrow();
+        state
+            .solver
+            .engine
+            .as_ref()
+            .map_or_else(Vec::new, |engine| {
+                engine.grid.step[..engine.grid.dimensions].to_vec()
+            })
+    }
+
     fn refresh_generated_columns(&mut self, pool: &mut [Column]) -> Result<()> {
         self.refresh_pool(pool)
     }

@@ -9,11 +9,8 @@ use multi_pricing::{
 fn bounds(lower: f64, upper: f64) -> Bounds {
     Bounds { lower, upper }
 }
-fn next(seed: &mut u64, modulus: i32) -> i32 {
-    *seed = seed
-        .wrapping_mul(6364136223846793005)
-        .wrapping_add(1442695040888963407);
-    ((*seed >> 32) % modulus as u64) as i32
+fn next(rng: &mut baldes::rng::Xoroshiro128Plus, modulus: i32) -> i32 {
+    rng.uniform_below(modulus as u64) as i32
 }
 fn permits(sense: RowSense, lhs: i32, rhs: i32) -> bool {
     match sense {
@@ -25,7 +22,7 @@ fn permits(sense: RowSense, lhs: i32, rhs: i32) -> bool {
 
 #[test]
 fn signed_import_fixing_and_propagation_preserve_every_exhaustive_integer_witness() {
-    let mut seed = 0x5035_2026_u64;
+    let mut seed = baldes::rng::Xoroshiro128Plus::from_seed(0x5035_2026_u64);
     let mut feasible_cases = 0;
     let mut infeasible_cases = 0;
     let mut checked_bounds = 0;

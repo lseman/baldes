@@ -69,13 +69,13 @@ fn separates_fractional_packings_and_future_loads() {
     assert!(cut.violation > 0.0);
     assert_valid_on_every_integer_packing(&cut, 4);
     assert!(cut.coefficient(4) >= cut.coefficient(3));
-    let mut seed = 719_u64;
+    let mut rng = crate::rng::Xoroshiro128Plus::from_seed(719_u64);
     for capacity in 2..=12 {
         for _ in 0..12 {
             let mut loads = Vec::new();
             let mut values = Vec::new();
             for load in 1..=capacity {
-                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let seed = rng.next();
                 if seed % 3 != 0 {
                     continue;
                 }

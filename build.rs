@@ -34,9 +34,19 @@ mod clp {
         stem.starts_with("Abc")
             || stem.starts_with("CoinAbc")
             || [
-                "ClpMain", "ClpSolver", "unitTest", "CbcOrClpParam", "Clp_ampl", "MyEventHandler",
-                "MyMessageHandler", "ClpCholeskyMumps", "ClpCholeskyPardiso", "ClpCholeskyTaucs",
-                "ClpCholeskyUfl", "ClpCholeskyWssmp", "ClpCholeskyWssmpKKT",
+                "ClpMain",
+                "ClpSolver",
+                "unitTest",
+                "CbcOrClpParam",
+                "Clp_ampl",
+                "MyEventHandler",
+                "MyMessageHandler",
+                "ClpCholeskyMumps",
+                "ClpCholeskyPardiso",
+                "ClpCholeskyTaucs",
+                "ClpCholeskyUfl",
+                "ClpCholeskyWssmp",
+                "ClpCholeskyWssmpKKT",
             ]
             .contains(&stem)
     }
@@ -57,7 +67,12 @@ mod clp {
     ];
     fn sources(dir: &Path, patched: &Path) -> Vec<PathBuf> {
         let mut files: Vec<PathBuf> = fs::read_dir(dir)
-            .unwrap_or_else(|_| panic!("{} missing: run `git submodule update --init`", dir.display()))
+            .unwrap_or_else(|_| {
+                panic!(
+                    "{} missing: run `git submodule update --init`",
+                    dir.display()
+                )
+            })
             .map(|entry| entry.unwrap().path())
             .filter(|p| p.extension().is_some_and(|e| e == "cpp"))
             .filter(|p| !excluded(p.file_stem().unwrap().to_str().unwrap()))
@@ -173,9 +188,67 @@ extern "C" void baldes_clp_solve_limits(Clp_Simplex *model, double *values) {
                 *file = copy;
                 continue;
             }
+            if name == "ClpPackedMatrix.cpp" {
+                // A column stamp replaces the second per-column walk that
+                // clears duplicate marks. Keep all coefficient validation and
+                // duplicate compression in their original order.
+                let mut text = fs::read_to_string(&*file).unwrap();
+                for (old, new) in [
+                    ("if (mark[iRow] == -1)", "if (mark[iRow] != iColumn)"),
+                    ("mark[iRow] = j;", "mark[iRow] = iColumn;"),
+                    ("      //clear mark\n      for (j = columnStart[iColumn];\n           j < columnStart[iColumn] + columnLength[iColumn]; j++) {\n        int iRow = row[j];\n        mark[iRow] = -1;\n      }\n", ""),
+                ] {
+                    assert_eq!(text.matches(old).count(), 1,
+                        "unsupported {name}: expected one duplicate-mark site");
+                    text = text.replace(old, new);
+                }
+                // Preserve the subtraction/addition order within each dot
+                // product while sharing the matrix traversal and loads.
+                let begin = text.find("int ClpPackedMatrix::transposeTimes2(").unwrap();
+                let end = begin
+                    + text[begin..]
+                        .find("\nvoid ClpPackedMatrix::subsetTimes2(")
+                        .unwrap();
+                let mut method = text[begin..end].to_string();
+                for indent in ["              ", "          "] {
+                    let old = format!("{indent}double modification = 0.0;\n{indent}for (j = start; j < end; j++) {{\n{indent}  int iRow = row[j];\n{indent}  modification += piWeight[iRow] * elementByColumn[j];\n{indent}}}\n");
+                    assert_eq!(
+                        method.matches(&old).count(),
+                        2,
+                        "unsupported transpose weight loops"
+                    );
+                    method = method.replace(&old, "");
+                }
+                assert_eq!(method.matches("double value = 0.0;").count(), 4);
+                method = method.replace(
+                    "double value = 0.0;",
+                    "double value = 0.0, modification = 0.0;",
+                );
+                for (indent, suffix, count) in [
+                    ("              ", "", 2),
+                    ("          ", "", 1),
+                    ("          ", " * rowScale[iRow]", 1),
+                ] {
+                    let old = format!("\n{indent}value -= pi[iRow] * elementByColumn[j]{suffix};");
+                    let new = format!(
+                        "{old}\n{indent}modification += piWeight[iRow] * elementByColumn[j];"
+                    );
+                    assert_eq!(method.matches(&old).count(), count);
+                    method = method.replace(&old, &new);
+                }
+                text.replace_range(begin..end, &method);
+                let copy = patched.join(name);
+                fs::write(&copy, text).unwrap();
+                *file = copy;
+                continue;
+            }
             if let Some((_, old, new)) = CORRECTIONS.iter().find(|(n, _, _)| *n == name) {
                 let text = fs::read_to_string(&*file).unwrap();
-                assert_eq!(text.matches(old).count(), 1, "unsupported {name}: expected one correction site");
+                assert_eq!(
+                    text.matches(old).count(),
+                    1,
+                    "unsupported {name}: expected one correction site"
+                );
                 let copy = patched.join(name);
                 fs::write(&copy, text.replace(old, new)).unwrap();
                 *file = copy;
@@ -216,7 +289,11 @@ extern "C" void baldes_clp_solve_limits(Clp_Simplex *model, double *values) {
         let coinutils_files = sources(&coinutils, &patched);
         let clp_files = sources(&clp, &patched);
         // Clp before CoinUtils on the link line: the solver needs CoinUtils.
-        library("baldes_clp_solver", &clp_files, &[&config, &coinutils, &clp]);
+        library(
+            "baldes_clp_solver",
+            &clp_files,
+            &[&config, &coinutils, &clp],
+        );
         library("baldes_coinutils", &coinutils_files, &[&config, &coinutils]);
     }
 }
@@ -232,9 +309,14 @@ mod highs {
         println!("cargo:rerun-if-env-changed=HIGHS_DIR");
         let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         let vendored = root.join("vendor/highs");
-        let dir = env::var_os("HIGHS_DIR").map(PathBuf::from).or_else(|| vendored.is_dir().then_some(vendored));
+        let dir = env::var_os("HIGHS_DIR")
+            .map(PathBuf::from)
+            .or_else(|| vendored.is_dir().then_some(vendored));
         if let Some(dir) = dir {
-            println!("cargo:rustc-link-search=native={}", dir.join("lib").display());
+            println!(
+                "cargo:rustc-link-search=native={}",
+                dir.join("lib").display()
+            );
             println!("cargo:rustc-link-lib=dylib=highs");
             return;
         }

@@ -19,7 +19,16 @@ pub(super) fn run<const D: usize>(
         configured.time_limit,
     );
     configured.objective_cutoff = configured.objective_cutoff.min(output.incumbent);
-    let Some(result) = snapshot.solve_enumerated_mip(&configured)? else {
+    let result = if let Some(fixing) = options
+        .deluxing
+        .as_ref()
+        .filter(|_| configured.objective_cutoff.is_finite())
+    {
+        snapshot.solve_enumerated_mip_with_deluxing(&configured, fixing)?
+    } else {
+        snapshot.solve_enumerated_mip(&configured)?
+    };
+    let Some(result) = result else {
         return Ok(());
     };
     output.enumerated_mip_calls += 1;

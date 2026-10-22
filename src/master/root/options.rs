@@ -144,6 +144,7 @@ pub struct RootOptions {
     /// IPM solves automatically disable dual stabilization.
     pub master_solver: MasterSolver,
     /// Clp-only numerical scaling and reoptimization storage policy.
+    /// Root solves default to equilibrium scaling with retained work areas.
     pub clp_options: ClpOptions,
     /// Retain an independently forkable model and active cuts for descendants.
     pub capture_state: bool,
@@ -183,7 +184,10 @@ impl Default for RootOptions {
         cg.column_cleanup_ratio = 0.66;
         Self {
             master_solver: MasterSolver::Clp,
-            clp_options: ClpOptions::default(),
+            clp_options: ClpOptions {
+                scaling: ClpScaling::Equilibrium,
+                ..ClpOptions::default()
+            },
             bound_mode: BoundMode::Numerical,
             capture_state: false,
             node_depth: 0,

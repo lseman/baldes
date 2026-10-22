@@ -271,6 +271,17 @@ def test_invalid_clp_scaling_is_rejected():
         solve_root(triangle(), clp_scaling="invalid")
 
 
+def test_root_scaling_defaults_to_equilibrium():
+    import inspect
+
+    assert inspect.signature(solve_root).parameters["clp_scaling"].default == "equilibrium"
+    assert inspect.signature(pybaldes._core._solve_root).parameters["clp_scaling"].default == "equilibrium"
+    default = solve_root(triangle(), reduced_cost_fixing=False)
+    explicit = solve_root(triangle(), reduced_cost_fixing=False, clp_scaling="equilibrium")
+    assert default.status == explicit.status == "Optimal"
+    assert default.lp == pytest.approx(explicit.lp, abs=1e-8)
+
+
 def test_direct_rust_solver_validates_ids_and_preserves_phase_keywords():
     solver = pybaldes.Solver(2, 1)
     for call in [

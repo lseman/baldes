@@ -160,7 +160,7 @@ def solve_root(
     stabilize: bool = True,
     master_solver: str = "clp",
     bound_mode: str = "numerical",
-    clp_scaling: str = "auto",
+    clp_scaling: str = "equilibrium",
     clp_keep_work_areas: bool = True,
     verbose: bool = False,
     log_interval: int = 10,
@@ -181,7 +181,7 @@ def solve_root(
     (unrounded for Solomon, TSPLIB nint for CVRPLIB EUC_2D); rounding accepts
     'none', 'nearest', 'tenth' and 'ceil'.
     verbose=True prints a CG progress table to stderr every log_interval iterations.
-    clp_scaling selects auto, geometric, equilibrium, or off for Clp.
+    clp_scaling selects equilibrium (default), auto, geometric, or off for Clp.
     clp_keep_work_areas retains native work buffers between LP solves by default.
     master_solver='highs' selects HiGHS (requires a build with its feature);
     master_solver='ipm' uses native IPM and disables stabilization. hgs_time

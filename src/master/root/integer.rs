@@ -74,6 +74,27 @@ impl<const D: usize> NodeSnapshot<D> {
         &self,
         options: &MipOptions,
     ) -> Result<Option<EnumeratedMipOutput>> {
+        self.solve_enumerated_mip_impl(options, None)
+    }
+
+    /// Opt-in DeLuxing filtering of the complete enumerated route matrix.
+    /// Requires a finite `options.objective_cutoff`; proof outcomes apply to
+    /// improvements below that cutoff. The live node is untouched.
+    #[cfg(feature = "highs")]
+    pub fn solve_enumerated_mip_with_deluxing(
+        &self,
+        options: &MipOptions,
+        fixing: &crate::master::deluxing::DeluxingOptions,
+    ) -> Result<Option<EnumeratedMipOutput>> {
+        self.solve_enumerated_mip_impl(options, Some(fixing))
+    }
+
+    #[cfg(feature = "highs")]
+    fn solve_enumerated_mip_impl(
+        &self,
+        options: &MipOptions,
+        fixing: Option<&crate::master::deluxing::DeluxingOptions>,
+    ) -> Result<Option<EnumeratedMipOutput>> {
         let started = Instant::now();
         let Some(universe) = self.pricing.enumeration.as_ref().filter(|e| e.completed) else {
             return Ok(None);
@@ -148,7 +169,12 @@ impl<const D: usize> NodeSnapshot<D> {
         let integers: Vec<_> = route_columns.iter().map(|&(c, _)| c).collect();
         let mut remaining = options.clone();
         remaining.time_limit = options.time_limit.saturating_sub(started.elapsed());
-        let mip = crate::master::solvers::highs::solve_integer(&model, &integers, &remaining)?;
+        let mip = if let Some(fixing) = fixing {
+            crate::master::solvers::highs::solve_integer_with_deluxing(&model, &remaining, fixing)?
+                .0
+        } else {
+            crate::master::solvers::highs::solve_integer(&model, &integers, &remaining)?
+        };
         let route_values = mip.solution.as_ref().map_or_else(Vec::new, |s| {
             route_columns
                 .into_iter()

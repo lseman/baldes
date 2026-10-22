@@ -183,13 +183,13 @@ impl<'a, const D: usize> Sweep<'a, D> {
             return;
         }
         let storage = &mut *self.storage;
-        let mut hot = crate::labeling::storage::HotColumns::default();
-        for &i in &retained {
-            hot.push(storage.hot[i]);
-        }
         let bucket = &mut storage.buckets[id.vertex][id.bucket];
+        // Rebuild in retained order without discarding the column capacities.
+        bucket.hot.truncate(0);
+        for &i in &retained {
+            bucket.hot.push(storage.hot[i]);
+        }
         bucket.active = retained;
-        bucket.hot = hot;
     }
     pub(super) fn run_direction(
         &mut self,
@@ -271,6 +271,11 @@ impl<'a, const D: usize> Sweep<'a, D> {
         };
         // Reading the clock per extension cost ~15% of pricing; sample it.
         let mut clock = 0u32;
+        // Keep the snapshot and deferred same-bucket insertions in sweep-local
+        // scratch so successive buckets reuse their allocations. The snapshot
+        // preserves the expansion order while insertions mutate storage.
+        let mut labels = Vec::new();
+        let mut pending = Vec::new();
         for component in components {
             loop {
                 let mut repeat = false;
@@ -286,10 +291,10 @@ impl<'a, const D: usize> Sweep<'a, D> {
                     let arc_count = self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket]
                         .arcs
                         .len();
-                    let mut pending = vec![];
                     // Same-bucket extensions go to `pending`, so this bucket's
                     // active list is fixed for the whole arc loop.
-                    let labels = self.storage.buckets[id.vertex][id.bucket].active.clone();
+                    labels.clear();
+                    labels.extend_from_slice(&self.storage.buckets[id.vertex][id.bucket].active);
                     for k in 0..arc_count {
                         let arc = self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket]
                             .arcs[k]
@@ -415,7 +420,7 @@ impl<'a, const D: usize> Sweep<'a, D> {
                         .storage
                         .labels
                         .expand(&self.storage.buckets[id.vertex][id.bucket].active);
-                    for (label, hot) in pending {
+                    for (label, hot) in pending.drain(..) {
                         let inserted = if BRANCHING {
                             self.insert::<BRANCHING, R, _>(g, forward, label, hot, controls)
                         } else {

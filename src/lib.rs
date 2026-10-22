@@ -19,6 +19,7 @@ pub mod graph;
 pub mod labeling;
 pub mod master;
 pub mod pricing;
+pub mod rng;
 pub use graph::{Graph, ResourceKind, Window};
 pub use labeling::{price, Controls, PricingResult, Route, Statistics};
 

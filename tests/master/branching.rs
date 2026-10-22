@@ -246,12 +246,9 @@ fn candidate_families_use_network_route_counts_and_pair_weights() {
 
 #[test]
 fn randomized_branch_pricing_with_cuts_matches_complete_paths() {
-    let mut seed = 417u64;
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(417u64);
     for case in 0..60 {
-        let mut next = || {
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
-            (seed >> 32) as usize
-        };
+        let mut next = || rng.next_u32() as usize;
         let n = 3 + next() % 4;
         let mut s = Solver::<2>::new(n + 2, 1).unwrap();
         for v in 0..n + 2 {

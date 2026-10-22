@@ -260,6 +260,9 @@ Routing solves are quiet by default. `--verbose`, `-v`, or `--log` enables an
 aligned column-generation table on stderr. It prints iteration 1, every tenth
 iteration, and the final state, followed by the CG status and work totals.
 `--log-interval N` enables the same log with a positive custom interval.
+The `Bucket step` column shows current active resource widths, separated by `/`.
+Changes also produce a `Bucket step updated: old -> new` message independently
+of that interval. Pricing implementations without a bucket grid show `--`.
 Cut-count columns appear only for enabled families: `Rank1`, `Capacity`,
 `2Path`, `KPath`, `Knapsack`, and `Fenchel`. Each shows the number of that
 family's rows currently in the master, including inherited cuts and excluding

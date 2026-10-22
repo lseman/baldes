@@ -132,12 +132,9 @@ fn integer_infeasibility_is_not_a_fractional_solution_or_a_cutoff() {
 }
 #[test]
 fn small_integer_models_match_independent_enumeration() {
-    let mut seed = 137u64;
+    let mut rng = baldes::rng::Xoroshiro128Plus::from_seed(137u64);
     for _ in 0..50 {
-        let mut next = || {
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
-            (seed >> 32) as usize
-        };
+        let mut next = || rng.next_u32() as usize;
         let n = 3 + next() % 6;
         let costs: Vec<_> = (0..n).map(|_| next() % 17 + 1).collect();
         let weights: Vec<_> = (0..n).map(|_| next() % 5 + 1).collect();

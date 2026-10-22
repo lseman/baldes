@@ -123,29 +123,6 @@ fn savings_list_sorted_descending() {
 }
 
 #[test]
-fn rng_matches_cpp_reference() {
-    // Values from BALDES's C++ math/RNG.h and libstdc++ 16 std::shuffle.
-    let mut rng = Xoroshiro128Plus::new(0);
-    assert_eq!(
-        [rng.next(), rng.next(), rng.next()],
-        [
-            2836985337983649843,
-            17383111449422238058,
-            15852657771511707500
-        ]
-    );
-    assert_eq!(rng.next_u64(100), 86);
-    let mut shuffled: Vec<Vec<usize>> = [1, 2, 10].iter().map(|&n| (0..n).collect()).collect();
-    for v in &mut shuffled {
-        rng.shuffle(v);
-    }
-    assert_eq!(
-        shuffled,
-        [vec![0], vec![1, 0], vec![7, 5, 9, 2, 3, 4, 1, 0, 8, 6]]
-    );
-}
-
-#[test]
 fn polar_angles_computed() {
     let mut instance = make_test_instance();
     for (customer, (x, y)) in

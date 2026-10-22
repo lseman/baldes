@@ -114,3 +114,5 @@ Thumbs.db
 # External compiled-reference verification lives outside this repository.
 /tests/verification/
 /examples/verify_*.rs
+
+/external/

@@ -13,8 +13,8 @@ node snapshots retain active rows and the pricing state needed to use them.
 | Limited-memory rank-one | Strengthen the customer-cover relaxation | `with_rank_one_cuts()` | `--rank1` / `rank_one_cuts=True` |
 | Rounded capacity | Enforce capacity-derived subset inequalities | `with_capacity_cuts(config)` | `--capacity-cuts` / `capacity_cuts=True` |
 | Kohl 2-path | Use time-window feasibility to strengthen capacity subsets | Capacity config with time windows | `--two-path-cuts` / `two_path_cuts=True` |
-| Strong k-path | Separate route-count inequalities on customer sets | `with_kpath_cuts(config)` or `with_native_kpath_cuts(config)` | Rust API |
-| Route-load knapsack | Separate inequalities on integer resource loads | `with_knapsack_cuts(config)` | Rust API |
+| Strong k-path | Separate route-count inequalities on customer sets | `with_kpath_cuts(config)` or `with_native_kpath_cuts(config)` | `--cuts` / Rust API |
+| Route-load knapsack | Separate inequalities on integer resource loads | `with_knapsack_cuts(config)` | `--cuts` / Rust API |
 | Fenchel load cuts | Search integer packing inequalities with an auxiliary LP | Knapsack config `.with_fenchel(parameters)` | `--fenchel-cuts` / Rust API |
 
 All routing root integrations require `clp`. HiGHS is needed only for the
@@ -71,6 +71,20 @@ Graph IDs, set IDs, and pricing vertex indices have different roles. Keep
 those mappings explicit when registering cuts. Full-memory enumeration and
 limited-memory pricing can use different coefficient state; the adapter
 updates the master when switching modes.
+
+The Kohl subset-growth heuristic within strong k-path separation visits each
+customer subset once and has a default work budget of 10,000 unique search
+states per separation call. Set `KPathParameters.max_two_path_states`, or use
+`set_parameter("max_two_path_states", value)`, to tune it; zero skips this
+heuristic, while the other k-path separation procedures remain enabled. This
+bounds an otherwise factorial traversal of equivalent insertion orders. The
+existing set-size limit remains 15.
+
+When the budget is exhausted, the current subset can be evaluated as a
+candidate and recursion unwinds cleanly. Every candidate still passes the
+normal violation/time-feasibility checks. This is a bounded heuristic, so it
+can find fewer or different cuts than the previous exhaustive growth search;
+it does not disable a cut family or relax cut validity checks.
 
 ## Route-load knapsack and resource IDs
 

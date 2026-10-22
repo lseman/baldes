@@ -11,6 +11,7 @@ pub(super) struct ProgressLog {
     latest: Option<(Iteration, f64, f64)>,
     printed: Option<String>,
     cuts: Vec<(&'static str, usize)>,
+    bucket_steps: Vec<f64>,
 }
 
 fn number(value: f64) -> String {
@@ -24,12 +25,25 @@ fn number(value: f64) -> String {
     }
 }
 
+fn steps(values: &[f64]) -> String {
+    if values.is_empty() {
+        "--".into()
+    } else {
+        values
+            .iter()
+            .map(f64::to_string)
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+}
+
 fn row(
     iteration: &Iteration,
     lower: f64,
     upper: f64,
     seconds: f64,
     cuts: &[(&str, usize)],
+    bucket_steps: &[f64],
 ) -> String {
     let gap = if lower.is_finite() && upper.is_finite() {
         format!(
@@ -53,7 +67,12 @@ fn row(
     for (_, count) in cuts {
         line.push_str(&format!(" {count:>8}"));
     }
-    line.push_str(&format!(" {:>5} {:>8.2}", iteration.phase, seconds));
+    line.push_str(&format!(
+        " {:>15} {:>5} {:>8.2}",
+        steps(bucket_steps),
+        iteration.phase,
+        seconds
+    ));
     line
 }
 
@@ -65,7 +84,10 @@ fn header(cuts: &[(&str, usize)]) -> String {
     for (name, _) in cuts {
         line.push_str(&format!(" {name:>8}"));
     }
-    line.push_str(&format!(" {:>5} {:>8}", "Phase", "Time(s)"));
+    line.push_str(&format!(
+        " {:>15} {:>5} {:>8}",
+        "Bucket step", "Phase", "Time(s)"
+    ));
     line
 }
 
@@ -74,9 +96,9 @@ impl ProgressLog {
         if interval.is_some() {
             let mut out = io::stderr().lock();
             let _ = writeln!(out, "\n  BALDES | COLUMN GENERATION");
-            let _ = writeln!(out, "{}", "─".repeat(99 + cuts.len() * 9));
+            let _ = writeln!(out, "{}", "─".repeat(115 + cuts.len() * 9));
             let _ = writeln!(out, "{}", header(&cuts));
-            let _ = writeln!(out, "{}", "─".repeat(99 + cuts.len() * 9));
+            let _ = writeln!(out, "{}", "─".repeat(115 + cuts.len() * 9));
         }
         Self {
             interval,
@@ -84,6 +106,7 @@ impl ProgressLog {
             latest: None,
             printed: None,
             cuts,
+            bucket_steps: vec![],
         }
     }
     fn print_row(&mut self, line: String) {
@@ -92,15 +115,28 @@ impl ProgressLog {
             self.printed = Some(line);
         }
     }
+    fn update_bucket_steps(&mut self, bucket_steps: Vec<f64>) {
+        if !self.bucket_steps.is_empty() && self.bucket_steps != bucket_steps {
+            let _ = writeln!(
+                io::stderr().lock(),
+                "  Bucket step updated: {} -> {}",
+                steps(&self.bucket_steps),
+                steps(&bucket_steps)
+            );
+        }
+        self.bucket_steps = bucket_steps;
+    }
     pub(super) fn iteration(
         &mut self,
         iteration: &Iteration,
         bound: f64,
         incumbent: f64,
         cuts: Vec<(&'static str, usize)>,
+        bucket_steps: Vec<f64>,
     ) {
         if let Some(interval) = self.interval {
             self.cuts = cuts;
+            self.update_bucket_steps(bucket_steps);
             if iteration.iteration == 1 || iteration.iteration % interval == 0 {
                 self.print_row(row(
                     iteration,
@@ -108,6 +144,7 @@ impl ProgressLog {
                     incumbent,
                     self.started.elapsed().as_secs_f64(),
                     &self.cuts,
+                    &self.bucket_steps,
                 ));
             }
             self.latest = Some((iteration.clone(), bound, incumbent));
@@ -118,11 +155,13 @@ impl ProgressLog {
         result: &crate::Result<Output>,
         incumbent: f64,
         cuts: Vec<(&'static str, usize)>,
+        bucket_steps: Vec<f64>,
     ) {
         if self.interval.is_none() {
             return;
         }
         self.cuts = cuts;
+        self.update_bucket_steps(bucket_steps);
         let seconds = self.started.elapsed().as_secs_f64();
         match result {
             Ok(output) => {
@@ -130,10 +169,17 @@ impl ProgressLog {
                     last.iteration = output.iterations;
                     last.lp = output.lp;
                     last.columns = output.columns;
-                    self.print_row(row(&last, output.bound, incumbent, seconds, &self.cuts));
+                    self.print_row(row(
+                        &last,
+                        output.bound,
+                        incumbent,
+                        seconds,
+                        &self.cuts,
+                        &self.bucket_steps,
+                    ));
                 }
                 let mut out = io::stderr().lock();
-                let _ = writeln!(out, "{}", "─".repeat(99 + self.cuts.len() * 9));
+                let _ = writeln!(out, "{}", "─".repeat(115 + self.cuts.len() * 9));
                 let _ = writeln!(
                     out,
                     "  CG {:?} | {} iterations | {} pricing calls | {} columns | {:.2}s\n",

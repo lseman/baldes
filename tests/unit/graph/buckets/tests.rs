@@ -62,9 +62,9 @@ fn bucket_floor_matches_standard_floor_at_numeric_boundaries() {
     }
     // Sample the entire IEEE-754 bit range, including subnormal values
     // and overflow, against the standard-library operation.
-    let mut bits = 0x8e71_23a4_917b_cdef_u64;
+    let mut rng = crate::rng::Xoroshiro128Plus::from_seed(0x8e71_23a4_917b_cdef);
     for _ in 0..10000 {
-        bits = bits.wrapping_mul(6364136223846793005).wrapping_add(1);
+        let bits = rng.next();
         let x = f64::from_bits(bits);
         assert_eq!(floor_isize(x), x.floor() as isize, "bits={bits:x} x={x:?}");
     }

@@ -8,6 +8,13 @@ Both features are off by default. Runtime detection keeps binaries portable:
 AVX-512F (when compiled in), AVX2, then the portable implementation. Scans
 shorter than 16 remaining labels use the portable implementation.
 
+With `simd`, rank-one local-search bitset accumulation also uses AVX2 on
+supported x86-64 CPUs for differences spanning at least 16 `u64` words.
+The kernel widens integer AND/OR operations through compiler vectorization;
+slice bounds checks remain in place, and floating-point gain calculations
+retain their order. Short bitsets and other CPUs use the portable loop.
+`simd-avx512` includes this AVX2 bitset path; only dominance uses AVX-512F.
+
 The AVX-512F kernel uses ordered comparisons, retains the exact EPSILON
 addition/subtraction order, and returns the first matching label or prefix
 key stop in storage order. It widens eight packed u16 NG masks into eight

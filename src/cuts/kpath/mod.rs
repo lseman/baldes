@@ -21,6 +21,8 @@ pub struct KPathParameters {
     pub max_cuts_per_round: usize,
     pub violation_tolerance: f64,
     pub max_two_path_set_size: i32,
+    /// Maximum unique Kohl search states per separation call; zero skips it.
+    pub max_two_path_states: usize,
     pub pulse_buckets: i32,
     pub candidate_limit: usize,
     pub use_two_path: bool,
@@ -32,6 +34,7 @@ impl Default for KPathParameters {
             max_cuts_per_round: 100,
             violation_tolerance: 1e-6,
             max_two_path_set_size: 15,
+            max_two_path_states: 10_000,
             pulse_buckets: 10,
             candidate_limit: 1000,
             use_two_path: true,
@@ -106,6 +109,7 @@ impl StrongKPathCut {
 struct Params {
     max_num_per_round: i32,
     max_kohl_set_size: i32,
+    max_kohl_states: usize,
     num_pulse_buckets: i32,
     violation_tolerance: f64,
     max_shrink_removals: i32,
@@ -329,6 +333,16 @@ impl KPathSeparator {
                 }
                 self.parameters.max_two_path_set_size = value as i32;
             }
+            "max_two_path_states" => {
+                if !value.is_finite()
+                    || value < 0.0
+                    || value.fract() != 0.0
+                    || value > i32::MAX as f64
+                {
+                    return Err(invalid("native k-path parameters"));
+                }
+                self.parameters.max_two_path_states = value as usize;
+            }
             "pulse_buckets" => {
                 if value < 1.0 {
                     return Err(invalid("native k-path parameters"));
@@ -354,6 +368,7 @@ impl KPathSeparator {
             "max_cuts_per_round" => Ok(self.parameters.max_cuts_per_round as f64),
             "violation_tolerance" => Ok(self.parameters.violation_tolerance),
             "max_two_path_set_size" => Ok(self.parameters.max_two_path_set_size as f64),
+            "max_two_path_states" => Ok(self.parameters.max_two_path_states as f64),
             "pulse_buckets" => Ok(self.parameters.pulse_buckets as f64),
             "candidate_limit" => Ok(self.parameters.candidate_limit as f64),
             "use_two_path" => Ok(if self.parameters.use_two_path {
@@ -397,6 +412,7 @@ impl KPathSeparator {
         if p.max_cuts_per_round == 0
             || p.max_cuts_per_round > (i32::MAX as usize)
             || p.candidate_limit > (i32::MAX as usize)
+            || p.max_two_path_states > i32::MAX as usize
             || p.max_two_path_set_size < 1
             || p.pulse_buckets < 1
             || !p.violation_tolerance.is_finite()
@@ -412,6 +428,7 @@ impl KPathSeparator {
         let params = Params {
             max_num_per_round: p.max_cuts_per_round as i32,
             max_kohl_set_size: p.max_two_path_set_size,
+            max_kohl_states: p.max_two_path_states,
             num_pulse_buckets: p.pulse_buckets,
             violation_tolerance: p.violation_tolerance,
             max_shrink_removals: p.candidate_limit as i32,

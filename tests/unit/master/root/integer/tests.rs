@@ -39,3 +39,36 @@ fn incumbent_witness_omitted_by_the_cutoff_survives_enumerated_mip() {
     assert_eq!(node.master.values, values);
     assert_eq!(node.pricing.enumeration.as_ref().unwrap().paths.len, 0);
 }
+
+#[test]
+fn deluxing_enumerated_mip_preserves_node_and_route_mapping() {
+    let mut graph = Graph::<5>::new(3, 5).unwrap();
+    graph.add_arc(0, 1, 1.).unwrap();
+    graph.add_arc(1, 2, 1.).unwrap();
+    let mut options = RootOptions::default();
+    options.capture_state = true;
+    options.enumerate = false;
+    let output = solve(RootProblem::set_partitioning(graph, 1.).unwrap(), options).unwrap();
+    let mut node = Rc::try_unwrap(output.snapshot.unwrap()).ok().unwrap();
+    node.pricing.enumerate(100.).unwrap();
+    let before = (node.master.costs.clone(), node.master.values.clone());
+    let options = MipOptions {
+        objective_cutoff: 3.,
+        ..Default::default()
+    };
+    let out = node
+        .solve_enumerated_mip_with_deluxing(
+            &options,
+            &crate::master::deluxing::DeluxingOptions::default(),
+        )
+        .unwrap()
+        .unwrap();
+    assert_eq!(out.mip.status, MipStatus::Optimal);
+    assert_eq!(out.mip.solution.unwrap().objective, 2.);
+    assert_eq!(out.route_values.len(), 1);
+    assert_eq!(out.route_values[0].0.arcs, [0, 1]);
+    assert_eq!(
+        (node.master.costs.clone(), node.master.values.clone()),
+        before
+    );
+}

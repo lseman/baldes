@@ -58,6 +58,7 @@ impl NativeKPathSeparator {
         let params = Params {
             max_num_per_round: p.max_cuts_per_round as i32,
             max_kohl_set_size: p.max_two_path_set_size,
+            max_kohl_states: p.max_two_path_states,
             num_pulse_buckets: p.pulse_buckets,
             violation_tolerance: p.violation_tolerance,
             max_shrink_removals: p.candidate_limit as i32,

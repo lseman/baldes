@@ -119,8 +119,15 @@ impl PulseDigraph {
         true
     }
     fn bucket(&self, time: f64) -> usize {
-        ((time - self.ready_time[self.source as usize] + 1e-6) / self.bucket_width).floor() as i32
-            as usize
+        let bucket = (time - self.ready_time[self.source as usize] + 1e-6) / self.bucket_width;
+        // Float-to-int conversion truncates, which equals floor for nonnegative
+        // buckets. Preserve floor for negative values (and NaN handling).
+        let bucket = if bucket >= 0. {
+            bucket as i32
+        } else {
+            bucket.floor() as i32
+        };
+        bucket as usize
     }
     fn bound_at(&self, node: usize, bucket: usize) -> f64 {
         self.bound
@@ -166,9 +173,15 @@ impl PulseDigraph {
     }
     /// Bucket bounds from the last bucket down to 1, then a pulse from the source.
     pub fn run(&mut self, subset: &[i32]) -> f64 {
-        self.bound = vec![vec![]; self.num_customers.max(0) as usize];
+        // Keep bucket storage between subset checks. Clear every row so nodes
+        // outside this subset retain the same missing-bound semantics.
+        self.bound
+            .resize_with(self.num_customers.max(0) as usize, Vec::new);
+        for row in &mut self.bound {
+            row.clear();
+        }
         for &i in subset {
-            self.bound[i as usize] = vec![-1e12; self.num_buckets as usize];
+            self.bound[i as usize].resize(self.num_buckets as usize, -1e12);
         }
         self.num_pulses = 0;
         let source = self.source as usize;
@@ -238,3 +251,7 @@ pub struct PulsePath {
     pub best: f64,
     pub visited: Bits1024,
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/cuts/shared/pulse_tests.rs"]
+mod tests;

@@ -1,5 +1,13 @@
 use super::*;
 
+#[test]
+fn root_scaling_defaults_to_equilibrium_without_changing_low_level_policy() {
+    let root = crate::master::root::RootOptions::default();
+    assert_eq!(root.clp_options.scaling, ClpScaling::Equilibrium);
+    assert!(root.clp_options.keep_work_areas);
+    assert_eq!(ClpOptions::default().scaling, ClpScaling::Auto);
+}
+
 fn verify(master: &mut ClpMaster, expected: f64) {
     assert_eq!(
         master
@@ -140,4 +148,61 @@ fn scaling_policies_solve_original_scaled_rows() {
         }
     }
     assert!("unknown".parse::<ClpScaling>().is_err());
+}
+
+#[test]
+fn native_matrix_validation_merges_duplicates_across_columns_and_repeated_solves() {
+    // Exercise the native validation path directly: the public Rust editor
+    // canonicalizes entries before passing them to Clp.
+    for scaling in [0, 1, 3] {
+        let master = ClpMaster::new().unwrap();
+        let model = master.model.unwrap().as_ptr();
+        let lower = [3., 4.];
+        let upper = [f64::MAX; 4];
+        let starts = [0, 3, 5, 7, 7];
+        let rows = [0, 0, 1, 0, 1, 1, 1];
+        let values = [0.4, 0.6, 1e-30, 1., 1., 1.5, 0.5];
+        let costs = [2., 3., 1., 9.];
+        // SAFETY: this owned native model is live, all sparse array sizes
+        // match the supplied row/column counts, and no pointers escape.
+        unsafe {
+            Clp_scaling(model, scaling);
+            Clp_addRows(
+                model,
+                2,
+                lower.as_ptr(),
+                upper.as_ptr(),
+                [0, 0, 0].as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+            );
+            Clp_addColumns(
+                model,
+                4,
+                [0.; 4].as_ptr(),
+                upper.as_ptr(),
+                costs.as_ptr(),
+                starts.as_ptr(),
+                rows.as_ptr(),
+                values.as_ptr(),
+            );
+            assert_eq!(
+                std::slice::from_raw_parts(Clp_getVectorLengths(model), 4),
+                &[3, 2, 2, 0]
+            );
+            for _ in 0..2 {
+                assert_eq!(baldes_clp_dual_limited(model, 1000, 60., 1), 0);
+                assert_eq!(Clp_status(model), 0);
+                assert!((Clp_objectiveValue(model) - 8.).abs() < 1e-9);
+                let solution = std::slice::from_raw_parts(Clp_primalColumnSolution(model), 4);
+                for (&actual, expected) in solution.iter().zip([3., 0., 2., 0.]) {
+                    assert!((actual - expected).abs() < 1e-9);
+                }
+                assert_eq!(
+                    std::slice::from_raw_parts(Clp_getVectorLengths(model), 4),
+                    &[1, 2, 1, 0]
+                );
+            }
+        }
+    }
 }

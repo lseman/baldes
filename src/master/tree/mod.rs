@@ -43,6 +43,9 @@ pub struct TreeOptions {
     /// Optional HiGHS MIP over complete enumeration (requires `highs`).
     /// Independent of the restricted-column heuristic and disabled by default.
     pub enumerated_mip: Option<super::solvers::mip::MipOptions>,
+    /// Optional DeLuxing filtering before complete enumerated MIP solves.
+    /// Requires `enumerated_mip`; used when a finite cutoff is available.
+    pub deluxing: Option<super::deluxing::DeluxingOptions>,
     pub absolute_gap: f64,
     pub relative_gap: f64,
     pub strong_branching: Option<StrongBranchingOptions>,
@@ -59,6 +62,7 @@ impl Default for TreeOptions {
             mip_node_limit: 10000,
             mip_time_limit: Duration::from_millis(100),
             enumerated_mip: None,
+            deluxing: None,
             absolute_gap: 1e-6,
             relative_gap: 1e-9,
             strong_branching: Some(StrongBranchingOptions::default()),
