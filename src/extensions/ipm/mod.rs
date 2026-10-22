@@ -1,6 +1,6 @@
 //! Native Rust port of the IPM in `solvers/ipm` and `solvers/src/ipm`.
 //! Minimizes cᵀx subject to mixed linear rows and variable bounds.
-#![doc = include_str!("README.md")]
+#![doc = include_str!("../../../docs/extensions/ipm.md")]
 #![forbid(unsafe_code)]
 
 mod factor;

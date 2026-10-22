@@ -291,6 +291,8 @@ impl Problem {
 }
 
 #[cfg(all(test, feature = "clp"))]
+#[path = "../../../tests/unit/extensions/evrp/master_tests.rs"]
 mod master_tests;
 #[cfg(test)]
+#[path = "../../../tests/unit/extensions/evrp/tests.rs"]
 mod tests;

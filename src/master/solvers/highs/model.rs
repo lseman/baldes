@@ -7,6 +7,7 @@ impl HighsMaster {
             .ok_or_else(|| incomplete("HiGHS model allocation failed"))?;
         let master = Self {
             highs,
+            thread_config: None,
             matrix_cache: OnceCell::new(),
             rhs: vec![],
             senses: vec![],
@@ -42,11 +43,97 @@ impl HighsMaster {
         Ok(master)
     }
 
+    /// Configure dual simplex with an explicit worker pool. Zero selects all
+    /// CPUs available to this process, rather than HiGHS's automatic default.
+    /// Simplex concurrency is capped by the linked library's option limit.
+    /// All HiGHS models sharing its process-global scheduler must use the same
+    /// thread count; this constructor never resets that shared scheduler.
+    pub fn with_threads(threads: usize) -> Result<Self> {
+        let threads = if threads == 0 {
+            std::thread::available_parallelism().map_or(1, usize::from)
+        } else {
+            threads
+        };
+        if threads > HighsInt::MAX as usize {
+            return Err(invalid("HiGHS thread count exceeds native integer range"));
+        }
+        let mut master = Self::new()?;
+        let mut current = 0;
+        let mut minimum = 0;
+        let mut maximum = 0;
+        let mut default_value = 0;
+        // SAFETY: exclusively owned live handle, static NUL-terminated names
+        // and values, and valid scalar output pointers. No pointers escape.
+        unsafe {
+            Self::check(
+                Highs_getIntOptionValues(
+                    master.highs.as_ptr(),
+                    b"simplex_max_concurrency\0".as_ptr().cast(),
+                    &mut current,
+                    &mut minimum,
+                    &mut maximum,
+                    &mut default_value,
+                ),
+                "query simplex concurrency limits",
+            )?;
+            if maximum < 1 {
+                return Err(incomplete("invalid HiGHS simplex concurrency limit"));
+            }
+            let concurrency = threads.min(maximum as usize);
+            for (name, value) in [
+                (&b"threads\0"[..], threads as HighsInt),
+                (&b"simplex_strategy\0"[..], if threads > 1 { 3 } else { 1 }),
+                (&b"simplex_max_concurrency\0"[..], concurrency as HighsInt),
+            ] {
+                Self::check(
+                    Highs_setIntOptionValue(master.highs.as_ptr(), name.as_ptr().cast(), value),
+                    "configure parallel dual simplex",
+                )?;
+            }
+            Self::check(
+                Highs_setStringOptionValue(
+                    master.highs.as_ptr(),
+                    b"solver\0".as_ptr().cast(),
+                    b"simplex\0".as_ptr().cast(),
+                ),
+                "select simplex solver",
+            )?;
+            let parallel = if threads > 1 {
+                &b"on\0"[..]
+            } else {
+                &b"off\0"[..]
+            };
+            Self::check(
+                Highs_setStringOptionValue(
+                    master.highs.as_ptr(),
+                    b"parallel\0".as_ptr().cast(),
+                    parallel.as_ptr().cast(),
+                ),
+                "configure parallel mode",
+            )?;
+            master.thread_config = Some((threads, concurrency));
+        }
+        Ok(master)
+    }
+
+    /// Explicit worker-pool size, or None for the backend's adaptive defaults.
+    pub fn configured_threads(&self) -> Option<usize> {
+        self.thread_config.map(|(threads, _)| threads)
+    }
+
+    /// Configured maximum simplex concurrency, bounded by the HiGHS library.
+    pub fn simplex_concurrency(&self) -> Option<usize> {
+        self.thread_config.map(|(_, concurrency)| concurrency)
+    }
+
     /// Independently copy the model and install its current native basis.
     /// Native factorization storage is private to each instance; the child
     /// refactorizes this basis once, then reuses its own solver state.
     pub fn try_clone(&self) -> Result<Self> {
-        let mut copy = Self::new()?;
+        let mut copy = match self.configured_threads() {
+            Some(threads) => Self::with_threads(threads)?,
+            None => Self::new()?,
+        };
         copy.set_tolerances(self.primal_tolerance, self.dual_tolerance)?;
         let rows = self
             .senses
@@ -308,3 +395,7 @@ impl HighsMaster {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/master/solvers/highs/model/thread_tests.rs"]
+mod thread_tests;

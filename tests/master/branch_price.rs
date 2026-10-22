@@ -90,6 +90,140 @@ fn tree_closes_fractional_root_with_and_without_integer_heuristic() {
         assert_eq!(visited, vec![1, 2, 3]);
     }
 }
+
+#[test]
+fn tree_rejects_nonfinite_family_priorities_before_solving() {
+    let problem =
+        RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
+    for priority in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let mut controls = options();
+        controls.node_limit = 0;
+        controls.branching.priorities.arc_flow = priority;
+        let error = tree::solve(problem.clone(), controls).unwrap_err();
+        assert!(error.to_string().contains("priorities"), "{error}");
+    }
+}
+
+#[test]
+fn quota_one_records_trials_without_ranking_history_or_weakening_bounds() {
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let problem =
+            RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.)
+                .unwrap();
+        let mut controls = options();
+        controls.root.cg.bound_mode = mode;
+        controls.mip_node_limit = 0;
+        controls.branching = tree::BranchingOptions::arc_flow_only();
+        let mut strong = tree::StrongBranchingOptions::default();
+        strong.phases.truncate(1);
+        strong.phases[0].candidates = 1;
+        controls.strong_branching = Some(strong);
+        let out = tree::solve(problem, controls).unwrap();
+        assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");
+        assert!((out.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6, "{out:?}");
+        // Directed lower bounds and upward-rounded witnesses can differ by
+        // several ulps even when the requested optimality gap is closed.
+        assert!(out.bound <= out.incumbent);
+        assert!(out.incumbent - out.bound < 1e-6);
+        assert!(out.strong_branching_trials > 0);
+        assert!(!out.branch_history.evaluations.is_empty());
+        assert_eq!(out.branch_history.ranked_candidates, 0);
+    }
+}
+#[test]
+fn adaptive_trial_budget_changes_work_without_changing_the_optimum() {
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let problem =
+            RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.)
+                .unwrap();
+        let mut counts = vec![];
+        for ratio in [0., 0.5e-12] {
+            let mut controls = options();
+            controls.root.cg.bound_mode = mode;
+            controls.mip_node_limit = 0;
+            controls.branching = tree::BranchingOptions::arc_flow_only();
+            let mut strong = tree::StrongBranchingOptions::default();
+            strong.phases[0].subtree_ratio = ratio;
+            controls.strong_branching = Some(strong);
+            let out = tree::solve(problem.clone(), controls).unwrap();
+            assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");
+            assert!((out.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6, "{out:?}");
+            assert!(out.bound <= out.incumbent);
+            assert!(out.incumbent - out.bound < 1e-6);
+            counts.push(out.strong_branching_trials);
+        }
+        assert!(counts[1] < counts[0], "{mode:?}: {counts:?}");
+    }
+}
+
+#[test]
+fn completed_depth_history_keeps_numerical_and_certified_tree_bounds() {
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let problem =
+            RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.)
+                .unwrap();
+        let mut controls = options();
+        controls.root.cg.bound_mode = mode;
+        controls.mip_node_limit = 0;
+        controls.branching = tree::BranchingOptions::arc_flow_only();
+        let mut strong = tree::StrongBranchingOptions::default();
+        strong.use_history_subtree_size = true;
+        controls.strong_branching = Some(strong);
+        let out = tree::solve(problem, controls).unwrap();
+        assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");
+        assert!((out.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6, "{out:?}");
+        assert!(out.bound <= out.incumbent);
+        assert!(out.incumbent - out.bound < 1e-6);
+    }
+}
+
+#[test]
+fn invalid_subtree_ratios_are_rejected_before_solving() {
+    let problem =
+        RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
+    for ratio in [-1., f64::NAN, f64::INFINITY] {
+        let mut controls = options();
+        controls.node_limit = 0;
+        let mut strong = tree::StrongBranchingOptions::default();
+        strong.phases[0].subtree_ratio = ratio;
+        controls.strong_branching = Some(strong);
+        assert!(tree::solve(problem.clone(), controls)
+            .unwrap_err()
+            .to_string()
+            .contains("subtree ratios"));
+    }
+}
+
+#[test]
+fn singleton_skips_ranking_phases_but_keeps_exact_trials_and_bounds() {
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let problem =
+            RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.)
+                .unwrap();
+        let mut controls = options();
+        controls.root.cg.bound_mode = mode;
+        controls.mip_node_limit = 0;
+        controls.branching = tree::BranchingOptions::arc_flow_only();
+        let mut strong = tree::StrongBranchingOptions::default();
+        strong.phases[0].candidates = 1;
+        controls.strong_branching = Some(strong);
+        let out = tree::solve(problem, controls).unwrap();
+        assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");
+        assert!((out.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6, "{out:?}");
+        assert!(out.bound <= out.incumbent);
+        assert!(out.incumbent - out.bound < 1e-6);
+        assert!(out.strong_branching_trials > 0);
+        let stages: Vec<_> = out
+            .branch_history
+            .evaluations
+            .iter()
+            .filter_map(|evaluation| evaluation.stage)
+            .collect();
+        assert!(!stages.is_empty(), "{out:?}");
+        assert!(stages.iter().all(|&stage| stage == 1), "{stages:?}");
+        assert_eq!(out.branch_history.ranked_candidates, 0);
+    }
+}
 #[test]
 fn node_limit_preserves_open_bound_and_never_certifies_restricted_mip() {
     let problem =

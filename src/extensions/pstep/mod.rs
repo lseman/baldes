@@ -296,4 +296,5 @@ fn step_entries(demands: &[f64], step: &Step) -> Vec<(usize, f64)> {
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/extensions/pstep/tests.rs"]
 mod tests;

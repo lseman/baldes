@@ -15,15 +15,19 @@ unit customer coverage with equality rows.
 | `--branching vehicles` | Vehicle count, then arc-flow fallback |
 | `--branching ryan-foster` | Ryan–Foster, then arc-flow fallback |
 | `--branching arc` | Arc flow |
-| `--branching cluster` | Cluster boundary/pair variables with arc-flow candidates |
-| `--branching resource` | Accumulated-resource splits with arc-flow candidates |
-| `--branching hybrid` | Vehicle count, then combined native/new candidates |
+| `--branching cluster` | Cluster boundary/pair variables, then arc-flow fallback |
+| `--branching resource` | Accumulated-resource splits, then arc-flow fallback |
+| `--branching hybrid` | Vehicle count, resource/cluster, assignment, Ryan–Foster, arc flow |
 
-In native mode, the selector uses the first enabled family with fractional candidates. Within
+The default selector visits enabled families in descending model priority. Within
 an applicable family it orders candidates by closeness of the fractional part
 to 0.5, with stable ties. Phased strong branching then evaluates candidates
 when enabled. These are adapter priorities, not a combined ranking across all
-families.
+families. Families in the same integer priority group can contribute together.
+Rust callers can set `BranchingOptions::priorities`; its defaults are vehicle
+count 11, resource/cluster 10, assignment 3, Ryan–Foster 2 and arc flow 1.
+These are Baldes adapter settings; reference model interfaces also register
+priorities explicitly. Every supplied priority must be finite.
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
@@ -103,7 +107,20 @@ the arc; branch duals also reach pricing through that arc.
 
 Strong branching is enabled by default. Its three phases retain up to 100
 restricted-LP candidates, price three survivors heuristically, then evaluate
-one with exact pricing. `StrongBranchingOptions` exposes the phase and time
+one with exact pricing. An intermediate restricted-LP or heuristic phase is
+skipped when all remaining candidates fit in the next phase. Terminal phases
+still run their trials, including explicitly heuristic-only configurations.
+Each Rust `StrongPhase` also has a `subtree_ratio`: positive values limit
+branching work using the estimated remaining subtree size; zero disables that
+phase's adaptive limit. The defaults are 0.3, 0.1 and 1. Moving below the
+parent's stored branch-family priority cutoff restores the full fresh quota.
+These estimates schedule trials and never strengthen a pruning bound. The
+`Reliable` comparison policy retains its fixed budgets.
+Rust callers can enable `StrongBranchingOptions::use_history_subtree_size` to
+prefer completed subtree sizes at the current depth. Until that depth has an
+observation, the parent estimate remains the fallback. Partial or interrupted
+subtrees do not enter this average. The default keeps parent estimates.
+`StrongBranchingOptions` exposes the phase and time
 budgets. Disable it with `--no-strong-branching`.
 
 Strong round-up diving uses isolated route-fixing trials and depth,
@@ -174,6 +191,10 @@ tightened together. Empty member windows contribute zero-flow enforcement for
 those arcs, while other members remain available. Parent and sibling states
 stay independent.
 
+Complete enumeration retains distinct physical paths even when their packing
+support is identical. A costlier path can have a different resource profile
+and remain necessary after fixing routes or applying a descendant restriction.
+
 The Rust pricing API exposes `AccumulatedResourceBranch`, its `boundary()` and `satisfied_by()`
 methods, and the add/clear methods on `Solver`. To request a split near resource value `t`, pass
 `threshold = t + 1e-6`; `boundary()` reports the actual floating-point split.
@@ -181,8 +202,8 @@ Older builds used the supplied threshold directly. Existing callers that need
 to preserve their split must account for the offset when upgrading.
 
 `--branching hybrid` enables both new families alongside the native families.
-Vehicle count keeps its first priority; remaining enabled aggregate families
-and arc-flow candidates compete in the existing phased strong branching.
+Vehicle count keeps its first default priority. Resource/cluster candidates
+share the next priority; assignment, Ryan–Foster and arc flow remain fallbacks.
 `native` remains the default, with both new families disabled.
 
 ## Branch evaluation history
@@ -194,7 +215,7 @@ again. The last flag wins.
 
 `TreeOutput::branch_history` records finite strong-trial and completed node
 evaluations, exported as `branch_evaluations` in JSON. Each record identifies
-the constraint, depth, evaluation kind, one-based strong phase (`stage`), parent bound, child estimate, fractional
+the constraint, depth, evaluation kind, one-based evaluation stage (`stage`), parent bound, child estimate, fractional
 distance and elapsed time. Restricted-master, heuristic-pricing, exact-pricing
 and ordinary-node observations remain separately identified. Ordinary nodes have
 `stage: null`; they contribute to the Rust `Reliable` comparison policy but not
@@ -206,33 +227,51 @@ For each constraint and child direction, history averages signed objective gain
 divided by branching distance. It uses the latest local stage with either child
 observed; an unobserved child has mean zero. Each predicted child gain is capped
 by the incumbent-minus-parent gap, and their product supplies the score.
-Candidates are ordered by stage, then decreasing score, then lexical canonical
-constraint name. Negative gains are retained and there is no positive score
+Candidates are ordered by stage, then decreasing score, then lexical generator
+label. Resource groups use `ES_<packing_row>_rID_<resource>_<threshold>`, with
+the stored threshold displayed to six significant digits. Other families use
+canonical constraint names. Negative gains are retained and there is no positive score
 floor.
 
 At non-root nodes, half of the first strong-branching phase's budget is reserved
-for history; the remainder retains supplied candidate order. Without strong
+for history. Fresh generation stops before a lower integer priority group once
+it has candidates, or when its quota fills. The stopping priority determines
+which stored generators can enter history ranking. Enabled empty families still
+affect this cutoff. Admission happens before stored activity is replayed; a high
+historical score cannot bypass it. The remainder retains fresh candidate order. Without strong
 trials, history can still rank candidates. History starts empty for each solve
 and never supplies a pruning bound or marks a node infeasible.
 
 With accumulated-resource branching enabled, the default policy also retains
 evaluated group thresholds and refreshes their fractional activity at later
 nodes. An older threshold can enter history selection even when fresh separation
-chooses another threshold for that group. Already applied splits, integral
+chooses another threshold for that group. Evaluated arc, vehicle, assignment,
+Ryan–Foster and cluster generators also refresh under their enabled family
+priorities; numeric bounds are rebuilt around the current activity. Already applied splits, integral
 activities and groups without a valid packing proof are excluded. The recorded
 resource activity is the route mass strictly below the threshold boundary;
 down/up history distances are that activity and its complement.
 
-The default policy indexes observations by position in the configured strong
-phase list, independently of whether a trial uses restricted-master, heuristic
-or exact pricing. A sole exact phase is stage one. The `Reliable` policy keeps
-semantic evaluation kinds separate. Canonical constraint names identify Baldes
-candidates; complete native generator-name equivalence remains unverified, so
+The default policy indexes observations by the number of evaluations actually
+run on that candidate side at the current node, independently of whether a
+trial uses restricted-master, heuristic or exact pricing. Skipped phases consume
+no stage; an exact trial after skipped ranking phases is stage one. The `Reliable` policy keeps
+semantic evaluation kinds separate and retains the earlier adapter selection
+workflow for controlled comparisons. Custom priority scheduling applies to the
+default policy. Exact resource split identities remain
+distinct even when rounded display labels coincide. Rust adapters can register
+original model names with `branching.generator_names.insert(&constraint, name)`.
+Registering either side names both sides of that exact generator. Display names
+only resolve equal-score ties and never merge histories; unnamed generators
+retain canonical labels. Automatic name mapping across native model interfaces
+remains unverified, so
 identical native candidate selection is not guaranteed. No speed improvement
 is claimed.
 
 Rust defaults select `BranchHistoryPolicy::ObservedNative` in
-`BranchHistoryOptions`. The earlier `Reliable` policy remains available through
+`BranchHistoryOptions`. Per-network route-count branches remain fresh candidates;
+this policy excludes them from stored-history ranking and generator replay.
+Their trial measurements remain available in diagnostics. The earlier `Reliable` policy remains available through
 Rust for controlled comparisons: it requires `minimum_observations` on both
 sides, clamps negative gains, uses uncapped predictions with positive floors,
 and preserves supplied order on ties. `minimum_observations` does not affect

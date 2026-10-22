@@ -5,13 +5,12 @@ pub mod solvers;
 pub use solvers::clp;
 #[cfg(feature = "highs")]
 pub use solvers::highs;
-pub mod column_generation;
-mod progress;
 pub mod certificates;
-pub(crate) mod rounding;
+pub mod column_generation;
 pub mod lp_master;
-pub mod stabilization;
 pub mod preprocessing;
+mod progress;
+pub mod stabilization;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RowSense {
     Equal,
@@ -22,9 +21,9 @@ pub enum RowSense {
 #[cfg(feature = "clp")]
 pub mod branching;
 #[cfg(feature = "clp")]
-pub mod root;
-#[cfg(feature = "clp")]
 pub mod multi_pricing;
+#[cfg(feature = "clp")]
+pub mod root;
 /// Compatibility path; prefer [`multi_pricing`] for shared-master models.
 #[cfg(feature = "clp")]
 pub use multi_pricing as networks;

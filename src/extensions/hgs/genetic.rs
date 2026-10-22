@@ -29,9 +29,15 @@ impl<'a, 'p> Genetic<'a, 'p> {
         split: &'a mut Split<'p>,
         local_search: &'a mut HGSLocalSearch<'p>,
     ) -> Self {
-        let candidate_offsprings =
-            (0..NUMBER_OF_CANDIDATE_OFFSPRINGS).map(|_| Individual::new_empty(params)).collect();
-        Genetic { params, split, local_search, candidate_offsprings }
+        let candidate_offsprings = (0..NUMBER_OF_CANDIDATE_OFFSPRINGS)
+            .map(|_| Individual::new_empty(params))
+            .collect();
+        Genetic {
+            params,
+            split,
+            local_search,
+            candidate_offsprings,
+        }
     }
 
     /// Run the genetic algorithm until `max_iter_non_prod` consecutive
@@ -64,7 +70,9 @@ impl<'a, 'p> Genetic<'a, 'p> {
             let mut is_new_best = population.add_individual(offspring, true);
 
             // Repair half of the infeasible offspring with stronger penalties.
-            if !offspring.is_feasible && self.params.rng.borrow_mut().next() % 100 < repair_threshold {
+            if !offspring.is_feasible
+                && self.params.rng.borrow_mut().next() % 100 < repair_threshold
+            {
                 self.local_search.run(
                     offspring,
                     self.params.penalty_capacity.get() * 10.0,
@@ -80,7 +88,11 @@ impl<'a, 'p> Genetic<'a, 'p> {
             if nb_iter % 100 == 0 {
                 population.manage_penalties();
             }
-            let log_interval = if config.log_pool_interval > 0 { config.log_pool_interval as usize } else { 500 };
+            let log_interval = if config.log_pool_interval > 0 {
+                config.log_pool_interval as usize
+            } else {
+                500
+            };
             if nb_iter % log_interval == 0 {
                 population.print_state(nb_iter as i32, nb_iter_non_prod as i32);
             }
@@ -99,7 +111,8 @@ impl<'a, 'p> Genetic<'a, 'p> {
             // Growth of the granular neighborhoods and of the population.
             let grows = |every_iter: i32, every_non_improving: i32| {
                 (every_iter > 0 && nb_iter % every_iter as usize == 0)
-                    || (every_non_improving > 0 && nb_iter_non_prod % every_non_improving as usize == 0)
+                    || (every_non_improving > 0
+                        && nb_iter_non_prod % every_non_improving as usize == 0)
             };
             if config.grow_nb_granular_size != 0
                 && grows(
@@ -138,8 +151,15 @@ impl<'a, 'p> Genetic<'a, 'p> {
         let (start, end) = (start as usize, end as usize);
         for (index, (first, second)) in [(2, (parent_a, parent_b)), (3, (parent_b, parent_a))] {
             let child = &mut self.candidate_offsprings[index];
-            Self::do_ox_crossover(&mut child.chrom_t, &first.chrom_t, &second.chrom_t, start, end);
-            self.split.general_split(child, self.params.nb_vehicles as usize);
+            Self::do_ox_crossover(
+                &mut child.chrom_t,
+                &first.chrom_t,
+                &second.chrom_t,
+                start,
+                end,
+            );
+            self.split
+                .general_split(child, self.params.nb_vehicles as usize);
         }
         if self.candidate_offsprings[2].my_cost_sol.penalized_cost
             < self.candidate_offsprings[3].my_cost_sol.penalized_cost
@@ -152,7 +172,13 @@ impl<'a, 'p> Genetic<'a, 'p> {
 
     /// One OX crossover: copy `p1[start..=end]` (cyclically), then fill the
     /// positions after `end` with the missing clients in `p2` order from `end + 1`.
-    fn do_ox_crossover(child: &mut Vec<usize>, p1: &[usize], p2: &[usize], start: usize, end: usize) {
+    fn do_ox_crossover(
+        child: &mut Vec<usize>,
+        p1: &[usize],
+        p2: &[usize],
+        start: usize,
+        end: usize,
+    ) {
         let n = p1.len();
         child.clear();
         child.resize(n, 0);
@@ -194,12 +220,16 @@ impl<'a, 'p> Genetic<'a, 'p> {
         let n_moved = if n_routes_a.min(n_routes_b) == 1 {
             1
         } else {
-            (self.params.rng.borrow_mut().next() % (n_routes_a - 1).min(n_routes_b - 1) as u64) as usize + 1
+            (self.params.rng.borrow_mut().next() % (n_routes_a - 1).min(n_routes_b - 1) as u64)
+                as usize
+                + 1
         };
         let mut start_b = if start_a < n_routes_b { start_a } else { 0 };
 
         let selected = |routes: &[Vec<usize>], start: usize, count: usize| -> HashSet<usize> {
-            (0..n_moved).flat_map(|r| routes[(start + r) % count].iter().copied()).collect()
+            (0..n_moved)
+                .flat_map(|r| routes[(start + r) % count].iter().copied())
+                .collect()
         };
         let mut selected_a = selected(routes_a, start_a, n_routes_a);
         let mut selected_b = selected(routes_b, start_b, n_routes_b);
@@ -213,10 +243,12 @@ impl<'a, 'p> Genetic<'a, 'p> {
             let b_left = (start_b + n_routes_b - 1) % n_routes_b;
             let b_right = (start_b + n_moved) % n_routes_b;
             let b_last = (start_b + n_moved - 1) % n_routes_b;
-            let outside =
-                |route: &[usize], set: &HashSet<usize>| route.iter().filter(|c| !set.contains(c)).count() as i32;
-            let inside =
-                |route: &[usize], set: &HashSet<usize>| route.iter().filter(|c| set.contains(c)).count() as i32;
+            let outside = |route: &[usize], set: &HashSet<usize>| {
+                route.iter().filter(|c| !set.contains(c)).count() as i32
+            };
+            let inside = |route: &[usize], set: &HashSet<usize>| {
+                route.iter().filter(|c| set.contains(c)).count() as i32
+            };
             let differences = [
                 outside(&routes_a[a_left], &selected_b) - outside(&routes_a[a_last], &selected_b),
                 outside(&routes_a[a_right], &selected_b) - outside(&routes_a[start_a], &selected_b),
@@ -261,12 +293,19 @@ impl<'a, 'p> Genetic<'a, 'p> {
             let index_a = (start_a + r) % n_routes_a;
             let route_b = &routes_b[(start_b + r) % n_routes_b];
             child0.chrom_r[index_a].clone_from(route_b);
-            child1.chrom_r[index_a] = route_b.iter().copied().filter(|c| !b_not_a.contains(c)).collect();
+            child1.chrom_r[index_a] = route_b
+                .iter()
+                .copied()
+                .filter(|c| !b_not_a.contains(c))
+                .collect();
         }
         for r in n_moved..n_routes_a {
             let index_a = (start_a + r) % n_routes_a;
-            child0.chrom_r[index_a] =
-                routes_a[index_a].iter().copied().filter(|c| !b_not_a.contains(c)).collect();
+            child0.chrom_r[index_a] = routes_a[index_a]
+                .iter()
+                .copied()
+                .filter(|c| !b_not_a.contains(c))
+                .collect();
             child1.chrom_r[index_a].clone_from(&routes_a[index_a]);
         }
         for r in n_routes_a..nb_vehicles {
@@ -290,11 +329,16 @@ impl<'a, 'p> Genetic<'a, 'p> {
     /// Insert each unplanned client at its cheapest position whose time
     /// windows look reachable. HGS drops a client with no such position; this
     /// port then uses the cheapest position overall so no client is lost.
-    fn insert_unplanned_tasks(params: &Params, offspring: &mut Individual<'p>, unplanned_tasks: &[usize]) {
+    fn insert_unplanned_tasks(
+        params: &Params,
+        offspring: &mut Individual<'p>,
+        unplanned_tasks: &[usize],
+    ) {
         let time_cost = &params.time_cost;
         let clients = &params.cli;
-        let non_empty: Vec<usize> =
-            (0..params.nb_vehicles as usize).filter(|&r| !offspring.chrom_r[r].is_empty()).collect();
+        let non_empty: Vec<usize> = (0..params.nb_vehicles as usize)
+            .filter(|&r| !offspring.chrom_r[r].is_empty())
+            .collect();
 
         for &client in unplanned_tasks {
             let earliest = clients[client].earliest_arrival;
@@ -322,7 +366,8 @@ impl<'a, 'p> Genetic<'a, 'p> {
                 );
                 for pos in 1..route.len() {
                     let (prev, next) = (route[pos - 1], route[pos]);
-                    let (from_prev, to_next) = (time_cost.get(prev, client), time_cost.get(client, next));
+                    let (from_prev, to_next) =
+                        (time_cost.get(prev, client), time_cost.get(client, next));
                     consider(
                         from_prev + to_next - time_cost.get(prev, next),
                         r,

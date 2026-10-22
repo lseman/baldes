@@ -135,6 +135,7 @@ pub struct LabelStorage<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/labeling/storage/tests.rs"]
 mod tests;
 
 mod dominance;

@@ -141,7 +141,7 @@ fn extend_resource_lower_bounds<const D: usize>(
             bounds.lower = bounds.lower.max(window.lower);
             bounds.upper = bounds.upper.min(window.upper);
         }
-        *value = crate::master::rounding::add_down(*value, arc.consumption[r])
+        *value = crate::core::rounding::add_down(*value, arc.consumption[r])
             .ok_or(PathDomainFailure::Arithmetic)?
             .max(bounds.lower);
         if *value > bounds.upper {
@@ -422,4 +422,5 @@ impl<'g, const D: usize> CompleteCanonicalPaths<'g, D> {
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/enumeration/domain/tests.rs"]
 mod tests;

@@ -449,4 +449,5 @@ impl<'a, const D: usize> Sweep<'a, D> {
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/labeling/engine/sweep/presence_tests.rs"]
 mod presence_tests;

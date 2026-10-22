@@ -175,4 +175,5 @@ fn support<const D: usize>(
 }
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/master/multi_pricing/nonlinear/propagation/tests.rs"]
 mod tests;

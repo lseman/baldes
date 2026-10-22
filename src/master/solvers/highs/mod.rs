@@ -44,11 +44,18 @@ extern "C" {
         option: *const c_char,
         value: HighsInt,
     ) -> HighsInt;
-    #[cfg(test)]
     fn Highs_setStringOptionValue(
         highs: *mut c_void,
         option: *const c_char,
         value: *const c_char,
+    ) -> HighsInt;
+    fn Highs_getIntOptionValues(
+        highs: *const c_void,
+        option: *const c_char,
+        current: *mut HighsInt,
+        minimum: *mut HighsInt,
+        maximum: *mut HighsInt,
+        default_value: *mut HighsInt,
     ) -> HighsInt;
     fn Highs_getInfinity(highs: *const c_void) -> c_double;
     #[allow(clippy::too_many_arguments)]
@@ -204,6 +211,7 @@ struct SparseColumns {
 #[derive(Debug)]
 pub struct HighsMaster {
     highs: NonNull<c_void>,
+    thread_config: Option<(usize, usize)>,
     matrix_cache: OnceCell<SparseColumns>,
     pub rhs: Vec<f64>,
     pub senses: Vec<RowSense>,
@@ -276,6 +284,7 @@ mod integer;
 pub use integer::solve_integer;
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/master/solvers/highs/limit_tests.rs"]
 mod limit_tests;
 
 mod interface;

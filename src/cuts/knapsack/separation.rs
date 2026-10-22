@@ -151,14 +151,21 @@ impl KnapsackSeparator {
             for (row, (totals, rhs)) in rows.iter().enumerate() {
                 let mut limits = options.clone();
                 limits.time_limit = limits.time_limit.saturating_sub(started.elapsed());
-                if limits.time_limit.is_zero() { break; }
-                let report = FenchelSeparator::with_parameters(limits)?.separate_totals(totals, *rhs)?;
-                if let Some(cut) = report.cut { result.push((row, cut)); }
+                if limits.time_limit.is_zero() {
+                    break;
+                }
+                let report =
+                    FenchelSeparator::with_parameters(limits)?.separate_totals(totals, *rhs)?;
+                if let Some(cut) = report.cut {
+                    result.push((row, cut));
+                }
             }
             // Rank by scale-independent violation when families are combined.
             result.sort_by(|(left_row, left), (right_row, right)| {
                 let score = |cut: &RouteLoadKnapsackCut| cut.violation / f64::from(cut.rhs.max(1));
-                score(right).total_cmp(&score(left)).then(left_row.cmp(right_row))
+                score(right)
+                    .total_cmp(&score(left))
+                    .then(left_row.cmp(right_row))
                     .then(left.coefficients.cmp(&right.coefficients))
             });
             result.truncate(self.parameters.max_cuts_per_round);

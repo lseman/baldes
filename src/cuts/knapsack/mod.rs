@@ -56,7 +56,9 @@ fn validate_parameters(parameters: &KnapsackParameters) -> Result<()> {
     }
     if let Some(options) = &parameters.fenchel {
         options.validate()?;
-        if !cfg!(feature = "clp") { return Err(invalid("Fenchel separation requires the clp feature")); }
+        if !cfg!(feature = "clp") {
+            return Err(invalid("Fenchel separation requires the clp feature"));
+        }
     }
     Ok(())
 }

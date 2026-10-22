@@ -136,4 +136,5 @@ impl PresenceRow {
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/cuts/soft_conflicts/tests.rs"]
 mod tests;

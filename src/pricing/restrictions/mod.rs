@@ -4,3 +4,5 @@ pub mod ryan_foster;
 
 pub use accumulated_resource::AccumulatedResourceBranch;
 pub use ryan_foster::{BinaryConsumption, BranchState, RyanFosterConstraint, RyanFosterResources};
+
+mod application;

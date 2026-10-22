@@ -145,8 +145,10 @@ impl<'p> Split<'p> {
     /// Main entry point: convert the individual's giant tour into routes.
     pub fn general_split(&mut self, indiv: &mut Individual<'p>, nb_max_vehicles: usize) {
         // Don't apply Split with fewer vehicles than the trivial bin-packing bound.
-        let bin_packing_bound = (self.params.total_demand as f64 / self.params.vehicle_capacity as f64).ceil() as usize;
-        self.max_vehicles = nb_max_vehicles.max(bin_packing_bound)
+        let bin_packing_bound =
+            (self.params.total_demand as f64 / self.params.vehicle_capacity as f64).ceil() as usize;
+        self.max_vehicles = nb_max_vehicles
+            .max(bin_packing_bound)
             .min(self.params.nb_vehicles as usize);
 
         // Pre-fetch client data from the giant tour.
@@ -218,7 +220,8 @@ impl<'p> Split<'p> {
 
                     let cost = distance as f64
                         + self.cli_split[j].dx_0 as f64
-                        + self.params.penalty_capacity.get() * (load - self.params.vehicle_capacity).max(0) as f64;
+                        + self.params.penalty_capacity.get()
+                            * (load - self.params.vehicle_capacity).max(0) as f64;
 
                     if cumulative_cost + cost < self.potential[0][j] {
                         self.potential[0][j] = cumulative_cost + cost;
@@ -239,7 +242,9 @@ impl<'p> Split<'p> {
                     let back = queue.get_back() as usize;
 
                     if !self.dominates(back, i, 0) {
-                        while queue.size() > 0 && self.dominates_right(queue.get_back() as usize, i, 0) {
+                        while queue.size() > 0
+                            && self.dominates_right(queue.get_back() as usize, i, 0)
+                        {
                             queue.pop_back();
                         }
                         queue.push_back(i as i32);
@@ -275,7 +280,11 @@ impl<'p> Split<'p> {
             end = begin;
         }
 
-        if end == 0 { 1 } else { 0 }
+        if end == 0 {
+            1
+        } else {
+            0
+        }
     }
 
     /// Split for limited fleet — O(n * B) algorithm.
@@ -317,7 +326,8 @@ impl<'p> Split<'p> {
 
                         let cost = distance as f64
                             + self.cli_split[j].dx_0 as f64
-                            + self.params.penalty_capacity.get() * (load - self.params.vehicle_capacity).max(0) as f64;
+                            + self.params.penalty_capacity.get()
+                                * (load - self.params.vehicle_capacity).max(0) as f64;
 
                         if cumulative_cost + cost < self.potential[k + 1][j] {
                             self.potential[k + 1][j] = cumulative_cost + cost;
@@ -344,7 +354,9 @@ impl<'p> Split<'p> {
                     if i < self.params.nb_clients as usize {
                         let back = queue.get_back() as usize;
                         if !self.dominates(back, i, k) {
-                            while queue.size() > 0 && self.dominates_right(queue.get_back() as usize, i, k) {
+                            while queue.size() > 0
+                                && self.dominates_right(queue.get_back() as usize, i, k)
+                            {
                                 queue.pop_back();
                                 if queue.size() == 0 {
                                     break;
@@ -353,11 +365,17 @@ impl<'p> Split<'p> {
                             queue.push_back(i as i32);
                         }
 
-                        let mut next_front_prop = self.propagate(queue.get_front() as usize, i + 1, k);
-                        while queue.size() > 1 && next_front_prop > self.propagate(queue.get_next_front() as usize, i + 1, k) - MY_EPSILON {
+                        let mut next_front_prop =
+                            self.propagate(queue.get_front() as usize, i + 1, k);
+                        while queue.size() > 1
+                            && next_front_prop
+                                > self.propagate(queue.get_next_front() as usize, i + 1, k)
+                                    - MY_EPSILON
+                        {
                             queue.pop_front();
                             if queue.size() > 0 {
-                                next_front_prop = self.propagate(queue.get_front() as usize, i + 1, k);
+                                next_front_prop =
+                                    self.propagate(queue.get_front() as usize, i + 1, k);
                             }
                         }
                     }
@@ -398,7 +416,11 @@ impl<'p> Split<'p> {
             end = begin;
         }
 
-        if end == 0 { 1 } else { 0 }
+        if end == 0 {
+            1
+        } else {
+            0
+        }
     }
 
     /// Compute the cost of extending from predecessor `i` to client `j` using route `k`.
@@ -410,7 +432,8 @@ impl<'p> Split<'p> {
             + dist_diff as f64
             + self.cli_split[i + 1].d0_x as f64
             + self.cli_split[j].dx_0 as f64
-            + self.params.penalty_capacity.get() * (load_diff - self.params.vehicle_capacity).max(0) as f64
+            + self.params.penalty_capacity.get()
+                * (load_diff - self.params.vehicle_capacity).max(0) as f64
     }
 
     /// Test if `i` dominates `j` as a predecessor for all nodes >= j+1. Assumes i < j.
@@ -419,7 +442,8 @@ impl<'p> Split<'p> {
         let load_diff = self.sum_load[j] - self.sum_load[i];
 
         self.potential[k][j] + self.cli_split[j + 1].d0_x as f64
-            > self.potential[k][i] + self.cli_split[i + 1].d0_x as f64
+            > self.potential[k][i]
+                + self.cli_split[i + 1].d0_x as f64
                 + dist_diff as f64
                 + self.params.penalty_capacity.get() * load_diff as f64
     }
@@ -429,82 +453,13 @@ impl<'p> Split<'p> {
         let dist_diff = self.sum_distance[j + 1] - self.sum_distance[i + 1];
 
         (self.potential[k][j] + self.cli_split[j + 1].d0_x as f64)
-            < (self.potential[k][i] + self.cli_split[i + 1].d0_x as f64 + dist_diff as f64 + MY_EPSILON)
+            < (self.potential[k][i]
+                + self.cli_split[i + 1].d0_x as f64
+                + dist_diff as f64
+                + MY_EPSILON)
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::extensions::hgs::Params;
-    use crate::inputs::{Customer, Instance};
-
-    fn make_test_instance() -> Instance {
-        Instance {
-            name: "test-5".to_string(),
-            vehicles: 3,
-            capacity: 100.0,
-            customers: vec![
-                Customer { x: 0.0, y: 0.0, demand: 0.0, ready: 0.0, due: i32::MAX as f64, service: 0.0 },
-                Customer { x: 10.0, y: 0.0, demand: 10.0, ready: 0.0, due: 1000.0, service: 5.0 },
-                Customer { x: 20.0, y: 0.0, demand: 20.0, ready: 0.0, due: 1000.0, service: 10.0 },
-                Customer { x: 30.0, y: 0.0, demand: 15.0, ready: 0.0, due: 1000.0, service: 5.0 },
-                Customer { x: 40.0, y: 0.0, demand: 25.0, ready: 0.0, due: 1000.0, service: 10.0 },
-            ],
-            rounding: crate::inputs::Rounding::None,
-            distances: None,
-        }
-    }
-
-    #[test]
-    fn test_split_basic() {
-        let instance = make_test_instance();
-        let params = Params::from_instance(&instance);
-        let mut indiv = Individual::new_random(&params);
-
-        let mut split = Split::new(&params);
-        split.general_split(&mut indiv, 3);
-
-        // After split, routes should be populated.
-        assert!(indiv.chrom_r.iter().any(|r| !r.is_empty()));
-    }
-
-    #[test]
-    fn test_split_preserves_all_customers() {
-        let instance = make_test_instance();
-        let params = Params::from_instance(&instance);
-        let mut indiv = Individual::new_random(&params);
-
-        let mut split = Split::new(&params);
-        split.general_split(&mut indiv, 3);
-
-        // All customers should appear exactly once across all routes.
-        let mut all_customers: Vec<usize> = Vec::new();
-        for route in &indiv.chrom_r {
-            all_customers.extend(route);
-        }
-        all_customers.sort();
-        assert_eq!(all_customers, vec![1, 2, 3, 4]);
-    }
-
-    #[test]
-    fn test_trivial_deque() {
-        let mut dq = TrivialDeque::new(10, 0);
-        assert_eq!(dq.size(), 1);
-        assert_eq!(dq.get_front(), 0);
-
-        dq.push_back(1);
-        dq.push_back(2);
-        assert_eq!(dq.size(), 3);
-        assert_eq!(dq.get_front(), 0);
-        assert_eq!(dq.get_back(), 2);
-
-        dq.pop_front();
-        assert_eq!(dq.size(), 2);
-        assert_eq!(dq.get_front(), 1);
-
-        dq.pop_back();
-        assert_eq!(dq.size(), 1);
-        assert_eq!(dq.get_back(), 1);
-    }
-}
+#[path = "../../../tests/unit/extensions/hgs/split/tests.rs"]
+mod tests;

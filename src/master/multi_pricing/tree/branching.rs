@@ -13,6 +13,18 @@ pub(super) fn children<const D: usize>(
     tolerance: f64,
 ) -> Result<Option<Vec<NodeSnapshot<D>>>> {
     let node = &output.snapshot;
+    let mut resources = node.resource_group_candidates(tolerance)?;
+    resources.sort_by(|a, b| (a.value - 0.5).abs().total_cmp(&(b.value - 0.5).abs()));
+    for candidate in resources {
+        // Candidate generation is heuristic. If a child's exact schedule cannot
+        // be reconstructed, neither child may prune: use another disjunction.
+        // Attachment works on private forks and leaves this parent unchanged.
+        if let Ok(down) = candidate.apply(node, false) {
+            if let Ok(up) = candidate.apply(node, true) {
+                return Ok(Some(vec![down, up]));
+            }
+        }
+    }
     let assignments = node.fractional_assignments(tolerance)?;
     if let Some(c) = assignments
         .iter()

@@ -429,6 +429,7 @@ pub fn coefficient(
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/cuts/registry/coefficient_tests.rs"]
 mod coefficient_tests;
 
 mod kpath_registration;

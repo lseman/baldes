@@ -205,4 +205,5 @@ fn shortest<const D: usize>(
 }
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/master/multi_pricing/bounds/presence/tests.rs"]
 mod tests;

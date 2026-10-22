@@ -1,9 +1,7 @@
 //! Necessary zero-penalty implications over the original network domain.
 use super::*;
-use crate::master::{
-    preprocessing::Bounds,
-    rounding::{add_down, multiply_down},
-};
+use crate::core::rounding::{add_down, multiply_down};
+use crate::master::preprocessing::Bounds;
 
 /// Return aggregate arc activities proved zero. No route enumeration is used.
 /// A positive arc consumption step supplies resource-load implications.

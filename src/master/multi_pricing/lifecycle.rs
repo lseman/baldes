@@ -369,7 +369,7 @@ impl<const D: usize> NodeSnapshot<D> {
                 return Err(invalid("fixed quantity exceeds remaining route cap"));
             }
             if upper.is_finite() {
-                let remaining = -crate::master::rounding::add_down(quantity, -upper)
+                let remaining = -crate::core::rounding::add_down(quantity, -upper)
                     .ok_or_else(|| invalid("fixed route cap arithmetic"))?;
                 Some((canonical, remaining.max(0.)))
             } else {
@@ -405,7 +405,7 @@ impl<const D: usize> NodeSnapshot<D> {
         oracle.network.multiplicity.upper -= quantity;
         if let Some(upper) = oracle.proved_multiplicity_upper {
             oracle.proved_multiplicity_upper = Some(
-                crate::master::rounding::add_up(upper, -quantity)
+                crate::core::rounding::add_up(upper, -quantity)
                     .ok_or_else(|| invalid("fixed multiplicity proof arithmetic"))?
                     .max(0.),
             );

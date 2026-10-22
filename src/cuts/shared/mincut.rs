@@ -30,7 +30,7 @@ fn erase_value(v: &mut Vec<i32>, x: i32) {
     }
 }
 impl MinCutDigraph {
-    /// Links i < j in both adjacency lists when cap[j][i] + cap[i][j] > 1e-6.
+    /// Links `i < j` in both adjacency lists when `cap[j][i] + cap[i][j] > 1e-6`.
     pub fn new(capacity: Vec<Vec<f64>>) -> Self {
         Self::new_with_terminals(capacity, -1, -1)
     }
@@ -42,8 +42,11 @@ impl MinCutDigraph {
         for i in 0..n {
             for j in i + 1..capacity[i].len() {
                 if capacity[j][i] + capacity[i][j] <= 1e-6
-                    && i as i32 != source && j as i32 != source
-                    && i as i32 != sink && j as i32 != sink {
+                    && i as i32 != source
+                    && j as i32 != source
+                    && i as i32 != sink
+                    && j as i32 != sink
+                {
                     continue;
                 }
                 adjacency[i].push(j as i32);
@@ -225,7 +228,8 @@ impl MinCutDigraph {
                     self.is_active.set(b);
                 }
                 let labels = &self.labels;
-                self.active.sort_by(|x, y| labels[*y as usize].cmp(&labels[*x as usize]));
+                self.active
+                    .sort_by(|x, y| labels[*y as usize].cmp(&labels[*x as usize]));
                 if self.active.is_empty() {
                     finished = true;
                     break;

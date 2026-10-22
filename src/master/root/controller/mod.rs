@@ -16,7 +16,7 @@ pub(super) use checkpoint::PricingCheckpoint;
 use pool::synchronize_pool;
 use separation::separation_gap_closed;
 #[cfg(test)]
-#[path = "tests.rs"]
+#[path = "../../../../tests/unit/master/root/controller/tests.rs"]
 mod synchronization_tests;
 
 pub(super) struct RootController<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {

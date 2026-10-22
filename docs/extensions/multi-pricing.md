@@ -601,6 +601,15 @@ it. Disposable resources can wait to satisfy an upper window. Equality resources
 cannot wait. Restrictions cover every occurrence of each listed physical arc,
 including parallel alternatives. Other networks and arcs remain available.
 
+Shared trees also generate disposable-resource groups automatically from original
+unit packing rows. They combine physical occurrences across networks, account for
+ancestor windows and use feasible forward/backward schedule intervals to select
+a threshold. Rust callers can inspect the current solved node with
+`parent.resource_group_candidates(1e-6)?` and attach either side with
+`candidate.apply(&parent, upper)?`. The tree tries these candidates before its
+assignment and aggregate-activity fallbacks. A failed attachment leaves the
+parent reusable and causes the tree to try another disjunction.
+
 Children own their restrictions through solves, further branches, route fixing,
 enumeration and MIP. Parent and sibling snapshots remain reusable. Retained
 schedules refresh under their existing route tags and caps. Fixed schedules

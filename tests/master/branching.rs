@@ -83,8 +83,8 @@ fn ryan_foster_pricing_and_enumeration_obey_both_children() {
 #[cfg(feature = "clp")]
 fn triangle_problem() -> baldes::master::root::RootProblem {
     use baldes::{
-        master::root::RootProblem,
         inputs::{Instance, Rounding},
+        master::root::RootProblem,
     };
     let instance=Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap()
@@ -206,16 +206,33 @@ fn candidate_families_use_network_route_counts_and_pair_weights() {
     assert!(!rf.is_empty());
     assert!(rf.iter().all(|c| matches!(c.down, B::RyanFoster(_))));
     assert!(rf.iter().all(|c| (c.value - 0.5).abs() < 1e-6));
+    let mut custom = BranchingOptions::default();
+    custom.priorities.number_of_vehicles = 1.;
+    let reordered = candidates(&p, &out, &custom);
+    assert!(!reordered.is_empty());
+    assert!(reordered.iter().all(|c| matches!(c.down, B::RyanFoster(_))));
+    custom.priorities.ryan_foster = f64::NAN;
+    assert!(candidates(&p, &out, &custom).is_empty());
     let arc = candidates(&p, &out, &BranchingOptions::arc_flow_only());
     assert!(!arc.is_empty());
     assert!(arc.iter().all(|c| matches!(c.down, B::ArcFlow { .. })));
-    let cluster = candidates(&p, &out, &BranchingOptions {
-        clusters: Some(baldes::master::branching::ClusterBranchingOptions {
-            partition: Some(vec![vec![1], vec![2], vec![3]]), ..Default::default()
-        }), ..BranchingOptions::arc_flow_only()
-    });
-    assert!(cluster.iter().any(|c| matches!(c.down, B::ClusterBoundary { .. })));
-    assert!(cluster.iter().any(|c| matches!(c.down, B::ClusterPair { .. })));
+    let cluster = candidates(
+        &p,
+        &out,
+        &BranchingOptions {
+            clusters: Some(baldes::master::branching::ClusterBranchingOptions {
+                partition: Some(vec![vec![1], vec![2], vec![3]]),
+                ..Default::default()
+            }),
+            ..BranchingOptions::arc_flow_only()
+        },
+    );
+    assert!(cluster
+        .iter()
+        .any(|c| matches!(c.down, B::ClusterBoundary { .. })));
+    assert!(cluster
+        .iter()
+        .any(|c| matches!(c.down, B::ClusterPair { .. })));
     for candidate in cluster {
         assert!((candidate.value - candidate.value.round()).abs() > 1e-6);
         let (down_sense, down_rhs) = candidate.down.row();
@@ -340,26 +357,41 @@ fn removing_branch_rebuilds_the_unrestricted_pricing_domain() {
 
 #[test]
 fn accumulated_resource_windows_cover_schedules_and_restore_pricing() {
-    use baldes::pricing::restrictions::AccumulatedResourceBranch;
     use baldes::graph::ResourceKind;
+    use baldes::pricing::restrictions::AccumulatedResourceBranch;
     for mode in [0., 1., 2.] {
         for kind in [ResourceKind::Disposable, ResourceKind::Equality] {
             for upper in [false, true] {
                 let mut s = solver();
                 s.graph.resources[0] = kind;
                 s.graph.elementary = true;
-                if kind == ResourceKind::Equality { s.graph.set_bounds(4, 0, 3., 3.).unwrap(); }
+                if kind == ResourceKind::Equality {
+                    s.graph.set_bounds(4, 0, 3., 3.).unwrap();
+                }
                 s.set_option("BALDESuseBidirectionalSearch", mode).unwrap();
-                let arc = s.graph.arcs.iter().find(|a| a.tail == 2 && a.head == 1).unwrap().id;
+                let arc = s
+                    .graph
+                    .arcs
+                    .iter()
+                    .find(|a| a.tail == 2 && a.head == 1)
+                    .unwrap()
+                    .id;
                 let before = s.price_phase(0, 150, false).unwrap();
                 let baseline = s.graph.clone();
-                let rule = AccumulatedResourceBranch { arc, resource: 0, threshold: 2.5, upper };
+                let rule = AccumulatedResourceBranch {
+                    arc,
+                    resource: 0,
+                    threshold: 2.5,
+                    upper,
+                };
                 let index = s.add_accumulated_resource_branch(rule).unwrap();
                 assert_eq!(index, 0);
                 assert!(s.enumeration.is_none());
                 let priced = s.price_phase(0, 150, false).unwrap();
                 assert!(priced.exact);
-                let enumerated = s.enumerate(100.).unwrap_or_else(|e| panic!("mode={mode} kind={kind:?} upper={upper}: {e}"));
+                let enumerated = s
+                    .enumerate(100.)
+                    .unwrap_or_else(|e| panic!("mode={mode} kind={kind:?} upper={upper}: {e}"));
                 assert!(!enumerated.is_empty());
                 for route in priced.columns.iter().chain(&enumerated) {
                     for (i, &id) in route.arcs.iter().enumerate() {
@@ -370,14 +402,30 @@ fn accumulated_resource_windows_cover_schedules_and_restore_pricing() {
                     }
                 }
                 let expected = enumerated.iter().map(|r| r.cost).fold(1e12, f64::min);
-                assert_eq!(priced.minimum_reduced_cost, expected, "mode={mode} {kind:?}");
+                assert_eq!(
+                    priced.minimum_reduced_cost, expected,
+                    "mode={mode} {kind:?}"
+                );
                 let child = s.fork_for_node();
                 s.clear_accumulated_resource_branches().unwrap();
                 assert_eq!(s.graph, baseline);
                 assert_ne!(child.graph, s.graph);
-                assert_eq!(s.price_phase(0, 150, false).unwrap().minimum_reduced_cost, before.minimum_reduced_cost);
-                assert!(s.add_accumulated_resource_branch(AccumulatedResourceBranch { resource: 2, ..rule }).is_err());
-                assert!(s.add_accumulated_resource_branch(AccumulatedResourceBranch { threshold: f64::NAN, ..rule }).is_err());
+                assert_eq!(
+                    s.price_phase(0, 150, false).unwrap().minimum_reduced_cost,
+                    before.minimum_reduced_cost
+                );
+                assert!(s
+                    .add_accumulated_resource_branch(AccumulatedResourceBranch {
+                        resource: 2,
+                        ..rule
+                    })
+                    .is_err());
+                assert!(s
+                    .add_accumulated_resource_branch(AccumulatedResourceBranch {
+                        threshold: f64::NAN,
+                        ..rule
+                    })
+                    .is_err());
                 assert!(s.accumulated_resource_branches().is_empty());
             }
         }
@@ -387,41 +435,105 @@ fn accumulated_resource_windows_cover_schedules_and_restore_pricing() {
 #[cfg(feature = "clp")]
 #[test]
 fn aggregate_branches_match_fresh_and_inherited_masters() {
-    use baldes::master::{branching::BranchConstraint as B, root::{self, RootOptions}, RowSense};
+    use baldes::master::{
+        branching::BranchConstraint as B,
+        root::{self, RootOptions},
+        RowSense,
+    };
     use baldes::pricing::restrictions::AccumulatedResourceBranch;
-    for (enumerate, mode) in [(false, root::BoundMode::Numerical), (true, root::BoundMode::Numerical), (false, root::BoundMode::Certified)] {
-    let p = triangle_problem();
-    let arc = p.graph.arcs.iter().find(|a| a.tail == 1 && a.head == p.graph.sink).unwrap().id;
-    let mut options = RootOptions::default();
-    options.capture_state = true;
-    options.bound_mode = mode;
-    options.enumerate = enumerate;
-    options.incumbent = 100.;
-    options.cg.stabilize = false;
-    options.cg.multiplicity = 3.;
-    let parent = root::solve(p.clone(), options.clone()).unwrap();
-    let snapshot = parent.snapshot.as_ref().unwrap();
-    for branch in [
-        B::ClusterBoundary { vertices: vec![1, 2], sense: RowSense::LessEqual, rhs: 1. },
-        B::ClusterBoundary { vertices: vec![1, 2], sense: RowSense::GreaterEqual, rhs: 2. },
-        B::ClusterPair { first: vec![1], second: vec![2, 3], sense: RowSense::LessEqual, rhs: 0. },
-        B::ClusterPair { first: vec![p.graph.source, p.graph.sink], second: vec![1, 2], sense: RowSense::GreaterEqual, rhs: 2. },
-        B::AccumulatedResource(AccumulatedResourceBranch { arc, resource: 0, threshold: 1.5, upper: false }),
-        B::AccumulatedResource(AccumulatedResourceBranch { arc, resource: 0, threshold: 1.5, upper: true }),
-        B::AccumulatedResource(AccumulatedResourceBranch { arc, resource: 0, threshold: -1., upper: false }),
+    for (enumerate, mode) in [
+        (false, root::BoundMode::Numerical),
+        (true, root::BoundMode::Numerical),
+        (false, root::BoundMode::Certified),
     ] {
-        let child = root::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
-        let mut cold = p.clone(); cold.branch(branch.clone()).unwrap();
-        let fresh = root::solve(cold, options.clone()).unwrap();
-        assert_eq!(child.master.status, fresh.master.status, "{branch:?}");
-        assert!((child.master.lp - fresh.master.lp).abs() < 1e-6, "{branch:?}: child={} fresh={}", child.master.lp, fresh.master.lp);
-        let (sense, rhs) = branch.row();
-        let activity: f64 = child.route_values().iter().map(|(r, x)| branch.coefficient(&p, r) * x).sum();
-        assert!(match sense { RowSense::LessEqual => activity <= rhs + 1e-6,
-            RowSense::GreaterEqual => activity >= rhs - 1e-6, RowSense::Equal => (activity-rhs).abs()<1e-6 }, "{branch:?} activity={activity}");
-        assert_eq!(snapshot.branch_depth(), 0);
-        assert_eq!(child.snapshot.as_ref().unwrap().branch_depth(), 1);
-    }
+        let p = triangle_problem();
+        let arc = p
+            .graph
+            .arcs
+            .iter()
+            .find(|a| a.tail == 1 && a.head == p.graph.sink)
+            .unwrap()
+            .id;
+        let mut options = RootOptions::default();
+        options.capture_state = true;
+        options.bound_mode = mode;
+        options.enumerate = enumerate;
+        options.incumbent = 100.;
+        options.cg.stabilize = false;
+        options.cg.multiplicity = 3.;
+        let parent = root::solve(p.clone(), options.clone()).unwrap();
+        let snapshot = parent.snapshot.as_ref().unwrap();
+        for branch in [
+            B::ClusterBoundary {
+                vertices: vec![1, 2],
+                sense: RowSense::LessEqual,
+                rhs: 1.,
+            },
+            B::ClusterBoundary {
+                vertices: vec![1, 2],
+                sense: RowSense::GreaterEqual,
+                rhs: 2.,
+            },
+            B::ClusterPair {
+                first: vec![1],
+                second: vec![2, 3],
+                sense: RowSense::LessEqual,
+                rhs: 0.,
+            },
+            B::ClusterPair {
+                first: vec![p.graph.source, p.graph.sink],
+                second: vec![1, 2],
+                sense: RowSense::GreaterEqual,
+                rhs: 2.,
+            },
+            B::AccumulatedResource(AccumulatedResourceBranch {
+                arc,
+                resource: 0,
+                threshold: 1.5,
+                upper: false,
+            }),
+            B::AccumulatedResource(AccumulatedResourceBranch {
+                arc,
+                resource: 0,
+                threshold: 1.5,
+                upper: true,
+            }),
+            B::AccumulatedResource(AccumulatedResourceBranch {
+                arc,
+                resource: 0,
+                threshold: -1.,
+                upper: false,
+            }),
+        ] {
+            let child =
+                root::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
+            let mut cold = p.clone();
+            cold.branch(branch.clone()).unwrap();
+            let fresh = root::solve(cold, options.clone()).unwrap();
+            assert_eq!(child.master.status, fresh.master.status, "{branch:?}");
+            assert!(
+                (child.master.lp - fresh.master.lp).abs() < 1e-6,
+                "{branch:?}: child={} fresh={}",
+                child.master.lp,
+                fresh.master.lp
+            );
+            let (sense, rhs) = branch.row();
+            let activity: f64 = child
+                .route_values()
+                .iter()
+                .map(|(r, x)| branch.coefficient(&p, r) * x)
+                .sum();
+            assert!(
+                match sense {
+                    RowSense::LessEqual => activity <= rhs + 1e-6,
+                    RowSense::GreaterEqual => activity >= rhs - 1e-6,
+                    RowSense::Equal => (activity - rhs).abs() < 1e-6,
+                },
+                "{branch:?} activity={activity}"
+            );
+            assert_eq!(snapshot.branch_depth(), 0);
+            assert_eq!(child.snapshot.as_ref().unwrap().branch_depth(), 1);
+        }
     }
 }
 
@@ -431,7 +543,9 @@ fn equality_bucket_jumps_cannot_invent_resource_consumption() {
     for mode in [0., 1., 2.] {
         let mut s = Solver::<2>::new(3, 1).unwrap();
         s.graph.resources[0] = ResourceKind::Equality;
-        for v in 0..3 { s.graph.set_bounds(v, 0, 0., 3.).unwrap(); }
+        for v in 0..3 {
+            s.graph.set_bounds(v, 0, 0., 3.).unwrap();
+        }
         s.graph.set_bounds(2, 0, 3., 3.).unwrap();
         let arc = s.graph.add_arc(0, 1, -1.).unwrap();
         s.graph.arc_mut(arc).unwrap().consumption[0] = 1.;
@@ -449,24 +563,58 @@ fn resource_boundary_belongs_to_both_sides_and_empty_intersections_forbid_only_t
     use baldes::pricing::restrictions::AccumulatedResourceBranch;
     for mode in [0., 1., 2.] {
         for upper in [false, true] {
-            let mut s = solver(); s.graph.elementary = true;
+            let mut s = solver();
+            s.graph.elementary = true;
             s.set_option("BALDESuseBidirectionalSearch", mode).unwrap();
-            let arc = s.graph.arcs.iter().find(|a| a.tail == 0 && a.head == 1).unwrap().id;
-            let rule = AccumulatedResourceBranch { arc, resource: 0, threshold: 1., upper };
+            let arc = s
+                .graph
+                .arcs
+                .iter()
+                .find(|a| a.tail == 0 && a.head == 1)
+                .unwrap()
+                .id;
+            let rule = AccumulatedResourceBranch {
+                arc,
+                resource: 0,
+                threshold: 1.,
+                upper,
+            };
             s.graph.arc_mut(arc).unwrap().consumption[0] = rule.boundary();
             s.add_accumulated_resource_branch(rule).unwrap();
             let result = s.price_phase(0, 100, false).unwrap();
             assert!(result.columns.iter().any(|r| r.arcs.first() == Some(&arc)));
-            for route in result.columns.iter().filter(|r| r.arcs.first() == Some(&arc)) {
+            for route in result
+                .columns
+                .iter()
+                .filter(|r| r.arcs.first() == Some(&arc))
+            {
                 assert_eq!(route.resource_profile[1][0], rule.boundary());
             }
             // Both an inherited restrictive window and an empty intersection
             // must be undone, in reverse order, without weakening other arcs.
-            s.add_accumulated_resource_branch(AccumulatedResourceBranch { threshold: if upper { 4. } else { -1. }, ..rule }).unwrap();
-            assert!(s.price_phase(0, 100, false).unwrap().columns.iter().all(|r| !r.arcs.contains(&arc)));
-            assert!(s.enumerate(100.).unwrap().iter().all(|r| !r.arcs.contains(&arc)));
+            s.add_accumulated_resource_branch(AccumulatedResourceBranch {
+                threshold: if upper { 4. } else { -1. },
+                ..rule
+            })
+            .unwrap();
+            assert!(s
+                .price_phase(0, 100, false)
+                .unwrap()
+                .columns
+                .iter()
+                .all(|r| !r.arcs.contains(&arc)));
+            assert!(s
+                .enumerate(100.)
+                .unwrap()
+                .iter()
+                .all(|r| !r.arcs.contains(&arc)));
             s.clear_accumulated_resource_branches().unwrap();
-            assert!(s.price_phase(0, 100, false).unwrap().columns.iter().any(|r| r.arcs.first() == Some(&arc)));
+            assert!(s
+                .price_phase(0, 100, false)
+                .unwrap()
+                .columns
+                .iter()
+                .any(|r| r.arcs.first() == Some(&arc)));
         }
     }
 }

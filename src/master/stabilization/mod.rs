@@ -403,4 +403,5 @@ fn cosine(center: &[f64], priced: &[f64], g: &[f64]) -> f64 {
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/master/stabilization/tests.rs"]
 mod tests;

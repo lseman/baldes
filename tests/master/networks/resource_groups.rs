@@ -2,6 +2,201 @@
 use super::*;
 use multi_pricing::{EnumerationOptions, ResourceGroupMember};
 
+fn adjacent_pair_problem(q: f64) -> (Problem<5>, Vec<ResourceGroupMember>) {
+    let mut networks = vec![];
+    let mut members = vec![];
+    for (id, base) in [
+        (7, vec![vec![0, 1], vec![1, 2], vec![0], vec![1], vec![2]]),
+        (42, vec![vec![0, 2], vec![0], vec![1], vec![2]]),
+    ] {
+        let mut routes: Vec<_> = (0..3)
+            .flat_map(|t| {
+                base.iter()
+                    .map(move |r| r.iter().map(|v| v + 3 * t).collect::<Vec<_>>())
+            })
+            .collect();
+        if id == 7 {
+            routes.push(vec![6, 7]);
+        }
+        let sink = routes.iter().map(Vec::len).sum::<usize>() + 1;
+        let mut graph = Graph::<5>::new(sink + 1, 5).unwrap();
+        for v in 0..=sink {
+            for resource in 0..5 {
+                graph.set_bounds(v, resource, 0., 2.).unwrap();
+            }
+        }
+        let mut vertex = 1;
+        let mut entries = vec![];
+        let mut arcs = vec![];
+        let count = routes.len();
+        for (index, route) in routes.into_iter().enumerate() {
+            let special = id == 7 && index + 1 == count;
+            let mut tail = 0;
+            for (step, customer) in route.into_iter().enumerate() {
+                let cost = if step == 0 {
+                    if special {
+                        1.125
+                    } else {
+                        1.
+                    }
+                } else {
+                    0.
+                };
+                let arc = graph.add_arc(tail, vertex, cost).unwrap();
+                let data = graph.arc_mut(arc).unwrap();
+                data.consumption[4] = if special && step == 1 { q - 1. } else { 1. };
+                data.consumption[3] = if special && step == 1 { 0. } else { 1. };
+                entries.push(vec![(customer, 1.)]);
+                if customer == 7 {
+                    arcs.push(arc);
+                }
+                tail = vertex;
+                vertex += 1;
+            }
+            graph.add_arc(tail, sink, 0.).unwrap();
+            entries.push(vec![]);
+        }
+        members.push(ResourceGroupMember { network: id, arcs });
+        networks.push(Network {
+            id,
+            graph,
+            multiplicity: Window::new(0., 9.).unwrap(),
+            arc_entries: entries,
+            route_entries: vec![],
+        });
+    }
+    (
+        Problem {
+            rows: vec![
+                Row {
+                    sense: RowSense::Equal,
+                    rhs: 1.
+                };
+                9
+            ],
+            networks,
+        },
+        members,
+    )
+}
+
+#[test]
+fn enumeration_keeps_costlier_same_cover_path_for_fixed_resource_descendant() {
+    let boundary: f64 = 2. - 1e-6;
+    let q = f64::from_bits(boundary.to_bits() - 1);
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let (problem, members) = adjacent_pair_problem(q);
+        let mut configured = options();
+        configured.cg.bound_mode = mode;
+        let parent = multi_pricing::solve(problem, configured.clone()).unwrap();
+        let complete = parent
+            .snapshot
+            .enumerate(&EnumerationOptions::default())
+            .unwrap();
+        let loaded = complete.solve(configured.clone()).unwrap();
+        optimal(&loaded, 4.5);
+        // Equal packing support does not identify a physical path: the more
+        // expensive pair has a different resource profile and can be fixed.
+        let special = loaded
+            .routes
+            .iter()
+            .position(|r| r.network == 7 && r.route.arcs == [36, 37, 38])
+            .expect("complete enumeration must retain the distinct original path");
+        assert_eq!(loaded.routes[special].route.resource_profile[2][4], q);
+        let child = loaded
+            .snapshot
+            .fix_route(special, 1.)
+            .unwrap()
+            .with_resource_group_branch(7, 4, 2., false, &members)
+            .unwrap();
+        optimal(&child.solve(configured.clone()).unwrap(), 5.125);
+        let tree = child
+            .solve_assignment_tree(multi_pricing::AssignmentTreeOptions {
+                node: configured.clone(),
+                node_limit: 1000,
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(tree.status, baldes::master::tree::TreeStatus::Optimal);
+        assert_eq!(tree.incumbent, 6.125);
+        assert!(tree.incumbent - tree.bound < 1e-6);
+        optimal(&parent.snapshot.solve(configured).unwrap(), 4.5);
+    }
+}
+
+#[test]
+fn adjacent_pair_profiles_close_both_children_without_repeating_the_split() {
+    let boundary: f64 = 2. - 1e-6;
+    let quantities = [
+        f64::from_bits(boundary.to_bits() - 1),
+        boundary,
+        f64::from_bits(boundary.to_bits() + 1),
+    ];
+    for q in quantities {
+        let (problem, members) = adjacent_pair_problem(q);
+        for mode in [BoundMode::Numerical, BoundMode::Certified] {
+            let mut configured = options();
+            configured.cg.bound_mode = mode;
+            let parent = multi_pricing::solve(problem.clone(), configured.clone()).unwrap();
+            optimal(&parent, 4.5);
+            for upper in [false, true] {
+                let child = parent
+                    .snapshot
+                    .with_resource_group_branch(7, 4, 2., upper, &members)
+                    .unwrap();
+                for enumeration in [false, true] {
+                    let enumerated = if enumeration {
+                        Some(child.enumerate(&EnumerationOptions::default()).unwrap())
+                    } else {
+                        None
+                    };
+                    let start = enumerated.as_ref().unwrap_or(&child);
+                    let solved = start.solve(configured.clone()).unwrap();
+                    assert!(!solved
+                        .snapshot
+                        .resource_group_candidates(1e-6)
+                        .unwrap()
+                        .iter()
+                        .any(|c| { c.packing_row == 7 && c.resource == 4 && c.threshold == 2. }));
+                    let tree = solved
+                        .snapshot
+                        .solve_assignment_tree(multi_pricing::AssignmentTreeOptions {
+                            node: configured.clone(),
+                            node_limit: 1000,
+                            ..Default::default()
+                        })
+                        .unwrap();
+                    assert_eq!(
+                        tree.status,
+                        baldes::master::tree::TreeStatus::Optimal,
+                        "q={q:?}, upper={upper}, enumeration={enumeration}: {tree:?}"
+                    );
+                    assert!((tree.incumbent - 6.).abs() < 1e-7);
+                    assert!(tree.bound <= tree.incumbent);
+                    assert!(tree.incumbent - tree.bound < 1e-6);
+                    for fixed in tree.routes {
+                        let member = members
+                            .iter()
+                            .find(|m| m.network == fixed.route.network)
+                            .unwrap();
+                        for (i, arc) in fixed.route.route.arcs.iter().enumerate() {
+                            if member.arcs.contains(arc) {
+                                let value = fixed.route.route.resource_profile[i + 1][4];
+                                assert!(if upper {
+                                    value >= boundary
+                                } else {
+                                    value <= boundary
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            optimal(&parent.snapshot.solve(configured).unwrap(), 4.5);
+        }
+    }
+}
+
 fn fixture(waiting: bool) -> (Problem<5>, Vec<ResourceGroupMember>) {
     let mut networks = vec![];
     let mut members = vec![];
@@ -584,12 +779,50 @@ fn public_triangle_group_mapping_survives_actual_shared_tree_descendants() {
         configured.cg.bound_mode = mode;
         let parent = multi_pricing::solve(problem.clone(), configured.clone()).unwrap();
         optimal(&parent, 4.5);
+        let choices = parent.snapshot.resource_group_candidates(1e-6).unwrap();
+        let mapped = choices
+            .iter()
+            .find(|c| c.packing_row == 1 && c.resource == 4)
+            .expect("the public packing group must be generated automatically");
+        assert_eq!(mapped.threshold, 2.);
+        assert_eq!(mapped.value, 0.5);
+        for member in &members {
+            let actual = mapped
+                .members
+                .iter()
+                .find(|m| m.network == member.network)
+                .unwrap();
+            let mut expected = member.arcs.clone();
+            expected.sort_unstable();
+            assert_eq!(actual.arcs, expected);
+        }
+        let automatic = parent
+            .snapshot
+            .solve_assignment_tree(multi_pricing::AssignmentTreeOptions {
+                node: configured.clone(),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(
+            automatic.status,
+            baldes::master::tree::TreeStatus::Optimal,
+            "{automatic:?}"
+        );
+        assert_eq!((automatic.incumbent, automatic.bound), (6., 6.));
+        assert!(automatic.nodes > 1);
         for upper in [false, true] {
             let child = parent
                 .snapshot
                 .with_resource_group_branch(1, 4, 2., upper, &members)
                 .unwrap();
             optimal(&child.solve(configured.clone()).unwrap(), 5.);
+            let solved = child.solve(configured.clone()).unwrap();
+            assert!(!solved
+                .snapshot
+                .resource_group_candidates(1e-6)
+                .unwrap()
+                .iter()
+                .any(|c| c.packing_row == 1 && c.resource == 4 && c.threshold == 2.));
             let tree = child
                 .solve_assignment_tree(multi_pricing::AssignmentTreeOptions {
                     node: configured.clone(),
@@ -751,4 +984,89 @@ fn rounded_compatible_profiles_cannot_hide_an_exact_fixed_resource_contradiction
         );
     }
     optimal(&parent.snapshot.solve(options()).unwrap(), 1.);
+}
+
+#[test]
+fn automatic_shared_resource_candidates_keep_weighted_mass_and_ancestor_windows() {
+    for complete in [false, true] {
+        let mut graph = Graph::<5>::new(5, 5).unwrap();
+        let mut entries = vec![];
+        let mut support = vec![];
+        for v in 0..5 {
+            for r in 0..5 {
+                graph.set_bounds(v, r, 0., 3.).unwrap();
+            }
+        }
+        // The cheap LP mixture is .25 low + .75 high. The middle path is a
+        // feasible integer alternative with cost four, so the tree must cover it.
+        for (v, q, cost, balance) in [(1, 0.5, 1., 3.), (2, 2.5, 1., -1.), (3, 1.5, 4., 0.)] {
+            graph.set_bounds(v, 4, 0., q).unwrap();
+            let a = graph.add_arc(0, v, cost).unwrap();
+            graph.arc_mut(a).unwrap().consumption[4] = q;
+            support.push(a);
+            entries.push(vec![(0, 1.), (1, balance)]);
+            graph.add_arc(v, 4, 0.).unwrap();
+            entries.push(vec![]);
+        }
+        let problem = Problem {
+            rows: vec![
+                Row {
+                    sense: RowSense::Equal,
+                    rhs: 1.,
+                },
+                Row {
+                    sense: RowSense::Equal,
+                    rhs: 0.,
+                },
+            ],
+            networks: vec![Network {
+                id: 42,
+                graph,
+                multiplicity: Window::new(0., 1.).unwrap(),
+                arc_entries: entries,
+                route_entries: vec![],
+            }],
+        };
+        let mut configured = options();
+        if complete {
+            configured.enumeration = Some(EnumerationOptions::default());
+        }
+        let parent = multi_pricing::solve(problem, configured.clone()).unwrap();
+        optimal(&parent, 1.);
+        assert!(parent.snapshot.resource_group_candidates(0.).is_err());
+        let candidates = parent.snapshot.resource_group_candidates(1e-6).unwrap();
+        assert_eq!(candidates.len(), 1);
+        let c = &candidates[0];
+        assert_eq!(
+            (c.packing_row, c.resource, c.threshold, c.value),
+            (0, 4, 2.5, 0.25)
+        );
+        assert_eq!(c.members.len(), 1);
+        assert_eq!(c.members[0].arcs, support);
+        let lower = c
+            .apply(&parent.snapshot, false)
+            .unwrap()
+            .solve(configured.clone())
+            .unwrap();
+        optimal(&lower, 4.);
+        assert!(lower
+            .snapshot
+            .resource_group_candidates(1e-6)
+            .unwrap()
+            .is_empty());
+        let tree = parent
+            .snapshot
+            .solve_assignment_tree(multi_pricing::AssignmentTreeOptions {
+                node: configured.clone(),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(
+            tree.status,
+            baldes::master::tree::TreeStatus::Optimal,
+            "{tree:?}"
+        );
+        assert_eq!((tree.incumbent, tree.bound), (4., 4.));
+        optimal(&parent.snapshot.solve(configured).unwrap(), 1.);
+    }
 }

@@ -12,7 +12,7 @@ pub struct Label<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub parent: Option<usize>,
     pub arc: Option<usize>,
     pub hops: usize,
-    /// Full-memory cut state (State<FullMemSBCutsResources>).
+    /// Full-memory cut state (`State<FullMemSBCutsResources>`).
     pub cut_words: [u32; FULL_WORDS],
     pub cut_cost: f64,
     pub presence_state: crate::cuts::soft_conflicts::LabelState,

@@ -13,6 +13,39 @@ pub struct ResourceInterval {
 
 const EPSILON: f64 = 1e-6;
 
+/// Latest feasible head quantities along a physical path. Callers supply the
+/// current domain windows, including ancestor restrictions.
+pub(crate) fn suffix_upper<const D: usize>(
+    graph: &crate::Graph<D>,
+    route: &crate::Route,
+    resource: usize,
+    position: impl Fn(i32) -> Option<usize>,
+    head_window: impl Fn(&crate::graph::Arc<D>) -> Option<crate::graph::Window>,
+) -> Option<Vec<f64>> {
+    let mut result = vec![0.; route.arcs.len()];
+    let mut upper = graph.vertices[graph.sink].bounds[resource].upper;
+    let mut expected_head = graph.sink;
+    for (i, &id) in route.arcs.iter().enumerate().rev() {
+        let arc = &graph.arcs[position(id)?];
+        if arc.head != expected_head {
+            return None;
+        }
+        let window = head_window(arc)?;
+        upper = upper.min(window.upper);
+        if upper < window.lower {
+            return None;
+        }
+        result[i] = upper;
+        upper = (upper - arc.consumption[resource])
+            .min(graph.vertices[arc.tail].bounds[resource].upper);
+        if !upper.is_finite() || upper < graph.vertices[arc.tail].bounds[resource].lower {
+            return None;
+        }
+        expected_head = arc.tail;
+    }
+    (expected_head == graph.source).then_some(result)
+}
+
 /// Native resource-generator activity at a stored threshold. This is the mass
 /// strictly below the shared boundary, not the lower child's violation row.
 /// Keeping that orientation makes U child one (upper) use distance `1-value`
@@ -123,36 +156,5 @@ fn update(nodes: &mut Vec<(f64, f64)>, quantity: f64, weight: f64, bound: f64, u
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-
-
-    #[test]
-    fn no_split_and_invalid_intervals_are_distinct() {
-        assert_eq!(select_resource_threshold(&[], 10.).unwrap(), None);
-        let i = ResourceInterval {
-            lower: 1.,
-            upper: 2.,
-            weight: 1.,
-        };
-        assert_eq!(select_resource_threshold(&[i], 10.).unwrap(), None);
-        for bad in [
-            ResourceInterval {
-                lower: f64::NAN,
-                ..i
-            },
-            ResourceInterval {
-                upper: f64::INFINITY,
-                ..i
-            },
-            ResourceInterval { lower: 3., ..i },
-            ResourceInterval { weight: 0., ..i },
-            ResourceInterval { weight: -1., ..i },
-        ] {
-            assert!(select_resource_threshold(&[bad], 10.).is_err());
-        }
-        assert!(select_resource_threshold(&[i], 1.).is_err());
-        assert!(select_resource_threshold(&[i], f64::INFINITY).is_err());
-    }
-}
+#[path = "../../../tests/unit/master/branching/resource_intervals/tests.rs"]
+mod tests;

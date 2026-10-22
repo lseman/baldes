@@ -1,6 +1,6 @@
 //! Request-bound numerical oracle results, distinct from directed certificates.
 use super::*;
-use crate::master::rounding::{add_down, multiply_down};
+use crate::core::rounding::{add_down, multiply_down};
 
 /// Caller-supplied global numerical reduced-cost lower bound for every possible
 /// missing column in this group's intended domain, at this exact request.

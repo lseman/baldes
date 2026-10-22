@@ -14,13 +14,6 @@ impl<const D: usize> LabelArena<D> {
         }
     }
 
-    /// Select representation after clearing dual-dependent labels. Repeated
-    /// pricing calls retain and reuse their compact allocation.
-    #[cfg(test)]
-    pub(crate) fn set_ordinary(&mut self, ordinary: bool) {
-        self.set_mode(ordinary, false);
-    }
-
     pub(crate) fn set_word_limit(&mut self, words: usize) {
         assert!(words <= LIMITED_WORDS);
         self.word_limit = words;

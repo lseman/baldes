@@ -1,6 +1,6 @@
 //! Complete-domain column caps and their Lagrangian compensation.
 use super::*;
-use crate::master::rounding::{add_down, multiply_down};
+use crate::core::rounding::{add_down, multiply_down};
 
 pub(super) fn upper<const D: usize>(state: &State<D>, tag: usize) -> Option<f64> {
     let route = state.routes.get(tag)?;
@@ -86,4 +86,5 @@ pub(super) fn certificate<const D: usize>(state: &State<D>, duals: &[f64]) -> Op
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/master/multi_pricing/route_bounds/tests.rs"]
 mod tests;

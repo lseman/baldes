@@ -112,6 +112,7 @@ impl<'p> Clone for Individual<'p> {
 }
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/extensions/hgs/individual/tests.rs"]
 mod tests;
 
 mod construction;

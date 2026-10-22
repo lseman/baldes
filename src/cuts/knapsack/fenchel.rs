@@ -371,4 +371,5 @@ fn certify(
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/cuts/knapsack/fenchel/tests.rs"]
 mod tests;

@@ -58,14 +58,22 @@ fn ce_command_solves_route_lp_and_reports_limits() {
     assert!(report["max_vehicles"].is_null());
     assert!((report["lp_bound"].as_f64().unwrap() - 2.0).abs() < 1e-6);
 
+    // The stronger initial diagram already solves the three-customer fixture.
+    // This four-customer case still needs refinement and exercises its budget.
+    let budget_file = file.with_extension("budget.txt");
+    std::fs::write(&budget_file,"ce-limit\nVEHICLE\nNUMBER CAPACITY\n4 3\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 10000 0\n1 12 13 1 0 10000 0\n2 1 8 1 0 10000 0\n3 16 15 1 0 10000 0\n4 12 9 1 0 10000 0\n").unwrap();
     for (flag, value, status) in [
         ("--time", "0", "TimeLimit"),
         ("--iterations", "0", "IterationLimit"),
-        ("--nodes", "11", "DiagramLimit"),
+        ("--nodes", "18", "DiagramLimit"),
     ] {
         let output = command()
             .arg("ce")
-            .arg(&file)
+            .arg(if status == "DiagramLimit" {
+                &budget_file
+            } else {
+                &file
+            })
             .args([flag, value, "--json"])
             .arg(&json)
             .output()
@@ -80,7 +88,11 @@ fn ce_command_solves_route_lp_and_reports_limits() {
         assert_eq!(report["status"], status);
         assert!(report["lp_bound"].is_null());
         assert!(report["routes"].as_array().unwrap().is_empty());
+        if status == "DiagramLimit" {
+            assert!(report["refinements"].as_u64().unwrap() > 0);
+        }
     }
+    std::fs::remove_file(budget_file).unwrap();
     std::fs::remove_file(file).unwrap();
     std::fs::remove_file(json).unwrap();
 }
@@ -162,7 +174,7 @@ fn ce_vrptw_windows_and_progress_logging() {
                 stderr.contains("Lower bound") && stderr.contains("Infeasible"),
                 "{stderr}"
             );
-            assert!(stderr.contains("CE finished: Converged"), "{stderr}");
+            assert!(stderr.contains("CE Converged"), "{stderr}");
             let rows: Vec<_> = stderr
                 .lines()
                 .filter(|line| {
@@ -191,7 +203,7 @@ fn ce_vrptw_windows_and_progress_logging() {
         .output()
         .unwrap();
     assert!(output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("CE finished: TimeLimit"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("CE TimeLimit"));
     std::fs::remove_file(file).unwrap();
     std::fs::remove_file(json).unwrap();
 }

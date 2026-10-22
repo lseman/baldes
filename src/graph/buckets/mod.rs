@@ -94,6 +94,7 @@ fn floor_isize(x: f64) -> isize {
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/graph/buckets/tests.rs"]
 mod tests;
 
 mod grid;

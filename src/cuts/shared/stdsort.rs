@@ -21,7 +21,13 @@ fn unguarded_linear_insert<T, F: Fn(&T, &T) -> bool>(v: &mut [T], mut last: usiz
         last -= 1;
     }
 }
-fn adjust_heap<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], mut hole: usize, len: usize, value: T, less: &F) {
+fn adjust_heap<T: Clone, F: Fn(&T, &T) -> bool>(
+    v: &mut [T],
+    mut hole: usize,
+    len: usize,
+    value: T,
+    less: &F,
+) {
     let top = hole;
     let mut second = hole;
     while second < (len - 1) / 2 {
@@ -66,7 +72,13 @@ fn heap_sort<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], less: &F) {
         adjust_heap(&mut v[..last], 0, last, value, less);
     }
 }
-fn move_median_to_first<T, F: Fn(&T, &T) -> bool>(v: &mut [T], a: usize, b: usize, c: usize, less: &F) {
+fn move_median_to_first<T, F: Fn(&T, &T) -> bool>(
+    v: &mut [T],
+    a: usize,
+    b: usize,
+    c: usize,
+    less: &F,
+) {
     if less(&v[a], &v[b]) {
         if less(&v[b], &v[c]) {
             v.swap(0, b);
@@ -149,7 +161,11 @@ pub fn stable_sort<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], less: F) {
     merge_sort_with_buffer(right, &mut buffer, &less);
     merge_adaptive(v, half, &mut buffer, &less);
 }
-fn merge_sort_with_buffer<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], buffer: &mut Vec<T>, less: &F) {
+fn merge_sort_with_buffer<T: Clone, F: Fn(&T, &T) -> bool>(
+    v: &mut [T],
+    buffer: &mut Vec<T>,
+    less: &F,
+) {
     let len = v.len();
     const CHUNK: usize = 7;
     let mut start = 0;
@@ -170,19 +186,42 @@ fn merge_sort_with_buffer<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], buffer: 
     }
 }
 /// __merge_sort_loop: merges runs of `step` from `from` into `to`.
-fn merge_sort_loop<T: Clone, F: Fn(&T, &T) -> bool>(from: &[T], to: &mut [T], step: usize, less: &F) {
+fn merge_sort_loop<T: Clone, F: Fn(&T, &T) -> bool>(
+    from: &[T],
+    to: &mut [T],
+    step: usize,
+    less: &F,
+) {
     let two = 2 * step;
     let len = from.len();
     let mut first = 0;
     let mut out = 0;
     while len - first >= two {
-        out = move_merge(&from[first..first + step], &from[first + step..first + two], to, out, less);
+        out = move_merge(
+            &from[first..first + step],
+            &from[first + step..first + two],
+            to,
+            out,
+            less,
+        );
         first += two;
     }
     let step = step.min(len - first);
-    move_merge(&from[first..first + step], &from[first + step..len], to, out, less);
+    move_merge(
+        &from[first..first + step],
+        &from[first + step..len],
+        to,
+        out,
+        less,
+    );
 }
-fn move_merge<T: Clone, F: Fn(&T, &T) -> bool>(a: &[T], b: &[T], to: &mut [T], mut out: usize, less: &F) -> usize {
+fn move_merge<T: Clone, F: Fn(&T, &T) -> bool>(
+    a: &[T],
+    b: &[T],
+    to: &mut [T],
+    mut out: usize,
+    less: &F,
+) -> usize {
     let (mut i, mut j) = (0, 0);
     while i < a.len() && j < b.len() {
         if less(&b[j], &a[i]) {
@@ -205,7 +244,12 @@ fn move_merge<T: Clone, F: Fn(&T, &T) -> bool>(a: &[T], b: &[T], to: &mut [T], m
     out
 }
 /// __merge_adaptive with a sufficient buffer.
-fn merge_adaptive<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], middle: usize, _buffer: &mut Vec<T>, less: &F) {
+fn merge_adaptive<T: Clone, F: Fn(&T, &T) -> bool>(
+    v: &mut [T],
+    middle: usize,
+    _buffer: &mut Vec<T>,
+    less: &F,
+) {
     let len1 = middle;
     let len2 = v.len() - middle;
     if len1 <= len2 {
@@ -262,17 +306,5 @@ fn merge_adaptive<T: Clone, F: Fn(&T, &T) -> bool>(v: &mut [T], middle: usize, _
 }
 
 #[cfg(test)]
-mod tests {
-    #[test]
-    fn stable_sorts() {
-        let mut v: Vec<(i32, usize)> = (0..200).map(|i| ((i * 7919) % 13, i as usize)).collect();
-        super::stable_sort(&mut v, |a, b| a.0 < b.0);
-        assert!(v.windows(2).all(|w| w[0].0 < w[1].0 || (w[0].0 == w[1].0 && w[0].1 < w[1].1)));
-    }
-    #[test]
-    fn sorts() {
-        let mut v: Vec<i32> = (0..200).map(|i| (i * 7919) % 101).collect();
-        super::sort(&mut v, |a, b| a < b);
-        assert!(v.windows(2).all(|w| w[0] <= w[1]));
-    }
-}
+#[path = "../../../tests/unit/cuts/shared/stdsort/tests.rs"]
+mod tests;

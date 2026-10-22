@@ -33,7 +33,7 @@ pub struct SolveResult {
     pub iterations: usize,
     pub refinements: usize,
     pub nodes: usize,
-    /// Includes disabled arcs, which count toward the memory budget.
+    /// Retained arcs after feasibility reduction and compaction.
     pub arcs: usize,
 }
 
@@ -42,7 +42,7 @@ impl Problem {
     /// column elimination. `make_lp` must supply a fresh empty backend each
     /// iteration; rebuilding avoids backend-dependent basis mutation.
     ///
-    /// The initial diagram allows repeated visits and ignores resources.
+    /// The initial diagram allows repeated visits and uses relaxed resource bounds.
     /// Refinement deletes only prefixes proven infeasible by exact replay.
     /// The initial diagram exceeding its budget returns an error; subsequent
     /// budgets return an explicit non-converged status and the last bound.
@@ -99,29 +99,48 @@ impl Problem {
             }
             let paths = dd.decompose(lp.values(), options.tolerance)?;
             result.lower_bound = Some(lp.objective());
-            let mut conflict = None;
+            let mut conflicts = Vec::new();
             let mut infeasible = 0;
-            for (ids, route) in &paths {
+            for (_, route) in &paths {
                 if let Some(i) = self.conflict(&route.path) {
                     infeasible += 1;
-                    if conflict.is_none() {
-                        conflict = Some(ids[..=i].to_vec());
-                    }
+                    // Keep locations rather than arc IDs: preceding splits in
+                    // this batch can redirect or copy the shared prefix arcs.
+                    conflicts.push(route.path[1..=i + 1].to_vec());
                 }
             }
             progress.iteration(&result, paths.len(), infeasible);
-            if let Some(prefix) = conflict {
-                if started.elapsed() >= options.time_limit {
-                    result.status = Status::TimeLimit;
-                    break;
+            if !conflicts.is_empty() {
+                let mut stopped = false;
+                for prefix in conflicts {
+                    if started.elapsed() >= options.time_limit {
+                        result.status = Status::TimeLimit;
+                        stopped = true;
+                        break;
+                    }
+                    let mut separated = dd.separate_locations(&prefix, &options)?;
+                    if separated == Some(false) {
+                        // Earlier splits in this batch may have left dead
+                        // nodes. Reclaim them before declaring a budget stop.
+                        dd.reduce();
+                        separated = dd.separate_locations(&prefix, &options)?;
+                    }
+                    match separated {
+                        Some(true) => result.refinements += 1,
+                        Some(false) => {
+                            result.status = Status::DiagramLimit;
+                            stopped = true;
+                            break;
+                        }
+                        None => {} // An earlier refinement already removed it.
+                    }
                 }
-                if !dd.separate(&prefix, &options)? {
-                    result.status = Status::DiagramLimit;
-                    break;
-                }
-                result.refinements += 1;
+                dd.reduce();
                 result.nodes = dd.nodes.len();
                 result.arcs = dd.arcs.len();
+                if stopped {
+                    break;
+                }
             } else {
                 let routes: Vec<_> = paths.into_iter().map(|(_, r)| r).collect();
                 // Reject appreciable residual losses instead of claiming convergence
@@ -163,19 +182,19 @@ impl Diagram {
         }
         lp.set_tolerances(tolerance * 0.1, tolerance * 0.1)?;
         let n = problem.demands.len();
-        for _ in 0..n {
-            lp.add_row(RowSense::Equal, 1.0, &[])?;
-        }
-        for _ in 2..self.nodes.len() {
-            lp.add_row(RowSense::Equal, 0.0, &[])?;
-        }
+        let mut rows = vec![(RowSense::Equal, 1.0, &[][..]); n];
+        rows.extend((2..self.nodes.len()).map(|_| (RowSense::Equal, 0.0, &[][..])));
         let fleet_row = if let Some(k) = problem.max_vehicles {
-            Some(lp.add_row(RowSense::LessEqual, k, &[])?)
+            let row = rows.len();
+            rows.push((RowSense::LessEqual, k, &[]));
+            Some(row)
         } else {
             None
         };
+        lp.add_rows(&rows)?;
         // Keep a one-to-one mapping between arc IDs and LP columns, including
         // disabled arcs fixed at zero. No flow row is needed at root or sink.
+        let mut coefficients = Vec::with_capacity(self.arcs.len());
         for arc in &self.arcs {
             let mut entries = Vec::with_capacity(4);
             let location = self.nodes[arc.to].location;
@@ -194,9 +213,24 @@ impl Diagram {
                 }
             }
             entries.sort_unstable_by_key(|e| e.0);
-            let column = lp.add_column(arc.cost, &entries)?;
-            // Degree rows imply each nonnegative arc flow <=1.
-            lp.set_upper(column, if arc.active { 1.0 } else { 0.0 })?;
+            coefficients.push(entries);
+        }
+        // Native Clp appends copy the matrix. Load all columns together rather
+        // than paying quadratic construction cost on large diagrams.
+        let columns: Vec<_> = self
+            .arcs
+            .iter()
+            .zip(&coefficients)
+            .map(|(arc, entries)| (arc.cost, entries.as_slice()))
+            .collect();
+        lp.add_columns(&columns)?;
+        for (column, arc) in self.arcs.iter().enumerate() {
+            // Degree and flow rows already imply every active arc flow <=1.
+            // Setting redundant bounds individually copies Clp's full bound
+            // vector each time. Only disabled arcs require explicit fixing.
+            if !arc.active {
+                lp.set_upper(column, 0.0)?;
+            }
         }
         Ok(lp)
     }

@@ -2,6 +2,7 @@
 mod accumulated_resource;
 mod arc_flow;
 mod cluster;
+pub(crate) mod generator_identity;
 mod grouped_resource;
 mod number_of_vehicles;
 mod options;
@@ -12,8 +13,9 @@ mod ryan_foster;
 use crate::master::{root::RootProblem, RowSense};
 use crate::{invalid, pricing::restrictions::RyanFosterConstraint, Result, Route};
 pub use cluster::ClusterBranchingOptions;
+pub use generator_identity::BranchGeneratorNames;
 pub use grouped_resource::AccumulatedResourceGroupBranch;
-pub use options::BranchingOptions;
+pub use options::{BranchPriorities, BranchingOptions};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum BranchConstraint {

@@ -21,6 +21,17 @@ pub fn solve<const D: usize>(
         ));
     }
     problem.graph.validate()?;
+    options.branching.priorities.validate()?;
+    if options.strong_branching.as_ref().is_some_and(|strong| {
+        strong
+            .phases
+            .iter()
+            .any(|phase| !phase.subtree_ratio.is_finite() || phase.subtree_ratio < 0.)
+    }) {
+        return Err(invalid(
+            "strong branching subtree ratios must be finite and nonnegative",
+        ));
+    }
     let standard = RootProblem::set_partitioning(
         problem.graph.clone(),
         problem
@@ -116,12 +127,25 @@ pub fn solve<const D: usize>(
         deadline,
     );
     let mut open = vec![Node {
+        lineage: 0,
+        subtree: Default::default(),
         observation: None,
         branches: vec![],
         bound: 0.,
         parent: None,
     }];
     let mut unresolved = vec![];
+    let mut subtree_history = options
+        .strong_branching
+        .as_ref()
+        .filter(|strong| {
+            strong.use_history_subtree_size
+                && !options
+                    .branch_history
+                    .as_ref()
+                    .is_some_and(|h| h.policy == BranchHistoryPolicy::Reliable)
+        })
+        .map(|_| strong::SubtreeHistory::new());
     // Tolerance closure does not strengthen a node's lower certificate to
     // the incumbent. These leaves still contribute to the global minimum.
     let mut closed_bound = f64::INFINITY;
@@ -130,6 +154,9 @@ pub fn solve<const D: usize>(
         // Discard only nodes whose selected bound closes the global gap.
         open.retain(|n| {
             if closed(n.bound, output.incumbent, &options) {
+                if let Some(history) = &mut subtree_history {
+                    history.close(n.lineage);
+                }
                 closed_bound = closed_bound.min(n.bound);
                 false
             } else {
@@ -208,6 +235,9 @@ pub fn solve<const D: usize>(
         output.fixing_calls += result.fixing_calls;
         output.enumerated_routes += result.enumerated_routes;
         if result.preprocessing.infeasible {
+            if let Some(history) = &mut subtree_history {
+                history.close(node.lineage);
+            }
             continue;
         }
         // The LP objective may include artificials or come from a heuristic
@@ -238,6 +268,9 @@ pub fn solve<const D: usize>(
             deadline,
         )?;
         if closed(node.bound, output.incumbent, &options) {
+            if let Some(history) = &mut subtree_history {
+                history.close(node.lineage);
+            }
             closed_bound = closed_bound.min(node.bound);
             continue;
         }
@@ -261,26 +294,78 @@ pub fn solve<const D: usize>(
                 *flows.entry(problem.arc_position(id).unwrap()).or_default() += value;
             }
         }
-        let mut candidates = candidates::candidates_with_history(
-            &problem,
-            &result,
-            &options.branching,
-            &node.branches,
-        );
+        let legacy = options
+            .branch_history
+            .as_ref()
+            .is_some_and(|h| h.policy == BranchHistoryPolicy::Reliable);
+        let mut quota = options
+            .strong_branching
+            .as_ref()
+            .map_or(usize::MAX, |s| s.phases.first().map_or(0, |p| p.candidates));
+        let mut budget = options
+            .strong_branching
+            .as_ref()
+            .filter(|_| !legacy)
+            .map(|strong| {
+                let average = subtree_history
+                    .as_ref()
+                    .and_then(|history| history.mean(node.branches.len()));
+                let mut estimate = node.subtree;
+                if let Some(size) = average {
+                    estimate.size = size;
+                }
+                let mut budget = strong::CandidateBudget::new(
+                    quota,
+                    strong
+                        .phases
+                        .first()
+                        .map_or(0., |phase| phase.subtree_ratio),
+                    estimate,
+                );
+                if average.is_some() {
+                    budget.use_history();
+                }
+                budget
+            });
+        if let Some(budget) = &budget {
+            quota = budget.quota;
+        }
+        let mut candidates = if legacy {
+            candidates::legacy_candidates_with_history(
+                &problem,
+                &result,
+                &options.branching,
+                &node.branches,
+            )
+        } else {
+            candidates::fresh_candidates_with_budget(
+                &problem,
+                &result,
+                &options.branching,
+                &node.branches,
+                quota,
+                budget.as_mut(),
+            )
+        };
+        if let Some(budget) = &budget {
+            quota = budget.quota;
+            node.subtree = budget.estimate;
+        }
+        let cutoff = BranchEvaluationHistory::cutoff(&candidates, quota, &options.branching);
+        let fresh_count = candidates.len();
         if !node.branches.is_empty()
-            && options.branching.accumulated_resource
+            && quota >= 2
             && options
                 .branch_history
                 .as_ref()
                 .is_some_and(|history| history.policy == BranchHistoryPolicy::ObservedNative)
-            && !candidates
-                .iter()
-                .any(|c| matches!(c.down, BranchConstraint::NumberOfVehicles { .. }))
         {
-            output.branch_history.refresh_resource_generators(
+            output.branch_history.refresh_generators(
                 &problem,
                 &result.route_values(),
                 &node.branches,
+                &options.branching,
+                cutoff,
                 &mut candidates,
             );
         }
@@ -296,6 +381,9 @@ pub fn solve<const D: usize>(
             deadline,
         )?;
         if closed(node.bound, output.incumbent, &options) {
+            if let Some(history) = &mut subtree_history {
+                history.close(node.lineage);
+            }
             closed_bound = closed_bound.min(node.bound);
             continue;
         }
@@ -304,16 +392,25 @@ pub fn solve<const D: usize>(
             &problem,
             &node,
             candidates,
+            fresh_count,
+            quota,
+            cutoff,
             &mut pool,
             &options,
             &mut output,
             deadline,
         )?;
-        if let Some((candidate, bounds)) = branch {
+        if let Some((candidate, bounds, subtree)) = branch {
+            let lineage = subtree_history
+                .as_mut()
+                .map(|history| history.split(node.lineage))
+                .unwrap_or([0, 0]);
             for (side, constraint) in [(1, candidate.up.clone()), (0, candidate.down.clone())] {
                 let mut branches = node.branches.clone();
                 branches.push(constraint);
                 open.push(Node {
+                    lineage: lineage[side],
+                    subtree,
                     observation: options
                         .branch_history
                         .as_ref()
@@ -374,12 +471,18 @@ pub fn solve<const D: usize>(
             if !closed(node.bound, output.incumbent, &options) {
                 unresolved.push(node);
             } else {
+                if let Some(history) = &mut subtree_history {
+                    history.close(node.lineage);
+                }
                 closed_bound = closed_bound.min(node.bound);
             }
         }
     }
     unresolved.retain(|n| {
         if closed(n.bound, output.incumbent, &options) {
+            if let Some(history) = &mut subtree_history {
+                history.close(n.lineage);
+            }
             closed_bound = closed_bound.min(n.bound);
             false
         } else {

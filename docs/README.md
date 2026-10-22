@@ -6,6 +6,7 @@ Commands in these guides run from the repository root.
 ## Getting started
 
 - [Build and installation](guides/build.md): dependencies, optional backends, and Make configuration.
+- [Source layout](guides/source-layout.md): production modules, CLI commands, and test organization.
 - [Command-line usage](guides/cli.md): routing solves, HGS, flags, and output.
 - [Python API](guides/python.md): installation, model inputs, solver options, and result export.
 
@@ -32,6 +33,7 @@ Commands in these guides run from the repository root.
 - [Finite column imports](extensions/column-imports.md): original-vector patterns and multiplicity constraints.
 - [P-step CVRP](extensions/pstep.md): compact p-step LP relaxation.
 - [Electric-vehicle routing](extensions/evrp.md): charging models, schedule replay, and current limitations.
+- [Interior-point solver](extensions/ipm.md): native LP backend, interfaces, and implementation details.
 
 ## Benchmarks
 

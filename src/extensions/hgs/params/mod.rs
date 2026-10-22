@@ -409,6 +409,7 @@ impl fmt::Debug for Params {
 }
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/extensions/hgs/params/tests.rs"]
 mod tests;
 
 mod construction;

@@ -160,4 +160,5 @@ fn capacity_entries_from_arcs<const D: usize>(
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/master/root/cut_state/tests.rs"]
 mod tests;

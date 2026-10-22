@@ -3,7 +3,12 @@
 use super::separation::{ColumnInfo, Separation};
 
 /// Whether some 3-row packing sub-cut of `sets` is violated.
-pub fn three_rows_pack_violated(s: &Separation, columns: &[ColumnInfo], sets: &[i32], perms: &[Vec<i32>]) -> bool {
+pub fn three_rows_pack_violated(
+    s: &Separation,
+    columns: &[ColumnInfo],
+    sets: &[i32],
+    perms: &[Vec<i32>],
+) -> bool {
     let mut lhs = vec![0.0f64; perms.len()];
     for col in columns {
         for (i, p) in perms.iter().enumerate() {
@@ -21,7 +26,12 @@ pub fn three_rows_pack_violated(s: &Separation, columns: &[ColumnInfo], sets: &[
     false
 }
 /// Whether some 4-row packing sub-cut (weights 2,1,1,1) of `sets` is violated.
-pub fn four_rows_pack_violated(s: &Separation, columns: &[ColumnInfo], sets: &[i32], column_ids: &[i32]) -> bool {
+pub fn four_rows_pack_violated(
+    s: &Separation,
+    columns: &[ColumnInfo],
+    sets: &[i32],
+    column_ids: &[i32],
+) -> bool {
     let perms = &s.permutations_190;
     let mut lhs = vec![0.0f64; perms.len()];
     for &ci in column_ids {
@@ -41,7 +51,12 @@ pub fn four_rows_pack_violated(s: &Separation, columns: &[ColumnInfo], sets: &[i
     false
 }
 /// Whether some 3-row covering sub-cut of `sets` is violated.
-pub fn three_rows_cov_violated(s: &Separation, columns: &[ColumnInfo], sets: &[i32], perms: &[Vec<i32>]) -> bool {
+pub fn three_rows_cov_violated(
+    s: &Separation,
+    columns: &[ColumnInfo],
+    sets: &[i32],
+    perms: &[Vec<i32>],
+) -> bool {
     let mut lhs = vec![0.0f64; perms.len()];
     for col in columns {
         for (i, p) in perms.iter().enumerate() {
@@ -60,7 +75,12 @@ pub fn three_rows_cov_violated(s: &Separation, columns: &[ColumnInfo], sets: &[i
     false
 }
 /// Whether some 4-row covering sub-cut of `sets` is violated.
-pub fn four_rows_cov_violated(s: &Separation, columns: &[ColumnInfo], sets: &[i32], column_ids: &[i32]) -> bool {
+pub fn four_rows_cov_violated(
+    s: &Separation,
+    columns: &[ColumnInfo],
+    sets: &[i32],
+    column_ids: &[i32],
+) -> bool {
     let perms_a = &s.permutations_5rows_b;
     let perms_b = &s.covering_permutations;
     let mut lhs_a = vec![0.0f64; perms_a.len()];
@@ -74,7 +94,10 @@ pub fn four_rows_cov_violated(s: &Separation, columns: &[ColumnInfo], sets: &[i3
         let cc = &col.covering_set_count;
         let present = |p: &[i32], q: usize| cc[sets[p[q] as usize] as usize] != 0;
         for (i, p) in perms_a.iter().enumerate() {
-            let c = present(p, 1) as u32 + present(p, 0) as u32 + present(p, 2) as u32 + present(p, 3) as u32;
+            let c = present(p, 1) as u32
+                + present(p, 0) as u32
+                + present(p, 2) as u32
+                + present(p, 3) as u32;
             if c == 0 {
                 continue;
             }
@@ -84,7 +107,9 @@ pub fn four_rows_cov_violated(s: &Separation, columns: &[ColumnInfo], sets: &[i3
             }
         }
         for (i, p) in perms_b.iter().enumerate() {
-            let w = present(p, 0) as u32 + if present(p, 1) { 2 } else { 0 } + if present(p, 2) { 4 } else { 0 };
+            let w = present(p, 0) as u32
+                + if present(p, 1) { 2 } else { 0 }
+                + if present(p, 2) { 4 } else { 0 };
             if w == 0 {
                 continue;
             }

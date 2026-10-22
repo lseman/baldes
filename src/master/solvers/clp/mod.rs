@@ -172,9 +172,11 @@ fn entries_of(entries: &[(usize, f64)], size: usize) -> Result<(Vec<i32>, Vec<f6
 }
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/master/solvers/clp/continuation_tests.rs"]
 mod continuation_tests;
 
 #[cfg(all(test, feature = "highs"))]
+#[path = "../../../../tests/unit/master/solvers/clp/highs_warm_tests.rs"]
 mod highs_warm_tests;
 
 mod ipm_state;
@@ -183,6 +185,7 @@ mod model;
 mod solve;
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/master/solvers/clp/ipm_warm_tests.rs"]
 mod ipm_warm_tests;
 
 mod interface;
@@ -191,7 +194,9 @@ mod options;
 pub use options::{ClpOptions, ClpScaling};
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/master/solvers/clp/reoptimization_tests.rs"]
 mod reoptimization_tests;
 
 #[cfg(test)]
+#[path = "../../../../tests/unit/master/solvers/clp/recovery_tests.rs"]
 mod recovery_tests;

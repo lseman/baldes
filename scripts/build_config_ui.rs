@@ -6,7 +6,7 @@ use std::path::Path;
 const ACCENT: &str = "1;36";
 const TEXT: &str = "0";
 const MUTED: &str = "90";
-const SELECTED: &str = "1;37;44";
+const SELECTED: &str = "1;30;46";
 const ENABLED: &str = "32";
 const CHANGED: &str = "33";
 

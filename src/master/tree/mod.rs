@@ -128,6 +128,8 @@ impl TreeOutput {
 }
 type Branch = BranchConstraint;
 struct Node<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    lineage: usize,
+    subtree: strong::SubtreeEstimate,
     observation: Option<(candidates::BranchCandidate, usize, f64)>,
     branches: Vec<Branch>,
     bound: f64,
@@ -238,6 +240,7 @@ fn evaluate<const D: usize>(
 /// may seed incumbents; the cost-only `root.incumbent` is not used without a
 /// feasible witness. Limits preserve the bound of every unfinished node.
 #[cfg(test)]
+#[path = "../../../tests/unit/master/tree/pool_tests.rs"]
 mod pool_tests;
 
 mod heuristic;

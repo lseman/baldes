@@ -10,9 +10,13 @@
 use crate::{invalid, Result};
 use std::time::Duration;
 
+mod capacity;
 mod diagram;
 mod progress;
+mod reduction;
 mod solve;
+mod state;
+mod time;
 pub use solve::{RouteFlow, SolveResult, Status};
 
 /// Start depot 0, customers 1..=n, end depot n+1. Costs and travel times
@@ -179,4 +183,5 @@ impl Problem {
 }
 
 #[cfg(test)]
+#[path = "../../../tests/unit/extensions/column_elimination/tests.rs"]
 mod tests;

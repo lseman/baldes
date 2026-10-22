@@ -1,6 +1,6 @@
 //! Directed additive cost pruning for physical-simple resource relaxations.
 use super::*;
-use crate::master::rounding::add_down;
+use crate::core::rounding::add_down;
 
 /// All exact-resource-feasible physical-simple paths whose additive arc cost is
 /// at most `ceiling` are included. Arc costs are caller-supplied lower bounds;

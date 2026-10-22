@@ -6,7 +6,9 @@
 
 use std::collections::VecDeque;
 
-use crate::extensions::hgs::{local_search::HGSLocalSearch, Individual, Params, SortableF64, Split};
+use crate::extensions::hgs::{
+    local_search::HGSLocalSearch, Individual, Params, SortableF64, Split,
+};
 
 type SubPop<'p> = Vec<Box<Individual<'p>>>;
 

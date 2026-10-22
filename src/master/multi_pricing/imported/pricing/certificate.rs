@@ -1,6 +1,6 @@
 //! Original-domain bounds covering every open, envelope-constrained group.
 use super::*;
-use crate::master::rounding::{add_down, multiply_down};
+use crate::core::rounding::{add_down, multiply_down};
 
 /// Bound over the retained finite groups, full routing domains, and every
 /// future column permitted by the open groups' declared envelopes. A positive

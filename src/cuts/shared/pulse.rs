@@ -54,7 +54,8 @@ impl PulseDigraph {
                 }
             }
         }
-        self.bucket_width = ((self.due_date[self.sink as usize] - self.ready_time[self.source as usize])
+        self.bucket_width = ((self.due_date[self.sink as usize]
+            - self.ready_time[self.source as usize])
             / self.num_buckets as f64)
             .ceil();
     }
@@ -118,7 +119,8 @@ impl PulseDigraph {
         true
     }
     fn bucket(&self, time: f64) -> usize {
-        ((time - self.ready_time[self.source as usize] + 1e-6) / self.bucket_width).floor() as i32 as usize
+        ((time - self.ready_time[self.source as usize] + 1e-6) / self.bucket_width).floor() as i32
+            as usize
     }
     fn bound_at(&self, node: usize, bucket: usize) -> f64 {
         self.bound

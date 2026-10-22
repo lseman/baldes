@@ -1,7 +1,7 @@
 //! Tuple-based 4- and 5-row rank-one separation, from the C++ reference `native/separation/TupleRankOneSeparation.h`. Its hash
 //! sets are used for membership only; `std::sort` ties follow libstdc++.
-use crate::cuts::shared::rbtree::CandidateSet;
 use super::separation::{ColumnInfo, NativeCut, Separation};
+use crate::cuts::shared::rbtree::CandidateSet;
 use crate::cuts::shared::stdsort;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -208,8 +208,11 @@ impl TupleSeparation {
             let cnt = &self.columns[idx as usize].packing_set_count;
             let value = self.columns[idx as usize].value;
             for (t, p) in self.four_row_subsets.iter().enumerate() {
-                let c = if cnt[ids[p[0] as usize] as usize] != 0 { 2 } else { 0 }
-                    + (cnt[ids[p[1] as usize] as usize] != 0) as i32
+                let c = if cnt[ids[p[0] as usize] as usize] != 0 {
+                    2
+                } else {
+                    0
+                } + (cnt[ids[p[1] as usize] as usize] != 0) as i32
                     + (cnt[ids[p[2] as usize] as usize] != 0) as i32
                     + (cnt[ids[p[3] as usize] as usize] != 0) as i32;
                 if c > 2 {
@@ -264,7 +267,18 @@ impl TupleSeparation {
     fn five_rows_type0(&self, ids: &[i32]) -> f64 {
         let p = |x: usize, y: usize| self.two_row_value[ids[x] as usize][ids[y] as usize];
         let mut pairs = 0.0;
-        for (x, y) in [(0, 1), (0, 2), (0, 3), (0, 4), (1, 2), (1, 3), (1, 4), (2, 3), (2, 4), (3, 4)] {
+        for (x, y) in [
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (0, 4),
+            (1, 2),
+            (1, 3),
+            (1, 4),
+            (2, 3),
+            (2, 4),
+            (3, 4),
+        ] {
             pairs += p(x, y);
         }
         let excess = pairs - 2.0;
@@ -275,7 +289,13 @@ impl TupleSeparation {
         if !self.three_row_subsets.is_empty() {
             let mut t3 = 0.0;
             for s in &self.three_row_subsets {
-                t3 = t3 + self.get3(ids[s[0] as usize], ids[s[1] as usize], ids[s[2] as usize], false);
+                t3 = t3
+                    + self.get3(
+                        ids[s[0] as usize],
+                        ids[s[1] as usize],
+                        ids[s[2] as usize],
+                        false,
+                    );
             }
             v = v - (t3 + t3);
         }
@@ -295,7 +315,12 @@ impl TupleSeparation {
         }
         let mut t = 0.0;
         for s in &self.three_row_subsets {
-            t = t + self.get3(ids[s[0] as usize], ids[s[1] as usize], ids[s[2] as usize], false);
+            t = t + self.get3(
+                ids[s[0] as usize],
+                ids[s[1] as usize],
+                ids[s[2] as usize],
+                false,
+            );
         }
         let excess = t - 1.0;
         if !(excess > 0.0) {
@@ -430,7 +455,9 @@ impl TupleSeparation {
                 if !(violation > self.violation_tolerance) {
                     continue;
                 }
-                if !self.skip_subcut_checks && (self.three_rows_violated(&rows) || self.four_rows_violated(&rows)) {
+                if !self.skip_subcut_checks
+                    && (self.three_rows_violated(&rows) || self.four_rows_violated(&rows))
+                {
                     continue;
                 }
                 let id = parent.round_cut_counter;
