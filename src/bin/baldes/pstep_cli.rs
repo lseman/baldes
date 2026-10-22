@@ -18,7 +18,7 @@ Options:
   --iterations N        LP solve limit (default: 1000)
   --labels N            Label/extension limit per pricing job (default: 1000000)
   --customers N         Keep the first N customers
-  --rounding MODE       none, nearest, tenth or ceil (default: file convention)
+  --rounding MODE       none, nearest, tenth or ceil (default: tenth)
   --enumerate           Cross-check against the full column pool (small cases)
   --json FILE           Write result and pricing statistics as JSON
   -h, --help            Print help";
@@ -36,7 +36,7 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
     let mut options = ColumnGenerationOptions::default();
     let mut json_path = None;
     let mut customers = None;
-    let mut rounding = None;
+    let mut rounding = Some(Rounding::Tenth);
     let mut enumerate = false;
     while let Some(arg) = args.next() {
         if arg == "--help" || arg == "-h" {

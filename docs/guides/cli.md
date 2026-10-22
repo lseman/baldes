@@ -16,9 +16,11 @@ detected from the content. Use `solve INSTANCE --ignore-time-windows` to
 solve a Solomon instance as CVRP. The legacy `vrptw` and `cvrp` commands
 remain available; `cvrp` always ignores time windows and service times.
 The `hgs` command runs the Hybrid Genetic Search heuristic.
-CVRPLIB instances have no time windows, so they are solved as `cvrp`. They use
-the file's distance convention: TSPLIB `nint` for `EUC_2D`, `ceil` for
-`CEIL_2D`, or the explicit `EDGE_WEIGHT_SECTION` (full or triangular). As for
+CVRPLIB instances have no time windows, so they are solved as `cvrp`. All routing
+commands default to distances truncated to tenths (`--rounding tenth`). Use
+`--rounding none` for unrounded Euclidean distances, `--rounding nearest` for
+TSPLIB `nint`, or `--rounding ceil` for `CEIL_2D`. Explicit `EDGE_WEIGHT_SECTION`
+matrices (full or triangular) retain their supplied weights. As for
 Solomon files, the root fleet bound is the customer count. Route-length limits (`DISTANCE`) and service times are not supported. Run
 `./target/release/baldes --help` for usage.
 
@@ -29,8 +31,9 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--ignore-time-windows` | ignore time windows and service times with `solve` |
 | `--customers N` | keep the first N customers |
 | `--ng N` | NG neighbourhood size (default 8) |
+| `--steps S` or `--steps TIME,CAPACITY` | Initial bucket widths in graph resource units (time, capacity). A single value applies to both; 0 selects automatic sizing (default). Dynamic refinement can decrease these widths. |
 | `--reference-ng` | the N nearest customers, ties by index (the comparison setup) |
-| `--rounding MODE` | distances `none`, `nearest`, `tenth` or `ceil` (default: the file's convention) |
+| `--rounding MODE` | distances `none` (unrounded), `nearest`, `tenth` or `ceil` (default: `tenth`) |
 | `--cuts` | enable rank-one, capacity, k-path, knapsack (rounding/1K), and Fenchel cuts; also 2-path for models with time windows. Requires the integer-demand Fenchel configuration to be valid. |
 | `--rank1` | separate limited-memory rank-one cuts |
 | `--clp-scaling MODE` | equilibrium (default), auto, geometric, or off |

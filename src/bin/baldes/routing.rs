@@ -17,9 +17,10 @@ Options:
   --ignore-time-windows Ignore time windows and service times (solve only)
   --customers N         Keep the first N customers
   --ng N                NG neighborhood size (default: 8)
+  --steps S|TIME,CAPACITY Initial bucket widths in graph resource units; one value
+                        applies to both resources (0 = automatic; default: 0)
   --reference-ng        Use reference-compatible customer neighborhoods
-  --rounding MODE       Distances: none, nearest, tenth or ceil (default: the
-                        file's convention; none for Solomon, nearest for EUC_2D)
+  --rounding MODE       Distances: none, nearest, tenth or ceil (default: tenth)
   --cuts                Enable all applicable cuts (2-path requires time windows)
   --rank1               Enable rank-one cuts
   --fenchel-cuts        Enable Fenchel cuts on the gcd-scaled integer-demand row
@@ -101,7 +102,7 @@ pub(super) fn run() -> std::result::Result<(), String> {
     let mut tree = false;
     let mut node_limit = 10000usize;
     let mut tree_options = baldes::master::tree::TreeOptions::default();
-    let mut rounding = None;
+    let mut rounding = Some(Rounding::Tenth);
     let mut hgs_pop_size: Option<u32> = None;
     let mut hgs_nb_iter: Option<u32> = None;
     let mut hgs_seed = 0;
@@ -148,6 +149,23 @@ pub(super) fn run() -> std::result::Result<(), String> {
                         .parse::<usize>()
                         .map_err(|e| e.to_string())?,
                 )
+            }
+            "--steps" => {
+                let value = args.next().ok_or("missing bucket steps")?;
+                let steps = value
+                    .split(',')
+                    .map(|v| v.parse::<f64>().map_err(|_| "invalid bucket steps"))
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+                if !(1..=2).contains(&steps.len())
+                    || steps.iter().any(|s| !s.is_finite() || *s < 0.)
+                {
+                    return Err("bucket steps require one or two finite nonnegative widths".into());
+                }
+                options.bucket_steps = if steps.len() == 1 {
+                    vec![steps[0]; 2]
+                } else {
+                    steps
+                };
             }
             "--ng" => {
                 ng = args

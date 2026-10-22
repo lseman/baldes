@@ -111,6 +111,9 @@ Thumbs.db
 /landing/docs/
 /landing/.docs-build-*/
 
+# Benchmark / problem instances (large, downloaded)
+/instances/
+
 # External compiled-reference verification lives outside this repository.
 /tests/verification/
 /examples/verify_*.rs

@@ -88,6 +88,10 @@ Routing commands solve the root LP relaxation by default; add `--tree` for
 integer routing. A root result with status `Optimal` means the relaxation
 converged. HGS is a heuristic and does not prove optimality.
 
+CLI routing commands, including HGS, default to distances truncated to tenths
+(`--rounding tenth`). Use `--rounding none` for unrounded Euclidean distances.
+Explicit distance matrices retain their supplied weights.
+
 Use `--json result.json` to save results. The [CLI guide](docs/guides/cli.md) covers
 input formats and options, including cuts, master solvers, HGS seeding,
 and progress logging.

@@ -164,9 +164,8 @@ If fewer routes are available, all available routes are inserted. This ranking
 uses route cost, not reduced cost or whole-solution quality. Every candidate
 is replayed against the actual graph, using its resource bounds and arc costs;
 HGS's integer demands do not establish original-model feasibility. HGS uses the
-instance's distance convention, with full-precision unrounded distances for
-Solomon instances by default. `--rounding tenth` explicitly enables truncated
-tenths in both HGS and the target graph; `--rounding none` keeps unrounded
+CLI's rounding mode, which defaults to truncated tenths (`--rounding tenth`)
+in both HGS and the target graph; `--rounding none` keeps unrounded
 distances. Explicit distance matrices retain their supplied precision. A complete best plan
 supplies an incumbent only after original-model validation. `--seed` controls
 the random seed. HGS runs before the solver's `--time` budget starts; its search

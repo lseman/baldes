@@ -263,7 +263,7 @@ extern "C" void baldes_clp_solve_limits(Clp_Simplex *model, double *values) {
         build
             .cpp(true)
             .std("c++14")
-            .opt_level(2)
+            .opt_level(3)
             .pic(true)
             .warnings(false)
             .flag_if_supported("-w")

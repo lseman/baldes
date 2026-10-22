@@ -7,6 +7,46 @@ fn command() -> Command {
 }
 
 #[test]
+fn rounding_defaults_to_tenths_and_none_preserves_euclidean_distances() {
+    let file = std::env::temp_dir().join(format!("baldes-rounding-cli-{}.txt", std::process::id()));
+    let json = file.with_extension("json");
+    std::fs::write(&file, "rounding\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n").unwrap();
+    for (kind, flags, key) in [
+        ("ce", vec![], "lp_bound"),
+        ("pstep", vec!["--p", "2"], "lp_bound"),
+        ("hgs", vec!["--nb-iter", "1", "--time", "0.05"], "cost"),
+    ] {
+        for (mode, expected) in [
+            (None, 3.4),
+            (Some("tenth"), 3.4),
+            (Some("none"), 2. + 2_f64.sqrt()),
+        ] {
+            let mut cmd = command();
+            cmd.arg(kind)
+                .arg(&file)
+                .args(&flags)
+                .arg("--json")
+                .arg(&json);
+            if let Some(mode) = mode {
+                cmd.args(["--rounding", mode]);
+            }
+            let output = cmd.output().unwrap();
+            assert!(
+                output.status.success(),
+                "{kind}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let report: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+            let cost = report[key].as_f64().expect("solution cost");
+            assert!((cost - expected).abs() < 1e-7, "{kind} {mode:?}: {report}");
+        }
+    }
+    std::fs::remove_file(file).unwrap();
+    std::fs::remove_file(json).unwrap();
+}
+
+#[test]
 fn ce_command_solves_route_lp_and_reports_limits() {
     let file = std::env::temp_dir().join(format!("baldes-ce-cli-{}.txt", std::process::id()));
     let json = file.with_extension("json");
@@ -217,7 +257,7 @@ fn fenchel_cli_separates_and_rejects_noninteger_demands() {
     let output = command()
         .arg("cvrp")
         .arg(&file)
-        .args(["--fenchel-cuts", "--log", "--json"])
+        .args(["--fenchel-cuts", "--log", "--rounding", "none", "--json"])
         .arg(&json)
         .output()
         .unwrap();
@@ -435,9 +475,16 @@ fn cvrp_ignores_time_windows_while_vrptw_enforces_them() {
     .unwrap();
     for (kind, flags, expected) in [
         ("vrptw", vec![], 4.),
-        ("cvrp", vec![], 2. + 2_f64.sqrt()),
+        ("cvrp", vec![], 3.4),
+        ("cvrp", vec!["--rounding", "tenth"], 3.4),
+        ("cvrp", vec!["--rounding", "none"], 2. + 2_f64.sqrt()),
         ("solve", vec![], 4.),
-        ("solve", vec!["--ignore-time-windows"], 2. + 2_f64.sqrt()),
+        ("solve", vec!["--ignore-time-windows"], 3.4),
+        (
+            "solve",
+            vec!["--ignore-time-windows", "--rounding", "none"],
+            2. + 2_f64.sqrt(),
+        ),
     ] {
         let output = command()
             .arg(kind)
@@ -498,6 +545,8 @@ fn tree_and_kohl_controls_reach_integer_solve_and_reject_cvrp_time_resource() {
             "10",
             "--tree",
             "--two-path-cuts",
+            "--rounding",
+            "none",
             "--time",
             "10",
         ])
@@ -672,6 +721,8 @@ fn hgs_warm_start_and_ipm_flags_reach_the_routing_master() {
             .args([
                 "--master",
                 "ipm",
+                "--rounding",
+                "none",
                 "--hgs-time",
                 "0.03",
                 "--hgs-columns",
@@ -1099,6 +1150,8 @@ fn deluxing_flag_enables_enumerated_mip_and_checks_dependencies() {
         .args([
             "--tree",
             "--deluxing",
+            "--rounding",
+            "none",
             "--no-strong-branching",
             "--no-diving",
             "--no-stabilization",
@@ -1124,4 +1177,40 @@ fn deluxing_flag_enables_enumerated_mip_and_checks_dependencies() {
     }
     let _ = std::fs::remove_file(json);
     std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn routing_bucket_steps_are_applied_and_validated() {
+    let file = std::env::temp_dir().join(format!("baldes-steps-{}.txt", std::process::id()));
+    std::fs::write(&file, "steps\nVEHICLE\nNUMBER CAPACITY\n2 10\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 2 0 1 0 100 0\n").unwrap();
+    for (value, expected) in [("7", "7/7"), ("7,3", "7/3")] {
+        let output = command()
+            .arg("solve")
+            .arg(&file)
+            .args(["--steps", value, "--log-interval", "1", "--no-enumeration"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let log = String::from_utf8_lossy(&output.stderr);
+        assert!(log.contains(expected), "{log}");
+    }
+    for value in ["-1", "NaN", "inf", "1,2,3", "", "1,", "bad"] {
+        let output = command()
+            .args(["solve", "missing", "--steps", value])
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{value}");
+        assert!(String::from_utf8_lossy(&output.stderr).contains("bucket steps"));
+    }
+    let output = command()
+        .args(["solve", "missing", "--steps"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("missing bucket steps"));
+    std::fs::remove_file(file).unwrap();
 }

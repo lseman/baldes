@@ -61,6 +61,17 @@ pub(super) fn solve_seeded<const D: usize>(
     options.cg.bound_mode = options.bound_mode;
     options.master_solver.ensure_available()?;
     options.normalize_pricing_options()?;
+    if !options.bucket_steps.is_empty()
+        && (options.bucket_steps.len() != problem.graph.resources.len()
+            || options
+                .bucket_steps
+                .iter()
+                .any(|s| !s.is_finite() || *s < 0.))
+    {
+        return Err(invalid(
+            "bucket steps must be finite, nonnegative widths in resource order",
+        ));
+    }
     if options.master_solver == MasterSolver::Ipm {
         options.cg.stabilize = false;
         options.cg.smoothing.initial_alpha = 0.;
@@ -135,6 +146,9 @@ pub(super) fn solve_seeded<const D: usize>(
     } else {
         let mut solver = Solver::new(problem.graph.vertices.len(), problem.graph.resources.len())?;
         solver.graph = problem.graph.clone();
+        for (slot, &step) in options.bucket_steps.iter().enumerate() {
+            solver.bucket_steps[slot] = step;
+        }
         solver
     };
     // Resource branches change the physical head windows. Rebuild labels and

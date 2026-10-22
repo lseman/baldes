@@ -156,6 +156,9 @@ pub struct RootOptions {
     pub pricing_phase_floor: usize,
     pub cg: Options,
     pub pricing_options: Vec<(String, f64)>,
+    /// Initial bucket widths in resource order; empty selects automatic sizing.
+    /// Zero entries retain automatic sizing. Dynamic refinement still applies.
+    pub bucket_steps: Vec<f64>,
     pub initial_routes: Vec<Route>,
     /// Assumed feasible objective upper bound supplied by the caller (default
     /// infinity). This scalar is not independently validated as a route witness.
@@ -194,6 +197,7 @@ impl Default for RootOptions {
             pricing_phase_floor: 0,
             cg,
             pricing_options: vec![],
+            bucket_steps: vec![],
             initial_routes: vec![],
             incumbent: f64::INFINITY,
             enumerate: true,

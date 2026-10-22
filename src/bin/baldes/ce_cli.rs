@@ -18,7 +18,7 @@ Options:
   --nodes N             Decision-diagram node limit (default: 100000)
   --arcs N              Decision-diagram arc limit (default: 1000000)
   --customers N         Keep the first N customers
-  --rounding MODE       none, nearest, tenth or ceil (default: file convention)
+  --rounding MODE       none, nearest, tenth or ceil (default: tenth)
   --unlimited-fleet     Ignore the instance fleet limit
   -v, --verbose, --log  Show progress on stderr every 10 LP iterations
   --log-interval N      Show progress every N LP iterations (enables logging)
@@ -40,7 +40,7 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
     }
     let mut options = Options::default();
     let mut customers = None;
-    let mut rounding = None;
+    let mut rounding = Some(Rounding::Tenth);
     let mut json_path = None;
     let mut unlimited_fleet = false;
     let mut solver = String::from("clp");
