@@ -13,6 +13,7 @@ crate-type = ["cdylib"]
 default = ["clp"]
 clp = ["baldes/clp"]
 highs = ["baldes/highs"]
+gurobi = ["baldes/gurobi"]
 simd = ["baldes/simd"]
 multi-time-windows = ["baldes/multi-time-windows"]
 

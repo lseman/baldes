@@ -33,7 +33,7 @@ fn _read_instance(py: Python<'_>, path: PathBuf) -> PyResult<Py<PyDict>> {
 
 #[cfg(feature = "clp")]
 #[pyfunction]
-#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false, master_solver="clp", hgs_time=None, hgs_columns="best", hgs_seed=0, verbose=false, log_interval=10, bound_mode="numerical", clp_scaling="equilibrium", clp_keep_work_areas=true))]
+#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false, master_solver="clp", hgs_time=None, hgs_columns="best", hgs_seed=0, verbose=false, log_interval=10, bound_mode="numerical", clp_scaling="equilibrium", clp_keep_work_areas=true, master_threads=0))]
 #[allow(clippy::too_many_arguments)]
 fn _solve_root(
     py: Python<'_>,
@@ -65,22 +65,28 @@ fn _solve_root(
     bound_mode: &str,
     clp_scaling: &str,
     clp_keep_work_areas: bool,
+    master_threads: usize,
 ) -> PyResult<Py<PyDict>> {
-    use baldes::master::root::{self, RootOptions, RootProblem};
     use baldes::inputs::{Customer, Rounding};
+    use baldes::master::root::{self, RootOptions, RootProblem};
     if problem_type != "vrptw" && problem_type != "cvrp" {
         return Err(PyValueError::new_err(
             "problem_type must be 'vrptw' or 'cvrp'",
         ));
     }
     if two_path_cuts && problem_type == "cvrp" {
-        return Err(PyValueError::new_err("Kohl 2-path cuts require vrptw time windows"));
+        return Err(PyValueError::new_err(
+            "Kohl 2-path cuts require vrptw time windows",
+        ));
     }
-    let rounding = Rounding::parse(rounding)
-        .map_err(|_| PyValueError::new_err("rounding must be 'none', 'nearest', 'tenth' or 'ceil'"))?;
+    let rounding = Rounding::parse(rounding).map_err(|_| {
+        PyValueError::new_err("rounding must be 'none', 'nearest', 'tenth' or 'ceil'")
+    })?;
     if let Some(matrix) = &distances {
         if matrix.len() != customers.len()
-            || matrix.iter().any(|row| row.len() != customers.len() || row.iter().any(|&d| !(d >= 0. && d.is_finite())))
+            || matrix.iter().any(|row| {
+                row.len() != customers.len() || row.iter().any(|&d| !(d >= 0. && d.is_finite()))
+            })
         {
             return Err(PyValueError::new_err(
                 "distances must be a square matrix over the depot and customers, finite and nonnegative",
@@ -152,29 +158,55 @@ fn _solve_root(
         distances,
     };
     let mut options = RootOptions::default();
-    options.bound_mode = root::BoundMode::parse(bound_mode)
-        .map_err(|e| PyValueError::new_err(e.to_string()))?;
-    if log_interval == 0 { return Err(PyValueError::new_err("log_interval must be positive")); }
+    if master_threads > i32::MAX as usize {
+        return Err(PyValueError::new_err(
+            "master thread count exceeds native integer range",
+        ));
+    }
+    options.master_threads = master_threads;
+    options.bound_mode =
+        root::BoundMode::parse(bound_mode).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    if log_interval == 0 {
+        return Err(PyValueError::new_err("log_interval must be positive"));
+    }
     options.cg.log_interval = verbose.then_some(log_interval);
     options.master_solver = match master_solver {
         "clp" => root::MasterSolver::Clp,
         "ipm" => root::MasterSolver::Ipm,
         "highs" => root::MasterSolver::Highs,
-        _ => return Err(PyValueError::new_err("master_solver must be 'clp', 'highs', or 'ipm'")),
+        "gurobi" => root::MasterSolver::Gurobi,
+        _ => {
+            return Err(PyValueError::new_err(
+                "master_solver must be 'clp', 'highs', 'gurobi', or 'ipm'",
+            ))
+        }
     };
     options.clp_options = root::ClpOptions {
-        scaling: clp_scaling.parse().map_err(|e: baldes::core::error::OrError| PyValueError::new_err(e.to_string()))?,
+        scaling: clp_scaling
+            .parse()
+            .map_err(|e: baldes::core::error::OrError| PyValueError::new_err(e.to_string()))?,
         keep_work_areas: clp_keep_work_areas,
     };
-    options.master_solver.ensure_available().map_err(|e|PyValueError::new_err(e.to_string()))?;
+    options
+        .master_solver
+        .ensure_available()
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
     let columns = baldes::inputs::HgsColumns::parse(hgs_columns)
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
-    let warm = hgs_time.map(|seconds| {
-        let time_limit = std::time::Duration::try_from_secs_f64(seconds)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        if time_limit.is_zero() { return Err(PyValueError::new_err("hgs_time must be positive")); }
-        Ok(baldes::inputs::HgsWarmStart { time_limit, columns, seed: hgs_seed })
-    }).transpose()?;
+    let warm = hgs_time
+        .map(|seconds| {
+            let time_limit = std::time::Duration::try_from_secs_f64(seconds)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            if time_limit.is_zero() {
+                return Err(PyValueError::new_err("hgs_time must be positive"));
+            }
+            Ok(baldes::inputs::HgsWarmStart {
+                time_limit,
+                columns,
+                seed: hgs_seed,
+            })
+        })
+        .transpose()?;
     options.cg.stabilize = stabilize;
     options.cg.max_iterations = max_iterations;
     options.cg.time_limit = std::time::Duration::try_from_secs_f64(time_limit)
@@ -236,8 +268,10 @@ fn _solve_root(
                         ids
                     };
                     neighbors.sort_unstable();
-                    let elements: Vec<_> = neighbors.iter()
-                        .flat_map(|&vertex| graph.vertices[vertex].elements.iter().copied()).collect();
+                    let elements: Vec<_> = neighbors
+                        .iter()
+                        .flat_map(|&vertex| graph.vertices[vertex].elements.iter().copied())
+                        .collect();
                     graph.set_ng(v, &elements)?;
                 }
             }
@@ -250,11 +284,17 @@ fn _solve_root(
             Ok(PythonRootOutput {
                 simplex_iterations: output.simplex_iterations,
                 ipm_iterations: output.ipm_iterations,
-                master: output.master, routes: output.routes, values: output.values,
-                duals: output.duals, incumbent: output.incumbent,
-                pricing_seconds: output.pricing_seconds, solver_seconds: output.solver_seconds,
-                cuts: output.cuts, lp_before_cuts: output.lp_before_cuts,
-                fixing_calls: output.fixing_calls, enumerated_routes: output.enumerated_routes,
+                master: output.master,
+                routes: output.routes,
+                values: output.values,
+                duals: output.duals,
+                incumbent: output.incumbent,
+                pricing_seconds: output.pricing_seconds,
+                solver_seconds: output.solver_seconds,
+                cuts: output.cuts,
+                lp_before_cuts: output.lp_before_cuts,
+                fixing_calls: output.fixing_calls,
+                enumerated_routes: output.enumerated_routes,
             })
         })
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
@@ -278,6 +318,21 @@ fn _solve_root(
     field!("simplex_iterations", output.simplex_iterations);
     field!("ipm_iterations", output.ipm_iterations);
     field!("pricing_calls", output.master.pricing_calls);
+    let mut feasibility = Vec::new();
+    for round in &output.master.feasibility {
+        let item = PyDict::new(py);
+        item.set_item("status", round.status.as_str())?;
+        item.set_item("iterations", round.iterations)?;
+        item.set_item("pricing_calls", round.pricing_calls)?;
+        item.set_item("simplex_iterations", round.simplex_iterations)?;
+        item.set_item("ipm_iterations", round.ipm_iterations)?;
+        item.set_item("seconds", round.seconds)?;
+        item.set_item("artificial_activity", round.artificial_activity)?;
+        item.set_item("lower_bound", round.lower_bound)?;
+        item.set_item("certified_infeasible", round.certified_infeasible)?;
+        feasibility.push(item);
+    }
+    field!("feasibility", feasibility);
     // Generated columns inserted over the run.
     field!("columns", output.master.inserted_tags.len());
     field!("master_columns", output.master.columns);

@@ -53,11 +53,14 @@ class PricingNetwork:
     sink: Optional[int] = None
     route_entries: Tuple[Tuple[int, float], ...] = ()
     ng: Optional[Tuple[Tuple[int, ...], ...]] = None
+    coupled_resources: Tuple[Mapping[str, Any], ...] = ()
+    elementary: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "multiplicity", tuple(self.multiplicity))
         object.__setattr__(self, "arcs", tuple(self.arcs))
         object.__setattr__(self, "resources", tuple(self.resources))
+        object.__setattr__(self, "coupled_resources", tuple(dict(r) for r in self.coupled_resources))
         object.__setattr__(self, "route_entries", tuple(tuple(e) for e in self.route_entries))
         if self.ng is not None:
             object.__setattr__(self, "ng", tuple(tuple(n) for n in self.ng))

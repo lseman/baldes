@@ -7,6 +7,7 @@ use pyo3::prelude::*;
 #[cfg(feature = "clp")]
 mod multi_pricing;
 mod root;
+mod coupled;
 
 fn run<T>(f: impl FnOnce() -> baldes::Result<T>) -> PyResult<T> {
     baldes::core::error::catch(f)
@@ -42,6 +43,10 @@ impl Route {
     #[getter]
     fn cost(&self) -> f64 {
         self.route.cost
+    }
+    #[getter]
+    fn original_cost(&self) -> f64 {
+        self.route.original_cost
     }
     #[getter]
     fn nb_nodes(&self) -> usize {
@@ -490,9 +495,11 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Solver>()?;
     m.add_class::<Route>()?;
     m.add_class::<Phase>()?;
+    coupled::register(m)?;
     m.add("resource_dimensions", baldes::DEFAULT_RESOURCE_DIMENSIONS)?;
     m.add("has_clp", cfg!(feature = "clp"))?;
     m.add("has_highs", cfg!(feature = "highs"))?;
+    m.add("has_gurobi", cfg!(feature = "gurobi"))?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     root::register(m)?;
     #[cfg(feature = "clp")]

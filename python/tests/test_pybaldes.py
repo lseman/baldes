@@ -170,7 +170,7 @@ def test_low_level_pricing_validation_and_route_ownership():
 
 def test_kohl_time_resource_closes_r101_root_gap():
     from pathlib import Path
-    instance = Instance.from_file(Path(__file__).resolve().parents[2] / 'instances/R101.txt').truncated(10)
+    instance = Instance.from_file(Path(__file__).resolve().parents[2] / 'instances/Solomon/R101.txt').truncated(10)
     plain = solve_root(instance, stabilize=False, reduced_cost_fixing=False)
     kohl = solve_root(instance, two_path_cuts=True, stabilize=False, reduced_cost_fixing=False)
     assert plain.lp == pytest.approx(261.30231910442023)
@@ -269,6 +269,18 @@ def test_clp_runtime_policy_preserves_routing_solution(scaling, keep, rank_one):
 def test_invalid_clp_scaling_is_rejected():
     with pytest.raises(ValueError, match="Clp scaling"):
         solve_root(triangle(), clp_scaling="invalid")
+
+
+def test_master_worker_budget_defaults_and_validation():
+    import inspect
+
+    assert inspect.signature(solve_root).parameters["master_threads"].default == 0
+    assert inspect.signature(pybaldes._core._solve_root).parameters["master_threads"].default == 0
+    for threads in [-1, 2**64, 2**31]:
+        with pytest.raises((ValueError, OverflowError)):
+            solve_root(triangle(), master_threads=threads)
+    result = solve_root(triangle(), master_threads=1, reduced_cost_fixing=False)
+    assert result.status == "Optimal"
 
 
 def test_root_scaling_defaults_to_equilibrium():

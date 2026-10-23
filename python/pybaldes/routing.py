@@ -101,6 +101,21 @@ class Iteration:
 
 
 @dataclass(frozen=True)
+class FeasibilityReport:
+    """An auxiliary phase-I round, separate from original-objective bounds."""
+
+    status: str
+    iterations: int
+    pricing_calls: int
+    simplex_iterations: int
+    ipm_iterations: int
+    seconds: float
+    artificial_activity: Optional[float]
+    lower_bound: Optional[float]
+    certified_infeasible: bool
+
+
+@dataclass(frozen=True)
 class RootResult:
     status: str
     lp: float
@@ -127,6 +142,7 @@ class RootResult:
     history: Tuple[Iteration, ...]
     simplex_iterations: int = 0
     ipm_iterations: int = 0
+    feasibility: Tuple[FeasibilityReport, ...] = ()
 
     def to_dict(self) -> dict:
         """Return ordinary Python data, retaining infinite unknown incumbents."""
@@ -159,6 +175,7 @@ def solve_root(
     rank_one_cuts: bool = False,
     stabilize: bool = True,
     master_solver: str = "clp",
+    master_threads: int = 0,
     bound_mode: str = "numerical",
     clp_scaling: str = "equilibrium",
     clp_keep_work_areas: bool = True,
@@ -184,6 +201,8 @@ def solve_root(
     clp_scaling selects equilibrium (default), auto, geometric, or off for Clp.
     clp_keep_work_areas retains native work buffers between LP solves by default.
     master_solver='highs' selects HiGHS (requires a build with its feature);
+    master_solver='gurobi' selects Gurobi (requires its feature and a license);
+    master_threads limits HiGHS/Gurobi workers; 0 uses all available CPUs.
     master_solver='ipm' uses native IPM and disables stabilization. hgs_time
     gives HGS a separate positive search budget before column generation;
     hgs_columns='best' seeds the best feasible plan, 'all' seeds all distinct
@@ -212,7 +231,7 @@ def solve_root(
         instance.name, instance.vehicles, instance.capacity, rows, distances, problem_type,
         ng, reference_ng, rounding or instance.rounding, capacity_cuts, rank_one_cuts, stabilize,
         reduced_cost_fixing, upper_bound, time_limit, max_iterations,
-        max_cut_rounds, dict(pricing_options or {}), two_path_cuts, master_solver, hgs_time, str(hgs_columns), hgs_seed, verbose, log_interval, bound_mode, clp_scaling, clp_keep_work_areas,
+        max_cut_rounds, dict(pricing_options or {}), two_path_cuts, master_solver, hgs_time, str(hgs_columns), hgs_seed, verbose, log_interval, bound_mode, clp_scaling, clp_keep_work_areas, master_threads,
     )
     data["duals"] = tuple(data["duals"])
     data["routes"] = tuple(
@@ -220,4 +239,5 @@ def solve_root(
         for r in data["routes"]
     )
     data["history"] = tuple(Iteration(**h) for h in data["history"])
+    data["feasibility"] = tuple(FeasibilityReport(**r) for r in data["feasibility"])
     return RootResult(**data)
