@@ -216,3 +216,114 @@ fn sparse_completion_skips_pair_tables_but_keeps_point_bounds() {
         .iter()
         .all(|c| c.queries.iter().all(Vec::is_empty)));
 }
+
+#[test]
+fn enumeration_projection_borrows_payloads_and_matches_owned_completion() {
+    use crate::cuts::soft_conflicts::{Mode, PresenceRow, PricingInput};
+    let graph = model();
+    let mut engine = engine(&graph);
+    engine
+        .load_presence(
+            &graph,
+            vec![PricingInput {
+                row: PresenceRow::new(130, vec![(0, 129)], Mode::AnyPair).unwrap(),
+                arc_events: vec![vec![0], vec![129]],
+                dual: -0.5,
+            }],
+        )
+        .unwrap();
+    engine
+        .prepare_full_labels(&graph, &Controls::default())
+        .unwrap();
+    let v = engine.grid.internal[1];
+    let id = engine.forward.buckets[v]
+        .iter()
+        .flat_map(|b| &b.active)
+        .copied()
+        .next()
+        .unwrap();
+    let original = engine.forward.labels.view(id).to_owned();
+    let label = crate::enumeration::Label {
+        id: 0,
+        vertex: original.vertex,
+        resources: original.resources,
+        reduced_cost: original.cost,
+        original_cost: original.original_cost,
+        visited: [0; 16],
+        element_hash: 0,
+        parent: None,
+        arc: None,
+        hops: original.hops,
+        cut_words: [0; crate::cuts::state::FULL_WORDS],
+        cut_cost: original.additional_cost,
+        presence_state: original.presence_state.clone(),
+        coupled_state: original.coupled_state.clone(),
+    };
+    let projected = EnumerationProjection {
+        label: &label,
+        ng: 0,
+        cut_words: [0; LIMITED_WORDS],
+        half_potential: 0.,
+    };
+    assert!(std::ptr::eq(
+        projected.presence_state(),
+        &label.presence_state
+    ));
+    assert!(std::ptr::eq(
+        projected.coupled_state().unwrap(),
+        label.coupled_state.as_deref().unwrap()
+    ));
+    let owned = StoredLabel {
+        bucket: BucketId::default(),
+        ng: 0,
+        ..original
+    };
+    for forward in [true, false] {
+        for scan in [false, true] {
+            for threshold in [-100., 0., 100.] {
+                assert_eq!(
+                    engine.enumeration_completion(&graph, forward, &label, threshold, scan),
+                    engine.completion_exists(&graph, forward, &owned, threshold, scan)
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn sweeps_reuse_id_scratch_and_do_not_replay_previous_terminals() {
+    let graph = model();
+    let mut engine = engine(&graph);
+    let first = engine.solve(&graph, &Controls::default()).unwrap();
+    let capacities = (
+        engine.forward_scratch.labels.capacity(),
+        engine.backward_scratch.labels.capacity(),
+    );
+    assert!(capacities.0 > 0 && capacities.1 > 0);
+    for _ in 0..3 {
+        let next = engine.solve(&graph, &Controls::default()).unwrap();
+        assert_eq!(
+            next.minimum_reduced_cost.to_bits(),
+            first.minimum_reduced_cost.to_bits()
+        );
+        assert_eq!(next.statistics.generated, first.statistics.generated);
+        assert_eq!(
+            next.columns.iter().map(|r| &r.arcs).collect::<Vec<_>>(),
+            first.columns.iter().map(|r| &r.arcs).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            capacities,
+            (
+                engine.forward_scratch.labels.capacity(),
+                engine.backward_scratch.labels.capacity()
+            )
+        );
+        assert!(
+            engine.forward_scratch.pending.is_empty() && engine.backward_scratch.pending.is_empty()
+        );
+        assert!(
+            engine.forward_scratch.terminals.is_empty()
+                && engine.backward_scratch.terminals.is_empty()
+        );
+    }
+}

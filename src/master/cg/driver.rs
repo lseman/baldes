@@ -61,7 +61,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     supplied: &[Phase],
     mut price: P,
     controller: &mut C,
-    options: Options,
+    mut options: Options,
     progress: &mut crate::master::progress::ProgressLog,
 ) -> Result<Output> {
     let schedule = phases::initialize(0, supplied)?;
@@ -71,21 +71,19 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     // only publication of smoothed duals.
     let mut smoothing = DualPriceSmoothing::new(options.smoothing.clone());
     let stabilize = options.stabilize && smoothing.parameters.alpha_factor > 0.;
-    let inherited_center = options
-        .warm_start
-        .as_ref()
-        .and_then(|warm| warm.stabilization.as_ref());
+    let mut warm = options.warm_start.take();
+    let is_resume = warm.is_some();
+    let inherited_center = warm.as_ref().and_then(|warm| warm.stabilization.as_ref());
     if let Some(previous) = inherited_center {
         smoothing.inherit_center(previous, (schedule.len() - 1) as i32);
     }
+    let has_inherited_center = inherited_center.is_some();
     smoothing.exclude_rows(controller.unstabilized_rows());
-    setup::validate_warm_start(master, options.warm_start.as_ref())?;
-    let inherited_numerical = options
-        .warm_start
+    setup::validate_warm_start(master, warm.as_ref())?;
+    let inherited_numerical = warm
         .as_ref()
         .map_or(f64::NEG_INFINITY, |w| w.numerical_bound);
-    let inherited_certified = options
-        .warm_start
+    let inherited_certified = warm
         .as_ref()
         .map_or(f64::NEG_INFINITY, |w| w.certified_bound);
     let inherited_bound = match options.bound_mode {
@@ -108,10 +106,13 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         -1e12
     };
     let mut round_primal_bound = 1e12_f64;
-    let mut loaded: Vec<Option<Column>> = options.warm_start.as_ref().map_or_else(
-        || options.known.iter().cloned().map(Some).collect(),
-        |w| w.columns.clone(),
-    );
+    let mut loaded: Vec<Option<Column>> = match warm.as_mut() {
+        Some(warm) => std::mem::take(&mut warm.columns),
+        None => std::mem::take(&mut options.known)
+            .into_iter()
+            .map(Some)
+            .collect(),
+    };
     loaded.resize(master.costs().len(), None);
     for (index, column) in loaded.iter().enumerate() {
         if let Some(column) = column {
@@ -122,10 +123,9 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     // Generated columns exist independently of membership in the restricted
     // master. Columns omitted by a pricing insertion test can become
     // eligible under the strict regeneration cutoff.
-    let mut pool: Vec<Column> = options
-        .warm_start
-        .as_ref()
-        .map_or_else(Vec::new, |warm| warm.generated_pool.clone());
+    let mut pool: Vec<Column> = warm
+        .as_mut()
+        .map_or_else(Vec::new, |warm| std::mem::take(&mut warm.generated_pool));
     let mut pool_seen: HashSet<_> = pool.iter().map(Column::signature).collect();
     // Include newly supplied initial routes without losing same-batch
     // duplicates when the caller starts with only a populated master.
@@ -156,10 +156,9 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             .map(|c| c.as_ref().map_or(-1, |c| c.tag))
             .collect(),
         inserted_tags: vec![],
-        artificials: options
-            .warm_start
-            .as_ref()
-            .map_or_else(Vec::new, |w| w.artificials.clone()),
+        artificials: warm
+            .as_mut()
+            .map_or_else(Vec::new, |w| std::mem::take(&mut w.artificials)),
         penalty_updates: 0,
         pruned_by_bound: false,
         cut_rounds: 0,
@@ -177,7 +176,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         },
     };
     out.column_tags.resize(master.costs().len(), -1);
-    if options.artificial_cost > 0. && options.warm_start.is_none() {
+    if options.artificial_cost > 0. && !is_resume {
         for r in 0..master.rhs().len() {
             if master.senses()[r] != RowSense::LessEqual {
                 out.artificials
@@ -202,14 +201,11 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     let mut tailing = 0;
     let mut lp_at_separation = 0.0f64;
     let mut separated_once = false;
-    let initial_rows = options
-        .warm_start
-        .as_ref()
-        .map_or(master.rhs().len(), |w| w.initial_rows);
-    let mut cut_artificials: Vec<(usize, usize)> = options
-        .warm_start
-        .as_ref()
-        .map_or_else(Vec::new, |w| w.cut_artificials.clone());
+    let initial_rows = warm.as_ref().map_or(master.rhs().len(), |w| w.initial_rows);
+    let mut cut_artificials: Vec<(usize, usize)> = warm
+        .as_mut()
+        .map_or_else(Vec::new, |w| std::mem::take(&mut w.cut_artificials));
+    drop(warm);
     let finish = |mut out: Output,
                   loaded: Vec<Option<Column>>,
                   cut_artificials: Vec<(usize, usize)>,
@@ -339,7 +335,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 master.senses(),
                 gap,
                 stage as i32,
-                iteration == 1 && inherited_center.is_none(),
+                iteration == 1 && !has_inherited_center,
             );
         }
         // earlyCGtermType1 uses the phase value for stage > 0
@@ -407,6 +403,56 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     controller.remap_columns(&map)?;
                 }
             }
+            if accurate {
+                let first = loaded.len();
+                if let Some(minimum) = super::pool::restore(
+                    master,
+                    controller,
+                    &raw,
+                    &pool,
+                    &mut loaded,
+                    &mut seen,
+                    &mut out,
+                    options.tolerance,
+                    started.checked_add(options.time_limit),
+                )? {
+                    // Only the restricted master improved. No pricing minimum,
+                    // phase completion or new global bound follows from reuse.
+                    if stabilize {
+                        smoothing.after_iteration();
+                    }
+                    out.history.push(Iteration {
+                        iteration,
+                        lp: out.lp,
+                        minimum,
+                        new_columns: loaded.len() - first,
+                        columns: out.columns,
+                        exact: false,
+                        alpha: smoothing.alpha,
+                        effective_alpha: smoothing.effective_alpha,
+                        angle: 0.,
+                        misprices: smoothing.misprices,
+                        phase: stage,
+                        pricing_calls: out.pricing_calls,
+                        stabilization_gap: gap,
+                        master_gap_tolerance: None,
+                    });
+                    if options.log_interval.is_some() {
+                        progress.iteration(
+                            out.history.last().unwrap(),
+                            out.bound,
+                            controller.incumbent(),
+                            controller.cut_counts(),
+                            controller.bucket_steps(),
+                        );
+                    }
+                    continue;
+                }
+            }
+            if started.elapsed() >= options.time_limit {
+                out.status = Status::TimeLimit;
+                return finish(out, loaded, cut_artificials, pool, smoothing);
+            }
             let mut current = if stabilize {
                 smoothing.pricing.clone()
             } else {
@@ -415,12 +461,14 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             let mut pending = vec![];
             loop {
                 let mut answer = price(stage, &current)?;
+                // One exact key per returned column is reused for the pool,
+                // improvement test and insertion instead of reformatting it.
+                let keys: Vec<_> = answer.columns.iter().map(Column::signature).collect();
                 let mut created = vec![];
-                for column in &answer.columns {
-                    let identity = column.signature();
-                    if column.acceptable && !pool_seen.contains(&identity) {
+                for (column, identity) in answer.columns.iter().zip(&keys) {
+                    if column.acceptable && !pool_seen.contains(identity) {
                         pool.push(column.clone());
-                        created.push(identity);
+                        created.push(identity.clone());
                     }
                 }
                 // Preserve duplicates produced within one oracle batch, as
@@ -431,10 +479,11 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 fresh = answer
                     .columns
                     .iter()
-                    .filter(|c| {
+                    .zip(&keys)
+                    .filter(|(c, identity)| {
                         c.acceptable
                             && master_reduced_cost(c, &raw) < -options.tolerance
-                            && !seen.contains(&c.signature())
+                            && !seen.contains(*identity)
                     })
                     .count();
                 minimum = answer
@@ -487,20 +536,29 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 }
                 exact = answer.exact;
                 answer_phase = stage;
-                let mut gradient = master.rhs().to_vec();
+                if !stabilize {
+                    pending.push(keys.into_iter().zip(answer.columns).collect::<Vec<_>>());
+                    break;
+                }
                 let best = answer
                     .columns
                     .iter()
                     .filter(|c| c.acceptable)
                     .min_by(|a, b| a.reduced_cost.total_cmp(&b.reduced_cost));
-                let supplied_gradient = controller.pricing_subgradient(master.rhs());
-                let subgradient_available = supplied_gradient.is_some() || best.is_some();
-                if let Some(supplied) = supplied_gradient {
-                    if supplied.len() != gradient.len() || supplied.iter().any(|g| !g.is_finite()) {
+                let supplied_gradient = controller.take_pricing_subgradient(master.rhs());
+                let controller_has_gradient = supplied_gradient.is_some();
+                let subgradient_available = controller_has_gradient || best.is_some();
+                let mut gradient = if let Some(supplied) = supplied_gradient {
+                    if supplied.len() != master.rhs().len()
+                        || supplied.iter().any(|g| !g.is_finite())
+                    {
                         return Err(invalid("invalid pricing subgradient"));
                     }
-                    gradient = supplied;
-                } else if let Some(best) = best {
+                    supplied
+                } else {
+                    master.rhs().to_vec()
+                };
+                if let Some(best) = best.filter(|_| !controller_has_gradient) {
                     // A returned pricing route contributes to the subgradient
                     // even when its rounded reduced cost is zero. Filtering it
                     // by that cost changes the reference's angle inputs.
@@ -510,10 +568,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                         }
                     }
                 }
-                pending.push(answer.columns);
-                if !stabilize {
-                    break;
-                }
+                pending.push(keys.into_iter().zip(answer.columns).collect::<Vec<_>>());
                 let first = smoothing.misprices == 0;
                 let again = smoothing.after_pricing(&Feedback {
                     negative_columns: fresh,
@@ -554,14 +609,13 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             let first = loaded.len();
             for batch in pending {
                 let mut identities = vec![];
-                for column in batch {
+                for (identity, column) in batch {
                     if !column.acceptable
                         || (!options.insert_non_negative
                             && master_reduced_cost(&column, &raw) >= -options.tolerance)
                     {
                         continue;
                     }
-                    let identity = column.signature();
                     if seen.contains(&identity) {
                         continue;
                     }
@@ -786,7 +840,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     continue;
                 }
             }
-            if !positive && controller.separates() {
+            if !positive && controller.separates() && controller.needs_pricing_checkpoint(master) {
                 let mut checkpoint = finish(
                     out.clone(),
                     loaded.clone(),

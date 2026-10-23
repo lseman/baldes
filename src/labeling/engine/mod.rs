@@ -29,7 +29,7 @@ use crate::{incomplete, invalid, Result};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;
 pub(crate) const RESOURCE_REPLAY_MISMATCH: &str = "reconstructed route violates resource windows";
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct EngineControls<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub bidirectional: bool,
     pub bidirectional_mode: i32,
@@ -92,6 +92,9 @@ pub struct LabelingEngine<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS 
     pub reverse: Vec<usize>,
     extension_checks: Vec<i32>,
     filter_checks: Vec<i32>,
+    forward_scratch: sweep::SweepScratch<D>,
+    backward_scratch: sweep::SweepScratch<D>,
+    backward_checks: (Vec<i32>, Vec<i32>),
     pub cuts: EngineCuts,
     coupled_costs: bool,
     coupled_present: bool,

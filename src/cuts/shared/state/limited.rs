@@ -127,7 +127,8 @@ pub fn prepare_vertices<const D: usize>(
         prep.positions.push(position);
         index += 1;
     }
-    info.vertex_cut_potential = vec![0.0; n];
+    info.vertex_cut_potential.resize(n, 0.0);
+    info.vertex_cut_potential.fill(0.0);
     for vertex in 0..n {
         for cut in kpath {
             if cut.support.get(vertex).copied().unwrap_or(false) {
@@ -353,7 +354,7 @@ pub fn update_duals(
         }
     }
     let n = info.vertex_cut_potential.len();
-    info.vertex_cut_potential = vec![0.0; n];
+    info.vertex_cut_potential.fill(0.0);
     for vertex in 0..n {
         for cut in kpath {
             if cut.support.get(vertex).copied().unwrap_or(false) {

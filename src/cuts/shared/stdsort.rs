@@ -180,8 +180,7 @@ fn merge_sort_with_buffer<T: Clone, F: Fn(&T, &T) -> bool>(
     while step < len {
         merge_sort_loop(v, buffer, step, less);
         step *= 2;
-        let snapshot = buffer.clone();
-        merge_sort_loop(&snapshot, v, step, less);
+        merge_sort_loop(buffer, v, step, less);
         step *= 2;
     }
 }

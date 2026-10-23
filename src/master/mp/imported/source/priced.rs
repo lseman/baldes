@@ -23,6 +23,7 @@ impl<const D: usize> ColumnImport<D> {
         let mut session = self.clone();
         let mut batches = 0;
         let mut added_columns = 0;
+        let mut points = super::super::pricing::session::PointCache::default();
         let status = loop {
             if session.complete {
                 break ImportStatus::Complete;
@@ -34,8 +35,7 @@ impl<const D: usize> ColumnImport<D> {
             if batches == limits.max_batches {
                 break ImportStatus::BatchLimit;
             }
-            let Some(point) = super::super::pricing::next_point(&session, &options, deadline)?
-            else {
+            let Some(point) = points.next(&session, &options, deadline)? else {
                 break ImportStatus::TimeLimit;
             };
             let remaining = deadline.saturating_duration_since(Instant::now());
@@ -44,6 +44,7 @@ impl<const D: usize> ColumnImport<D> {
             }
             let batch = source(&point, remaining)?;
             let count = batch.columns.len();
+            points.accepted(&batch);
             session = session.accept(batch)?;
             batches += 1;
             added_columns += count;

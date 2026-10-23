@@ -26,6 +26,25 @@ pub trait Controller<M> {
     fn pricing_subgradient(&self, _rhs: &[f64]) -> Option<Vec<f64>> {
         None
     }
+    /// Transfer an aggregate computed for this pricing pass when its owner can
+    /// relinquish it. The compatibility default retains borrowed callbacks.
+    fn take_pricing_subgradient(&mut self, rhs: &[f64]) -> Option<Vec<f64>> {
+        self.pricing_subgradient(rhs)
+    }
+    /// Opt in only when cached columns can be revalidated against the current
+    /// pricing domain. Cached improvement never proves pricing exhaustion.
+    fn uses_inactive_column_pool(&self) -> bool {
+        false
+    }
+    /// Refresh one promising inactive column, or decline it if its path is no
+    /// longer permitted. The default leaves domain ownership with the oracle.
+    fn reprice_inactive_column(
+        &mut self,
+        _column: &Column,
+        _duals: &[f64],
+    ) -> Result<Option<Column>> {
+        Ok(None)
+    }
     /// Logical base/branch rows can follow inherited cut rows. Cleanup must
     /// never delete these rows, even when their slacks are basic.
     fn protected_rows(&self) -> Vec<usize> {
@@ -140,6 +159,11 @@ pub trait Controller<M> {
     /// Retain a completed feasible pricing round before cut mutations.
     fn save_pricing_checkpoint(&mut self, _master: &M, _output: &Output) -> Result<()> {
         Ok(())
+    }
+    /// Permit an owner to decline a redundant checkpoint before the driver
+    /// copies column metadata. Existing controllers keep their callback flow.
+    fn needs_pricing_checkpoint(&self, _master: &M) -> bool {
+        true
     }
     /// Transfer the completed checkpoint when its owner can retain it without
     /// copying the generated pool again. Existing borrowed callbacks still run.

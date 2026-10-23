@@ -95,3 +95,46 @@ fn repeated_pulse_subsets_match_fresh_search_and_exhaustive_feasibility() {
         assert_eq!(reused.bound, fresh.bound);
     }
 }
+
+#[test]
+fn changed_windows_and_distances_restore_newly_feasible_arcs() {
+    fn prepared(ready: Vec<f64>, due: Vec<f64>, distance: Vec<Vec<f64>>) -> PulseDigraph {
+        let mut graph = PulseDigraph::new(10);
+        assert!(graph.set_ready_time(ready));
+        assert!(graph.set_due_date(due));
+        assert!(graph.set_distance_matrix(distance));
+        graph
+    }
+    let final_ready = vec![0.; 3];
+    let final_due = vec![10., 100., 100.];
+    let final_distance = vec![vec![0., 2., 2.], vec![2., 0., 2.], vec![2., 2., 0.]];
+    for change in 0..3 {
+        let mut ready = final_ready.clone();
+        let mut due = final_due.clone();
+        let mut distance = final_distance.clone();
+        match change {
+            0 => due[0] = 1.,
+            1 => ready[1] = 20.,
+            _ => distance[1][0] = 20.,
+        }
+        let mut reused = prepared(ready, due, distance);
+        assert!(!reused.is_subset_time_feasible(&[0]));
+        let row = reused.arc_cost[0].as_ptr();
+        match change {
+            0 => assert!(reused.set_due_date(final_due.clone())),
+            1 => assert!(reused.set_ready_time(final_ready.clone())),
+            _ => assert!(reused.set_distance_matrix(final_distance.clone())),
+        }
+        let mut fresh = prepared(
+            final_ready.clone(),
+            final_due.clone(),
+            final_distance.clone(),
+        );
+        assert_eq!(reused.arc_cost[0].as_ptr(), row);
+        assert_eq!(reused.arc_cost, fresh.arc_cost);
+        assert_eq!(reused.arc_cost[1][0], -1.);
+        assert!(feasible(&fresh, &[0], fresh.source as usize, 0.));
+        assert!(reused.is_subset_time_feasible(&[0]));
+        assert_eq!(reused.run(&[0]), fresh.run(&[0]));
+    }
+}

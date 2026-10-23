@@ -1,6 +1,25 @@
 use super::*;
 
 impl<const D: usize> LabelArena<D> {
+    /// Drop retained payloads and capacity without changing the prepared cut
+    /// width or record representation of an auxiliary pricing workspace.
+    pub(crate) fn release_records(&mut self) {
+        self.clear();
+        match &mut self.records {
+            Records::Ordinary(v) => v.shrink_to_fit(),
+            Records::Extended(v) => v.shrink_to_fit(),
+            Records::Branched(v) => v.shrink_to_fit(),
+            Records::Compact2(v) => v.shrink_to_fit(),
+            Records::Compact4(v) => v.shrink_to_fit(),
+            Records::Compact8(v) => v.shrink_to_fit(),
+            Records::Auxiliary2(v) => v.shrink_to_fit(),
+            Records::Auxiliary4(v) => v.shrink_to_fit(),
+            Records::Auxiliary8(v) => v.shrink_to_fit(),
+            Records::AuxiliaryFull(v) => v.shrink_to_fit(),
+            Records::Full(v) => v.shrink_to_fit(),
+        }
+    }
+
     pub fn clear(&mut self) {
         self.inspected.take();
         match &mut self.records {

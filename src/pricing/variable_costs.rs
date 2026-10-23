@@ -46,7 +46,37 @@ impl<const D: usize> Solver<D> {
         }
         // Bucket fixing and retained paths may omit the raw optimum. Physical
         // forbidden arcs and Ryan-Foster constraints remain in the fork.
-        let mut raw = self.fork_pricing(false);
+        let controls = self.engine_controls(self.phases[index].exact());
+        let previous = self.raw_pricing.take().filter(|cache| {
+            cache.controls == controls
+                && cache.solver.graph.same_topology(&self.graph)
+                && cache.solver.forbidden_arcs == self.forbidden_arcs
+                && cache.solver.ryan_foster == self.ryan_foster
+                && cache.solver.presence_pricing.inputs() == self.presence_pricing.inputs()
+        });
+        let reused = previous.is_some();
+        let mut raw =
+            previous.map_or_else(|| Box::new(self.fork_pricing(false)), |cache| cache.solver);
+        if reused {
+            // Only graph geometry and allocation capacity persist. Objectives,
+            // cut inputs and the controller's logical round start at the same
+            // parent state as a fresh raw fork. solve rebuilds all labels.
+            raw.controls = self.controls.clone();
+            raw.options.clone_from(&self.options);
+            raw.phases.clone_from(&self.phases);
+            raw.cuts.clone_from(&self.cuts);
+            raw.round.clone_from(&self.round);
+            raw.bucket_steps = self.bucket_steps;
+            raw.cutoff = self.cutoff;
+            raw.rollback_point_saved = self.rollback_point_saved;
+            raw.maximum_variable_id = self.maximum_variable_id;
+            raw.dominance_mode = self.dominance_mode;
+            raw.knapsack_resource_indices
+                .clone_from(&self.knapsack_resource_indices);
+            raw.knapsack_exact_coefficients = self.knapsack_exact_coefficients;
+            raw.exact_cut_duals = self.exact_cut_duals;
+        }
+        debug_assert!(raw.enumeration.is_none() && raw.raw_pricing.is_none());
         for arc in &mut raw.graph.arcs {
             let mut cost = arc.cost;
             for &(id, coefficient) in &arc.variables {
@@ -68,7 +98,7 @@ impl<const D: usize> Solver<D> {
         }
         raw.controls.time_limit = remaining;
         let mut answer = raw.price_phase(index, maximum, false);
-        self.round = raw.round;
+        self.round = std::mem::take(&mut raw.round);
         self.requires_rollback = raw.requires_rollback;
         // Report the work of both sweeps while keeping the cached labels and
         // arc costs associated with the original solver's pricing domain.
@@ -86,6 +116,15 @@ impl<const D: usize> Solver<D> {
         if let Ok(result) = &mut answer {
             result.statistics = statistics;
         }
+        if let Some(engine) = &mut raw.engine {
+            engine.release_raw_labels();
+        }
+        // A failed solve may have partial work, but the next solve discards
+        // its labels. No raw bucket arc is ever fixed using an old objective.
+        self.raw_pricing = Some(RawPricing {
+            solver: raw,
+            controls,
+        });
         answer
     }
 
@@ -117,3 +156,7 @@ impl<const D: usize> Solver<D> {
         Ok(bound)
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/pricing/variable_costs_tests.rs"]
+mod tests;

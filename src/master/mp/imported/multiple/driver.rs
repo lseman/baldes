@@ -78,16 +78,19 @@ impl<const D: usize> MultiImport<D> {
     where
         F: FnMut(&ImportPricing<D>, Duration) -> Result<ColumnBatch>,
     {
+        let mut points = super::super::pricing::session::PointCache::default();
         self.collect_with(limits, |session, group, deadline| {
             let view = session.view(group)?;
-            let Some(point) = super::super::pricing::next_point(&view, &options, deadline)? else {
+            let Some(point) = points.next(&view, &options, deadline)? else {
                 return Ok(None);
             };
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
                 return Ok(None);
             }
-            source(&point, remaining).map(Some)
+            let batch = source(&point, remaining)?;
+            points.accepted(&batch);
+            Ok(Some(batch))
         })
     }
 }

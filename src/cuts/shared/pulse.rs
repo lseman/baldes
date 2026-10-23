@@ -43,7 +43,13 @@ impl PulseDigraph {
         self.sink = self.num_customers + 1;
         let nodes = self.num_nodes.max(0) as usize;
         let fill = self.feasible_arc_cost as f64;
-        self.arc_cost.resize(nodes, vec![fill; nodes]);
+        self.arc_cost.resize_with(nodes, Vec::new);
+        for row in &mut self.arc_cost {
+            row.resize(nodes, fill);
+            // Setters can loosen windows or shorten travel. A previously
+            // infeasible arc must regain its ordinary cost in that case.
+            row.fill(fill);
+        }
         let n = self.distance.len();
         for i in 0..n {
             for j in 0..n {

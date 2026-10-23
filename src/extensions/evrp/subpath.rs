@@ -3,13 +3,14 @@
 //! Distinct phase-one orders are deliberately retained; no unsafe scalar
 //! subpath domination is substituted for the E2 domination framework.
 
-use super::direct::{failure, Label};
+use super::direct::{failure, label_path, Label, PathStep};
 use super::functions::{Piece, Workspace};
 use super::{
     ChargingSolution, ChargingStatus, DirectOptions, EvPricingResult, EvPricingStatistics,
     EvPricingStatus, LocationKind, PricedRoute, Problem, Visit,
 };
 use crate::Result;
+use std::{borrow::Cow, sync::Arc};
 
 #[derive(Clone, Copy, Debug)]
 pub struct SubpathOptions {
@@ -29,7 +30,7 @@ impl Default for SubpathOptions {
 }
 
 struct Subpath {
-    order: Vec<usize>,
+    order: Arc<[usize]>,
     visited: Vec<bool>,
     load: f64,
     reduced: f64,
@@ -101,7 +102,7 @@ impl Generator<'_> {
                 }
                 self.count += 1;
                 out.push(Subpath {
-                    order: order.clone(),
+                    order: Arc::from(order.as_slice()),
                     visited: visited.to_vec(),
                     load: new_load,
                     reduced: new_reduced,
@@ -190,7 +191,10 @@ impl Problem {
                 parent: None,
             });
             let mut labels = vec![Label {
-                path: vec![self.depot],
+                parent: None,
+                step: PathStep::Vertex(self.depot),
+                depth: 1,
+                location: self.depot,
                 visited: vec![false; self.locations.len()],
                 load: 0.0,
                 reduced: -fleet_dual,
@@ -206,12 +210,10 @@ impl Problem {
                     cursor += 1;
                     continue;
                 }
-                let at = *labels[cursor].path.last().unwrap();
+                let at = labels[cursor].location;
                 for subpath in &subpaths[at] {
                     ws.tick().map_err(failure)?;
-                    if labels[cursor].path.len() + subpath.order.len() - 2
-                        > options.pricing.max_arcs
-                    {
+                    if labels[cursor].depth + subpath.order.len() - 2 > options.pricing.max_arcs {
                         continue;
                     }
                     if labels[cursor]
@@ -234,12 +236,12 @@ impl Problem {
                     if !reduced.is_finite() {
                         return Err(EvPricingStatus::NumericalFailure);
                     }
-                    let mut frontier = labels[cursor].frontier.clone();
+                    let mut frontier = Cow::Borrowed(labels[cursor].frontier.as_slice());
                     let mut feasible = true;
                     for pair in subpath.order.windows(2) {
                         match ws.extend_forward(self, &frontier, pair[0], pair[1]) {
                             Ok(f) => {
-                                frontier = f;
+                                frontier = Cow::Owned(f);
                                 if frontier.is_empty() {
                                     feasible = false;
                                     break;
@@ -255,15 +257,14 @@ impl Problem {
                     if !feasible {
                         continue;
                     }
-                    let mut path = labels[cursor].path.clone();
-                    path.extend_from_slice(&subpath.order[1..]);
+                    let frontier = frontier.into_owned();
                     let visited = labels[cursor]
                         .visited
                         .iter()
                         .zip(&subpath.visited)
                         .map(|(a, b)| *a || *b)
                         .collect::<Vec<_>>();
-                    let next = *path.last().unwrap();
+                    let next = *subpath.order.last().unwrap();
                     if next == self.depot {
                         if !visited.iter().any(|v| *v)
                             || result
@@ -283,6 +284,8 @@ impl Problem {
                             }
                         }
                         let (mut id, mut e, _) = best.ok_or(EvPricingStatus::NumericalFailure)?;
+                        let mut path = label_path(&labels, cursor);
+                        path.extend_from_slice(&subpath.order[1..]);
                         let mut visits = path
                             .iter()
                             .map(|&location| Visit {
@@ -320,7 +323,10 @@ impl Problem {
                         }
                     } else {
                         let mut new = Label {
-                            path,
+                            parent: Some(cursor),
+                            step: PathStep::Subpath(subpath.order.clone()),
+                            depth: labels[cursor].depth + subpath.order.len() - 1,
+                            location: next,
                             visited,
                             load,
                             reduced,
@@ -336,7 +342,7 @@ impl Problem {
                                     continue;
                                 }
                                 result.statistics.dominance_checks += 1;
-                                if old.path.len() <= new.path.len()
+                                if old.depth <= new.depth
                                     && old.reduced <= new.reduced
                                     && ws
                                         .dominates(&old.frontier, &new.frontier)
@@ -345,7 +351,7 @@ impl Problem {
                                     new.active = false;
                                     break;
                                 }
-                                if new.path.len() <= old.path.len()
+                                if new.depth <= old.depth
                                     && new.reduced <= old.reduced
                                     && ws
                                         .dominates(&new.frontier, &old.frontier)

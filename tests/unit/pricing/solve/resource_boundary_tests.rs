@@ -1,6 +1,29 @@
 use super::*;
 
 #[test]
+fn full_kpath_repricing_agrees_before_and_after_retained_inspection() {
+    let mut solver = Solver::<2>::new(4, 1).unwrap();
+    solver.graph.elementary = true;
+    solver.enumeration_preserve_arc_paths = true;
+    for (tail, head, cost) in [(0, 1, -4.), (1, 3, 0.), (0, 2, -2.), (2, 3, 0.)] {
+        solver.graph.add_arc(tail, head, cost).unwrap();
+    }
+    let cut = solver.cuts.add_strong_k_path_cut(4, &[1], 1, -3.).unwrap();
+    let labeled = solver.price_phase(0, 10, false).unwrap();
+    assert_eq!(labeled.minimum_reduced_cost, -2.);
+    assert_eq!(solver.applied_cuts.3.len(), 1);
+    solver.enumerate(100.).unwrap();
+    let retained = solver.price_phase(0, 10, false).unwrap();
+    assert_eq!(retained.minimum_reduced_cost, labeled.minimum_reduced_cost);
+    solver.cuts.cuts[cut].dual = -1.;
+    let heuristic = solver.price_phase(1, 10, false).unwrap();
+    assert!(!heuristic.exact && heuristic.columns.is_empty());
+    let repriced = solver.price_phase(0, 10, false).unwrap();
+    assert!(repriced.exact);
+    assert_eq!(repriced.minimum_reduced_cost, -3.);
+}
+
+#[test]
 fn heuristic_pricing_respects_requested_column_cap_across_join_groups() {
     for phase in [1, 2] {
         for maximum in [1, 2, 3] {

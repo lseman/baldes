@@ -64,12 +64,46 @@ pub struct EvPricingResult {
 }
 
 pub(super) struct Label {
-    pub(super) path: Vec<usize>,
+    pub(super) parent: Option<usize>,
+    pub(super) step: PathStep,
+    pub(super) depth: usize,
+    pub(super) location: usize,
     pub(super) visited: Vec<bool>,
     pub(super) load: f64,
     pub(super) reduced: f64,
     pub(super) frontier: Vec<usize>,
     pub(super) active: bool,
+}
+
+pub(super) enum PathStep {
+    Vertex(usize),
+    Subpath(std::sync::Arc<[usize]>),
+}
+
+/// Label indices remain valid after dominance deactivates an ancestor. Build
+/// the stop order only when a join or completed route needs its witness.
+pub(super) fn label_path(labels: &[Label], mut id: usize) -> Vec<usize> {
+    let mut path = vec![0; labels[id].depth];
+    let mut end = path.len();
+    loop {
+        match &labels[id].step {
+            PathStep::Vertex(vertex) => {
+                end -= 1;
+                path[end] = *vertex;
+            }
+            PathStep::Subpath(order) => {
+                let start = end - (order.len() - 1);
+                path[start..end].copy_from_slice(&order[1..]);
+                end = start;
+            }
+        }
+        match labels[id].parent {
+            Some(parent) => id = parent,
+            None => break,
+        }
+    }
+    debug_assert_eq!(end, 0);
+    path
 }
 
 pub(super) fn failure(status: ChargingStatus) -> EvPricingStatus {
@@ -98,11 +132,11 @@ fn generate(
     let mut cursor = 0;
     let depth = options.max_arcs / 2 + options.max_arcs % 2;
     while cursor < labels.len() {
-        if !labels[cursor].active || labels[cursor].path.len() - 1 >= depth {
+        if !labels[cursor].active || labels[cursor].depth > depth {
             cursor += 1;
             continue;
         }
-        let at = *labels[cursor].path.last().unwrap();
+        let at = labels[cursor].location;
         for next in 0..problem.locations.len() {
             ws.tick().map_err(failure)?;
             if next == at
@@ -119,11 +153,9 @@ fn generate(
                 return Err(EvPricingStatus::WorkLimit);
             }
             stats.labels += 1;
-            let mut visited = labels[cursor].visited.clone();
             let mut load = labels[cursor].load;
             let mut reduced = labels[cursor].reduced + arc.cost;
             if let LocationKind::Customer { demand } = problem.locations[next].kind {
-                visited[next] = true;
                 load += demand;
                 reduced -= duals[next];
             }
@@ -146,10 +178,15 @@ fn generate(
             if frontier.is_empty() {
                 continue;
             }
-            let mut path = labels[cursor].path.clone();
-            path.push(next);
+            let mut visited = labels[cursor].visited.clone();
+            if matches!(problem.locations[next].kind, LocationKind::Customer { .. }) {
+                visited[next] = true;
+            }
             let mut new = Label {
-                path,
+                parent: Some(cursor),
+                step: PathStep::Vertex(next),
+                depth: labels[cursor].depth + 1,
+                location: next,
                 visited,
                 load,
                 reduced,
@@ -167,7 +204,7 @@ fn generate(
                         continue;
                     }
                     stats.dominance_checks += 1;
-                    if old.path.len() <= new.path.len()
+                    if old.depth <= new.depth
                         && old.reduced <= new.reduced
                         && ws
                             .dominates(&old.frontier, &new.frontier)
@@ -176,7 +213,7 @@ fn generate(
                         new.active = false;
                         break;
                     }
-                    if new.path.len() <= old.path.len()
+                    if new.depth <= old.depth
                         && new.reduced <= old.reduced
                         && ws
                             .dominates(&new.frontier, &old.frontier)
@@ -255,7 +292,10 @@ impl Problem {
                 parent: None,
             });
             let root = |id, reduced| Label {
-                path: vec![self.depot],
+                parent: None,
+                step: PathStep::Vertex(self.depot),
+                depth: 1,
+                location: self.depot,
                 visited: vec![false; self.locations.len()],
                 load: 0.0,
                 reduced,
@@ -280,13 +320,19 @@ impl Problem {
                 options,
                 &mut result.statistics,
             )?;
-            for f in forward.iter().filter(|l| l.active && l.path.len() > 1) {
-                for b in backward.iter().filter(|l| l.active && l.path.len() > 1) {
+            for (fi, f) in forward
+                .iter()
+                .enumerate()
+                .filter(|(_, l)| l.active && l.depth > 1)
+            {
+                for (bi, b) in backward
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, l)| l.active && l.depth > 1)
+                {
                     ws.tick().map_err(failure)?;
-                    let at = *f.path.last().unwrap();
-                    if b.path.last() != Some(&at)
-                        || f.path.len() + b.path.len() - 2 > options.max_arcs
-                    {
+                    let at = f.location;
+                    if b.location != at || f.depth + b.depth - 2 > options.max_arcs {
                         continue;
                     }
                     if (0..self.locations.len()).any(|i| i != at && f.visited[i] && b.visited[i]) {
@@ -319,8 +365,9 @@ impl Problem {
                     else {
                         continue;
                     };
-                    let mut visits = f
-                        .path
+                    let forward_path = label_path(&forward, fi);
+                    let backward_path = label_path(&backward, bi);
+                    let mut visits = forward_path
                         .iter()
                         .map(|&location| Visit {
                             location,
@@ -328,7 +375,7 @@ impl Problem {
                         })
                         .collect::<Vec<_>>();
                     let (mut id, mut e) = (fid, energy);
-                    for i in (1..f.path.len()).rev() {
+                    for i in (1..forward_path.len()).rev() {
                         let p = ws.arena[id];
                         let arrival = p.p * e + p.q;
                         visits[i].recharge = e - arrival;
@@ -336,7 +383,7 @@ impl Problem {
                         id = p.parent.ok_or(EvPricingStatus::NumericalFailure)?;
                     }
                     let (mut id, mut e) = (bid, energy);
-                    for &location in b.path[..b.path.len() - 1].iter().rev() {
+                    for &location in backward_path[..backward_path.len() - 1].iter().rev() {
                         let p = ws.arena[id];
                         let next_e = p.p * e + p.q;
                         visits.push(Visit {
@@ -437,5 +484,35 @@ impl Problem {
             return EvPricingStatus::Complete;
         }
         EvPricingStatus::Bounded
+    }
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+
+    #[test]
+    fn reconstruction_keeps_inactive_ancestors_and_shared_subpaths() {
+        let make = |parent, step, depth, location| Label {
+            parent,
+            step,
+            depth,
+            location,
+            visited: vec![],
+            load: 0.,
+            reduced: 0.,
+            frontier: vec![],
+            active: false,
+        };
+        let segment: std::sync::Arc<[usize]> = vec![4, 6, 8, 9].into();
+        let labels = vec![
+            make(None, PathStep::Vertex(9), 1, 9),
+            make(Some(0), PathStep::Vertex(4), 2, 4),
+            make(Some(1), PathStep::Subpath(segment.clone()), 5, 9),
+        ];
+        assert_eq!(label_path(&labels, 0), vec![9]);
+        assert_eq!(label_path(&labels, 1), vec![9, 4]);
+        assert_eq!(label_path(&labels, 2), vec![9, 4, 6, 8, 9]);
+        assert_eq!(&*segment, &[4, 6, 8, 9]);
     }
 }

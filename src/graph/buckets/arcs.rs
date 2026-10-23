@@ -89,29 +89,37 @@ impl BucketGraph {
             if !direction && !self.bidirectional {
                 continue;
             }
-            let entries: Vec<_> = self
+            let flags: Vec<_> = self
                 .direction(direction)
                 .buckets
                 .iter()
-                .flat_map(|row| row.iter().flat_map(|b| b.arcs.iter().cloned()))
-                .map(|a| {
-                    let flags = self.flags(g, direction, &a);
-                    (a.from, a.id, flags)
-                })
+                .flat_map(|row| row.iter().flat_map(|b| b.arcs.iter()))
+                .map(|a| self.flags(g, direction, a))
                 .collect();
-            for (b, id, flags) in entries {
-                if let Some(a) = self.direction_mut(direction).buckets[b.vertex][b.bucket]
-                    .arcs
-                    .iter_mut()
-                    .find(|a| a.id == id)
-                {
-                    a.flags = flags;
-                }
+            // No arcs are inserted or removed while flags are computed, so
+            // the same traversal can assign them without per-bucket ID scans.
+            for (arc, flags) in self
+                .direction_mut(direction)
+                .buckets
+                .iter_mut()
+                .flat_map(|row| row.iter_mut().flat_map(|b| b.arcs.iter_mut()))
+                .zip(flags)
+            {
+                arc.flags = flags;
             }
         }
     }
 
     pub(super) fn regenerate(&mut self, forward: bool) -> Result<()> {
+        self.regenerate_retaining_buckets(forward).map(drop)
+    }
+
+    // Commit newly allocated rows only after all dimensions are valid. The
+    // caller may retain the replaced rows to transfer reduced-cost fixings.
+    pub(super) fn regenerate_retaining_buckets(
+        &mut self,
+        forward: bool,
+    ) -> Result<Vec<Vec<Bucket>>> {
         if self.step[..self.dimensions]
             .iter()
             .any(|s| !s.is_finite() || *s <= 0.)
@@ -189,9 +197,9 @@ impl BucketGraph {
             corners.push(points);
         }
         let d = self.direction_mut(forward);
-        d.buckets = rows;
+        let previous = std::mem::replace(&mut d.buckets, rows);
         d.corners = corners;
-        Ok(())
+        Ok(previous)
     }
 
     pub fn rebuild<const D: usize>(&mut self, g: &Graph<D>, forward: bool) -> Result<()> {

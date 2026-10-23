@@ -124,6 +124,8 @@ impl PathStorage {
             return Err(invalid("invalid enumeration inspection cutoff"));
         }
         let before = self.len;
+        let mut vertices = Vec::new();
+        let mut ids = Vec::new();
         for row in &mut self.partitions {
             for path in row.iter_mut() {
                 path.reduced_cost = path.arcs.iter().map(|&a| g.arcs[a].reduced_cost).sum();
@@ -131,9 +133,11 @@ impl PathStorage {
                     .coupled_path_cost(&path.arcs)?
                     .ok_or_else(|| invalid("enumerated path violates coupled resources"))?;
                 if !cuts.is_empty() || !kpath.is_empty() {
-                    let mut vertices = vec![g.source];
+                    vertices.clear();
+                    vertices.push(g.source);
                     vertices.extend(path.arcs.iter().map(|&a| g.arcs[a].head));
-                    let ids: Vec<i32> = path.arcs.iter().map(|&a| g.arcs[a].id).collect();
+                    ids.clear();
+                    ids.extend(path.arcs.iter().map(|&a| g.arcs[a].id));
                     path.reduced_cost = state::enumerated_path_cut_cost(
                         cuts,
                         kpath,

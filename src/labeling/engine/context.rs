@@ -236,19 +236,34 @@ impl<'a, const D: usize> Context<'a, D> {
         }
         let root_forward = !forward || self.consumption_joins;
         let root_vertex = if root_forward { g.source } else { g.sink };
-        let mut root = label.clone();
-        root.vertex = root_vertex;
-        root.cost = 0.;
-        root.ng = self.ng.vertex_bits[root_vertex];
-        root.branch_state = None;
-        root.presence_state = self.cuts.presence.empty_state();
-        root.coupled_state = g.coupled_kernel().map(|k| k.root(root_forward));
+        let (cut_words, additional_cost) = self.root_cut_state(root_vertex);
+        // Root state replaces every owning payload. Copy only scalar metadata
+        // instead of cloning the terminal's boxes immediately before dropping them.
+        let mut root = StoredLabel {
+            id: label.id,
+            local_id: label.local_id,
+            bucket: label.bucket,
+            vertex: root_vertex,
+            cost: 0.,
+            original_cost: label.original_cost,
+            resources: label.resources,
+            ng: self.ng.vertex_bits[root_vertex],
+            branch_state: None,
+            presence_state: self.cuts.presence.empty_state(),
+            coupled_state: g.coupled_kernel().map(|k| k.root(root_forward)),
+            parent: label.parent,
+            arc: label.arc,
+            hops: label.hops,
+            expanded: label.expanded,
+            cut_words,
+            additional_cost,
+            half_potential: label.half_potential,
+        };
         for (r, _) in g.resources.iter().enumerate() {
             root.resources[r] = g
                 .root_resource(r, root_forward)
                 .expect("validated terminal resource");
         }
-        (root.cut_words, root.additional_cost) = self.root_cut_state(root_vertex);
         let (feasible, cost) = if forward {
             self.concatenate(g, g.sink, label.into(), (&root).into())
         } else {

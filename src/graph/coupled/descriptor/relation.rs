@@ -120,7 +120,13 @@ impl PreparedSlopeRelationArc {
         let increment_front = match (&composition, &inverse) {
             (FrontierOutcome::Complete(map), FrontierOutcome::Complete(inverse)) => {
                 let (lo, hi) = inverse.domain();
-                match map.compose(&source.increment, lo, hi, policy, FrontierBudget::default()) {
+                match map.compose_clipped(
+                    &source.increment,
+                    lo,
+                    hi,
+                    policy,
+                    FrontierBudget::default(),
+                ) {
                     FrontierOutcome::Complete(f) => {
                         FrontierOutcome::Complete(SlopeFront::from_prepared(f))
                     }
@@ -500,7 +506,7 @@ impl PreparedSlopeRelationArc {
         let mut pairs = 0usize;
         for f in front.components() {
             let (lo, hi) = inverse.domain();
-            match composition.compose(f, lo, hi, self.policy, stage_budget()) {
+            match composition.compose_clipped(f, lo, hi, self.policy, stage_budget()) {
                 FrontierOutcome::Complete(f) => {
                     pairs = pairs
                         .checked_add(f.pairs().len())
@@ -683,6 +689,40 @@ mod tests {
                 .unwrap(),
             Some(3.5)
         );
+    }
+    #[test]
+    fn paired_composition_intersects_each_component_domain_before_waiting() {
+        for policy in [
+            FrontOperationPolicy::StrictDomain,
+            FrontOperationPolicy::NativeFrontAlgebra,
+        ] {
+            let source = SlopeRelationArc {
+                arrival: function(&[(0., 0.), (2., 4.)]),
+                increment: function(&[(1., 0.), (1., 4.)]),
+                lower: function(&[(0., 1.), (0., 4.)]),
+                upper: function(&[(100., 1.), (0., 4.)]),
+                waiting: 1,
+            };
+            let arc = PreparedSlopeRelationArc::new(&source, policy).unwrap();
+            let front = SlopeFront::from_prepared(function(&[(5., 0.), (2., 2.)]));
+            let FrontierOutcome::Complete(out) = arc.extend(&front, FrontierBudget::default())
+            else {
+                panic!("partial component preimage remains feasible under {policy:?}");
+            };
+            assert_eq!(out.components()[0].domain(), (1., 4.));
+            assert_eq!(
+                out.components()[0]
+                    .evaluate(1., EvaluationPolicy::StrictDomain)
+                    .unwrap(),
+                Some(7.)
+            );
+            assert_eq!(
+                out.components()[0]
+                    .evaluate(4., EvaluationPolicy::StrictDomain)
+                    .unwrap(),
+                Some(10.)
+            );
+        }
     }
     #[test]
     fn signed_waiting_and_function_valued_lower_bound_remain_operational() {

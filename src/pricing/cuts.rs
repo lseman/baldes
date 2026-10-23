@@ -40,68 +40,81 @@ impl<const D: usize> Solver<D> {
     /// successful enumeration survives; otherwise it is dropped.
     pub fn refresh_cuts(&mut self) -> Result<()> {
         self.invalidate_changed_graph();
-        let mut knapsack = self.knapsack_pricing.clone();
-        let resource_indices = self.knapsack_indices();
-        if resource_indices
-            .values()
-            .any(|&r| r >= self.graph.resources.len())
-        {
-            return Err(invalid(
-                "knapsack resource mapping exceeds solver coordinates",
-            ));
-        }
-        if self.knapsack_exact_coefficients
+        let exact_knapsack = self.knapsack_exact_coefficients
             || self
                 .cuts
                 .knapsack_cuts
                 .iter()
-                .any(|cut| cut.cut.kind == crate::cuts::knapsack::KnapsackKind::Fenchel)
-        {
-            knapsack.retrieve_exact(
-                &self.cuts.knapsack_cuts,
-                self.graph.graph_id.max(0),
-                &resource_indices,
-            )?;
-        } else {
-            knapsack.retrieve(
-                &self.cuts.knapsack_cuts,
-                self.graph.graph_id.max(0),
-                &resource_indices,
-            )?;
-        }
-        if knapsack != self.knapsack_pricing {
+                .any(|cut| cut.cut.kind == crate::cuts::knapsack::KnapsackKind::Fenchel);
+        if self.knapsack_pricing.refresh_cached(
+            &self.cuts.knapsack_cuts,
+            self.graph.graph_id.max(0),
+            &self.knapsack_resource_indices,
+            self.graph.resources.len(),
+            exact_knapsack,
+        )? {
             if let Some(engine) = &mut self.engine {
-                engine.cuts.knapsack = knapsack.clone();
+                engine.cuts.knapsack = self.knapsack_pricing.clone();
                 engine.half_ready = false;
                 engine.full_ready = false;
             }
-            self.knapsack_pricing = knapsack;
         }
-        let next = if self.exact_cut_duals {
-            state::build_inputs_exact(&self.cuts, &self.graph)
-        } else {
-            state::build_inputs(&self.cuts, &self.graph)
-        };
-        if next == self.applied_cuts {
+        if self.cuts.cuts.is_empty()
+            && self.cuts.pricing_order.is_empty()
+            && self.applied_cuts.0.is_empty()
+            && self.applied_cuts.1.is_empty()
+            && self.applied_cuts.2.is_empty()
+            && self.applied_cuts.3.is_empty()
+        {
+            self.cut_input_source = None;
             return Ok(());
         }
-        let without_duals = |(l, lk, f, fk): &(
-            Vec<LimitedInput>,
-            Vec<LimitedKPathInput>,
-            Vec<FullInput>,
-            Vec<FullKPathInput>,
-        )| {
-            let mut l = l.clone();
-            let mut lk = lk.clone();
-            let mut f = f.clone();
-            let mut fk = fk.clone();
-            l.iter_mut().for_each(|c| c.dual = 0.);
-            lk.iter_mut().for_each(|c| c.dual = 0.);
-            f.iter_mut().for_each(|c| c.dual = 0.);
-            fk.iter_mut().for_each(|c| c.dual = 0.);
-            (l, lk, f, fk)
-        };
-        let only_duals = without_duals(&next) == without_duals(&self.applied_cuts);
+        if let Some(source) = self.cut_input_source.as_ref().filter(|source| {
+            source.matches(&self.cuts, &self.graph, self.exact_cut_duals)
+                && self.engine.as_ref().map_or(true, |engine| {
+                    engine.cut_structure_matches(&self.applied_cuts.0, &self.applied_cuts.1)
+                })
+        }) {
+            if let Some(changed) = source.refresh_duals(&self.cuts, &mut self.applied_cuts) {
+                if changed {
+                    if let Some(engine) = &mut self.engine {
+                        engine
+                            .update_cut_duals_borrowed(&self.applied_cuts.0, &self.applied_cuts.1);
+                    }
+                }
+                return Ok(());
+            }
+        }
+        let (next, source) =
+            state::build_inputs_cached(&self.cuts, &self.graph, self.exact_cut_duals);
+        if next == self.applied_cuts {
+            self.cut_input_source = Some(source);
+            return Ok(());
+        }
+        let only_duals = next.0.len() == self.applied_cuts.0.len()
+            && next.1.len() == self.applied_cuts.1.len()
+            && next.2.len() == self.applied_cuts.2.len()
+            && next.3.len() == self.applied_cuts.3.len()
+            && next
+                .0
+                .iter()
+                .zip(&self.applied_cuts.0)
+                .all(|(a, b)| a.same_structure(b))
+            && next
+                .1
+                .iter()
+                .zip(&self.applied_cuts.1)
+                .all(|(a, b)| a.same_structure(b))
+            && next
+                .2
+                .iter()
+                .zip(&self.applied_cuts.2)
+                .all(|(a, b)| a.same_structure(b))
+            && next
+                .3
+                .iter()
+                .zip(&self.applied_cuts.3)
+                .all(|(a, b)| a.same_structure(b));
         let enumerated = self.enumeration.is_some();
         let was_extended = !self.applied_cuts.0.is_empty() || !self.applied_cuts.1.is_empty();
         let needs_extended = !next.0.is_empty() || !next.1.is_empty();
@@ -126,6 +139,7 @@ impl<const D: usize> Solver<D> {
             self.enumeration_snapshot = None;
         }
         self.applied_cuts = next;
+        self.cut_input_source = Some(source);
         Ok(())
     }
     pub(super) fn new_engine(
@@ -156,3 +170,7 @@ impl<const D: usize> Solver<D> {
         Ok(engine)
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/pricing/cut_cache_tests.rs"]
+mod cache_tests;

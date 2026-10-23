@@ -53,7 +53,7 @@ impl<const D: usize> ImportPricing<D> {
         let Some(mut bound) = self.retained_bound else {
             return Ok(None);
         };
-        for id in &self.open_groups {
+        for id in self.open_groups.iter() {
             let position = self
                 .definition
                 .subproblems
@@ -125,12 +125,12 @@ pub(in crate::master::mp::imported) fn objective_request_at_output<const D: usiz
         definition: session.definition.clone(),
         registry,
         position: session.position,
-        duals: output.duals.clone(),
+        duals: Rc::new(output.duals.clone()),
         shared_offset: output.snapshot.state.shared_offset,
         kind: ImportPricingKind::Objective,
         violation: None,
-        routing: vec![],
+        routing: Rc::new(vec![]),
         retained_bound: retained_bound(session, output),
-        open_groups: session.open_groups.clone(),
+        open_groups: Rc::new(session.open_groups.clone()),
     }
 }

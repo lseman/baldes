@@ -95,3 +95,35 @@ fn native_decimal_cuts_preserve_feasible_matchings_and_separate_real_overload() 
         }
     }
 }
+
+#[test]
+fn native_separation_transfers_pulse_storage_and_restores_it_on_rejected_input() {
+    let (graph, paths) = cycle_graph();
+    let mut separator = NativeKPathSeparator::new(true);
+    separator.prepare(&[graph], &[0.1; 16], 0.2, -1).unwrap();
+    let pulse = &mut separator.preparation.pulse;
+    assert!(pulse.set_ready_time(vec![0.; 18]));
+    assert!(pulse.set_due_date(vec![100.; 18]));
+    assert!(pulse.set_distance_matrix(vec![vec![1.; 18]; 18]));
+    let ready = pulse.ready_time.as_ptr();
+    let due = pulse.due_date.as_ptr();
+    let distance = pulse.distance.as_ptr();
+    let costs = pulse.arc_cost.as_ptr();
+    let before = format!("{pulse:?}");
+    let invalid = Solution {
+        graph_id: 99,
+        enumerated: false,
+        arc_ids: vec![0],
+    };
+    assert!(separator.separate(&[invalid], &[1.]).is_err());
+    assert_eq!(format!("{:?}", separator.preparation.pulse), before);
+    for _ in 0..2 {
+        separator.separate(&paths, &[0.5; 16]).unwrap();
+        let pulse = &separator.preparation.pulse;
+        assert_eq!(pulse.ready_time.as_ptr(), ready);
+        assert_eq!(pulse.due_date.as_ptr(), due);
+        assert_eq!(pulse.distance.as_ptr(), distance);
+        assert_eq!(pulse.arc_cost.as_ptr(), costs);
+        assert_eq!(format!("{pulse:?}"), before);
+    }
+}

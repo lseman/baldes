@@ -1,6 +1,20 @@
 use super::*;
 
 impl<const D: usize> LabelingEngine<D> {
+    /// A retained raw-domain workspace keeps only reusable preparation. Avoid
+    /// holding a second peak-sized label arena for every master network.
+    pub(crate) fn release_raw_labels(&mut self) {
+        self.forward.release_records();
+        self.backward.release_records();
+        self.half_ready = false;
+        self.full_ready = false;
+        self.last_costs.clear();
+        self.pending_middle = None;
+        self.coupled_completion = std::array::from_fn(|_| Default::default());
+        self.forward_scratch = Default::default();
+        self.backward_scratch = Default::default();
+    }
+
     /// Carry the bucket graph (including fixed arcs), adaptive state and cuts.
     /// Labels depend on the node's duals and are rebuilt in the child.
     pub(crate) fn fork_for_node(&self) -> Self {
@@ -23,6 +37,9 @@ impl<const D: usize> LabelingEngine<D> {
             reverse: self.reverse.clone(),
             extension_checks: vec![0; self.extension_checks.len()],
             filter_checks: vec![0; self.filter_checks.len()],
+            forward_scratch: Default::default(),
+            backward_scratch: Default::default(),
+            backward_checks: Default::default(),
             cuts: self.cuts.clone(),
             coupled_costs: self.coupled_costs,
             coupled_present: self.coupled_present,
@@ -85,6 +102,9 @@ impl<const D: usize> LabelingEngine<D> {
             reverse,
             extension_checks: vec![0; g.vertices.len()],
             filter_checks: vec![0; g.vertices.len()],
+            forward_scratch: Default::default(),
+            backward_scratch: Default::default(),
+            backward_checks: Default::default(),
             cuts: EngineCuts::default(),
             coupled_costs: g.coupled_kernel().is_some_and(|k| k.has_costs()),
             coupled_present: g.has_coupled_resources(),

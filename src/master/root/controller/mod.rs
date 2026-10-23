@@ -65,6 +65,11 @@ impl<const D: usize> Controller<ClpMaster> for RootController<D> {
         self.store_pricing_checkpoint(master, output.clone())
     }
 
+    fn needs_pricing_checkpoint(&self, master: &ClpMaster) -> bool {
+        self.checkpoint.is_none()
+            || !separation_gap_closed(master.objective(), self.state.borrow().incumbent)
+    }
+
     fn store_pricing_checkpoint(&mut self, master: &ClpMaster, output: Output) -> Result<()> {
         self.store_checkpoint(master, output)
     }
@@ -128,6 +133,63 @@ impl<const D: usize> Controller<ClpMaster> for RootController<D> {
 
     fn refresh_generated_columns(&mut self, pool: &mut [Column]) -> Result<()> {
         self.refresh_pool(pool)
+    }
+
+    fn uses_inactive_column_pool(&self) -> bool {
+        let state = self.state.borrow();
+        // A finite pricing universe and its full-memory cut contract own
+        // their own reuse rules. Likewise, a graph narrowed by resource
+        // branching needs current-domain replay, not original-graph replay.
+        state.solver.enumeration.is_none()
+            && state.cut.enumerated.is_empty()
+            && state.solver.graph.same_topology(&self.problem.graph)
+    }
+
+    fn reprice_inactive_column(
+        &mut self,
+        column: &Column,
+        duals: &[f64],
+    ) -> Result<Option<Column>> {
+        let state = self.state.borrow();
+        let Some(route) = usize::try_from(column.tag)
+            .ok()
+            .and_then(|tag| state.routes.get(tag))
+        else {
+            return Ok(None);
+        };
+        // Only reuse an independently replayed original path. Relaxed-only
+        // paths remain available to normal pricing, so this optional filter
+        // cannot strengthen the domain or certify exhaustion.
+        if super::incumbent::exact_route_feasible(&self.problem, route).is_none()
+            || !state
+                .solver
+                .route_satisfies_relaxation(&route.nodes, &route.arcs)
+                .unwrap_or(false)
+            || route.arcs.iter().any(|id| {
+                state
+                    .solver
+                    .graph
+                    .arcs
+                    .iter()
+                    .position(|a| a.id == *id)
+                    .map_or(true, |arc| {
+                        state
+                            .solver
+                            .forbidden_arcs
+                            .get(arc)
+                            .copied()
+                            .unwrap_or(false)
+                    })
+            })
+        {
+            return Ok(None);
+        }
+        Ok(Some(state.column(
+            &self.problem,
+            route,
+            duals,
+            column.tag,
+        )?))
     }
 
     fn synchronize_generated_columns(

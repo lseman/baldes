@@ -295,6 +295,40 @@ pub struct FullKPathInput {
     pub vertex_support: Vec<bool>,
 }
 
+// Exhaustive destructuring makes a new structural field a compile error here;
+// only row prices may be ignored when deciding whether tables can be reused.
+macro_rules! compare_structure {
+    ($input:ty, $($field:ident),+ $(,)?) => {
+        impl $input {
+            pub(crate) fn same_structure(&self, other: &Self) -> bool {
+                let Self { dual: _, $($field),+ } = self;
+                true $(&& $field == &other.$field)+
+            }
+        }
+    };
+}
+compare_structure!(
+    LimitedInput,
+    covering,
+    type2,
+    arc_memory,
+    denominator,
+    vertex_coefficient,
+    arc_coefficient,
+    memory_vertices,
+    memory_arcs
+);
+compare_structure!(LimitedKPathInput, arc_memory, support, memory_vertices);
+compare_structure!(
+    FullInput,
+    ordered_support,
+    denominator,
+    covering,
+    vertex_coefficient,
+    arc_coefficient
+);
+compare_structure!(FullKPathInput, ordered_support, vertex_support);
+
 const BITMASK: [u32; 8] = [0, 1, 1, 3, 3, 7, 7, 7];
 const DENOMINATOR_BITS: [i32; 8] = [0, 1, 1, 2, 2, 3, 3, 3];
 
@@ -475,3 +509,6 @@ mod limited;
 pub use limited::*;
 
 use limited::{lim_memory_bits, lim_memory_mask};
+
+mod source;
+pub(crate) use source::{build_inputs_cached, CutInputSource};

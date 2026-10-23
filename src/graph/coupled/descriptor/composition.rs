@@ -223,6 +223,32 @@ impl PreparedCompositionMap {
         policy: FrontOperationPolicy,
         budget: FrontierBudget,
     ) -> FrontierOutcome<PreparedSlopeFunction> {
+        self.compose_with_clipping(outer, lower, upper, policy, false, budget)
+    }
+
+    /// Paired relations explicitly intersect a component's feasible preimage.
+    /// Preserve their ordered native arithmetic while permitting that clipping;
+    /// this is a relation operation, not a standalone native-helper witness.
+    pub(super) fn compose_clipped(
+        &self,
+        outer: &PreparedSlopeFunction,
+        lower: f64,
+        upper: f64,
+        policy: FrontOperationPolicy,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<PreparedSlopeFunction> {
+        self.compose_with_clipping(outer, lower, upper, policy, true, budget)
+    }
+
+    fn compose_with_clipping(
+        &self,
+        outer: &PreparedSlopeFunction,
+        lower: f64,
+        upper: f64,
+        policy: FrontOperationPolicy,
+        allow_outer_clipping: bool,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<PreparedSlopeFunction> {
         let mut work = Work::new(budget);
         if let Err(reason) = work.pairs(self.knots.len()) {
             return FrontierOutcome::Unknown(reason);
@@ -232,7 +258,13 @@ impl PreparedCompositionMap {
             knots: Cow::Borrowed(&self.knots),
         };
         finish(compose_cached(
-            outer, &inner, lower, upper, policy, &mut work,
+            outer,
+            &inner,
+            lower,
+            upper,
+            policy,
+            allow_outer_clipping,
+            &mut work,
         ))
     }
 }
@@ -247,7 +279,7 @@ fn compose_checked(
 ) -> Result<Option<PreparedSlopeFunction>> {
     let mut work = Work::new(budget);
     let inner = Cached::new(inner, true, &mut work)?;
-    compose_cached(outer, &inner, lower, upper, policy, &mut work)
+    compose_cached(outer, &inner, lower, upper, policy, false, &mut work)
 }
 fn compose_cached(
     outer: &PreparedSlopeFunction,
@@ -255,6 +287,7 @@ fn compose_cached(
     lower: f64,
     upper: f64,
     policy: FrontOperationPolicy,
+    allow_outer_clipping: bool,
     work: &mut Work,
 ) -> Result<Option<PreparedSlopeFunction>> {
     if !lower.is_finite() || !upper.is_finite() || lower > upper {
@@ -290,6 +323,8 @@ fn compose_cached(
     }
     let mut output = Vec::new();
     let mut last: Option<(f64, f64)> = None;
+    let mut native_inner_end = None;
+    let mut native_outer_anchor = None;
     for index in 1..inner.knots.len() {
         work.charge(1)?;
         let (gx, gy) = inner.knots[index - 1];
@@ -300,8 +335,34 @@ fn compose_cached(
         if x0 > x1 {
             continue;
         }
-        let mut y0 = segment_value(gx, gy, slope, x0)?;
-        let mut y1 = segment_value(gx, gy, slope, x1)?;
+        // Native front algebra advances from the clipped interval start,
+        // carrying the rounded endpoint into the following segment. Reusing
+        // the original knot anchor is mathematically equivalent, but can
+        // change both a crossing and the final secant by a binary64 bit.
+        let (anchor_x, anchor_y) = if policy == FrontOperationPolicy::NativeFrontAlgebra {
+            let y = match native_inner_end {
+                Some(y) => y,
+                None => segment_value(gx, gy, slope, x0)?,
+            };
+            (x0, y)
+        } else {
+            (gx, gy)
+        };
+        let mut y0 = segment_value(anchor_x, anchor_y, slope, x0)?;
+        let mut y1 = segment_value(anchor_x, anchor_y, slope, x1)?;
+        native_inner_end = Some(y1);
+        if policy == FrontOperationPolicy::NativeFrontAlgebra {
+            for value in [y0, y1] {
+                let at = outer.knots.partition_point(|&(x, _)| x < value);
+                for &(knot, _) in
+                    &outer.knots[at.saturating_sub(1)..(at + 1).min(outer.knots.len())]
+                {
+                    if knot != value && near(knot, value)? {
+                        return Err(unsupported("native near-knot composition endpoint"));
+                    }
+                }
+            }
+        }
         if y0 > outer_hi || y1 < outer_lo {
             if policy == FrontOperationPolicy::NativeFrontAlgebra
                 && (near(y0, outer_hi)? || near(y1, outer_lo)?)
@@ -310,18 +371,39 @@ fn compose_cached(
             }
             continue;
         }
+        if policy == FrontOperationPolicy::NativeFrontAlgebra
+            && !allow_outer_clipping
+            && (y0 < outer_lo || y1 > outer_hi)
+        {
+            // The native helper can reject an exhausted outer domain even
+            // when a nonempty clipped composition exists. Its false result
+            // does not certify infeasibility. Keep strict-domain clipping
+            // below, but do not publish a native witness for this case.
+            return Err(unsupported("native composition image outside outer domain"));
+        }
         if y0 < outer_lo {
-            x0 = crossing(gx, gy, slope, outer_lo)?;
+            x0 = crossing(anchor_x, anchor_y, slope, outer_lo)?;
             y0 = outer_lo;
         }
         if y1 > outer_hi {
-            x1 = crossing(gx, gy, slope, outer_hi)?;
+            x1 = crossing(anchor_x, anchor_y, slope, outer_hi)?;
             y1 = outer_hi;
         }
         if x0 < lo || x1 > hi || x0 > x1 || (x0 == x1 && y0 != y1) {
             return Err(unsupported("rounded composition domain crossing"));
         }
-        let f0 = outer.value(y0, policy, work)?;
+        let native = policy == FrontOperationPolicy::NativeFrontAlgebra;
+        let f0 = if native {
+            match last {
+                Some((x, value)) if x == x0 => value,
+                _ => outer.value(y0, policy, work)?,
+            }
+        } else {
+            outer.value(y0, policy, work)?
+        };
+        if native && native_outer_anchor.is_none() {
+            native_outer_anchor = Some((y0, f0));
+        }
         match last {
             None => {
                 work.pairs(1)?;
@@ -337,15 +419,41 @@ fn compose_cached(
         }
         let mut next = outer.knots.partition_point(|&(x, _)| x <= y0);
         while next < outer.knots.len() && outer.knots[next].0 < y1 {
-            let (target, value) = outer.knots[next];
-            let x = crossing(gx, gy, slope, target)?;
+            let (target, cached_value) = outer.knots[next];
+            let value = if let Some((y, value)) = native_outer_anchor {
+                let value = segment_value(y, value, outer.function.pairs()[next].0, target)?;
+                native_outer_anchor = Some((target, value));
+                value
+            } else {
+                cached_value
+            };
+            let x = crossing(anchor_x, anchor_y, slope, target)?;
             if x < x0 || x > x1 {
                 return Err(unsupported("rounded composition knot crossing"));
             }
             emit(&mut output, &mut last, x, value, policy, work)?;
             next += 1;
         }
-        let end = outer.value(y1, policy, work)?;
+        let end = if let Some((y, value)) = native_outer_anchor {
+            // At an exact final knot `next` still names its incoming segment.
+            // Once it was consumed, use the following segment's slope.
+            if y1 == y {
+                value
+            } else {
+                let slope = outer
+                    .function
+                    .pairs()
+                    .get(next)
+                    .ok_or_else(|| unsupported("native composition outside outer domain"))?
+                    .0;
+                segment_value(y, value, slope, y1)?
+            }
+        } else {
+            outer.value(y1, policy, work)?
+        };
+        if native && outer.knots.get(next).is_some_and(|&(knot, _)| knot == y1) {
+            native_outer_anchor = Some((y1, end));
+        }
         emit(&mut output, &mut last, x1, end, policy, work)?;
     }
     if output.is_empty() {
@@ -488,6 +596,80 @@ mod tests {
         );
     }
     #[test]
+    fn clipped_native_and_strict_composition_preserve_their_arithmetic() {
+        let outer = f(&[(0.1, 0.), (0.3, 0.7), (-0.2, 2.)]);
+        let inner = f(&[(0.05, 0.), (0.7, 2.)]);
+        let strict = complete(compose_increasing(
+            &outer,
+            &inner,
+            0.1,
+            1.7,
+            FrontOperationPolicy::StrictDomain,
+            FrontierBudget::default(),
+        ));
+        let native = complete(compose_increasing(
+            &outer,
+            &inner,
+            0.1,
+            1.7,
+            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontierBudget::default(),
+        ));
+        assert_eq!(strict.pairs()[2].0.to_bits(), (-0.14_f64).to_bits());
+        assert_eq!(native.pairs()[2].0.to_bits(), 0xbfc1_eb85_1eb8_51eb);
+    }
+    #[test]
+    fn native_composition_carries_an_outer_knot_at_an_inner_segment_end() {
+        let actual = complete(compose_increasing(
+            &f(&[(0.16, 0.), (0.75, 0.7), (-0.79, 2.)]),
+            &f(&[(0.034, 0.), (0.74, 0.9), (0.629, 2.)]),
+            0.167,
+            1.593,
+            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontierBudget::default(),
+        ));
+        let bits: Vec<_> = actual
+            .pairs()
+            .iter()
+            .map(|(a, b)| (a.to_bits(), b.to_bits()))
+            .collect();
+        assert_eq!(
+            bits,
+            vec![
+                (0x3fd1_cdc8_754f_3776, 0x3fc5_6041_8937_4bc7),
+                (0x3fe1_c28f_5c28_f5c2, 0x3fec_cccc_cccc_cccd),
+                (0xbfdf_cd5f_99c3_8b05, 0x3ff9_7ced_9168_72b0),
+            ]
+        );
+    }
+    #[test]
+    fn near_knot_native_composition_is_unknown_without_a_recovered_snap() {
+        let outer = f(&[(-0.88, 0.), (0.15, 0.7), (-0.57, 2.)]);
+        let inner = f(&[(0.037, 0.), (0.387, 0.9), (0.456, 2.)]);
+        assert!(matches!(
+            compose_increasing(
+                &outer,
+                &inner,
+                0.251,
+                1.59,
+                FrontOperationPolicy::NativeFrontAlgebra,
+                FrontierBudget::default(),
+            ),
+            FrontierOutcome::Unknown(_)
+        ));
+        assert!(matches!(
+            compose_increasing(
+                &outer,
+                &inner,
+                0.251,
+                1.59,
+                FrontOperationPolicy::StrictDomain,
+                FrontierBudget::default(),
+            ),
+            FrontierOutcome::Complete(_)
+        ));
+    }
+    #[test]
     fn clipping_point_and_budget_are_not_guessed_infeasible() {
         let outer = f(&[(7., 2.)]);
         let inner = f(&[(0., 0.), (2., 2.)]);
@@ -543,5 +725,49 @@ mod tests {
                 .unwrap(),
             Some(2.)
         );
+    }
+
+    #[test]
+    fn native_exhausted_outer_domain_is_unknown_while_strict_composition_clips() {
+        let outer = f(&[(0.25, 0.), (-0.5, 0.7), (0.75, 2.)]);
+        let inner = f(&[(0.7, 0.), (0.75, 0.9), (0.75, 2.)]);
+        for lower in [0.9, 1., 1.5] {
+            for upper in [1.8, 2.] {
+                assert!(matches!(
+                    compose_increasing(
+                        &outer,
+                        &inner,
+                        lower,
+                        upper,
+                        FrontOperationPolicy::NativeFrontAlgebra,
+                        FrontierBudget::default()
+                    ),
+                    FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                        "native composition image outside outer domain"
+                    ))
+                ));
+                let clipped = complete(compose_increasing(
+                    &outer,
+                    &inner,
+                    lower,
+                    upper,
+                    FrontOperationPolicy::StrictDomain,
+                    FrontierBudget::default(),
+                ));
+                assert_eq!(clipped.domain().0, lower);
+                assert!(clipped.domain().1 < upper);
+            }
+            assert!(matches!(
+                compose_increasing(
+                    &outer,
+                    &inner,
+                    lower,
+                    1.6,
+                    FrontOperationPolicy::NativeFrontAlgebra,
+                    FrontierBudget::default()
+                ),
+                FrontierOutcome::Complete(_)
+            ));
+        }
     }
 }

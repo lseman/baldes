@@ -257,7 +257,7 @@ pub(super) fn run<const D: usize>(
             &schedule,
             |phase, duals| state.borrow_mut().price(phase, duals),
             &mut controller,
-            options.cg.clone(),
+            options.cg.take_continuation(),
         )?;
         if let Some(mut prior) = previous.take() {
             if current.enumeration_failure.is_none() {
@@ -287,7 +287,11 @@ pub(super) fn run<const D: usize>(
             current.status = cg::Status::TimeLimit;
             break current;
         }
-        options.cg.warm_start = Some(current.warm_start.clone());
+        let mode = current.bound_mode;
+        options.cg.warm_start = Some(std::mem::replace(
+            &mut current.warm_start,
+            cg::WarmStart::empty(mode),
+        ));
         // transfer stages every model/registry change on private copies. On a
         // backend failure the checkpoint is still valid for ordinary pricing.
         if let Err(error) = enumeration::transfer(

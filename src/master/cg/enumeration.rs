@@ -8,9 +8,9 @@ pub(super) struct Transfer<M> {
     pub output: Output,
     pub loaded: Vec<Option<Column>>,
     pub cut_artificials: Vec<(usize, usize)>,
-    pub seen: HashSet<String>,
+    pub seen: HashSet<ColumnKey>,
     pub pool: Vec<Column>,
-    pub pool_seen: HashSet<String>,
+    pub pool_seen: HashSet<ColumnKey>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -21,9 +21,9 @@ pub(super) fn transfer<M: LpMaster, C: Controller<M>>(
     output: &Output,
     loaded: &[Option<Column>],
     cut_artificials: &[(usize, usize)],
-    seen: &HashSet<String>,
+    seen: &HashSet<ColumnKey>,
     pool: &[Column],
-    pool_seen: &HashSet<String>,
+    pool_seen: &HashSet<ColumnKey>,
     insertion_limit: usize,
 ) -> Result<Option<Transfer<M>>> {
     if !controller.begin_enumeration_transaction(output.bound)? {

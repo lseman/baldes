@@ -107,7 +107,7 @@ impl<const D: usize> ImportPricing<D> {
         let Some(mut value) = self.retained_bound else {
             return Ok(None);
         };
-        for id in &self.open_groups {
+        for id in self.open_groups.iter() {
             let position = self
                 .definition
                 .subproblems

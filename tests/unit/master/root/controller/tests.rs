@@ -51,6 +51,73 @@ fn invalid_route_tags_do_not_bypass_refresh_validation() {
 }
 
 #[test]
+fn inactive_pool_declines_finite_domains_full_memory_markers_and_changed_geometry() {
+    let mut graph = Graph::<2>::new(3, 1).unwrap();
+    for vertex in 0..3 {
+        graph.set_bounds(vertex, 0, 0., 10.).unwrap();
+    }
+    let first = graph.add_arc(0, 1, 1.).unwrap();
+    graph.arc_mut(first).unwrap().consumption[0] = 6.;
+    graph.add_arc(1, 2, 1.).unwrap();
+    let mut options = RootOptions::default();
+    options.capture_state = true;
+    options.enumerate = false;
+    let result =
+        super::super::solve(RootProblem::set_partitioning(graph, 1.).unwrap(), options).unwrap();
+    let snapshot = result.snapshot.unwrap();
+    let problem = Rc::new(snapshot.problem.clone());
+    let mut solver = snapshot.pricing.fork_for_node();
+    solver.restore_arcs();
+    solver.graph = problem.graph.clone();
+    let mut cut = snapshot.cut.clone();
+    cut.enumerated.clear();
+    let state = Rc::new(RefCell::new(State {
+        solver,
+        routes: snapshot.routes.clone(),
+        route_tags: Default::default(),
+        incumbent: snapshot.incumbent,
+        enumerate: false,
+        rounded: true,
+        previous_fixing_gap: f64::INFINITY,
+        deadline: None,
+        pricing_seconds: 0.,
+        cut,
+        fixing_calls: 0,
+        enumerated_routes: 0,
+    }));
+    let controller = RootController {
+        problem: problem.clone(),
+        state: state.clone(),
+        checkpoint: None,
+        enumeration_checkpoint: None,
+        certificate_search: Default::default(),
+    };
+    assert!(controller.uses_inactive_column_pool());
+    // A complete empty universe excludes even the original feasible route.
+    state.borrow_mut().solver.enumeration = Some(crate::enumeration::Enumeration {
+        labels: crate::enumeration::Storage::new(1).unwrap(),
+        paths: crate::enumeration::PathStorage::new(1).unwrap(),
+        completed: true,
+        generated: 0,
+        pruning: Default::default(),
+    });
+    assert!(!controller.uses_inactive_column_pool());
+    state.borrow_mut().solver.enumeration = None;
+    state.borrow_mut().cut.enumerated.insert(vec![first]);
+    assert!(!controller.uses_inactive_column_pool());
+    state.borrow_mut().cut.enumerated.clear();
+    assert!(controller.uses_inactive_column_pool());
+    state
+        .borrow_mut()
+        .solver
+        .graph
+        .set_bounds(1, 0, 0., 5.)
+        .unwrap();
+    assert!(!controller.uses_inactive_column_pool());
+    assert_eq!(problem.graph.vertices[1].bounds[0].upper, 10.);
+}
+
+#[test]
 fn owned_checkpoint_restores_warm_pool_rows_and_routes_after_pricing_timeout() {
     let mut graph = Graph::<2>::new(3, 1).unwrap();
     for v in 0..3 {

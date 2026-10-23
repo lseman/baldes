@@ -1,6 +1,21 @@
 use super::*;
 
 impl<const D: usize> LabelStorage<D> {
+    pub(crate) fn release_records(&mut self) {
+        self.labels.release_records();
+        for bucket in self.buckets.iter_mut().flatten() {
+            *bucket = LabelBucket {
+                lower_cost: 1e12,
+                knapsack_lower_cost: 1e12,
+                ..Default::default()
+            };
+        }
+        for crossing in &mut self.crossing {
+            *crossing = Vec::new();
+        }
+        self.root = None;
+    }
+
     pub fn new(counts: impl IntoIterator<Item = usize>) -> Self {
         let buckets: Vec<Vec<_>> = counts
             .into_iter()

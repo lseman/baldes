@@ -120,8 +120,53 @@ impl Point {
         }
         Ok(())
     }
+
+    /// Evaluate a corrected direction without copying all five vectors.
+    /// Addition order matches materializing `direction + correction` first.
+    fn alpha_with_correction(&self, direction: &Self, correction: &Self) -> f64 {
+        let mut alpha = 1.0_f64;
+        for (values, direction, correction) in [
+            (&self.x, &direction.x, &correction.x),
+            (&self.s, &direction.s, &correction.s),
+            (&self.v, &direction.v, &correction.v),
+            (&self.w, &direction.w, &correction.w),
+        ] {
+            for ((&value, &delta), &change) in values.iter().zip(direction).zip(correction) {
+                let delta = delta + change;
+                if delta < 0. {
+                    alpha = alpha.min(-value / delta);
+                }
+            }
+        }
+        for (value, delta) in [
+            (self.tau, direction.tau + correction.tau),
+            (self.kappa, direction.kappa + correction.kappa),
+        ] {
+            if delta < 0. {
+                alpha = alpha.min(-value / delta);
+            }
+        }
+        alpha
+    }
+
+    fn add_direction(&mut self, correction: &Self) {
+        for (values, correction) in [
+            (&mut self.x, &correction.x),
+            (&mut self.y, &correction.y),
+            (&mut self.s, &correction.s),
+            (&mut self.v, &correction.v),
+            (&mut self.w, &correction.w),
+        ] {
+            for (value, &change) in values.iter_mut().zip(correction) {
+                *value += change;
+            }
+        }
+        self.tau += correction.tau;
+        self.kappa += correction.kappa;
+    }
 }
 
+#[derive(Default)]
 struct Residual {
     p: Vec<f64>,
     u: Vec<f64>,
@@ -129,35 +174,26 @@ struct Residual {
     g: f64,
 }
 
-fn residual(f: &StandardForm, q: &Point) -> Residual {
-    let p =
-        f.a.mul(&q.x)
+fn residual_into(f: &StandardForm, q: &Point, out: &mut Residual) {
+    f.a.mul_into(&q.x, &mut out.p);
+    for (p, b) in out.p.iter_mut().zip(&f.b) {
+        *p = q.tau * b - *p;
+    }
+    out.u.clear();
+    out.u.extend(
+        f.upper
             .iter()
-            .zip(&f.b)
-            .map(|(a, b)| q.tau * b - a)
-            .collect();
-    let u = f
-        .upper
-        .iter()
-        .enumerate()
-        .map(|(i, &(j, b))| q.tau * b - q.x[j] - q.v[i])
-        .collect();
-    let mut d: Vec<_> =
-        f.a.tmul(&q.y)
-            .iter()
-            .zip(&f.c)
-            .zip(&q.s)
-            .map(|((a, c), s)| q.tau * c - a - s)
-            .collect();
+            .enumerate()
+            .map(|(i, &(j, b))| q.tau * b - q.x[j] - q.v[i]),
+    );
+    f.a.tmul_into(&q.y, &mut out.d);
+    for ((d, c), s) in out.d.iter_mut().zip(&f.c).zip(&q.s) {
+        *d = q.tau * c - *d - s;
+    }
     for (i, &(j, _)) in f.upper.iter().enumerate() {
-        d[j] += q.w[i];
+        out.d[j] += q.w[i];
     }
-    Residual {
-        p,
-        u,
-        d,
-        g: q.kappa + dot(&f.c, &q.x) - dot(&f.b, &q.y) + bound_dot(f, &q.w),
-    }
+    out.g = q.kappa + dot(&f.c, &q.x) - dot(&f.b, &q.y) + bound_dot(f, &q.w);
 }
 fn bound_dot(f: &StandardForm, w: &[f64]) -> f64 {
     f.upper.iter().zip(w).map(|((_, u), w)| u * w).sum()
@@ -184,6 +220,7 @@ fn solve_prepared(
         unscaled_cost_norm,
         ls,
         solve_workspace,
+        newton_scratch,
         iterations: work_iterations,
         ..
     } = prepared;
@@ -204,6 +241,22 @@ fn solve_prepared(
     let mut iterations = 0;
     let mut cert = None;
     let mut metrics = (f64::INFINITY, f64::INFINITY, f64::INFINITY);
+    let ubnorm = f.upper.iter().fold(0.0_f64, |v, (_, u)| v.max(u.abs()));
+    let rhsnorm = norm(&f.b);
+    let upper: Vec<_> = f.upper.iter().map(|&(_, u)| u).collect();
+    let mut original = Vec::with_capacity(f.recovery.len());
+    let mut tvw = Vec::with_capacity(nu);
+    let mut theta = Vec::with_capacity(n);
+    let mut r = Residual::default();
+    let mut original_activity = Vec::with_capacity(model.a.rows());
+    let mut xs = Vec::with_capacity(n);
+    let mut vw = Vec::with_capacity(nu);
+    let mut cx = Vec::with_capacity(n);
+    let mut cv = Vec::with_capacity(nu);
+    let mut tx = Vec::with_capacity(n);
+    let mut tv = Vec::with_capacity(nu);
+    let mut damped = Residual::default();
+    let mut zero: Option<Residual> = None;
     for k in 0..=options.max_iterations {
         iterations = k;
         *work_iterations = k;
@@ -214,11 +267,10 @@ fn solve_prepared(
             status = Status::TimeLimit;
             break;
         }
-        let r = residual(&f, &q);
-        let ubnorm = f.upper.iter().fold(0.0_f64, |v, (_, u)| v.max(u.abs()));
-        let dual_obj = dot(&f.b, &q.y) - bound_dot(&f, &q.w);
+        residual_into(f, &q, &mut r);
+        let dual_obj = dot(&f.b, &q.y) - bound_dot(f, &q.w);
         metrics = (
-            (norm(&r.p) / (q.tau * (1. + norm(&f.b)))).max(norm(&r.u) / (q.tau * (1. + ubnorm))),
+            (norm(&r.p) / (q.tau * (1. + rhsnorm))).max(norm(&r.u) / (q.tau * (1. + ubnorm))),
             r.d.iter()
                 .zip(col_scale.iter())
                 .fold(0.0_f64, |v, (d, s)| v.max((d / s).abs()))
@@ -227,18 +279,15 @@ fn solve_prepared(
         );
         // Verify original coordinates too, since equilibration can conceal
         // large original-unit row errors.
-        let original: Vec<_> = f
-            .recovery
-            .iter()
-            .map(|(offset, terms)| {
-                offset
-                    + terms
-                        .iter()
-                        .map(|&(j, s)| s * col_scale[j] * q.x[j] / q.tau)
-                        .sum::<f64>()
-            })
-            .collect();
-        let original_p = primal_residual(model, &original);
+        original.clear();
+        original.extend(f.recovery.iter().map(|(offset, terms)| {
+            offset
+                + terms
+                    .iter()
+                    .map(|&(j, s)| s * col_scale[j] * q.x[j] / q.tau)
+                    .sum::<f64>()
+        }));
+        let original_p = primal_residual(model, &original, &mut original_activity);
         if options.gap_tolerance.is_some() {
             // Recovery includes objective contributions from shifted/fixed variables.
             metrics.2 = (dot(&f.c, &q.x) - dual_obj).abs()
@@ -253,7 +302,7 @@ fn solve_prepared(
             break;
         }
         if q.tau < 1e-7 * q.kappa {
-            if let Some((s, c)) = certificate(&f, &q, tol.min(1e-8)) {
+            if let Some((s, c)) = certificate(f, &q, tol.min(1e-8)) {
                 status = s;
                 cert = Some(c);
                 break;
@@ -262,8 +311,10 @@ fn solve_prepared(
         if k == options.max_iterations {
             break;
         }
-        let tvw: Vec<_> = q.w.iter().zip(&q.v).map(|(w, v)| w / v).collect();
-        let mut theta: Vec<_> = q.s.iter().zip(&q.x).map(|(s, x)| s / x).collect();
+        tvw.clear();
+        tvw.extend(q.w.iter().zip(&q.v).map(|(w, v)| w / v));
+        theta.clear();
+        theta.extend(q.s.iter().zip(&q.x).map(|(s, x)| s / x));
         for (i, &(j, _)) in f.upper.iter().enumerate() {
             theta[j] += tvw[i];
         }
@@ -278,8 +329,7 @@ fn solve_prepared(
         for _ in 0..8 {
             let result = (|| -> Result<(Point, f64)> {
                 ls.factorize(&theta, &rp, &rd)?;
-                let ub: Vec<_> = f.upper.iter().map(|&(_, u)| u).collect();
-                let delta = augsys(ls, &f, &tvw, &f.b, &f.c, &ub, solve_workspace)?;
+                let delta = augsys(ls, f, &tvw, &f.b, &f.c, &upper, solve_workspace)?;
                 // Equivalent positive quadratic form avoids cancellation between the
                 // three dot products in the original homogeneous Schur complement.
                 let delta0 = rg
@@ -308,17 +358,26 @@ fn solve_prepared(
                 }
                 let newton = Newton {
                     ls,
-                    f: &f,
+                    f,
                     q: &q,
                     tvw: &tvw,
                     delta,
                     delta0,
                 };
-                let xs: Vec<_> = q.x.iter().zip(&q.s).map(|(x, s)| -x * s).collect();
-                let vw: Vec<_> = q.v.iter().zip(&q.w).map(|(v, w)| -v * w).collect();
+                xs.clear();
+                xs.extend(q.x.iter().zip(&q.s).map(|(x, s)| -x * s));
+                vw.clear();
+                vw.extend(q.v.iter().zip(&q.w).map(|(v, w)| -v * w));
                 let mu = (q.tau * q.kappa - xs.iter().sum::<f64>() - vw.iter().sum::<f64>())
                     / (n + nu + 1) as f64;
-                let affine = newton.solve(&r, &xs, &vw, -q.tau * q.kappa, solve_workspace)?;
+                let affine = newton.solve(
+                    &r,
+                    &xs,
+                    &vw,
+                    -q.tau * q.kappa,
+                    solve_workspace,
+                    newton_scratch,
+                )?;
                 let one_minus = 1. - q.alpha(&affine);
                 // alpha is in [0, 1], so the expression before clipping is at most
                 // 0.1. A lower bound of 0.1 would make centering constant and damp
@@ -326,30 +385,34 @@ fn solve_prepared(
                 // steps, but permit faster feasibility progress near a full step.
                 let gamma = (one_minus * one_minus * one_minus.min(0.1)).clamp(1e-4, 0.1);
                 let damping = 1. - gamma;
-                let damped = Residual {
-                    p: r.p.iter().map(|r| damping * r).collect(),
-                    u: r.u.iter().map(|r| damping * r).collect(),
-                    d: r.d.iter().map(|r| damping * r).collect(),
-                    g: damping * r.g,
-                };
-                let cx: Vec<_> = xs
-                    .iter()
-                    .zip(&affine.x)
-                    .zip(&affine.s)
-                    .map(|((xs, x), s)| xs + gamma * mu - x * s)
-                    .collect();
-                let cv: Vec<_> = vw
-                    .iter()
-                    .zip(&affine.v)
-                    .zip(&affine.w)
-                    .map(|((vw, v), w)| vw + gamma * mu - v * w)
-                    .collect();
+                damped.p.clear();
+                damped.p.extend(r.p.iter().map(|r| damping * r));
+                damped.u.clear();
+                damped.u.extend(r.u.iter().map(|r| damping * r));
+                damped.d.clear();
+                damped.d.extend(r.d.iter().map(|r| damping * r));
+                damped.g = damping * r.g;
+                cx.clear();
+                cx.extend(
+                    xs.iter()
+                        .zip(&affine.x)
+                        .zip(&affine.s)
+                        .map(|((xs, x), s)| xs + gamma * mu - x * s),
+                );
+                cv.clear();
+                cv.extend(
+                    vw.iter()
+                        .zip(&affine.v)
+                        .zip(&affine.w)
+                        .map(|((vw, v), w)| vw + gamma * mu - v * w),
+                );
                 let mut direction = newton.solve(
                     &damped,
                     &cx,
                     &cv,
                     -q.tau * q.kappa + gamma * mu - affine.tau * affine.kappa,
                     solve_workspace,
+                    newton_scratch,
                 )?;
                 let mut alpha = q.alpha(&direction);
                 // Gondzio centrality corrections are added to the existing direction.
@@ -361,7 +424,8 @@ fn solve_prepared(
                     let trial = (2. * alpha).min(1.);
                     let low = 0.1 * mu * gamma;
                     let high = mu * gamma / 0.1;
-                    let mut tx: Vec<_> =
+                    tx.clear();
+                    tx.extend(
                         q.x.iter()
                             .zip(&direction.x)
                             .zip(&q.s)
@@ -369,9 +433,10 @@ fn solve_prepared(
                             .map(|(((x, dx), s), ds)| {
                                 let v = (x + trial * dx) * (s + trial * ds);
                                 v.clamp(low, high) - v
-                            })
-                            .collect();
-                    let mut tv: Vec<_> =
+                            }),
+                    );
+                    tv.clear();
+                    tv.extend(
                         q.v.iter()
                             .zip(&direction.v)
                             .zip(&q.w)
@@ -379,8 +444,8 @@ fn solve_prepared(
                             .map(|(((v, dv), w), dw)| {
                                 let z = (v + trial * dv) * (w + trial * dw);
                                 z.clamp(low, high) - z
-                            })
-                            .collect();
+                            }),
+                    );
                     let z = (q.tau + trial * direction.tau) * (q.kappa + trial * direction.kappa);
                     let mut t0 = z.clamp(low, high) - z;
                     let mean = (tx.iter().sum::<f64>() + tv.iter().sum::<f64>() + t0)
@@ -389,31 +454,17 @@ fn solve_prepared(
                         *t -= mean;
                     }
                     t0 -= mean;
-                    let zero = Residual {
+                    let zero = zero.get_or_insert_with(|| Residual {
                         p: vec![0.; m],
                         u: vec![0.; nu],
                         d: vec![0.; n],
                         g: 0.,
-                    };
-                    let correction = newton.solve(&zero, &tx, &tv, t0, solve_workspace)?;
-                    let mut candidate = direction.clone();
-                    // Directions have unrestricted signs, so do not use Point::update.
-                    for (v, dv) in [
-                        (&mut candidate.x, &correction.x),
-                        (&mut candidate.y, &correction.y),
-                        (&mut candidate.s, &correction.s),
-                        (&mut candidate.v, &correction.v),
-                        (&mut candidate.w, &correction.w),
-                    ] {
-                        for (v, dv) in v.iter_mut().zip(dv) {
-                            *v += dv;
-                        }
-                    }
-                    candidate.tau += correction.tau;
-                    candidate.kappa += correction.kappa;
-                    let improved = q.alpha(&candidate);
+                    });
+                    let correction =
+                        newton.solve(zero, &tx, &tv, t0, solve_workspace, newton_scratch)?;
+                    let improved = q.alpha_with_correction(&direction, &correction);
                     if improved > alpha {
-                        direction = candidate;
+                        direction.add_direction(&correction);
                         alpha = improved;
                     } else {
                         break;
@@ -462,7 +513,7 @@ fn solve_prepared(
         Solution {
             status,
             objective,
-            primal_residual: primal_residual(model, &primal),
+            primal_residual: primal_residual(model, &primal, &mut original_activity),
             dual_residual: metrics.1,
             relative_gap: metrics.2,
             primal,
@@ -475,9 +526,10 @@ fn solve_prepared(
     ))
 }
 
-fn primal_residual(model: &ModelData, x: &[f64]) -> f64 {
+fn primal_residual(model: &ModelData, x: &[f64], activity: &mut Vec<f64>) -> f64 {
     let mut residual = 0.0_f64;
-    for ((ax, &b), sense) in model.a.mul(x).iter().zip(&model.b).zip(&model.sense) {
+    model.a.mul_into(x, activity);
+    for ((ax, &b), sense) in activity.iter().zip(&model.b).zip(&model.sense) {
         let v = match sense {
             super::Sense::Equal => (ax - b).abs(),
             super::Sense::LessEqual => (ax - b).max(0.),
@@ -501,3 +553,53 @@ use newton::{augsys, Newton};
 
 mod scaling;
 use scaling::{certificate, scale};
+
+#[cfg(test)]
+mod direction_tests {
+    use super::*;
+
+    #[test]
+    fn correction_step_bound_matches_materialized_directions() {
+        let q = Point {
+            x: vec![0.5, 2., 3.],
+            y: vec![0., -1.],
+            s: vec![2., 1., 5.],
+            v: vec![1., 2.],
+            w: vec![5., 1.],
+            tau: 1.,
+            kappa: 1.5,
+        };
+        let mut rng = crate::rng::Xoroshiro128Plus::from_seed(0x01f0_cafe);
+        for _ in 0..1000 {
+            let mut values = |n| {
+                (0..n)
+                    .map(|_| (rng.uniform_below(257) as f64 - 128.) / 16.)
+                    .collect()
+            };
+            let direction = Point {
+                x: values(3),
+                y: values(2),
+                s: values(3),
+                v: values(2),
+                w: values(2),
+                tau: -0.25,
+                kappa: 0.5,
+            };
+            let correction = Point {
+                x: values(3),
+                y: values(2),
+                s: values(3),
+                v: values(2),
+                w: values(2),
+                tau: 0.125,
+                kappa: -2.,
+            };
+            let mut combined = direction.clone();
+            combined.add_direction(&correction);
+            assert_eq!(
+                q.alpha_with_correction(&direction, &correction).to_bits(),
+                q.alpha(&combined).to_bits()
+            );
+        }
+    }
+}

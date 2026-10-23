@@ -20,6 +20,7 @@ impl<const D: usize> Solver<D> {
         engine.prepare_full_labels(&self.graph, &controls)
     }
     pub fn restore_arcs(&mut self) {
+        self.raw_pricing = None;
         self.engine = None;
         self.prepared = None;
         self.enumeration = None;

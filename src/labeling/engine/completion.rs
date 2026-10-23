@@ -1,5 +1,52 @@
 use super::*;
 
+/// Enumeration's limited-memory projection borrows expensive resource payloads.
+struct EnumerationProjection<'a, const D: usize> {
+    label: &'a crate::enumeration::Label<D>,
+    ng: u16,
+    cut_words: [u32; LIMITED_WORDS],
+    half_potential: f64,
+}
+
+impl<const D: usize> LabelData for EnumerationProjection<'_, D> {
+    fn vertex(&self) -> usize {
+        self.label.vertex
+    }
+    fn cost(&self) -> f64 {
+        self.label.reduced_cost
+    }
+    fn original_cost(&self) -> f64 {
+        self.label.original_cost
+    }
+    fn resources(&self) -> &[f64] {
+        &self.label.resources
+    }
+    fn ng(&self) -> u16 {
+        self.ng
+    }
+    fn branch_state(&self) -> &crate::pricing::restrictions::BranchState {
+        &None
+    }
+    fn presence_state(&self) -> &crate::cuts::soft_conflicts::LabelState {
+        &self.label.presence_state
+    }
+    fn coupled_state(&self) -> Option<&crate::graph::coupled::CoupledLabelState> {
+        self.label.coupled_state.as_deref()
+    }
+    fn hops(&self) -> usize {
+        self.label.hops
+    }
+    fn cut_words(&self) -> &[u32] {
+        &self.cut_words
+    }
+    fn additional_cost(&self) -> f64 {
+        self.label.cut_cost
+    }
+    fn key(&self) -> f64 {
+        (self.half_potential + self.label.cut_cost) + (0.0 + self.label.reduced_cost)
+    }
+}
+
 impl<const D: usize> LabelingEngine<D> {
     pub(super) fn refresh_coupled_completion(&mut self, g: &Graph<D>) {
         self.coupled_completion = std::array::from_fn(|_| Default::default());
@@ -117,6 +164,18 @@ impl<const D: usize> LabelingEngine<D> {
         threshold: f64,
         scan: bool,
     ) -> bool {
+        self.completion_exists_data(g, forward, label, label.bucket, threshold, scan)
+    }
+
+    fn completion_exists_data<L: LabelData>(
+        &self,
+        g: &Graph<D>,
+        forward: bool,
+        label: &L,
+        own: BucketId,
+        threshold: f64,
+        scan: bool,
+    ) -> bool {
         if g.coupled_kernel()
             .is_some_and(|kernel| kernel.has_slope_fronts())
         {
@@ -138,12 +197,12 @@ impl<const D: usize> LabelingEngine<D> {
             && self
                 .cuts
                 .presence
-                .join_correction_lower_bound(&label.presence_state)
+                .join_correction_lower_bound(label.presence_state())
                 .is_err()
         {
             return true;
         }
-        let vertex = self.grid.internal[label.vertex];
+        let vertex = self.grid.internal[label.vertex()];
         let mut q = self.grid.coordinate(label.resources());
         let opposite = self.consumption_joins || !forward;
         if self.consumption_joins && forward {
@@ -164,12 +223,15 @@ impl<const D: usize> LabelingEngine<D> {
         let key = self.ctx().resource_completion_key(
             g,
             forward,
-            label.coupled_state.as_deref(),
-            &label.presence_state,
+            label.coupled_state(),
+            label.presence_state(),
             key,
         );
-        let mut work = vec![(bucket, 0usize)];
-        while let Some((k, min)) = work.pop() {
+        // The initial bucket needs no heap storage. Bounds-only queries and
+        // leaf buckets finish here without allocating a predecessor stack.
+        let mut initial = Some((bucket, 0usize));
+        let mut work = Vec::new();
+        while let Some((k, min)) = work.pop().or_else(|| initial.take()) {
             let row = &storage.buckets[vertex][k];
             if self
                 .ctx()
@@ -181,10 +243,11 @@ impl<const D: usize> LabelingEngine<D> {
             if !scan {
                 return true;
             }
-            if let Some(scan_key) = self.ctx().bucket_completion(
+            if let Some(scan_key) = self.ctx().bucket_completion_data(
                 g,
                 forward,
-                label.into(),
+                label,
+                own,
                 base_key,
                 BucketId { vertex, bucket: k },
                 row.hot.key.first().copied(),
@@ -195,12 +258,14 @@ impl<const D: usize> LabelingEngine<D> {
                     if self.ctx().completion_sum(scan_key, other.key()) >= threshold {
                         break;
                     }
-                    let cost = if forward {
-                        self.ctx().join_cost(g, label.vertex, label.into(), other)
+                    let (feasible, cost) = if forward {
+                        self.ctx()
+                            .concatenate_records(g, label.vertex(), label, &other)
                     } else {
-                        self.ctx().join_cost(g, label.vertex, other, label.into())
+                        self.ctx()
+                            .concatenate_records(g, label.vertex(), &other, label)
                     };
-                    if cost.is_some_and(|c| threshold > c) {
+                    if feasible && threshold > cost {
                         return true;
                     }
                 }
@@ -246,31 +311,16 @@ impl<const D: usize> LabelingEngine<D> {
                 ng |= 1 << bit;
             }
         }
-        let (cut_words, additional_cost) = match (&self.cuts.full, self.has_cuts()) {
-            (Some(full), true) => (
-                state::project_words(&self.cuts.limited, full, label.vertex, &label.cut_words),
-                label.cut_cost,
-            ),
-            _ => ([0; LIMITED_WORDS], label.cut_cost),
+        let cut_words = match (&self.cuts.full, self.has_cuts()) {
+            (Some(full), true) => {
+                state::project_words(&self.cuts.limited, full, label.vertex, &label.cut_words)
+            }
+            _ => [0; LIMITED_WORDS],
         };
-        let projected = StoredLabel {
-            id: 0,
-            local_id: 0,
-            bucket: BucketId::default(),
-            vertex: label.vertex,
-            cost: label.reduced_cost,
-            original_cost: label.original_cost,
-            resources: label.resources,
+        let projected = EnumerationProjection {
+            label,
             ng,
-            branch_state: None,
-            presence_state: label.presence_state.clone(),
-            coupled_state: label.coupled_state.clone(),
-            parent: None,
-            arc: None,
-            hops: label.hops,
-            expanded: false,
             cut_words,
-            additional_cost,
             half_potential: self
                 .cuts
                 .info
@@ -278,7 +328,7 @@ impl<const D: usize> LabelingEngine<D> {
                 .get(label.vertex)
                 .map_or(0.0, |&p| 0.5 * p),
         };
-        self.completion_exists(g, forward, &projected, threshold, scan)
+        self.completion_exists_data(g, forward, &projected, BucketId::default(), threshold, scan)
     }
 }
 

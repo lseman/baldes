@@ -24,18 +24,40 @@ pub struct Column {
     pub identity: String,
 }
 
+/// Exact membership key. Formatting floating-point values is not injective:
+/// nearby costs or coefficients must never suppress an improving column.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum ColumnKey {
+    Identity(String),
+    Structural {
+        tag: i32,
+        cost: u64,
+        entries: Vec<(usize, u64)>,
+    },
+}
+
 impl Column {
-    fn signature(&self) -> String {
+    fn signature(&self) -> ColumnKey {
         if !self.identity.is_empty() {
-            return format!("identity:{}", self.identity);
+            return ColumnKey::Identity(self.identity.clone());
         }
-        let mut s = format!("{:.11e}", self.cost);
-        for &(r, v) in &self.entries {
-            if v != 0. {
-                s.push_str(&format!("|{r}:{v:.11e}"));
-            }
+        ColumnKey::Structural {
+            // Tags may carry different semantic upper bounds even for equal
+            // algebraic columns, so the fallback must preserve them as well.
+            tag: self.tag,
+            // Signed zeros denote the same objective/zero coefficient.
+            cost: if self.cost == 0. {
+                0
+            } else {
+                self.cost.to_bits()
+            },
+            entries: self
+                .entries
+                .iter()
+                .filter(|(_, value)| *value != 0.)
+                .map(|&(row, value)| (row, value.to_bits()))
+                .collect(),
         }
-        s
     }
 }
 
@@ -165,6 +187,23 @@ pub struct WarmStart {
     pub initial_rows: usize,
 }
 
+impl WarmStart {
+    pub(crate) fn empty(bound_mode: BoundMode) -> Self {
+        Self {
+            bound: f64::NEG_INFINITY,
+            bound_mode,
+            numerical_bound: f64::NEG_INFINITY,
+            certified_bound: f64::NEG_INFINITY,
+            stabilization: None,
+            generated_pool: vec![],
+            columns: vec![],
+            artificials: vec![],
+            cut_artificials: vec![],
+            initial_rows: 0,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Options {
     pub bound_mode: BoundMode,
@@ -233,6 +272,18 @@ impl Default for Options {
     }
 }
 
+impl Options {
+    /// Retain reusable controls while moving the owned continuation into a run.
+    pub(crate) fn take_continuation(&mut self) -> Self {
+        let warm_start = self.warm_start.take();
+        let known = std::mem::take(&mut self.known);
+        let mut next = self.clone();
+        next.warm_start = warm_start;
+        next.known = known;
+        next
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Output {
     pub status: Status,
@@ -280,3 +331,8 @@ use bounds::{lagrangian, master_reduced_cost, optimality_gap, publish_certificat
 
 mod cleanup;
 use cleanup::cleanup_columns;
+mod pool;
+
+#[cfg(all(test, feature = "clp"))]
+#[path = "../../../tests/unit/master/cg/identity_pool_tests.rs"]
+mod identity_pool_tests;

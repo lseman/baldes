@@ -101,17 +101,26 @@ impl SparseMatrix {
         Ok(self.tmul(x))
     }
     pub(crate) fn mul(&self, x: &[f64]) -> Vec<f64> {
-        let mut y = vec![0.0; self.rows];
+        let mut y = Vec::new();
+        self.mul_into(x, &mut y);
+        y
+    }
+    pub(crate) fn mul_into(&self, x: &[f64], y: &mut Vec<f64>) {
+        y.resize(self.rows, 0.);
+        y.fill(0.);
         for (j, &xj) in x.iter().enumerate() {
             for (i, v) in self.column(j) {
                 y[i] += v * xj;
             }
         }
-        y
     }
     pub(crate) fn tmul(&self, x: &[f64]) -> Vec<f64> {
-        (0..self.cols)
-            .map(|j| self.column(j).map(|(i, v)| v * x[i]).sum())
-            .collect()
+        let mut y = Vec::new();
+        self.tmul_into(x, &mut y);
+        y
+    }
+    pub(crate) fn tmul_into(&self, x: &[f64], y: &mut Vec<f64>) {
+        y.clear();
+        y.extend((0..self.cols).map(|j| self.column(j).map(|(i, v)| v * x[i]).sum::<f64>()));
     }
 }

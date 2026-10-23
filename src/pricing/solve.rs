@@ -64,8 +64,7 @@ impl<const D: usize> Solver<D> {
             self.check_presence_universe()?;
         }
         self.refresh_cuts()?;
-        let enumerated_kpath = self.enumerated_kpath_inputs();
-        if let Some(universe) = &mut self.enumeration {
+        if self.enumeration.is_some() {
             if !phase.exact() {
                 return Ok(PricingResult {
                     columns: vec![],
@@ -74,6 +73,8 @@ impl<const D: usize> Solver<D> {
                     statistics: Default::default(),
                 });
             }
+            let enumerated_kpath = self.enumerated_kpath_inputs();
+            let universe = self.enumeration.as_mut().unwrap();
             universe.paths.inspect_with_presence(
                 &self.graph,
                 f64::INFINITY,

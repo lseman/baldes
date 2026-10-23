@@ -65,7 +65,23 @@ impl NativeKPathSeparator {
         };
         let capacity = super::super::shared::rhs_rounding_capacity(prep.capacity, n);
         let mut state = Separation::prepare(&prep.demands[..n], capacity, params, None)?;
-        state.pulse = prep.pulse.clone();
+        // The prepared pulse graph is restored on both success and rejected
+        // column input. Its mutable search scratch already persists between
+        // successful calls, so transfer ownership instead of copying matrices.
+        std::mem::swap(&mut state.pulse, &mut self.preparation.pulse);
+        let result = self.separate_prepared(solutions, values, &mut state);
+        std::mem::swap(&mut state.pulse, &mut self.preparation.pulse);
+        result
+    }
+
+    fn separate_prepared(
+        &mut self,
+        solutions: &[crate::cuts::rank_one::separation::Solution],
+        values: &[f64],
+        state: &mut Separation,
+    ) -> Result<Vec<NativeKPathCut>> {
+        let prep = &self.preparation;
+        let n = prep.num_customers;
         state.two_path = prep.two_path_resource >= 0;
         state.num_columns = solutions.len();
         for (i, (path, &value)) in solutions.iter().zip(values).enumerate() {
@@ -161,7 +177,6 @@ impl NativeKPathSeparator {
             });
             self.next_cut_id += 1;
         }
-        self.preparation.pulse = state.pulse;
         Ok(cuts)
     }
     pub fn coefficient(

@@ -194,6 +194,23 @@ impl BucketGraph {
         g: &Graph<D>,
         forward: bool,
     ) -> Result<()> {
+        self.order_components_impl(g, forward, true)
+    }
+
+    pub(super) fn order_components_preserving_depth<const D: usize>(
+        &mut self,
+        g: &Graph<D>,
+        forward: bool,
+    ) -> Result<()> {
+        self.order_components_impl(g, forward, false)
+    }
+
+    fn order_components_impl<const D: usize>(
+        &mut self,
+        g: &Graph<D>,
+        forward: bool,
+        update_depth: bool,
+    ) -> Result<()> {
         let (ids, offsets, mut edges) = self.auxiliary(g, forward);
         if ids.is_empty() {
             return Err(invalid("empty bucket graph"));
@@ -343,6 +360,10 @@ impl BucketGraph {
         for row in &mut components {
             row.sort_by_key(|id| (id.bucket, id.vertex));
         }
+        self.direction_mut(forward).components = components;
+        if !update_depth {
+            return Ok(());
+        }
         let mut depth = vec![0; self.order.len()];
         for v in 0..depth.len() {
             let Some(last) = self.direction(forward).buckets[v].last() else {
@@ -359,7 +380,6 @@ impl BucketGraph {
             }
         }
         let d = self.direction_mut(forward);
-        d.components = components;
         for (v, old) in d.depth.iter().enumerate() {
             depth[v] = depth[v].max(*old);
         }

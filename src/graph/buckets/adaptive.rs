@@ -5,8 +5,6 @@ impl BucketGraph {
     /// from the physical graph here would silently undo reduced-cost fixing.
     pub fn decrease_steps<const D: usize>(&mut self, g: &Graph<D>) -> Result<()> {
         let old_steps = self.step;
-        let old_forward = self.forward.clone();
-        let old_backward = self.backward.clone();
         for r in 0..self.dimensions {
             self.step[r] = if self.dimensions == 1 {
                 (old_steps[r] * 5. + 0.5).floor() / 10.
@@ -22,8 +20,7 @@ impl BucketGraph {
             if !forward && !self.bidirectional {
                 continue;
             }
-            let old = if forward { &old_forward } else { &old_backward };
-            self.regenerate(forward)?;
+            let old = self.regenerate_retaining_buckets(forward)?;
             let mut identity = 0;
             for v in 0..self.order.len() {
                 let count = self.direction(forward).buckets[v].len();
@@ -77,7 +74,7 @@ impl BucketGraph {
                         let mut coord = origin0;
                         let mut scan = base;
                         loop {
-                            if let Some(bucket) = old.buckets[v].get(scan) {
+                            if let Some(bucket) = old[v].get(scan) {
                                 selected.extend(
                                     bucket
                                         .arcs
@@ -111,7 +108,7 @@ impl BucketGraph {
                             run1 - old_steps[1]
                         };
                         base += old_row;
-                        if base >= old.buckets[v].len()
+                        if base >= old[v].len()
                             || !run1.is_finite()
                             || if forward {
                                 bound1 <= run1 - 1e-7
@@ -151,9 +148,7 @@ impl BucketGraph {
             // regenerateBuckets after a step change only scales the preceding
             // depths below: createBucketGraph's depth initialization (the
             // maximum with the new graph's chain depth) does not run here.
-            let depth = self.direction(forward).depth.clone();
-            self.order_components(g, forward)?;
-            self.direction_mut(forward).depth = depth;
+            self.order_components_preserving_depth(g, forward)?;
             self.refresh_counts(g, forward);
             self.regenerate_jumps(g, forward);
             let factor = if self.dimensions == 1 { 2. } else { 1.4 };

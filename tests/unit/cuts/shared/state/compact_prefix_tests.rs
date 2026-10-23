@@ -186,3 +186,60 @@ fn omitted_words_match_zero_extended_states_in_all_readers() {
     assert_eq!(actual[19], 1);
     assert_eq!(full_cost.to_bits(), short_cost.to_bits());
 }
+#[test]
+fn structural_comparison_ignores_only_duals() {
+    use super::*;
+    let limited = LimitedInput {
+        covering: false,
+        type2: false,
+        arc_memory: true,
+        denominator: 3,
+        dual: 1.,
+        vertex_coefficient: vec![1, 0, 2],
+        arc_coefficient: [(7, 1)].into_iter().collect(),
+        memory_vertices: vec![0, 2],
+        memory_arcs: [4].into_iter().collect(),
+    };
+    let mut other = limited.clone();
+    other.dual = f64::NAN;
+    assert!(limited.same_structure(&other));
+    other.denominator = 2;
+    assert!(!limited.same_structure(&other));
+    other = limited.clone();
+    other.memory_arcs.insert(8);
+    assert!(!limited.same_structure(&other));
+    let kpath = LimitedKPathInput {
+        dual: 2.,
+        arc_memory: false,
+        support: vec![true, false],
+        memory_vertices: vec![1],
+    };
+    let mut other = kpath.clone();
+    other.dual = -0.;
+    assert!(kpath.same_structure(&other));
+    other.arc_memory = true;
+    assert!(!kpath.same_structure(&other));
+    let full = FullInput {
+        dual: 1.,
+        ordered_support: vec![(1, 2)],
+        denominator: 3,
+        covering: false,
+        vertex_coefficient: vec![0, 2],
+        arc_coefficient: BTreeMap::new(),
+    };
+    let mut other = full.clone();
+    other.dual = -2.;
+    assert!(full.same_structure(&other));
+    other.covering = true;
+    assert!(!full.same_structure(&other));
+    let full_kpath = FullKPathInput {
+        dual: 2.,
+        ordered_support: vec![0],
+        vertex_support: vec![true],
+    };
+    let mut other = full_kpath.clone();
+    other.dual = 3.;
+    assert!(full_kpath.same_structure(&other));
+    other.ordered_support.push(1);
+    assert!(!full_kpath.same_structure(&other));
+}

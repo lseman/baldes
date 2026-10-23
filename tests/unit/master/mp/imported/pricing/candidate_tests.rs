@@ -1,4 +1,5 @@
 use super::*;
+use std::time::Duration;
 
 fn bounds(lower: f64, upper: f64) -> Bounds {
     Bounds { lower, upper }
@@ -117,12 +118,17 @@ fn sparse_candidates_match_compilation_with_interleaved_restrictions_and_group_v
     ] {
         // Nonzero, mixed-sign stored duals exercise every row and preserve
         // arithmetic ordering, independent of which LP basis was selected.
-        point.duals = (0..point.duals.len())
-            .map(|i| (i as f64 - 3.5) / 8.)
-            .collect();
+        point.duals = Rc::new(
+            (0..point.duals.len())
+                .map(|i| (i as f64 - 3.5) / 8.)
+                .collect(),
+        );
         for group in [7, 9, 42] {
             let view = point.for_subproblem(group).unwrap();
             assert!(Rc::ptr_eq(&point.registry, &view.registry));
+            assert!(Rc::ptr_eq(&point.duals, &view.duals));
+            assert!(Rc::ptr_eq(&point.routing, &view.routing));
+            assert!(Rc::ptr_eq(&point.open_groups, &view.open_groups));
             for i in 0..128 {
                 let entries = view
                     .subproblem()
@@ -198,4 +204,85 @@ fn sparse_candidates_preserve_validation_and_symbolic_envelope_queries() {
     }
     assert!(point.costs().is_ok());
     assert!(point.envelope_reduced_cost_bound().unwrap().is_some());
+}
+
+#[test]
+fn collection_point_cache_preserves_empty_model_and_refreshes_proof_epochs() {
+    let multi = session();
+    let view = multi.certificate_view().unwrap();
+    let options = Options::default();
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut cache = super::session::PointCache::default();
+    let first = cache.next(&view, &options, deadline).unwrap().unwrap();
+    assert_eq!(first.kind(), ImportPricingKind::Objective);
+    let batch = ColumnBatch {
+        columns: vec![],
+        complete: false,
+    };
+    cache.accepted(&batch);
+    let unchanged = view.accept(batch).unwrap();
+    assert!(Rc::ptr_eq(&view.definition, &unchanged.definition));
+    let second = cache.next(&unchanged, &options, deadline).unwrap().unwrap();
+    assert!(Rc::ptr_eq(&first.duals, &second.duals));
+    assert!(Rc::ptr_eq(&first.epoch, &second.epoch));
+    let batch = ColumnBatch {
+        columns: vec![],
+        complete: true,
+    };
+    cache.accepted(&batch);
+    let completed = unchanged.accept(batch).unwrap();
+    let third = cache.next(&completed, &options, deadline).unwrap().unwrap();
+    assert!(Rc::ptr_eq(&first.duals, &third.duals));
+    assert!(!Rc::ptr_eq(&first.epoch, &third.epoch));
+    assert!(!third.open_groups.contains(&7));
+    assert_eq!(first.open_groups.as_ref(), &BTreeSet::from([7, 9, 42]));
+}
+
+#[test]
+fn collection_point_cache_rebuilds_registry_after_optional_columns() {
+    let view = session().certificate_view().unwrap();
+    let options = Options::default();
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut cache = super::session::PointCache::default();
+    let first = cache.next(&view, &options, deadline).unwrap().unwrap();
+    let batch = ColumnBatch {
+        columns: vec![column(77, 0., vec![])],
+        complete: false,
+    };
+    cache.accepted(&batch);
+    let next = view.accept(batch).unwrap();
+    let second = cache.next(&next, &options, deadline).unwrap().unwrap();
+    assert_eq!(second.kind(), ImportPricingKind::Objective);
+    assert!(!Rc::ptr_eq(&first.registry, &second.registry));
+    assert!(!Rc::ptr_eq(&first.epoch, &second.epoch));
+    assert!(second
+        .subproblem()
+        .columns
+        .iter()
+        .any(|column| column.id == 77));
+    assert!(second
+        .reduced_cost(column(78, 0., vec![]))
+        .unwrap()
+        .is_finite());
+}
+
+#[test]
+fn collection_point_cache_uses_phase_one_for_forced_new_columns() {
+    let view = session().certificate_view().unwrap();
+    let options = Options::default();
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut cache = super::session::PointCache::default();
+    let first = cache.next(&view, &options, deadline).unwrap().unwrap();
+    assert_eq!(first.kind(), ImportPricingKind::Objective);
+    let mut forced = column(77, 0., vec![]);
+    forced.bounds.lower = 5.; // Existing explicit group upper quantity is four.
+    let batch = ColumnBatch {
+        columns: vec![forced],
+        complete: false,
+    };
+    cache.accepted(&batch);
+    let next = view.accept(batch).unwrap();
+    let second = cache.next(&next, &options, deadline).unwrap().unwrap();
+    assert_eq!(second.kind(), ImportPricingKind::Feasibility);
+    assert!(second.restricted_violation().unwrap() > 0.);
 }

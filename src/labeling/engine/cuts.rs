@@ -114,6 +114,69 @@ impl<const D: usize> LabelingEngine<D> {
         self.cuts.full = None;
     }
 
+    pub(crate) fn cut_structure_matches(
+        &self,
+        inputs: &[LimitedInput],
+        kpath: &[LimitedKPathInput],
+    ) -> bool {
+        self.cuts.inputs.len() == inputs.len()
+            && self.cuts.kpath.len() == kpath.len()
+            && self
+                .cuts
+                .inputs
+                .iter()
+                .zip(inputs)
+                .all(|(a, b)| a.same_structure(b))
+            && self
+                .cuts
+                .kpath
+                .iter()
+                .zip(kpath)
+                .all(|(a, b)| a.same_structure(b))
+    }
+
+    /// Refresh the prices of a verified unchanged input layout without taking
+    /// ownership of, or reallocating, any coefficient or memory arrays.
+    pub(crate) fn update_cut_duals_borrowed(
+        &mut self,
+        inputs: &[LimitedInput],
+        kpath: &[LimitedKPathInput],
+    ) {
+        debug_assert!(self.cut_structure_matches(inputs, kpath));
+        self.coupled_completion = std::array::from_fn(|_| Default::default());
+        self.half_ready = false;
+        self.full_ready = false;
+        state::update_duals(
+            &mut self.cuts.info,
+            &self.cuts.limited,
+            inputs,
+            kpath,
+            true,
+            true,
+        );
+        for (saved, current) in self.cuts.inputs.iter_mut().zip(inputs) {
+            saved.dual = current.dual;
+        }
+        for (saved, current) in self.cuts.kpath.iter_mut().zip(kpath) {
+            saved.dual = current.dual;
+        }
+        self.cuts.full = None;
+        // A retained enumeration may have installed full-memory tables. They
+        // will be prepared again from the updated full inputs before reuse.
+        for vertex in &mut self.cuts.info.vertices {
+            vertex.full_memory_support.clear();
+        }
+        for arc in self
+            .cuts
+            .info
+            .forward
+            .iter_mut()
+            .chain(&mut self.cuts.info.backward)
+        {
+            arc.full_memory.clear();
+        }
+    }
+
     /// updateComplBoundsWithResConsKnapsackCutDuals: preserve the raw
     /// dominance bounds and rebuild the resource-cost completion bounds.
     pub(super) fn update_knapsack_bounds(&mut self, g: &Graph<D>, forward: bool) {

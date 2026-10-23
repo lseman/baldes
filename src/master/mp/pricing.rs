@@ -46,6 +46,57 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
     fn pricing_subgradient(&self, _rhs: &[f64]) -> Option<Vec<f64>> {
         self.0.borrow().gradient.clone()
     }
+    fn take_pricing_subgradient(&mut self, _rhs: &[f64]) -> Option<Vec<f64>> {
+        self.0.borrow_mut().gradient.take()
+    }
+    fn uses_inactive_column_pool(&self) -> bool {
+        true
+    }
+    fn reprice_inactive_column(
+        &mut self,
+        column: &cg::Column,
+        duals: &[f64],
+    ) -> Result<Option<cg::Column>> {
+        let state = self.0.borrow();
+        let Some(tag) = usize::try_from(column.tag).ok() else {
+            return Ok(None);
+        };
+        let Some(route) = state.routes.get(tag) else {
+            return Ok(None);
+        };
+        let Some(oracle) = state.oracles.iter().find(|o| o.network.id == route.network) else {
+            return Ok(None);
+        };
+        if oracle.multiplicity_upper() == 0.
+            || state
+                .universe
+                .as_ref()
+                .is_some_and(|universe| !universe.contains(&tag))
+            || route.route.arcs.iter().any(|id| {
+                oracle
+                    .proved_zero_arcs
+                    .get(oracle.index[id])
+                    .copied()
+                    .unwrap_or(false)
+            })
+            || !lifecycle::integer_route_feasible(oracle, &route.route).unwrap_or(false)
+        {
+            return Ok(None);
+        }
+        let entries = entries(oracle, &route.route, state.shared_offset)?;
+        let cost = route.route.original_cost;
+        let reduced_cost = entries
+            .iter()
+            .fold(cost, |value, &(row, a)| value - duals[row] * a);
+        Ok(Some(cg::Column {
+            cost,
+            reduced_cost,
+            entries,
+            acceptable: true,
+            tag: column.tag,
+            identity: column.identity.clone(),
+        }))
+    }
 }
 
 impl<const D: usize> State<D> {

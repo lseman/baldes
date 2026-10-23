@@ -32,6 +32,7 @@ pub(super) struct Prepared {
     pub(super) unscaled_cost_norm: f64,
     pub(super) ls: SparseSolver,
     pub(super) solve_workspace: super::super::sparse_solver::SolveWorkspace,
+    pub(super) newton_scratch: super::newton::NewtonScratch,
     pub(super) iterations: usize,
     last: Option<Point>,
 }
@@ -71,6 +72,7 @@ impl Prepared {
             col_scale,
             ls,
             solve_workspace: Default::default(),
+            newton_scratch: Default::default(),
             cost_scale: 1.,
             unscaled_cost_norm: 0.,
             iterations: 0,

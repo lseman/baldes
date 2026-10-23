@@ -76,13 +76,13 @@ impl<const D: usize> ColumnImport<D> {
             definition: self.definition.clone(),
             registry,
             position: self.position,
-            duals: output.duals,
+            duals: Rc::new(output.duals),
             shared_offset: output.snapshot.state.shared_offset,
             kind: ImportPricingKind::Feasibility,
             violation: Some(violation),
-            routing: output.routes,
+            routing: Rc::new(output.routes),
             retained_bound,
-            open_groups: self.open_groups.clone(),
+            open_groups: Rc::new(self.open_groups.clone()),
         })
     }
 }

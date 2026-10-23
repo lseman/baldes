@@ -39,10 +39,33 @@ impl<const D: usize> Context<'_, D> {
         first_key: Option<f64>,
         threshold: f64,
     ) -> Option<f64> {
+        self.bucket_completion_data(
+            g,
+            forward,
+            &label,
+            label.bucket(),
+            key,
+            target,
+            first_key,
+            threshold,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn bucket_completion_data<L: LabelData>(
+        &self,
+        g: &Graph<D>,
+        forward: bool,
+        label: &L,
+        own: BucketId,
+        key: f64,
+        target: BucketId,
+        first_key: Option<f64>,
+        threshold: f64,
+    ) -> Option<f64> {
         if let Some(kernel) = g.coupled_kernel() {
             let first_key = first_key?;
             if let Some(cache) = self.coupled_cache(g, forward) {
-                let own = label.bucket();
                 if own.vertex == target.vertex {
                     let hull = cache
                         .queries

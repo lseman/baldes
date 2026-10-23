@@ -69,11 +69,16 @@ impl<const D: usize> LabelingEngine<D> {
             coupled_completion: &self.coupled_completion,
             resource_error: &self.resource_error,
         };
-        let (storage, other) = if forward {
-            (&mut self.forward, &self.backward)
+        let (storage, other, scratch) = if forward {
+            (&mut self.forward, &self.backward, &mut self.forward_scratch)
         } else {
-            (&mut self.backward, &self.forward)
+            (
+                &mut self.backward,
+                &self.forward,
+                &mut self.backward_scratch,
+            )
         };
+        scratch.reset();
         counts.1.store(other.labels.len(), Ordering::Relaxed);
         Sweep {
             ctx,
@@ -81,8 +86,10 @@ impl<const D: usize> LabelingEngine<D> {
             statistics: &mut self.statistics,
             extension_checks: &mut self.extension_checks,
             filter_checks: &mut self.filter_checks,
-            filter_scratch: Default::default(),
-            coupled_workspace: Default::default(),
+            filter_scratch: &mut scratch.filter,
+            coupled_workspace: &mut scratch.coupled,
+            label_scratch: &mut scratch.labels,
+            pending: &mut scratch.pending,
             terminals,
             labels: (&counts.0, &counts.1),
         }
@@ -110,12 +117,24 @@ impl<const D: usize> LabelingEngine<D> {
         started: Instant,
         pool: &mut SolutionPool<(Option<usize>, Option<usize>)>,
     ) -> Result<()> {
-        let mut terminals = vec![];
+        let scratch = if forward {
+            &mut self.forward_scratch
+        } else {
+            &mut self.backward_scratch
+        };
+        let mut terminals = std::mem::take(&mut scratch.terminals);
+        terminals.clear();
         let counts = Default::default();
         let result = self
             .sweep(forward, &mut terminals, &counts)
             .run_direction(g, forward, controls, started);
         insert_terminals(pool, forward, &terminals);
+        terminals.clear();
+        if forward {
+            self.forward_scratch.terminals = terminals;
+        } else {
+            self.backward_scratch.terminals = terminals;
+        }
         if result.is_ok() {
             self.update_knapsack_bounds(g, forward);
         }
@@ -149,9 +168,17 @@ impl<const D: usize> LabelingEngine<D> {
             resource_error: &self.resource_error,
         };
         let vertices = self.extension_checks.len();
-        let (mut statistics, mut extension_checks, mut filter_checks) =
-            (Statistics::default(), vec![0; vertices], vec![0; vertices]);
-        let (mut forward_terminals, mut backward_terminals) = (vec![], vec![]);
+        let mut statistics = Statistics::default();
+        self.backward_checks.0.resize(vertices, 0);
+        self.backward_checks.1.resize(vertices, 0);
+        self.backward_checks.0.fill(0);
+        self.backward_checks.1.fill(0);
+        self.forward_scratch.reset();
+        self.backward_scratch.reset();
+        let mut forward_terminals = std::mem::take(&mut self.forward_scratch.terminals);
+        let mut backward_terminals = std::mem::take(&mut self.backward_scratch.terminals);
+        forward_terminals.clear();
+        backward_terminals.clear();
         let forward_count = AtomicUsize::new(self.forward.labels.len());
         let backward_count = AtomicUsize::new(self.backward.labels.len());
         let mut forward = Sweep {
@@ -160,8 +187,10 @@ impl<const D: usize> LabelingEngine<D> {
             statistics: &mut self.statistics,
             extension_checks: &mut self.extension_checks,
             filter_checks: &mut self.filter_checks,
-            filter_scratch: Default::default(),
-            coupled_workspace: Default::default(),
+            filter_scratch: &mut self.forward_scratch.filter,
+            coupled_workspace: &mut self.forward_scratch.coupled,
+            label_scratch: &mut self.forward_scratch.labels,
+            pending: &mut self.forward_scratch.pending,
             terminals: &mut forward_terminals,
             labels: (&forward_count, &backward_count),
         };
@@ -169,10 +198,12 @@ impl<const D: usize> LabelingEngine<D> {
             ctx,
             storage: &mut self.backward,
             statistics: &mut statistics,
-            extension_checks: &mut extension_checks,
-            filter_checks: &mut filter_checks,
-            filter_scratch: Default::default(),
-            coupled_workspace: Default::default(),
+            extension_checks: &mut self.backward_checks.0,
+            filter_checks: &mut self.backward_checks.1,
+            filter_scratch: &mut self.backward_scratch.filter,
+            coupled_workspace: &mut self.backward_scratch.coupled,
+            label_scratch: &mut self.backward_scratch.labels,
+            pending: &mut self.backward_scratch.pending,
             terminals: &mut backward_terminals,
             labels: (&backward_count, &forward_count),
         };
@@ -191,16 +222,28 @@ impl<const D: usize> LabelingEngine<D> {
                 )
             });
         self.statistics.absorb(&statistics);
-        for (total, part) in self.extension_checks.iter_mut().zip(&extension_checks) {
+        for (total, part) in self
+            .extension_checks
+            .iter_mut()
+            .zip(&self.backward_checks.0)
+        {
             *total = total.wrapping_add(*part);
         }
-        for (total, part) in self.filter_checks.iter_mut().zip(&filter_checks) {
+        for (total, part) in self.filter_checks.iter_mut().zip(&self.backward_checks.1) {
             *total = total.wrapping_add(*part);
         }
+        if forward_result.is_ok() {
+            insert_terminals(pool, true, &forward_terminals);
+            if backward_result.is_ok() {
+                insert_terminals(pool, false, &backward_terminals);
+            }
+        }
+        forward_terminals.clear();
+        backward_terminals.clear();
+        self.forward_scratch.terminals = forward_terminals;
+        self.backward_scratch.terminals = backward_terminals;
         forward_result?;
-        insert_terminals(pool, true, &forward_terminals);
         backward_result?;
-        insert_terminals(pool, false, &backward_terminals);
         self.update_knapsack_bounds(g, true);
         self.update_knapsack_bounds(g, false);
         Ok((forward_time, backward_time))

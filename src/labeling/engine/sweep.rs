@@ -7,6 +7,31 @@ pub(super) struct FilterScratch {
     retained: Vec<usize>,
     work: Vec<(usize, usize, i32, bool)>,
 }
+
+#[derive(Default)]
+pub(super) struct SweepScratch<const D: usize> {
+    pub(super) filter: FilterScratch,
+    pub(super) coupled: crate::graph::coupled::CoupledWorkspace,
+    pub(super) labels: Vec<usize>,
+    pub(super) pending: Vec<(StoredLabel<D>, HotLabel<D>)>,
+    pub(super) terminals: Vec<(usize, f64, usize)>,
+}
+impl<const D: usize> SweepScratch<D> {
+    pub(super) fn reset(&mut self) {
+        self.filter.retained.clear();
+        self.filter.work.clear();
+        self.labels.clear();
+        self.pending.clear();
+    }
+}
+impl<const D: usize> std::fmt::Debug for SweepScratch<D> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SweepScratch")
+            .field("label_capacity", &self.labels.capacity())
+            .field("pending_capacity", &self.pending.capacity())
+            .finish_non_exhaustive()
+    }
+}
 /// One direction's labeling sweep: the shared read-only context, that
 /// direction's storage, and private counters merged afterwards. Terminal pool
 /// candidates are recorded and replayed in sweep order, so a forward and a
@@ -17,9 +42,11 @@ pub(super) struct Sweep<'a, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSION
     pub(super) statistics: &'a mut Statistics,
     pub(super) extension_checks: &'a mut [i32],
     pub(super) filter_checks: &'a mut [i32],
-    pub(super) filter_scratch: FilterScratch,
+    pub(super) filter_scratch: &'a mut FilterScratch,
     /// Owned by this direction; scratch never escapes into retained labels.
-    pub(super) coupled_workspace: crate::graph::coupled::CoupledWorkspace,
+    pub(super) coupled_workspace: &'a mut crate::graph::coupled::CoupledWorkspace,
+    pub(super) label_scratch: &'a mut Vec<usize>,
+    pub(super) pending: &'a mut Vec<(StoredLabel<D>, HotLabel<D>)>,
     /// (group, cost, label) of each terminal candidate, in insertion order.
     pub(super) terminals: &'a mut Vec<(usize, f64, usize)>,
     /// This direction's and the other direction's label counts, for the
@@ -101,7 +128,7 @@ impl<'a, const D: usize> Sweep<'a, D> {
             return;
         }
         let active = &bucket.active;
-        let FilterScratch { retained, work } = &mut self.filter_scratch;
+        let FilterScratch { retained, work } = &mut *self.filter_scratch;
         retained.clear();
         retained.reserve(active.len());
         let before = self.statistics.other_dominance_checks;
@@ -300,8 +327,6 @@ impl<'a, const D: usize> Sweep<'a, D> {
         // Keep the snapshot and deferred same-bucket insertions in sweep-local
         // scratch so successive buckets reuse their allocations. The snapshot
         // preserves the expansion order while insertions mutate storage.
-        let mut labels = Vec::new();
-        let mut pending = Vec::new();
         let prefilter_labels = controls.max_labels == usize::MAX;
         for component in components {
             loop {
@@ -320,7 +345,7 @@ impl<'a, const D: usize> Sweep<'a, D> {
                         .len();
                     // Same-bucket extensions go to `pending`, so this bucket's
                     // active list is fixed for the whole arc loop.
-                    labels.clear();
+                    self.label_scratch.clear();
                     if prefilter_labels {
                         // Eligibility cannot change during the arc loop: same-bucket
                         // insertions are deferred and expansion happens afterwards.
@@ -339,12 +364,12 @@ impl<'a, const D: usize> Sweep<'a, D> {
                                         .is_none_or(|limit| from.hops < limit)
                             };
                             if eligible {
-                                labels.push(index);
+                                self.label_scratch.push(index);
                             }
                         }
                     } else {
                         // Preserve per-record budget checks before eligibility.
-                        labels
+                        self.label_scratch
                             .extend_from_slice(&self.storage.buckets[id.vertex][id.bucket].active);
                     }
                     for k in 0..arc_count {
@@ -356,7 +381,8 @@ impl<'a, const D: usize> Sweep<'a, D> {
                         {
                             continue;
                         }
-                        for &index in &labels {
+                        for position in 0..self.label_scratch.len() {
+                            let index = self.label_scratch[position];
                             clock = clock.wrapping_add(1);
                             if clock % 64 == 0 && started.elapsed() >= controls.time_limit {
                                 return Err(incomplete("pricing hard time limit exceeded"));
@@ -459,7 +485,7 @@ impl<'a, const D: usize> Sweep<'a, D> {
                                 ..HotLabel::of(&label)
                             };
                             if label.bucket == id {
-                                pending.push((label, hot));
+                                self.pending.push((label, hot));
                                 continue;
                             }
                             let same = self.ctx.grid.direction(forward).buckets
@@ -481,6 +507,7 @@ impl<'a, const D: usize> Sweep<'a, D> {
                         .storage
                         .labels
                         .expand(&self.storage.buckets[id.vertex][id.bucket].active);
+                    let mut pending = std::mem::take(self.pending);
                     for (label, hot) in pending.drain(..) {
                         let inserted = if BRANCHING || R::OWNS_AUXILIARY {
                             self.insert::<BRANCHING, R, _>(g, forward, label, hot, controls)
@@ -491,6 +518,7 @@ impl<'a, const D: usize> Sweep<'a, D> {
                             repeat = true;
                         }
                     }
+                    *self.pending = pending;
                 }
                 if !repeat {
                     break;

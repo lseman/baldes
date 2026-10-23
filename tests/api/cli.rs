@@ -500,6 +500,7 @@ fn bound_mode_is_explicit_in_root_and_tree_json() {
 #[test]
 fn cvrp_ignores_time_windows_while_vrptw_enforces_them() {
     let path = std::env::temp_dir().join(format!("baldes-cli-{}.txt", std::process::id()));
+    let json = path.with_extension("json");
     // Each customer is reachable individually, but the time windows prevent a
     // combined VRPTW route. A CVRP route can visit both within capacity.
     std::fs::write(
@@ -525,6 +526,8 @@ fn cvrp_ignores_time_windows_while_vrptw_enforces_them() {
             .arg(&path)
             .args(flags)
             .args(["--no-enumeration", "--no-stabilization"])
+            .arg("--json")
+            .arg(&json)
             .output()
             .unwrap();
         assert!(
@@ -533,15 +536,13 @@ fn cvrp_ignores_time_windows_while_vrptw_enforces_them() {
             String::from_utf8_lossy(&output.stderr)
         );
         let stdout = String::from_utf8(output.stdout).unwrap();
-        let lp: f64 = stdout
-            .split_whitespace()
-            .find_map(|word| word.strip_prefix("lp="))
-            .expect("root objective")
-            .parse()
-            .unwrap();
+        let report: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+        let lp = report["lp"].as_f64().expect("root objective");
         assert!((lp - expected).abs() < 1e-8, "{kind}: {stdout}");
     }
     std::fs::remove_file(path).unwrap();
+    std::fs::remove_file(json).unwrap();
 }
 
 #[test]
@@ -571,6 +572,8 @@ fn hgs_respects_time_windows() {
 
 #[test]
 fn tree_and_kohl_controls_reach_integer_solve_and_reject_cvrp_time_resource() {
+    let json =
+        std::env::temp_dir().join(format!("baldes-tree-controls-{}.json", std::process::id()));
     let output = command()
         .args([
             "vrptw",
@@ -584,6 +587,8 @@ fn tree_and_kohl_controls_reach_integer_solve_and_reject_cvrp_time_resource() {
             "--time",
             "10",
         ])
+        .arg("--json")
+        .arg(&json)
         .output()
         .unwrap();
     assert!(
@@ -592,10 +597,14 @@ fn tree_and_kohl_controls_reach_integer_solve_and_reject_cvrp_time_resource() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("status=Optimal"), "{stdout}");
+    let report: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
     assert!(
-        stdout.contains("status=Optimal incumbent=269.533140900"),
+        (report["incumbent"].as_f64().unwrap() - 269.533140900).abs() < 1e-6,
         "{stdout}"
     );
+    std::fs::remove_file(json).unwrap();
     let output = command()
         .args(["cvrp", "instances/Solomon/R101.txt", "--two-path-cuts"])
         .output()
@@ -747,6 +756,7 @@ fn canonical_and_legacy_option_names_reach_the_same_root_and_tree_controls() {
 #[test]
 fn hgs_warm_start_and_ipm_flags_reach_the_routing_master() {
     let path = std::env::temp_dir().join(format!("baldes-ipm-hgs-{}.txt", std::process::id()));
+    let json = path.with_extension("json");
     std::fs::write(&path,"tiny\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n").unwrap();
     for columns in ["best", "all", "1"] {
         let output = command()
@@ -765,6 +775,8 @@ fn hgs_warm_start_and_ipm_flags_reach_the_routing_master() {
                 "--time",
                 "5",
             ])
+            .arg("--json")
+            .arg(&json)
             .output()
             .unwrap();
         assert!(
@@ -773,15 +785,13 @@ fn hgs_warm_start_and_ipm_flags_reach_the_routing_master() {
             String::from_utf8_lossy(&output.stderr)
         );
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let lp: f64 = stdout
-            .split_whitespace()
-            .find_map(|w| w.strip_prefix("lp="))
-            .unwrap()
-            .parse()
-            .unwrap();
+        let report: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+        let lp = report["lp"].as_f64().expect("root objective");
         assert!((lp - (2. + 2_f64.sqrt())).abs() < 1e-6, "{stdout}");
         assert!(String::from_utf8_lossy(&output.stderr).contains("HGS seed: columns="));
     }
+    std::fs::remove_file(json).unwrap();
     for flags in [
         vec!["--master", "wrong"],
         vec!["--hgs-columns", "wrong"],

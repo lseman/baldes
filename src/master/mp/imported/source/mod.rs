@@ -122,23 +122,30 @@ impl<const D: usize> ColumnImport<D> {
     }
 
     pub(super) fn accept(&self, batch: ColumnBatch) -> Result<Self> {
-        let old = &self.definition;
-        let mut definition = Definition {
-            problem: old.problem.clone(),
-            variables: old.variables.clone(),
-            subproblems: old.subproblems.clone(),
-            envelopes: old.envelopes.clone(),
+        let definition = if batch.columns.is_empty() {
+            // Completion changes source coverage, not the declared LP. Retain
+            // its immutable model identity and avoid recompiling an empty edit.
+            self.definition.clone()
+        } else {
+            let old = &self.definition;
+            let mut definition = Definition {
+                problem: old.problem.clone(),
+                variables: old.variables.clone(),
+                subproblems: old.subproblems.clone(),
+                envelopes: old.envelopes.clone(),
+            };
+            definition.subproblems[self.position]
+                .columns
+                .extend(batch.columns);
+            super::envelope::validate(&definition)?;
+            // No LP or publication is initialized while validating a declaration.
+            compile::model(
+                definition.problem.clone(),
+                definition.variables.clone(),
+                definition.subproblems.clone(),
+            )?;
+            Rc::new(definition)
         };
-        definition.subproblems[self.position]
-            .columns
-            .extend(batch.columns);
-        super::envelope::validate(&definition)?;
-        // No LP or publication is initialized while validating a declaration.
-        compile::model(
-            definition.problem.clone(),
-            definition.variables.clone(),
-            definition.subproblems.clone(),
-        )?;
         let mut open_groups = self.open_groups.clone();
         if batch.complete {
             open_groups.remove(&self.subproblem().id);
@@ -147,7 +154,7 @@ impl<const D: usize> ColumnImport<D> {
         }
         Ok(Self {
             context: self.context.clone(),
-            definition: Rc::new(definition),
+            definition,
             position: self.position,
             complete: batch.complete,
             open_groups,

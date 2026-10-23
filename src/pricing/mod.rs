@@ -26,6 +26,11 @@ use crate::{incomplete, invalid, Controls, Graph, PricingResult, Result};
 use std::sync::Arc;
 use std::time::Duration;
 #[derive(Debug)]
+struct RawPricing<const D: usize> {
+    solver: Box<Solver<D>>,
+    controls: EngineControls<D>,
+}
+#[derive(Debug)]
 pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub graph: Graph<D>,
     pub(crate) forbidden_arcs: Vec<bool>,
@@ -50,6 +55,9 @@ pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     ng_baseline: Option<(Vec<Vec<usize>>, Vec<Vec<usize>>)>,
     pub variable_costs: Vec<f64>,
     arc_cost_scratch: Vec<f64>,
+    // Private full-domain workspace: it never receives reduced-cost fixing or
+    // enumeration, and is never copied into node/transaction forks.
+    raw_pricing: Option<RawPricing<D>>,
     enumeration_snapshot: Option<Arc<Graph<D>>>,
     /// Registered rank-one cuts and their separator.
     pub cuts: CutRegistry,
@@ -70,4 +78,5 @@ pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
         Vec<FullInput>,
         Vec<FullKPathInput>,
     ),
+    cut_input_source: Option<Arc<state::CutInputSource>>,
 }

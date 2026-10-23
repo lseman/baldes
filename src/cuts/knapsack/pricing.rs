@@ -2,14 +2,97 @@ use super::*;
 
 /// Pricing keys are the integer cut
 /// breakpoints; scaling is applied by separation and master coefficients.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub struct KnapsackPricing {
     pub active: bool,
     pub resources: BTreeMap<usize, BTreeMap<i32, f64>>,
     /// Scaled, unrounded penalties for coefficient-consistent pricing.
     exact_terms: Vec<(usize, f64, RouteLoadKnapsackCut, f64)>,
+    source: Option<std::sync::Arc<PricingSource>>,
+}
+// Empty registries are common. Cache their result, including public map state,
+// without adding snapshot copies to the changing-dual path for active cuts.
+#[derive(Debug)]
+struct PricingSource {
+    graph: i32,
+    exact: bool,
+    resource_count: usize,
+    mapping: BTreeMap<usize, usize>,
+    output: KnapsackPricing,
+}
+impl PartialEq for KnapsackPricing {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            active,
+            resources,
+            exact_terms,
+            source: _,
+        } = self;
+        active == &other.active
+            && resources == &other.resources
+            && exact_terms == &other.exact_terms
+    }
 }
 impl KnapsackPricing {
+    /// Solver refresh preserves the previous committed cache on invalid input.
+    /// The empty explicit mapping denotes identity solver coordinates.
+    pub(crate) fn refresh_cached(
+        &mut self,
+        cuts: &[ResourceKnapsackCut],
+        graph: i32,
+        explicit_mapping: &BTreeMap<usize, usize>,
+        resource_count: usize,
+        exact: bool,
+    ) -> Result<bool> {
+        if explicit_mapping
+            .values()
+            .any(|&slot| slot >= resource_count)
+        {
+            return Err(invalid(
+                "knapsack resource mapping exceeds solver coordinates",
+            ));
+        }
+        if cuts.is_empty()
+            && self.source.as_ref().is_some_and(|source| {
+                source.graph == graph
+                    && source.exact == exact
+                    && source.resource_count == resource_count
+                    && source.mapping == *explicit_mapping
+                    && source.output == *self
+            })
+        {
+            return Ok(false);
+        }
+        let identity;
+        let mapping = if explicit_mapping.is_empty() {
+            identity = (0..resource_count)
+                .map(|resource| (resource, resource))
+                .collect();
+            &identity
+        } else {
+            explicit_mapping
+        };
+        let mut next = self.clone();
+        // Do not retain an obsolete snapshot through the new output snapshot.
+        next.source = None;
+        if exact {
+            next.retrieve_exact(cuts, graph, mapping)?;
+        } else {
+            next.retrieve(cuts, graph, mapping)?;
+        }
+        let changed = next != *self;
+        if cuts.is_empty() {
+            next.source = Some(std::sync::Arc::new(PricingSource {
+                graph,
+                exact,
+                resource_count,
+                mapping: explicit_mapping.clone(),
+                output: next.clone(),
+            }));
+        }
+        *self = next;
+        Ok(changed)
+    }
     /// Prepare nonnegative pricing penalties using the master coefficient's
     /// graph scale and unrounded dual. Unlike `retrieve`, no small dual is
     /// discarded. Positive master duals require a separate dominance contract.
@@ -163,3 +246,7 @@ impl KnapsackPricing {
         self.cost(&consumption)
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/cuts/knapsack/pricing_cache_tests.rs"]
+mod tests;

@@ -1,6 +1,12 @@
 use super::super::sparse_solver::SolveWorkspace;
 use super::*;
 
+#[derive(Debug, Clone, Default)]
+pub(super) struct NewtonScratch {
+    d: Vec<f64>,
+    u: Vec<f64>,
+}
+
 pub(super) fn augsys(
     ls: &SparseSolver,
     f: &StandardForm,
@@ -48,22 +54,21 @@ impl Newton<'_> {
         vw: &[f64],
         tk: f64,
         workspace: &mut SolveWorkspace,
+        scratch: &mut NewtonScratch,
     ) -> Result<Point> {
         let q = self.q;
         let f = self.f;
-        let d: Vec<_> =
-            r.d.iter()
-                .zip(xs)
-                .zip(&q.x)
-                .map(|((d, xs), x)| d - xs / x)
-                .collect();
-        let u: Vec<_> =
-            r.u.iter()
-                .zip(vw)
-                .zip(&q.w)
-                .map(|((u, vw), w)| u - vw / w)
-                .collect();
-        let (mut x, mut y, mut w) = augsys(self.ls, f, self.tvw, &r.p, &d, &u, workspace)?;
+        scratch.d.clear();
+        scratch
+            .d
+            .extend(r.d.iter().zip(xs).zip(&q.x).map(|((d, xs), x)| d - xs / x));
+        scratch.u.clear();
+        scratch
+            .u
+            .extend(r.u.iter().zip(vw).zip(&q.w).map(|((u, vw), w)| u - vw / w));
+        let (mut x, mut y, mut w) = augsys(
+            self.ls, f, self.tvw, &r.p, &scratch.d, &scratch.u, workspace,
+        )?;
         let tau =
             (r.g + tk / q.tau + dot(&f.c, &x) - dot(&f.b, &y) + bound_dot(f, &w)) / self.delta0;
         let kappa = (tk - q.kappa * tau) / q.tau;

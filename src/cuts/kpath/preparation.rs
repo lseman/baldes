@@ -100,8 +100,12 @@ impl KPathPreparation {
         } else {
             vec![]
         };
-        let mut distance = vec![vec![1e12; n + 2]; n + 2];
-        for input in graphs {
+        let mut distance = if two_path_resource >= 0 {
+            vec![vec![1e12; n + 2]; n + 2]
+        } else {
+            vec![]
+        };
+        for (graph_index, input) in graphs.iter().enumerate() {
             let g = &input.graph;
             let info = self.preprocessed[g.id as usize].as_ref().unwrap();
             let mut elements = vec![-1; (info.max_vertex_id + 1).max(0) as usize];
@@ -214,9 +218,19 @@ impl KPathPreparation {
                 }
             }
             if two_path_resource >= 0 {
-                self.pulse.set_ready_time(ready.clone());
-                self.pulse.set_due_date(due.clone());
-                self.pulse.set_distance_matrix(distance.clone());
+                if graph_index + 1 == graphs.len() {
+                    // Earlier graph commits preserve the preparation's
+                    // partial-failure contract. The final buffers no longer
+                    // need local owners, so transfer them without copying.
+                    self.pulse.set_ready_time(std::mem::take(&mut ready));
+                    self.pulse.set_due_date(std::mem::take(&mut due));
+                    self.pulse
+                        .set_distance_matrix(std::mem::take(&mut distance));
+                } else {
+                    self.pulse.set_ready_time(ready.clone());
+                    self.pulse.set_due_date(due.clone());
+                    self.pulse.set_distance_matrix(distance.clone());
+                }
             }
         }
         Ok(())

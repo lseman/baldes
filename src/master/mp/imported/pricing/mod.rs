@@ -7,6 +7,7 @@ mod envelope;
 mod feasibility;
 mod objective;
 mod oracle;
+pub(super) mod session;
 pub use oracle::{ImportOracleReply, ImportPricingMinimum};
 
 /// Which objective the numerical pricing point represents.
@@ -37,13 +38,13 @@ pub struct ImportPricing<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }
     // it across group views preserves row identities without recompilation.
     registry: Rc<Registry>,
     position: usize,
-    duals: Vec<f64>,
+    duals: Rc<Vec<f64>>,
     shared_offset: usize,
     kind: ImportPricingKind,
     violation: Option<f64>,
-    routing: Vec<NetworkRoute>,
+    routing: Rc<Vec<NetworkRoute>>,
     retained_bound: Option<f64>,
-    open_groups: BTreeSet<i32>,
+    open_groups: Rc<BTreeSet<i32>>,
 }
 impl<const D: usize> ImportPricing<D> {
     pub(in crate::master::mp::imported) fn open_group_ids(&self) -> &BTreeSet<i32> {

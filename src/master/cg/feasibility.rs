@@ -4,9 +4,9 @@ use super::*;
 
 pub(super) struct Columns<'a> {
     pub loaded: &'a mut Vec<Option<Column>>,
-    pub seen: &'a mut HashSet<String>,
+    pub seen: &'a mut HashSet<ColumnKey>,
     pub pool: &'a mut Vec<Column>,
-    pub pool_seen: &'a mut HashSet<String>,
+    pub pool_seen: &'a mut HashSet<ColumnKey>,
 }
 
 pub(super) fn install<M: LpMaster, C: Controller<M>>(
