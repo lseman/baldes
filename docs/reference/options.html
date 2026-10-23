@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="BALDES pricing options Documentation index · Cuts ·Enumerated MIP The public option names start with BALDES. The standard build exposes39 supported pricing options. Builds with bot">
+<meta name="description" content="BALDES pricing options Documentation index · Cuts ·Enumerated MIP The public option names start with BALDES. The standard build exposes40 supported pricing options. Builds with bot">
 <meta name="theme-color" content="#0b0e11">
 <title>BALDES pricing options — BALDES docs</title>
 <link rel="canonical" href="https://laioseman.com/baldes/docs/reference/options.html">
@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="algorithms.html">Algorithms and references</a><a href="options.html" aria-current="page">BALDES pricing options</a><a href="resources.html">Scalar resources</a><a href="simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="algorithms.html">Algorithms and references</a><a href="options.html" aria-current="page">BALDES pricing options</a><a href="resources.html">Scalar resources</a><a href="simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/reference/options.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -31,7 +31,7 @@
 <p><a href="../index.html">Documentation index</a> · <a href="../solver/cuts.html">Cuts</a> ·
 <a href="../solver/enumerated-mip.html">Enumerated MIP</a></p>
 <p>The public option names start with <code>BALDES</code>. The standard build exposes
-<strong>39 supported pricing options</strong>. Builds with both <code>clp</code> and <code>highs</code> expose
+<strong>40 supported pricing options</strong>. Builds with both <code>clp</code> and <code>highs</code> expose
 <strong>two additional enumerated-MIP controls</strong>. Each option below has a consumer;
 some apply only to a particular operation or a configured cut family.</p>
 <p>Rust exposes the supported metadata through <code>OPTION_TABLE</code> and availability
@@ -165,6 +165,12 @@ reconfigure its existing separator.</p>
 <td>Int</td>
 <td><code>100.0</code></td>
 <td><a href="https://github.com/lseman/baldes/blob/main/src/cuts/registry/rank_one.rs">src/cuts/registry/rank_one.rs</a>; <a href="https://github.com/lseman/baldes/blob/main/src/cuts/kpath/mod.rs">src/cuts/kpath/mod.rs</a></td>
+</tr>
+<tr>
+<td><code>BALDESrankOneCutsMaxPerVertex</code></td>
+<td>Int</td>
+<td><code>0.0</code></td>
+<td>Experimental support/memory overlap budget; zero disables.</td>
 </tr>
 <tr>
 <td><code>BALDESrankOneCutsMemoryType</code></td>

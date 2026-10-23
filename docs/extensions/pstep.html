@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="P-step CVRP extension Documentation index baldes::extensions::pstep implements the compact continuous relaxation inProposition 1 of A p-step Formulation for the Capacitated Vehicle">
+<meta name="description" content="P-step CVRP and VRPTW extension Documentation index baldes::extensions::pstep implements the compact continuous relaxation inProposition 1 of A p-step Formulation for the Capacitat">
 <meta name="theme-color" content="#0b0e11">
-<title>P-step CVRP extension — BALDES docs</title>
+<title>P-step CVRP and VRPTW extension — BALDES docs</title>
 <link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/pstep.html">
 <link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../_static/site.css">
@@ -20,14 +20,14 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html" aria-current="page">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html" aria-current="page">P-step CVRP and VRPTW extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/pstep.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
 <div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Extensions</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
-<article class="prose"><h1 id="p-step-cvrp-extension">P-step CVRP extension</h1>
+<article class="prose"><h1 id="p-step-cvrp-and-vrptw-extension">P-step CVRP and VRPTW extension</h1>
 <p><a href="../index.html">Documentation index</a></p>
 <p><code>baldes::extensions::pstep</code> implements the compact continuous relaxation in
 Proposition 1 of <a href="https://repub.eur.nl/pub/123411/EI-2020-01.pdf">A p-step Formulation for the Capacitated Vehicle Routing
@@ -291,10 +291,108 @@ E-n22 p=4 needed the extended limit. Converged backend bounds agreed within
 numerical p-step LP bound. The larger p=4 full-pool model was not independently
 solved for that instance. Raw records, binary/input hashes, and compiler
 metadata are under <code>results/pstep-pricing-20261021/final/</code> and <code>verified/</code>.</p>
+<h2 id="experimental-cuda-pricing">Experimental CUDA pricing</h2>
+<p>Build with an NVIDIA CUDA toolkit (<code>nvcc</code> on PATH) and a working CUDA driver:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,cuda<span class="w"> </span>--bin<span class="w"> </span>baldes
+./target/release/baldes<span class="w"> </span>pstep<span class="w"> </span>instances/cvrplib/P-n16-k8.vrp<span class="w"> </span>--p<span class="w"> </span><span class="m">3</span><span class="w"> </span>--gpu<span class="w"> </span>--rounding<span class="w"> </span>none
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>cuda<span class="w"> </span>--lib<span class="w"> </span>extensions::pstep
+cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>cuda<span class="w"> </span>--example<span class="w"> </span>pstep_gpu_bench
+python3<span class="w"> </span>scripts/benchmarks/benchmark_pstep_cuda.py
+</code></pre></div>
+<p><code>--gpu</code> is the CLI shorthand for <code>--pricing cuda</code>.</p>
+<p><code>PricingMethod::Cuda</code> runs exact elementary enumeration for each endpoint/load
+extreme on an NVIDIA GPU. It supports effective p &lt;= 6, uses double precision,
+and preserves CPU enumeration traversal and tie order. It is opt-in; <code>Auto</code>
+keeps selecting CPU methods. The LP and reduced-cost replay remain on CPU.
+<code>threads</code> applies to CPU methods; CUDA reports zero CPU pricing workers.</p>
+<p>The prototype allocates and transfers data each round. Timing includes these
+costs, synchronization, and result replay. Runtime errors and extension limits
+abort the entire round. The deadline is checked after synchronization: an active
+kernel is not preempted, and an over-budget result is discarded. Large p or
+large dense instances can therefore overrun a requested wall-clock limit.</p>
+<p>The synthetic benchmark warms every configuration once, then alternates five
+measured rounds on identical problems and duals, comparing every returned path.
+The CVRPLIB script uses three fresh-process runs per configuration, alternates
+CPU/CUDA order, fixes rounding to <code>none</code>, and checks converged LP bounds.</p>
+<h2 id="time-windows">Time windows</h2>
+<p>The CLI automatically enforces finite service-start windows in Solomon inputs:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,cuda<span class="w"> </span>--bin<span class="w"> </span>baldes
+./target/release/baldes<span class="w"> </span>pstep<span class="w"> </span>instances/Solomon/C201.txt<span class="w"> </span>--p<span class="w"> </span><span class="m">3</span><span class="w"> </span>--gpu<span class="w"> </span>--rounding<span class="w"> </span>none<span class="w"> </span>--json<span class="w"> </span>c201-gpu.json
+./target/release/baldes<span class="w"> </span>pstep<span class="w"> </span>instances/Solomon/C201.txt<span class="w"> </span>--p<span class="w"> </span><span class="m">3</span><span class="w"> </span>--pricing<span class="w"> </span>enumeration<span class="w"> </span>--threads<span class="w"> </span><span class="m">16</span><span class="w"> </span>--rounding<span class="w"> </span>none<span class="w"> </span>--json<span class="w"> </span>c201-cpu.json
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--features<span class="w"> </span>cuda,clp<span class="w"> </span>--test<span class="w"> </span>pstep_vrptw
+cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>cuda<span class="w"> </span>--example<span class="w"> </span>pstep_vrptw_bench<span class="w"> </span>--<span class="w"> </span>instances/Solomon/C201.txt<span class="w"> </span>instances/Solomon/C202.txt
+</code></pre></div>
+<p>Rust callers use <code>TimeWindowProblem::from_instance</code>. <code>TimeWindowProblem</code> wraps
+the existing CVRP data and adds windows and service durations for both depot
+copies and every customer. Travel duration equals travel cost, in the same units
+as the windows. Finite ordered windows and nonnegative service times are required.
+<code>Auto</code> uses CPU enumeration; <code>Cuda</code> uses the GPU; bucket pricing is currently
+unsupported for this model. CUDA still requires effective p &lt;= 6.</p>
+<p>The master has four blocks of n rows: degree, endpoint flow, cumulative load,
+and service-start flow. A timed step contributes its start time positively at
+its first customer and its end time negatively at its last customer. Service
+starts of outgoing steps must therefore cover incoming end times. This follows
+the endpoint-time extension in <a href="https://thesis.eur.nl/pub/65803/Thesis-Wouter-Vaes.pdf">Vaes (2022), sections 3.2–3.3</a>.</p>
+<p>For a fixed path, propagation represents its earliest end service time as
+<code>max(start + transit, barrier)</code>. <code>transit</code> includes service on each arc's tail;
+<code>barrier</code> accounts for waiting. Latest feasible starts are bounded by every
+visited due time. Pricing considers the nondominated earliest scheduling
+breakpoint and the latest feasible start, together with the existing load
+extremes. This retains compatible time assignments in the master instead of
+only filtering individually feasible segments.</p>
+<p>The result remains an unlimited-fleet <strong>LP relaxation</strong>, with no integer route
+certificate. The JSON identifies <code>problem: VRPTW</code> and <code>time_windows_enforced</code>.
+A converged LP bound is distinct from a restricted-master objective. GPU/CPU
+comparisons must use identical rounding; the examples explicitly use <code>none</code>.</p>
+<h3 id="measured-solomon-comparison">Measured Solomon comparison</h3>
+<p>On a Ryzen 9 9950X and RTX 5090, three fresh-process runs with all 100
+customers and <code>--rounding none</code> gave these median LP solve times. P-step CPU
+pricing used 16 workers; the normal solver used its default settings.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Instance</th>
+<th style="text-align:right">Default solver</th>
+<th style="text-align:right">P-step CPU p=2</th>
+<th style="text-align:right">P-step GPU p=2</th>
+<th style="text-align:right">P-step CPU p=3</th>
+<th style="text-align:right">P-step GPU p=3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C201</td>
+<td style="text-align:right">0.127 s</td>
+<td style="text-align:right">1.031 s</td>
+<td style="text-align:right">1.187 s</td>
+<td style="text-align:right">2.612 s</td>
+<td style="text-align:right">2.053 s</td>
+</tr>
+<tr>
+<td>C202</td>
+<td style="text-align:right">8.449 s</td>
+<td style="text-align:right">2.489 s</td>
+<td style="text-align:right">2.719 s</td>
+<td style="text-align:right">7.523 s</td>
+<td style="text-align:right">5.677 s</td>
+</tr>
+</tbody>
+</table></div>
+<p>All CPU/GPU p-step pairs converged to matching bounds. The default solver
+obtained 591.55655667 for both cases. C201 p-step obtained the same bound;
+C202 p-step obtained 590.78102398 at p=2 and 591.54926228 at p=3, so its
+faster times do not represent equally strong bounds. GPU startup outweighed
+pricing savings at p=2. At p=3, warmed, matched-dual pricing rounds were
+6.96x (C201) and 7.25x (C202) faster on GPU; whole-solve improvements were
+1.27x and 1.33x because LP solving remained on CPU.</p>
+<p><a href="https://github.com/lseman/baldes/blob/main/docs/benchmarks/pstep-vrptw.json">Machine details, input/binary hashes, timing ranges and LP bounds</a>
+record the measurements. These timings precede the <code>--gpu</code> alias and integration
+of the unrelated imported-pricing update; the measured CUDA and VRPTW algorithms
+are identical. The normal solver comparison uses its stronger route LP.</p>
 </article>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="column-imports.html"><small>Previous guide</small>Finite column imports <span aria-hidden="true">↗</span></a><a href="evrp.html"><small>Next guide</small>EVRP implementation status <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#experimental-cuda-pricing">Experimental CUDA pricing</a><a class="toc-level-2" href="#time-windows">Time windows</a><a class="toc-level-3" href="#measured-solomon-comparison">Measured Solomon comparison</a></nav></aside>
 </div>
 </body></html>
