@@ -58,11 +58,18 @@ pub struct Values {
 }
 
 #[derive(Debug)]
-struct Registry {
+struct GroupRows {
     links: BTreeMap<i32, usize>,
+    multiplicity: Vec<usize>,
+    next_column: Option<i32>,
+}
+
+#[derive(Debug)]
+struct Registry {
     original: Vec<i32>,
     columns: BTreeMap<(i32, i32), i32>,
     groups: BTreeMap<i32, Vec<i32>>,
+    group_rows: BTreeMap<i32, GroupRows>,
 }
 impl Registry {
     fn values(&self, values: &[(i32, f64)]) -> Result<Values> {

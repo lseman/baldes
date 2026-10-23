@@ -21,10 +21,10 @@ impl<const D: usize> ImportPricing<D> {
         if cost == f64::NEG_INFINITY {
             return Ok(Some(f64::NEG_INFINITY));
         }
-        let compiled = lifecycle::compile_definition(&self.definition, Some(&self.context))?;
+        let rows = &self.registry.group_rows[&group.id];
         let mut entries = vec![];
         for &(id, bounds) in &envelope.coordinates {
-            let price = self.duals[self.shared_offset + compiled.registry.links[&id]];
+            let price = self.duals[self.shared_offset + rows.links[&id]];
             let value = if price > 0. {
                 bounds.lower
             } else if price < 0. {
@@ -37,9 +37,8 @@ impl<const D: usize> ImportPricing<D> {
             }
             entries.push((id, value));
         }
-        let used: HashSet<_> = group.columns.iter().map(|c| c.id).collect();
-        let id = (0..=i32::MAX)
-            .find(|id| !used.contains(id))
+        let id = rows
+            .next_column
             .ok_or_else(|| invalid("pricing candidate IDs exhausted"))?;
         Ok(self
             .bounds_at(

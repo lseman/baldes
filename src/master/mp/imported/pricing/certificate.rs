@@ -117,16 +117,16 @@ pub(super) fn retained_bound<const D: usize>(
 pub(in crate::master::mp::imported) fn objective_request_at_output<const D: usize>(
     session: &ColumnImport<D>,
     output: &Output<D>,
-    shared_rows: usize,
+    registry: Rc<Registry>,
 ) -> ImportPricing<D> {
     ImportPricing {
         epoch: Rc::new(()),
         context: session.context.clone(),
         definition: session.definition.clone(),
+        registry,
         position: session.position,
         duals: output.duals.clone(),
         shared_offset: output.snapshot.state.shared_offset,
-        shared_rows,
         kind: ImportPricingKind::Objective,
         violation: None,
         routing: vec![],
