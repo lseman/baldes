@@ -134,7 +134,7 @@ fn _solve_networks(
     if options.tree {
         let options = options.tree_options().map_err(error)?;
         let json = py
-            .allow_threads(move || -> baldes::Result<String> {
+            .detach(move || -> baldes::Result<String> {
                 let output = multi_pricing::solve_assignment_tree(problem, options)?;
                 SolveResult::tree(&output, started.elapsed().as_secs_f64()).to_json()
             })

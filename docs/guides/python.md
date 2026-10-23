@@ -2,7 +2,7 @@
 
 [Documentation index](../README.md) · [Command-line usage](cli.md)
 
-Commands below run from the repository root. Python 3.9+, Rust/Cargo and a
+Commands below run from the repository root. Python 3.9+, Rust/Cargo 1.85+ and a
 C++14 compiler are required to build the default package from source.
 
 The Python distribution and import are both named `pybaldes`. It contains the
