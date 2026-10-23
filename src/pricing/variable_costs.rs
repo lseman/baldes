@@ -7,7 +7,8 @@ impl<const D: usize> Solver<D> {
         {
             return Err(invalid("variable cost domain"));
         }
-        let mut next = vec![];
+        let next = &mut self.arc_cost_scratch;
+        next.clear();
         for arc in &self.graph.arcs {
             let mut value = arc.cost;
             for &(id, a) in &arc.variables {
@@ -21,10 +22,11 @@ impl<const D: usize> Solver<D> {
             }
             next.push(value);
         }
-        for (arc, cost) in self.graph.arcs.iter_mut().zip(next) {
-            arc.reduced_cost = cost;
+        for (arc, cost) in self.graph.arcs.iter_mut().zip(next.iter()) {
+            arc.reduced_cost = *cost;
         }
-        self.variable_costs = costs.to_vec();
+        self.variable_costs.clear();
+        self.variable_costs.extend_from_slice(costs);
         Ok(())
     }
     /// Price the raw variable-cost problem for the functor interface. Rounding

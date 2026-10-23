@@ -87,7 +87,7 @@ impl CapacitySeparator {
         };
         Separation::prepare(
             &self.demands[1..],
-            self.capacity,
+            super::super::shared::rhs_rounding_capacity(self.capacity, self.num_customers()),
             params,
             p.pulse_buckets,
             windows,
@@ -161,7 +161,8 @@ impl CapacitySeparator {
             arcs.push((previous * width + sink) as i32);
             routes.push((arcs, *value));
         }
-        let capacity = self.capacity;
+        let capacity =
+            super::super::shared::rhs_rounding_capacity(self.capacity, self.num_customers());
         let state = self.prepared()?;
         let first_id = state.statistics.cuts_created;
         let generated = state.separate(&routes);
@@ -191,7 +192,7 @@ impl CapacitySeparator {
                 }
                 cut.edges.insert((tail.min(head), tail.max(head)), weight);
             }
-            let rounded_k = (cut.demand / capacity - 1e-9).ceil() as i32;
+            let rounded_k = (cut.demand / capacity).ceil() as i32;
             if kind == 0 {
                 cut.k = rhs / 2;
                 cut.kind = if cut.k > rounded_k {

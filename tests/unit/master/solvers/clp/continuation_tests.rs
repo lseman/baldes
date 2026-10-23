@@ -166,7 +166,7 @@ fn iteration_stopped_model_is_not_an_infeasibility_certificate() {
 
 #[test]
 fn cg_time_stop_preserves_bound_and_does_not_price() {
-    use crate::master::column_generation::{self as cg, NoController};
+    use crate::master::cg::{self, NoController};
     let mut master = ClpMaster::new().unwrap();
     for _ in 0..128 {
         master.add_row(RowSense::Equal, 1., &[]).unwrap();

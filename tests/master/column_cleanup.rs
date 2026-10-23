@@ -1,10 +1,13 @@
 #![cfg(feature = "clp")]
 use baldes::inputs::{Instance, Rounding};
-use baldes::master::{column_generation::Status, root::RootOptions};
+use baldes::master::{cg::Status, root::RootOptions};
 
 fn r101_25() -> Instance {
-    let mut instance =
-        Instance::read(concat!(env!("CARGO_MANIFEST_DIR"), "/instances/Solomon/R101.txt")).unwrap();
+    let mut instance = Instance::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/instances/Solomon/R101.txt"
+    ))
+    .unwrap();
     instance.truncate(25).unwrap();
     instance
 }
@@ -29,8 +32,8 @@ fn column_cleanup_shrinks_the_master_and_keeps_the_root_bound() {
 #[test]
 fn convergence_before_pricing_keeps_the_solved_cut_model() {
     use baldes::master::{
+        cg::{self, Answer, Column, Controller, LpMaster, Options},
         clp::ClpMaster,
-        column_generation::{self as cg, Answer, Column, Controller, LpMaster, Options},
         RowSense,
     };
     use baldes::pricing::phases::Phase;
@@ -103,8 +106,8 @@ fn convergence_before_pricing_keeps_the_solved_cut_model() {
 #[test]
 fn controller_caps_cover_initial_and_newly_priced_columns() {
     use baldes::master::{
+        cg::{self, Answer, Column, Controller, LpMaster, Options},
         clp::ClpMaster,
-        column_generation::{self as cg, Answer, Column, Controller, LpMaster, Options},
         RowSense,
     };
     use baldes::pricing::phases::Phase;
@@ -184,8 +187,8 @@ fn controller_caps_cover_initial_and_newly_priced_columns() {
 #[test]
 fn enumeration_checkpoint_is_resumable_and_never_requests_with_positive_artificials() {
     use baldes::master::{
+        cg::{self, Answer, Column, Controller, LpMaster, Options},
         clp::ClpMaster,
-        column_generation::{self as cg, Answer, Column, Controller, LpMaster, Options},
         RowSense,
     };
     use baldes::pricing::phases::Phase;

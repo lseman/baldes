@@ -230,7 +230,7 @@ fn _solve_root(
     // Node snapshots retain an Rc<ClpMaster> and must stay on the solver
     // thread. Python consumes only the owned result data, which is Send.
     struct PythonRootOutput {
-        master: baldes::master::column_generation::Output,
+        master: baldes::master::cg::Output,
         routes: Vec<baldes::Route>,
         values: Vec<f64>,
         duals: Vec<f64>,

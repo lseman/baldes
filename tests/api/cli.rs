@@ -828,6 +828,9 @@ fn cg_progress_is_opt_in_periodic_and_separate_from_results() {
     );
     let log = String::from_utf8_lossy(&logged.stderr);
     assert!(log.contains("BALDES | COLUMN GENERATION"));
+    assert!(log.contains(&format!("BALDES ({})", env!("BALDES_GIT_VERSION"))));
+    assert!(log.contains("SIMD: AVX2 ") && log.contains("AVX-512 "));
+    assert!(log.contains("Runtime path: ") && log.contains("Backends: Clp enabled"));
     assert!(log.contains("RMP obj") && log.contains("Lower bound") && log.contains("CG Optimal"));
     assert!(log.contains("Bucket step"));
     for line in log.lines().filter(|line| {

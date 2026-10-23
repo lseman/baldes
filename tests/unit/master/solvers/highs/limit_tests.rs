@@ -1,5 +1,5 @@
 use super::*;
-use crate::master::column_generation::{self as cg, NoController};
+use crate::master::cg::{self, NoController};
 
 fn time_limit(master: &HighsMaster) -> f64 {
     let mut value = 0.;

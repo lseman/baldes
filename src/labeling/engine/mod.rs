@@ -131,6 +131,3 @@ mod sweep;
 use context::Context;
 
 mod directions;
-
-#[cfg(feature = "native-pricing")]
-mod extension_batch;

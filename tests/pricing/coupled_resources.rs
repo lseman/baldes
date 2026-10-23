@@ -720,7 +720,7 @@ fn selection_simultaneous_loads_and_signed_cumulative_dependencies_match_tiny_pa
 #[test]
 fn root_phase_i_recovers_nonlinear_cost_columns_then_restores_original_objective() {
     use baldes::master::{
-        column_generation::{FeasibilityStatus, Status},
+        cg::{FeasibilityStatus, Status},
         root::{self, RootOptions, RootProblem},
     };
     let mut graph: Graph<2> = Graph::new(4, 1).unwrap();
@@ -1047,7 +1047,7 @@ fn interval_front_pricing_cuts_fixing_retention_and_forks_preserve_physical_path
 #[test]
 fn interval_cost_phase_i_keeps_domains_and_restores_original_front_objective() {
     use baldes::master::{
-        column_generation::{FeasibilityStatus, Status},
+        cg::{FeasibilityStatus, Status},
         root::{self, RootOptions, RootProblem},
     };
     let mut graph = Graph::<2>::new(4, 1).unwrap();

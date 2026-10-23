@@ -124,16 +124,23 @@ impl<const D: usize> Storage<D> {
         self.pending += 1;
         true
     }
-    pub fn pop(&mut self) -> Option<Label<D>> {
+    /// Take the next live identity, leaving its immutable predecessor record
+    /// in the arena. Reborrow it between insertions, which may grow the arena.
+    pub fn pop_id(&mut self) -> Option<usize> {
         while self.cursor < self.arena.len() {
             let id = self.cursor;
             self.cursor += 1;
             if self.live[id] {
                 self.pending -= 1;
-                return Some(self.arena[id].clone());
+                return Some(id);
             }
         }
         None
+    }
+    /// Return an owned label for callers that need one. Enumeration engines
+    /// use `pop_id` to avoid copying coupled state on every expansion.
+    pub fn pop(&mut self) -> Option<Label<D>> {
+        self.pop_id().map(|id| self.arena[id].clone())
     }
 }
 

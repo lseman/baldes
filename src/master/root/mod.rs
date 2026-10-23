@@ -3,8 +3,8 @@
 //! driver `_solve_root_clp` of `python/src/openrscp/vrptw.py`.
 use super::branching::BranchConstraint;
 use super::{
+    cg::{self, Answer, Column, Controller, LpMaster, Options, Output},
     clp::ClpMaster,
-    column_generation::{self, Answer, Column, Controller, LpMaster, Options, Output},
     RowSense,
 };
 use crate::cuts::capacity::{CapacityCut, CapacityParameters, CapacitySeparator, TimeWindows};
@@ -37,7 +37,7 @@ mod options;
 mod partial;
 mod preprocessing;
 mod problem;
-pub use column_generation::BoundMode;
+pub use cg::BoundMode;
 use controller::RootController;
 use options::RootKPathSeparator;
 pub use options::{
@@ -78,7 +78,7 @@ pub struct NodeSnapshot<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>
     pricing: Solver<D>,
     incumbent: f64,
     routes: Vec<Route>,
-    warm: column_generation::WarmStart,
+    warm: cg::WarmStart,
 }
 
 #[derive(Clone)]

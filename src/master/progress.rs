@@ -1,5 +1,5 @@
 //! Opt-in, per-solve column-generation progress. Formatting never affects solving.
-use super::column_generation::{Iteration, Output};
+use super::cg::{Iteration, Output};
 use std::{
     io::{self, Write},
     time::Instant,
@@ -95,7 +95,7 @@ impl ProgressLog {
     pub(super) fn new(interval: Option<usize>, cuts: Vec<(&'static str, usize)>) -> Self {
         if interval.is_some() {
             let mut out = io::stderr().lock();
-            let _ = writeln!(out, "\n  BALDES | COLUMN GENERATION");
+            let _ = crate::logging::banner(&mut out, "COLUMN GENERATION");
             let _ = writeln!(out, "{}", "─".repeat(115 + cuts.len() * 9));
             let _ = writeln!(out, "{}", header(&cuts));
             let _ = writeln!(out, "{}", "─".repeat(115 + cuts.len() * 9));

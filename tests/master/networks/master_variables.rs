@@ -1,6 +1,6 @@
 use super::*;
 use baldes::master::preprocessing::Bounds;
-use multi_pricing::{EnumerationOptions, MasterVariable};
+use mp::{EnumerationOptions, MasterVariable};
 
 fn optional_cover(sign: f64, integer: bool) -> MasterVariable {
     MasterVariable {
@@ -25,7 +25,7 @@ fn optional_cover(sign: f64, integer: bool) -> MasterVariable {
 #[test]
 fn independent_master_variables_link_both_networks_and_keep_siblings() {
     for sign in [1., -1.] {
-        let root = multi_pricing::solve_with_master_variables(
+        let root = mp::solve_with_master_variables(
             triangle(),
             vec![optional_cover(sign, true)],
             options(),
@@ -80,12 +80,9 @@ fn independent_master_variables_link_both_networks_and_keep_siblings() {
 
 #[test]
 fn continuous_master_values_and_integer_route_mip_are_distinct() {
-    let root = multi_pricing::solve_with_master_variables(
-        triangle(),
-        vec![optional_cover(1., false)],
-        options(),
-    )
-    .unwrap();
+    let root =
+        mp::solve_with_master_variables(triangle(), vec![optional_cover(1., false)], options())
+            .unwrap();
     let half = root
         .snapshot
         .with_master_variable_bounds(
@@ -133,8 +130,7 @@ fn static_master_variable_certificate_compensates_negative_reduced_cost() {
         integer: true,
         entries: vec![],
     };
-    let output =
-        multi_pricing::solve_with_master_variables(triangle(), vec![variable], configured).unwrap();
+    let output = mp::solve_with_master_variables(triangle(), vec![variable], configured).unwrap();
     optimal(&output, -1.5);
     assert!(output.master.certified_bound <= -1.5);
     assert_eq!(output.master_values, vec![(5, 1.)]);
@@ -142,12 +138,9 @@ fn static_master_variable_certificate_compensates_negative_reduced_cost() {
 
 #[test]
 fn static_integer_values_survive_enumeration_mip_and_assignment_tree() {
-    let root = multi_pricing::solve_with_master_variables(
-        triangle(),
-        vec![optional_cover(1., true)],
-        options(),
-    )
-    .unwrap();
+    let root =
+        mp::solve_with_master_variables(triangle(), vec![optional_cover(1., true)], options())
+            .unwrap();
     #[cfg(feature = "highs")]
     {
         let complete = root
@@ -161,9 +154,9 @@ fn static_integer_values_survive_enumeration_mip_and_assignment_tree() {
         assert!((mip.mip.solution.unwrap().objective - 1.25).abs() < 1e-8);
         assert_eq!(mip.master_values, vec![(100, 1.)]);
     }
-    let mut config = multi_pricing::AssignmentTreeOptions::default();
+    let mut config = mp::AssignmentTreeOptions::default();
     config.node = options();
-    let tree = multi_pricing::solve_assignment_tree_with_master_variables(
+    let tree = mp::solve_assignment_tree_with_master_variables(
         triangle(),
         vec![optional_cover(1., true)],
         config,
@@ -177,7 +170,7 @@ fn static_integer_values_survive_enumeration_mip_and_assignment_tree() {
 
 #[test]
 fn independent_master_fixing_propagates_through_a_shared_nonlinear_row() {
-    use multi_pricing::RankOneCoefficients;
+    use mp::RankOneCoefficients;
     let problem = Problem {
         rows: (0..4)
             .map(|_| Row {
@@ -197,8 +190,7 @@ fn independent_master_fixing_propagates_through_a_shared_nonlinear_row() {
         integer: true,
         entries: vec![],
     };
-    let root =
-        multi_pricing::solve_with_master_variables(problem, vec![master], options()).unwrap();
+    let root = mp::solve_with_master_variables(problem, vec![master], options()).unwrap();
     optimal(&root, 4.);
     let floors = [7, 42].map(|network| RankOneCoefficients {
         network,
@@ -265,19 +257,14 @@ fn integer_domain_policy_proves_mixed_cover_contradiction_without_changing_defau
         upper: 0.5,
     };
     let root =
-        multi_pricing::solve_with_master_variables(triangle(), vec![variable.clone()], options())
-            .unwrap();
+        mp::solve_with_master_variables(triangle(), vec![variable.clone()], options()).unwrap();
     optimal(&root, 1.375);
     assert!(!root.snapshot.preprocessing_report().propagation.infeasible);
-    let mut config = multi_pricing::AssignmentTreeOptions::default();
+    let mut config = mp::AssignmentTreeOptions::default();
     config.node = options();
     config.node.preprocessing.integer_domains = true;
-    let tree = multi_pricing::solve_assignment_tree_with_master_variables(
-        triangle(),
-        vec![variable],
-        config,
-    )
-    .unwrap();
+    let tree = mp::solve_assignment_tree_with_master_variables(triangle(), vec![variable], config)
+        .unwrap();
     assert_eq!(tree.status, baldes::master::tree::TreeStatus::Infeasible);
     assert_eq!(tree.open_nodes, 0);
     assert!(tree.master_values.is_empty());
@@ -297,8 +284,7 @@ fn mixed_mip_retains_a_feasible_fractional_continuous_master_value() {
         entries: vec![(0, 2.)],
     };
     let root =
-        multi_pricing::solve_with_master_variables(triangle(), vec![variable.clone()], options())
-            .unwrap();
+        mp::solve_with_master_variables(triangle(), vec![variable.clone()], options()).unwrap();
     optimal(&root, 1.125);
     assert_eq!(root.master_values, vec![(9, 0.5)]);
     #[cfg(feature = "highs")]
@@ -320,15 +306,11 @@ fn mixed_mip_retains_a_feasible_fractional_continuous_master_value() {
         assert_eq!(mip.mip.solution.unwrap().objective, 1.125);
         assert_eq!(mip.master_values, vec![(9, 0.5)]);
     }
-    let mut config = multi_pricing::AssignmentTreeOptions::default();
+    let mut config = mp::AssignmentTreeOptions::default();
     config.node = options();
     config.node.preprocessing.integer_domains = true;
-    let tree = multi_pricing::solve_assignment_tree_with_master_variables(
-        triangle(),
-        vec![variable],
-        config,
-    )
-    .unwrap();
+    let tree = mp::solve_assignment_tree_with_master_variables(triangle(), vec![variable], config)
+        .unwrap();
     assert_eq!(tree.status, baldes::master::tree::TreeStatus::Optimal);
     assert_eq!(tree.incumbent, 1.125);
     assert_eq!(tree.master_values, vec![(9, 0.5)]);
@@ -337,18 +319,13 @@ fn mixed_mip_retains_a_feasible_fractional_continuous_master_value() {
 #[test]
 fn master_variable_validation_does_not_confuse_id_spaces_or_partial_definitions() {
     let v = optional_cover(1., true);
-    assert!(multi_pricing::solve_with_master_variables(
-        triangle(),
-        vec![v.clone(), v.clone()],
-        options()
-    )
-    .is_err());
+    assert!(
+        mp::solve_with_master_variables(triangle(), vec![v.clone(), v.clone()], options()).is_err()
+    );
     let mut invalid = v.clone();
     invalid.entries.push((0, 2.));
-    assert!(
-        multi_pricing::solve_with_master_variables(triangle(), vec![invalid], options()).is_err()
-    );
-    let root = multi_pricing::solve_with_master_variables(triangle(), vec![v], options()).unwrap();
+    assert!(mp::solve_with_master_variables(triangle(), vec![invalid], options()).is_err());
+    let root = mp::solve_with_master_variables(triangle(), vec![v], options()).unwrap();
     assert!(root
         .snapshot
         .with_master_variable_bounds(

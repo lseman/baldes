@@ -11,7 +11,7 @@
 //! Phased strong branching and diving
 //! use isolated node evaluations via fork-and-carry.
 use super::{
-    column_generation::Status,
+    cg::Status,
     root::{self, RootOptions, RootProblem},
     RowSense,
 };

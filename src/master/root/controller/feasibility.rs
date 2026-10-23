@@ -1,8 +1,6 @@
 //! Independent routing phase I, preserving original rows and route identities.
 use super::*;
-use crate::master::column_generation::{
-    FeasibilityRecovery, FeasibilityReport, FeasibilityStatus, WarmStart,
-};
+use crate::master::cg::{FeasibilityRecovery, FeasibilityReport, FeasibilityStatus, WarmStart};
 use std::time::{Duration, Instant};
 
 impl<const D: usize> RootController<D> {

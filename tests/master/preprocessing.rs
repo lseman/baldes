@@ -230,10 +230,7 @@ fn a_required_arc_propagates_to_other_incoming_and_outgoing_arcs() {
     let result = root::solve(p, options).unwrap();
     assert!(!result.preprocessing.infeasible);
     assert!(result.preprocessing.bound_updates > 0);
-    assert_eq!(
-        result.master.status,
-        baldes::master::column_generation::Status::Optimal
-    );
+    assert_eq!(result.master.status, baldes::master::cg::Status::Optimal);
     // 1->2 required: 0->2 and 1->sink are fixed out by cover/conservation.
     assert!(
         result
@@ -285,10 +282,7 @@ fn positive_aggregate_bounds_do_not_filter_unrelated_routes() {
     let mut options = RootOptions::default();
     options.cg.stabilize = false;
     let result = root::solve(p, options).unwrap();
-    assert_eq!(
-        result.master.status,
-        baldes::master::column_generation::Status::Optimal
-    );
+    assert_eq!(result.master.status, baldes::master::cg::Status::Optimal);
     assert!((result.master.lp - 5.).abs() < 1e-6);
     assert!(result.routes.iter().any(|r| r.arcs == [3, 4]));
 }
@@ -296,12 +290,12 @@ fn positive_aggregate_bounds_do_not_filter_unrelated_routes() {
 #[cfg(feature = "clp")]
 #[test]
 fn inherited_capacity_rows_detect_a_child_contradiction_before_pricing() {
+    use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         branching::BranchConstraint,
-        column_generation::Status,
+        cg::Status,
         root::{self, CapacityCutConfig, RootOptions, RootProblem},
     };
-    use baldes::inputs::{Instance, Rounding};
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for complement in [false, true] {
         let graph = instance.graph(3, Rounding::None).unwrap();

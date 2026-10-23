@@ -306,10 +306,6 @@ impl<'a, const D: usize> Sweep<'a, D> {
         let mut labels = Vec::new();
         let mut pending = Vec::new();
         let prefilter_labels = controls.max_labels == usize::MAX;
-        #[cfg(feature = "native-pricing")]
-        let mut batch = extension_batch::ExtensionBatch::default();
-        #[cfg(feature = "native-pricing")]
-        let batch_supported = prefilter_labels && extension_batch::ExtensionBatch::supported(g);
         for component in components {
             loop {
                 let mut repeat = false;
@@ -354,12 +350,6 @@ impl<'a, const D: usize> Sweep<'a, D> {
                         labels
                             .extend_from_slice(&self.storage.buckets[id.vertex][id.bucket].active);
                     }
-                    #[cfg(feature = "native-pricing")]
-                    let use_batch = batch_supported && labels.len() >= 32;
-                    #[cfg(feature = "native-pricing")]
-                    if use_batch {
-                        batch.snapshot(self.storage, &labels);
-                    }
                     for k in 0..arc_count {
                         let arc = self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket]
                             .arcs[k]
@@ -369,11 +359,7 @@ impl<'a, const D: usize> Sweep<'a, D> {
                         {
                             continue;
                         }
-                        #[cfg(feature = "native-pricing")]
-                        if use_batch {
-                            batch.run(self.ctx, g, &arc, forward);
-                        }
-                        for (_position, &index) in labels.iter().enumerate() {
+                        for &index in &labels {
                             clock = clock.wrapping_add(1);
                             if clock % 64 == 0 && started.elapsed() >= controls.time_limit {
                                 return Err(incomplete("pricing hard time limit exceeded"));
@@ -389,19 +375,6 @@ impl<'a, const D: usize> Sweep<'a, D> {
                                     return Err(incomplete("pricing label limit exceeded"));
                                 }
                             }
-                            #[cfg(feature = "native-pricing")]
-                            let prepared = if use_batch {
-                                let Some(resources) = batch.resources::<D>(_position) else {
-                                    continue;
-                                };
-                                Some(resources)
-                            } else {
-                                None
-                            };
-                            #[cfg(not(feature = "native-pricing"))]
-                            let prepared: Option<
-                                crate::graph::ResourceValues<D>,
-                            > = None;
                             let (from_vertex, extension) = if let Some(from) =
                                 R::get(&self.storage.labels, index)
                             {
@@ -422,7 +395,6 @@ impl<'a, const D: usize> Sweep<'a, D> {
                                         from,
                                         from.ancestry_id(index),
                                         &mut self.coupled_workspace,
-                                        prepared,
                                     ),
                                 )
                             } else {
@@ -444,7 +416,6 @@ impl<'a, const D: usize> Sweep<'a, D> {
                                         from,
                                         from.id,
                                         &mut self.coupled_workspace,
-                                        prepared,
                                     ),
                                 )
                             };

@@ -94,7 +94,7 @@ fn run(
     let params = params;
 
     if options.verbose {
-        crate::log_err!("\n  BALDES | HYBRID GENETIC SEARCH");
+        let _ = crate::logging::banner(&mut std::io::stderr().lock(), "HYBRID GENETIC SEARCH");
         crate::log_err!(
             "  Instance: {} | Customers: {} | Population: {} | Seed: {}",
             instance.name,

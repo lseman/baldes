@@ -23,6 +23,7 @@ use crate::cuts::CutRegistry;
 use crate::enumeration::{self, Enumeration};
 use crate::labeling::engine::{EngineControls, LabelingEngine};
 use crate::{incomplete, invalid, Controls, Graph, PricingResult, Result};
+use std::sync::Arc;
 use std::time::Duration;
 #[derive(Debug)]
 pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
@@ -37,7 +38,7 @@ pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     /// Preserve arc orderings needed by current or future arc-flow branches.
     pub enumeration_preserve_arc_paths: bool,
     pub cutoff: f64,
-    prepared: Option<Graph<D>>,
+    prepared: Option<Arc<Graph<D>>>,
     pub bucket_steps: crate::graph::ResourceValues<D>,
     pub rollback_point_saved: bool,
     pub requires_rollback: bool,
@@ -48,7 +49,8 @@ pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     accumulated_original_bounds: Vec<(i32, usize, Option<crate::graph::Window>, bool)>,
     ng_baseline: Option<(Vec<Vec<usize>>, Vec<Vec<usize>>)>,
     pub variable_costs: Vec<f64>,
-    enumeration_snapshot: Option<Graph<D>>,
+    arc_cost_scratch: Vec<f64>,
+    enumeration_snapshot: Option<Arc<Graph<D>>>,
     /// Registered rank-one cuts and their separator.
     pub cuts: CutRegistry,
     /// Original knapsack resource ID -> solver coordinate. Empty is identity.

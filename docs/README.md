@@ -31,11 +31,12 @@ Commands in these guides run from the repository root.
 - [Coupled resources](extensions/coupled-resources.md): simultaneous pickup/delivery, selected values, cumulative costs and affine dependencies in the physical-graph labeling engine.
 - [Multiple time windows](extensions/multi-time-windows.md): disjoint service-start domains for scalar pricing resources.
 
-- [Multi-pricing](extensions/multi-pricing.md): shared masters, multiple route families, and assignment branching.
+- [Multi-pricing](extensions/mp.md): shared masters, multiple route families, and assignment branching.
 - [Finite column imports](extensions/column-imports.md): original-vector patterns and multiplicity constraints.
 - [P-step CVRP](extensions/pstep.md): compact p-step LP relaxation.
 - [Electric-vehicle routing](extensions/evrp.md): charging models, schedule replay, and current limitations.
 - [Interior-point solver](extensions/ipm.md): native LP backend, interfaces, and implementation details.
+- [Column elimination (CE)](extensions/ce.md): decision-diagram route relaxation and refinement.
 
 ## Benchmarks
 
@@ -52,7 +53,7 @@ Commands in these guides run from the repository root.
 | Generic mixed-integer master solve | `highs::solve_integer` | Not exposed directly | Not exposed | HiGHS |
 
 The `vrptw` and `cvrp` routing tree uses one pricing network. For models with
-multiple route families, use the [multi-pricing interface](extensions/multi-pricing.md),
+multiple route families, use the [multi-pricing interface](extensions/mp.md),
 including its CLI and Python APIs and assignment tree. Its supported branching
 families and solve limitations differ from the single-network routing tree.
 
@@ -64,9 +65,9 @@ not prove a lower bound for the full routing problem.
 ## Rust module organization
 
 Core modules implement graphs, labeling, pricing, cuts, enumeration and the
-master. `master::multi_pricing` coordinates one master with multiple pricing
+master. `master::mp` coordinates one master with multiple pricing
 subproblems and belongs to the core master framework. Rust callers can also use
-`master::multi_pricing::solve_master` for original master variables with no
+`master::mp::solve_master` for original master variables with no
 pricing subproblems.
 
 | Module | Purpose |
@@ -75,7 +76,7 @@ pricing subproblems.
 | `extensions::ipm` | Native interior-point LP backend |
 | `extensions::evrp` | Electric-vehicle routing models and charging schedules |
 | `extensions::pstep` | P-step CVRP LP with parallel bucket pricing and reference enumeration |
-| `master::multi_pricing` | Shared rows, per-subproblem multiplicities and node lifecycle |
+| `master::mp` | Shared rows, per-subproblem multiplicities and node lifecycle |
 
 `extensions` groups algorithms and specialized models in the same crate; it
 does not imply runtime plugins or new build features. Existing `baldes::hgs`,

@@ -132,6 +132,64 @@ impl CutRegistry {
         if !state.prepare(&refs, incidences) {
             return Err(invalid("native rank-one separation preparation failed"));
         }
+        // Matching arc-memory cuts inherit the memories of active cuts from
+        // earlier rounds. Translate physical customer IDs back to separator
+        // row IDs; k-path and custom graph/arc supports use other universes.
+        let active_cuts = self
+            .cuts
+            .iter()
+            .enumerate()
+            .filter(|(index, cut)| {
+                p.memory_type == MemoryType::Arc
+                    && !self.retired.contains(index)
+                    && cut.memory_kind == MemoryKind::Arc
+                    && cut.native_kpath_support.is_none()
+                    && cut.graph_support.is_empty()
+                    && cut.graph_pricing_support.is_empty()
+                    && cut.arc_weights.is_empty()
+                    && !cut.visit_once
+                    && (cut.class == CutClass::Covering) == p.covering
+            })
+            .filter_map(|(_, cut)| {
+                let support = cut.ordered_support.as_ref()?;
+                let mut rows = Vec::with_capacity(support.len());
+                let sign = if cut.class == CutClass::Covering {
+                    -1
+                } else {
+                    1
+                };
+                for &(vertex, weight) in support {
+                    let row = *row_of.get(vertex)?;
+                    if row < 0 {
+                        return None;
+                    }
+                    rows.push((row, sign * weight));
+                }
+                rows.sort();
+                let (set_ids, numerators) = rows.into_iter().unzip();
+                Some(separation::NativeCut {
+                    id: cut.id,
+                    rhs: cut.rhs as f64,
+                    kind: if cut.native_type2 {
+                        2
+                    } else if sign < 0 {
+                        1
+                    } else {
+                        0
+                    },
+                    num_rows: support.len() as i32,
+                    class: cut.kind,
+                    denominator: sign * cut.denominator,
+                    numerators,
+                    set_ids,
+                    memory_type: 1,
+                    memory: graph_ids
+                        .iter()
+                        .map(|&graph| (graph, cut.arc_memory_for_graph(graph)))
+                        .collect(),
+                })
+            })
+            .collect();
         let input = Input {
             solutions: solutions.iter().collect(),
             values: columns.iter().map(|c| c.value).collect(),
@@ -146,7 +204,7 @@ impl CutRegistry {
             } else {
                 p.max_rank
             },
-            active_cuts: vec![],
+            active_cuts,
         };
         let generated = state
             .separate(&input)

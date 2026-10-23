@@ -5,11 +5,11 @@
 Column generation can repeatedly produce similar master duals and columns.
 BALDES optionally smooths the dual point sent to pricing, using a stored
 center and bounded retries when smoothed pricing finds no fresh columns.
-It is enabled by default in `column_generation::Options`.
+It is enabled by default in `cg::Options`.
 
 The implementation is
 [`DualPriceSmoothing`](../../src/master/stabilization/mod.rs), integrated by the
-[column-generation loop](../../src/master/column_generation/driver.rs). The sections below
+[column-generation loop](../../src/master/cg/driver.rs). The sections below
 describe the implemented update and retry rules.
 
 ## Smoothing weight
@@ -32,7 +32,7 @@ configured tolerance. Equality rows have no such sign restriction.
 ## Parameters
 
 These are Rust `master::stabilization::Parameters`, configured through
-`RootOptions::cg.smoothing` or directly in `column_generation::Options`.
+`RootOptions::cg.smoothing` or directly in `cg::Options`.
 They are separate from the named BALDES pricing options.
 
 | Parameter | Default | Behavior |

@@ -129,7 +129,7 @@ are all retained.
 
 The built-in routing controller transfers enumerated columns through an atomic
 LP copy. If enumeration, regeneration, insertion or remapping fails, it restores
-pricing state and continues ordinary CG. `column_generation::Output::enumeration_failure`
+pricing state and continues ordinary CG. `cg::Output::enumeration_failure`
 retains the last transfer error; it does not itself change the solve status.
 Incomplete retained enumerations are discarded before pricing or inspection.
 Within a CG solve, a successful handoff is not repeated for an unchanged

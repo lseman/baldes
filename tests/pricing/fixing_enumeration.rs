@@ -2,7 +2,6 @@ use baldes::enumeration::{Controls, Enumeration};
 use baldes::inputs::{Instance, Rounding};
 use baldes::pricing::Solver;
 
-
 #[test]
 fn raw_functor_pricing_restores_discarded_paths_and_keeps_branch_restrictions() {
     let mut solver = baldes::pricing::Solver::<2>::new(3, 1).unwrap();
@@ -322,8 +321,6 @@ fn enumeration_rebuilds_completion_after_resource_relaxation() {
     // Both unit extensions now fit; the old grid must not hide the route.
     assert_eq!(solver.enumerate(10.).unwrap().len(), 1);
 }
-
-
 
 #[test]
 fn incomplete_retained_universe_never_closes_pricing_or_inspection() {

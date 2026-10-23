@@ -1,7 +1,5 @@
 use super::*;
 
-
-
 #[test]
 fn no_split_and_invalid_intervals_are_distinct() {
     assert_eq!(select_resource_threshold(&[], 10.).unwrap(), None);

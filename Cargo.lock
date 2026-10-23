@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "baldes"
-version = "2.0.0"
+version = "2.0.2"
 dependencies = [
  "cc",
  "pkg-config",

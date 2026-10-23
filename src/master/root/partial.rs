@@ -77,7 +77,7 @@ fn residual_fork<const D: usize>(
     parent: &NodeSnapshot<D>,
     fixed: &[FixedRoute],
     penalty: f64,
-) -> Result<(RootProblem<D>, ClpMaster, column_generation::WarmStart)> {
+) -> Result<(RootProblem<D>, ClpMaster, cg::WarmStart)> {
     let (mut problem, mut master, warm) = parent.fork(&[], penalty)?;
     let mut checked = vec![];
     for entry in fixed {

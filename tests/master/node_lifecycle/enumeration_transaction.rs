@@ -1,5 +1,5 @@
 use baldes::master::{
-    column_generation::{self as cg, Answer, Column, Controller, LpMaster, Options, Status},
+    cg::{self, Answer, Column, Controller, LpMaster, Options, Status},
     RowSense,
 };
 

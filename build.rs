@@ -1,8 +1,9 @@
-//! Optional LP backends link C++; `native-pricing` adds a numerical batch preflight.
+//! Only the optional LP backend links C++; all solver logic stays Rust.
 //! `--features clp` compiles Clp 1.17.10 and CoinUtils 2.11 from the vendor/
 //! submodules, as OpenRSCP's cmake/CoinClp.cmake does.
 //! `--features highs` links against HiGHS via pkg-config or a vendored copy.
 fn main() {
+    git_version();
     println!("cargo:rerun-if-env-changed=BALDES_RESOURCE_DIMENSIONS");
     let dimensions = std::env::var("BALDES_RESOURCE_DIMENSIONS")
         .unwrap_or_else(|_| "2".into())
@@ -25,6 +26,31 @@ fn main() {
     {
         highs::link();
     }
+}
+
+fn git_version() {
+    fn git(args: &[&str]) -> Option<String> {
+        let output = std::process::Command::new("git").args(args).output().ok()?;
+        output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    }
+    // Resolve Git paths rather than assuming .git is a directory (worktrees).
+    for name in ["HEAD", "index", "packed-refs"] {
+        if let Some(path) = git(&["rev-parse", "--git-path", name]) {
+            println!("cargo:rerun-if-changed={path}");
+        }
+    }
+    if let Some(reference) = git(&["symbolic-ref", "-q", "HEAD"]) {
+        if let Some(path) = git(&["rev-parse", "--git-path", &reference]) {
+            println!("cargo:rerun-if-changed={path}");
+        }
+    }
+    let version = git(&["rev-parse", "--short=12", "HEAD"])
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "unknown".into());
+    println!("cargo:rustc-env=BALDES_GIT_VERSION={version}");
 }
 
 #[cfg(feature = "clp")]
@@ -325,18 +351,6 @@ extern "C" void baldes_clp_solve_limits(Clp_Simplex *model, double *values) {
             &[&config, &coinutils, &clp],
         );
         library("baldes_coinutils", &coinutils_files, &[&config, &coinutils]);
-        #[cfg(feature = "native-pricing")]
-        {
-            let batch = root.join("src/labeling/engine/extension_batch.cpp");
-            println!("cargo:rerun-if-changed={}", batch.display());
-            cc::Build::new()
-                .cpp(true)
-                .std("c++14")
-                .opt_level(3)
-                .flag_if_supported("-ffp-contract=off")
-                .file(batch)
-                .compile("baldes_extension_batch");
-        }
     }
 }
 

@@ -1,6 +1,6 @@
 use super::*;
 use baldes::master::{preprocessing::Bounds, tree::TreeStatus};
-use multi_pricing::{AssignmentTreeOptions, EnumerationOptions};
+use mp::{AssignmentTreeOptions, EnumerationOptions};
 
 fn unbounded(mut p: Problem<2>) -> Problem<2> {
     for n in &mut p.networks {
@@ -13,7 +13,7 @@ fn shared_rows_bound_unlimited_networks_through_fixing_enumeration_and_tree() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let mut configured = options();
         configured.cg.bound_mode = mode;
-        let root = multi_pricing::solve(unbounded(triangle()), configured.clone()).unwrap();
+        let root = mp::solve(unbounded(triangle()), configured.clone()).unwrap();
         optimal(&root, 1.5);
         assert!(root
             .snapshot
@@ -78,7 +78,7 @@ fn unlimited_multiplicity_with_a_positive_lower_bound_retains_original_rows() {
     p.networks[0].multiplicity.lower = 1.;
     let mut certified = options();
     certified.cg.bound_mode = BoundMode::Certified;
-    let root = multi_pricing::solve(p, certified.clone()).unwrap();
+    let root = mp::solve(p, certified.clone()).unwrap();
     optimal(&root, 1.);
     let fixed = root.snapshot.fix_route(0, 1.).unwrap();
     optimal(&fixed.solve(certified).unwrap(), 1.);
@@ -92,14 +92,14 @@ fn truly_unbounded_route_directions_and_neutral_infinite_boxes_are_distinct() {
             rows: vec![],
             networks: vec![network(7, &[(-1., &[])], 0)],
         });
-        let root = multi_pricing::solve(p, configured.clone()).unwrap();
+        let root = mp::solve(p, configured.clone()).unwrap();
         assert_eq!(root.master.status, Status::Unbounded);
         assert_eq!(root.master.bound, f64::NEG_INFINITY);
         let p = unbounded(Problem {
             rows: vec![],
             networks: vec![network(7, &[(0., &[])], 0)],
         });
-        let root = multi_pricing::solve(p, configured.clone()).unwrap();
+        let root = mp::solve(p, configured.clone()).unwrap();
         optimal(&root, 0.);
         let full = root
             .snapshot
@@ -122,7 +122,7 @@ fn shared_route_quantities_can_exceed_the_legacy_backend_default_cap() {
         p.networks[0].multiplicity.upper = if unlimited { f64::INFINITY } else { quantity };
         let mut configured = options();
         configured.cg.bound_mode = BoundMode::Certified;
-        let root = multi_pricing::solve(p, configured.clone()).unwrap();
+        let root = mp::solve(p, configured.clone()).unwrap();
         optimal(&root, quantity);
         assert_eq!(root.values.iter().sum::<f64>(), quantity);
         let fixed = root.snapshot.fix_route(0, quantity).unwrap();
@@ -139,6 +139,6 @@ fn invalid_network_infinities_are_rejected() {
     ] {
         let mut p = triangle();
         p.networks[0].multiplicity = Window { lower, upper };
-        assert!(multi_pricing::solve(p, options()).is_err());
+        assert!(mp::solve(p, options()).is_err());
     }
 }

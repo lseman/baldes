@@ -1,5 +1,5 @@
 mod ce_cli;
-mod multi_pricing_cli;
+mod mp_cli;
 mod pstep_cli;
 mod routing;
 

@@ -39,6 +39,9 @@ impl<const D: usize> Solver<D> {
             })
             .collect()
     }
+    /// Price one phase. `negative_only` filters outputs at the configured zero
+    /// threshold; the minimum remains independent of that filter. Retained-path
+    /// inspection also keeps its minimum when the output column limit is zero.
     pub fn price_phase(
         &mut self,
         index: usize,
@@ -79,10 +82,12 @@ impl<const D: usize> Solver<D> {
                 &self.knapsack_pricing,
                 &self.presence_pricing,
             )?;
-            let mut routes = universe.paths.routes(&self.graph)?;
-            routes.sort_by(|a, b| enumerated_cost_order(a.cost, b.cost));
-            routes.truncate(maximum.min(self.controls.max_columns));
-            let minimum = routes.first().map_or(1e12, |r| r.cost);
+            let (routes, minimum) = universe.paths.priced_routes(
+                &self.graph,
+                maximum.min(self.controls.max_columns),
+                negative_only,
+                self.controls.zero_threshold,
+            )?;
             return Ok(PricingResult {
                 columns: routes,
                 minimum_reduced_cost: minimum,
@@ -177,13 +182,6 @@ impl<const D: usize> Solver<D> {
         }
         answer
     }
-}
-
-fn enumerated_cost_order(left: f64, right: f64) -> std::cmp::Ordering {
-    // Native cost/index pairs treat the two signed zeros as equal. Stable
-    // sorting then retains the canonical exported path index for ties.
-    left.partial_cmp(&right)
-        .unwrap_or(std::cmp::Ordering::Equal)
 }
 
 #[cfg(test)]

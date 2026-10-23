@@ -35,6 +35,7 @@ impl<const D: usize> Solver<D> {
             accumulated_original_bounds: vec![],
             ng_baseline: None,
             variable_costs: vec![],
+            arc_cost_scratch: vec![],
             enumeration_snapshot: None,
             cuts: CutRegistry::default(),
             knapsack_resource_indices: Default::default(),
@@ -97,6 +98,7 @@ impl<const D: usize> Solver<D> {
             accumulated_original_bounds: self.accumulated_original_bounds.clone(),
             ng_baseline: self.ng_baseline.clone(),
             variable_costs: self.variable_costs.clone(),
+            arc_cost_scratch: vec![],
             enumeration_snapshot: if keep_cost_state {
                 self.enumeration_snapshot.clone()
             } else {

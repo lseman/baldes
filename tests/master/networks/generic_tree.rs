@@ -1,6 +1,6 @@
 use super::*;
 use baldes::master::{preprocessing::Bounds, tree::TreeStatus};
-use multi_pricing::{AssignmentTreeOptions, MasterVariable};
+use mp::{AssignmentTreeOptions, MasterVariable};
 
 #[test]
 fn tree_from_snapshot_branches_signed_integer_master_variables() {
@@ -39,8 +39,7 @@ fn tree_from_snapshot_branches_signed_integer_master_variables() {
             let mut configured = options();
             configured.cg.bound_mode = mode;
             let root =
-                multi_pricing::solve_with_master_variables(p, vec![variable], configured.clone())
-                    .unwrap();
+                mp::solve_with_master_variables(p, vec![variable], configured.clone()).unwrap();
             optimal(&root, 0.5);
             let mut zero = AssignmentTreeOptions {
                 node: configured.clone(),
@@ -97,7 +96,7 @@ fn tree_branches_multiplicity_and_original_arc_activity_without_assignment_candi
         for mode in [BoundMode::Numerical, BoundMode::Certified] {
             let mut configured = options();
             configured.cg.bound_mode = mode;
-            let root = multi_pricing::solve(p.clone(), configured.clone()).unwrap();
+            let root = mp::solve(p.clone(), configured.clone()).unwrap();
             optimal(&root, 0.5);
             assert!(root
                 .snapshot
@@ -145,7 +144,7 @@ fn continuous_master_values_do_not_trigger_integer_branching() {
         ],
         networks: vec![network(7, &[(0., &[0])], 2)],
     };
-    let tree = multi_pricing::solve_assignment_tree_with_master_variables(
+    let tree = mp::solve_assignment_tree_with_master_variables(
         p,
         vec![MasterVariable {
             id: 99,

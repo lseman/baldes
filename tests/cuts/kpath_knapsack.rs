@@ -8,6 +8,128 @@ use baldes::pricing::Solver;
 use baldes::Graph;
 use std::collections::{BTreeMap, BTreeSet};
 
+#[test]
+fn enumeration_keeps_routes_with_same_support_and_distinct_cut_denominators() {
+    use baldes::cuts::{CutClass, MemoryKind, RankOneCut};
+    for mode in [0., 1., 2.] {
+        let mut solver = Solver::<2>::new(4, 1).unwrap();
+        for vertex in 0..4 {
+            solver.graph.set_bounds(vertex, 0, 0., 4.).unwrap();
+        }
+        for vertex in 0..3 {
+            let id = solver.graph.add_arc(vertex, vertex + 1, 0.).unwrap();
+            solver.graph.arc_mut(id).unwrap().consumption[0] = 1.;
+        }
+        solver.graph.elementary = true;
+        solver
+            .options
+            .set("BALDESuseBidirectionalSearch", mode)
+            .unwrap();
+        for (denominator, dual) in [(2, -2.), (3, -3.)] {
+            solver.cuts.cuts.push(RankOneCut {
+                weights: vec![0, 1, 1, 0],
+                graph_support: BTreeMap::new(),
+                graph_pricing_support: BTreeMap::new(),
+                native_kpath_support: None,
+                memory: vec![true; 4],
+                graph_dependent_memory: false,
+                graph_memories: BTreeMap::new(),
+                memory_kind: MemoryKind::Vertex,
+                arc_memory: BTreeSet::new(),
+                graph_arc_memories: BTreeMap::new(),
+                arc_weights: BTreeMap::new(),
+                visit_once: false,
+                native_type2: false,
+                denominator,
+                dual,
+                class: CutClass::Packing,
+                rhs: 2 / denominator,
+                kind: -1,
+                id: denominator,
+                ordered_support: Some(vec![(1, 1), (2, 1)]),
+            });
+        }
+        let priced = solver.price_phase(0, 10, false).unwrap();
+        assert!(priced.exact);
+        assert_eq!(priced.minimum_reduced_cost, 2.);
+        // Only the denominator-2 row contributes: floor(2/2)*2 +
+        // floor(2/3)*3 = 2, safely below the enumeration cutoff.
+        let enumerated = solver.enumerate(3.).unwrap();
+        assert_eq!(enumerated.len(), 1, "bidirectional mode {mode}");
+        assert_eq!(enumerated[0].nodes, vec![0, 1, 2, 3]);
+        assert_eq!(enumerated[0].cost, 2.);
+    }
+}
+
+#[test]
+fn decimal_capacity_cuts_preserve_exactly_feasible_pair_matchings() {
+    for demand in [0.1, 0.05] {
+        let capacity = demand + demand;
+        // Pricing accepts each pair at the strict capacity boundary. The
+        // 16-customer union, however, accumulates above eight capacities.
+        let mut solver = Solver::<2>::new(4, 1).unwrap();
+        for v in 0..4 {
+            solver.graph.set_bounds(v, 0, 0., capacity).unwrap();
+        }
+        for (tail, head, load) in [(0, 1, demand), (1, 2, demand), (2, 3, 0.)] {
+            let arc = solver.graph.add_arc(tail, head, 0.).unwrap();
+            solver.graph.arc_mut(arc).unwrap().consumption[0] = load;
+        }
+        let priced = solver.price_phase(0, 100, false).unwrap();
+        assert!(priced.exact);
+        assert_eq!(priced.columns.len(), 1);
+        assert_eq!(priced.columns[0].nodes, vec![0, 1, 2, 3]);
+        assert_eq!(priced.columns[0].resources, vec![capacity]);
+
+        let demands: Vec<_> = std::iter::once(0.)
+            .chain(std::iter::repeat(demand).take(16))
+            .collect();
+        let cycle: Vec<_> = (1..=16).map(|v| (vec![v, v % 16 + 1], 0.5)).collect();
+        let matching: Vec<_> = (1..=16).step_by(2).map(|v| vec![v, v + 1]).collect();
+        assert_eq!(matching.len(), 8);
+        for complement in [false, true] {
+            let mut separator = CapacitySeparator::new(demands.clone(), capacity).unwrap();
+            separator.parameters.complement_form = complement;
+            for cut in separator.separate(&cycle).unwrap() {
+                let lhs: i32 = matching.iter().map(|r| cut.coefficient(r)).sum();
+                assert!(if cut.greater_equal() {
+                    lhs >= cut.rhs
+                } else {
+                    lhs <= cut.rhs
+                });
+            }
+        }
+        let mut separator = KPathSeparator::new(demands, capacity).unwrap();
+        for cut in separator.separate(&cycle).unwrap() {
+            let lhs: i32 = matching.iter().map(|r| cut.coefficient(r).unwrap()).sum();
+            assert!(lhs >= cut.rhs);
+        }
+    }
+}
+
+#[test]
+fn decimal_capacity_cuts_still_separate_real_overload() {
+    let demands: Vec<_> = std::iter::once(0.)
+        .chain(std::iter::repeat(0.100_000_1).take(16))
+        .collect();
+    let columns: Vec<_> = (1..=16).map(|v| (vec![v, v % 16 + 1], 0.5)).collect();
+    for complement in [false, true] {
+        let mut separator = CapacitySeparator::new(demands.clone(), 0.2).unwrap();
+        separator.parameters.complement_form = complement;
+        assert!(separator
+            .separate(&columns)
+            .unwrap()
+            .iter()
+            .any(|c| c.k == 9 && c.violation > 0.5));
+    }
+    let mut separator = KPathSeparator::new(demands, 0.2).unwrap();
+    assert!(separator
+        .separate(&columns)
+        .unwrap()
+        .iter()
+        .any(|c| c.k == 9 && c.violation > 0.5));
+}
+
 // ============================================================================
 // Route load knapsack cut tests (ported from test_knapsack.py)
 // ============================================================================
@@ -280,7 +402,6 @@ fn a_column_is_counted_once_per_set() {
     let cut = &sep.separate(&[(vec![1, 2], 0.5)]).unwrap()[0];
     assert!((cut.weight - 0.5).abs() < 1e-9);
 }
-
 
 fn random_fractional_point(
     rng: &mut baldes::rng::Xoroshiro128Plus,
@@ -1100,7 +1221,6 @@ fn kpath_memory_ignores_enumerated_columns() {
     }
 }
 
-
 fn knapsack_pricing_solver(bidirectional: bool) -> Solver<2> {
     use baldes::cuts::knapsack::{KnapsackColumn, KnapsackRow, ResourceKnapsackSeparator};
     let mut separator = ResourceKnapsackSeparator {
@@ -1189,7 +1309,7 @@ fn knapsack_root_cuts_close_fractional_capacity_gap_and_survive_snapshot() {
     use baldes::cuts::knapsack::KnapsackRow;
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
-        column_generation::Status,
+        cg::Status,
         root::{KnapsackCutConfig, RootOptions},
     };
     let instance = Instance::parse("knapsack-root\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
@@ -1384,7 +1504,6 @@ fn check_knapsack_pricing_against_exhaustive_routes(exact: bool) {
     }
 }
 
-
 #[test]
 fn knapsack_retrieval_remaps_resources_and_retains_inactive_slots() {
     use baldes::cuts::knapsack::{KnapsackPricing, ResourceKnapsackCut, RouteLoadKnapsackCut};
@@ -1424,15 +1543,6 @@ fn knapsack_retrieval_remaps_resources_and_retains_inactive_slots() {
     assert!(!cache.active);
     assert!(cache.resources.values().all(BTreeMap::is_empty));
 }
-
-
-
-
-
-
-
-
-
 
 #[test]
 fn mapped_knapsack_separation_retains_original_ids() {

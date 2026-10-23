@@ -16,8 +16,8 @@ pub struct FullPreparation {
     pub fields: Vec<FullField>,
     pub row_to_field: Vec<i32>,
 }
-/// Full-memory enumeration tables. Rows with the same ordered
-/// support share one field whose cost is the sum of their duals.
+/// Full-memory enumeration tables. Rows with the same ordered support,
+/// denominator and rounding direction share one field and sum their duals.
 pub fn prepare_full_memory<const D: usize>(
     info: &mut CutResourceInfo,
     prep: &mut FullPreparation,
@@ -27,11 +27,11 @@ pub fn prepare_full_memory<const D: usize>(
     backward: bool,
 ) -> bool {
     let vertices = g.vertices.len();
-    let mut groups: BTreeMap<Vec<(usize, i32)>, Vec<usize>> = BTreeMap::new();
+    let mut groups: BTreeMap<_, Vec<usize>> = BTreeMap::new();
     let mut kpath_groups: BTreeMap<Vec<usize>, Vec<usize>> = BTreeMap::new();
     for (row, cut) in cuts.iter().enumerate() {
         groups
-            .entry(cut.ordered_support.clone())
+            .entry((cut.ordered_support.clone(), cut.denominator, cut.covering))
             .or_default()
             .push(row);
     }
@@ -144,9 +144,9 @@ pub fn prepare_full_memory<const D: usize>(
                 if !from && to {
                     tables[i].push(transition(&f, -1, -1, -1));
                 } else if from && !to {
-                    // The native call supplies the word coordinate for BOTH
-                    // destination arguments, not shift.
-                    tables[i].push(transition(&f, 1, f.word, f.word));
+                    // Keep the visited bit in this cut's field. The word
+                    // index is not its bit offset within that word.
+                    tables[i].push(transition(&f, 1, f.word, f.shift));
                 }
             };
             add(true, &mut forward_tables);

@@ -5,7 +5,7 @@ use baldes::master::preprocessing::Bounds;
 #[test]
 fn activity_caps_do_not_turn_into_pricing_availability_thresholds() {
     let p = triangle();
-    let root = multi_pricing::solve(p.clone(), options()).unwrap();
+    let root = mp::solve(p.clone(), options()).unwrap();
     optimal(&root, 1.5);
     let mut arcs = vec![0.; p.networks[0].graph.arcs.len()];
     arcs[0] = 1.;
@@ -68,7 +68,7 @@ fn propagated_zero_activity_and_enumeration_do_not_leak_into_siblings() {
         let mut configured = options();
         configured.cg.bound_mode = mode;
         let problem = triangle();
-        let root = multi_pricing::solve(problem.clone(), configured.clone()).unwrap();
+        let root = mp::solve(problem.clone(), configured.clone()).unwrap();
         let mut arcs = vec![0.; problem.networks[0].graph.arcs.len()];
         arcs[0] = 1.;
         let row = [RowCoefficients {
@@ -113,7 +113,7 @@ fn propagated_zero_activity_and_enumeration_do_not_leak_into_siblings() {
         assert_eq!(bounds[0].upper, 0.);
         let complete = child
             .snapshot
-            .enumerate(&multi_pricing::EnumerationOptions::default())
+            .enumerate(&mp::EnumerationOptions::default())
             .unwrap()
             .preprocess()
             .unwrap();

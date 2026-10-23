@@ -1,6 +1,6 @@
 use super::*;
 use baldes::master::{preprocessing::Bounds, tree::TreeStatus};
-use multi_pricing::{
+use mp::{
     imported::{self, Column, Subproblem},
     MasterVariable,
 };

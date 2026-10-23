@@ -76,7 +76,7 @@ fn dominance_removal_preserves_survivor_order_and_pending_after_pop() {
     for (resource, cost) in [(3., 1.), (2., 2.), (1., 3.)] {
         assert!(storage.insert(&graph, make(resource, cost), true));
     }
-    assert_eq!(storage.pop().unwrap().id, 0);
+    assert_eq!(storage.pop_id().unwrap(), 0);
     assert_eq!(storage.pending, 2);
     // Dominate both a popped label and a pending label, leaving label 2.
     assert!(storage.insert(&graph, make(2., 0.), true));
@@ -86,7 +86,7 @@ fn dominance_removal_preserves_survivor_order_and_pending_after_pop() {
     assert!(!storage.insert(&graph, make(3., 4.), true));
     assert_eq!(storage.partitions[0], [3, 2]);
     assert_eq!(storage.pending, 2);
-    assert_eq!(storage.pop().unwrap().id, 2);
+    assert_eq!(storage.pop_id().unwrap(), 2);
     assert_eq!(storage.pop().unwrap().id, 3);
     assert!(storage.pop().is_none());
     assert_eq!(storage.pending, 0);

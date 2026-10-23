@@ -31,7 +31,14 @@ fn main() {
         let due = vec(n + 1);
         let service = vec(n + 1);
         let travel = (0..=n).map(|_| vec(n + 1)).collect();
-        separator.set_time_windows(TimeWindows { ready, due, service, travel }).unwrap();
+        separator
+            .set_time_windows(TimeWindows {
+                ready,
+                due,
+                service,
+                travel,
+            })
+            .unwrap();
     }
     let rounds: usize = next().parse().unwrap();
     for round in 0..rounds {
@@ -52,8 +59,18 @@ fn main() {
                 baldes::cuts::capacity::CapacityKind::Complement => 2,
             };
             let customers: Vec<String> = c.customers.iter().map(|v| v.to_string()).collect();
-            let edges: Vec<String> = c.edges.iter().map(|((a, b), w)| format!("{a}-{b}:{w}")).collect();
-            println!("cut {kind} {} {:.17e} {} | {}", c.rhs, c.violation, customers.join(","), edges.join(","));
+            let edges: Vec<String> = c
+                .edges
+                .iter()
+                .map(|((a, b), w)| format!("{a}-{b}:{w}"))
+                .collect();
+            println!(
+                "cut {kind} {} {:.17e} {} | {}",
+                c.rhs,
+                c.violation,
+                customers.join(","),
+                edges.join(",")
+            );
         }
     }
 }

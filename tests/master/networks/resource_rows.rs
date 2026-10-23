@@ -1,7 +1,7 @@
 use super::*;
 use baldes::cuts::knapsack::{KnapsackKind, RouteLoadKnapsackCut};
 use baldes::master::preprocessing::Bounds;
-use multi_pricing::{EnumerationOptions, MasterVariable, ResourceKnapsackCoefficients};
+use mp::{EnumerationOptions, MasterVariable, ResourceKnapsackCoefficients};
 
 fn problem() -> Problem<2> {
     let mut networks = vec![
@@ -45,7 +45,7 @@ fn coefficients() -> Vec<ResourceKnapsackCoefficients> {
 }
 #[test]
 fn shared_resource_steps_price_fix_enumerate_and_restore() {
-    let root = multi_pricing::solve(problem(), options()).unwrap();
+    let root = mp::solve(problem(), options()).unwrap();
     optimal(&root, 2.);
     let row = Row {
         sense: RowSense::LessEqual,
@@ -94,7 +94,7 @@ fn shared_resource_steps_price_fix_enumerate_and_restore() {
 }
 #[test]
 fn resource_steps_propagate_with_unbounded_static_variables() {
-    let root = multi_pricing::solve_with_master_variables(
+    let root = mp::solve_with_master_variables(
         problem(),
         vec![MasterVariable {
             id: 99,
@@ -168,7 +168,7 @@ fn resource_steps_propagate_with_unbounded_static_variables() {
 }
 #[test]
 fn resource_steps_reject_unproved_load_and_row_contracts() {
-    let root = multi_pricing::solve(problem(), options()).unwrap();
+    let root = mp::solve(problem(), options()).unwrap();
     assert!(root
         .snapshot
         .with_resource_knapsack_row(
@@ -193,7 +193,7 @@ fn resource_steps_reject_unproved_load_and_row_contracts() {
         .is_err());
     let mut waiting = problem();
     waiting.networks[0].graph.arcs[0].bounds[0] = Some(Window::new(0.1, 100000.).unwrap());
-    let root_waiting = multi_pricing::solve(waiting, options()).unwrap();
+    let root_waiting = mp::solve(waiting, options()).unwrap();
     assert!(root_waiting
         .snapshot
         .with_resource_knapsack_row(
@@ -206,7 +206,7 @@ fn resource_steps_reject_unproved_load_and_row_contracts() {
         .is_err());
     let mut p = problem();
     p.networks[0].graph.arcs[0].consumption[0] = 0.1;
-    let root = multi_pricing::solve(p, options()).unwrap();
+    let root = mp::solve(p, options()).unwrap();
     assert!(root
         .snapshot
         .with_resource_knapsack_row(
@@ -245,7 +245,7 @@ fn scheduled_resource_rows_replay_initial_usage_waiting_and_equality() {
         forward
             .pricing_options
             .push(("BALDESuseBidirectionalSearch".into(), 0.));
-        let root = multi_pricing::solve(p, forward).unwrap();
+        let root = mp::solve(p, forward).unwrap();
         optimal(&root, 2.);
         let row = Row {
             sense: RowSense::LessEqual,
@@ -321,7 +321,7 @@ fn equality_enumeration_filters_paths_that_only_a_waiting_relaxation_can_use() {
     forward
         .pricing_options
         .push(("BALDESuseBidirectionalSearch".into(), 0.));
-    let root = multi_pricing::solve(p, forward).unwrap();
+    let root = mp::solve(p, forward).unwrap();
     optimal(&root, 6.);
     let complete = root
         .snapshot
@@ -350,7 +350,7 @@ fn equality_enumeration_filters_paths_that_only_a_waiting_relaxation_can_use() {
 
 #[test]
 fn automatic_resource_flow_policy_reaches_a_cross_network_fixed_point_with_one_budget() {
-    let root = multi_pricing::solve_with_master_variables(
+    let root = mp::solve_with_master_variables(
         problem(),
         vec![MasterVariable {
             id: 99,
@@ -423,7 +423,7 @@ fn automatic_resource_flow_policy_reaches_a_cross_network_fixed_point_with_one_b
     optimal(&propagated.solve(certified).unwrap(), 6.);
     for budget in [0, 64, 128, 256, 512, 1024, 4096] {
         let partial = chain
-            .preprocess_with_options(&multi_pricing::PreprocessingOptions {
+            .preprocess_with_options(&mp::PreprocessingOptions {
                 work_limit: budget,
                 ..Default::default()
             })

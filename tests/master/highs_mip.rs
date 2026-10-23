@@ -265,10 +265,7 @@ mod routing {
                     }
                 ) {
                     assert!(child.preprocessing.infeasible);
-                    assert_eq!(
-                        child.master.status,
-                        baldes::master::column_generation::Status::Infeasible
-                    );
+                    assert_eq!(child.master.status, baldes::master::cg::Status::Infeasible);
                     assert_eq!(child.master.pricing_calls, 0);
                     assert!(child.snapshot.is_none());
                     continue;

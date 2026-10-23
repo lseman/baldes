@@ -1,5 +1,7 @@
 //! Captured R201 LP: measure Newton iterations independently of column generation.
-use baldes::extensions::ipm::{solve, ModelData, Options, Sense, Solver, SolverType, SparseMatrix, Status};
+use baldes::extensions::ipm::{
+    solve, ModelData, Options, Sense, Solver, SolverType, SparseMatrix, Status,
+};
 use std::time::Instant;
 
 fn main() {

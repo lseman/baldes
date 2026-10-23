@@ -154,10 +154,7 @@ fn routing_root_matches_clp() {
             ..Default::default()
         };
         let output = root::solve(problem, options).unwrap();
-        assert_eq!(
-            output.master.status,
-            baldes::master::column_generation::Status::Optimal
-        );
+        assert_eq!(output.master.status, baldes::master::cg::Status::Optimal);
         objectives.push(output.master.lp);
     }
     assert!((objectives[0] - objectives[1]).abs() < 1e-6);

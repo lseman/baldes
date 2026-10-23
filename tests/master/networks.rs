@@ -1,8 +1,8 @@
 use baldes::{
     graph::{Graph, Window},
     master::{
-        column_generation::{BoundMode, Status},
-        multi_pricing::{self, Network, Options, Output, Problem, RowCoefficients},
+        cg::{BoundMode, Status},
+        mp::{self, Network, Options, Output, Problem, RowCoefficients},
         root::Row,
         RowSense,
     },
@@ -74,7 +74,7 @@ fn optimal<const D: usize>(output: &Output<D>, expected: f64) {
 }
 
 fn assignment_mass(output: &Output, problem: &Problem<2>, network: i32, row: usize) -> f64 {
-    let coefficient = |route: &multi_pricing::NetworkRoute| {
+    let coefficient = |route: &mp::NetworkRoute| {
         if route.network != network {
             return 0.;
         }
@@ -111,7 +111,7 @@ fn assignment_mass(output: &Output, problem: &Problem<2>, network: i32, row: usi
 #[test]
 fn shared_root_prices_both_networks_with_overlapping_arc_ids() {
     let problem = triangle();
-    let output = multi_pricing::solve(problem.clone(), options()).unwrap();
+    let output = mp::solve(problem.clone(), options()).unwrap();
     // Three pair routes, each with quantity 1/2. Summing coverage gives
     // 2*sum(pair quantities)+sum(singletons)=3, proving LP >= 3/2.
     optimal(&output, 1.5);
@@ -142,7 +142,7 @@ fn shared_root_prices_both_networks_with_overlapping_arc_ids() {
 #[test]
 fn assignment_children_and_sibling_restore_preserve_all_oracles() {
     let problem = triangle();
-    let parent = multi_pricing::solve(problem.clone(), options()).unwrap();
+    let parent = mp::solve(problem.clone(), options()).unwrap();
     let left = parent.snapshot.branch_assignment(0, 7, true).unwrap();
     let right = parent.snapshot.branch_assignment(0, 7, false).unwrap();
     // Every integer cover costs at least ceil(3/2)=2. Both sides have
@@ -163,7 +163,7 @@ fn assignment_children_and_sibling_restore_preserve_all_oracles() {
 #[test]
 fn additive_cut_and_fixed_route_survive_descendants() {
     let problem = triangle();
-    let parent = multi_pricing::solve(problem.clone(), options()).unwrap();
+    let parent = mp::solve(problem.clone(), options()).unwrap();
     // A globally valid integer-cover cut: at least two routes.
     let coefficients: Vec<_> = problem
         .networks
@@ -217,7 +217,7 @@ fn additive_cut_and_fixed_route_survive_descendants() {
 #[test]
 fn new_row_after_fixing_subtracts_fixed_contributions() {
     let problem = triangle();
-    let parent = multi_pricing::solve(problem.clone(), options()).unwrap();
+    let parent = mp::solve(problem.clone(), options()).unwrap();
     let pair = parent
         .routes
         .iter()
@@ -267,7 +267,7 @@ fn required_fractional_and_disabled_multiplicities() {
         problem.networks[2].multiplicity = Window::new(0., 0.).unwrap();
         let mut opts = options();
         opts.cg.bound_mode = bound_mode;
-        let output = multi_pricing::solve(problem.clone(), opts).unwrap();
+        let output = mp::solve(problem.clone(), opts).unwrap();
         optimal(&output, 2.);
         assert!((assignment_mass(&output, &problem, 3, 0) - 0.5).abs() < 1e-8);
         assert!((assignment_mass(&output, &problem, 9, 0) - 0.5).abs() < 1e-8);
@@ -285,7 +285,7 @@ fn once_per_route_coefficients_and_invalid_node_requests() {
     for n in &mut problem.networks {
         n.route_entries.push((3, 1.));
     }
-    let parent = multi_pricing::solve(problem.clone(), options()).unwrap();
+    let parent = mp::solve(problem.clone(), options()).unwrap();
     optimal(&parent, 1.5);
     assert!(parent.snapshot.branch_assignment(3, 7, true).is_err());
     assert!(parent.snapshot.branch_assignment(0, 99, true).is_err());
@@ -316,9 +316,9 @@ fn once_per_route_coefficients_and_invalid_node_requests() {
 #[test]
 fn assignment_tree_matches_exhaustive_integer_covers() {
     use baldes::master::tree::TreeStatus;
-    let mut opts = multi_pricing::AssignmentTreeOptions::default();
+    let mut opts = mp::AssignmentTreeOptions::default();
     opts.node = options();
-    let tree = multi_pricing::solve_assignment_tree(triangle(), opts.clone()).unwrap();
+    let tree = mp::solve_assignment_tree(triangle(), opts.clone()).unwrap();
     // Independently enumerate the nine binary route choices. No optimum uses
     // repeated copies because every route covers a unit-demand customer.
     let masks = [3u8, 6, 1, 2, 4, 5, 1, 2, 4];
@@ -347,16 +347,14 @@ fn assignment_tree_matches_exhaustive_integer_covers() {
     assert!(tree.routes.iter().all(|r| r.quantity.fract() == 0.));
 
     opts.node_limit = 1;
-    let stopped = multi_pricing::solve_assignment_tree(triangle(), opts.clone()).unwrap();
+    let stopped = mp::solve_assignment_tree(triangle(), opts.clone()).unwrap();
     assert_eq!(stopped.status, TreeStatus::NodeLimit);
     assert_eq!(stopped.open_nodes, 2);
     assert!((stopped.bound - 1.5).abs() < 1e-8);
     assert!(!stopped.incumbent.is_finite());
     opts.time_limit = std::time::Duration::ZERO;
     assert_eq!(
-        multi_pricing::solve_assignment_tree(triangle(), opts)
-            .unwrap()
-            .status,
+        mp::solve_assignment_tree(triangle(), opts).unwrap().status,
         TreeStatus::TimeLimit
     );
 }
@@ -373,9 +371,9 @@ fn tree_keeps_unproved_infeasibility_open_and_closes_exact_original_contradictio
         &[(1., &[0, 1]), (1., &[1, 2]), (1., &[0, 2])],
         3,
     )];
-    let mut opts = multi_pricing::AssignmentTreeOptions::default();
+    let mut opts = mp::AssignmentTreeOptions::default();
     opts.node = options();
-    let result = multi_pricing::solve_assignment_tree(problem, opts.clone()).unwrap();
+    let result = mp::solve_assignment_tree(problem, opts.clone()).unwrap();
     assert_eq!(result.status, TreeStatus::Incomplete);
     assert_eq!(result.open_nodes, 2);
     assert!((result.bound - 1.5).abs() < 1e-8);
@@ -388,7 +386,7 @@ fn tree_keeps_unproved_infeasibility_open_and_closes_exact_original_contradictio
         }],
         networks: vec![network(7, &[(1., &[])], 1)],
     };
-    let incomplete = multi_pricing::solve_assignment_tree(impossible, opts).unwrap();
+    let incomplete = mp::solve_assignment_tree(impossible, opts).unwrap();
     assert_eq!(incomplete.status, TreeStatus::Infeasible);
     assert_eq!(incomplete.open_nodes, 0);
     assert!(!incomplete.incumbent.is_finite());
@@ -404,7 +402,7 @@ fn child_row_prices_a_route_absent_from_the_parent_registry() {
             arc.reduced_cost = arc.cost;
         }
     }
-    let parent = multi_pricing::solve(
+    let parent = mp::solve(
         Problem {
             rows: vec![Row {
                 sense: RowSense::Equal,
@@ -482,7 +480,7 @@ fn resource_aware_bounds_certify_bounded_cycles_and_keep_unrestricted_cycles_unk
         };
         let mut opts = options();
         opts.cg.bound_mode = BoundMode::Certified;
-        let output = multi_pricing::solve(problem, opts.clone()).unwrap();
+        let output = mp::solve(problem, opts.clone()).unwrap();
         let resumed = output.snapshot.solve(opts).unwrap();
         for result in [&output, &resumed] {
             if bounded {
@@ -512,7 +510,7 @@ fn stabilized_children_keep_column_cleanup_metadata_consistent() {
     opts.cg.stabilize = true;
     opts.cg.column_cleanup_threshold = 3.;
     opts.cg.column_cleanup_ratio = 0.66;
-    let parent = multi_pricing::solve(triangle(), opts.clone()).unwrap();
+    let parent = mp::solve(triangle(), opts.clone()).unwrap();
     optimal(&parent, 1.5);
     let branch = parent.snapshot.branch_assignment(0, 7, false).unwrap();
     optimal(&branch.solve(opts.clone()).unwrap(), 2.);
@@ -537,7 +535,7 @@ fn nondefault_resource_dimension_survives_node_forks() {
             route_entries: vec![],
         }],
     };
-    let parent = multi_pricing::solve(problem, options()).unwrap();
+    let parent = mp::solve(problem, options()).unwrap();
     assert_eq!(parent.master.status, Status::Optimal);
     assert!((parent.master.lp - 2.).abs() < 1e-8);
     let child = parent
@@ -573,12 +571,12 @@ fn rounded_resource_profiles_do_not_authorize_fixed_routes_or_incumbents() {
             route_entries: vec![],
         }],
     };
-    let root = multi_pricing::solve(problem.clone(), options()).unwrap();
+    let root = mp::solve(problem.clone(), options()).unwrap();
     assert!(!root.routes.is_empty());
     assert!(root.snapshot.fix_route(0, 1.).is_err());
-    let mut opts = multi_pricing::AssignmentTreeOptions::default();
+    let mut opts = mp::AssignmentTreeOptions::default();
     opts.node = options();
-    let result = multi_pricing::solve_assignment_tree(problem, opts).unwrap();
+    let result = mp::solve_assignment_tree(problem, opts).unwrap();
     assert_eq!(result.status, TreeStatus::Incomplete);
     assert_eq!(result.open_nodes, 1);
     assert!(!result.incumbent.is_finite());
@@ -609,7 +607,7 @@ fn nonlinear_network(id: i32, first_row: usize) -> Network<2> {
 
 #[test]
 fn nonlinear_shared_rows_propagate_fixed_contributions_across_networks_and_siblings() {
-    use multi_pricing::{EnumerationOptions, RankOneCoefficients};
+    use mp::{EnumerationOptions, RankOneCoefficients};
     let problem = Problem {
         rows: (0..4)
             .map(|_| Row {
@@ -619,7 +617,7 @@ fn nonlinear_shared_rows_propagate_fixed_contributions_across_networks_and_sibli
             .collect(),
         networks: vec![nonlinear_network(7, 0), nonlinear_network(42, 2)],
     };
-    let root = multi_pricing::solve(problem, options()).unwrap();
+    let root = mp::solve(problem, options()).unwrap();
     optimal(&root, 4.);
     let coefficients = [7, 42].map(|network| RankOneCoefficients {
         network,
@@ -712,7 +710,7 @@ fn nonlinear_shared_rows_propagate_fixed_contributions_across_networks_and_sibli
 fn original_activity_fixing_and_multiplicity_links_survive_future_pricing() {
     use baldes::master::preprocessing::Bounds;
     let problem = triangle();
-    let root = multi_pricing::solve(problem.clone(), options()).unwrap();
+    let root = mp::solve(problem.clone(), options()).unwrap();
     let coefficients: Vec<_> = problem
         .networks
         .iter()
@@ -776,7 +774,7 @@ fn original_activity_fixing_and_multiplicity_links_survive_future_pricing() {
 #[test]
 fn fixed_original_variable_links_two_networks_and_nonlinear_row() {
     use baldes::master::preprocessing::Bounds;
-    use multi_pricing::{EnumerationOptions, PreprocessingOptions, RankOneCoefficients};
+    use mp::{EnumerationOptions, PreprocessingOptions, RankOneCoefficients};
     let problem = Problem {
         rows: (0..4)
             .map(|_| Row {
@@ -786,7 +784,7 @@ fn fixed_original_variable_links_two_networks_and_nonlinear_row() {
             .collect(),
         networks: vec![nonlinear_network(7, 0), nonlinear_network(42, 2)],
     };
-    let root = multi_pricing::solve(problem, options()).unwrap();
+    let root = mp::solve(problem, options()).unwrap();
     let coefficients = [7, 42].map(|network| RowCoefficients {
         network,
         arcs: vec![0., 1., 0., 0., 0.],
@@ -876,7 +874,7 @@ fn rounded_original_coefficients_do_not_justify_automatic_fixing() {
             route_entries: vec![],
         }],
     };
-    let root = multi_pricing::solve(problem, options()).unwrap();
+    let root = mp::solve(problem, options()).unwrap();
     assert_eq!(
         root.snapshot.preprocessing_report().skipped.as_deref(),
         Some("RoundedFlowCoefficients")
@@ -884,7 +882,7 @@ fn rounded_original_coefficients_do_not_justify_automatic_fixing() {
     assert_eq!(root.snapshot.preprocessing_report().forbidden_arcs, 0);
     let child = root
         .snapshot
-        .enumerate(&multi_pricing::EnumerationOptions::default())
+        .enumerate(&mp::EnumerationOptions::default())
         .unwrap()
         .preprocess()
         .unwrap();
@@ -898,7 +896,7 @@ fn rounded_original_coefficients_do_not_justify_automatic_fixing() {
 #[test]
 fn original_variable_and_multiplicity_fixtures_match_exact_cover_domains() {
     use baldes::master::preprocessing::Bounds;
-    let root = multi_pricing::solve(triangle(), options()).unwrap();
+    let root = mp::solve(triangle(), options()).unwrap();
     // The first source arc selects exactly the first pair route in network 7.
     let mut arcs = vec![0.; 10];
     arcs[0] = 1.;
@@ -956,7 +954,6 @@ mod unbounded_multiplicity_tests;
 
 #[path = "networks/presence_rows.rs"]
 mod presence_row_tests;
-
 
 #[path = "networks/master_only.rs"]
 mod master_only_tests;

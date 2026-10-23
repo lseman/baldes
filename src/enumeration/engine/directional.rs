@@ -146,7 +146,7 @@ impl<const D: usize> Enumeration<D> {
             let step = controls.label_limit / 50;
             let mut checkpoint = 0;
             let mut coupled_workspace = crate::graph::coupled::CoupledWorkspace::default();
-            while let Some(from) = storage.pop() {
+            while let Some(from_id) = storage.pop_id() {
                 if started.elapsed() > controls.time_limit {
                     return Err(incomplete("enumeration time limit exceeded"));
                 }
@@ -161,6 +161,7 @@ impl<const D: usize> Enumeration<D> {
                     }
                     checkpoint += step;
                 }
+                let from = &storage.arena[from_id];
                 if controls
                     .max_route_arcs
                     .is_some_and(|limit| from.hops >= limit)
@@ -173,6 +174,7 @@ impl<const D: usize> Enumeration<D> {
                     continue;
                 };
                 for arc in &grid.direction(direction).buckets[v][bucket].arcs {
+                    let from = &storage.arena[from_id];
                     let physical = &g.arcs[arc.physical];
                     let mut next = from.clone_without_coupled();
                     next.parent = Some(from.id);

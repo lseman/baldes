@@ -101,8 +101,8 @@ fn fork_carries_fixing_options_and_rebuilds_dual_dependent_labels() {
 #[test]
 fn enumeration_rewrites_existing_master_coefficients() {
     use baldes::master::{
+        cg::{self, Answer, Column, Controller, Options},
         clp::ClpMaster,
-        column_generation::{self as cg, Answer, Column, Controller, Options},
         RowSense,
     };
     struct Transition {
@@ -219,7 +219,7 @@ fn enumerated_snapshot_survives_siblings_grandchildren_and_failed_setup() {
     let interrupted = root::inherit(snapshot, &[], expired).unwrap();
     assert_eq!(
         interrupted.master.status,
-        baldes::master::column_generation::Status::TimeLimit
+        baldes::master::cg::Status::TimeLimit
     );
     assert_eq!(snapshot.enumerated_routes(), Some(count));
     for (sense, rhs) in [(RowSense::LessEqual, 0.), (RowSense::GreaterEqual, 1.)] {
@@ -312,8 +312,8 @@ fn fixing_without_prior_pricing_keeps_its_grid_in_a_child() {
 #[test]
 fn warm_starts_preserve_uninserted_columns_and_same_batch_duplicates() {
     use baldes::master::{
+        cg::{self, Answer, Column, Controller, NoController, Options},
         clp::ClpMaster,
-        column_generation::{self as cg, Answer, Column, Controller, NoController, Options},
         RowSense,
     };
     struct EnumerateOnce {
@@ -431,7 +431,7 @@ fn warm_starts_preserve_uninserted_columns_and_same_batch_duplicates() {
 fn snapshots_keep_cached_columns_and_extend_branch_rows_without_aliasing() {
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
-        column_generation::Status,
+        cg::Status,
         root::{self, RootOptions, RootProblem},
         RowSense,
     };
@@ -549,8 +549,8 @@ fn child_enumeration_never_reactivates_a_forbidden_cached_arc() {
 #[test]
 fn cut_cleanup_remaps_loaded_and_uninserted_pool_rows_before_resume() {
     use baldes::master::{
+        cg::{self, Answer, Column, Controller, Options, WarmStart},
         clp::ClpMaster,
-        column_generation::{self as cg, Answer, Column, Controller, Options, WarmStart},
         RowSense,
     };
     struct Cleanup {

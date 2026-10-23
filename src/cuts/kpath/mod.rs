@@ -440,8 +440,8 @@ impl KPathSeparator {
             None
         };
 
-        let mut state =
-            Separation::prepare(&self.demands[1..], self.capacity, params, use_windows)?;
+        let capacity = super::shared::rhs_rounding_capacity(self.capacity, count);
+        let mut state = Separation::prepare(&self.demands[1..], capacity, params, use_windows)?;
         state.next_cut_id = self.next_id;
 
         let mut routes = Vec::with_capacity(columns.len());
@@ -473,7 +473,7 @@ impl KPathSeparator {
                 customers.push(row + 1);
                 demand += self.demands[row + 1];
             }
-            let two_path = (k as f64) > (demand / self.capacity).ceil();
+            let two_path = (k as f64) > (demand / capacity).ceil();
             let memory: Vec<usize> = memory_set.into_iter().collect();
             let mut cut = StrongKPathCut {
                 customers,

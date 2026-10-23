@@ -349,12 +349,9 @@ impl<'a, const D: usize> Context<'a, D> {
             from,
             id,
             &mut Default::default(),
-            None,
         )
     }
     /// Hot sweeps retain one private workspace across physical extensions.
-    /// A native preflight may supply resources; all remaining state updates
-    /// share the same path and retain the original insertion order.
     #[inline(always)]
     pub(super) fn extend_record_with_workspace<
         const BRANCHING: bool,
@@ -368,7 +365,6 @@ impl<'a, const D: usize> Context<'a, D> {
         from: &L,
         id: usize,
         workspace: &mut crate::graph::coupled::CoupledWorkspace,
-        prepared: Option<crate::graph::ResourceValues<D>>,
     ) -> Option<(StoredLabel<D>, crate::graph::ResourceValues<D>)> {
         let physical = &g.arcs[arc.physical];
         if self
@@ -380,28 +376,25 @@ impl<'a, const D: usize> Context<'a, D> {
         {
             return None;
         }
-        let resources = if let Some(resources) = prepared {
-            resources
-        } else {
-            let mut q = crate::graph::ResourceValues::<D>::from_slice(from.resources());
-            if self.phase.jump_arcs {
-                if let Some(jump) = arc.jump {
-                    let point = self.grid.direction(forward).corners[arc.from.vertex][jump];
-                    for (axis, &slot) in self.grid.resource_slots.iter().enumerate() {
-                        if g.resources[slot] == ResourceKind::Equality {
-                            continue;
-                        }
-                        q[slot] = if forward {
-                            q[slot].max(point[axis])
-                        } else {
-                            q[slot].min(point[axis])
-                        };
+        let mut q = crate::graph::ResourceValues::<D>::from_slice(from.resources());
+        if self.phase.jump_arcs {
+            if let Some(jump) = arc.jump {
+                let point = self.grid.direction(forward).corners[arc.from.vertex][jump];
+                for (axis, &slot) in self.grid.resource_slots.iter().enumerate() {
+                    if g.resources[slot] == ResourceKind::Equality {
+                        continue;
                     }
+                    q[slot] = if forward {
+                        q[slot].max(point[axis])
+                    } else {
+                        q[slot].min(point[axis])
+                    };
                 }
             }
+        }
+        let resources: crate::graph::ResourceValues<D> =
             crate::labeling::ScalarResourceKernel::<D>::extend_active(g, physical, q.0, forward)?
-                .into()
-        };
+                .into();
         let (mut coupled_state, coupled_cost) = if let Some(kernel) = g.coupled_kernel() {
             let Some(state) = from.coupled_state() else {
                 self.resource_error.store(true, Ordering::Relaxed);

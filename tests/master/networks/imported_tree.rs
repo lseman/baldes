@@ -1,7 +1,7 @@
 //! Open-domain tree conclusions versus explicit original-coordinate models.
 use super::imported_multiple_tests::{bounds, column, envelope, fixture};
 use super::*;
-use multi_pricing::{
+use mp::{
     imported::{
         self, ColumnBatch, ColumnEnvelope, ImportOptions, ImportPricingKind, ImportTreeStatus,
     },
@@ -9,8 +9,8 @@ use multi_pricing::{
 };
 use std::time::Duration;
 
-fn tree_options() -> multi_pricing::AssignmentTreeOptions {
-    multi_pricing::AssignmentTreeOptions {
+fn tree_options() -> mp::AssignmentTreeOptions {
+    mp::AssignmentTreeOptions {
         node: options(),
         ..Default::default()
     }
@@ -470,7 +470,7 @@ fn open_tree_branches_routing_multiplicity_and_physical_activity() {
 #[test]
 fn open_tree_replays_fixed_routes_and_new_presence_restrictions_into_phase_one() {
     use baldes::cuts::soft_conflicts::{Mode, PresenceRow};
-    use multi_pricing::PresenceCoefficients;
+    use mp::PresenceCoefficients;
     let root = imported::solve(
         Problem::<2> {
             rows: vec![

@@ -41,11 +41,11 @@ impl<const D: usize> Solver<D> {
             self.restore_arcs();
         }
     }
-    pub(super) fn topology(&self) -> Graph<D> {
+    pub(super) fn topology(&self) -> Arc<Graph<D>> {
         let mut graph = self.graph.clone();
         for a in &mut graph.arcs {
             a.reduced_cost = 0.;
         }
-        graph
+        Arc::new(graph)
     }
 }

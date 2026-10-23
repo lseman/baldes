@@ -1,9 +1,9 @@
 #![cfg(feature = "clp")]
+use baldes::inputs::{Instance, Rounding};
 use baldes::master::{
-    column_generation::Status,
+    cg::Status,
     root::{CapacityCutConfig, RootOptions},
 };
-use baldes::inputs::{Instance, Rounding};
 
 #[test]
 fn cleanup_retains_basic_capacity_rows_with_negative_normalized_slack() {
@@ -14,12 +14,16 @@ fn cleanup_retains_basic_capacity_rows_with_negative_normalized_slack() {
     master.add_row(RowSense::LessEqual, 4., &[]).unwrap();
     master.add_row(RowSense::LessEqual, 0., &[]).unwrap();
     master.add_row(RowSense::LessEqual, -1., &[]).unwrap();
-    master.add_column(1., &[(0,1.),(1,-1.),(2,1.),(3,-1.),(4,-1.)]).unwrap();
+    master
+        .add_column(1., &[(0, 1.), (1, -1.), (2, 1.), (3, -1.), (4, -1.)])
+        .unwrap();
     assert!(master.solve());
-    for row in 1..5 { assert!(master.row_is_basic(row).unwrap()); }
+    for row in 1..5 {
+        assert!(master.row_is_basic(row).unwrap());
+    }
     // -2 - (-3) = 1, divided by signed rhs -2 -> -0.5, retained.
     // rhs == -1 is not normalized and is eligible for deletion.
-    assert_eq!(master.cleanup_cut_rows(1).unwrap(), vec![2,3,4]);
+    assert_eq!(master.cleanup_cut_rows(1).unwrap(), vec![2, 3, 4]);
 }
 
 #[test]
@@ -98,12 +102,26 @@ fn kohl_time_resource_closes_r101_ten_customer_root_gap() {
     let mut options = RootOptions::default();
     options.enumerate = false;
     options.cg.stabilize = false;
-    let plain = instance.solve_root(10, Rounding::None, options.clone()).unwrap();
+    let plain = instance
+        .solve_root(10, Rounding::None, options.clone())
+        .unwrap();
     assert!((plain.master.lp - 261.30231910442023).abs() < 1e-5);
-    let capacity_only = instance.solve_root(10, Rounding::None,
-        options.clone().with_capacity_cuts(instance.capacity_cut_config(Rounding::None, false))).unwrap();
-    let kohl = instance.solve_root(10, Rounding::None,
-        options.with_capacity_cuts(instance.capacity_cut_config(Rounding::None, true))).unwrap();
+    let capacity_only = instance
+        .solve_root(
+            10,
+            Rounding::None,
+            options
+                .clone()
+                .with_capacity_cuts(instance.capacity_cut_config(Rounding::None, false)),
+        )
+        .unwrap();
+    let kohl = instance
+        .solve_root(
+            10,
+            Rounding::None,
+            options.with_capacity_cuts(instance.capacity_cut_config(Rounding::None, true)),
+        )
+        .unwrap();
     assert_eq!(kohl.master.status, Status::Optimal);
     assert!(kohl.cuts > 0);
     assert!(kohl.master.lp > capacity_only.master.lp + 1.);

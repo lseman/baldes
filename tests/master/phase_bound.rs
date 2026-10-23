@@ -1,14 +1,14 @@
 #![cfg(feature = "clp")]
 
 use baldes::master::{
+    cg::{self, Answer, Column, NoController, Options, Status},
     clp::ClpMaster,
-    column_generation::{self, Answer, Column, NoController, Options, Status},
     RowSense,
 };
 
 #[test]
 fn numerical_mode_skips_certification_and_certified_mode_requests_only_a_closing_pass() {
-    use column_generation::{BoundMode, Controller};
+    use cg::{BoundMode, Controller};
     use std::cell::Cell;
     struct Proof {
         calls: Cell<usize>,
@@ -32,7 +32,7 @@ fn numerical_mode_skips_certification_and_certified_mode_requests_only_a_closing
             jump_arcs: true,
             labels_per_bucket: i64::MAX,
         }];
-        let out = column_generation::optimize(
+        let out = cg::optimize(
             &mut master,
             &exact,
             |_, duals| {
@@ -87,7 +87,7 @@ fn numerical_mode_skips_certification_and_certified_mode_requests_only_a_closing
 
 #[test]
 fn numerical_warm_bounds_never_authorize_certified_pruning() {
-    use column_generation::{BoundMode, Controller};
+    use cg::{BoundMode, Controller};
     struct Unknown;
     impl Controller<ClpMaster> for Unknown {
         fn incumbent(&self) -> f64 {
@@ -98,7 +98,7 @@ fn numerical_warm_bounds_never_authorize_certified_pruning() {
     let mut master = ClpMaster::new().unwrap();
     master.add_row(RowSense::Equal, 1., &[]).unwrap();
     master.add_column(1., &[(0, 1.)]).unwrap();
-    let parent = column_generation::optimize(
+    let parent = cg::optimize(
         &mut master,
         &[],
         |_, _| {
@@ -118,7 +118,7 @@ fn numerical_warm_bounds_never_authorize_certified_pruning() {
     .unwrap();
     assert_eq!(parent.bound, 1.);
     assert_eq!(parent.certified_bound, f64::NEG_INFINITY);
-    let child = column_generation::optimize(
+    let child = cg::optimize(
         &mut master,
         &[],
         |_, _| {
@@ -213,7 +213,7 @@ fn root_snapshots_and_tree_modes_do_not_promote_an_unsupported_certificate() {
 
 #[test]
 fn certified_pruning_uses_the_independent_bound_and_preserves_its_mode_in_warm_starts() {
-    use column_generation::{BoundMode, Controller};
+    use cg::{BoundMode, Controller};
     struct Proof;
     impl Controller<ClpMaster> for Proof {
         fn incumbent(&self) -> f64 {
@@ -226,7 +226,7 @@ fn certified_pruning_uses_the_independent_bound_and_preserves_its_mode_in_warm_s
     let mut master = ClpMaster::new().unwrap();
     master.add_row(RowSense::Equal, 1., &[]).unwrap();
     master.add_column(1., &[(0, 1.)]).unwrap();
-    let out = column_generation::optimize(
+    let out = cg::optimize(
         &mut master,
         &[],
         |_, _| {
@@ -249,7 +249,7 @@ fn certified_pruning_uses_the_independent_bound_and_preserves_its_mode_in_warm_s
     assert_eq!(out.bound, 1.);
     assert_eq!(out.certified_bound, 1.);
     assert_eq!(out.numerical_bound, 0.5);
-    let resumed = column_generation::optimize(
+    let resumed = cg::optimize(
         &mut master,
         &[],
         |_, _| {
@@ -278,7 +278,7 @@ fn certified_pruning_uses_the_independent_bound_and_preserves_its_mode_in_warm_s
 #[test]
 fn original_feasible_columns_can_recover_an_exhausted_penalized_master() {
     use baldes::Result;
-    use column_generation::Controller;
+    use cg::Controller;
     struct Recovery {
         calls: usize,
     }
@@ -312,7 +312,7 @@ fn original_feasible_columns_can_recover_an_exhausted_penalized_master() {
     options.artificial_cost = 1.;
     options.max_penalty_updates = 1;
     let mut controller = Recovery { calls: 0 };
-    let output = column_generation::optimize(
+    let output = cg::optimize(
         &mut master,
         &[],
         |phase, duals| {
@@ -370,7 +370,7 @@ fn large_original_routes_recover_before_a_rank_cut_certificate_closes_the_root()
 #[test]
 fn an_integer_certificate_does_not_terminate_fractional_lp_pricing() {
     use baldes::{pricing::phases::Phase, Result};
-    use column_generation::Controller;
+    use cg::Controller;
     struct IntegerCover;
     impl Controller<ClpMaster> for IntegerCover {
         fn certified_pricing_bound(&self, _: &ClpMaster, _: &[f64]) -> Result<Option<f64>> {
@@ -384,12 +384,12 @@ fn an_integer_certificate_does_not_terminate_fractional_lp_pricing() {
         master.add_row(RowSense::Equal, 1., &[]).unwrap();
         master.add_column(1., &[(0, 1.)]).unwrap();
         let mut options = Options::default();
-        options.bound_mode = column_generation::BoundMode::Certified;
+        options.bound_mode = cg::BoundMode::Certified;
         options.stabilize = false;
         if warm {
-            options.warm_start = Some(column_generation::WarmStart {
+            options.warm_start = Some(cg::WarmStart {
                 bound: 1.,
-                bound_mode: column_generation::BoundMode::Certified,
+                bound_mode: cg::BoundMode::Certified,
                 numerical_bound: f64::NEG_INFINITY,
                 certified_bound: 1.,
                 stabilization: None,
@@ -408,7 +408,7 @@ fn an_integer_certificate_does_not_terminate_fractional_lp_pricing() {
             });
         }
         let mut calls = 0;
-        let output = column_generation::optimize(
+        let output = cg::optimize(
             &mut master,
             &[Phase {
                 check_ng: true,
@@ -452,7 +452,7 @@ fn finite_artificial_penalty_exhaustion_does_not_prove_infeasibility() {
         options.stabilize = false;
         options.artificial_cost = 1.;
         options.max_penalty_updates = updates;
-        let result = column_generation::optimize(
+        let result = cg::optimize(
             &mut master,
             &[],
             |phase, duals| {
@@ -493,7 +493,7 @@ fn heuristic_stage_value_skips_pricing_resets_and_never_certifies_the_global_bou
     options.stabilize = false;
     options.artificial_cost = 100.;
     let mut phases = Vec::new();
-    let result = column_generation::optimize(
+    let result = cg::optimize(
         &mut master,
         &[],
         |phase, duals| {
@@ -641,7 +641,7 @@ fn ipm_column_generation_tightens_from_lp_bounds_and_finishes_accurately() {
     master.set_solver(MasterSolver::Ipm);
     master.add_row(RowSense::Equal, 1., &[]).unwrap();
     master.add_column(10., &[(0, 1.)]).unwrap();
-    let output = column_generation::optimize(
+    let output = cg::optimize(
         &mut master,
         &[],
         |_, duals| {
@@ -720,7 +720,7 @@ fn ipm_cut_round_resets_the_primal_accuracy_bound() {
     struct CutOnce {
         added: bool,
     }
-    impl column_generation::Controller<ClpMaster> for CutOnce {
+    impl cg::Controller<ClpMaster> for CutOnce {
         fn separates(&self) -> bool {
             true
         }
@@ -741,7 +741,7 @@ fn ipm_cut_round_resets_the_primal_accuracy_bound() {
     master.add_row(RowSense::Equal, 1., &[]).unwrap();
     master.add_column(1., &[(0, 1.)]).unwrap();
     master.add_column(10., &[(0, 1.)]).unwrap();
-    let output = column_generation::optimize(
+    let output = cg::optimize(
         &mut master,
         &[],
         |_, _| {
@@ -811,10 +811,7 @@ fn hgs_seeded_ipm_root_and_tree_match_the_small_routing_optimum() {
         let mut root_options = options.clone();
         root_options.capture_state = true;
         let root = root::solve(problem.clone(), root_options).unwrap();
-        assert_eq!(
-            root.master.status,
-            baldes::master::column_generation::Status::Optimal
-        );
+        assert_eq!(root.master.status, baldes::master::cg::Status::Optimal);
         assert!(
             (root.master.lp - (4. + 2_f64.sqrt())).abs() < 1e-6,
             "{}",
@@ -1043,7 +1040,7 @@ fn highs_recovers_the_r201_hundred_customer_warm_basis_failure() {
 
 #[test]
 fn closing_exact_bound_keeps_feasible_master_before_empty_enumeration() {
-    use column_generation::Controller;
+    use cg::Controller;
     struct ClosingBound {
         enumeration_calls: usize,
     }
@@ -1074,7 +1071,7 @@ fn closing_exact_bound_keeps_feasible_master_before_empty_enumeration() {
     let mut controller = ClosingBound {
         enumeration_calls: 0,
     };
-    let out = column_generation::optimize(
+    let out = cg::optimize(
         &mut master,
         &[baldes::pricing::phases::Phase {
             check_ng: true,

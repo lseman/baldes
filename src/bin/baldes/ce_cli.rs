@@ -1,4 +1,4 @@
-use baldes::extensions::column_elimination::{Options, Problem, Status};
+use baldes::extensions::ce::{Options, Problem, Status};
 use baldes::inputs::{Instance, Rounding};
 use baldes::master::solvers::ClpMaster;
 use std::time::{Duration, Instant};

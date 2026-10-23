@@ -203,8 +203,8 @@ fn paired_limited_memory_cut_dual_refresh_keeps_original_route_costs() {
 #[test]
 fn paired_phase_i_restores_costs_and_unknown_certificate_declines_transfer_atomically() {
     use baldes::master::{
-        column_generation::{FeasibilityStatus, Status},
-        multi_pricing::{self, format::Model, EnumerationOptions, Options},
+        cg::{FeasibilityStatus, Status},
+        mp::{self, format::Model, EnumerationOptions, Options},
         root::{self, RootOptions, RootProblem},
     };
     let graph = fixture(PairedResourceMode::CostBounded, 0.);
@@ -247,7 +247,7 @@ fn paired_phase_i_restores_costs_and_unknown_certificate_declines_transfer_atomi
     let mut options = Options::default();
     options.cg.artificial_cost = 100.;
     options.cg.stabilize = false;
-    let parent = multi_pricing::solve(problem, options.clone()).unwrap();
+    let parent = mp::solve(problem, options.clone()).unwrap();
     assert_eq!(parent.master.status, Status::Optimal);
     assert!((parent.master.lp - 12.).abs() < 1e-8);
     let attempted = parent

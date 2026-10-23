@@ -7,7 +7,6 @@ use baldes::{
 #[path = "accumulated_resource/grouped.rs"]
 mod grouped;
 
-
 fn solver(kind: ResourceKind) -> Solver<5> {
     let mut s = Solver::<5>::new(3, 5).unwrap();
     s.graph.elementary = true;

@@ -63,7 +63,8 @@ impl NativeKPathSeparator {
             violation_tolerance: p.violation_tolerance,
             max_shrink_removals: p.candidate_limit as i32,
         };
-        let mut state = Separation::prepare(&prep.demands[..n], prep.capacity, params, None)?;
+        let capacity = super::super::shared::rhs_rounding_capacity(prep.capacity, n);
+        let mut state = Separation::prepare(&prep.demands[..n], capacity, params, None)?;
         state.pulse = prep.pulse.clone();
         state.two_path = prep.two_path_resource >= 0;
         state.num_columns = solutions.len();
@@ -216,3 +217,7 @@ impl NativeKPathSeparator {
         Ok(coefficient)
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/cuts/kpath/native_rounding_tests.rs"]
+mod rounding_tests;

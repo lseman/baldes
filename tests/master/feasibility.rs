@@ -3,7 +3,7 @@
 use baldes::{
     master::{
         branching::BranchConstraint,
-        column_generation::{FeasibilityStatus, Status},
+        cg::{FeasibilityStatus, Status},
         root::{self, BoundMode, FixedRoute, MasterSolver, RootOptions, RootProblem},
         tree::{self, TreeOptions, TreeStatus},
         RowSense,

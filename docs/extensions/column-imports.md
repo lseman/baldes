@@ -3,7 +3,7 @@
 [Documentation index](../README.md)
 
 With `clp`, Rust callers can import finite column domains through
-`master::multi_pricing::imported`. Routing networks are optional. Imported
+`master::mp::imported`. Routing networks are optional. Imported
 columns are original-vector patterns, so this interface also supports finite
 non-routing models without constructing synthetic routes.
 
@@ -46,7 +46,7 @@ pricing callback.
 
 ```rust
 use baldes::master::{
-    multi_pricing::{self, imported, MasterVariable, Options, Problem},
+    mp::{self, imported, MasterVariable, Options, Problem},
     preprocessing::Bounds,
     root::Row,
     RowSense,
@@ -115,7 +115,7 @@ restrictions are replayed by this extension operation.
 Use `node.with_row(row, routing_coefficients, original_coefficients)` to add a
 shared restriction. Original coefficients are `(original_variable_id, value)`
 pairs; generated imported-column IDs are rejected. Routing coefficients use
-`multi_pricing::RowCoefficients`, with physical arc order and an optional
+`mp::RowCoefficients`, with physical arc order and an optional
 once-per-route term. Omitted coordinates and routing families contribute zero.
 Coefficients must be finite and coalesced. The caller supplies a valid cut or
 branch restriction. Original-coordinate links apply the row to new imported
@@ -124,7 +124,7 @@ contribution, whether the row was added before or after fixing.
 
 `node.with_presence_row(row, presence_coefficients, original_coefficients)`
 couples nonlinear routing-event presence to original coordinates. It uses
-`multi_pricing::PresenceCoefficients`, with event lists aligned to physical
+`mp::PresenceCoefficients`, with event lists aligned to physical
 arcs, and supports both pair-count and any-pair semantics. The original
 presence descriptor survives extension. Fixed routes contribute their exact
 presence coefficient before preprocessing the rebuilt model; imported vectors
@@ -177,7 +177,7 @@ domains. This protocol enumerates a domain; it supplies no reduced-cost pricing
 or external optimality certificate.
 
 ```rust
-use baldes::master::multi_pricing::imported::{ColumnBatch, ImportOptions, ImportStatus};
+use baldes::master::mp::imported::{ColumnBatch, ImportOptions, ImportStatus};
 
 let session = node.begin_import(7)?;
 let progress = session.collect(&ImportOptions::default(), |known, remaining| {

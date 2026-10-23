@@ -1,7 +1,7 @@
 use super::*;
 use baldes::cuts::{CutClass, CutRegistry, MemoryKind, RankOneCut};
 use baldes::master::preprocessing::Bounds;
-use multi_pricing::{EnumerationOptions, MasterVariable, RegisteredCutCoefficients};
+use mp::{EnumerationOptions, MasterVariable, RegisteredCutCoefficients};
 
 fn cut(vertices: usize, support: &[usize]) -> RankOneCut {
     let mut registry = CutRegistry::default();
@@ -55,7 +55,7 @@ fn gap_problem(parallel: bool) -> Problem<2> {
     }
 }
 fn verify_descendants(problem: Problem<2>, descriptor: RankOneCut, row: Row, expected: f64) {
-    let root = multi_pricing::solve(problem, options()).unwrap();
+    let root = mp::solve(problem, options()).unwrap();
     optimal(&root, 4.);
     let coefficients = [7, 42].map(|network| RegisteredCutCoefficients {
         network,
@@ -208,8 +208,7 @@ fn registered_graph_mapping_and_unbounded_master_coupling_survive_forks() {
         integer: true,
         entries: vec![],
     };
-    let root =
-        multi_pricing::solve_with_master_variables(problem, vec![master], options()).unwrap();
+    let root = mp::solve_with_master_variables(problem, vec![master], options()).unwrap();
     let coefficients = [7, 42].map(|network| RegisteredCutCoefficients {
         network,
         cut: descriptor.clone(),
@@ -247,7 +246,7 @@ fn registered_graph_mapping_and_unbounded_master_coupling_survive_forks() {
 
 #[test]
 fn unsupported_registered_contracts_fail_before_kernel_preparation() {
-    let root = multi_pricing::solve(gap_problem(false), options()).unwrap();
+    let root = mp::solve(gap_problem(false), options()).unwrap();
     let base = cut(5, &[1, 3]);
     let mut invalid = base.clone();
     invalid.denominator = 8;
@@ -287,7 +286,7 @@ fn unsupported_registered_contracts_fail_before_kernel_preparation() {
                 sense: RowSense::LessEqual,
                 rhs: 1.
             },
-            &[multi_pricing::RankOneCoefficients {
+            &[mp::RankOneCoefficients {
                 network: 7,
                 weights: vec![0, 1, 0, 1, 0],
                 denominator: 8
@@ -314,8 +313,7 @@ fn registered_vertex_and_arc_carries_share_a_consistent_pricing_coefficient() {
         entries: vec![],
     };
     let root =
-        multi_pricing::solve_with_master_variables(gap_problem(false), vec![master], options())
-            .unwrap();
+        mp::solve_with_master_variables(gap_problem(false), vec![master], options()).unwrap();
     let coefficients = [7, 42].map(|network| RegisteredCutCoefficients {
         network,
         cut: descriptor.clone(),
@@ -361,7 +359,7 @@ fn registered_type_two_uses_packing_semantics_in_master_and_pricing() {
 
 #[test]
 fn composite_shared_row_sums_same_network_terms_through_fixing_and_enumeration() {
-    let root = multi_pricing::solve(gap_problem(false), options()).unwrap();
+    let root = mp::solve(gap_problem(false), options()).unwrap();
     optimal(&root, 4.);
     let terms: Vec<_> = [7, 42]
         .into_iter()
@@ -425,8 +423,7 @@ fn composite_terms_share_one_master_variable_coefficient() {
         entries: vec![],
     };
     let root =
-        multi_pricing::solve_with_master_variables(gap_problem(false), vec![master], options())
-            .unwrap();
+        mp::solve_with_master_variables(gap_problem(false), vec![master], options()).unwrap();
     let terms: Vec<_> = [7, 42]
         .into_iter()
         .flat_map(|network| {

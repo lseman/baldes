@@ -1,7 +1,7 @@
 //! Global numerical oracle feedback versus independent pattern-domain optima.
 use super::imported_multiple_tests::{bounds, column, fixture};
 use super::*;
-use multi_pricing::{
+use mp::{
     imported::{
         self, Column, ColumnBatch, ImportOptions, ImportOracleReply, ImportPricing,
         ImportPricingKind, ImportPricingMinimum, ImportTreeStatus,

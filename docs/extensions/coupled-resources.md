@@ -283,7 +283,7 @@ Reinstall after changing the physical arc vector order. Set up the complete grap
 before installing resources. Resource validation also runs during preparation.
 
 With `clp`, pass the attached physical graph to the ordinary
-`RootProblem::set_partitioning` or `master::multi_pricing::Network` constructor.
+`RootProblem::set_partitioning` or `master::mp::Network` constructor.
 Customer covering rows and cuts continue to refer to physical customers. No
 expanded-node adapter, duplicated rows, or route projection is needed.
 Coupled charges are included in priced and enumerated route objectives, master
@@ -531,6 +531,6 @@ reduction, fixing/enumeration, node forks and root phase-I cost restoration.
 Independent physical-load/path and numerical-interval oracles supplement those
 integration cases. A freshly built native Python wheel exercises the public
 resource methods. Commands, source/wheel hashes and results are recorded in the
-[current validation manifest](../../results/coupled-next-20261022/manifest.json).
+current validation manifest.
 Earlier expansion smoke results do not validate these kernels, and the current
 regressions do not claim exact native descriptor, tolerance or performance parity.

@@ -32,12 +32,12 @@ impl<const D: usize> Controller<ClpMaster> for RootController<D> {
     fn recover_feasibility(
         &mut self,
         master: &ClpMaster,
-        warm: &column_generation::WarmStart,
+        warm: &cg::WarmStart,
         remaining: std::time::Duration,
         iterations: usize,
         tolerance: f64,
         bound_mode: BoundMode,
-    ) -> Result<Option<column_generation::FeasibilityRecovery>> {
+    ) -> Result<Option<cg::FeasibilityRecovery>> {
         self.recover_phase_one(master, warm, remaining, iterations, tolerance, bound_mode)
     }
     fn begin_enumeration_transaction(&mut self, bound: f64) -> Result<bool> {

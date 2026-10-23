@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[test]
 fn observed_depth_history_prevents_the_parent_priority_reset() {
     let mut budget = CandidateBudget::new(
@@ -16,9 +15,6 @@ fn observed_depth_history_prevents_the_parent_priority_reset() {
     assert_eq!(budget.quota, 1);
     assert_eq!(budget.estimate.size, 3.236066202157737);
 }
-
-
-
 
 #[test]
 fn lower_priority_resets_the_quota_and_estimate() {

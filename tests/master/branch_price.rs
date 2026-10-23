@@ -332,7 +332,6 @@ fn small_trees_agree_with_exhaustive_elementary_route_universe() {
     }
 }
 
-
 #[test]
 fn strong_branching_solves_with_certified_child_bounds() {
     use baldes::master::tree::StrongBranchingOptions;
@@ -543,7 +542,6 @@ fn cluster_resource_and_history_trees_preserve_exhaustive_optimum() {
         }
     }
 }
-
 
 #[test]
 fn root_and_exact_incumbent_validation_support_more_than_two_resources() {

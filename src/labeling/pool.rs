@@ -28,6 +28,12 @@ fn ordered<T>(set: &mut Vec<Candidate<T>>, candidate: Candidate<T>) {
 }
 impl<T> SolutionPool<T> {
     pub fn new(groups: usize, total: usize, group_limit: i32) -> Self {
+        // Representatives occupy slots in the same bounded output pool.
+        let group_limit = if group_limit > 0 {
+            group_limit.min(total.min(i32::MAX as usize) as i32)
+        } else {
+            group_limit
+        };
         Self {
             group_limit,
             total,
@@ -153,14 +159,23 @@ impl<T> SolutionPool<T> {
         true
     }
     pub fn iter(&self) -> impl Iterator<Item = &Candidate<T>> {
-        let mut all: Vec<_> = self.a.iter().chain(&self.b).collect();
-        all.sort_by(|x, y| x.cost.total_cmp(&y.cost).then(x.id.cmp(&y.id)));
-        all.into_iter()
+        let mut a = self.a.iter().peekable();
+        let mut b = self.b.iter().peekable();
+        // Both partitions already use cost/identity order. Merge their borrowed
+        // entries without allocating and sorting another vector on each visit.
+        std::iter::from_fn(move || match (a.peek(), b.peek()) {
+            (Some(x), Some(y)) if x.cost < y.cost || (x.cost == y.cost && x.id < y.id) => a.next(),
+            (_, Some(_)) => b.next(),
+            _ => a.next(),
+        })
     }
     pub fn into_sorted(self) -> Vec<Candidate<T>> {
         let mut all = self.a;
         all.extend(self.b);
-        all.sort_by(|x, y| x.cost.total_cmp(&y.cost).then(x.id.cmp(&y.id)));
+        all.sort_by(|x, y| x.cost.partial_cmp(&y.cost).unwrap().then(x.id.cmp(&y.id)));
         all
     }
 }
+#[cfg(test)]
+#[path = "../../tests/unit/labeling/pool_tests.rs"]
+mod tests;

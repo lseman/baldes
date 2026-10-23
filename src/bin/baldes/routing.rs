@@ -1,4 +1,4 @@
-use super::{ce_cli, multi_pricing_cli, pstep_cli};
+use super::{ce_cli, mp_cli, pstep_cli};
 use baldes::inputs::{Instance, Rounding};
 use baldes::master::root::RootOptions;
 const HELP: &str = "Usage: baldes <solve|hgs|ce> INSTANCE [OPTIONS]
@@ -70,7 +70,7 @@ pub(super) fn run() -> std::result::Result<(), String> {
         return Ok(());
     }
     if kind == "multi-pricing" || kind == "networks" {
-        return multi_pricing_cli::run(args.collect());
+        return mp_cli::run(args.collect());
     }
     if kind == "pstep" {
         return pstep_cli::run(args.collect());
@@ -568,7 +568,7 @@ pub(super) fn run() -> std::result::Result<(), String> {
             std::fs::write(path, result.to_json(&instance.name)).map_err(|e| e.to_string())?;
         }
         println!(
-            "instance={} status={:?} incumbent={} bound={} nodes={} pricing_calls={} bound_mode={}",
+            "instance={} status={:?} incumbent={:.2} bound={:.2} nodes={} pricing_calls={} bound_mode={}",
             instance.name,
             result.status,
             result.incumbent,
@@ -653,7 +653,7 @@ pub(super) fn run() -> std::result::Result<(), String> {
         std::fs::write(path, json).map_err(|e| e.to_string())?;
     }
     println!(
-        "instance={} status={:?} lp={:.12} bound={:.12} solves={} pricing_calls={} columns={} master_columns={} cuts={} cut_rounds={} bound_mode={}",
+        "instance={} status={:?} lp={:.2} bound={:.2} solves={} pricing_calls={} columns={} master_columns={} cuts={} cut_rounds={} bound_mode={}",
         instance.name,
         output.master.status,
         output.master.lp,

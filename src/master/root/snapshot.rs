@@ -42,7 +42,7 @@ impl<const D: usize> NodeSnapshot<D> {
         &self,
         branches: &[BranchConstraint],
         penalty: f64,
-    ) -> Result<(RootProblem<D>, ClpMaster, column_generation::WarmStart)> {
+    ) -> Result<(RootProblem<D>, ClpMaster, cg::WarmStart)> {
         let mut master = self.master.try_clone()?;
         let mut problem = self.problem.clone();
         let mut warm = self.warm.clone();

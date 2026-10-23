@@ -5,7 +5,7 @@ use baldes::cuts::{
     CutRegistry,
 };
 use baldes::master::preprocessing::Bounds;
-use multi_pricing::{
+use mp::{
     imported::{
         self, Column, ColumnBatch, ImportOptions, ImportPricingKind, ImportTreeStatus,
         ImportedSnapshot, MultiImport, Subproblem,
@@ -249,7 +249,7 @@ fn open_import_trees_keep_registered_composite_and_resource_rows_during_phase_on
                 .with_multiplicity(42, bounds(0., 2.))
                 .unwrap();
             let session = kind.session(&base);
-            let mut tree = multi_pricing::AssignmentTreeOptions {
+            let mut tree = mp::AssignmentTreeOptions {
                 node: options(),
                 ..Default::default()
             };

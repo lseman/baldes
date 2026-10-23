@@ -41,3 +41,76 @@ fn export_order_survives_partition_tuning_replacement_retention_and_forks() {
         assert!(child.path_order.is_empty());
     }
 }
+
+#[test]
+fn pricing_preserves_canonical_ties_and_reconstructs_only_selected_paths() {
+    let mut graph = Graph::<1>::new(4, 1).unwrap();
+    for (tail, head) in [(0, 1), (1, 3), (0, 2), (2, 3)] {
+        graph.add_arc(tail, head, 0.).unwrap();
+    }
+    let mut storage = PathStorage::new(1).unwrap();
+    storage.preserve_arc_paths = true;
+    let make = |arcs, hash, cost| Path {
+        arcs,
+        element_hash: hash,
+        visited: [0; 16],
+        original_cost: 0.,
+        reduced_cost: cost,
+    };
+    storage.insert(make(vec![0, 1], 1, -0.));
+    storage.insert(make(vec![2, 3], 0, 0.));
+    let (routes, minimum) = storage.priced_routes(&graph, 1, false, 0.).unwrap();
+    assert_eq!(routes[0].arcs, [0, 1]);
+    assert!(minimum.is_sign_negative());
+
+    // Deliberately make the unselected path impossible to reconstruct. Ranking
+    // can still return the valid selected route without replaying that path.
+    graph.arcs[2].consumption[0] = 2e5;
+    assert!(storage.routes(&graph).is_err());
+    assert_eq!(
+        storage.priced_routes(&graph, 1, false, 0.).unwrap().0.len(),
+        1
+    );
+    assert!(storage
+        .priced_routes(&graph, 0, false, 0.)
+        .unwrap()
+        .0
+        .is_empty());
+    assert!(storage.priced_routes(&graph, 2, false, 0.).is_err());
+}
+
+#[test]
+fn preserved_identity_index_is_shared_until_membership_changes() {
+    let mut graph = Graph::<1>::new(4, 1).unwrap();
+    for (tail, head) in [(0, 1), (1, 3), (0, 2), (2, 3)] {
+        graph.add_arc(tail, head, 0.).unwrap();
+    }
+    let make = |arcs| Path {
+        arcs,
+        element_hash: 0,
+        visited: [0; 16],
+        original_cost: 0.,
+        reduced_cost: 0.,
+    };
+    let mut parent = PathStorage::new(1).unwrap();
+    parent.preserve_arc_paths = true;
+    parent.insert(make(vec![0, 1]));
+    parent.insert(make(vec![2, 3]));
+    let mut child = parent.clone();
+    assert!(!child.insert(make(vec![0, 1])));
+    child.inspect(&graph, f64::INFINITY, &[], &[]).unwrap();
+    child.retain(|_| true);
+    assert!(Arc::ptr_eq(&child.path_order, &parent.path_order));
+    child.retain(|p| p.arcs != [0, 1]);
+    assert!(!Arc::ptr_eq(&child.path_order, &parent.path_order));
+    assert_eq!(parent.len, 2);
+    assert_eq!(child.len, 1);
+    let retained: &[usize] = &[2, 3];
+    assert!(Arc::ptr_eq(
+        parent.path_order.get_key_value(retained).unwrap().0,
+        child.path_order.get_key_value(retained).unwrap().0
+    ));
+    assert!(child.insert(make(vec![0, 1])));
+    assert!(!child.insert(make(vec![0, 1])));
+    assert_eq!(child.routes(&graph).unwrap().len(), 2);
+}

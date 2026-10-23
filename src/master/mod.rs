@@ -6,7 +6,7 @@ pub use solvers::clp;
 #[cfg(feature = "highs")]
 pub use solvers::highs;
 pub mod certificates;
-pub mod column_generation;
+pub mod cg;
 pub mod deluxing;
 pub mod lp_master;
 pub mod preprocessing;
@@ -22,11 +22,11 @@ pub enum RowSense {
 #[cfg(feature = "clp")]
 pub mod branching;
 #[cfg(feature = "clp")]
-pub mod multi_pricing;
+pub mod mp;
 #[cfg(feature = "clp")]
 pub mod root;
-/// Compatibility path; prefer [`multi_pricing`] for shared-master models.
+/// Compatibility path; prefer [`mp`] for shared-master models.
 #[cfg(feature = "clp")]
-pub use multi_pricing as networks;
+pub use mp as networks;
 #[cfg(feature = "clp")]
 pub mod tree;

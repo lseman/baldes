@@ -237,7 +237,7 @@ pub(super) fn infeasible_output<const D: usize>(
         ipm_iterations: 0,
         inherited_cuts: 0,
         master: Output {
-            status: column_generation::Status::Infeasible,
+            status: cg::Status::Infeasible,
             feasibility: vec![],
             enumeration_requested: false,
             enumeration_failure: None,
@@ -256,7 +256,7 @@ pub(super) fn infeasible_output<const D: usize>(
             penalty_updates: 0,
             pruned_by_bound: false,
             cut_rounds: 0,
-            warm_start: column_generation::WarmStart {
+            warm_start: cg::WarmStart {
                 bound: f64::NEG_INFINITY,
                 bound_mode,
                 numerical_bound: f64::NEG_INFINITY,

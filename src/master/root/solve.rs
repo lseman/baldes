@@ -56,7 +56,7 @@ pub(crate) fn inherit_with_history<const D: usize>(
 pub(super) fn solve_seeded<const D: usize>(
     problem: RootProblem<D>,
     mut options: RootOptions,
-    seed: Option<(&NodeSnapshot<D>, ClpMaster, column_generation::WarmStart)>,
+    seed: Option<(&NodeSnapshot<D>, ClpMaster, cg::WarmStart)>,
 ) -> Result<RootOutput<D>> {
     options.cg.bound_mode = options.bound_mode;
     options.master_solver.ensure_available()?;
@@ -508,7 +508,7 @@ pub(super) fn solve_seeded<const D: usize>(
             .time_limit
             .min(deadline.saturating_duration_since(std::time::Instant::now()));
     }
-    let optimized = column_generation::optimize::<ClpMaster, _, _>(
+    let optimized = cg::optimize::<ClpMaster, _, _>(
         &mut master,
         &schedule,
         |phase, duals| {
@@ -592,8 +592,8 @@ pub(super) fn solve_seeded<const D: usize>(
     output.warm_start.initial_rows = initial_rows;
     let state = state.borrow();
     // Extract values, duals and simplex iterations before moving master into snapshot.
-    let values = master.values().to_vec();
-    let duals = master.duals().to_vec();
+    let values = master.values();
+    let duals = master.duals();
     let simplex_iterations = output
         .feasibility
         .iter()

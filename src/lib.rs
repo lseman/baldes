@@ -17,6 +17,7 @@ pub mod extensions;
 pub use extensions::{evrp, hgs, ipm};
 pub mod graph;
 pub mod labeling;
+mod logging;
 pub mod master;
 pub mod pricing;
 pub mod rng;

@@ -242,7 +242,7 @@ fn active_cut_rows_fixed_offsets_and_recovered_coefficients_survive_private_phas
             options,
         )
         .unwrap();
-        assert_eq!(branched.master.status, column_generation::Status::Optimal);
+        assert_eq!(branched.master.status, cg::Status::Optimal);
         let snapshot = branched.snapshot.as_ref().unwrap();
         let mut controller = controller(snapshot);
         let (master, warm) = remove_real_columns(snapshot);

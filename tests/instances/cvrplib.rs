@@ -28,22 +28,40 @@ fn euc_2d_moves_the_depot_first_and_rounds_to_nearest() {
     assert_eq!(instance.name, "tiny-k2");
     assert_eq!(instance.rounding, Rounding::Nearest);
     assert!(instance.distances.is_none());
-    assert_eq!(instance.vehicles, 4, "DIMENSION bounds the fleet without VEHICLES");
-    let order: Vec<_> = instance.customers.iter().map(|c| (c.x, c.y, c.demand)).collect();
-    assert_eq!(order, [(3., 4., 0.), (0., 0., 4.), (1., 1., 5.), (6., 8., 4.)]);
+    assert_eq!(
+        instance.vehicles, 4,
+        "DIMENSION bounds the fleet without VEHICLES"
+    );
+    let order: Vec<_> = instance
+        .customers
+        .iter()
+        .map(|c| (c.x, c.y, c.demand))
+        .collect();
+    assert_eq!(
+        order,
+        [(3., 4., 0.), (0., 0., 4.), (1., 1., 5.), (6., 8., 4.)]
+    );
     assert!(!instance.has_time_windows());
     // Depot (3, 4) to (1, 1): sqrt(13) = 3.606.
     assert_eq!(instance.distance(0, 2, Rounding::Nearest), 4.);
     assert_eq!(instance.distance(0, 2, Rounding::Ceil), 4.);
     assert_eq!(instance.distance(0, 2, Rounding::Tenth), 3.6);
-    assert!(instance.graph(8, Rounding::Nearest).is_err(), "no time windows for VRPTW");
+    assert!(
+        instance.graph(8, Rounding::Nearest).is_err(),
+        "no time windows for VRPTW"
+    );
     instance.capacity_graph(8, Rounding::Nearest).unwrap();
 }
 
 #[test]
 fn explicit_weights_in_every_triangle_format() {
     // Symmetric distances of nodes 1..4 (depot 1).
-    let full = [[0., 2., 3., 4.], [2., 0., 5., 6.], [3., 5., 0., 7.], [4., 6., 7., 0.]];
+    let full = [
+        [0., 2., 3., 4.],
+        [2., 0., 5., 6.],
+        [3., 5., 0., 7.],
+        [4., 6., 7., 0.],
+    ];
     let section = |format: &str| -> String {
         let mut weights = vec![];
         for i in 0..4 {
@@ -62,7 +80,13 @@ fn explicit_weights_in_every_triangle_format() {
         }
         weights.join(" ")
     };
-    for format in ["FULL_MATRIX", "LOWER_ROW", "LOWER_DIAG_ROW", "UPPER_ROW", "UPPER_DIAG_ROW"] {
+    for format in [
+        "FULL_MATRIX",
+        "LOWER_ROW",
+        "LOWER_DIAG_ROW",
+        "UPPER_ROW",
+        "UPPER_DIAG_ROW",
+    ] {
         let text = format!(
             "NAME : explicit\nTYPE : CVRP\nDIMENSION : 4\nVEHICLES : 2\nCAPACITY : 10\n\
              EDGE_WEIGHT_TYPE : EXPLICIT\nEDGE_WEIGHT_FORMAT : {format}\nEDGE_WEIGHT_SECTION\n{}\n\
@@ -77,7 +101,10 @@ fn explicit_weights_in_every_triangle_format() {
         assert_eq!(instance.distance(1, 3, Rounding::Tenth), 6.);
         let mut truncated = instance.clone();
         truncated.truncate(2).unwrap();
-        assert_eq!(truncated.distances.unwrap(), vec![vec![0., 2., 3.], vec![2., 0., 5.], vec![3., 5., 0.]]);
+        assert_eq!(
+            truncated.distances.unwrap(),
+            vec![vec![0., 2., 3.], vec![2., 0., 5.], vec![3., 5., 0.]]
+        );
     }
 }
 
@@ -90,7 +117,10 @@ fn unsupported_cvrplib_features_are_rejected() {
         (EUC.replace("TYPE : CVRP", "TYPE : VRPTW"), "TYPE"),
         (EUC.replace("EUC_2D", "GEO"), "EDGE_WEIGHT_TYPE"),
         (EUC.replace("2 0\n", "2 1\n"), "depot demand"),
-        (EUC.replace("4 6 8\n", ""), "NODE_COORD_SECTION needs 4 rows"),
+        (
+            EUC.replace("4 6 8\n", ""),
+            "NODE_COORD_SECTION needs 4 rows",
+        ),
     ] {
         let error = Instance::parse(&text).unwrap_err().to_string();
         assert!(error.contains(message), "{message}: {error}");
@@ -99,7 +129,11 @@ fn unsupported_cvrplib_features_are_rejected() {
 
 #[test]
 fn solomon_input_is_unchanged() {
-    let instance = Instance::read(concat!(env!("CARGO_MANIFEST_DIR"), "/instances/Solomon/R101.txt")).unwrap();
+    let instance = Instance::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/instances/Solomon/R101.txt"
+    ))
+    .unwrap();
     assert_eq!(instance.rounding, Rounding::None);
     assert!(instance.distances.is_none() && instance.has_time_windows());
 }
@@ -108,11 +142,27 @@ fn solomon_input_is_unchanged() {
 #[test]
 fn cli_solves_a_cvrplib_root() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_baldes"))
-        .args(["cvrp", concat!(env!("CARGO_MANIFEST_DIR"), "/instances/cvrplib/E-n22-k4.vrp")])
-        .args(["--capacity-cuts", "--no-enumeration", "--reference-ng", "--rounding", "nearest"])
+        .args([
+            "cvrp",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/instances/cvrplib/E-n22-k4.vrp"
+            ),
+        ])
+        .args([
+            "--capacity-cuts",
+            "--no-enumeration",
+            "--reference-ng",
+            "--rounding",
+            "nearest",
+        ])
         .output()
         .unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let lp: f64 = stdout
         .split_whitespace()
@@ -123,7 +173,13 @@ fn cli_solves_a_cvrplib_root() {
     // E-n22-k4: optimal 375 under TSPLIB nint distances; capacity cuts close the root.
     assert!((lp - 375.).abs() < 1e-6, "lp {lp}");
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_baldes"))
-        .args(["vrptw", concat!(env!("CARGO_MANIFEST_DIR"), "/instances/cvrplib/E-n22-k4.vrp")])
+        .args([
+            "vrptw",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/instances/cvrplib/E-n22-k4.vrp"
+            ),
+        ])
         .output()
         .unwrap();
     assert!(!output.status.success());
@@ -143,10 +199,19 @@ fn tenth_rounding_uses_integer_times_and_tenth_costs() {
         // Cost: the HGS distance in tenths; time adds the scaled service.
         let tail = if arc.tail == 3 { 0 } else { arc.tail };
         let service = instance.customers[tail].service * 10.;
-        assert!((arc.cost * 10. - (time - service)).abs() < 1e-9, "{} vs {}", arc.cost, time);
+        assert!(
+            (arc.cost * 10. - (time - service)).abs() < 1e-9,
+            "{} vs {}",
+            arc.cost,
+            time
+        );
     }
     // sqrt(2) = 1.414... -> 14 tenths.
-    let arc = graph.arcs.iter().find(|a| a.tail == 0 && a.head == 1).unwrap();
+    let arc = graph
+        .arcs
+        .iter()
+        .find(|a| a.tail == 0 && a.head == 1)
+        .unwrap();
     assert_eq!((arc.consumption[0], arc.cost), (14., 1.4));
     assert_eq!(graph.vertices[1].bounds[0].upper, 500.);
 }

@@ -1,7 +1,7 @@
 //! Shared external features, original fixing and counts versus exact fixtures.
 use super::*;
 use baldes::master::preprocessing::Bounds;
-use multi_pricing::{
+use mp::{
     imported::{self, Column, ColumnBatch, ImportOptions, ImportOracleReply, ImportTreeStatus},
     AssignmentTreeOptions, MasterVariable,
 };

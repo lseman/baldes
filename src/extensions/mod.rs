@@ -6,7 +6,7 @@
 //! These modules remain in the same
 //! crate; this namespace does not introduce runtime plugins or Cargo features.
 /// Decision-diagram arc-flow relaxation with infeasible-prefix refinement.
-pub mod column_elimination;
+pub mod ce;
 pub mod evrp;
 pub mod hgs;
 pub mod ipm;

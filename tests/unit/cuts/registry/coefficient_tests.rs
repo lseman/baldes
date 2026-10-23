@@ -78,3 +78,65 @@ fn dense_packing_matches_graph_support_for_walks_and_memory_policies() {
         }
     }
 }
+
+#[test]
+fn rank_one_rounds_inherit_only_active_arc_memories() {
+    for graph_dependent in [false, true] {
+        for retired in [false, true] {
+            let mut graph = Graph::<2>::new(6, 1).unwrap();
+            graph.graph_id = 7;
+            for tail in 0..6 {
+                for head in 0..6 {
+                    if tail != head {
+                        graph.add_arc(tail, head, 1.0).unwrap();
+                    }
+                }
+            }
+            let remembered = graph
+                .arcs
+                .iter()
+                .find(|a| a.tail == 4 && a.head == 2)
+                .unwrap()
+                .id;
+            let mut registry = CutRegistry::default();
+            registry.parameters.max_rank = 3;
+            registry.parameters.graph_id = 7;
+            registry.parameters.memory_type = MemoryType::Arc;
+            let mut columns: Vec<_> = [vec![1, 4, 2], vec![1, 3], vec![2, 3]]
+                .into_iter()
+                .map(|vertices| FractionalColumn {
+                    vertices,
+                    value: 0.5,
+                    graph_id: 7,
+                    enumerated: false,
+                })
+                .collect();
+            // Physical vertex IDs differ from the separator's row IDs.
+            let customers = [3, 1, 2];
+            assert_eq!(registry.separate(&graph, &customers, &columns).unwrap(), 1);
+            assert!(registry.cuts[0]
+                .arc_memory_for_graph(7)
+                .contains(&remembered));
+            registry.cuts[0].graph_dependent_memory = graph_dependent;
+            if retired {
+                registry.retire(0);
+            }
+            let previous = registry.cuts[0].clone();
+            columns[0].vertices = vec![1, 2];
+            assert_eq!(registry.separate(&graph, &[2, 3, 1], &columns).unwrap(), 1);
+            assert_eq!(registry.cuts[0], previous);
+            assert_eq!(registry.cuts[1].weights, previous.weights);
+            assert_eq!(
+                registry.cuts[1]
+                    .arc_memory_for_graph(7)
+                    .contains(&remembered),
+                !retired
+            );
+            assert_eq!(registry.coefficient(&graph, 1, &[1, 2], false).unwrap(), 1);
+            assert_eq!(
+                registry.coefficient(&graph, 1, &[1, 4, 2], false).unwrap(),
+                i32::from(!retired)
+            );
+        }
+    }
+}

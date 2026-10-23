@@ -5,7 +5,7 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
 #[cfg(feature = "clp")]
-mod multi_pricing;
+mod mp;
 mod root;
 mod coupled;
 
@@ -503,6 +503,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     root::register(m)?;
     #[cfg(feature = "clp")]
-    multi_pricing::register(m)?;
+    mp::register(m)?;
     Ok(())
 }

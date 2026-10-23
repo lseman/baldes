@@ -1,7 +1,5 @@
 use super::*;
 
-
-
 #[test]
 fn validates_options_and_input() {
     let mut options = FenchelParameters::default();
@@ -205,7 +203,7 @@ fn integrated_resource_separator_remaps_and_limits_combined_families() {
 fn root_fenchel_only_cuts_survive_enumeration_and_child_restore() {
     use crate::inputs::{Instance, Rounding};
     use crate::master::{
-        column_generation::Status,
+        cg::Status,
         root::{inherit, RootOptions},
     };
     let instance = Instance::parse("fenchel-root\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();

@@ -28,11 +28,10 @@ prepare these paths before running. Runs can take several minutes.
 | Script in `scripts/benchmarks/` | Arguments and purpose |
 | --- | --- |
 | `benchmark_solvers.mjs` | `before=/path/to/binary after=/path/to/binary`: compare builds/options on mixed VRPTW and CVRP root workloads. |
-| `benchmark_native_pricing.py` | `BASELINE CANDIDATE [--output DIR] [--runs N]`: compare Clp and experimental native-pricing builds with complete non-timing JSON checks; requires Python 3 and Linux `taskset`. |
 | `benchmark_vrptw_pair.mjs` | `BEFORE AFTER LABEL`: alternate two binaries on cut-enabled VRPTW workloads and verify matching non-timing results. |
 | `benchmark_pstep.mjs` | `[BINARY] [--grid]`: validate p-step bounds against enumeration and compare serial/parallel jobs; `--grid` expands the instance/p combinations. |
 | `benchmark_pstep_pricing.mjs` | `[BINARY] [OUTPUT]`: compare bucket and enumeration pricing backends. |
-| `benchmark_column_elimination.mjs` | `name=/path/to/binary [...]`: compare column-elimination solves. |
+| `benchmark_ce.mjs` | `name=/path/to/binary [...]`: compare column-elimination solves. |
 | `benchmark_ce_lp_threads.mjs` | `MODEL.mps [OUTPUT] [THREAD_COUNTS]`: compare HiGHS simplex/HiPO thread counts on an exported LP; requires the `highs` executable. |
 
 For example:

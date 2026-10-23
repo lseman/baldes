@@ -34,23 +34,6 @@ Python and JSON APIs.
 
 Python installation is covered in the [pybaldes guide](python.md).
 
-### Experimental native pricing
-
-`cargo build --release --features native-pricing` enables the Clp backend and a
-C++14 batch preflight for buckets with at least 32 eligible labels. It checks
-two disposable resources and NG rejection together, using SSE2 where available
-and a scalar C++ fallback elsewhere. Rust retains cut/branch updates, label
-construction and ordered insertion. Other resource dimensions, equality or
-coupled resources, disjoint time windows and finite label budgets retain scalar
-Rust propagation.
-
-This feature is disabled by default: initial comparisons preserved solver
-outputs but did not establish an end-to-end speedup, and R202 regressed. See
-[the native-kernel experiment](../benchmarks/native-kernels.md) before enabling
-it for a workload. The existing Clp paired sparse-matrix kernel remains enabled
-with `clp` independently of this experiment.
-
-
 ## Gurobi master backend
 
 Download and extract the latest stable Linux release into the repository's
