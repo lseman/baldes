@@ -437,9 +437,9 @@ impl Config {
         vec![
             Item::value(0, "BUILD", "Build profile", if self.release { "Release" } else { "Development" }, "Release optimizes solver performance. Development compiles faster and keeps debug information."),
             Item::toggle(3, "BUILD", "Command-line program", self.cli, "Build the baldes executable alongside the library. Enabling the CLI selects Clp; disabling Clp also disables the CLI."),
-            Item::toggle(1, "BUILD", "Clp backend", self.clp, "LP solver and routing model store. Builds the Clp and CoinUtils submodules; requires a C++14 compiler."),
-            Item::toggle(2, "BUILD", "HiGHS backend", self.highs, "LP and mixed-integer solver. Requires libhighs with 32-bit HighsInt, discovered through the installation path, pkg-config or system libraries."),
-            Item::toggle(13, "BUILD", "Gurobi backend", self.gurobi, "LP master solver. Requires a Gurobi installation and valid license. Set Gurobi installation below or export GUROBI_HOME. Routing CLI also requires Clp."),
+            Item::toggle(1, "BACKEND", "Clp backend", self.clp, "LP solver and routing model store. Builds the Clp and CoinUtils submodules; requires a C++14 compiler."),
+            Item::toggle(2, "BACKEND", "HiGHS backend", self.highs, "LP and mixed-integer solver. Requires libhighs with 32-bit HighsInt, discovered through the installation path, pkg-config or system libraries."),
+            Item::toggle(13, "BACKEND", "Gurobi backend", self.gurobi, "LP master solver. Requires a Gurobi installation and valid license. Set Gurobi installation below or export GUROBI_HOME. Routing CLI also requires Clp."),
             Item::toggle(15, "BUILD", "Multi-time windows", self.multi_time_windows, "Disjoint service-start domains for scalar pricing resources."),
             Item::value(12, "PERFORMANCE", "SIMD acceleration", self.simd.name(), "Cycle Off / AVX2 / AVX-512, skipping modes unsupported by this CPU. Host target only. AVX-512 requires Rust 1.89+. Runtime detection keeps portable fallback."),
             Item::toggle(4, "PERFORMANCE", "Native CPU", self.native_cpu, "Optimize for this computer with target-cpu=native. Clear the target triple before enabling; use portable builds for distribution."),
