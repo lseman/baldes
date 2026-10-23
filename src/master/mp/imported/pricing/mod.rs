@@ -33,10 +33,12 @@ pub struct ImportPricing<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }
     epoch: Rc<()>,
     context: Rc<Context<D>>,
     definition: Rc<Definition<D>>,
+    // Compiled with this request's definition and restriction journal. Sharing
+    // it across group views preserves row identities without recompilation.
+    registry: Rc<Registry>,
     position: usize,
     duals: Vec<f64>,
     shared_offset: usize,
-    shared_rows: usize,
     kind: ImportPricingKind,
     violation: Option<f64>,
     routing: Vec<NetworkRoute>,
@@ -63,9 +65,9 @@ impl<const D: usize> ImportPricing<D> {
     /// All base and explicit group multiplicity rows enter the constant term.
     pub fn costs(&self) -> Result<ImportCosts> {
         let group = self.subproblem();
-        let used: HashSet<_> = group.columns.iter().map(|c| c.id).collect();
-        let id = (0..=i32::MAX)
-            .find(|id| !used.contains(id))
+        let rows = &self.registry.group_rows[&group.id];
+        let id = rows
+            .next_column
             .ok_or_else(|| invalid("pricing candidate IDs exhausted"))?;
         let per_column = self.reduced_cost(Column {
             id,
@@ -77,16 +79,10 @@ impl<const D: usize> ImportPricing<D> {
             integer: false,
             entries: vec![],
         })?;
-        let compiled = lifecycle::compile_definition(&self.definition, Some(&self.context))?;
         let coordinates = group
             .variables
             .iter()
-            .map(|id| {
-                (
-                    *id,
-                    self.duals[self.shared_offset + compiled.registry.links[id]],
-                )
-            })
+            .map(|id| (*id, self.duals[self.shared_offset + rows.links[id]]))
             .collect();
         Ok(ImportCosts {
             kind: self.kind,
@@ -96,7 +92,7 @@ impl<const D: usize> ImportPricing<D> {
     }
 
     /// Numerical reduced cost of a new, zero-lower-bound column in this group.
-    /// Recompile identity links and every explicit multiplicity restriction so
+    /// Use this request's compiled links and multiplicity restrictions so
     /// shifted internal column IDs cannot retarget the candidate. Additional
     /// original-variable objective costs enter through the coordinate duals.
     /// This value is a search signal, not a certified global pricing bound.
@@ -119,40 +115,53 @@ impl<const D: usize> ImportPricing<D> {
         }
         Ok(reduced)
     }
-    fn candidate(&self, column: Column) -> Result<MasterVariable> {
+    fn candidate(&self, column: Column) -> Result<Candidate> {
         self.candidate_at(self.position, column)
     }
-    fn candidate_at(&self, position: usize, column: Column) -> Result<MasterVariable> {
+    fn candidate_at(&self, position: usize, column: Column) -> Result<Candidate> {
         if column.bounds.lower != 0. {
             return Err(invalid(
                 "pricing candidate requires zero quantity lower bound",
             ));
         }
-        let id = column.id;
         let group = self.definition.subproblems[position].id;
-        let old = &self.definition;
-        let mut definition = Definition {
-            problem: old.problem.clone(),
-            variables: old.variables.clone(),
-            subproblems: old.subproblems.clone(),
-            envelopes: old.envelopes.clone(),
-        };
-        // Algebra queries may use symbolic vectors outside the permitted box
-        // (e.g. the objective intercept). Acceptance enforces the envelope.
-        definition.envelopes.remove(&group);
-        definition.subproblems[position].columns.push(column);
-        let model = lifecycle::compile_definition(&definition, Some(&self.context))?;
-        if model.problem.rows.len() != self.shared_rows {
-            return Err(invalid("pricing candidate changed original row domain"));
+        if column.id < 0
+            || self.registry.columns.contains_key(&(group, column.id))
+            || !column.cost.is_finite()
+        {
+            return Err(invalid("imported column identity or cost"));
         }
-        let variable_id = model.registry.columns[&(group, id)];
-        let variable = model
-            .variables
-            .into_iter()
-            .find(|v| v.id == variable_id)
-            .unwrap();
-        Ok(variable)
+        quantity_bounds(column.bounds)?;
+        let rows = &self.registry.group_rows[&group];
+        let mut entries = Vec::with_capacity(column.entries.len() + rows.multiplicity.len());
+        for (id, a) in column.entries {
+            let row = rows
+                .links
+                .get(&id)
+                .filter(|_| a.is_finite())
+                .ok_or_else(|| invalid("coalesced imported column entries required"))?;
+            entries.push((*row, -a));
+        }
+        entries.sort_unstable_by_key(|&(row, _)| row);
+        if entries.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+            return Err(invalid("coalesced imported column entries required"));
+        }
+        entries.retain(|&(_, a)| a != 0.);
+        // Link rows precede base multiplicity rows; journal multiplicity rows
+        // follow in replay order. Keep the compiler's floating-point order.
+        entries.extend(rows.multiplicity.iter().map(|&row| (row, 1.)));
+        // Algebra queries may lie outside the envelope (e.g. its intercept).
+        // Acceptance, rather than reduced-cost evaluation, enforces that box.
+        Ok(Candidate {
+            cost: column.cost,
+            entries,
+        })
     }
+}
+
+struct Candidate {
+    cost: f64,
+    entries: Vec<(usize, f64)>,
 }
 
 /// Shared numerical request selection for collection drivers.
@@ -187,3 +196,7 @@ pub(super) fn next_point<const D: usize>(
         Err(error) => Err(error),
     }
 }
+
+#[cfg(test)]
+#[path = "../../../../../tests/unit/master/mp/imported/pricing/candidate_tests.rs"]
+mod candidate_tests;

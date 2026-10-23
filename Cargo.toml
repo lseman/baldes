@@ -73,6 +73,11 @@ name = "baldes"
 path = "src/bin/baldes/main.rs"
 required-features = ["clp"]
 
+[[example]]
+name = "import_pricing_bench"
+path = "examples/import_pricing_bench.rs"
+required-features = ["clp"]
+
 # API integration tests.
 
 [[test]]

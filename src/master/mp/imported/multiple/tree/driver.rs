@@ -128,7 +128,7 @@ where
             let point = if phase.restricted_violation().unwrap_or(f64::INFINITY) > 0. {
                 phase
             } else {
-                let (output, shared_rows) = match view.objective_output(configured()) {
+                let (output, registry) = match view.objective_output(configured()) {
                     Ok(output) => output,
                     Err(_) if Instant::now() >= deadline => {
                         tree.pending.push(pending);
@@ -137,9 +137,7 @@ where
                     Err(error) => return Err(error),
                 };
                 let point = super::super::super::pricing::certificate::objective_request_at_output(
-                    &view,
-                    &output,
-                    shared_rows,
+                    &view, &output, registry,
                 );
                 if let Some(certificate) = point.domain_certificate()? {
                     pending.bound = pending.bound.max(certificate.lower_bound());

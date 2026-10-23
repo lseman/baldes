@@ -117,7 +117,7 @@ pub(super) fn compile_definition<const D: usize>(
     previous: Option<&Context<D>>,
 ) -> Result<Compiled<D>> {
     super::envelope::validate(definition)?;
-    let (mut problem, mut variables, registry) = compile::model(
+    let (mut problem, mut variables, mut registry) = compile::model(
         definition.problem.clone(),
         definition.variables.clone(),
         definition.subproblems.clone(),
@@ -224,6 +224,14 @@ pub(super) fn compile_definition<const D: usize>(
                 }
                 let row = problem.rows.len();
                 problem.rows.push(Row { sense, rhs });
+                if let Restriction::Multiplicity(group, _) = restriction {
+                    registry
+                        .group_rows
+                        .get_mut(group)
+                        .unwrap()
+                        .multiplicity
+                        .push(row);
+                }
                 for id in &ids {
                     variables[indices[id]].entries.push((row, 1.));
                 }

@@ -47,7 +47,7 @@ impl<const D: usize> ColumnImport<D> {
         options: Options,
         certify: bool,
     ) -> Result<ImportPricing<D>> {
-        let (output, shared_rows) = self.objective_output(options)?;
+        let (output, registry) = self.objective_output(options)?;
         let retained_bound = if certify {
             super::certificate::retained_bound(self, &output)
         } else {
@@ -57,10 +57,10 @@ impl<const D: usize> ColumnImport<D> {
             epoch: Rc::new(()),
             context: self.context.clone(),
             definition: self.definition.clone(),
+            registry,
             position: self.position,
             duals: output.duals,
             shared_offset: output.snapshot.state.shared_offset,
-            shared_rows,
             kind: ImportPricingKind::Objective,
             violation: None,
             routing: output.routes,
@@ -72,7 +72,7 @@ impl<const D: usize> ColumnImport<D> {
     pub(in crate::master::mp::imported) fn objective_output(
         &self,
         mut options: Options,
-    ) -> Result<(Output<D>, usize)> {
+    ) -> Result<(Output<D>, Rc<Registry>)> {
         options.preprocessing.enabled = false;
         options.enumeration = None;
         options.cg.stabilize = false;
@@ -81,7 +81,7 @@ impl<const D: usize> ColumnImport<D> {
             .checked_add(options.cg.time_limit)
             .ok_or_else(|| invalid("import pricing time limit"))?;
         let compiled = lifecycle::compile_definition(&self.definition, Some(&self.context))?;
-        let shared_rows = compiled.problem.rows.len();
+        let mut registry = Rc::new(compiled.registry);
         let mut initial_options = options.clone();
         initial_options.cg.time_limit = deadline.saturating_duration_since(Instant::now());
         let mut output = solve_with_fixed_routes(
@@ -113,6 +113,7 @@ impl<const D: usize> ColumnImport<D> {
                 ));
             }
             let compiled = lifecycle::compile_definition(&self.definition, Some(&self.context))?;
+            registry = Rc::new(compiled.registry);
             options.cg.time_limit = deadline.saturating_duration_since(Instant::now());
             output = solve_with_seed_routes(
                 compiled.problem,
@@ -135,6 +136,6 @@ impl<const D: usize> ColumnImport<D> {
         if output.duals.iter().any(|x| !x.is_finite()) {
             return Err(crate::incomplete("nonfinite restricted import duals"));
         }
-        Ok((output, shared_rows))
+        Ok((output, registry))
     }
 }

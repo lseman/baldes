@@ -19,7 +19,7 @@ impl<const D: usize> ColumnImport<D> {
         options.cg.artificial_cost = 1.;
         options.cg.max_penalty_updates = 0;
         let mut compiled = lifecycle::compile_definition(&self.definition, Some(&self.context))?;
-        let shared_rows = compiled.problem.rows.len();
+        let registry = Rc::new(compiled.registry);
         for variable in &mut compiled.variables {
             variable.cost = 0.;
         }
@@ -74,10 +74,10 @@ impl<const D: usize> ColumnImport<D> {
             epoch: Rc::new(()),
             context: self.context.clone(),
             definition: self.definition.clone(),
+            registry,
             position: self.position,
             duals: output.duals,
             shared_offset: output.snapshot.state.shared_offset,
-            shared_rows,
             kind: ImportPricingKind::Feasibility,
             violation: Some(violation),
             routing: output.routes,

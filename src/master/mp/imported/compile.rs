@@ -60,10 +60,10 @@ pub(super) fn model<const D: usize>(
         }
     }
     let mut registry = Registry {
-        links: links.clone(),
         original,
         columns: BTreeMap::new(),
         groups: BTreeMap::new(),
+        group_rows: BTreeMap::new(),
     };
     let mut next = 0i64;
     for group in subproblems {
@@ -79,6 +79,15 @@ pub(super) fn model<const D: usize>(
             problem.rows.push(Row { sense, rhs });
             rows.push(row);
         }
+        let column_ids: HashSet<_> = group.columns.iter().map(|c| c.id).collect();
+        registry.group_rows.insert(
+            group.id,
+            GroupRows {
+                links: group.variables.iter().map(|id| (*id, links[id])).collect(),
+                multiplicity: rows.clone(),
+                next_column: (0..=i32::MAX).find(|id| !column_ids.contains(id)),
+            },
+        );
         let members = registry.groups.entry(group.id).or_default();
         for column in group.columns {
             while next <= i64::from(i32::MAX) && used.contains(&(next as i32)) {
