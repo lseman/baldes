@@ -20,11 +20,11 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="multi-time-windows.html">Multiple time windows</a><a href="multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html" aria-current="page">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="column-elimination.html">Column elimination</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html" aria-current="page">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/evrp.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Extensions</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="evrp-implementation-status">EVRP implementation status</h1>
@@ -158,6 +158,50 @@ same data, duals and arc bounds, with dominance enabled and disabled. Fixtures
 include heterogeneous/non-concave charging, repeated stations, and a route with
 two consecutive charging stops in both directions. Global versus bounded
 coverage and phase-one/phase-two work limits have separate checks.</p>
+<h2 id="native-physical-graph-backend">Native physical-graph backend</h2>
+<p><code>Problem::price_native(duals, fleet_dual, departure, NativeOptions::default())</code>
+uses the ordinary Baldes labeling engine. Select
+<code>EvPricingBackend::Native(NativeOptions::default())</code> in the shared EV master to
+use it in both feasibility and travel-cost phases. The reference direct and
+subpath backends remain available; the default backend is unchanged.</p>
+<p><code>Problem::native_graph(...)</code> also exposes the compiled <code>Graph&lt;3&gt;</code> for a native
+<code>pricing::Solver&lt;3&gt;</code>. The graph preserves location IDs and duplicates the depot
+at vertex <code>locations.len()</code> as the sink. Its active scalar resources track arc
+count and delivered load. Only customers receive elementarity sets, so station
+visits may repeat. A native PWL boolean state records whether a customer has
+been served; the sink requires that state to be one. Customer duals are charged
+on incoming arcs and the fleet dual is charged once on source departure.
+The delivery-only native simultaneous-load resource additionally guards load
+feasibility and dominance without scalar epsilon comparisons.</p>
+<p>The native <code>CoupledResource::Charging</code> retains earliest departure time as a
+continuous function of exact remaining energy. Travel consumes energy; service
+starts inside its window. Stations apply the full partial-charging envelope
+<code>T(x) + min_{q&lt;=x}(F(q)-T(q))</code> and require service/charging to finish by closing.
+Heterogeneous and non-concave strictly increasing curves are supported without
+an energy grid. Forward labels retain owned front pieces. Backward labels retain
+the physical suffix; joins replay that suffix on the actual forward front.
+Dominance conservatively requires equal charging fronts, and reversal reuse is
+disabled. This resource adds no objective and cannot be a numeric parent.</p>
+<p>After native pricing chooses a stop order, the existing fixed-order optimizer
+reconstructs its charging amounts and independently replays the schedule. A
+failed reconstruction reports numerical failure, never infeasibility or complete
+pricing. <code>max_front_work</code> bounds each individual frontier extension, including
+suffix replay; it is not a total pricing-work budget. <code>max_reconstruction_work</code>
+separately bounds witness reconstruction. Label limits and <code>max_arcs</code> bound the
+native search. Resource arithmetic/state failures remain unknown; the native
+engine may aggregate a nonzero frontier-budget exhaustion into numerical failure.
+The <code>work</code> statistic counts witness reconstruction work, not native front work.</p>
+<p>This adapter currently supports at most fifteen customers, reflecting native
+exact NG local memory, and at most 1023 input locations because it adds a sink.
+It uses native numerical resource/cost comparisons. <code>Complete</code> and <code>Bounded</code>
+retain their numerical coverage meanings; no directed-rounding certificate is
+provided for charging. The largest absolute reduced arc cost times <code>max_arcs</code>
+must be below <code>1e12 - 1</code>, because the native engine reserves <code>1e12</code> as a sentinel;
+unsupported scales are rejected explicitly and require rescaling cost units.
+Native cuts and restrictions can be attached to the
+exposed graph/solver; the shared EV master does not add cut separation or tree
+search. The tiny regression comparisons establish agreement on the tested
+fixtures, with no performance or large-instance scaling claim.</p>
 <h2 id="shared-route-master-and-column-generation">Shared route master and column generation</h2>
 <p><code>EvMaster&lt;M: LpMaster&gt;</code> uses Baldes's existing LP backend interface. Supply an
 empty backend, the EV problem, its initial departure time, and an optional
@@ -193,20 +237,20 @@ bound. <code>optimize</code> can be called again after a work/iteration/time lim
 the route pool and the current phase.</p>
 <p>The adapter is generic over <code>LpMaster</code>; the integration tests below use Clp.
 For example, with an existing <code>problem</code>:</p>
-<pre><code class="language-rust,ignore"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">evrp</span><span class="p">::{</span><span class="n">EvMaster</span><span class="p">,</span><span class="w"> </span><span class="n">EvColumnGenerationOptions</span><span class="p">};</span>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">evrp</span><span class="p">::{</span><span class="n">EvMaster</span><span class="p">,</span><span class="w"> </span><span class="n">EvColumnGenerationOptions</span><span class="p">};</span>
 <span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">clp</span><span class="p">::</span><span class="n">ClpMaster</span><span class="p">;</span>
 <span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">master</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">EvMaster</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">problem</span><span class="p">,</span><span class="w"> </span><span class="n">ClpMaster</span><span class="p">::</span><span class="n">new</span><span class="p">()</span><span class="o">?</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="mf">3.0</span><span class="p">))</span><span class="o">?</span><span class="p">;</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">master</span><span class="p">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">EvColumnGenerationOptions</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
 <span class="c1">// Inspect result.status before interpreting its last LP snapshot.</span>
-</code></pre>
+</code></pre></div>
 <p>LP solves receive the remaining time budget. Pricing uses its work/label limits,
 with elapsed time checked before and after the call; the wall-time setting is
 not an interrupt inside an individual pricing operation.</p>
 <h2 id="reproducible-tiny-comparisons">Reproducible tiny comparisons</h2>
 <p>Run <code>cargo run --features clp --example evrp_compare</code> for a CSV comparison of
-both backends with identical data and tolerances (<code>1e-7</code> for LP and reduced
+all three backends with identical data and tolerances (<code>1e-7</code> for LP and reduced
 cost). On the checked fixtures:</p>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Case</th>
@@ -232,7 +276,7 @@ cost). On the checked fixtures:</p>
 <td>Returned routes require partial charging and pass replay.</td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p>The test reference pool enumerates every tiny stop order and constructs charging
 schedules independently on an integer-energy grid. For these integral fixtures,
 every order with no grid witness is also checked for continuous infeasibility
@@ -259,12 +303,12 @@ workflow. It is not an integer branch-and-price solver. Cuts, branching/ng
 state, mixed fleets, tariffs, congestion, time-dependent travel, external
 benchmark parsers and large-instance performance engineering remain extensions.
 The E1 reference backend and E2-inspired prototype do not reproduce every
-acceleration from either paper. Existing scalar resource pricing is not used
-to claim nonlinear EV pricing completeness.</p>
+acceleration from either paper. The native backend uses the explicit charging-front resource; scalar resource
+pricing alone does not establish nonlinear charging feasibility.</p>
 </article>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="pstep.html"><small>Previous guide</small>P-step CVRP extension <span aria-hidden="true">↗</span></a><a href="ipm.html"><small>Next guide</small>BALDES IPM in Rust <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#fixed-stop-sequence-optimizer">Fixed stop sequence optimizer</a><a class="toc-level-2" href="#direct-bidirectional-pricing">Direct bidirectional pricing</a><a class="toc-level-2" href="#two-phase-subpath-prototype">Two-phase subpath prototype</a><a class="toc-level-2" href="#shared-route-master-and-column-generation">Shared route master and column generation</a><a class="toc-level-2" href="#reproducible-tiny-comparisons">Reproducible tiny comparisons</a><a class="toc-level-2" href="#supported-scope-and-remaining-extensions">Supported scope and remaining extensions</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#fixed-stop-sequence-optimizer">Fixed stop sequence optimizer</a><a class="toc-level-2" href="#direct-bidirectional-pricing">Direct bidirectional pricing</a><a class="toc-level-2" href="#two-phase-subpath-prototype">Two-phase subpath prototype</a><a class="toc-level-2" href="#native-physical-graph-backend">Native physical-graph backend</a><a class="toc-level-2" href="#shared-route-master-and-column-generation">Shared route master and column generation</a><a class="toc-level-2" href="#reproducible-tiny-comparisons">Reproducible tiny comparisons</a><a class="toc-level-2" href="#supported-scope-and-remaining-extensions">Supported scope and remaining extensions</a></nav></aside>
 </div>
 </body></html>

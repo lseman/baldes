@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Multi-pricing: one master, multiple pricing subproblems Documentation index With clp, master::multi_pricing::solve solves a shared root and returns an ownednode snapshot that can b">
+<meta name="description" content="Multi-pricing: one master, multiple pricing subproblems Documentation index With clp, master::mp::solve solves a shared root and returns an ownednode snapshot that can be resumed o">
 <meta name="theme-color" content="#0b0e11">
 <title>Multi-pricing: one master, multiple pricing subproblems — BALDES docs</title>
-<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/multi-pricing.html">
+<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/mp.html">
 <link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../_static/site.css">
 <link rel="stylesheet" href="../_static/docs.css">
@@ -20,16 +20,16 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="multi-time-windows.html">Multiple time windows</a><a href="multi-pricing.html" aria-current="page">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="column-elimination.html">Column elimination</a></nav></details>
-<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/multi-pricing.md">View Markdown source ↗</a>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="mp.html" aria-current="page">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/mp.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Extensions</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="multi-pricing-one-master-multiple-pricing-subproblems">Multi-pricing: one master, multiple pricing subproblems</h1>
 <p><a href="../index.html">Documentation index</a></p>
-<p>With <code>clp</code>, <code>master::multi_pricing::solve</code> solves a shared root and returns an owned
+<p>With <code>clp</code>, <code>master::mp::solve</code> solves a shared root and returns an owned
 node snapshot that can be resumed or forked. Its pricing graphs share master
 rows. Each <code>Network</code> owns a graph, a unique nonnegative ID and
 nonnegative multiplicity bounds. Rust models may use a finite lower bound and
@@ -106,7 +106,7 @@ contribution. <code>Output.fixed_routes</code> reports the fixed portion separat
 <code>Output.values</code> contains only remaining quantities.</li>
 </ul>
 <p>For example, after obtaining a coupled root:</p>
-<pre><code class="language-rust"><span class="kd">let</span><span class="w"> </span><span class="n">candidate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">root</span><span class="p">.</span><span class="n">snapshot</span><span class="p">.</span><span class="n">fractional_assignments</span><span class="p">(</span><span class="mf">1e-6</span><span class="p">)</span><span class="o">?</span><span class="p">[</span><span class="mi">0</span><span class="p">];</span>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="kd">let</span><span class="w"> </span><span class="n">candidate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">root</span><span class="p">.</span><span class="n">snapshot</span><span class="p">.</span><span class="n">fractional_assignments</span><span class="p">(</span><span class="mf">1e-6</span><span class="p">)</span><span class="o">?</span><span class="p">[</span><span class="mi">0</span><span class="p">];</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">assigned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">root</span><span class="p">.</span><span class="n">snapshot</span><span class="p">.</span><span class="n">branch_assignment</span><span class="p">(</span>
 <span class="w">    </span><span class="n">candidate</span><span class="p">.</span><span class="n">shared_row</span><span class="p">,</span><span class="w"> </span><span class="n">candidate</span><span class="p">.</span><span class="n">network</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
 <span class="p">)</span><span class="o">?</span><span class="p">;</span>
@@ -116,7 +116,7 @@ contribution. <code>Output.fixed_routes</code> reports the fixed portion separat
 <span class="kd">let</span><span class="w"> </span><span class="n">assigned_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">assigned</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">options</span><span class="p">.</span><span class="n">clone</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">excluded_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">excluded</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">options</span><span class="p">.</span><span class="n">clone</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">restored_parent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">root</span><span class="p">.</span><span class="n">snapshot</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">options</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-</code></pre>
+</code></pre></div>
 <p>Fresh roots still require an empty column registry; descendants own their warm
 metadata internally. Pass pricing options through <code>Options.pricing_options</code>.
 Scalar resource capacity is a const generic, defaulting to two; see
@@ -148,7 +148,7 @@ reductions are exact; otherwise valid inherited certificates remain available,
 but a new original-domain bound stays unknown.</p>
 <h2 id="finite-column-imports">Finite column imports</h2>
 <p>Rust callers can combine routing networks with explicitly declared finite
-original-vector column domains using <code>multi_pricing::imported::solve</code>. See
+original-vector column domains using <code>mp::imported::solve</code>. See
 <a href="column-imports.html">finite column imports</a> for coordinate links, column fixing,
 multiplicity bounds, identity mapping and complete-domain MIP.</p>
 <h2 id="independent-master-variables">Independent master variables</h2>
@@ -349,12 +349,12 @@ points retain their current behavior.</p>
 <h2 id="cli">CLI</h2>
 <p>The <code>multi-pricing</code> command accepts an explicit JSON model, rather than a Solomon
 instance. It uses Clp and supports both shared roots and the assignment tree:</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--offline<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--offline<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes
 target/debug/baldes<span class="w"> </span>multi-pricing<span class="w"> </span>examples/networks/triangle.json<span class="w"> </span>--json<span class="w"> </span>root.json
 target/debug/baldes<span class="w"> </span>multi-pricing<span class="w"> </span>examples/networks/triangle.json<span class="w"> </span>--tree<span class="w"> </span>--json<span class="w"> </span>tree.json
 <span class="c1"># JSON alone on stdout, suitable for a pipe:</span>
 target/debug/baldes<span class="w"> </span>multi-pricing<span class="w"> </span>examples/networks/triangle.json<span class="w"> </span>--tree<span class="w"> </span>--json<span class="w"> </span>-
-</code></pre>
+</code></pre></div>
 <p>The example has shared LP optimum <code>1.5</code> and integer optimum <code>2</code>. <code>--time</code>,
 <code>--iterations</code>, <code>--nodes</code>, <code>--bound-mode</code>, <code>--no-stabilization</code>,
 <code>--artificial-cost</code>, <code>--option NAME=VALUE</code>, and <code>--log-interval</code> control solves.
@@ -389,9 +389,9 @@ an independently replayed integer witness when available. Their <code>mode</code
 <p>Install the extension with Clp support (the Python build's default). The typed
 inputs use the same JSON schema as the CLI, allowing a single model to drive
 both interfaces:</p>
-<pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkProblem</span><span class="p">,</span> <span class="n">solve_networks</span>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkProblem</span><span class="p">,</span> <span class="n">solve_networks</span>
 
-<span class="n">problem</span> <span class="o">=</span> <span class="n">NetworkProblem</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;examples/networks/triangle.json&quot;</span><span class="p">)</span>
+<span class="n">problem</span> <span class="o">=</span> <span class="n">NetworkProblem</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"examples/networks/triangle.json"</span><span class="p">)</span>
 <span class="n">root</span> <span class="o">=</span> <span class="n">solve_networks</span><span class="p">(</span><span class="n">problem</span><span class="p">)</span>
 <span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">lp</span> <span class="o">==</span> <span class="mf">1.5</span>
 <span class="n">integer</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">tree</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -407,7 +407,7 @@ both interfaces:</p>
 <span class="k">assert</span> <span class="n">left</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span><span class="o">.</span><span class="n">lp</span> <span class="o">==</span> <span class="mf">2.0</span>
 <span class="k">assert</span> <span class="n">right</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span><span class="o">.</span><span class="n">lp</span> <span class="o">==</span> <span class="mf">2.0</span>
 <span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">snapshot</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span><span class="o">.</span><span class="n">lp</span> <span class="o">==</span> <span class="mf">1.5</span>
-</code></pre>
+</code></pre></div>
 <p>Models can also be constructed with <code>NetworkProblem</code>, <code>SharedRow</code>,
 <code>PricingNetwork</code>, <code>PricingArc</code> and <code>PricingResource</code> dataclasses. Use
 <code>problem.to_json()</code> to export them for the CLI. <code>NetworkResult.to_json()</code>
@@ -495,11 +495,11 @@ the private MIP model restores it from the complete universe and reapplies its
 cap before solving. The original snapshot remains unchanged. Positive integer routes are
 replayed against the original graph and original rows before an incumbent is
 published. Source masters and siblings remain unchanged after any MIP outcome.</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--offline<span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>--bin<span class="w"> </span>baldes
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--offline<span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>--bin<span class="w"> </span>baldes
 target/debug/baldes<span class="w"> </span>multi-pricing<span class="w"> </span>examples/networks/triangle.json<span class="w"> </span>--tree<span class="w"> </span>--enumerated-mip<span class="w"> </span>--json<span class="w"> </span>-
 <span class="c1"># Force enumeration to decline and normal pricing/branching to continue:</span>
 target/debug/baldes<span class="w"> </span>multi-pricing<span class="w"> </span>examples/networks/triangle.json<span class="w"> </span>--tree<span class="w"> </span>--enumerated-mip<span class="w"> </span>--enumeration-route-limit<span class="w"> </span><span class="m">5</span><span class="w"> </span>--json<span class="w"> </span>-
-</code></pre>
+</code></pre></div>
 <p><code>--enumerated-mip</code> requires <code>--tree</code> and HiGHS support; it also enables enumeration.
 <code>--enumeration-time</code>, <code>--mip-time</code> and <code>--mip-nodes</code> control per-attempt budgets.
 MIP timeout/node limits/backend failure do not authorize pricing termination.
@@ -508,16 +508,16 @@ work and fallback. Full-MIP numerical proof outcomes may close numerical-mode
 nodes; they never become certified-mode lower-bound certificates. A cutoff
 without a validated witness is not an incumbent or an infeasibility claim.</p>
 <p>Python uses the same options and reports:</p>
-<pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkProblem</span>
-<span class="n">problem</span> <span class="o">=</span> <span class="n">NetworkProblem</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;examples/networks/triangle.json&quot;</span><span class="p">)</span>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkProblem</span>
+<span class="n">problem</span> <span class="o">=</span> <span class="n">NetworkProblem</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"examples/networks/triangle.json"</span><span class="p">)</span>
 <span class="n">root</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="nb">enumerate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">enumeration_reports</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">complete</span>
 <span class="n">integer</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">snapshot</span><span class="o">.</span><span class="n">solve_enumerated_mip</span><span class="p">(</span><span class="n">time_limit</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
-<span class="k">assert</span> <span class="n">integer</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;Optimal&quot;</span> <span class="ow">and</span> <span class="n">integer</span><span class="o">.</span><span class="n">incumbent</span> <span class="o">==</span> <span class="mf">2.0</span>
+<span class="k">assert</span> <span class="n">integer</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"Optimal"</span> <span class="ow">and</span> <span class="n">integer</span><span class="o">.</span><span class="n">incumbent</span> <span class="o">==</span> <span class="mf">2.0</span>
 <span class="c1"># Or combine node enumeration and MIP with the tree:</span>
 <span class="n">tree</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">tree</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">enumerated_mip</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">assert</span> <span class="n">tree</span><span class="o">.</span><span class="n">nodes</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">tree</span><span class="o">.</span><span class="n">incumbent</span> <span class="o">==</span> <span class="mf">2.0</span>
-</code></pre>
+</code></pre></div>
 <p><code>node.solve(enumerate=True, enumeration_route_limit=..., enumeration_work_limit=..., enumeration_stored_arc_limit=..., enumeration_time_limit=...)</code> prepares a resumed
 node and returns a new snapshot. <code>solve_enumerated_mip</code> returns <code>None</code> when the
 node has not completed transfer. Its optional <code>objective_cutoff</code> filters improving
@@ -534,14 +534,14 @@ to the group in each network. The packing row must prove at most one occurrence:
 its sense is <code>eq</code> or <code>le</code>, its RHS is at most one, all original contributions are
 nonnegative, and each member arc has a coefficient of at least one. Signed
 master-variable domains must also preserve nonnegative packing contributions.</p>
-<pre><code class="language-rust,ignore"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">multi_pricing</span><span class="p">::</span><span class="n">ResourceGroupMember</span><span class="p">;</span>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">mp</span><span class="p">::</span><span class="n">ResourceGroupMember</span><span class="p">;</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">members</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="fm">vec!</span><span class="p">[</span>
 <span class="w">    </span><span class="n">ResourceGroupMember</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">network</span><span class="p">:</span><span class="w"> </span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="n">arcs</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="p">},</span>
 <span class="w">    </span><span class="n">ResourceGroupMember</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">network</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span><span class="w"> </span><span class="n">arcs</span><span class="p">:</span><span class="w"> </span><span class="nc">vec</span><span class="o">!</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="p">},</span>
 <span class="p">];</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">lower</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parent</span><span class="p">.</span><span class="n">with_resource_group_branch</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.5</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">members</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">upper</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parent</span><span class="p">.</span><span class="n">with_resource_group_branch</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.5</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">members</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-</code></pre>
+</code></pre></div>
 <p>Both children include the boundary <code>threshold - 1e-6</code>. The lower child requires
 resource usage at most that boundary; the upper child requires usage at least
 it. Disposable resources can wait to satisfy an upper window. Equality resources
@@ -567,22 +567,22 @@ path-load semantics. Call <code>parent.enumerate(&amp;limits)</code> first; the 
 applies when adding such a row after a branch. Rows on other coordinates and
 path-based additive or registered rows keep their usual workflow.</p>
 <p>Python exposes the same owned operation:</p>
-<pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkResourceGroupMember</span>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkResourceGroupMember</span>
 <span class="n">members</span> <span class="o">=</span> <span class="p">(</span><span class="n">NetworkResourceGroupMember</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)),</span>
            <span class="n">NetworkResourceGroupMember</span><span class="p">(</span><span class="mi">42</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)))</span>
 <span class="n">child</span> <span class="o">=</span> <span class="n">parent</span><span class="o">.</span><span class="n">with_resource_group_branch</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="n">members</span><span class="p">)</span>
 <span class="n">result</span> <span class="o">=</span> <span class="n">child</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">stabilize</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="n">tree</span> <span class="o">=</span> <span class="n">child</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">tree</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">stabilize</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-</code></pre>
+</code></pre></div>
 <p>For the CLI, pass a JSON array of these restrictions with
 <code>--resource-branches FILE</code>. Each object has <code>packing_row</code>, <code>resource</code>,
 <code>threshold</code>, <code>upper</code> and <code>members</code>; each member has <code>network</code> and <code>arcs</code>.
 The model is restricted before the requested root or tree solve.</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span>multi-pricing<span class="w"> </span><span class="se">\</span>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span>multi-pricing<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>examples/networks/resource_groups.json<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--resource-branches<span class="w"> </span>examples/networks/resource_group_upper.json<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--tree<span class="w"> </span>--bound-mode<span class="w"> </span>certified<span class="w"> </span>--json<span class="w"> </span>-
-</code></pre>
+</code></pre></div>
 </article>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="multi-time-windows.html"><small>Previous guide</small>Multiple time windows <span aria-hidden="true">↗</span></a><a href="column-imports.html"><small>Next guide</small>Finite column imports <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>

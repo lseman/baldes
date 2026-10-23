@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Routing feasibility recovery Documentation index · Tree lifecycle The ordinary routing root and its descendants automatically attempt phase Iwhen an exact pricing round leaves posi">
+<meta name="theme-color" content="#0b0e11">
+<title>Routing feasibility recovery — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/solver/feasibility.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="feasibility.html" aria-current="page">Routing feasibility recovery</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="stabilization.html">Dual-price stabilization</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/solver/feasibility.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> The solver</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="routing-feasibility-recovery">Routing feasibility recovery</h1>
+<p><a href="../index.html">Documentation index</a> · <a href="tree.html">Tree lifecycle</a></p>
+<p>The ordinary routing root and its descendants automatically attempt phase I
+when an exact pricing round leaves positive artificial activity after the
+configured penalty updates, or when the restricted master is primal infeasible.
+The same recovery runs through Rust, CLI and Python routing solves; it requires
+no new option. Generic CG controllers opt in through
+<code>Controller::recover_feasibility</code>; the default declines this routing-specific
+operation. External column imports retain their separate feasibility-pricing API.</p>
+<p>Phase I copies the current master, keeps its physical rows and real-column
+upper bounds, zeros real costs and the objective offset, and adds unit-cost
+violation columns for every row. It retains fixed-route RHS reductions,
+inherited cuts and branch rows. Independent pricing keeps logical exclusions
+and resource restrictions, while discarding original-cost fixing, completion
+caches and cutoff enumeration. Exact phases use unrounded arc and cut prices.</p>
+<p>Recovery does not require enumerating all physical paths. It generates columns
+under the phase-I duals and re-solves the auxiliary master. A zero-artificial
+point is checked against the real matrix and upper bounds before recovery is
+accepted. Recovered columns enter the original master with their original
+costs and current coefficients. Original artificials are then fixed to zero
+so an expensive feasible route cannot lose to a finite artificial penalty.
+The objective offset, incumbent and original route costs remain unchanged.
+Stabilization and objective convergence bookkeeping restart before ordinary
+pricing resumes.</p>
+<h2 id="outcomes-and-proof-scope">Outcomes and proof scope</h2>
+<p><code>Output::feasibility</code> records auxiliary rounds separately from original-objective
+iteration history. CLI root JSON exposes a <code>feasibility</code> list; Python returns
+a tuple of typed <code>FeasibilityReport</code> records. Each record includes status, iteration/pricing counts,
+LP work, elapsed seconds, artificial activity, an optional feasibility lower
+bound and <code>certified_infeasible</code>.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Phase-I status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>feasible</code></td>
+<td>A real feasible restricted point was recovered within the configured numerical tolerance; original-objective optimization resumes</td>
+</tr>
+<tr>
+<td><code>infeasible</code></td>
+<td>An original-domain directed proof excludes zero artificial activity</td>
+</tr>
+<tr>
+<td><code>stalled</code></td>
+<td>Pricing or proof information did not justify further recovery or infeasibility</td>
+</tr>
+<tr>
+<td><code>time_limit</code> / <code>iteration_limit</code></td>
+<td>The shared solve budget stopped recovery; accepted original-cost columns remain available for resumption</td>
+</tr>
+</tbody>
+</table></div>
+<p>Feasibility estimates concern artificial activity under the original fleet bound;
+they never become finite bounds for the original objective. Exact pricing at one
+projected dual point and a total-route bound from the original fleet row supply
+the numerical estimate. Backend infinity sentinels are not route-count proofs.
+A positive estimate schedules a directed original-domain check in both bound
+modes. Floating resource extension can reject boundary paths admitted by the
+conservative relaxation, so the numerical estimate alone cannot prove original
+infeasibility. The conservative path proof can decline unsupported models,
+arithmetic or exhausted budgets. Declining that proof leaves the result unknown.
+Positive restricted artificial activity, an LP failure, or a finite penalty
+alone never proves original infeasibility.</p>
+<p>The private operation uses the remaining node deadline and CG iteration budget.
+Limit outcomes retain valid generated columns at original costs, with no phase-I
+dual/minimum reused on a later request. Original-objective state is retained on
+failure; model installation stages edits on a private copy. Parents and siblings
+retain their own snapshots. A subsequent solve can reconstruct phase I from the
+retained original model and columns; retaining the auxiliary basis is unnecessary.</p>
+<p>A proof-qualified infeasible result closes ordinary tree nodes and strong
+branching sides. A stalled or interrupted phase I does not close a node.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="tree.html"><small>Previous guide</small>Branch-and-price tree and node lifecycle <span aria-hidden="true">↗</span></a><a href="branching.html"><small>Next guide</small>Routing branching <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#outcomes-and-proof-scope">Outcomes and proof scope</a></nav></aside>
+</div>
+</body></html>

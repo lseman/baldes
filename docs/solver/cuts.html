@@ -20,11 +20,11 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html" aria-current="page">Routing cuts</a><a href="stabilization.html">Dual-price stabilization</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="../extensions/column-elimination.html">Column elimination</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="feasibility.html">Routing feasibility recovery</a><a href="branching.html">Routing branching</a><a href="cuts.html" aria-current="page">Routing cuts</a><a href="stabilization.html">Dual-price stabilization</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/solver/cuts.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> The solver</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="routing-cuts">Routing cuts</h1>
@@ -33,7 +33,7 @@
 routes, and descendants. The root adapter installs cut rows and dual effects;
 node snapshots retain active rows and the pricing state needed to use them.</p>
 <h2 id="available-families">Available families</h2>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Family</th>
@@ -65,13 +65,13 @@ node snapshots retain active rows and the pricing state needed to use them.</p>
 <td>Strong k-path</td>
 <td>Separate route-count inequalities on customer sets</td>
 <td><code>with_kpath_cuts(config)</code> or <code>with_native_kpath_cuts(config)</code></td>
-<td>Rust API</td>
+<td><code>--cuts</code> / Rust API</td>
 </tr>
 <tr>
 <td>Route-load knapsack</td>
 <td>Separate inequalities on integer resource loads</td>
 <td><code>with_knapsack_cuts(config)</code></td>
-<td>Rust API</td>
+<td><code>--cuts</code> / Rust API</td>
 </tr>
 <tr>
 <td>Fenchel load cuts</td>
@@ -80,19 +80,19 @@ node snapshots retain active rows and the pricing state needed to use them.</p>
 <td><code>--fenchel-cuts</code> / Rust API</td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p>All routing root integrations require <code>clp</code>. HiGHS is needed only for the
 optional enumerated integer solve. Cut configuration does not enable that
 solve automatically.</p>
 <h2 id="start-with-capacity-and-rank-one-cuts">Start with capacity and rank-one cuts</h2>
-<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">25</span><span class="w"> </span>--capacity-cuts<span class="w"> </span>--rank1<span class="w"> </span>--time<span class="w"> </span><span class="m">60</span>
-</code></pre>
+</code></pre></div>
 <p>A complete Rust example:</p>
-<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span><span class="n">master</span><span class="p">::</span><span class="n">root</span><span class="p">::</span><span class="n">RootOptions</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="p">::{</span><span class="n">Instance</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">}};</span>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span><span class="n">master</span><span class="p">::</span><span class="n">root</span><span class="p">::</span><span class="n">RootOptions</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="p">::{</span><span class="n">Instance</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">}};</span>
 
 <span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">baldes</span><span class="p">::</span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Instance</span><span class="p">::</span><span class="n">read</span><span class="p">(</span><span class="s">&quot;instances/R101.txt&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Instance</span><span class="p">::</span><span class="n">read</span><span class="p">(</span><span class="s">"instances/R101.txt"</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <span class="w">    </span><span class="n">instance</span><span class="p">.</span><span class="n">truncate</span><span class="p">(</span><span class="mi">25</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">rounding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Rounding</span><span class="p">::</span><span class="nb">None</span><span class="p">;</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">capacity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">instance</span><span class="p">.</span><span class="n">capacity_cut_config</span><span class="p">(</span><span class="n">rounding</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
@@ -100,10 +100,10 @@ solve automatically.</p>
 <span class="w">        </span><span class="p">.</span><span class="n">with_capacity_cuts</span><span class="p">(</span><span class="n">capacity</span><span class="p">)</span>
 <span class="w">        </span><span class="p">.</span><span class="n">with_rank_one_cuts</span><span class="p">();</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">instance</span><span class="p">.</span><span class="n">solve_root</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="n">rounding</span><span class="p">,</span><span class="w"> </span><span class="n">options</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}: root LP={}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">master</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">master</span><span class="p">.</span><span class="n">lp</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}: root LP={}"</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">master</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">master</span><span class="p">.</span><span class="n">lp</span><span class="p">);</span>
 <span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
 <span class="p">}</span>
-</code></pre>
+</code></pre></div>
 <p>Use <code>capacity_cut_config(rounding, true)</code> to attach the instance's ready/due
 windows, service times, and travel matrix for Kohl separation. The CLI/Python
 2-path switch is for VRPTW; CVRP inputs do not supply time windows.</p>
@@ -123,6 +123,18 @@ adapters; the most recently selected one replaces the other.</p>
 those mappings explicit when registering cuts. Full-memory enumeration and
 limited-memory pricing can use different coefficient state; the adapter
 updates the master when switching modes.</p>
+<p>The Kohl subset-growth heuristic within strong k-path separation visits each
+customer subset once and has a default work budget of 10,000 unique search
+states per separation call. Set <code>KPathParameters.max_two_path_states</code>, or use
+<code>set_parameter(&quot;max_two_path_states&quot;, value)</code>, to tune it; zero skips this
+heuristic, while the other k-path separation procedures remain enabled. This
+bounds an otherwise factorial traversal of equivalent insertion orders. The
+existing set-size limit remains 15.</p>
+<p>When the budget is exhausted, the current subset can be evaluated as a
+candidate and recursion unwinds cleanly. Every candidate still passes the
+normal violation/time-feasibility checks. This is a bounded heuristic, so it
+can find fewer or different cuts than the previous exhaustive growth search;
+it does not disable a cut family or relax cut validity checks.</p>
 <h2 id="route-load-knapsack-and-resource-ids">Route-load knapsack and resource IDs</h2>
 <p><code>KnapsackCutConfig::new(rows)</code> takes integer resource rows from
 <code>cuts::knapsack::KnapsackRow</code>. Separation uses route resource loads, and
@@ -146,9 +158,9 @@ step tables. This option does not turn numerical route costs into directed
 certificates or automatically register shared-network rows. The default retains
 the existing rounded pricing convention.</p>
 <h2 id="fenchel-separation">Fenchel separation</h2>
-<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>cvrp<span class="w"> </span>instances/cvrplib/E-n22-k4.vrp<span class="w"> </span>--fenchel-cuts<span class="w"> </span>--time<span class="w"> </span><span class="m">30</span>
-</code></pre>
+</code></pre></div>
 <p>The CVRP/VRPTW switch builds an integer load row from total customer demand,
 divides demands by their greatest common divisor, and enables Fenchel alone.
 Demands must be nonnegative integers. The normalized total must not exceed

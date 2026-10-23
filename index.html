@@ -10,24 +10,25 @@
   <meta property="og:type" content="website">
   <link rel="canonical" href="https://laioseman.com/baldes/">
   <link rel="icon" href="mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=hero-routing-2">
-  <script src="app.js?v=hero-routing-2" defer></script>
+  <link rel="stylesheet" href="style.css?v=routing-2d-2">
+  <script src="app.js?v=routing-2d-2" defer></script>
   <title>BALDES — Go beyond the shortest path</title>
 </head>
 <body class="landing-dark">
   <a class="skip-link" href="#content">Skip to content</a>
   <header class="site-header">
     <a class="brand" href="./" aria-label="BALDES home"><img src="mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
-    <nav aria-label="Main"><a href="#engine">The engine</a><a href="docs/">Documentation</a><a class="nav-source" href="https://github.com/lseman/baldes">GitHub <span aria-hidden="true">↗</span></a></nav>
+    <nav aria-label="Main"><a href="#quickstart">Get started</a><a href="#engine">The engine</a><a href="docs/">Documentation</a><a class="nav-source" href="https://github.com/lseman/baldes">GitHub <span aria-hidden="true">↗</span></a></nav>
   </header>
   <main id="content" tabindex="-1">
-    <section class="hero section-wrap" aria-labelledby="hero-title">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-main section-wrap">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> OPEN SOURCE · VEHICLE ROUTING · RUST</p>
-        <h1 id="hero-title">Go beyond<br>the <em>shortest path.</em></h1>
-        <p class="hero-description">A toolkit for the hard parts of vehicle routing. Bucket-graph labeling, column generation, and branch-and-price—built in Rust, with the algorithms in reach.</p>
-        <div class="hero-actions"><a class="button button-dark" href="docs/">Explore the docs <span aria-hidden="true">↗</span></a><a class="text-link" href="#quickstart">Build your first solve <span aria-hidden="true">↓</span></a></div>
-        <div class="hero-footnote"><span>Rust core</span><span>Clp master LP</span><span>Optional HiGHS MIP</span></div>
+        <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> OPEN SOURCE / ROUTING OPTIMIZATION</p>
+        <h1 id="hero-title">Hard routing.<br><em>Open possibilities.</em></h1>
+        <p class="hero-description">From your first Python model to branch-and-price in Rust. Build with bucket-graph pricing, strengthen bounds with cuts, and keep the algorithms within reach.</p>
+        <div class="hero-actions"><a class="button button-dark" href="#quickstart">Start building <span aria-hidden="true">↗</span></a><a class="text-link" href="docs/">Explore the docs <span aria-hidden="true">↓</span></a></div>
+        <div class="hero-footnote"><span>Rust performance</span><span>Python interface</span><span>MIT licensed</span></div>
       </div>
       <figure class="route-card" aria-labelledby="route-title">
         <div class="route-card-header"><div><p class="eyebrow">A ROUTING SANDBOX</p><h2 id="route-title">One depot. Many possibilities.</h2></div><span class="figure-index" aria-hidden="true">FIG. 01</span></div>
@@ -47,11 +48,55 @@
         <figcaption id="route-caption"><span id="route-summary" role="status">3 routes · 10 customers · unit demand</span><span>Illustration only; routes are grouped, not optimized by BALDES.</span></figcaption>
         <noscript><p class="notice">Enable JavaScript to change the capacity in this illustration.</p></noscript>
       </figure>
+      </div>
+      <div class="hero-footer"><div class="capability-strip section-wrap" aria-label="Core capabilities"><span>VRPTW &amp; CVRP</span><span>Bidirectional pricing</span><span>Limited-memory cuts</span><span>Node inheritance</span><span>Rust &amp; Python APIs</span></div></div>
       <a class="hero-scroll" href="#engine" aria-label="Scroll to explore the engine"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 4v16m-6-6 6 6 6-6"/></svg></a>
     </section>
-    <div class="capability-strip section-wrap" aria-label="Core capabilities"><span>VRPTW &amp; CVRP</span><span>Bidirectional pricing</span><span>Limited-memory cuts</span><span>Node inheritance</span><span>Rust &amp; Python APIs</span></div>
+    <section id="quickstart" class="start-section" aria-labelledby="start-title">
+      <div class="section-wrap">
+        <div class="section-heading heading-row"><div><p class="eyebrow">01 / YOUR FIRST SOLVE</p><h2 id="start-title">Less setup.<br>More possibilities.</h2></div><p>Choose your interface. The same Rust engine powers the CLI and Python root solver.</p></div>
+        <div class="setup-strip"><div><span class="setup-number">01</span><h3>Get the source.</h3><p>Clone once, with the bundled Clp sources.</p></div><pre><code class="language-bash">git<span class="w"> </span>clone<span class="w"> </span>--recurse-submodules<span class="w"> </span>https://github.com/lseman/baldes.git
+<span class="nb">cd</span><span class="w"> </span>baldes</code></pre></div>
+        <div class="install-grid">
+          <article class="install-card"><div class="install-card-heading"><span class="language-badge">Rs</span><div><h3>Install with Cargo</h3><p>The solver, in your terminal.</p></div><span class="setup-number">02</span></div>
+            <pre><code class="language-bash">cargo<span class="w"> </span>install<span class="w"> </span>--path<span class="w"> </span>.<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--locked
+baldes<span class="w"> </span>--help</code></pre>
+            <p class="install-note">From the checkout above. Requires Rust/Cargo and a C++14 compiler. Cargo installs <code>baldes</code> into its binary directory; add it to your <code>PATH</code> if needed.</p>
+            <a class="text-link" href="docs/guides/build.html">Build options &amp; native backends <span aria-hidden="true">↗</span></a>
+          </article>
+          <article class="install-card"><div class="install-card-heading"><span class="language-badge python-badge">Py</span><div><h3>Install for Python</h3><p>Your data. A Rust-backed solve.</p></div><span class="setup-number">02</span></div>
+            <pre><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
+<span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.</code></pre>
+            <p class="install-note">From the same checkout, with Python 3.9+, Rust/Cargo and a C++14 compiler. The source build includes Clp. Activation shown for Linux/macOS shells.</p>
+            <a class="text-link" href="docs/guides/python.html">Python installation &amp; API <span aria-hidden="true">↗</span></a>
+          </article>
+        </div>
+        <div class="example-grid">
+          <div class="example-copy"><p class="eyebrow">03 / PUT IT TO WORK</p><h3>A small model.<br>A real starting point.</h3><p>Define a depot, add customers, and solve a capacitated routing root relaxation. No instance file required.</p><ul class="example-features"><li>Model directly with Python objects</li><li>Inspect bounds, duals, and route columns</li><li>Export results as a dictionary or JSON</li></ul><p class="install-note">Python returns an LP relaxation; routes may have fractional values. Use the CLI or Rust for integer tree search.</p><a class="text-link" href="docs/guides/python.html">Explore the Python API <span aria-hidden="true">↗</span></a></div>
+          <div class="terminal"><div class="terminal-bar"><span class="file-dot" aria-hidden="true"></span><span>first_route.py</span><span class="terminal-language">PYTHON</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Customer</span><span class="p">,</span> <span class="n">Instance</span>
+
+<span class="c1"># Depot first, then customers with unit demand.</span>
+<span class="n">instance</span> <span class="o">=</span> <span class="n">Instance</span><span class="p">(</span><span class="s2">&quot;first-route&quot;</span><span class="p">,</span> <span class="n">capacity</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">customers</span><span class="o">=</span><span class="p">[</span>
+    <span class="n">Customer</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+    <span class="n">Customer</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">demand</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="n">Customer</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">demand</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+<span class="p">])</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span>
+    <span class="n">problem_type</span><span class="o">=</span><span class="s2">&quot;cvrp&quot;</span><span class="p">,</span>
+    <span class="n">capacity_cuts</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">lp</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">route</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">routes</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">route</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">route</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span></code></pre></div>
+        </div>
+        <details class="more-start"><summary>Working with files or building a Rust application?</summary><div class="install-grid"><div><h3>Solve a Solomon instance</h3><p>Run from the checkout after installing the CLI.</p><pre><code class="language-bash">baldes<span class="w"> </span>vrptw<span class="w"> </span>instances/Solomon/R101.txt<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span>--rank1<span class="w"> </span>--tree<span class="w"> </span>--time<span class="w"> </span><span class="m">60</span></code></pre></div><div><h3>Add the Rust library</h3><p>From your own Cargo project, use a path to the cloned source.</p><pre><code class="language-bash">cargo<span class="w"> </span>add<span class="w"> </span>baldes<span class="w"> </span>--path<span class="w"> </span>../baldes<span class="w"> </span>--features<span class="w"> </span>clp</code></pre><a class="text-link" href="docs/#rust-module-organization">Rust module guide <span aria-hidden="true">↗</span></a></div></div></details>
+      </div>
+    </section>
     <section id="engine" class="section-wrap section-space" aria-labelledby="engine-title">
-      <div class="section-heading"><p class="eyebrow">01 / INSIDE THE ENGINE</p><h2 id="engine-title">From promising paths<br>to a stronger bound.</h2><p>Work with one component, or connect the full routing pipeline. The Rust core uses the standard library; native backends power the master solves.</p></div>
+      <div class="section-heading"><p class="eyebrow">02 / INSIDE THE ENGINE</p><h2 id="engine-title">From promising paths<br>to a stronger bound.</h2><p>Work with one component, or connect the full routing pipeline. The Rust core uses the standard library; native backends power the master solves.</p></div>
       <div class="engine-grid">
         <article class="engine-card"><span class="step-number">01</span><div class="mini-buckets" aria-hidden="true"><span>•••</span><span>••</span><span>•</span><span>••</span></div><h3>Price the paths.</h3><p>Bucket graphs organize resource-constrained labels. Forward and backward searches meet, while dominance removes paths that cannot help.</p><a class="text-link" href="docs/reference/algorithms.html#solver-components">Explore pricing <span aria-hidden="true">↗</span></a></article>
         <article class="engine-card"><span class="step-number">02</span><svg class="mini-plot" viewBox="0 0 180 46" aria-hidden="true"><path class="plot-area" d="M0 42 30 35 55 35 85 20 115 20 140 8 180 8V46H0Z"/><path d="M0 42 30 35 55 35 85 20 115 20 140 8 180 8"/></svg><h3>Tighten the model.</h3><p>Rank-one, capacity, strong k-path, and load-knapsack cuts strengthen the relaxation, with their dual effects carried into pricing.</p><a class="text-link" href="docs/solver/cuts.html">Meet the cut families <span aria-hidden="true">↗</span></a></article>
@@ -59,28 +104,6 @@
       </div>
       <a class="feature-note" href="docs/solver/enumerated-mip.html"><span class="note-symbol" aria-hidden="true">+</span><span><strong>Few routes left?</strong> Send a complete enumerated node master to HiGHS, preserving its branches and cuts.</span><span aria-hidden="true">↗</span></a>
     </section>
-    <section id="quickstart" class="start-section" aria-labelledby="start-title"><div class="section-wrap start-grid">
-      <div class="section-heading"><p class="eyebrow">02 / MAKE IT RUN</p><h2 id="start-title">Your next route<br>starts here.</h2><p>Build the routing CLI, try a Solomon instance, then explore the model one piece at a time.</p><a class="text-link" href="docs/guides/build.html">Build requirements &amp; configuration <span aria-hidden="true">↗</span></a><p class="small-copy">The Clp build needs a C++14 compiler. HiGHS is optional. Python exposes root relaxations and pricing; use Rust or the CLI for the tree.</p></div>
-      <div class="terminal"><div class="terminal-bar"><span class="terminal-lights" aria-hidden="true">● ● ●</span><span>GETTING STARTED / TERMINAL</span></div>
-        <pre><code class="language-bash"><span class="nf">git</span><span class="w"> </span>clone<span class="w"> </span><span class="na">--recurse-submodules</span><span class="w"> </span>https://github.com/lseman/baldes.git
-<span class="nf">cd</span><span class="w"> </span>baldes
-<span class="nf">cargo</span><span class="w"> </span>build<span class="w"> </span><span class="na">--release</span><span class="w"> </span><span class="na">--features</span><span class="w"> </span>clp
-
-<span class="c1"># A small routing tree with rank-one cuts</span>
-<span class="nf">./target/release/baldes</span><span class="w"> </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="na">--customers</span><span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="na">--rank1</span><span class="w"> </span><span class="na">--tree</span><span class="w"> </span><span class="na">--time</span><span class="w"> </span><span class="m">60</span></code></pre>
-        <details><summary>Use Python for a root relaxation</summary><pre><code class="language-bash"><span class="nf">python</span><span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.</code></pre><pre><code class="language-python"><span class="kn">import</span><span class="w"> </span><span class="nn">pybaldes</span>
-
-<span class="n">result</span> <span class="o">=</span> <span class="n">pybaldes</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span>
-    <span class="s2">&quot;instances/R101.txt&quot;</span><span class="p">,</span> <span class="n">customers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-    <span class="n">capacity_cuts</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">rank_one_cuts</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">lp</span><span class="p">)</span></code></pre></details>
-        <details><summary>Add HiGHS for enumerated node MIP</summary><p>Install a HiGHS shared library with 32-bit <code>HighsInt</code>, then build both backends.</p><pre><code class="language-bash"><span class="nf">cargo</span><span class="w"> </span>build<span class="w"> </span><span class="na">--release</span><span class="w"> </span><span class="na">--features</span><span class="w"> </span>clp,highs
-<span class="nf">./target/release/baldes</span><span class="w"> </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="na">--customers</span><span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="na">--tree</span><span class="w"> </span><span class="na">--enumerated-mip</span><span class="w"> </span><span class="na">--time</span><span class="w"> </span><span class="m">60</span></code></pre></details>
-      </div>
-    </div></section>
     <section class="section-wrap section-space" aria-labelledby="guides-title"><div class="section-heading heading-row"><div><p class="eyebrow">03 / OPEN THE NOTEBOOK</p><h2 id="guides-title">Understand what<br>the solver is doing.</h2></div><a class="text-link" href="docs/">All documentation <span aria-hidden="true">↗</span></a></div>
       <div class="guide-grid"><a class="guide-card" href="docs/solver/branching.html"><span class="eyebrow">MODELING</span><h3>A branch is a decision.</h3><p>Ryan–Foster, vehicle counts, arc flow, and what network assignment really requires.</p><span class="guide-arrow" aria-hidden="true">↗</span></a><a class="guide-card" href="docs/solver/stabilization.html"><span class="eyebrow">ALGORITHMS</span><h3>Keep duals moving.</h3><p>Follow smoothing weights, center updates, and the retry back to raw master duals.</p><span class="guide-arrow" aria-hidden="true">↗</span></a><a class="guide-card" href="docs/reference/options.html"><span class="eyebrow">REFERENCE</span><h3>Know your controls.</h3><p>Supported BALDES options, their defaults, and where each control applies.</p><span class="guide-arrow" aria-hidden="true">↗</span></a></div>
     </section>

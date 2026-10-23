@@ -20,11 +20,11 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="multi-time-windows.html">Multiple time windows</a><a href="multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html" aria-current="page">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="column-elimination.html">Column elimination</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html" aria-current="page">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/pstep.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Extensions</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="p-step-cvrp-extension">P-step CVRP extension</h1>
@@ -34,10 +34,10 @@ Proposition 1 of <a href="https://repub.eur.nl/pub/123411/EI-2020-01.pdf">A p-st
 Problem, Dollevoet, Munari and Spliet</a>.</p>
 <p>The extension is available without Cargo features. Solving requires an
 implementation of Baldes's <code>LpMaster</code>, such as Clp (<code>--features clp</code>).</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes
 ./target/release/baldes<span class="w"> </span>pstep<span class="w"> </span>instances/cvrplib/P-n16-k8.vrp<span class="w"> </span>--p<span class="w"> </span><span class="m">2</span><span class="w"> </span>--threads<span class="w"> </span><span class="m">4</span>
 ./target/release/baldes<span class="w"> </span>pstep<span class="w"> </span>instances/cvrplib/P-n16-k8.vrp<span class="w"> </span>--p<span class="w"> </span><span class="m">3</span><span class="w"> </span>--threads<span class="w"> </span><span class="m">4</span><span class="w"> </span>--enumerate<span class="w"> </span>--json<span class="w"> </span>pstep.json
-</code></pre>
+</code></pre></div>
 <p>Use <code>baldes pstep --help</code> for time, iteration and label limits. <code>--enumerate</code>
 checks the bound against the complete column pool; use it on small cases.
 The JSON separates a converged full-model <code>lp_bound</code> from a potentially
@@ -67,7 +67,7 @@ prior demand for depot ends, and both extremes for internal paths. Coincident
 extremes are stored once. A junction customer's demand belongs to both adjacent
 paths; the load coefficients account for this overlap.</p>
 <p><code>Formulation::entries</code> exposes sparse columns in this row order:</p>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Rows</th>
@@ -92,7 +92,7 @@ paths; the load coefficients account for this overlap.</p>
 <td><code>&gt;= 0</code></td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p><code>Formulation::into_master</code> populates an empty LP backend with nonnegative
 continuous columns. Solve through the backend's status and time-limit API.
 An optimal solve gives the full p-step LP bound to solver tolerance. At <code>p=1</code>
@@ -153,9 +153,10 @@ optimization of this compact model, impose binary aggregate <strong>arc flows</s
 in equations (7)–(9); making extreme p-step columns binary is not equivalent.
 The exposed paths and coefficients provide the data needed for a separate
 arc-flow integrality implementation.</p>
-<p>Run <code>node scripts/benchmark_pstep.mjs ./target/release/baldes</code> from the repository
+<p>Run <code>node scripts/benchmarks/benchmark_pstep.mjs ./target/release/baldes</code> from the repository
 root to repeat the known-instance validation and serial/parallel timing checks.
-It writes raw JSON and CSV records under <code>results/pstep-20261020/</code> and compares
+It writes raw JSON and CSV records under <code>results/pstep/</code> (override with
+<code>PSTEP_OUT</code>) and compares
 every bound with full column enumeration.</p>
 <p>Add <code>--grid</code> to run p=2,3,4 on all three bundled CVRPLIB instances, with four
 workers, 120 seconds per solve and five million labels per endpoint job. Grid
@@ -165,7 +166,7 @@ limit. Pricing stops are recorded explicitly, without a claimed LP bound.</p>
 <p>The validation runs gave these numerical bounds (four workers, development
 profile). The normal CVRP column uses default root NG-route pricing; the integer
 values were obtained separately with the normal tree solver.</p>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Instance</th>
@@ -202,14 +203,14 @@ values were obtained separately with the normal tree solver.</p>
 <td style="text-align:right">784</td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p>The A-n32-k5 p=4 run stopped at 120 seconds without a full LP bound. The other
 eight cases converged; six also matched complete-column enumeration within
 1e-5. The A-n32-k5 integer solve used capacity cuts, rank-one cuts and a
 one-second HGS warm start before closing the gap at 784.</p>
-<p>Compare backends with <code>node scripts/benchmark_pstep_pricing.mjs</code>. It alternates
+<p>Compare backends with <code>node scripts/benchmarks/benchmark_pstep_pricing.mjs</code>. It alternates
 backend order over three repetitions, checks converged bounds agree, and writes
-raw JSON and CSV to <code>results/pstep-pricing-20261021/</code>. Set <code>PSTEP_RUNS</code>,
+raw JSON and CSV to <code>results/pstep-pricing/</code> (or the second positional argument). Set <code>PSTEP_RUNS</code>,
 <code>PSTEP_SECONDS</code>, or <code>PSTEP_THREADS</code> to change repetitions, per-solve limits,
 or worker count. An optional binary path and output directory are accepted.</p>
 <p>The 2026-10-21 release comparison used an AMD Ryzen 9 9950X, four workers,
@@ -218,7 +219,7 @@ million labels/extensions per job. The binary was built with
 <code>cargo build --release --features clp --bin baldes</code> (opt-level 3, thin LTO).
 These are end-to-end solve medians, including the LP; they are local timings,
 not a guarantee for larger or different instances.</p>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Instance</th>
@@ -283,7 +284,7 @@ not a guarantee for larger or different instances.</p>
 <td style="text-align:right">2.47</td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p>The initial run used a 15-second limit; the extended run allowed 20 seconds.
 E-n22 p=4 needed the extended limit. Converged backend bounds agreed within
 1e-5. Enumeration also converged for A-n32 p=4 at 691.463021739; this is a

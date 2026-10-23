@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="DeLuxing column fixing BALDES provides an opt-in Rust implementation of deep Lagrangian underestimatefixing, following the algorithm in RouteOpt&#x27;s packages/deluxing reference.It fi">
+<meta name="theme-color" content="#0b0e11">
+<title>DeLuxing column fixing — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/solver/deluxing.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="feasibility.html">Routing feasibility recovery</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="stabilization.html">Dual-price stabilization</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="deluxing.html" aria-current="page">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/solver/deluxing.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> The solver</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="deluxing-column-fixing">DeLuxing column fixing</h1>
+<p>BALDES provides an opt-in Rust implementation of deep Lagrangian underestimate
+fixing, following the algorithm in RouteOpt's <code>packages/deluxing</code> reference.
+It filters a <strong>complete enumerated integer column pool</strong> before a MIP solve.
+Do not use these fixes to certify an incomplete restricted master: later
+pricing could introduce columns that invalidate the bounds.</p>
+<p>The procedure first solves the full LP and fixes columns by reduced cost.
+It divides surviving columns at half the incumbent gap, clusters the vectors
+<code>rhs - column</code>, and solves auxiliary LPs over the low reduced-cost columns.
+Each cluster supplies a new RHS; successful fixing rounds supply subsequent
+RHS vectors. Small pools use deterministic Lloyd clustering; larger pools use
+norm quantiles. Seeds and deletion trajectories can differ from RouteOpt.</p>
+<p>The Rust implementation accounts for row senses, finite upper bounds, integer
+multiplicities and objective offsets. It projects row multipliers onto their
+valid sign cone and corrects negative reduced costs using column bounds. An
+improving integer solution can use at most one column above the half-gap
+threshold, which supplies the stronger bound in the auxiliary rounds. Fixing
+requires a bound strictly greater than the cutoff plus a safety tolerance.</p>
+<h2 id="rust-api">Rust API</h2>
+<p>With <code>highs</code> enabled, call
+<code>master::solvers::highs::solve_integer_with_deluxing</code> on a complete matrix in
+which <strong>every column is integer</strong>:</p>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">deluxing</span><span class="p">::</span><span class="n">DeluxingOptions</span><span class="p">;</span>
+<span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">solvers</span><span class="p">::{</span><span class="n">highs</span><span class="p">,</span><span class="w"> </span><span class="n">mip</span><span class="p">::</span><span class="n">MipOptions</span><span class="p">};</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MipOptions</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">objective_cutoff</span><span class="p">:</span><span class="w"> </span><span class="nc">incumbent</span><span class="p">,</span>
+<span class="w">    </span><span class="o">..</span><span class="nb">Default</span><span class="p">::</span><span class="n">default</span><span class="p">()</span>
+<span class="p">};</span>
+<span class="kd">let</span><span class="w"> </span><span class="p">(</span><span class="n">mip</span><span class="p">,</span><span class="w"> </span><span class="n">fixing</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">highs</span><span class="p">::</span><span class="n">solve_integer_with_deluxing</span><span class="p">(</span>
+<span class="w">    </span><span class="o">&amp;</span><span class="n">complete_master</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">options</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">DeluxingOptions</span><span class="p">::</span><span class="n">default</span><span class="p">(),</span>
+<span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="fm">println!</span><span class="p">(</span><span class="s">"fixed {} columns"</span><span class="p">,</span><span class="w"> </span><span class="n">fixing</span><span class="p">.</span><span class="n">fixed_columns</span><span class="p">.</span><span class="n">len</span><span class="p">());</span>
+</code></pre></div>
+<p>Routing snapshots expose
+<code>node.solve_enumerated_mip_with_deluxing(&amp;options, &amp;fixing_options)</code> with
+<code>clp,highs</code> enabled. This reconstructs the complete enumerated matrix, including
+branch rows and full-memory cut coefficients, before filtering. Existing
+<code>solve_enumerated_mip</code> calls retain their behavior. In Rust tree search, set
+<code>TreeOptions.deluxing</code> and <code>TreeOptions.enumerated_mip</code> to enable filtering.
+The CLI enables both with <code>--deluxing</code>:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>--<span class="w"> </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--tree<span class="w"> </span>--deluxing
+</code></pre></div>
+<p><code>--deluxing</code> requires <code>--tree</code> and the <code>highs</code> build feature, and conflicts with
+<code>--no-enumeration</code>. Filtering runs when a finite incumbent/cutoff is available;
+otherwise the enumerated MIP runs directly to find a first witness. Python and
+shared masters with continuous static variables do not expose this option.</p>
+<p>The cutoff must be finite and includes fixed-route objective contributions.
+It is an objective threshold; the API does not presume a feasible incumbent.
+After filtering, infeasibility means <code>ObjectiveCutoff</code> and the reported bound
+is capped at the cutoff. It does not prove infeasibility above the cutoff.
+Solutions retain the source column order. The live source model, solution,
+basis and enumeration pool are untouched.</p>
+<p>For another backend, <code>master::deluxing::filter</code> accepts an <code>LpMaster</code> source and
+an empty-model factory. It returns sorted original column indices without
+applying changes. Its caller must guarantee integrality and completeness.
+A time limit or nonoptimal LP stops filtering and retains only fixes already
+certified. The MIP wrapper subtracts preprocessing time from the MIP budget.
+Clustering checks the budget between iterations and points. Allocations,
+matrix construction and native model edits can overshoot the time limit.</p>
+<p>Defaults are 10 clusters, Lloyd clustering up to 10,000 columns, deep rounds
+while more than 10 columns are fixed per round, 30 seconds, and an absolute
+fixing margin of <code>1e-6</code>. No speedup or reduction ratio is assumed; benchmark on
+the intended enumerated route pools before enabling it in a search policy.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="../benchmarks/root.html"><small>Previous guide</small>Root benchmarks <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#rust-api">Rust API</a></nav></aside>
+</div>
+</body></html>

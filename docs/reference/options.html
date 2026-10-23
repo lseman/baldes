@@ -20,11 +20,11 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="algorithms.html">Algorithms and references</a><a href="options.html" aria-current="page">BALDES pricing options</a><a href="resources.html">Scalar resources</a><a href="simd.html">SIMD dispatch</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="../extensions/column-elimination.html">Column elimination</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="algorithms.html">Algorithms and references</a><a href="options.html" aria-current="page">BALDES pricing options</a><a href="resources.html">Scalar resources</a><a href="simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/reference/options.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Reference</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="baldes-pricing-options">BALDES pricing options</h1>
@@ -66,7 +66,7 @@ installs its own heuristic column schedule, while <code>price_phase</code> uses 
 configured per-iteration limit. Knapsack root overrides currently apply when
 constructing that separator; changing them in an inherited node does not
 reconfigure its existing separator.</p>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Option</th>
@@ -311,14 +311,14 @@ reconfigure its existing separator.</p>
 <td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/universe.rs">src/pricing/universe.rs</a></td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p><code>BALDEShardTimeThresholdInPricing</code> is measured in seconds. Pricing uses fifty
 times this threshold before a rollback point is saved and the threshold itself
 afterward. The explicit <code>Controls::time_limit</code> remains a cap in either case.
 Zero disallows a labeling sweep; cached inspection can complete without one.
 Raw variable-cost validation shares the effective budget with cached pricing.</p>
 <p>The two additional consumers with <code>clp,highs</code> are:</p>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Option</th>
@@ -341,34 +341,34 @@ Raw variable-cost validation shares the effective budget with cached pricing.</p
 <td>End-of-node route-count gate, raised to at least the normal threshold; requires complete enumeration and opt-in HiGHS solving</td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p>These appear in the public option list only when both <code>clp</code> and <code>highs</code> are
 enabled. They apply to opt-in tree MIP solving; see
 <a href="../solver/enumerated-mip.html">enumerated integer solving</a>.</p>
 <h2 id="examples-and-verification">Examples and verification</h2>
 <p>Rust exposes metadata independently of constructing a graph:</p>
-<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span><span class="n">core</span><span class="p">::</span><span class="n">options</span><span class="p">::</span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">pricing</span><span class="p">::</span><span class="n">Solver</span><span class="p">};</span>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span><span class="n">core</span><span class="p">::</span><span class="n">options</span><span class="p">::</span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">pricing</span><span class="p">::</span><span class="n">Solver</span><span class="p">};</span>
 
 <span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">baldes</span><span class="p">::</span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">::</span><span class="n">support</span><span class="p">(</span><span class="s">&quot;BALDESlabelDominanceStrategy&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">::</span><span class="n">support</span><span class="p">(</span><span class="s">"BALDESlabelDominanceStrategy"</span><span class="p">)</span><span class="o">?</span><span class="p">);</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Solver</span><span class="p">::</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-<span class="w">    </span><span class="n">solver</span><span class="p">.</span><span class="n">set_option</span><span class="p">(</span><span class="s">&quot;BALDESlabelDominanceStrategy&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">solver</span><span class="p">.</span><span class="n">set_option</span><span class="p">(</span><span class="s">"BALDESlabelDominanceStrategy"</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
 <span class="p">}</span>
-</code></pre>
+</code></pre></div>
 <p>Python exposes the same support query and runtime setter:</p>
-<pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Solver</span>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Solver</span>
 
 <span class="n">names</span> <span class="o">=</span> <span class="n">Solver</span><span class="o">.</span><span class="n">option_names</span><span class="p">()</span>
-<span class="n">implemented</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="n">Solver</span><span class="o">.</span><span class="n">option_support</span><span class="p">(</span><span class="s2">&quot;BALDESlabelDominanceStrategy&quot;</span><span class="p">)</span>
+<span class="n">implemented</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="n">Solver</span><span class="o">.</span><span class="n">option_support</span><span class="p">(</span><span class="s2">"BALDESlabelDominanceStrategy"</span><span class="p">)</span>
 <span class="n">solver</span> <span class="o">=</span> <span class="n">Solver</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-<span class="n">solver</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s2">&quot;BALDESlabelDominanceStrategy&quot;</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
-</code></pre>
+<span class="n">solver</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s2">"BALDESlabelDominanceStrategy"</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+</code></pre></div>
 <p>CLI overrides are repeatable:</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--option<span class="w"> </span><span class="nv">BALDESlabelDominanceStrategy</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>--time<span class="w"> </span><span class="m">60</span>
-</code></pre>
+</code></pre></div>
 <p><a href="https://github.com/lseman/baldes/blob/main/src/core/options.rs"><code>OPTION_TABLE</code></a> is the source of truth for names,
 types, defaults, and feature-dependent support. It lists only controls supported
 in the current build.
@@ -377,9 +377,9 @@ require integral values. Live setters also validate operation-specific modes
 and limits before changing solver state.</p>
 <h2 id="hgs-initial-columns-and-master-backends">HGS initial columns and master backends</h2>
 <p>Run HGS for a separate, positive search budget before solving the root or tree:</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>cvrp<span class="w"> </span>instances/cvrplib/E-n22-k4.vrp<span class="w"> </span>--hgs-time<span class="w"> </span><span class="m">10</span><span class="w"> </span>--hgs-columns<span class="w"> </span>all<span class="w"> </span>--tree
-</code></pre>
+</code></pre></div>
 <p><code>--hgs-columns best</code> (default) inserts routes from the best feasible HGS solution.
 <code>all</code> retains distinct routes seen during population insertion, including those
 later discarded or lost at a restart. A positive integer such as
@@ -391,9 +391,8 @@ If fewer routes are available, all available routes are inserted. This ranking
 uses route cost, not reduced cost or whole-solution quality. Every candidate
 is replayed against the actual graph, using its resource bounds and arc costs;
 HGS's integer demands do not establish original-model feasibility. HGS uses the
-instance's distance convention, with full-precision unrounded distances for
-Solomon instances by default. <code>--rounding tenth</code> explicitly enables truncated
-tenths in both HGS and the target graph; <code>--rounding none</code> keeps unrounded
+CLI's rounding mode, which defaults to truncated tenths (<code>--rounding tenth</code>)
+in both HGS and the target graph; <code>--rounding none</code> keeps unrounded
 distances. Explicit distance matrices retain their supplied precision. A complete best plan
 supplies an incumbent only after original-model validation. <code>--seed</code> controls
 the random seed. HGS runs before the solver's <code>--time</code> budget starts; its search
@@ -426,9 +425,9 @@ branching retain accurate solves. The requested tolerance is available as
 restricted master; the stored-interior-iterate warm starts in Section 3.4 and
 early cut generation in Algorithm 2 are not implemented by this option.</p>
 <p>Select HiGHS for restricted-master LP solves with <code>--master highs</code>:</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,highs
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,highs
 ./target/release/baldes<span class="w"> </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">25</span><span class="w"> </span>--master<span class="w"> </span>highs<span class="w"> </span>--log
-</code></pre>
+</code></pre></div>
 <p>HiGHS preserves the requested stabilization setting; use <code>--no-stabilization</code>
 to turn it off. The native HiGHS instance persists across LP solves. Row/column
 insertion, cost and coefficient edits, RHS/bound changes, and cleanup update
@@ -461,25 +460,28 @@ before passing those options to <code>root::solve</code> or <code>TreeOptions::r
 The returned summary reports inserted/rejected columns and any validated
 incumbent. Existing initial columns are retained and duplicates are skipped.</p>
 <p>Python exposes the same root options:</p>
-<pre><code class="language-python"><span class="n">result</span> <span class="o">=</span> <span class="n">pybaldes</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span>
-    <span class="s2">&quot;instances/cvrplib/E-n22-k4.vrp&quot;</span><span class="p">,</span> <span class="n">problem_type</span><span class="o">=</span><span class="s2">&quot;cvrp&quot;</span><span class="p">,</span>
-    <span class="n">hgs_time</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span> <span class="n">hgs_columns</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">hgs_seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">master_solver</span><span class="o">=</span><span class="s2">&quot;ipm&quot;</span><span class="p">,</span>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="n">result</span> <span class="o">=</span> <span class="n">pybaldes</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span>
+    <span class="s2">"instances/cvrplib/E-n22-k4.vrp"</span><span class="p">,</span> <span class="n">problem_type</span><span class="o">=</span><span class="s2">"cvrp"</span><span class="p">,</span>
+    <span class="n">hgs_time</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span> <span class="n">hgs_columns</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">hgs_seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">master_solver</span><span class="o">=</span><span class="s2">"ipm"</span><span class="p">,</span>
 <span class="p">)</span>
-</code></pre>
+</code></pre></div>
 <h2 id="terminal-progress">Terminal progress</h2>
 <p>Routing solves are quiet by default. <code>--verbose</code>, <code>-v</code>, or <code>--log</code> enables an
 aligned column-generation table on stderr. It prints iteration 1, every tenth
 iteration, and the final state, followed by the CG status and work totals.
 <code>--log-interval N</code> enables the same log with a positive custom interval.
+The <code>Bucket step</code> column shows current active resource widths, separated by <code>/</code>.
+Changes also produce a <code>Bucket step updated: old -&gt; new</code> message independently
+of that interval. Pricing implementations without a bucket grid show <code>--</code>.
 Cut-count columns appear only for enabled families: <code>Rank1</code>, <code>Capacity</code>,
 <code>2Path</code>, <code>KPath</code>, <code>Knapsack</code>, and <code>Fenchel</code>. Each shows the number of that
 family's rows currently in the master, including inherited cuts and excluding
 removed rows. Enabled families show zero before any cuts are installed.
 The interval applies to each CG solve, including descendant nodes and tree
 trials. Each node reports its depth, master algorithm, and stabilization mode.</p>
-<pre><code class="language-sh">./target/release/baldes<span class="w"> </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">25</span><span class="w"> </span><span class="se">\</span>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">./target/release/baldes<span class="w"> </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">25</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--hgs-time<span class="w"> </span><span class="m">2</span><span class="w"> </span>--hgs-columns<span class="w"> </span><span class="m">100</span><span class="w"> </span>--master<span class="w"> </span>ipm<span class="w"> </span>--verbose
-</code></pre>
+</code></pre></div>
 <p><code>RMP obj</code> is the restricted-master objective and may include artificial columns;
 it is not a feasible routing objective or a global lower bound. <code>Lower bound</code>
 is the separately certified bound. <code>Incumbent</code> is the current objective upper

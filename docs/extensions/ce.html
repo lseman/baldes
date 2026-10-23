@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Column elimination baldes::extensions::column_elimination solves the continuous elementaryroute set-partitioning relaxation for CVRP and VRPTW. It uses a layereddecision diagram an">
+<meta name="description" content="Column elimination baldes::extensions::ce solves the continuous elementaryroute set-partitioning relaxation for CVRP and VRPTW. It uses a layereddecision diagram and an arc-flow LP">
 <meta name="theme-color" content="#0b0e11">
 <title>Column elimination — BALDES docs</title>
-<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/column-elimination.html">
+<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/ce.html">
 <link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../_static/site.css">
 <link rel="stylesheet" href="../_static/docs.css">
@@ -20,15 +20,15 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="multi-time-windows.html">Multiple time windows</a><a href="multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="column-elimination.html" aria-current="page">Column elimination</a></nav></details>
-<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/column-elimination.md">View Markdown source ↗</a>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html" aria-current="page">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/ce.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Extensions</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="column-elimination">Column elimination</h1>
-<p><code>baldes::extensions::column_elimination</code> solves the continuous elementary
+<p><code>baldes::extensions::ce</code> solves the continuous elementary
 route set-partitioning relaxation for CVRP and VRPTW. It uses a layered
 decision diagram and an arc-flow LP, followed by infeasible-prefix refinement.
 It is an independent implementation inspired by <a href="https://github.com/amkarahalios/dd_vrptw">Karahalios's reference
@@ -89,18 +89,18 @@ LP is rebuilt after the batch, rather than after every individual conflict.
 Consequently every feasible route survives refinement. If the complete
 decomposition is feasible, it supplies a route-LP solution matching the
 arc-flow lower bound, establishing LP convergence within numerical tolerances.</p>
-<pre><code class="language-rust,ignore"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">column_elimination</span><span class="p">::{</span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">Problem</span><span class="p">,</span><span class="w"> </span><span class="n">Status</span><span class="p">};</span>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">ce</span><span class="p">::{</span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">Problem</span><span class="p">,</span><span class="w"> </span><span class="n">Status</span><span class="p">};</span>
 <span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">solvers</span><span class="p">::</span><span class="n">ClpMaster</span><span class="p">;</span>
 
 <span class="kd">let</span><span class="w"> </span><span class="n">problem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Problem</span><span class="p">::</span><span class="n">from_instance</span><span class="p">(</span><span class="o">&amp;</span><span class="n">instance</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">solve_column_elimination</span><span class="p">(</span><span class="n">ClpMaster</span><span class="p">::</span><span class="n">new</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
 <span class="k">if</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">Status</span><span class="p">::</span><span class="n">Converged</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;Route LP objective: {:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">lower_bound</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">"Route LP objective: {:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">lower_bound</span><span class="p">);</span>
 <span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">route</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">routes</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{} * {:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">route</span><span class="p">.</span><span class="n">flow</span><span class="p">,</span><span class="w"> </span><span class="n">route</span><span class="p">.</span><span class="n">path</span><span class="p">);</span>
+<span class="w">        </span><span class="fm">println!</span><span class="p">(</span><span class="s">"{} * {:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">route</span><span class="p">.</span><span class="n">flow</span><span class="p">,</span><span class="w"> </span><span class="n">route</span><span class="p">.</span><span class="n">path</span><span class="p">);</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="p">}</span>
-</code></pre>
+</code></pre></div>
 <p>The backend factory supplies a fresh empty <code>LpMaster</code> each iteration. The
 extension loads rows and columns in bulk to avoid repeated native matrix
 copies; only disabled arcs need explicit upper-bound changes, since flow and
@@ -133,16 +133,16 @@ temporary refinement allocations also respect the configured budgets.
 The time budget is checked between stages
 and passed to the backend; backend support determines solve interruption.</p>
 <p>Run an instance from the CLI (Solomon or CVRPLIB):</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--<span class="w"> </span>ce<span class="w"> </span>instances/cvrplib/P-n16-k8.vrp<span class="w"> </span>--customers<span class="w"> </span><span class="m">5</span><span class="w"> </span>--time<span class="w"> </span><span class="m">60</span><span class="w"> </span>--log<span class="w"> </span>--json<span class="w"> </span>ce.json
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--<span class="w"> </span>ce<span class="w"> </span>instances/cvrplib/P-n16-k8.vrp<span class="w"> </span>--customers<span class="w"> </span><span class="m">5</span><span class="w"> </span>--time<span class="w"> </span><span class="m">60</span><span class="w"> </span>--log<span class="w"> </span>--json<span class="w"> </span>ce.json
 baldes<span class="w"> </span>ce<span class="w"> </span>--help
-</code></pre>
+</code></pre></div>
 <p>The command respects the instance fleet size; <code>--unlimited-fleet</code> removes
 that limit. <code>--nodes</code>, <code>--arcs</code> and <code>--iterations</code> set diagram and solve
 budgets. JSON includes the last <code>lower_bound</code>, the converged <code>lp_bound</code>
 (null before convergence), status, statistics and fractional route flows.</p>
 <p>For VRPTW, pass a Solomon instance directly:</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--<span class="w"> </span>ce<span class="w"> </span>instances/C101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">5</span><span class="w"> </span>--time<span class="w"> </span><span class="m">60</span><span class="w"> </span>--log
-</code></pre>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--<span class="w"> </span>ce<span class="w"> </span>instances/C101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">5</span><span class="w"> </span>--time<span class="w"> </span><span class="m">60</span><span class="w"> </span>--log
+</code></pre></div>
 <p>Time windows and service durations are enforced automatically. The command
 still solves the continuous route LP, with potentially fractional routes.
 <code>--log</code> (also <code>-v</code> or <code>--verbose</code>) writes progress every 10 iterations to
@@ -152,9 +152,9 @@ limit stops. Columns show the LP lower bound, decomposed path count,
 infeasible path count, diagram size and elapsed time. Stdout retains the
 final result summary. The Rust API exposes <code>Options::log_interval</code> as well.</p>
 <p>To use parallel HiGHS, build with both backends and select it explicitly:</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>--bin<span class="w"> </span>baldes
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,highs<span class="w"> </span>--bin<span class="w"> </span>baldes
 target/release/baldes<span class="w"> </span>ce<span class="w"> </span>instances/C101.txt<span class="w"> </span>--solver<span class="w"> </span>highs<span class="w"> </span>--threads<span class="w"> </span><span class="m">0</span><span class="w"> </span>--log
-</code></pre>
+</code></pre></div>
 <p><code>--master</code> is an alias for <code>--solver</code>, matching the main solver CLI spelling.
 CE enforces capacity constraints automatically. The main solver's <code>--rank1</code>
 and <code>--capacity</code> cut flags are not implemented in CE and report explicit errors.</p>
@@ -175,27 +175,25 @@ simplex concurrency at eight. Selecting all CPUs therefore does not promise
 HiGHS models sharing its process-global scheduler must use the same worker
 count. This wrapper never resets the shared scheduler to change that count.</p>
 <p>Run the small demonstration with:</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--example<span class="w"> </span>column_elimination
-</code></pre>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--example<span class="w"> </span>ce
+</code></pre></div>
 <p>Regression tests verify route preservation after refinement, exact resource
 replay, atomic limits, fractional LP behavior, infeasibility, and agreement
 with full route enumeration on small asymmetric VRPTW instances:</p>
-<pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--lib<span class="w"> </span>extensions::column_elimination
-</code></pre>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--lib<span class="w"> </span>extensions::ce
+</code></pre></div>
 <p>Performance smoke check (2026-10-21, release build, Clp):</p>
-<pre><code class="language-sh">baldes<span class="w"> </span>ce<span class="w"> </span>instances/C101.txt<span class="w"> </span>--time<span class="w"> </span><span class="m">15</span><span class="w"> </span>--log
-</code></pre>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">baldes<span class="w"> </span>ce<span class="w"> </span>instances/C101.txt<span class="w"> </span>--time<span class="w"> </span><span class="m">15</span><span class="w"> </span>--log
+</code></pre></div>
 <p>Before the subsequent resource-propagation reductions, one local run on all
 100 customers converged to the continuous route-LP bound
 <code>828.936867</code> in 8.00 seconds, with two LP solves and three prefix refinements.
 Local feasibility pruning reduced the initial arc count from 990,200 to
 436,988. This is a single-instance check, not a general runtime guarantee.
 Capacity-only instances can still require many refinements because the
-general layered states do not track exact accumulated load or visit history.
-See <a href="../benchmarks/column-elimination.html">the model-reduction audit and comparison</a>
-for the current construction, validation and benchmark procedure.</p>
+general layered states do not track exact accumulated load or visit history.</p>
 </article>
-<nav class="page-turn" aria-label="Adjacent guides"><a href="../benchmarks/column-elimination.html"><small>Previous guide</small>Column elimination model reductions <span aria-hidden="true">↗</span></a></nav>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="ipm.html"><small>Previous guide</small>BALDES IPM in Rust <span aria-hidden="true">↗</span></a><a href="../benchmarks/root.html"><small>Next guide</small>Root benchmarks <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
 <aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p></nav></aside>

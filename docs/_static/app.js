@@ -11,7 +11,8 @@
     controls.append(demo);
     const summary = document.querySelector('#route-summary');
     const nodes = [...document.querySelectorAll('#customer-nodes > g')];
-    let playing = true;
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let playing = !motion.matches;
     let visible = true;
     let timer;
     let animations = [];
@@ -42,6 +43,7 @@
       vehicles.setAttribute('aria-hidden', 'true');
       document.querySelector('#route-map').append(vehicles);
       paths.forEach((path, route) => {
+        if (motion.matches) return;
         const length = path.getTotalLength();
         const duration = length * 3;
         const vehicle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -127,6 +129,11 @@
       observer.observe(document.querySelector('.route-card'));
     }
     document.addEventListener('visibilitychange', syncVisibility);
+    motion.addEventListener('change', () => {
+      if (motion.matches) playing = false;
+      syncDemo();
+      update();
+    });
     syncDemo();
     update();
   }
@@ -159,6 +166,7 @@
       clearTimeout(reset);
       reset = setTimeout(() => { button.textContent = 'Copy'; }, 1800);
     });
-    pre.append(button);
+    const block = pre.closest(".code-block");
+    (block ? block.querySelector(".code-heading") : pre).append(button);
   });
 })();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Finite column imports Documentation index With clp, Rust callers can import finite column domains throughmaster::multi_pricing::imported. Routing networks are optional. Importedcol">
+<meta name="description" content="Finite column imports Documentation index With clp, Rust callers can import finite column domains throughmaster::mp::imported. Routing networks are optional. Importedcolumns are or">
 <meta name="theme-color" content="#0b0e11">
 <title>Finite column imports — BALDES docs</title>
 <link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/column-imports.html">
@@ -20,17 +20,17 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="multi-time-windows.html">Multiple time windows</a><a href="multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html" aria-current="page">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="column-elimination.html">Column elimination</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html" aria-current="page">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/column-imports.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Extensions</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="finite-column-imports">Finite column imports</h1>
 <p><a href="../index.html">Documentation index</a></p>
 <p>With <code>clp</code>, Rust callers can import finite column domains through
-<code>master::multi_pricing::imported</code>. Routing networks are optional. Imported
+<code>master::mp::imported</code>. Routing networks are optional. Imported
 columns are original-vector patterns, so this interface also supports finite
 non-routing models without constructing synthetic routes.</p>
 <h2 id="model-contract">Model contract</h2>
@@ -63,8 +63,8 @@ external pricing problem does not establish completeness for that larger
 problem. Every declared column is loaded immediately; this is not a dynamic
 pricing callback.</p>
 <h2 id="solving-and-restricting-snapshots">Solving and restricting snapshots</h2>
-<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::{</span>
-<span class="w">    </span><span class="n">multi_pricing</span><span class="p">::{</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">imported</span><span class="p">,</span><span class="w"> </span><span class="n">MasterVariable</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">Problem</span><span class="p">},</span>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::{</span>
+<span class="w">    </span><span class="n">mp</span><span class="p">::{</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">imported</span><span class="p">,</span><span class="w"> </span><span class="n">MasterVariable</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">Problem</span><span class="p">},</span>
 <span class="w">    </span><span class="n">preprocessing</span><span class="p">::</span><span class="n">Bounds</span><span class="p">,</span>
 <span class="w">    </span><span class="n">root</span><span class="p">::</span><span class="n">Row</span><span class="p">,</span>
 <span class="w">    </span><span class="n">RowSense</span><span class="p">,</span>
@@ -92,7 +92,7 @@ pricing callback.</p>
 <span class="kd">let</span><span class="w"> </span><span class="n">node</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">fixed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">node</span><span class="p">.</span><span class="n">with_column_bounds</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">Bounds</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">lower</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="n">upper</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="w"> </span><span class="p">})</span><span class="o">?</span><span class="p">;</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">child</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fixed</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
-</code></pre>
+</code></pre></div>
 <p><code>ImportedOutput.output</code> contains ordinary solver status, bounds and routing
 results. <code>ImportedOutput.values.original</code> contains the caller's original
 variable IDs and values. <code>values.columns</code> identifies each quantity by subproblem
@@ -127,7 +127,7 @@ restrictions are replayed by this extension operation.</p>
 <p>Use <code>node.with_row(row, routing_coefficients, original_coefficients)</code> to add a
 shared restriction. Original coefficients are <code>(original_variable_id, value)</code>
 pairs; generated imported-column IDs are rejected. Routing coefficients use
-<code>multi_pricing::RowCoefficients</code>, with physical arc order and an optional
+<code>mp::RowCoefficients</code>, with physical arc order and an optional
 once-per-route term. Omitted coordinates and routing families contribute zero.
 Coefficients must be finite and coalesced. The caller supplies a valid cut or
 branch restriction. Original-coordinate links apply the row to new imported
@@ -135,7 +135,7 @@ vectors automatically. Rebuilds replay the row and subtract any fixed routing
 contribution, whether the row was added before or after fixing.</p>
 <p><code>node.with_presence_row(row, presence_coefficients, original_coefficients)</code>
 couples nonlinear routing-event presence to original coordinates. It uses
-<code>multi_pricing::PresenceCoefficients</code>, with event lists aligned to physical
+<code>mp::PresenceCoefficients</code>, with event lists aligned to physical
 arcs, and supports both pair-count and any-pair semantics. The original
 presence descriptor survives extension. Fixed routes contribute their exact
 presence coefficient before preprocessing the rebuilt model; imported vectors
@@ -181,7 +181,7 @@ including all currently known columns, and the remaining time. Return
 has supplied its entire intended domain. All other groups retain their declared
 domains. This protocol enumerates a domain; it supplies no reduced-cost pricing
 or external optimality certificate.</p>
-<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">multi_pricing</span><span class="p">::</span><span class="n">imported</span><span class="p">::{</span><span class="n">ColumnBatch</span><span class="p">,</span><span class="w"> </span><span class="n">ImportOptions</span><span class="p">,</span><span class="w"> </span><span class="n">ImportStatus</span><span class="p">};</span>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">mp</span><span class="p">::</span><span class="n">imported</span><span class="p">::{</span><span class="n">ColumnBatch</span><span class="p">,</span><span class="w"> </span><span class="n">ImportOptions</span><span class="p">,</span><span class="w"> </span><span class="n">ImportStatus</span><span class="p">};</span>
 
 <span class="kd">let</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">node</span><span class="p">.</span><span class="n">begin_import</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">progress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="n">collect</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ImportOptions</span><span class="p">::</span><span class="n">default</span><span class="p">(),</span><span class="w"> </span><span class="o">|</span><span class="n">known</span><span class="p">,</span><span class="w"> </span><span class="n">remaining</span><span class="o">|</span><span class="w"> </span><span class="p">{</span>
@@ -192,7 +192,7 @@ or external optimality certificate.</p>
 <span class="k">if</span><span class="w"> </span><span class="n">progress</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">ImportStatus</span><span class="p">::</span><span class="n">Complete</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">solved</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">progress</span><span class="p">.</span><span class="n">session</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
 <span class="p">}</span>
-</code></pre>
+</code></pre></div>
 <p>A batch or time limit returns a resumable <code>progress.session</code>. Incomplete
 sessions reject <code>solve</code> and inherit no finite-parent bounds or infeasibility
 conclusion. Explicit envelope-covered certificate requests are described below.
@@ -370,12 +370,12 @@ additive and nonlinear-row coupling to newly accepted vectors.</p>
 optimizer can bound its entire missing-column domain without enumerating it.
 The callback returns <code>ImportOracleReply</code> containing a <code>ColumnBatch</code> and an
 optional <code>ImportPricingMinimum</code>:</p>
-<pre><code class="language-rust,ignore"><span class="kd">let</span><span class="w"> </span><span class="n">minimum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">point</span><span class="p">.</span><span class="n">numerical_minimum</span><span class="p">(</span><span class="n">global_reduced_cost_lower_bound</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="kd">let</span><span class="w"> </span><span class="n">minimum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">point</span><span class="p">.</span><span class="n">numerical_minimum</span><span class="p">(</span><span class="n">global_reduced_cost_lower_bound</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <span class="nb">Ok</span><span class="p">(</span><span class="n">ImportOracleReply</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">batch</span><span class="p">:</span><span class="w"> </span><span class="nc">ColumnBatch</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">columns</span><span class="p">:</span><span class="w"> </span><span class="nc">generated_columns</span><span class="p">,</span><span class="w"> </span><span class="n">complete</span><span class="p">:</span><span class="w"> </span><span class="nc">false</span><span class="w"> </span><span class="p">},</span>
 <span class="w">    </span><span class="n">minimum</span><span class="p">:</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">minimum</span><span class="p">),</span>
 <span class="p">})</span>
-</code></pre>
+</code></pre></div>
 <p>The supplied number must lower-bound the reduced cost of <strong>every permitted
 missing column</strong> in that group's intended domain, at the supplied objective or
 feasibility prices. A minimum over a heuristic candidate list does not satisfy
@@ -411,7 +411,7 @@ the node, or returns <code>Incomplete</code> with an open frontier.
 Errors preserve the input tree, including batches accepted earlier in that
 failed invocation; callback side effects remain caller-owned.</p>
 </article>
-<nav class="page-turn" aria-label="Adjacent guides"><a href="multi-pricing.html"><small>Previous guide</small>Multi-pricing: one master, multiple pricing subproblems <span aria-hidden="true">↗</span></a><a href="pstep.html"><small>Next guide</small>P-step CVRP extension <span aria-hidden="true">↗</span></a></nav>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="mp.html"><small>Previous guide</small>Multi-pricing: one master, multiple pricing subproblems <span aria-hidden="true">↗</span></a><a href="pstep.html"><small>Next guide</small>P-step CVRP extension <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
 <aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#model-contract">Model contract</a><a class="toc-level-2" href="#solving-and-restricting-snapshots">Solving and restricting snapshots</a><a class="toc-level-2" href="#extending-a-declared-domain">Extending a declared domain</a><a class="toc-level-3" href="#incremental-domain-sources">Incremental domain sources</a><a class="toc-level-3" href="#numerical-pricing-requests">Numerical pricing requests</a><a class="toc-level-3" href="#permitted-column-envelopes">Permitted column envelopes</a><a class="toc-level-3" href="#certificates-for-open-domains">Certificates for open domains</a><a class="toc-level-3" href="#several-open-imported-groups">Several open imported groups</a><a class="toc-level-3" href="#automatic-pricing-requests-during-collection">Automatic pricing requests during collection</a><a class="toc-level-3" href="#trees-with-open-external-groups">Trees with open external groups</a><a class="toc-level-3" href="#numerical-oracle-replies">Numerical oracle replies</a></nav></aside>

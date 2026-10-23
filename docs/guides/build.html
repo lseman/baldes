@@ -20,11 +20,11 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="build.html" aria-current="page">Configuring and building BALDES</a><a href="source-layout.html">Source layout</a><a href="cli.html">Command-line usage</a><a href="python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="../extensions/column-elimination.html">Column elimination</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="build.html" aria-current="page">Configuring and building BALDES</a><a href="source-layout.html">Source layout</a><a href="cli.html">Command-line usage</a><a href="python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/guides/build.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Getting started</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="configuring-and-building-baldes">Configuring and building BALDES</h1>
@@ -32,14 +32,14 @@
 <h2 id="direct-cargo-builds">Direct Cargo builds</h2>
 <p>Install Rust/Cargo and clone the repository. The core library can be built
 without an external LP backend:</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release
-</code></pre>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release
+</code></pre></div>
 <p>For the CLI and routing master, initialize the vendored dependencies and build
 with Clp. This requires a C++14 compiler:</p>
-<pre><code class="language-sh">git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>vendor/Clp<span class="w"> </span>vendor/CoinUtils
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>vendor/Clp<span class="w"> </span>vendor/CoinUtils
 cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp
 ./target/release/baldes<span class="w"> </span>--help
-</code></pre>
+</code></pre></div>
 <p>The <code>clp</code> feature builds Clp 1.17.10 and CoinUtils 2.11 from those submodules.
 To also enable the optional HiGHS backend and integer solver, install its
 shared library and use <code>cargo build --release --features clp,highs</code>.
@@ -51,11 +51,56 @@ HiGHS backend and generic MIP API. See below for library discovery details.</p>
 <a href="../extensions/multi-time-windows.html">multiple time windows</a> for the Rust,
 Python and JSON APIs.</p>
 <p>Python installation is covered in the <a href="python.html">pybaldes guide</a>.</p>
+<h2 id="gurobi-master-backend">Gurobi master backend</h2>
+<p>Download and extract the latest stable Linux release into the repository's
+ignored <code>external/</code> directory:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">./scripts/setup/gurobi_downloader
+</code></pre></div>
+<p>The script detects x86-64, ARM64, or PowerPC Linux, verifies Gurobi's published
+checksum, and prints the installation path to use in <code>make config</code>. It reuses
+verified downloads and existing installations. Use <code>--version 13.0.3</code> to pin a
+release, <code>--destination PATH</code> for another directory, or <code>--help</code> for options.
+Extraction requires Python with <code>tarfile.data_filter</code> (Python 3.12+).</p>
+<p>Install Gurobi and configure a valid license. Set <code>GUROBI_HOME</code> to its platform
+installation directory, containing <code>lib/</code>, then build:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh"><span class="nb">export</span><span class="w"> </span><span class="nv">GUROBI_HOME</span><span class="o">=</span>/opt/gurobi1300/linux64
+<span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">"</span><span class="nv">$GUROBI_HOME</span><span class="s2">/lib:</span><span class="si">${</span><span class="nv">LD_LIBRARY_PATH</span><span class="k">:-</span><span class="si">}</span><span class="s2">"</span>
+cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,gurobi
+./target/release/baldes<span class="w"> </span>vrptw<span class="w"> </span>instances/Solomon/R101.txt<span class="w"> </span>--master<span class="w"> </span>gurobi
+</code></pre></div>
+<p>On macOS configure <code>DYLD_LIBRARY_PATH</code> as needed instead. The build detects the
+versioned C library (for example <code>libgurobi130.so</code>) in <code>$GUROBI_HOME/lib</code>.
+Set <code>GUROBI_LIB_NAME=gurobi130</code> explicitly if that directory contains multiple
+versions. Gurobi is linked dynamically and is not bundled with BALDES.
+License errors are reported when the backend is initialized.</p>
+<p><code>GurobiMaster</code> implements the generic Rust <code>LpMaster</code> interface with automatic
+algorithm selection, warm-basis reoptimization, primal values, duals, reduced costs, basis-aware
+cut cleanup, solve limits, and independent model copies. Use <code>--features gurobi</code>
+for the library backend alone; the routing CLI/tree also require <code>clp</code>.
+All three native features may be enabled together. Enumerated-node integer
+solving continues to use the <code>highs</code> feature.</p>
+<p>Routing root/tree solves give HiGHS and Gurobi all CPUs available to the process
+by default. Use <code>--master-threads N</code> to limit their worker budget, or
+<code>--master-threads 0</code> for all available CPUs. CPU affinity is respected.
+Clp and native IPM ignore this setting. HiGHS retains adaptive primal/dual
+simplex; Gurobi uses automatic algorithm selection. Both receive the worker
+budget and determine actual algorithm parallelism. Warm simplex reoptimization
+may remain serial, and more workers do not guarantee a faster solve.
+HiGHS models in one process must use a consistent worker budget because its
+native scheduler is shared; configure it before the first solve. Forks retain
+their parent's budget. In Rust, use <code>RootOptions::master_threads</code>; in Python,
+use <code>solve_root(..., master_threads=N)</code>.</p>
+<p>For Python, build with <code>maturin develop --release --features clp,gurobi</code> from
+<code>python/</code>, then pass <code>master_solver=&quot;gurobi&quot;</code> to <code>solve_root</code>. Check
+<code>pybaldes.has_gurobi</code> to see whether that wheel includes the backend.
+In <code>make config</code>, enable <strong>Gurobi backend</strong> and set <strong>Gurobi installation</strong>,
+or leave its path empty to inherit <code>GUROBI_HOME</code> from your shell. Save and
+run <code>make</code> to build with those settings.</p>
 <h2 id="interactive-configuration">Interactive configuration</h2>
 <p>From the repository root:</p>
-<pre><code class="language-sh">make<span class="w"> </span>config<span class="w">       </span><span class="c1"># Open the configuration window in your terminal</span>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">make<span class="w"> </span>config<span class="w">       </span><span class="c1"># Open the configuration window in your terminal</span>
 make<span class="w">              </span><span class="c1"># Compile with the saved settings</span>
-</code></pre>
+</code></pre></div>
 <p><code>make menuconfig</code> opens the same window. Use <strong>Up/Down</strong> or <strong>J/K</strong> to select
 an option, <strong>Space/Enter</strong> to change it, <strong>S</strong> to save and exit, and <strong>Q/Escape</strong>
 to discard changes. Text fields accept Enter to confirm, Escape to cancel,
@@ -73,7 +118,7 @@ session, Python packages, ncurses headers or UI library downloads are needed.
 The helper is compiled directly with <code>rustc</code> into <code>target/baldes-build</code> before
 configuration, so it does not need to build the solver first.</p>
 <h2 id="build-options">Build options</h2>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Setting</th>
@@ -96,6 +141,11 @@ configuration, so it does not need to build the solver first.</p>
 <td>HiGHS</td>
 <td>Off</td>
 <td>Enable the <code>highs</code> Cargo feature</td>
+</tr>
+<tr>
+<td>Gurobi</td>
+<td>Off</td>
+<td>Enable the <code>gurobi</code> Cargo feature; requires an installation and license</td>
 </tr>
 <tr>
 <td>Command-line program</td>
@@ -147,8 +197,13 @@ configuration, so it does not need to build the solver first.</p>
 <td>Empty (automatic)</td>
 <td>Set <code>HIGHS_DIR</code> to the root containing <code>lib/libhighs</code></td>
 </tr>
+<tr>
+<td>Gurobi installation</td>
+<td>Empty (shell environment)</td>
+<td>Set <code>GUROBI_HOME</code> to the installation root containing <code>lib/libgurobi</code></td>
+</tr>
 </tbody>
-</table>
+</table></div>
 <p>The library, including native IPM, pricing, cuts, and HGS, is always included.
 These components currently have no Cargo feature switches. Algorithm settings
 such as cut priorities and IPM tolerances remain runtime options.</p>
@@ -158,8 +213,8 @@ triple. Cross compilation requires installing the Rust target and configuring
 its linker separately, including any enabled native solver libraries.</p>
 <p>Before building Clp, initialize its source submodules and provide a C++14
 compiler:</p>
-<pre><code class="language-sh">git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>vendor/Clp<span class="w"> </span>vendor/CoinUtils
-</code></pre>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>vendor/Clp<span class="w"> </span>vendor/CoinUtils
+</code></pre></div>
 <p>HiGHS needs a shared library with 32-bit <code>HighsInt</code>. Discovery follows the
 existing Cargo build: <code>HIGHS_DIR/lib</code>, <code>vendor/highs/lib</code>, <code>pkg-config</code>, then the
 system linker path. Leaving the menu's installation field empty preserves
@@ -170,12 +225,12 @@ needed for a custom HiGHS installation.</p>
 read it. A missing configuration uses release/library-only defaults with no
 optional solver dependencies. Cargo commands invoked directly continue to
 use their explicit Cargo flags; they do not read <code>.config</code>.</p>
-<pre><code class="language-sh">make<span class="w"> </span>showconfig<span class="w">                </span><span class="c1"># Display effective settings</span>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">make<span class="w"> </span>showconfig<span class="w">                </span><span class="c1"># Display effective settings</span>
 make<span class="w"> </span>print-command<span class="w">             </span><span class="c1"># Preview the Cargo build invocation</span>
 make<span class="w"> </span>defconfig<span class="w">                 </span><span class="c1"># Replace .config with defaults</span>
 make<span class="w"> </span>defconfig<span class="w"> </span><span class="nv">CONFIG</span><span class="o">=</span>ci.config<span class="w"> </span><span class="c1"># Write another configuration file</span>
 make<span class="w"> </span><span class="nv">CONFIG</span><span class="o">=</span>ci.config<span class="w">          </span><span class="c1"># Build with it</span>
-</code></pre>
+</code></pre></div>
 <p>For noninteractive use, run <code>make defconfig</code> and edit the file or supply a
 saved config via <code>CONFIG=path</code>. The format is <code>CONFIG_NAME=value</code>, using <code>y/n</code>
 for booleans and double quotes for strings. Backslashes and quotes in strings
@@ -183,9 +238,10 @@ must be escaped. Missing settings take their defaults; unknown/duplicate keys,
 invalid values and conflicting dependencies are rejected. The file is parsed
 as data and is never included as Make code or sourced by a shell.</p>
 <p>An example configuration for the CLI with both LP backends:</p>
-<pre><code class="language-ini"><span class="na">CONFIG_PROFILE</span><span class="o">=</span><span class="s">release</span>
+<div class="code-block"><div class="code-heading"><span>ini</span></div><pre><code class="language-ini"><span class="na">CONFIG_PROFILE</span><span class="o">=</span><span class="s">release</span>
 <span class="na">CONFIG_CLP</span><span class="o">=</span><span class="s">y</span>
 <span class="na">CONFIG_HIGHS</span><span class="o">=</span><span class="s">y</span>
+<span class="na">CONFIG_GUROBI</span><span class="o">=</span><span class="s">n</span>
 <span class="na">CONFIG_CLI</span><span class="o">=</span><span class="s">y</span>
 <span class="na">CONFIG_SIMD</span><span class="o">=</span><span class="s">off</span>
 <span class="na">CONFIG_NATIVE_CPU</span><span class="o">=</span><span class="s">n</span>
@@ -194,11 +250,12 @@ as data and is never included as Make code or sourced by a shell.</p>
 <span class="na">CONFIG_LOCKED</span><span class="o">=</span><span class="s">y</span>
 <span class="na">CONFIG_JOBS</span><span class="o">=</span><span class="s">0</span>
 <span class="na">CONFIG_RESOURCE_DIMENSIONS</span><span class="o">=</span><span class="s">2</span>
-<span class="na">CONFIG_TARGET</span><span class="o">=</span><span class="s">&quot;&quot;</span>
-<span class="na">CONFIG_HIGHS_DIR</span><span class="o">=</span><span class="s">&quot;&quot;</span>
-</code></pre>
+<span class="na">CONFIG_TARGET</span><span class="o">=</span><span class="s">""</span>
+<span class="na">CONFIG_HIGHS_DIR</span><span class="o">=</span><span class="s">""</span>
+<span class="na">CONFIG_GUROBI_HOME</span><span class="o">=</span><span class="s">""</span>
+</code></pre></div>
 <h2 id="other-make-targets">Other Make targets</h2>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Command</th>
@@ -239,7 +296,7 @@ as data and is never included as Make code or sourced by a shell.</p>
 <td>List targets and tool overrides</td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p><code>make test</code> and <code>make clippy</code> select integration tests as well as the library;
 Cargo may build the CLI for integration tests when its Clp requirement is
 enabled, even if the CLI artifact is disabled for ordinary builds. The
@@ -265,6 +322,8 @@ detection. AVX-512 builds fall back to AVX2 when available. Other CPUs and small
 portable implementation. Scalar capacities remain arbitrary; the optimized
 scan applies when the model activates one or two disposable resources and
 the compiled capacity is at least two.
+The <code>simd</code> feature also enables runtime-dispatched AVX2 rank-one bitset
+accumulation for at least 16 words, independently of the resource dimension.
 This feature does not require <code>target-cpu=native</code> and does not change numerical
 comparison tolerances or certification policy.</p>
 <p>For eight-label AVX-512F dominance scans, use
@@ -280,6 +339,6 @@ See <a href="../reference/simd.html">SIMD dispatch</a> for dispatch behavior and
 <nav class="page-turn" aria-label="Adjacent guides"><a href="../index.html"><small>Previous guide</small>BALDES documentation <span aria-hidden="true">↗</span></a><a href="source-layout.html"><small>Next guide</small>Source layout <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#direct-cargo-builds">Direct Cargo builds</a><a class="toc-level-2" href="#interactive-configuration">Interactive configuration</a><a class="toc-level-2" href="#build-options">Build options</a><a class="toc-level-2" href="#saved-settings-and-automation">Saved settings and automation</a><a class="toc-level-2" href="#other-make-targets">Other Make targets</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#direct-cargo-builds">Direct Cargo builds</a><a class="toc-level-2" href="#gurobi-master-backend">Gurobi master backend</a><a class="toc-level-2" href="#interactive-configuration">Interactive configuration</a><a class="toc-level-2" href="#build-options">Build options</a><a class="toc-level-2" href="#saved-settings-and-automation">Saved settings and automation</a><a class="toc-level-2" href="#other-make-targets">Other Make targets</a></nav></aside>
 </div>
 </body></html>

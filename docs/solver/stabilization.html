@@ -20,11 +20,11 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="stabilization.html" aria-current="page">Dual-price stabilization</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="../extensions/column-elimination.html">Column elimination</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="feasibility.html">Routing feasibility recovery</a><a href="branching.html">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="stabilization.html" aria-current="page">Dual-price stabilization</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/solver/stabilization.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> The solver</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="dual-price-stabilization">Dual-price stabilization</h1>
@@ -32,16 +32,16 @@
 <p>Column generation can repeatedly produce similar master duals and columns.
 BALDES optionally smooths the dual point sent to pricing, using a stored
 center and bounded retries when smoothed pricing finds no fresh columns.
-It is enabled by default in <code>column_generation::Options</code>.</p>
+It is enabled by default in <code>cg::Options</code>.</p>
 <p>The implementation is
 <a href="https://github.com/lseman/baldes/blob/main/src/master/stabilization/mod.rs"><code>DualPriceSmoothing</code></a>, integrated by the
-<a href="https://github.com/lseman/baldes/blob/main/src/master/column_generation/driver.rs">column-generation loop</a>. The sections below
+<a href="https://github.com/lseman/baldes/blob/main/src/master/cg/driver.rs">column-generation loop</a>. The sections below
 describe the implemented update and retry rules.</p>
 <h2 id="smoothing-weight">Smoothing weight</h2>
 <p>For raw master duals <code>raw</code>, stored <code>center</code>, and an outward point <code>outward</code>:</p>
-<pre><code class="language-text">pricing[i] = (1 - effective_alpha) * outward[i]
+<div class="code-block"><div class="code-heading"><span>text</span></div><pre><code class="language-text">pricing[i] = (1 - effective_alpha) * outward[i]
            + effective_alpha * center[i]
-</code></pre>
+</code></pre></div>
 <p>By default <code>outward = raw</code>. <strong>Larger alpha means more weight on the center.</strong>
 At alpha zero pricing uses the outward point; at alpha one it uses the center.
 Reducing alpha moves pricing back toward the current master duals.</p>
@@ -50,9 +50,9 @@ on a <code>GreaterEqual</code> row is set to zero when its magnitude exceeds the
 configured tolerance. Equality rows have no such sign restriction.</p>
 <h2 id="parameters">Parameters</h2>
 <p>These are Rust <code>master::stabilization::Parameters</code>, configured through
-<code>RootOptions::cg.smoothing</code> or directly in <code>column_generation::Options</code>.
+<code>RootOptions::cg.smoothing</code> or directly in <code>cg::Options</code>.
 They are separate from the named BALDES pricing options.</p>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Parameter</th>
@@ -102,7 +102,7 @@ They are separate from the named BALDES pricing options.</p>
 <td>General comparison and sign-correction tolerance</td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p>The reference stores <code>alpha_factor</code>, <code>beta_factor</code>, <code>min_gap</code> and <code>max_gap</code>
 as single-precision controls. The constructor rounds these fields through <code>f32</code>
 before using them as <code>f64</code>. A factor that rounds to zero disables stabilization.</p>
@@ -115,7 +115,7 @@ Unknown bounds use finite -1e12/+1e12 sentinels; a known lower bound with an
 unknown LP bound therefore gives a gap slightly below one. Warm starts retain
 the parent certificate.</p>
 <h2 id="lifecycle">Lifecycle</h2>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Method</th>
@@ -144,7 +144,7 @@ the parent certificate.</p>
 <td>Compact dual, center, sense, and pending-center vectors after row removal</td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p>The first master iteration uses raw duals. Cut/enumeration transitions restart
 the schedule; row cleanup applies the row map. Removing columns alone does
 not change row coordinates and does not require a center remap.</p>
@@ -155,11 +155,11 @@ subgradient starts at the row RHS and subtracts multiplicity times the best
 returned acceptable column's coefficients. A near-zero or rounded-zero reduced
 cost does not suppress this contribution.</p>
 <p>On the first pricing pass in dynamic mode (<code>alpha_factor &gt;= 1</code>):</p>
-<pre><code class="language-text">if no fresh negative columns or angle &gt; 1e-12:
+<div class="code-block"><div class="code-heading"><span>text</span></div><pre><code class="language-text">if no fresh negative columns or angle &gt; 1e-12:
     alpha -= 0.1
 else if angle &lt; -1e-12 and alpha is below the near-one gate:
     alpha += 0.1 * (1 - alpha)
-</code></pre>
+</code></pre></div>
 <p>The angle threshold is <strong>1e-12</strong>, independently of <code>Parameters::tolerance</code>.
 The near-one gate includes the general tolerance and a relative margin.
 Updating base alpha affects subsequent master iterations; retries update the
@@ -167,9 +167,9 @@ current effective alpha separately. The angle is calculated only on that first
 adaptive pricing pass and retained during subsequent mispricing retries.</p>
 <p>If fresh negative columns exist, or smoothing is inactive, <code>after_pricing</code>
 returns false and stops retrying. Otherwise it increments <code>misprices</code> and uses:</p>
-<pre><code class="language-text">dynamic mode: effective_alpha = 1 - 2 * (1 - effective_alpha)
+<div class="code-block"><div class="code-heading"><span>text</span></div><pre><code class="language-text">dynamic mode: effective_alpha = 1 - 2 * (1 - effective_alpha)
 fixed-base mode: effective_alpha = 1 - misprices * (1 - alpha)
-</code></pre>
+</code></pre></div>
 <p>It republishes a smoothed point only while the retry count is at most
 <code>max_updates</code> and effective alpha exceeds the tolerance. When either gate
 fails, it deactivates smoothing and requests a final retry at raw duals.
@@ -186,10 +186,10 @@ same improvement requirement.</p>
 center, installed by the next <code>after_master</code> call. Consequently the stored
 center bound is not unconditionally monotone across phase changes.</p>
 <p>The angle helper computes:</p>
-<pre><code class="language-text">toward = pricing - center
+<div class="code-block"><div class="code-heading"><span>text</span></div><pre><code class="language-text">toward = pricing - center
 angle = dot(toward, feedback_subgradient)
       / (norm(toward) * norm(feedback_subgradient))
-</code></pre>
+</code></pre></div>
 <p>The division is unguarded. A zero denominator may yield <code>NaN</code>; comparisons
 with it then fail. This behavior differs from forcing an angle of zero.</p>
 <h2 id="optional-directional-construction">Optional directional construction</h2>
@@ -198,8 +198,8 @@ be the stored normalized center subgradient. A negligible <code>l</code> returns
 For <code>beta_factor == 1</code>, beta is the cosine between <code>d</code> and <code>g</code>; a negligible
 subgradient also returns raw duals. Otherwise the configured beta is used.
 Beta is clamped to <code>[0, 1]</code> before constructing:</p>
-<pre><code class="language-text">outward = center + (1 - beta) * d + beta * l * g
-</code></pre>
+<div class="code-block"><div class="code-heading"><span>text</span></div><pre><code class="language-text">outward = center + (1 - beta) * d + beta * l * g
+</code></pre></div>
 <p>A negligible subgradient contributes zero to its directional term. When the
 constructed step has norm above <code>1e-12</code>, it is rescaled to length <code>l</code>. This
 changes the outward point before the alpha interpolation. Mispricing retries use
@@ -208,32 +208,32 @@ provides a new normalized subgradient. Retaining the old vector alone does not
 make it valid. The 54-case parameter corpus covers this capacity-row transition.</p>
 <h2 id="configure-or-disable">Configure or disable</h2>
 <p>A complete Rust example, requiring <code>clp</code>:</p>
-<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span><span class="n">master</span><span class="p">::</span><span class="n">root</span><span class="p">::</span><span class="n">RootOptions</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="p">::{</span><span class="n">Instance</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">}};</span>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::{</span><span class="n">master</span><span class="p">::</span><span class="n">root</span><span class="p">::</span><span class="n">RootOptions</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="p">::{</span><span class="n">Instance</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">}};</span>
 
 <span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">baldes</span><span class="p">::</span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Instance</span><span class="p">::</span><span class="n">read</span><span class="p">(</span><span class="s">&quot;instances/R101.txt&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Instance</span><span class="p">::</span><span class="n">read</span><span class="p">(</span><span class="s">"instances/R101.txt"</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <span class="w">    </span><span class="n">instance</span><span class="p">.</span><span class="n">truncate</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RootOptions</span><span class="p">::</span><span class="n">default</span><span class="p">();</span>
 <span class="w">    </span><span class="n">options</span><span class="p">.</span><span class="n">cg</span><span class="p">.</span><span class="n">smoothing</span><span class="p">.</span><span class="n">initial_alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.5</span><span class="p">;</span>
 <span class="w">    </span><span class="n">options</span><span class="p">.</span><span class="n">cg</span><span class="p">.</span><span class="n">smoothing</span><span class="p">.</span><span class="n">beta_factor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0</span><span class="p">;</span>
 <span class="w">    </span><span class="n">options</span><span class="p">.</span><span class="n">cg</span><span class="p">.</span><span class="n">smoothing</span><span class="p">.</span><span class="n">max_updates</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">instance</span><span class="p">.</span><span class="n">solve_root</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="n">Rounding</span><span class="p">::</span><span class="nb">None</span><span class="p">,</span><span class="w"> </span><span class="n">options</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}: root LP={}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">master</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">master</span><span class="p">.</span><span class="n">lp</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}: root LP={}"</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">master</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="n">master</span><span class="p">.</span><span class="n">lp</span><span class="p">);</span>
 <span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
 <span class="p">}</span>
-</code></pre>
+</code></pre></div>
 <p>Set <code>options.cg.stabilize = false</code> to disable it in Rust. The CLI exposes:</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>vrptw<span class="w"> </span>instances/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span>--no-stabilization
-</code></pre>
+</code></pre></div>
 <p>Python exposes the enable/disable switch through the public root API:</p>
-<pre><code class="language-python"><span class="kn">import</span><span class="w"> </span><span class="nn">pybaldes</span>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">import</span><span class="w"> </span><span class="nn">pybaldes</span>
 
 <span class="n">result</span> <span class="o">=</span> <span class="n">pybaldes</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span>
-    <span class="s2">&quot;instances/R101.txt&quot;</span><span class="p">,</span> <span class="n">customers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">stabilize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="s2">"instances/R101.txt"</span><span class="p">,</span> <span class="n">customers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">stabilize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">lp</span><span class="p">)</span>
-</code></pre>
+</code></pre></div>
 <p>The Python root API does not expose the individual smoothing parameters.</p>
 <p>An unavailable best pricing solution differs from a zero subgradient. Feedback
 carries that availability explicitly; the adaptive angle retains its preceding

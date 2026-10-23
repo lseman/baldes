@@ -20,11 +20,11 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="../index.html">Overview</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a><a href="multi-time-windows.html">Multiple time windows</a><a href="multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html" aria-current="page">BALDES IPM in Rust</a><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/column-elimination.html">Column elimination model reductions</a><a href="column-elimination.html">Column elimination</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP extension</a><a href="evrp.html">EVRP implementation status</a><a href="ipm.html" aria-current="page">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/ipm.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Extensions</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="baldes-ipm-in-rust">BALDES IPM in Rust</h1>
@@ -34,15 +34,15 @@
 under <code>src/extensions/ipm</code>, requires Rust 1.70+, and has no external dependencies,
 C++ bindings, BLAS requirement, or unsafe code.</p>
 <p>From the BALDES repository root:</p>
-<pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--example<span class="w"> </span>ipm<span class="w"> </span>--offline
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--example<span class="w"> </span>ipm<span class="w"> </span>--offline
 cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--test<span class="w"> </span>ipm<span class="w"> </span>--offline
 cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--lib<span class="w"> </span>ipm::<span class="w"> </span>--offline
 cargo<span class="w"> </span>fmt<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--check
-</code></pre>
+</code></pre></div>
 <p>The example minimizes <code>-x - 2y</code>, with <code>x + y &lt;= 3</code> and <code>x &gt;= 1</code>, and
 returns objective <code>-5</code> at approximately <code>[1, 2]</code>.</p>
 <h2 id="api">API</h2>
-<pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">ipm</span><span class="p">::{</span><span class="n">solve</span><span class="p">,</span><span class="w"> </span><span class="n">ModelData</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">Sense</span><span class="p">,</span><span class="w"> </span><span class="n">SparseMatrix</span><span class="p">,</span><span class="w"> </span><span class="n">Status</span><span class="p">};</span>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">ipm</span><span class="p">::{</span><span class="n">solve</span><span class="p">,</span><span class="w"> </span><span class="n">ModelData</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">Sense</span><span class="p">,</span><span class="w"> </span><span class="n">SparseMatrix</span><span class="p">,</span><span class="w"> </span><span class="n">Status</span><span class="p">};</span>
 
 <span class="kd">let</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ModelData</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="nc">SparseMatrix</span><span class="p">::</span><span class="n">from_triplets</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.</span><span class="p">),</span><span class="w"> </span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mf">1.</span><span class="p">)])</span><span class="o">?</span><span class="p">,</span>
@@ -56,7 +56,7 @@ returns objective <code>-5</code> at approximately <code>[1, 2]</code>.</p>
 <span class="fm">assert_eq!</span><span class="p">(</span><span class="n">solution</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">Status</span><span class="p">::</span><span class="n">Optimal</span><span class="p">);</span>
 <span class="fm">assert!</span><span class="p">((</span><span class="n">solution</span><span class="p">.</span><span class="n">objective</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">3.</span><span class="p">).</span><span class="n">abs</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mf">1e-6</span><span class="p">);</span>
 <span class="p">#</span><span class="w"> </span><span class="nb">Ok</span><span class="p">::</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">ipm</span><span class="p">::</span><span class="n">Error</span><span class="o">&gt;</span><span class="p">(())</span>
-</code></pre>
+</code></pre></div>
 <p>Objectives are minimized. Matrices accept triplets or CSR input; duplicate
 entries are summed, columns are sorted, and explicit zeros are removed.
 <code>ModelData::validate</code> checks dimensions, finite coefficients and valid bounds.
@@ -80,15 +80,15 @@ change; numerical <code>factorize</code> calls reuse symbolic analysis for a fix
 Failed refactorization invalidates the previous factor.</p>
 <p><code>Solver::default().solve(&amp;model, &amp;options)</code> provides a persistent alternative
 to the one-shot <code>solve</code> function. Retain the <code>Solver</code> between related LPs:</p>
-<pre><code class="language-rust"><span class="p">#</span><span class="w"> </span><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">ipm</span><span class="p">::{</span><span class="n">ModelData</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">Solver</span><span class="p">};</span>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="p">#</span><span class="w"> </span><span class="k">use</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">ipm</span><span class="p">::{</span><span class="n">ModelData</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">,</span><span class="w"> </span><span class="n">Solver</span><span class="p">};</span>
 <span class="p">#</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">example</span><span class="p">(</span><span class="n">model</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="nc">ModelData</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">baldes</span><span class="p">::</span><span class="n">extensions</span><span class="p">::</span><span class="n">ipm</span><span class="p">::</span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
 <span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Solver</span><span class="p">::</span><span class="n">default</span><span class="p">();</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">first</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">repeated</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
-<span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">statistics</span><span class="p">());</span>
+<span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">statistics</span><span class="p">());</span>
 <span class="p">#</span><span class="w"> </span><span class="nb">Ok</span><span class="p">(())</span>
 <span class="p">#</span><span class="w"> </span><span class="p">}</span>
-</code></pre>
+</code></pre></div>
 <p>An unchanged LP can retain its interior iterate; all stopping tests still run,
 including when a later call tightens the requested accuracy. Cost/RHS edits
 reuse standard-form storage, scaling and symbolic analysis, with a cold iterate.
@@ -128,7 +128,7 @@ not an optimum. Invalid inputs and numerical breakdowns return <code>Error</code
 Certificate detection is conservative: some difficult infeasible/unbounded
 problems may instead reach the iteration limit or return a numerical error.</p>
 <h2 id="source-mapping-and-implementation">Source mapping and implementation</h2>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>C++ source</th>
@@ -163,7 +163,7 @@ problems may instead reach the iteration limit or return a numerical error.</p>
 <td>Owned sparse CSC input and factors stored as sparse columns; dense arrays only for individual fronts and Schur updates</td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p>The augmented matrix is <code>[-(theta + Rp), Aᵀ; A, Rd]</code>. The ordering preserves
 the primal/dual boundary, and fundamental supernodes cannot cross it. Fronts
 are processed in increasing elimination order, a valid child-before-parent
@@ -257,7 +257,7 @@ adapts to the affine step, bounded between <code>1e-4</code> and <code>0.1</code
 expression was always <code>0.1</code> for valid step lengths. Stopping tolerances and
 original-coordinate feasibility checks are unchanged.</p>
 </article>
-<nav class="page-turn" aria-label="Adjacent guides"><a href="evrp.html"><small>Previous guide</small>EVRP implementation status <span aria-hidden="true">↗</span></a><a href="../benchmarks/root.html"><small>Next guide</small>Root benchmarks <span aria-hidden="true">↗</span></a></nav>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="evrp.html"><small>Previous guide</small>EVRP implementation status <span aria-hidden="true">↗</span></a><a href="ce.html"><small>Next guide</small>Column elimination <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
 <aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#api">API</a><a class="toc-level-2" href="#source-mapping-and-implementation">Source mapping and implementation</a><a class="toc-level-2" href="#validation">Validation</a><a class="toc-level-2" href="#performance-investigation">Performance investigation</a></nav></aside>

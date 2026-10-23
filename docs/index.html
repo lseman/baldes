@@ -20,11 +20,11 @@
 <nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><a href="index.html" aria-current="page">Overview</a><a href="guides/build.html">Configuring and building BALDES</a><a href="guides/source-layout.html">Source layout</a><a href="guides/cli.html">Command-line usage</a><a href="guides/python.html">Python: pybaldes</a><a href="solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="solver/branching.html">Routing branching</a><a href="solver/cuts.html">Routing cuts</a><a href="solver/stabilization.html">Dual-price stabilization</a><a href="solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="reference/algorithms.html">Algorithms and references</a><a href="reference/options.html">BALDES pricing options</a><a href="reference/resources.html">Scalar resources</a><a href="reference/simd.html">SIMD dispatch</a><a href="extensions/multi-time-windows.html">Multiple time windows</a><a href="extensions/multi-pricing.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="extensions/column-imports.html">Finite column imports</a><a href="extensions/pstep.html">P-step CVRP extension</a><a href="extensions/evrp.html">EVRP implementation status</a><a href="extensions/ipm.html">BALDES IPM in Rust</a><a href="benchmarks/root.html">Root benchmarks</a><a href="benchmarks/column-elimination.html">Column elimination model reductions</a><a href="extensions/column-elimination.html">Column elimination</a></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="index.html" aria-current="page">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="guides/build.html">Configuring and building BALDES</a><a href="guides/source-layout.html">Source layout</a><a href="guides/cli.html">Command-line usage</a><a href="guides/python.html">Python: pybaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="solver/feasibility.html">Routing feasibility recovery</a><a href="solver/branching.html">Routing branching</a><a href="solver/cuts.html">Routing cuts</a><a href="solver/stabilization.html">Dual-price stabilization</a><a href="solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="reference/algorithms.html">Algorithms and references</a><a href="reference/options.html">BALDES pricing options</a><a href="reference/resources.html">Scalar resources</a><a href="reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="extensions/coupled-resources.html">Coupled resources</a><a href="extensions/multi-time-windows.html">Multiple time windows</a><a href="extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="extensions/column-imports.html">Finite column imports</a><a href="extensions/pstep.html">P-step CVRP extension</a><a href="extensions/evrp.html">EVRP implementation status</a><a href="extensions/ipm.html">BALDES IPM in Rust</a><a href="extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="benchmarks/root.html">Root benchmarks</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/README.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Overview</span><form class="doc-search" role="search" action="index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="baldes-documentation">BALDES documentation</h1>
@@ -40,6 +40,7 @@ Commands in these guides run from the repository root.</p>
 <h2 id="solver">Solver</h2>
 <ul>
 <li><a href="solver/tree.html">Tree and node lifecycle</a>: integer routing, inherited state, bounds, and limits.</li>
+<li><a href="solver/feasibility.html">Routing feasibility recovery</a>: zero-objective phase I, objective restoration, proof scope and limits.</li>
 <li><a href="solver/branching.html">Branching</a>: branching families and selection.</li>
 <li><a href="solver/cuts.html">Cuts</a>: cut configuration and coefficient consistency.</li>
 <li><a href="solver/stabilization.html">Dual-price stabilization</a>: smoothing, center updates, and retries.</li>
@@ -55,10 +56,13 @@ Commands in these guides run from the repository root.</p>
 <h2 id="extensions-and-modeling">Extensions and modeling</h2>
 <ul>
 <li>
+<p><a href="extensions/coupled-resources.html">Coupled resources</a>: simultaneous pickup/delivery, selected values, cumulative costs and affine dependencies in the physical-graph labeling engine.</p>
+</li>
+<li>
 <p><a href="extensions/multi-time-windows.html">Multiple time windows</a>: disjoint service-start domains for scalar pricing resources.</p>
 </li>
 <li>
-<p><a href="extensions/multi-pricing.html">Multi-pricing</a>: shared masters, multiple route families, and assignment branching.</p>
+<p><a href="extensions/mp.html">Multi-pricing</a>: shared masters, multiple route families, and assignment branching.</p>
 </li>
 <li>
 <p><a href="extensions/column-imports.html">Finite column imports</a>: original-vector patterns and multiplicity constraints.</p>
@@ -72,13 +76,16 @@ Commands in these guides run from the repository root.</p>
 <li>
 <p><a href="extensions/ipm.html">Interior-point solver</a>: native LP backend, interfaces, and implementation details.</p>
 </li>
+<li>
+<p><a href="extensions/ce.html">Column elimination (CE)</a>: decision-diagram route relaxation and refinement.</p>
+</li>
 </ul>
 <h2 id="benchmarks">Benchmarks</h2>
 <ul>
 <li><a href="benchmarks/root.html">Root benchmarks</a>: published root relaxation timings and measurement setup.</li>
 </ul>
 <h2 id="capabilities-and-interfaces">Capabilities and interfaces</h2>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Operation</th>
@@ -125,9 +132,9 @@ Commands in these guides run from the repository root.</p>
 <td>HiGHS</td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p>The <code>vrptw</code> and <code>cvrp</code> routing tree uses one pricing network. For models with
-multiple route families, use the <a href="extensions/multi-pricing.html">multi-pricing interface</a>,
+multiple route families, use the <a href="extensions/mp.html">multi-pricing interface</a>,
 including its CLI and Python APIs and assignment tree. Its supported branching
 families and solve limitations differ from the single-network routing tree.</p>
 <p>Root <code>Optimal</code> means the LP relaxation converged. Tree <code>Optimal</code> means the
@@ -136,11 +143,11 @@ restricted-column solution supplies an incumbent; its objective alone does
 not prove a lower bound for the full routing problem.</p>
 <h2 id="rust-module-organization">Rust module organization</h2>
 <p>Core modules implement graphs, labeling, pricing, cuts, enumeration and the
-master. <code>master::multi_pricing</code> coordinates one master with multiple pricing
+master. <code>master::mp</code> coordinates one master with multiple pricing
 subproblems and belongs to the core master framework. Rust callers can also use
-<code>master::multi_pricing::solve_master</code> for original master variables with no
+<code>master::mp::solve_master</code> for original master variables with no
 pricing subproblems.</p>
-<table>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
 <th>Module</th>
@@ -165,11 +172,11 @@ pricing subproblems.</p>
 <td>P-step CVRP LP with parallel bucket pricing and reference enumeration</td>
 </tr>
 <tr>
-<td><code>master::multi_pricing</code></td>
+<td><code>master::mp</code></td>
 <td>Shared rows, per-subproblem multiplicities and node lifecycle</td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p><code>extensions</code> groups algorithms and specialized models in the same crate; it
 does not imply runtime plugins or new build features. Existing <code>baldes::hgs</code>,
 <code>baldes::ipm</code>, <code>baldes::evrp</code> and <code>master::networks</code> paths remain compatibility

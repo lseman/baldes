@@ -1,5 +1,33 @@
 /* Offline-friendly reader: navigation works without JavaScript; search is local. */
 (() => {
+  const menu = document.querySelector('.guide-menu');
+  const mobile = matchMedia('(max-width: 760px)');
+  const syncMenu = () => { menu.open = !mobile.matches; };
+  syncMenu();
+  mobile.addEventListener('change', syncMenu);
+  document.querySelector('.guide-menu [aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
+  document.querySelectorAll('.prose h2[id], .prose h3[id], .prose h4[id]').forEach(heading => {
+    const link = document.createElement('a');
+    link.className = 'heading-anchor';
+    link.href = `#${heading.id}`;
+    link.setAttribute('aria-label', `Link to ${heading.textContent}`);
+    link.textContent = '#';
+    heading.append(link);
+  });
+  const tocLinks = [...document.querySelectorAll('.doc-toc a')];
+  if ('IntersectionObserver' in window) {
+    const visible = new Set();
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => entry.isIntersecting ? visible.add(entry.target.id) : visible.delete(entry.target.id));
+      const current = tocLinks.find(link => visible.has(decodeURIComponent(link.hash.slice(1))));
+      if (!current) return;
+      tocLinks.forEach(link => {
+        if (link === current) link.setAttribute('aria-current', 'location');
+        else link.removeAttribute('aria-current');
+      });
+    }, { rootMargin: '-100px 0px -55% 0px' });
+    document.querySelectorAll('.prose h2[id], .prose h3[id]').forEach(heading => observer.observe(heading));
+  }
   const input = document.querySelector('#docs-search');
   const results = document.querySelector('#search-results');
   const status = document.querySelector('#search-status');
