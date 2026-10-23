@@ -7,6 +7,40 @@ fn command() -> Command {
 }
 
 #[test]
+fn routing_phase_one_restores_expensive_costs_and_exposes_separate_diagnostics() {
+    let file = std::env::temp_dir().join(format!("baldes-phase-one-{}.txt", std::process::id()));
+    let json = file.with_extension("json");
+    std::fs::write(&file, "phase-i\nVEHICLE\nNUMBER CAPACITY\n1 1\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000000000000000 0\n1 10000000000000 0 1 0 1000000000000000 0\n").unwrap();
+    let output = command()
+        .arg("cvrp")
+        .arg(&file)
+        .args([
+            "--rounding",
+            "none",
+            "--no-stabilization",
+            "--no-enumeration",
+            "--json",
+        ])
+        .arg(&json)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+    assert_eq!(report["status"], "Optimal", "{report}");
+    assert_eq!(report["lp"].as_f64().unwrap(), 2e13);
+    assert_eq!(report["routes"][0]["cost"].as_f64().unwrap(), 2e13);
+    assert_eq!(report["feasibility"][0]["status"], "feasible");
+    assert!(report["feasibility"][0]["pricing_calls"].as_u64().unwrap() > 0);
+    std::fs::remove_file(file).unwrap();
+    std::fs::remove_file(json).unwrap();
+}
+
+#[test]
 fn rounding_defaults_to_tenths_and_none_preserves_euclidean_distances() {
     let file = std::env::temp_dir().join(format!("baldes-rounding-cli-{}.txt", std::process::id()));
     let json = file.with_extension("json");
@@ -540,7 +574,7 @@ fn tree_and_kohl_controls_reach_integer_solve_and_reject_cvrp_time_resource() {
     let output = command()
         .args([
             "vrptw",
-            "instances/R101.txt",
+            "instances/Solomon/R101.txt",
             "--customers",
             "10",
             "--tree",
@@ -563,7 +597,7 @@ fn tree_and_kohl_controls_reach_integer_solve_and_reject_cvrp_time_resource() {
         "{stdout}"
     );
     let output = command()
-        .args(["cvrp", "instances/R101.txt", "--two-path-cuts"])
+        .args(["cvrp", "instances/Solomon/R101.txt", "--two-path-cuts"])
         .output()
         .unwrap();
     assert!(!output.status.success());
@@ -678,7 +712,7 @@ fn canonical_and_legacy_option_names_reach_the_same_root_and_tree_controls() {
         for tree in [false, true] {
             let mut args = vec![
                 "vrptw".to_owned(),
-                "instances/R101.txt".to_owned(),
+                "instances/Solomon/R101.txt".to_owned(),
                 "--customers".to_owned(),
                 "4".to_owned(),
                 "--time".to_owned(),
@@ -771,7 +805,7 @@ fn hgs_warm_start_and_ipm_flags_reach_the_routing_master() {
 fn cg_progress_is_opt_in_periodic_and_separate_from_results() {
     let base = [
         "vrptw",
-        "instances/R101.txt",
+        "instances/Solomon/R101.txt",
         "--customers",
         "5",
         "--no-enumeration",
@@ -850,7 +884,7 @@ fn highs_master_selection_respects_the_build_features() {
     let result = command()
         .args([
             "vrptw",
-            "instances/R101.txt",
+            "instances/Solomon/R101.txt",
             "--customers",
             "5",
             "--master",
@@ -878,7 +912,7 @@ fn hgs_solver_log_precedes_column_generation_and_preserves_stdout() {
     let output = command()
         .args([
             "vrptw",
-            "instances/R101.txt",
+            "instances/Solomon/R101.txt",
             "--customers",
             "5",
             "--hgs-time",
@@ -914,7 +948,7 @@ fn hgs_solver_log_precedes_column_generation_and_preserves_stdout() {
     let quiet = command()
         .args([
             "hgs",
-            "instances/R101.txt",
+            "instances/Solomon/R101.txt",
             "--customers",
             "5",
             "--time",
@@ -928,7 +962,7 @@ fn hgs_solver_log_precedes_column_generation_and_preserves_stdout() {
     let standalone = command()
         .args([
             "hgs",
-            "instances/R101.txt",
+            "instances/Solomon/R101.txt",
             "--customers",
             "5",
             "--time",
@@ -949,7 +983,7 @@ fn clp_runtime_policy_modes_are_validated() {
         ("--clp-work-areas", "invalid"),
     ] {
         let output = command()
-            .args(["vrptw", "instances/C101.txt", flag, value])
+            .args(["vrptw", "instances/Solomon/C101.txt", flag, value])
             .output()
             .unwrap();
         assert!(!output.status.success());
@@ -1001,7 +1035,7 @@ fn cg_progress_shows_only_enabled_cut_families() {
         let output = command()
             .args([
                 "vrptw",
-                "instances/R101.txt",
+                "instances/Solomon/R101.txt",
                 "--customers",
                 "5",
                 "--no-enumeration",
@@ -1085,7 +1119,7 @@ fn solve_detects_cvrplib_and_rejects_time_window_cuts() {
 fn all_cuts_supports_capacity_only_models_and_rejects_hgs() {
     for flags in [vec!["cvrp"], vec!["solve", "--ignore-time-windows"]] {
         let mut cmd = command();
-        cmd.arg(flags[0]).arg("instances/R101.txt");
+        cmd.arg(flags[0]).arg("instances/Solomon/R101.txt");
         cmd.args(&flags[1..]);
         let output = cmd
             .args([
@@ -1109,7 +1143,13 @@ fn all_cuts_supports_capacity_only_models_and_rejects_hgs() {
         assert!(!header.split_whitespace().any(|s| s == "2Path"), "{header}");
     }
     let output = command()
-        .args(["hgs", "instances/R101.txt", "--cuts", "--customers", "5"])
+        .args([
+            "hgs",
+            "instances/Solomon/R101.txt",
+            "--cuts",
+            "--customers",
+            "5",
+        ])
         .output()
         .unwrap();
     assert!(!output.status.success());
@@ -1213,4 +1253,21 @@ fn routing_bucket_steps_are_applied_and_validated() {
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("missing bucket steps"));
     std::fs::remove_file(file).unwrap();
+}
+
+#[test]
+fn routing_rejects_invalid_master_worker_budgets() {
+    for value in ["-1", "NaN", "2147483648", "bad", ""] {
+        let output = command()
+            .args(["solve", "missing", "--master-threads", value])
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{value}");
+        assert!(String::from_utf8_lossy(&output.stderr).contains("master thread"));
+    }
+    let output = command()
+        .args(["solve", "missing", "--master-threads"])
+        .output()
+        .unwrap();
+    assert!(String::from_utf8_lossy(&output.stderr).contains("missing master thread count"));
 }

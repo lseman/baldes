@@ -8,24 +8,6 @@ impl<'p> Individual<'p> {
         let mut cost_sol = CostSol::default();
         let nb_vehicles = self.nb_vehicles.min(self.chrom_r.len());
 
-        // Precompute time-cost cache for each route.
-        let mut time_cost_cache: Vec<Vec<f64>> = Vec::with_capacity(nb_vehicles);
-        for r in 0..nb_vehicles {
-            if self.chrom_r[r].is_empty() {
-                time_cost_cache.push(Vec::new());
-                continue;
-            }
-            let mut cache = vec![0.; self.chrom_r[r].len()];
-            cache[0] = self.params.time_cost.get(0, self.chrom_r[r][0]);
-            for i in 1..self.chrom_r[r].len() {
-                cache[i] = self
-                    .params
-                    .time_cost
-                    .get(self.chrom_r[r][i - 1], self.chrom_r[r][i]);
-            }
-            time_cost_cache.push(cache);
-        }
-
         // Evaluate each route.
         for r in 0..nb_vehicles {
             let route = &self.chrom_r[r];
@@ -41,7 +23,7 @@ impl<'p> Individual<'p> {
                 }
             }
 
-            let mut distance = time_cost_cache[r][0];
+            let mut distance = self.params.time_cost.get(0, route[0]);
             let mut load = self.params.cli[route[0]].demand;
             let mut _service = self.params.cli[route[0]].service_duration;
             let mut time = latest_release_time + distance;
@@ -50,8 +32,8 @@ impl<'p> Individual<'p> {
 
             // Handle time windows for first customer.
             if self.params.cli[route[0]].n_tw > 0 {
-                let tws: Vec<TimeWindow> = self.params.cli[route[0]].time_windows.clone();
-                time = Self::adjust_to_time_window(time, &tws, &mut wait_time, &mut time_warp);
+                let tws = &self.params.cli[route[0]].time_windows;
+                time = Self::adjust_to_time_window(time, tws, &mut wait_time, &mut time_warp);
             } else {
                 if time < self.params.cli[route[0]].earliest_arrival {
                     time = self.params.cli[route[0]].earliest_arrival;
@@ -67,14 +49,15 @@ impl<'p> Individual<'p> {
             for i in 1..route.len() {
                 let prev = route[i - 1];
                 let curr = route[i];
-                distance += time_cost_cache[r][i];
+                let travel = self.params.time_cost.get(prev, curr);
+                distance += travel;
                 load += self.params.cli[curr].demand;
                 _service += self.params.cli[curr].service_duration;
-                time += self.params.cli[prev].service_duration + time_cost_cache[r][i];
+                time += self.params.cli[prev].service_duration + travel;
 
                 if self.params.cli[curr].n_tw > 0 {
-                    let tws: Vec<TimeWindow> = self.params.cli[curr].time_windows.clone();
-                    time = Self::adjust_to_time_window(time, &tws, &mut wait_time, &mut time_warp);
+                    let tws = &self.params.cli[curr].time_windows;
+                    time = Self::adjust_to_time_window(time, tws, &mut wait_time, &mut time_warp);
                 } else {
                     if time < self.params.cli[curr].earliest_arrival {
                         wait_time += self.params.cli[curr].earliest_arrival - time;

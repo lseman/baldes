@@ -114,3 +114,34 @@ fn test_shuffled_giant_tour_is_permutation() {
     sorted.sort();
     assert_eq!(sorted, vec![1, 2, 3, 4]);
 }
+
+#[test]
+fn route_evaluation_preserves_multiple_windows_and_empty_routes() {
+    let instance = make_test_instance();
+    let mut params = Params::from_instance(&instance);
+    params.problem_type = ProblemType::Vrptw;
+    for i in 0..params.time_cost.size() {
+        for j in 0..params.time_cost.size() {
+            params.time_cost.set(i, j, 1.);
+        }
+    }
+    params.cli[1].service_duration = 1.;
+    params.cli[1].time_windows = vec![TimeWindow::new(3., 4.)];
+    params.cli[1].n_tw = 1;
+    params.cli[2].service_duration = 0.;
+    params.cli[2].time_windows = vec![TimeWindow::new(0., 1.), TimeWindow::new(8., 9.)];
+    params.cli[2].n_tw = 2;
+    let mut individual = Individual::from_string(&params, "1 2 0");
+    for _ in 0..2 {
+        individual.evaluate_complete_cost();
+        let cost = &individual.my_cost_sol;
+        assert_eq!(cost.nb_routes, 1);
+        assert_eq!(cost.distance, 3.);
+        assert_eq!(cost.wait_time, 5.);
+        assert_eq!(cost.time_warp, 0.);
+        assert_eq!(cost.capacity_excess, 0);
+        assert!(cost.is_feasible);
+        assert_eq!(individual.successors[1], 2);
+        assert_eq!(individual.predecessors[2], 1);
+    }
+}

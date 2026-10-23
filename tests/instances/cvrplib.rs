@@ -99,7 +99,7 @@ fn unsupported_cvrplib_features_are_rejected() {
 
 #[test]
 fn solomon_input_is_unchanged() {
-    let instance = Instance::read(concat!(env!("CARGO_MANIFEST_DIR"), "/instances/R101.txt")).unwrap();
+    let instance = Instance::read(concat!(env!("CARGO_MANIFEST_DIR"), "/instances/Solomon/R101.txt")).unwrap();
     assert_eq!(instance.rounding, Rounding::None);
     assert!(instance.distances.is_none() && instance.has_time_windows());
 }
@@ -109,7 +109,7 @@ fn solomon_input_is_unchanged() {
 fn cli_solves_a_cvrplib_root() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_baldes"))
         .args(["cvrp", concat!(env!("CARGO_MANIFEST_DIR"), "/instances/cvrplib/E-n22-k4.vrp")])
-        .args(["--capacity-cuts", "--no-enumeration", "--reference-ng"])
+        .args(["--capacity-cuts", "--no-enumeration", "--reference-ng", "--rounding", "nearest"])
         .output()
         .unwrap();
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
