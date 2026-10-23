@@ -199,5 +199,3 @@ Local feasibility pruning reduced the initial arc count from 990,200 to
 436,988. This is a single-instance check, not a general runtime guarantee.
 Capacity-only instances can still require many refinements because the
 general layered states do not track exact accumulated load or visit history.
-See [the model-reduction audit and comparison](../benchmarks/column-elimination.md)
-for the current construction, validation and benchmark procedure.
