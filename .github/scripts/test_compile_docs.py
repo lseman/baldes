@@ -88,6 +88,34 @@ class DocumentationBuild(unittest.TestCase):
         child = (self.output / "nested" / "index.html").read_text()
         self.assertIn('id="intro-1"', child)
 
+    def test_code_panels_keep_literal_text_and_normalize_rust_annotations(self):
+        with (self.source / "README.md").open("a") as f:
+            f.write('\n```rust,no_run\nlet label = "<route>";\n```\n'
+                    '\n```unknown-language\n<script>unsafe</script>\n```\n')
+        self.compile()
+        index = (self.output / "index.html").read_text()
+        self.assertIn('class="code-heading"><span>Python</span>', index)
+        self.assertIn('class="language-rust"', index)
+        self.assertIn('&lt;route&gt;', index)
+        self.assertIn('&lt;script&gt;unsafe&lt;/script&gt;', index)
+        self.assertNotIn('<script>unsafe</script>', index)
+
+    def test_tables_have_keyboard_accessible_scroll_regions(self):
+        self.compile()
+        index = (self.output / "index.html").read_text()
+        self.assertIn('class="table-scroll" role="region" aria-label="Data table" tabindex="0"', index)
+        self.assertIn('</table></div>', index)
+
+    def test_navigation_groups_follow_directories_and_keep_current_page(self):
+        (self.source / "guides").mkdir()
+        (self.source / "guides" / "install.md").write_text("# Install\n")
+        self.compile()
+        guide = (self.output / "guides" / "install.html").read_text()
+        self.assertIn('class="nav-group-title">Getting started</p>', guide)
+        self.assertIn('href="install.html" aria-current="page">Install</a>', guide)
+        self.assertIn('href="../nested/index.html"', guide)
+        self.assertIn('DOCS <span aria-hidden="true">/</span> Getting started', guide)
+
     def test_bad_link_fails_without_changing_previous_build(self):
         self.compile()
         before = (self.output / "index.html").read_bytes()

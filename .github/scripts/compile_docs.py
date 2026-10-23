@@ -133,7 +133,28 @@ def code_highlight(code: str, language: str, _attrs: str) -> str:
 
 
 def parser() -> MarkdownIt:
-    return MarkdownIt("js-default", {"html": False, "highlight": code_highlight})
+    md = MarkdownIt("js-default", {"html": False, "highlight": code_highlight})
+
+    def fence(tokens, index, options, env):
+        token = tokens[index]
+        language = token.info.strip().split(maxsplit=1)[0] if token.info.strip() else "text"
+        language = language.split(",")[0]
+        label = {"bash": "Terminal", "sh": "Terminal", "shell": "Terminal",
+                 "python": "Python", "rust": "Rust", "json": "JSON"}.get(language, language)
+        return (f'<div class="code-block"><div class="code-heading"><span>{escape(label)}</span></div>'
+                f'<pre><code class="language-{escape(language, quote=True)}">'
+                f'{code_highlight(token.content, language, "")}</code></pre></div>\n')
+
+    def table_open(tokens, index, options, env):
+        return '<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>\n'
+
+    def table_close(tokens, index, options, env):
+        return '</table></div>\n'
+
+    md.renderer.rules["fence"] = fence
+    md.renderer.rules["table_open"] = table_open
+    md.renderer.rules["table_close"] = table_close
+    return md
 
 
 def read_pages(source: Path, md: MarkdownIt) -> list[Page]:
@@ -259,12 +280,24 @@ def render_shell(page: Page, pages: list[Page], body: str, repository: str, base
         return escape(relative_url(Path(path), page.output), quote=True)
     docs_root = posixpath.relpath(".", page.output.parent.as_posix()) + "/"
     home = posixpath.relpath("..", page.output.parent.as_posix()) + "/"
-    navigation = "".join(
-        f'<a href="{href(p.output.as_posix())}"' + (' aria-current="page"' if p is page else '')
-        + f'>{escape("Overview" if p.output == Path("index.html") else p.title)}</a>' for p in pages
-    )
+    groups: dict[str, list[Page]] = {}
+    labels = {"guides": "Getting started", "solver": "The solver", "reference": "Reference",
+              "extensions": "Extensions", "benchmarks": "Benchmarks", "internal": "Internals"}
+    for guide in pages:
+        section = guide.output.parts[0] if len(guide.output.parts) > 1 else "overview"
+        groups.setdefault(section, []).append(guide)
+    navigation = ""
+    for section, guides in groups.items():
+        links = "".join(
+            f'<a href="{href(p.output.as_posix())}"' + (' aria-current="page"' if p is page else '')
+            + f'>{escape("Overview" if p.output == Path("index.html") else p.title)}</a>' for p in guides
+        )
+        navigation += (f'<div class="nav-group"><p class="nav-group-title">'
+                       f'{escape(labels.get(section, section.capitalize()))}</p>{links}</div>')
     toc = "".join(f'<a class="toc-level-{level}" href="#{escape(anchor)}">{escape(title)}</a>'
                   for level, title, anchor in page.headings if level in {2, 3})
+    section = page.output.parts[0] if len(page.output.parts) > 1 else "overview"
+    section_label = labels.get(section, section.capitalize())
     index = pages.index(page)
     previous = pages[index - 1] if index else None
     following = pages[index + 1] if index + 1 < len(pages) else None
@@ -299,7 +332,7 @@ def render_shell(page: Page, pages: list[Page], body: str, repository: str, base
 <a class="source-link" href="{escape(edit_url)}">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
-<div class="doc-toolbar"><span class="eyebrow">BALDES / DOCUMENTATION</span><form class="doc-search" role="search" action="{href('index.html')}" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span id="search-status" class="sr-only" role="status"></span></form></div>
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> {escape(section_label)}</span><form class="doc-search" role="search" action="{href('index.html')}" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose">{body}</article>

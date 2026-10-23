@@ -34,6 +34,80 @@ Python and JSON APIs.
 
 Python installation is covered in the [pybaldes guide](python.md).
 
+### Experimental native pricing
+
+`cargo build --release --features native-pricing` enables the Clp backend and a
+C++14 batch preflight for buckets with at least 32 eligible labels. It checks
+two disposable resources and NG rejection together, using SSE2 where available
+and a scalar C++ fallback elsewhere. Rust retains cut/branch updates, label
+construction and ordered insertion. Other resource dimensions, equality or
+coupled resources, disjoint time windows and finite label budgets retain scalar
+Rust propagation.
+
+This feature is disabled by default: initial comparisons preserved solver
+outputs but did not establish an end-to-end speedup, and R202 regressed. See
+[the native-kernel experiment](../benchmarks/native-kernels.md) before enabling
+it for a workload. The existing Clp paired sparse-matrix kernel remains enabled
+with `clp` independently of this experiment.
+
+
+## Gurobi master backend
+
+Download and extract the latest stable Linux release into the repository's
+ignored `external/` directory:
+
+```sh
+./scripts/setup/gurobi_downloader
+```
+
+The script detects x86-64, ARM64, or PowerPC Linux, verifies Gurobi's published
+checksum, and prints the installation path to use in `make config`. It reuses
+verified downloads and existing installations. Use `--version 13.0.3` to pin a
+release, `--destination PATH` for another directory, or `--help` for options.
+Extraction requires Python with `tarfile.data_filter` (Python 3.12+).
+
+Install Gurobi and configure a valid license. Set `GUROBI_HOME` to its platform
+installation directory, containing `lib/`, then build:
+
+```sh
+export GUROBI_HOME=/opt/gurobi1300/linux64
+export LD_LIBRARY_PATH="$GUROBI_HOME/lib:${LD_LIBRARY_PATH:-}"
+cargo build --release --features clp,gurobi
+./target/release/baldes vrptw instances/Solomon/R101.txt --master gurobi
+```
+
+On macOS configure `DYLD_LIBRARY_PATH` as needed instead. The build detects the
+versioned C library (for example `libgurobi130.so`) in `$GUROBI_HOME/lib`.
+Set `GUROBI_LIB_NAME=gurobi130` explicitly if that directory contains multiple
+versions. Gurobi is linked dynamically and is not bundled with BALDES.
+License errors are reported when the backend is initialized.
+
+`GurobiMaster` implements the generic Rust `LpMaster` interface with automatic
+algorithm selection, warm-basis reoptimization, primal values, duals, reduced costs, basis-aware
+cut cleanup, solve limits, and independent model copies. Use `--features gurobi`
+for the library backend alone; the routing CLI/tree also require `clp`.
+All three native features may be enabled together. Enumerated-node integer
+solving continues to use the `highs` feature.
+
+Routing root/tree solves give HiGHS and Gurobi all CPUs available to the process
+by default. Use `--master-threads N` to limit their worker budget, or
+`--master-threads 0` for all available CPUs. CPU affinity is respected.
+Clp and native IPM ignore this setting. HiGHS retains adaptive primal/dual
+simplex; Gurobi uses automatic algorithm selection. Both receive the worker
+budget and determine actual algorithm parallelism. Warm simplex reoptimization
+may remain serial, and more workers do not guarantee a faster solve.
+HiGHS models in one process must use a consistent worker budget because its
+native scheduler is shared; configure it before the first solve. Forks retain
+their parent's budget. In Rust, use `RootOptions::master_threads`; in Python,
+use `solve_root(..., master_threads=N)`.
+
+For Python, build with `maturin develop --release --features clp,gurobi` from
+`python/`, then pass `master_solver="gurobi"` to `solve_root`. Check
+`pybaldes.has_gurobi` to see whether that wheel includes the backend.
+In `make config`, enable **Gurobi backend** and set **Gurobi installation**,
+or leave its path empty to inherit `GUROBI_HOME` from your shell. Save and
+run `make` to build with those settings.
+
 ## Interactive configuration
 
 From the repository root:
@@ -69,6 +143,7 @@ configuration, so it does not need to build the solver first.
 | Profile | `release` | Choose Cargo's `release` or `dev` profile |
 | Clp | Off | Enable the `clp` Cargo feature |
 | HiGHS | Off | Enable the `highs` Cargo feature |
+| Gurobi | Off | Enable the `gurobi` Cargo feature; requires an installation and license |
 | Command-line program | Off | Build the `baldes` executable along with the library; selects Clp |
 | Optional SIMD | Off | Cycle off / AVX2 / AVX-512; only CPU-supported modes are selectable |
 | Native CPU | Off | Add `-C target-cpu=native`, preserving existing Rust flags |
@@ -79,6 +154,7 @@ configuration, so it does not need to build the solver first.
 | Parallel jobs | `0` (automatic) | Pass `--jobs N` when nonzero |
 | Target triple | Empty (host) | Pass `--target TRIPLE` for cross compilation |
 | HiGHS installation | Empty (automatic) | Set `HIGHS_DIR` to the root containing `lib/libhighs` |
+| Gurobi installation | Empty (shell environment) | Set `GUROBI_HOME` to the installation root containing `lib/libgurobi` |
 
 The library, including native IPM, pricing, cuts, and HGS, is always included.
 These components currently have no Cargo feature switches. Algorithm settings
@@ -130,6 +206,7 @@ An example configuration for the CLI with both LP backends:
 CONFIG_PROFILE=release
 CONFIG_CLP=y
 CONFIG_HIGHS=y
+CONFIG_GUROBI=n
 CONFIG_CLI=y
 CONFIG_SIMD=off
 CONFIG_NATIVE_CPU=n
@@ -140,6 +217,7 @@ CONFIG_JOBS=0
 CONFIG_RESOURCE_DIMENSIONS=2
 CONFIG_TARGET=""
 CONFIG_HIGHS_DIR=""
+CONFIG_GUROBI_HOME=""
 ```
 
 ## Other Make targets

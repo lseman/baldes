@@ -125,9 +125,10 @@ in equations (7)–(9); making extreme p-step columns binary is not equivalent.
 The exposed paths and coefficients provide the data needed for a separate
 arc-flow integrality implementation.
 
-Run `node scripts/benchmark_pstep.mjs ./target/release/baldes` from the repository
+Run `node scripts/benchmarks/benchmark_pstep.mjs ./target/release/baldes` from the repository
 root to repeat the known-instance validation and serial/parallel timing checks.
-It writes raw JSON and CSV records under `results/pstep-20261020/` and compares
+It writes raw JSON and CSV records under `results/pstep/` (override with
+`PSTEP_OUT`) and compares
 every bound with full column enumeration.
 
 Add `--grid` to run p=2,3,4 on all three bundled CVRPLIB instances, with four
@@ -151,9 +152,9 @@ eight cases converged; six also matched complete-column enumeration within
 1e-5. The A-n32-k5 integer solve used capacity cuts, rank-one cuts and a
 one-second HGS warm start before closing the gap at 784.
 
-Compare backends with `node scripts/benchmark_pstep_pricing.mjs`. It alternates
+Compare backends with `node scripts/benchmarks/benchmark_pstep_pricing.mjs`. It alternates
 backend order over three repetitions, checks converged bounds agree, and writes
-raw JSON and CSV to `results/pstep-pricing-20261021/`. Set `PSTEP_RUNS`,
+raw JSON and CSV to `results/pstep-pricing/` (or the second positional argument). Set `PSTEP_RUNS`,
 `PSTEP_SECONDS`, or `PSTEP_THREADS` to change repetitions, per-solve limits,
 or worker count. An optional binary path and output directory are accepted.
 

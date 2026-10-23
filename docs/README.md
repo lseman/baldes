@@ -13,6 +13,7 @@ Commands in these guides run from the repository root.
 ## Solver
 
 - [Tree and node lifecycle](solver/tree.md): integer routing, inherited state, bounds, and limits.
+- [Routing feasibility recovery](solver/feasibility.md): zero-objective phase I, objective restoration, proof scope and limits.
 - [Branching](solver/branching.md): branching families and selection.
 - [Cuts](solver/cuts.md): cut configuration and coefficient consistency.
 - [Dual-price stabilization](solver/stabilization.md): smoothing, center updates, and retries.
@@ -27,6 +28,7 @@ Commands in these guides run from the repository root.
 
 ## Extensions and modeling
 
+- [Coupled resources](extensions/coupled-resources.md): simultaneous pickup/delivery, selected values, cumulative costs and affine dependencies in the physical-graph labeling engine.
 - [Multiple time windows](extensions/multi-time-windows.md): disjoint service-start domains for scalar pricing resources.
 
 - [Multi-pricing](extensions/multi-pricing.md): shared masters, multiple route families, and assignment branching.

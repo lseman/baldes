@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 832" width="960" height="832" font-family="Inter, -apple-system, Segoe UI, sans-serif">
-<title>Solomon root LP times — BALDES refresh 2026-10-20</title>
-<desc>All 13 BALDES cases were rerun on one and two physical cores. Automatic Clp scaling, retained work areas, numerical bounds, enumeration disabled. One warmup and three measured runs. Background work was present. VRPSolver times are historical and were not rerun.</desc>
-<metadata>{&quot;baldes&quot;: {&quot;date&quot;: &quot;2026-10-20&quot;, &quot;binary_sha256&quot;: &quot;c1cba60fc9f85349bcb4de149f870bfa0664b321e0f1552f1672183221874dec&quot;, &quot;warmups&quot;: 1, &quot;repetitions&quot;: 3, &quot;cpus&quot;: {&quot;1&quot;: &quot;0&quot;, &quot;2&quot;: &quot;0,1&quot;}, &quot;clp_scaling&quot;: &quot;auto&quot;, &quot;clp_work_areas&quot;: &quot;retain&quot;, &quot;simd&quot;: false, &quot;background_work_previously_confirmed&quot;: true}, &quot;medians&quot;: {&quot;C101&quot;: {&quot;1&quot;: 0.061714137, &quot;2&quot;: 0.061565114}, &quot;C102&quot;: {&quot;1&quot;: 0.381897916, &quot;2&quot;: 0.365226062}, &quot;C103&quot;: {&quot;1&quot;: 1.035404081, &quot;2&quot;: 0.965359378}, &quot;C201&quot;: {&quot;1&quot;: 0.127663825, &quot;2&quot;: 0.126399335}, &quot;C202&quot;: {&quot;1&quot;: 10.651404623, &quot;2&quot;: 9.707543231}, &quot;R101&quot;: {&quot;1&quot;: 0.048162537, &quot;2&quot;: 0.04810774}, &quot;R101-rank1&quot;: {&quot;1&quot;: 1.144266854, &quot;2&quot;: 1.140878764}, &quot;R102&quot;: {&quot;1&quot;: 0.288297194, &quot;2&quot;: 0.283949868}, &quot;R103&quot;: {&quot;1&quot;: 0.866251665, &quot;2&quot;: 0.848629188}, &quot;R103-rank1&quot;: {&quot;1&quot;: 1.7604086639999998, &quot;2&quot;: 1.696261762}, &quot;R201&quot;: {&quot;1&quot;: 1.488687378, &quot;2&quot;: 1.465671625}, &quot;R201-rank1&quot;: {&quot;1&quot;: 6.862406154, &quot;2&quot;: 6.764320143}, &quot;R202&quot;: {&quot;1&quot;: 5.837315165, &quot;2&quot;: 5.582672603}}, &quot;geometric_means&quot;: {&quot;1&quot;: 0.7916237069821332, &quot;2&quot;: 0.7693279367909895}, &quot;reference&quot;: &quot;Historical values retained from previous chart; speedups use its displayed reference times.&quot;, &quot;results&quot;: &quot;results/chart-refresh-cpu01-20261020/benchmark.json&quot;}</metadata>
+<title>Solomon root LP times — BALDES refresh 2026-10-22</title>
+<desc>All 13 BALDES cases were rerun on one and two physical cores. Automatic Clp scaling, retained work areas, numerical bounds, enumeration disabled. One warmup and three measured runs. Local timings are indicative. VRPSolver times are historical and were not rerun.</desc>
+<metadata>{&quot;baldes&quot;:{&quot;date&quot;:&quot;2026-10-22&quot;,&quot;commit&quot;:&quot;1da7f22b11d3a2de81772a8f4df9bbe6b80edb4d&quot;,&quot;binary_sha256&quot;:&quot;e9c445a8eb015ab82c350978dda58e5c361fcb3c0279c03ab899ae4a2764e38d&quot;,&quot;build&quot;:&quot;cargo build --release --features clp&quot;,&quot;warmups&quot;:1,&quot;repetitions&quot;:3,&quot;cpus&quot;:{&quot;1&quot;:&quot;0&quot;,&quot;2&quot;:&quot;0,1&quot;},&quot;rounding&quot;:&quot;none&quot;,&quot;bound_mode&quot;:&quot;numerical&quot;,&quot;clp_scaling&quot;:&quot;auto&quot;,&quot;clp_work_areas&quot;:&quot;retain&quot;,&quot;simd&quot;:false},&quot;medians&quot;:{&quot;C101&quot;:{&quot;1&quot;:0.06186863,&quot;2&quot;:0.06165311},&quot;C102&quot;:{&quot;1&quot;:0.385548854,&quot;2&quot;:0.402969341},&quot;C103&quot;:{&quot;1&quot;:1.056551804,&quot;2&quot;:0.99073771},&quot;C201&quot;:{&quot;1&quot;:0.130240553,&quot;2&quot;:0.12881994},&quot;C202&quot;:{&quot;1&quot;:10.127826485,&quot;2&quot;:9.287723736},&quot;R101&quot;:{&quot;1&quot;:0.048238464,&quot;2&quot;:0.048058771},&quot;R101-rank1&quot;:{&quot;1&quot;:0.68754303,&quot;2&quot;:0.683232484},&quot;R102&quot;:{&quot;1&quot;:0.282253259,&quot;2&quot;:0.278597461},&quot;R103&quot;:{&quot;1&quot;:0.853674908,&quot;2&quot;:0.833481502},&quot;R103-rank1&quot;:{&quot;1&quot;:1.756824843,&quot;2&quot;:1.691547774},&quot;R201&quot;:{&quot;1&quot;:1.43843316,&quot;2&quot;:1.412834758},&quot;R201-rank1&quot;:{&quot;1&quot;:6.006760768,&quot;2&quot;:5.909739526},&quot;R202&quot;:{&quot;1&quot;:5.653114219,&quot;2&quot;:5.372822988}},&quot;geometric_means&quot;:{&quot;1&quot;:0.74762297094242,&quot;2&quot;:0.7310664198986763},&quot;reference&quot;:&quot;Historical values retained from previous chart; speedups use its displayed reference times.&quot;,&quot;results&quot;:&quot;results/chart-refresh-cpu01-20261022/benchmark.json&quot;}</metadata>
 <defs>
-  <linearGradient id="grad-bapcod" x1="0" y1="0" x2="1" y2="0">
+  <linearGradient id="grad-reference" x1="0" y1="0" x2="1" y2="0">
     <stop offset="0%" stop-color="#8b5cf6"/>
     <stop offset="100%" stop-color="#bba0ff"/>
   </linearGradient>
@@ -37,7 +37,7 @@
 <text class="title" x="35" y="38">Root Relaxation Solve Time — Solomon VRPTW (100 customers)</text>
 <text class="subtitle" x="35" y="58">AMD Ryzen 9 9950X · Medians of 3 runs · Clp master LP · 8-NN exact pricing · Unrounded Euclidean</text>
 <g transform="translate(35, 80)">
-  <rect x="0" y="0" width="14" height="10" rx="2" fill="url(#grad-bapcod)"/>
+  <rect x="0" y="0" width="14" height="10" rx="2" fill="url(#grad-reference)"/>
   <text class="legend-text" x="20" y="9">VRPSolver (historical, 1 thread)</text>
   <rect x="230" y="0" width="14" height="10" rx="2" fill="url(#grad-baldes1)"/>
   <text class="legend-text" x="250" y="9">BALDES (1 core)</text>
@@ -75,152 +75,152 @@
 <text class="subtitle" x="885" y="100" text-anchor="middle">Speedup (2c)</text>
 <rect class="row-bg" x="30" y="118" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="135">C101</text>
-<rect x="205" y="123.0" width="85.5" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="123.0" width="85.5" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="297.5" y="127.2" fill="#bba0ff">0.090s</text>
-<rect x="205" y="134.0" width="51.4" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="263.4" y="138.2" fill="#06b6d4">0.062s</text>
-<rect x="205" y="145.0" width="51.1" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="263.1" y="149.2" fill="#22d3ee">0.062s</text>
+<rect x="205" y="134.0" width="51.6" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="263.6" y="138.2" fill="#06b6d4">0.062s</text>
+<rect x="205" y="145.0" width="51.3" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="263.3" y="149.2" fill="#22d3ee">0.062s</text>
 <rect x="859" y="129" width="52" height="21" rx="10.5" fill="#0d262c" stroke="#22d3ee" stroke-opacity="0.35"/>
 <text class="speedup-pill" x="885" y="140.5" fill="#22d3ee">1.46×</text>
 <rect class="row-bg" x="30" y="161" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="178">C102</text>
-<rect x="205" y="166.0" width="218.4" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="166.0" width="218.4" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="430.4" y="170.2" fill="#bba0ff">0.39s</text>
-<rect x="205" y="177.0" width="216.4" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="428.4" y="181.2" fill="#06b6d4">0.38s</text>
-<rect x="205" y="188.0" width="212.4" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="424.4" y="192.2" fill="#22d3ee">0.37s</text>
+<rect x="205" y="177.0" width="217.3" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="429.3" y="181.2" fill="#06b6d4">0.39s</text>
+<rect x="205" y="188.0" width="221.3" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="433.3" y="192.2" fill="#22d3ee">0.40s</text>
 <rect x="859" y="172" width="52" height="21" rx="10.5" fill="#182026" stroke="#8a959e" stroke-opacity="0.35"/>
-<text class="speedup-pill" x="885" y="183.5" fill="#8a959e">1.07×</text>
+<text class="speedup-pill" x="885" y="183.5" fill="#8a959e">0.97×</text>
 <rect class="row-bg" x="30" y="204" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="221">C103</text>
-<rect x="205" y="209.0" width="314.7" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="209.0" width="314.7" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="526.7" y="213.2" fill="#bba0ff">1.13s</text>
-<rect x="205" y="220.0" width="306.7" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="518.7" y="224.2" fill="#06b6d4">1.04s</text>
-<rect x="205" y="231.0" width="300.4" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="512.4" y="235.2" fill="#22d3ee">0.97s</text>
+<rect x="205" y="220.0" width="308.5" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="520.5" y="224.2" fill="#06b6d4">1.06s</text>
+<rect x="205" y="231.0" width="302.7" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="514.7" y="235.2" fill="#22d3ee">0.99s</text>
 <rect x="859" y="215" width="52" height="21" rx="10.5" fill="#0d262c" stroke="#22d3ee" stroke-opacity="0.35"/>
-<text class="speedup-pill" x="885" y="226.5" fill="#22d3ee">1.17×</text>
+<text class="speedup-pill" x="885" y="226.5" fill="#22d3ee">1.14×</text>
 <line class="cluster-line" x1="35" y1="247" x2="925" y2="247"/>
 <rect class="row-bg" x="30" y="247" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="264">C201</text>
-<rect x="205" y="252.0" width="137.7" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="252.0" width="137.7" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="349.7" y="256.2" fill="#bba0ff">0.16s</text>
-<rect x="205" y="263.0" width="117.2" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="329.2" y="267.2" fill="#06b6d4">0.13s</text>
-<rect x="205" y="274.0" width="116.3" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="328.3" y="278.2" fill="#22d3ee">0.13s</text>
+<rect x="205" y="263.0" width="119.0" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="331.0" y="267.2" fill="#06b6d4">0.13s</text>
+<rect x="205" y="274.0" width="118.0" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="330.0" y="278.2" fill="#22d3ee">0.13s</text>
 <rect x="859" y="258" width="52" height="21" rx="10.5" fill="#0d262c" stroke="#22d3ee" stroke-opacity="0.35"/>
-<text class="speedup-pill" x="885" y="269.5" fill="#22d3ee">1.27×</text>
+<text class="speedup-pill" x="885" y="269.5" fill="#22d3ee">1.24×</text>
 <rect class="row-bg" x="30" y="290" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="307">C202</text>
-<rect x="205" y="295.0" width="546.7" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="295.0" width="546.7" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="758.7" y="299.2" fill="#bba0ff">14.64s</text>
-<rect x="205" y="306.0" width="517.8" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="729.8" y="310.2" fill="#06b6d4">10.65s</text>
-<rect x="205" y="317.0" width="509.4" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="721.4" y="321.2" fill="#22d3ee">9.71s</text>
+<rect x="205" y="306.0" width="513.2" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="725.2" y="310.2" fill="#06b6d4">10.13s</text>
+<rect x="205" y="317.0" width="505.4" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="717.4" y="321.2" fill="#22d3ee">9.29s</text>
 <rect x="859" y="301" width="52" height="21" rx="10.5" fill="#0d262c" stroke="#22d3ee" stroke-opacity="0.35"/>
-<text class="speedup-pill" x="885" y="312.5" fill="#22d3ee">1.51×</text>
+<text class="speedup-pill" x="885" y="312.5" fill="#22d3ee">1.58×</text>
 <line class="cluster-line" x1="35" y1="333" x2="925" y2="333"/>
 <rect class="row-bg" x="30" y="333" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="350">R101</text>
-<rect x="205" y="338.0" width="62.8" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="338.0" width="62.8" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="274.8" y="342.2" fill="#bba0ff">0.070s</text>
-<rect x="205" y="349.0" width="28.9" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="240.9" y="353.2" fill="#06b6d4">0.048s</text>
-<rect x="205" y="360.0" width="28.8" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="240.8" y="364.2" fill="#22d3ee">0.048s</text>
+<rect x="205" y="349.0" width="29.0" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="241.0" y="353.2" fill="#06b6d4">0.048s</text>
+<rect x="205" y="360.0" width="28.7" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="240.7" y="364.2" fill="#22d3ee">0.048s</text>
 <rect x="859" y="344" width="52" height="21" rx="10.5" fill="#0d262c" stroke="#22d3ee" stroke-opacity="0.35"/>
 <text class="speedup-pill" x="885" y="355.5" fill="#22d3ee">1.46×</text>
 <rect class="row-bg" x="30" y="376" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="393">R101</text>
 <text class="inst-cuts" x="81" y="393">rank-1</text>
-<rect x="205" y="381.0" width="309.8" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="381.0" width="309.8" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="521.8" y="385.2" fill="#bba0ff">1.07s</text>
-<rect x="205" y="392.0" width="315.8" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="527.8" y="396.2" fill="#06b6d4">1.14s</text>
-<rect x="205" y="403.0" width="315.5" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="527.5" y="407.2" fill="#22d3ee">1.14s</text>
-<rect x="859" y="387" width="52" height="21" rx="10.5" fill="#182026" stroke="#8a959e" stroke-opacity="0.35"/>
-<text class="speedup-pill" x="885" y="398.5" fill="#8a959e">0.94×</text>
+<rect x="205" y="392.0" width="269.6" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="481.6" y="396.2" fill="#06b6d4">0.69s</text>
+<rect x="205" y="403.0" width="269.1" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="481.1" y="407.2" fill="#22d3ee">0.68s</text>
+<rect x="859" y="387" width="52" height="21" rx="10.5" fill="#0d262c" stroke="#22d3ee" stroke-opacity="0.35"/>
+<text class="speedup-pill" x="885" y="398.5" fill="#22d3ee">1.57×</text>
 <rect class="row-bg" x="30" y="419" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="436">R102</text>
-<rect x="205" y="424.0" width="200.4" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="424.0" width="200.4" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="412.4" y="428.2" fill="#bba0ff">0.32s</text>
-<rect x="205" y="435.0" width="190.9" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="402.9" y="439.2" fill="#06b6d4">0.29s</text>
-<rect x="205" y="446.0" width="189.6" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="401.6" y="450.2" fill="#22d3ee">0.28s</text>
+<rect x="205" y="435.0" width="189.0" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="401.0" y="439.2" fill="#06b6d4">0.28s</text>
+<rect x="205" y="446.0" width="187.8" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="399.8" y="450.2" fill="#22d3ee">0.28s</text>
 <rect x="859" y="430" width="52" height="21" rx="10.5" fill="#0d262c" stroke="#22d3ee" stroke-opacity="0.35"/>
-<text class="speedup-pill" x="885" y="441.5" fill="#22d3ee">1.13×</text>
+<text class="speedup-pill" x="885" y="441.5" fill="#22d3ee">1.15×</text>
 <rect class="row-bg" x="30" y="462" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="479">R103</text>
-<rect x="205" y="467.0" width="295.1" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="467.0" width="295.1" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="507.1" y="471.2" fill="#bba0ff">0.91s</text>
-<rect x="205" y="478.0" width="290.6" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="502.6" y="482.2" fill="#06b6d4">0.87s</text>
-<rect x="205" y="489.0" width="288.7" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="500.7" y="493.2" fill="#22d3ee">0.85s</text>
+<rect x="205" y="478.0" width="289.2" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="501.2" y="482.2" fill="#06b6d4">0.85s</text>
+<rect x="205" y="489.0" width="287.1" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="499.1" y="493.2" fill="#22d3ee">0.83s</text>
 <rect x="859" y="473" width="52" height="21" rx="10.5" fill="#182026" stroke="#8a959e" stroke-opacity="0.35"/>
-<text class="speedup-pill" x="885" y="484.5" fill="#8a959e">1.07×</text>
+<text class="speedup-pill" x="885" y="484.5" fill="#8a959e">1.09×</text>
 <rect class="row-bg" x="30" y="505" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="522">R103</text>
 <text class="inst-cuts" x="81" y="522">rank-1</text>
-<rect x="205" y="510.0" width="365.5" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="510.0" width="365.5" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="577.5" y="514.2" fill="#bba0ff">1.98s</text>
-<rect x="205" y="521.0" width="354.8" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="566.8" y="525.2" fill="#06b6d4">1.76s</text>
-<rect x="205" y="532.0" width="351.4" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="563.4" y="536.2" fill="#22d3ee">1.70s</text>
+<rect x="205" y="521.0" width="354.6" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="566.6" y="525.2" fill="#06b6d4">1.76s</text>
+<rect x="205" y="532.0" width="351.2" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="563.2" y="536.2" fill="#22d3ee">1.69s</text>
 <rect x="859" y="516" width="52" height="21" rx="10.5" fill="#0d262c" stroke="#22d3ee" stroke-opacity="0.35"/>
 <text class="speedup-pill" x="885" y="527.5" fill="#22d3ee">1.17×</text>
 <line class="cluster-line" x1="35" y1="548" x2="925" y2="548"/>
 <rect class="row-bg" x="30" y="548" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="565">R201</text>
-<rect x="205" y="553.0" width="344.5" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="553.0" width="344.5" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="556.5" y="557.2" fill="#bba0ff">1.57s</text>
-<rect x="205" y="564.0" width="339.6" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="551.6" y="568.2" fill="#06b6d4">1.49s</text>
-<rect x="205" y="575.0" width="338.2" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="550.2" y="579.2" fill="#22d3ee">1.47s</text>
-<rect x="859" y="559" width="52" height="21" rx="10.5" fill="#182026" stroke="#8a959e" stroke-opacity="0.35"/>
-<text class="speedup-pill" x="885" y="570.5" fill="#8a959e">1.07×</text>
+<rect x="205" y="564.0" width="336.5" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="548.5" y="568.2" fill="#06b6d4">1.44s</text>
+<rect x="205" y="575.0" width="334.9" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="546.9" y="579.2" fill="#22d3ee">1.41s</text>
+<rect x="859" y="559" width="52" height="21" rx="10.5" fill="#0d262c" stroke="#22d3ee" stroke-opacity="0.35"/>
+<text class="speedup-pill" x="885" y="570.5" fill="#22d3ee">1.11×</text>
 <rect class="row-bg" x="30" y="591" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="608">R201</text>
 <text class="inst-cuts" x="81" y="608">rank-1</text>
-<rect x="205" y="596.0" width="502.5" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="596.0" width="502.5" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="714.5" y="600.2" fill="#bba0ff">8.98s</text>
-<rect x="205" y="607.0" width="478.0" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="690.0" y="611.2" fill="#06b6d4">6.86s</text>
-<rect x="205" y="618.0" width="476.7" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="688.7" y="622.2" fill="#22d3ee">6.76s</text>
+<rect x="205" y="607.0" width="465.9" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="677.9" y="611.2" fill="#06b6d4">6.01s</text>
+<rect x="205" y="618.0" width="464.4" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="676.4" y="622.2" fill="#22d3ee">5.91s</text>
 <rect x="859" y="602" width="52" height="21" rx="10.5" fill="#0d262c" stroke="#22d3ee" stroke-opacity="0.35"/>
-<text class="speedup-pill" x="885" y="613.5" fill="#22d3ee">1.33×</text>
+<text class="speedup-pill" x="885" y="613.5" fill="#22d3ee">1.52×</text>
 <rect class="row-bg" x="30" y="634" width="900" height="43" fill="transparent" rx="4"/>
 <text class="inst-name" x="35" y="651">R202</text>
-<rect x="205" y="639.0" width="464.7" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="639.0" width="464.7" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="676.7" y="643.2" fill="#bba0ff">5.92s</text>
-<rect x="205" y="650.0" width="463.3" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="675.3" y="654.2" fill="#06b6d4">5.84s</text>
-<rect x="205" y="661.0" width="459.3" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="671.3" y="665.2" fill="#22d3ee">5.58s</text>
-<rect x="859" y="645" width="52" height="21" rx="10.5" fill="#182026" stroke="#8a959e" stroke-opacity="0.35"/>
-<text class="speedup-pill" x="885" y="656.5" fill="#8a959e">1.06×</text>
+<rect x="205" y="650.0" width="460.4" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="672.4" y="654.2" fill="#06b6d4">5.65s</text>
+<rect x="205" y="661.0" width="455.8" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="667.8" y="665.2" fill="#22d3ee">5.37s</text>
+<rect x="859" y="645" width="52" height="21" rx="10.5" fill="#0d262c" stroke="#22d3ee" stroke-opacity="0.35"/>
+<text class="speedup-pill" x="885" y="656.5" fill="#22d3ee">1.10×</text>
 <line class="divider" x1="35" y1="685" x2="925" y2="685"/>
 <text class="inst-name" x="35" y="714">Geometric Mean</text>
 <text class="inst-cuts" x="35" y="730">all 13 solves</text>
-<rect x="205" y="702.0" width="296.0" height="8.5" rx="2.5" fill="url(#grad-bapcod)"/>
+<rect x="205" y="702.0" width="296.0" height="8.5" rx="2.5" fill="url(#grad-reference)"/>
 <text class="val-text" x="508.0" y="706.2" fill="#bba0ff">0.92s</text>
-<rect x="205" y="713.0" width="282.4" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
-<text class="val-text" x="494.4" y="717.2" fill="#06b6d4">0.79s</text>
-<rect x="205" y="724.0" width="279.8" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
-<text class="val-text" x="491.8" y="728.2" fill="#22d3ee">0.77s</text>
+<rect x="205" y="713.0" width="277.2" height="8.5" rx="2.5" fill="url(#grad-baldes1)"/>
+<text class="val-text" x="489.2" y="717.2" fill="#06b6d4">0.75s</text>
+<rect x="205" y="724.0" width="275.2" height="8.5" rx="2.5" fill="url(#grad-baldes2)"/>
+<text class="val-text" x="487.2" y="728.2" fill="#22d3ee">0.73s</text>
 <rect x="857" y="708" width="56" height="21" rx="10.5" fill="#0d262c" stroke="#22d3ee" stroke-opacity="0.6"/>
-<text class="speedup-pill" x="885" y="719.5" fill="#22d3ee">1.20×</text>
-<text class="subtitle" x="35" y="784">BALDES: 2026-10-20 · Clp auto scaling + retained work areas · Numerical bounds · Enumeration off</text>
-<text class="subtitle" x="35" y="801">1 warmup + 3 measured runs · CPUs 0 / 0,1 · Background work present; timings are indicative</text>
+<text class="speedup-pill" x="885" y="719.5" fill="#22d3ee">1.26×</text>
+<text class="subtitle" x="35" y="784">BALDES: 2026-10-22 · Clp auto scaling + retained work areas · Numerical bounds · Enumeration off</text>
+<text class="subtitle" x="35" y="801">1 warmup + 3 measured runs · CPUs 0 / 0,1 · Local timings are indicative</text>
 <text class="subtitle" x="35" y="818">VRPSolver values are historical; speedups compare against those retained reference times.</text>
 </svg>
