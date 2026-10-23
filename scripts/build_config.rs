@@ -73,7 +73,9 @@ impl SimdMode {
 struct Config {
     clp: bool,
     highs: bool,
+    gurobi: bool,
     cli: bool,
+    multi_time_windows: bool,
     release: bool,
     native_cpu: bool,
     simd: SimdMode,
@@ -84,6 +86,7 @@ struct Config {
     resource_dimensions: usize,
     target: String,
     highs_dir: String,
+    gurobi_home: String,
 }
 
 impl Default for Config {
@@ -91,7 +94,9 @@ impl Default for Config {
         Self {
             clp: false,
             highs: false,
+            gurobi: false,
             cli: false,
+            multi_time_windows: false,
             release: true,
             native_cpu: false,
             simd: SimdMode::Off,
@@ -102,6 +107,7 @@ impl Default for Config {
             resource_dimensions: 2,
             target: String::new(),
             highs_dir: String::new(),
+            gurobi_home: String::new(),
         }
     }
 }
@@ -131,7 +137,9 @@ impl Config {
             match key {
                 "CONFIG_CLP" => config.clp = boolean()?,
                 "CONFIG_HIGHS" => config.highs = boolean()?,
+                "CONFIG_GUROBI" => config.gurobi = boolean()?,
                 "CONFIG_CLI" => config.cli = boolean()?,
+                "CONFIG_MULTI_TIME_WINDOWS" => config.multi_time_windows = boolean()?,
                 "CONFIG_SIMD" => {
                     config.simd = match value {
                         "off" | "n" => SimdMode::Off,
@@ -163,6 +171,7 @@ impl Config {
                 }
                 "CONFIG_TARGET" => config.target = parse_string(value)?,
                 "CONFIG_HIGHS_DIR" => config.highs_dir = parse_string(value)?,
+                "CONFIG_GUROBI_HOME" => config.gurobi_home = parse_string(value)?,
                 _ => return Err(format!("unknown setting {key}")),
             }
         }
@@ -188,6 +197,9 @@ impl Config {
             return Err(
                 "target must be a Rust target triple (letters, numbers, '-', '_' or '.')".into(),
             );
+        }
+        if self.gurobi_home.chars().any(char::is_control) {
+            return Err("Gurobi directory cannot contain control characters".into());
         }
         if self.highs_dir.chars().any(char::is_control) {
             return Err("HiGHS directory cannot contain control characters".into());
@@ -222,13 +234,15 @@ impl Config {
         let yn = |b| if b { "y" } else { "n" };
         format!(
             "# BALDES build configuration; edit with make config.\n\
-            CONFIG_PROFILE={}\nCONFIG_CLP={}\nCONFIG_HIGHS={}\nCONFIG_CLI={}\n\
+            CONFIG_PROFILE={}\nCONFIG_CLP={}\nCONFIG_HIGHS={}\nCONFIG_GUROBI={}\nCONFIG_CLI={}\nCONFIG_MULTI_TIME_WINDOWS={}\n\
             CONFIG_SIMD={}\nCONFIG_NATIVE_CPU={}\nCONFIG_RELEASE_DEBUG={}\nCONFIG_OFFLINE={}\nCONFIG_LOCKED={}\n\
-            CONFIG_JOBS={}\nCONFIG_RESOURCE_DIMENSIONS={}\nCONFIG_TARGET={}\nCONFIG_HIGHS_DIR={}\n",
+            CONFIG_JOBS={}\nCONFIG_RESOURCE_DIMENSIONS={}\nCONFIG_TARGET={}\nCONFIG_HIGHS_DIR={}\nCONFIG_GUROBI_HOME={}\n",
             if self.release { "release" } else { "dev" },
             yn(self.clp),
             yn(self.highs),
+            yn(self.gurobi),
             yn(self.cli),
+            yn(self.multi_time_windows),
             self.simd.name(),
             yn(self.native_cpu),
             yn(self.release_debug),
@@ -237,7 +251,8 @@ impl Config {
             self.jobs,
             self.resource_dimensions,
             quoted(&self.target),
-            quoted(&self.highs_dir)
+            quoted(&self.highs_dir),
+            quoted(&self.gurobi_home)
         )
     }
 
@@ -287,6 +302,8 @@ impl Config {
         let features = [
             (self.clp, "clp"),
             (self.highs, "highs"),
+            (self.gurobi, "gurobi"),
+            (self.multi_time_windows, "multi-time-windows"),
             (self.simd == SimdMode::Avx2, "simd"),
             (self.simd == SimdMode::Avx512, "simd-avx512"),
         ]
@@ -319,6 +336,9 @@ impl Config {
         }
         if self.highs && !self.highs_dir.is_empty() {
             vars.insert("HIGHS_DIR".into(), self.highs_dir.clone().into());
+        }
+        if self.gurobi && !self.gurobi_home.is_empty() {
+            vars.insert("GUROBI_HOME".into(), self.gurobi_home.clone().into());
         }
         if self.native_cpu {
             // Encoded flags take precedence in Cargo; extend them if supplied.
@@ -397,6 +417,16 @@ impl Config {
                         .map_err(|_| "Resource dimensions must be a nonnegative usize")?;
                 }
             }
+            13 => self.gurobi = !self.gurobi,
+            14 => {
+                if let Some(value) = input {
+                    let mut next = self.clone();
+                    next.gurobi_home = value;
+                    next.validate()?;
+                    *self = next;
+                }
+            }
+            15 => self.multi_time_windows = !self.multi_time_windows,
             12 => self.simd = self.simd.next(CpuSimd::detect(), self.target.is_empty()),
             _ => {}
         }
@@ -409,6 +439,8 @@ impl Config {
             Item::toggle(3, "BUILD", "Command-line program", self.cli, "Build the baldes executable alongside the library. Enabling the CLI selects Clp; disabling Clp also disables the CLI."),
             Item::toggle(1, "BUILD", "Clp backend", self.clp, "LP solver and routing model store. Builds the Clp and CoinUtils submodules; requires a C++14 compiler."),
             Item::toggle(2, "BUILD", "HiGHS backend", self.highs, "LP and mixed-integer solver. Requires libhighs with 32-bit HighsInt, discovered through the installation path, pkg-config or system libraries."),
+            Item::toggle(13, "BUILD", "Gurobi backend", self.gurobi, "LP master solver. Requires a Gurobi installation and valid license. Set Gurobi installation below or export GUROBI_HOME. Routing CLI also requires Clp."),
+            Item::toggle(15, "BUILD", "Multi-time windows", self.multi_time_windows, "Disjoint service-start domains for scalar pricing resources."),
             Item::value(12, "PERFORMANCE", "SIMD acceleration", self.simd.name(), "Cycle Off / AVX2 / AVX-512, skipping modes unsupported by this CPU. Host target only. AVX-512 requires Rust 1.89+. Runtime detection keeps portable fallback."),
             Item::toggle(4, "PERFORMANCE", "Native CPU", self.native_cpu, "Optimize for this computer with target-cpu=native. Clear the target triple before enabling; use portable builds for distribution."),
             Item::toggle(5, "PERFORMANCE", "Release debug symbols", self.release_debug, "Keep debug symbols in release builds for perf and other profilers. The development profile retains Cargo's normal debug settings."),
@@ -416,6 +448,7 @@ impl Config {
             Item::value(11, "TOOLCHAIN", "Resource dimensions", self.resource_dimensions.to_string(), "Compiled scalar capacity for Python and default Rust types. Explicit const-generic Rust capacities remain independent. Default: 2."),
             Item::value(9, "TOOLCHAIN", "Target triple", if self.target.is_empty() { "Host" } else { &self.target }, "Leave empty to build for this host. Cross compilation requires the Rust target, a linker and compatible native solver libraries."),
             Item::value(10, "TOOLCHAIN", "HiGHS installation", if self.highs_dir.is_empty() { "Automatic" } else { &self.highs_dir }, "Optional installation root containing lib/libhighs. Leave empty to preserve HIGHS_DIR and normal library discovery."),
+            Item::value(14, "TOOLCHAIN", "Gurobi installation", if self.gurobi_home.is_empty() { "From GUROBI_HOME" } else { &self.gurobi_home }, "Gurobi installation root containing lib/libgurobi. Leave empty to preserve GUROBI_HOME from your shell. GUROBI_LIB_NAME may select a library version."),
             Item::toggle(6, "CARGO", "Offline builds", self.offline, "Use Cargo's offline mode. All dependencies must already be available in the local cache."),
             Item::toggle(7, "CARGO", "Locked dependencies", self.locked, "Require Cargo.lock to stay unchanged. Recommended for reproducible builds."),
         ]
@@ -731,6 +764,13 @@ fn menu(config: &mut Config, path: &Path) -> Result<()> {
                         "HiGHS root (empty = automatic)",
                         &config.highs_dir,
                     )?,
+                    14 => input(
+                        &terminal,
+                        &view,
+                        &mut state,
+                        "Gurobi root (empty = shell GUROBI_HOME)",
+                        &config.gurobi_home,
+                    )?,
                     11 => input(
                         &terminal,
                         &view,
@@ -947,6 +987,47 @@ mod tests {
         );
     }
     #[test]
+    fn gurobi_menu_settings_reach_cargo_and_preserve_shell_defaults() {
+        // Existing configurations need no migration.
+        let mut c = Config::parse("CONFIG_CLP=y\nCONFIG_HIGHS=y").unwrap();
+        assert!(!c.gurobi);
+        c.edit(13, None).unwrap();
+        c.edit(14, Some("/opt/Gurobi build/$(literal)".into()))
+            .unwrap();
+        assert_eq!(Config::parse(&c.text()).unwrap(), c);
+        for action in ["build", "check", "test", "clippy"] {
+            assert!(args(&c, action)
+                .windows(2)
+                .any(|w| w == ["--features", "clp,highs,gurobi"]));
+            assert_eq!(
+                c.cargo(action).unwrap().vars.get(OsStr::new("GUROBI_HOME")),
+                Some(&OsString::from(&c.gurobi_home))
+            );
+        }
+        c.edit(13, None).unwrap();
+        assert!(!c
+            .cargo("build")
+            .unwrap()
+            .vars
+            .contains_key(OsStr::new("GUROBI_HOME")));
+        c.edit(13, None).unwrap();
+        c.edit(14, Some(String::new())).unwrap();
+        assert!(!c
+            .cargo("build")
+            .unwrap()
+            .vars
+            .contains_key(OsStr::new("GUROBI_HOME")));
+        assert!(c.cargo("clean").unwrap().vars.is_empty());
+        assert!(Config::parse("CONFIG_GUROBI=maybe").is_err());
+        assert!(c.edit(14, Some("bad\npath".into())).is_err());
+        assert!(c.gurobi_home.is_empty());
+        // The standalone Gurobi library does not require Clp.
+        assert!(args(&Config::parse("CONFIG_GUROBI=y").unwrap(), "build")
+            .windows(2)
+            .any(|w| w == ["--features", "gurobi"]));
+    }
+
+    #[test]
     fn malformed_settings_are_rejected_instead_of_executed() {
         for text in [
             "CONFIG_CLP=maybe",
@@ -1006,7 +1087,7 @@ mod tests {
         c.edit(11, Some("0".into())).unwrap();
         assert_eq!(c.resource_dimensions, 0);
         assert!(c.cargo("clean").unwrap().vars.is_empty());
-        assert_eq!(c.rows().len(), 13);
+        assert_eq!(c.rows().len(), 16);
     }
     #[test]
     fn clean_does_not_receive_build_flags() {

@@ -55,7 +55,7 @@ impl Item {
     }
 
     pub fn editable(&self) -> bool {
-        matches!(self.id, 8..=11)
+        matches!(self.id, 8..=11 | 14)
     }
 }
 
@@ -390,11 +390,19 @@ pub(super) fn render(
             },
             TEXT,
         );
-        let backends = match (view.config.clp, view.config.highs) {
-            (true, true) => "Clp + HiGHS",
-            (true, false) => "Clp",
-            (false, true) => "HiGHS",
-            _ => "No optional LP backends",
+        let backends = [
+            (view.config.clp, "Clp"),
+            (view.config.highs, "HiGHS"),
+            (view.config.gurobi, "Gurobi"),
+        ]
+        .into_iter()
+        .filter_map(|(enabled, name)| enabled.then_some(name))
+        .collect::<Vec<_>>()
+        .join(" + ");
+        let backends = if backends.is_empty() {
+            "No optional LP backends"
+        } else {
+            &backends
         };
         frame.put(y + 4, x + 2, inner, backends, TEXT);
         frame.put(
@@ -477,7 +485,7 @@ mod tests {
         }
         let mut ids: Vec<_> = rows.iter().map(|item| item.id).collect();
         ids.sort_unstable();
-        assert_eq!(ids, (0..13).collect::<Vec<_>>());
+        assert_eq!(ids, (0..16).collect::<Vec<_>>());
     }
 
     #[test]
