@@ -4,7 +4,7 @@ use baldes::master::{column_generation::Status, root::RootOptions};
 
 fn r101_25() -> Instance {
     let mut instance =
-        Instance::read(concat!(env!("CARGO_MANIFEST_DIR"), "/instances/R101.txt")).unwrap();
+        Instance::read(concat!(env!("CARGO_MANIFEST_DIR"), "/instances/Solomon/R101.txt")).unwrap();
     instance.truncate(25).unwrap();
     instance
 }

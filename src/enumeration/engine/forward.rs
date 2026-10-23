@@ -14,6 +14,7 @@ impl<const D: usize> Enumeration<D> {
             return Err(invalid("invalid enumeration controls"));
         }
         let preserve = controls.preserve_arc_paths
+            || g.has_coupled_resources()
             || cuts.and_then(|c| c.presence).is_some_and(|p| p.active());
         let mut labels = Storage::new(controls.partitions)?;
         labels.preserve_arc_paths = preserve;
@@ -38,6 +39,7 @@ impl<const D: usize> Enumeration<D> {
             cut_words: [0; FULL_WORDS],
             cut_cost: 0.,
             presence_state: cuts.and_then(|c| c.presence).and_then(|p| p.empty_state()),
+            coupled_state: g.coupled_kernel().map(|k| k.root(true)),
         };
         for r in 0..g.resources.len() {
             root.resources[r] = g
@@ -53,6 +55,7 @@ impl<const D: usize> Enumeration<D> {
         labels.insert(g, root, true);
         let step = controls.label_limit / 50;
         let mut checkpoint = 0;
+        let mut coupled_workspace = crate::graph::coupled::CoupledWorkspace::default();
         while let Some(from) = labels.pop() {
             if started.elapsed() > controls.time_limit {
                 return Err(incomplete("enumeration time limit exceeded"));
@@ -80,13 +83,38 @@ impl<const D: usize> Enumeration<D> {
             };
             for arc in &grid.forward.buckets[v][bucket].arcs {
                 let physical = &g.arcs[arc.physical];
-                let mut next = from.clone();
+                let mut next = from.clone_without_coupled();
                 next.parent = Some(from.id);
                 next.arc = Some(arc.physical);
                 next.vertex = physical.head;
                 next.hops += 1;
-                next.reduced_cost = physical.reduced_cost + from.reduced_cost;
-                next.original_cost = from.original_cost + physical.cost;
+                if let Some(kernel) = g.coupled_kernel() {
+                    let state = from
+                        .coupled_state
+                        .as_deref()
+                        .ok_or_else(|| invalid("missing coupled enumeration state"))?;
+                    let Some((mut next_state, _)) = kernel.extend_with_workspace(
+                        state,
+                        arc.physical,
+                        true,
+                        &mut coupled_workspace,
+                    )?
+                    else {
+                        continue;
+                    };
+                    (next.reduced_cost, next.original_cost) = next_state.account_extension(
+                        state,
+                        physical.reduced_cost,
+                        physical.cost,
+                    )?;
+                    next.coupled_state = Some(next_state);
+                    if !next.reduced_cost.is_finite() || !next.original_cost.is_finite() {
+                        return Err(incomplete("coupled enumeration cost overflow"));
+                    }
+                } else {
+                    next.reduced_cost = physical.reduced_cost + from.reduced_cost;
+                    next.original_cost = from.original_cost + physical.cost;
+                }
                 if !next.add_elements(&physical.elements) {
                     continue;
                 }

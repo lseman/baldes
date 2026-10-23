@@ -1,6 +1,17 @@
 use super::*;
 
 #[test]
+fn worker_budget_survives_forks_and_rejects_overflow_transactionally() {
+    let mut master = ClpMaster::new().unwrap();
+    assert_eq!(master.backend_threads(), 0);
+    master.set_backend_threads(3).unwrap();
+    assert!(master.set_backend_threads(usize::MAX).is_err());
+    assert_eq!(master.backend_threads(), 3);
+    let fork = master.try_clone().unwrap();
+    assert_eq!(fork.backend_threads(), 3);
+}
+
+#[test]
 fn canonical_sparse_entries_match_tree_accumulation() {
     fn reference(entries: &[(usize, f64)]) -> (Vec<i32>, Vec<f64>) {
         let mut sums = std::collections::BTreeMap::new();

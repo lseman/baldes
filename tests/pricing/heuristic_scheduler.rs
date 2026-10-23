@@ -21,6 +21,7 @@ fn single_label_phase_replaces_cheaper_prefix_and_requests_expansion() {
         ng: 0,
         branch_state: None,
         presence_state: None,
+        coupled_state: None,
         parent: None,
         arc: None,
         hops: 1,

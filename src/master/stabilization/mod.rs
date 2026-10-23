@@ -120,13 +120,13 @@ impl DualPriceSmoothing {
         self.center_phase = phase;
     }
     pub fn remap_rows(&mut self, map: &[Option<usize>]) {
-        fn compact<T: Clone>(v: &mut Vec<T>, map: &[Option<usize>]) {
-            *v = v
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| map.get(*i).is_some_and(Option::is_some))
-                .map(|(_, v)| v.clone())
-                .collect();
+        fn compact<T>(v: &mut Vec<T>, map: &[Option<usize>]) {
+            let mut index = 0;
+            v.retain(|_| {
+                let keep = map.get(index).is_some_and(Option::is_some);
+                index += 1;
+                keep
+            });
         }
         compact(&mut self.center, map);
         compact(&mut self.raw, map);
@@ -159,8 +159,10 @@ impl DualPriceSmoothing {
                 self.subgradient = g;
             }
         }
-        self.raw = raw.to_vec();
-        self.senses = senses.to_vec();
+        self.raw.clear();
+        self.raw.extend_from_slice(raw);
+        self.senses.clear();
+        self.senses.extend_from_slice(senses);
         self.center.resize(raw.len(), 0.);
         self.angle_center.resize(raw.len(), 0.);
         if stage >= self.parameters.minimum_stage {
@@ -168,7 +170,8 @@ impl DualPriceSmoothing {
         }
         self.active = false;
         self.misprices = 0;
-        self.pricing = raw.to_vec();
+        self.pricing.clear();
+        self.pricing.extend_from_slice(raw);
         if initial {
             self.effective_alpha = 0.;
             return;
@@ -233,14 +236,14 @@ impl DualPriceSmoothing {
             return true;
         }
         self.active = false;
-        self.pricing = self.raw.clone();
+        self.pricing.clone_from(&self.raw);
         true
     }
     pub fn after_iteration(&mut self) {
         self.center_moved = false;
         if self.active {
             self.active = false;
-            self.pricing = self.raw.clone();
+            self.pricing.clone_from(&self.raw);
         }
     }
     fn gap_accepts(&self, gap: f64) -> bool {
@@ -249,16 +252,13 @@ impl DualPriceSmoothing {
             && !greater(self.parameters.min_gap, gap, self.parameters.tolerance)
     }
     fn publish(&mut self, alpha: f64, directional: bool) {
-        let outward = if directional && self.parameters.beta_factor > 0. {
-            self.directional_point()
-        } else {
-            self.raw.clone()
-        };
-        self.pricing = outward
-            .iter()
-            .enumerate()
-            .map(|(i, out)| (1. - alpha) * out + alpha * self.center.get(i).copied().unwrap_or(0.))
-            .collect();
+        let directional_point =
+            (directional && self.parameters.beta_factor > 0.).then(|| self.directional_point());
+        let outward = directional_point.as_deref().unwrap_or(&self.raw);
+        self.pricing.resize(outward.len(), 0.);
+        for (i, (price, out)) in self.pricing.iter_mut().zip(outward).enumerate() {
+            *price = (1. - alpha) * out + alpha * self.center.get(i).copied().unwrap_or(0.);
+        }
         for (pi, sense) in self.pricing.iter_mut().zip(&self.senses) {
             if (*sense == RowSense::LessEqual && *pi > self.parameters.tolerance)
                 || (*sense == RowSense::GreaterEqual && *pi < -self.parameters.tolerance)

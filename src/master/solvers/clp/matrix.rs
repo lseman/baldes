@@ -14,6 +14,13 @@ impl ClpMaster {
             self.solved = false;
             return Ok(());
         }
+        #[cfg(feature = "gurobi")]
+        if let Some(backend) = self.gurobi_backend.as_mut() {
+            backend.set_rhs(rhs)?;
+            self.rhs.copy_from_slice(rhs);
+            self.solved = false;
+            return Ok(());
+        }
         let lower: Vec<_> = rhs
             .iter()
             .zip(&self.senses)
@@ -70,6 +77,14 @@ impl ClpMaster {
         self.ensure_backend()?;
         #[cfg(feature = "highs")]
         if let Some(backend) = self.highs_backend.as_mut() {
+            let added = backend.add_rows(rows)?;
+            self.rhs.extend(rows.iter().map(|&(_, rhs, _)| rhs));
+            self.senses.extend(rows.iter().map(|&(sense, _, _)| sense));
+            self.solved = false;
+            return Ok(added);
+        }
+        #[cfg(feature = "gurobi")]
+        if let Some(backend) = self.gurobi_backend.as_mut() {
             let added = backend.add_rows(rows)?;
             self.rhs.extend(rows.iter().map(|&(_, rhs, _)| rhs));
             self.senses.extend(rows.iter().map(|&(sense, _, _)| sense));
@@ -166,6 +181,38 @@ impl ClpMaster {
             self.values.resize(self.values.len() + preserved, 0.);
             return Ok(added);
         }
+        #[cfg(feature = "gurobi")]
+        if let Some(backend) = self.gurobi_backend.as_mut() {
+            // The wrapper may retain a valid optimum after cut cleanup even
+            // when native solution info is invalid. Preserve its own compacted
+            // cache, rather than resizing it from stale native solution arrays.
+            let mut preserve = self.solved;
+            let mut preserved = 0;
+            for &(cost, entries) in columns {
+                if !preserve {
+                    break;
+                }
+                let (rows, values) = entries_of(entries, self.rhs.len())?;
+                let reduced = rows.iter().zip(values).fold(cost, |rc, (&r, a)| {
+                    rc - self.duals.get(r as usize).copied().unwrap_or(0.) * a
+                });
+                preserve = reduced >= -self.dual_tolerance;
+                preserved += usize::from(preserve);
+            }
+            let added = backend.add_columns(columns)?;
+            // Route-count caps are per-model, not a solver-global infinity.
+            if self.column_default_upper != 1e12 {
+                for column in added.clone() {
+                    backend.set_upper(column, self.column_default_upper)?;
+                }
+            }
+            self.costs.extend(columns.iter().map(|&(cost, _)| cost));
+            self.upper
+                .resize(self.costs.len(), self.column_default_upper);
+            self.solved = preserve;
+            self.values.resize(self.values.len() + preserved, 0.);
+            return Ok(added);
+        }
         let mut starts = vec![0i32];
         let mut indices = vec![];
         let mut values = vec![];
@@ -223,6 +270,8 @@ impl ClpMaster {
         }
         #[cfg(feature = "highs")]
         self.edit_highs(|backend| backend.set_coefficient(row, column, value))?;
+        #[cfg(feature = "gurobi")]
+        self.edit_gurobi(|backend| backend.set_coefficient(row, column, value))?;
         self.ipm.matrix_dirty = true;
         self.solved = false;
         Ok(())
@@ -235,6 +284,8 @@ impl ClpMaster {
         self.ensure_backend()?;
         #[cfg(feature = "highs")]
         self.edit_highs(|backend| backend.set_cost(column, cost))?;
+        #[cfg(feature = "gurobi")]
+        self.edit_gurobi(|backend| backend.set_cost(column, cost))?;
         self.costs[column] = cost;
         if let Some(model) = self.model {
             unsafe {
@@ -262,6 +313,8 @@ impl ClpMaster {
                 .is_some_and(|v| v.is_finite() && *v <= upper);
         #[cfg(feature = "highs")]
         self.edit_highs(|backend| backend.set_upper(column, upper))?;
+        #[cfg(feature = "gurobi")]
+        self.edit_gurobi(|backend| backend.set_upper(column, upper))?;
         self.upper[column] = upper;
         if let Some(model) = self.model {
             unsafe {
@@ -279,12 +332,12 @@ impl ClpMaster {
         if self.solver == MasterSolver::Ipm {
             return Ok(false);
         }
-        if self.solver == MasterSolver::Highs {
+        if matches!(self.solver, MasterSolver::Highs | MasterSolver::Gurobi) {
             return self
-                .highs_row_basic
+                .native_row_basic
                 .get(row)
                 .copied()
-                .ok_or_else(|| invalid("HiGHS basis requires a solved master"));
+                .ok_or_else(|| invalid("native LP basis requires a solved master"));
         }
         let model = self
             .model
@@ -306,6 +359,10 @@ impl ClpMaster {
         }
         #[cfg(feature = "highs")]
         if let Some(backend) = self.highs_backend.as_ref() {
+            return backend.column_entries(column);
+        }
+        #[cfg(feature = "gurobi")]
+        if let Some(backend) = self.gurobi_backend.as_ref() {
             return backend.column_entries(column);
         }
         let m = self.model.expect("Clp backend is active").as_ptr();
@@ -405,8 +462,10 @@ impl ClpMaster {
         }
         #[cfg(feature = "highs")]
         self.edit_highs(|backend| backend.remove(rows, columns).map(|_| ()))?;
-        self.highs_row_basic = self
-            .highs_row_basic
+        #[cfg(feature = "gurobi")]
+        self.edit_gurobi(|backend| backend.remove(rows, columns).map(|_| ()))?;
+        self.native_row_basic = self
+            .native_row_basic
             .iter()
             .zip(&rm)
             .filter_map(|(&value, mapped)| mapped.map(|_| value))

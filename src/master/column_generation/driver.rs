@@ -103,6 +103,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     // A successful universe handoff applies once to this formulation. A new
     // row, coefficient/domain change or remapping makes it eligible again.
     let mut enumeration_transferred = false;
+    let mut feasibility_attempted = false;
     let mut ipm_accuracy = IpmAccuracy::new();
     let mut accurate_next = false;
     let mut round_lower_bound = if inherited_bound.is_finite() {
@@ -142,6 +143,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     pool.extend(missing);
     let mut out = Output {
         status: Status::IterationLimit,
+        feasibility: vec![],
         enumeration_requested: false,
         enumeration_failure: None,
         lp: 0.,
@@ -231,7 +233,12 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         };
         Ok(out)
     };
-    for iteration in 1..=options.max_iterations {
+    for _ in 0..options.max_iterations {
+        if out.iterations >= options.max_iterations {
+            out.status = Status::IterationLimit;
+            break;
+        }
+        let iteration = out.iterations + 1;
         if started.elapsed() >= options.time_limit {
             out.status = Status::TimeLimit;
             return finish(out, loaded, cut_artificials, pool, smoothing);
@@ -243,6 +250,61 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         )?;
         let accurate = outcome == LpSolveOutcome::Optimal;
         if !accurate && outcome != LpSolveOutcome::Suboptimal {
+            out.iterations = iteration;
+            if outcome == LpSolveOutcome::PrimalInfeasible && !feasibility_attempted {
+                feasibility_attempted = true;
+                let warm = finish(
+                    out.clone(),
+                    loaded.clone(),
+                    cut_artificials.clone(),
+                    pool.clone(),
+                    smoothing.clone(),
+                )?
+                .warm_start;
+                if let Some(recovery) = controller.recover_feasibility(
+                    master,
+                    &warm,
+                    options.time_limit.saturating_sub(started.elapsed()),
+                    options.max_iterations.saturating_sub(out.iterations),
+                    options.tolerance,
+                    options.bound_mode,
+                )? {
+                    let resume = super::feasibility::install(
+                        master,
+                        controller,
+                        recovery,
+                        &mut out,
+                        super::feasibility::Columns {
+                            loaded: &mut loaded,
+                            seen: &mut seen,
+                            pool: &mut pool,
+                            pool_seen: &mut pool_seen,
+                        },
+                    )?;
+                    if resume {
+                        pricing_estimate = f64::NEG_INFINITY;
+                        out.numerical_bound = inherited_numerical;
+                        out.certified_bound = inherited_certified;
+                        out.bound = inherited_bound;
+                        ipm_accuracy = IpmAccuracy::new();
+                        accurate_next = false;
+                        enumeration_transferred = false;
+                        smoothing = DualPriceSmoothing::new(options.smoothing.clone());
+                        smoothing.exclude_rows(controller.unstabilized_rows());
+                        round_lower_bound = if inherited_bound.is_finite() {
+                            inherited_bound
+                        } else {
+                            -1e12
+                        };
+                        round_primal_bound = 1e12;
+                        stage = schedule.len() - 1;
+                        stage_bound = -1e12;
+                        round_penalty_updates = 0;
+                        continue;
+                    }
+                    return finish(out, loaded, cut_artificials, pool, smoothing);
+                }
+            }
             out.status = match outcome {
                 LpSolveOutcome::PrimalInfeasible => Status::Infeasible,
                 LpSolveOutcome::DualInfeasible => Status::Unbounded,
@@ -613,6 +675,61 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         }
         accurate_next = false;
         if fresh == 0 && exact {
+            if positive && !feasibility_attempted {
+                feasibility_attempted = true;
+                let warm = finish(
+                    out.clone(),
+                    loaded.clone(),
+                    cut_artificials.clone(),
+                    pool.clone(),
+                    smoothing.clone(),
+                )?
+                .warm_start;
+                if let Some(recovery) = controller.recover_feasibility(
+                    master,
+                    &warm,
+                    options.time_limit.saturating_sub(started.elapsed()),
+                    options.max_iterations.saturating_sub(out.iterations),
+                    options.tolerance,
+                    options.bound_mode,
+                )? {
+                    let resume = super::feasibility::install(
+                        master,
+                        controller,
+                        recovery,
+                        &mut out,
+                        super::feasibility::Columns {
+                            loaded: &mut loaded,
+                            seen: &mut seen,
+                            pool: &mut pool,
+                            pool_seen: &mut pool_seen,
+                        },
+                    )?;
+                    if resume {
+                        pricing_estimate = f64::NEG_INFINITY;
+                        // A feasibility minimum cannot refresh an objective bound.
+                        out.numerical_bound = inherited_numerical;
+                        out.certified_bound = inherited_certified;
+                        out.bound = inherited_bound;
+                        ipm_accuracy = IpmAccuracy::new();
+                        accurate_next = false;
+                        enumeration_transferred = false;
+                        smoothing = DualPriceSmoothing::new(options.smoothing.clone());
+                        smoothing.exclude_rows(controller.unstabilized_rows());
+                        round_lower_bound = if inherited_bound.is_finite() {
+                            inherited_bound
+                        } else {
+                            -1e12
+                        };
+                        round_primal_bound = 1e12;
+                        stage = schedule.len() - 1;
+                        stage_bound = -1e12;
+                        round_penalty_updates = 0;
+                        continue;
+                    }
+                    return finish(out, loaded, cut_artificials, pool, smoothing);
+                }
+            }
             if !positive && controller.request_enumeration_checkpoint(master)? {
                 out.enumeration_requested = true;
                 return finish(out, loaded, cut_artificials, pool, smoothing);
@@ -830,6 +947,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     pool_seen = pool.iter().map(Column::signature).collect();
                 }
                 if added > 0 {
+                    feasibility_attempted = false;
                     out.cut_rounds += 1;
                     round_penalty_updates = 0;
                     smoothing.restart_schedule((schedule.len() - 1) as i32);

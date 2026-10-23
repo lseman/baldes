@@ -75,6 +75,10 @@ pub struct PricingNetwork {
     pub sink: Option<usize>,
     #[serde(default)]
     pub resources: Vec<Resource>,
+    #[serde(default)]
+    pub coupled_resources: Vec<crate::graph::coupled::CoupledResource>,
+    #[serde(default)]
+    pub elementary: bool,
     pub arcs: Vec<Arc>,
     #[serde(default)]
     pub route_entries: Vec<(usize, f64)>,
@@ -168,6 +172,8 @@ impl Model {
                 }
                 arc_entries.push(input.entries);
             }
+            graph.elementary = input.elementary;
+            graph.set_coupled_resources(&input.coupled_resources)?;
             graph.validate()?;
             networks.push(Network {
                 id: input.id,

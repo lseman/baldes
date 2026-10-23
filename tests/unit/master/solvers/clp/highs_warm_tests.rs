@@ -23,6 +23,12 @@ fn persistent_highs_reuses_basis_across_edits_and_independent_forks() {
     master.add_column(1., &[(0, 1.)]).unwrap();
     assert!(master.solve());
     let identity = master.highs_backend.as_ref().unwrap().native_identity();
+    assert_eq!(
+        master.highs_backend.as_ref().unwrap().configured_threads(),
+        Some(std::thread::available_parallelism().map_or(1, usize::from))
+    );
+    assert!(master.set_backend_threads(1).is_err());
+    assert_eq!(master.backend_threads(), 0);
     assert!(master.solve());
     assert_eq!(
         master.highs_backend.as_ref().unwrap().native_identity(),

@@ -237,7 +237,9 @@ pub fn solve<const D: usize>(
         output.pricing_calls += result.master.pricing_calls;
         output.fixing_calls += result.fixing_calls;
         output.enumerated_routes += result.enumerated_routes;
-        if result.preprocessing.infeasible {
+        if result.preprocessing.infeasible
+            || (result.master.status == Status::Infeasible && result.master.bound == f64::INFINITY)
+        {
             if let Some(history) = &mut subtree_history {
                 history.close(node.lineage);
             }

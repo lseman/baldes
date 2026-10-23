@@ -162,11 +162,11 @@ impl CapacitySeparator {
             routes.push((arcs, *value));
         }
         let capacity = self.capacity;
-        let demands = self.demands.clone();
         let state = self.prepared()?;
         let first_id = state.statistics.cuts_created;
         let generated = state.separate(&routes);
         let positive = state.num_positive_demand as i32;
+        let demands = &self.demands;
         let mut result = vec![];
         for (offset, (rhs, kind, sets, weights)) in generated.into_iter().enumerate() {
             let mut cut = CapacityCut {

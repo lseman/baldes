@@ -47,6 +47,50 @@ pub struct Answer {
     pub bound_minimum: Option<f64>,
 }
 
+/// Outcome of a zero-real-objective feasibility pricing round. This is
+/// independent of convergence or bounds for the original objective.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FeasibilityStatus {
+    Feasible,
+    Infeasible,
+    Stalled,
+    TimeLimit,
+    IterationLimit,
+}
+impl FeasibilityStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Feasible => "feasible",
+            Self::Infeasible => "infeasible",
+            Self::Stalled => "stalled",
+            Self::TimeLimit => "time_limit",
+            Self::IterationLimit => "iteration_limit",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FeasibilityReport {
+    pub status: FeasibilityStatus,
+    pub iterations: usize,
+    pub pricing_calls: usize,
+    pub simplex_iterations: usize,
+    pub ipm_iterations: usize,
+    pub seconds: f64,
+    pub artificial_activity: Option<f64>,
+    /// A bound for artificial activity, never an original-objective bound.
+    pub lower_bound: Option<f64>,
+    /// True only when original-domain directed arithmetic justifies infeasibility.
+    pub certified_infeasible: bool,
+}
+
+/// Original-objective columns recovered on a private phase-I model. Tags and
+/// coefficients must remain valid when the caller installs these columns.
+pub struct FeasibilityRecovery {
+    pub columns: Vec<Column>,
+    pub report: FeasibilityReport,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
     Optimal,
@@ -217,6 +261,8 @@ impl Default for Options {
 #[derive(Clone, Debug)]
 pub struct Output {
     pub status: Status,
+    /// Auxiliary feasibility rounds; their values never enter objective history.
+    pub feasibility: Vec<FeasibilityReport>,
     /// The controller requested a resumable handoff, rather than termination.
     /// `status` remains a limit status; this flag never certifies enumeration.
     pub enumeration_requested: bool,
@@ -250,6 +296,7 @@ pub use controller::{Controller, NoController};
 mod driver;
 pub use driver::optimize;
 mod enumeration;
+mod feasibility;
 
 mod bounds;
 pub use bounds::gap_smaller_than_tolerance;

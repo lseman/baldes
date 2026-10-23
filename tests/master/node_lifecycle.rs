@@ -435,7 +435,7 @@ fn snapshots_keep_cached_columns_and_extend_branch_rows_without_aliasing() {
         root::{self, RootOptions, RootProblem},
         RowSense,
     };
-    let mut instance = Instance::read("instances/R201.txt").unwrap();
+    let mut instance = Instance::read("instances/Solomon/R201.txt").unwrap();
     instance.truncate(10).unwrap();
     let graph = instance.graph(12, Rounding::None).unwrap();
     let problem = RootProblem::set_partitioning(graph.clone(), 10.).unwrap();

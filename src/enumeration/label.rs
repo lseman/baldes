@@ -16,6 +16,7 @@ pub struct Label<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub cut_words: [u32; FULL_WORDS],
     pub cut_cost: f64,
     pub presence_state: crate::cuts::soft_conflicts::LabelState,
+    pub coupled_state: Option<Box<crate::graph::coupled::CoupledLabelState>>,
 }
 /// Full-memory cut tables of an enumeration with cuts.
 #[derive(Clone, Copy, Debug)]
@@ -99,6 +100,44 @@ impl<'a> CutTables<'a> {
     }
 }
 impl<const D: usize> Label<D> {
+    /// Copy the non-coupled fields before replacing the resource state with
+    /// a physical extension. Avoid cloning a frontier that would be discarded.
+    pub(super) fn clone_without_coupled(&self) -> Self {
+        // Keep this exhaustive: adding a label field must update this copy.
+        let Self {
+            id,
+            vertex,
+            resources,
+            reduced_cost,
+            original_cost,
+            visited,
+            element_hash,
+            parent,
+            arc,
+            hops,
+            cut_words,
+            cut_cost,
+            presence_state,
+            coupled_state: _,
+        } = self;
+        Self {
+            id: *id,
+            vertex: *vertex,
+            resources: *resources,
+            reduced_cost: *reduced_cost,
+            original_cost: *original_cost,
+            visited: *visited,
+            element_hash: *element_hash,
+            parent: *parent,
+            arc: *arc,
+            hops: *hops,
+            cut_words: *cut_words,
+            cut_cost: *cut_cost,
+            presence_state: presence_state.clone(),
+            coupled_state: None,
+        }
+    }
+
     /// Enumeration bucket key, ((0.5 potential + additional) + reduced) + 0.
     pub fn key(&self) -> f64 {
         ((0.0 + self.cut_cost) + self.reduced_cost) + 0.0

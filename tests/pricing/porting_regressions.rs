@@ -2,6 +2,9 @@
 use baldes::{pricing::Solver, Graph, Route};
 use std::collections::BTreeMap;
 
+#[path = "mixed_reversal.rs"]
+mod mixed_reversal;
+
 fn solver(symmetric: bool, cut: bool) -> Solver<2> {
     let mut s = Solver::<2>::new(5, 1).unwrap();
     s.graph.vertices[0].elements.clear();
@@ -578,4 +581,249 @@ fn capacity_candidate_ids_and_counters_persist_and_reset() {
     sep.reset();
     assert_eq!(sep.statistics(), CapacityStatistics::default());
     assert_eq!(sep.separate(&columns).unwrap()[0].id, 0);
+}
+
+fn coupled_solver(symmetric: bool, cut: bool) -> Solver<2> {
+    use baldes::graph::coupled::CoupledResource;
+    let mut s = solver(symmetric, cut);
+    for arc in &mut s.graph.arcs {
+        arc.reduced_cost = -2.;
+    }
+    let allowed = s
+        .graph
+        .arcs
+        .iter()
+        .map(|a| {
+            let mut domain = 3;
+            if a.tail == 1 || a.head == 1 {
+                domain &= 1;
+            }
+            if a.tail == 2 || a.head == 2 {
+                domain &= 2;
+            }
+            domain
+        })
+        .collect();
+    let n = s.graph.arcs.len();
+    s.set_coupled_resources(&[
+        CoupledResource::Selection {
+            initial: 3,
+            allowed,
+        },
+        CoupledResource::SimultaneousPickupDelivery {
+            capacity: 6.,
+            deliveries: vec![1.; n],
+            pickups: vec![2.; n],
+        },
+    ])
+    .unwrap();
+    s
+}
+fn coupled_exhaustive(g: &Graph<2>, cut: bool, cutoff: f64) -> BTreeMap<Vec<i32>, f64> {
+    // Independent literal service recurrence, not the coupled kernel/replay.
+    exhaustive(g, cut, cutoff)
+        .into_iter()
+        .filter(|(path, _)| {
+            let (mut domain, mut deliveries, mut net, mut peak) = (3, 0., 0f64, 0f64);
+            for &id in path {
+                let a = g.arcs.iter().find(|a| a.id == id).unwrap();
+                if a.tail == 1 || a.head == 1 {
+                    domain &= 1;
+                }
+                if a.tail == 2 || a.head == 2 {
+                    domain &= 2;
+                }
+                deliveries += 1.;
+                net += 1.;
+                peak = peak.max(net);
+            }
+            domain != 0 && deliveries + peak <= 6.
+        })
+        .collect()
+}
+#[test]
+fn coupled_prefix_reversal_preserves_pricing_fixing_and_cut_bearing_enumeration() {
+    for symmetric in [false, true] {
+        for cut in [false, true] {
+            for cutoff in [-5., -3., 100.] {
+                let mut s = coupled_solver(symmetric, cut);
+                let expected = coupled_exhaustive(&s.graph, cut, cutoff);
+                let minimum = coupled_exhaustive(&s.graph, cut, 100.)
+                    .values()
+                    .copied()
+                    .fold(f64::INFINITY, f64::min);
+                let priced = s.price_phase(0, 100, false).unwrap();
+                assert_eq!(s.engine.as_ref().unwrap().consumption_joins, symmetric);
+                assert!((priced.minimum_reduced_cost - minimum).abs() < 1e-9);
+                for route in &priced.columns {
+                    let original: f64 = route
+                        .arcs
+                        .iter()
+                        .map(|id| s.graph.arcs.iter().find(|a| a.id == *id).unwrap().cost)
+                        .sum();
+                    assert_eq!(route.original_cost, original);
+                }
+                s.fix(cutoff).unwrap();
+                assert_costs(&costs(s.enumerate(cutoff).unwrap()), &expected);
+            }
+        }
+    }
+}
+#[test]
+fn coupled_prefix_reversal_falls_back_for_duals_and_isolates_forbidden_children() {
+    let mut s = coupled_solver(true, false);
+    s.price_phase(0, 100, false).unwrap();
+    assert!(s.engine.as_ref().unwrap().consumption_joins);
+    let mut child = s.fork_for_node();
+    child.set_forbidden_arcs(vec![0]).unwrap();
+    let priced = child.price_phase(0, 100, false).unwrap();
+    assert!(!child.engine.as_ref().unwrap().consumption_joins);
+    assert!(priced
+        .columns
+        .iter()
+        .all(|r| !r.arcs.contains(&s.graph.arcs[0].id)));
+    assert!(s.engine.as_ref().unwrap().consumption_joins);
+    for (i, a) in s.graph.arcs.iter_mut().enumerate() {
+        a.reduced_cost = (i * 7 % 13) as f64 - 6.;
+    }
+    let expected = coupled_exhaustive(&s.graph, false, 100.);
+    let result = s.price_phase(0, 100, false).unwrap();
+    assert!(!s.engine.as_ref().unwrap().consumption_joins);
+    assert!(
+        (result.minimum_reduced_cost - expected.values().copied().fold(f64::INFINITY, f64::min))
+            .abs()
+            < 1e-9
+    );
+    assert_costs(&costs(s.enumerate(100.).unwrap()), &expected);
+}
+
+#[test]
+fn g13_coupled_retained_universe_survives_duals_fixing_and_sibling_branches() {
+    for symmetric in [false, true] {
+        for cut in [false, true] {
+            for seed in 0..16 {
+                let mut parent = coupled_solver(symmetric, false);
+                let initial = coupled_exhaustive(&parent.graph, false, 100.);
+                assert_costs(&costs(parent.enumerate(100.).unwrap()), &initial);
+                if cut {
+                    parent
+                        .cuts
+                        .add_strong_k_path_cut(5, &[1, 2], 1, -1.25)
+                        .unwrap();
+                }
+                let original = coupled_exhaustive(&parent.graph, cut, 100.);
+                assert_costs(
+                    &costs(parent.inspect_enumeration(100.).unwrap().unwrap()),
+                    &original,
+                );
+                let mut sibling = parent.fork_for_node();
+                let mut child = parent.fork_for_node();
+                let forbidden = seed % child.graph.arcs.len();
+                let forbidden_id = child.graph.arcs[forbidden].id;
+                child.set_forbidden_arcs(vec![forbidden]).unwrap();
+                for (i, arc) in child.graph.arcs.iter_mut().enumerate() {
+                    arc.reduced_cost = ((i * 7 + seed * 3) % 17) as f64 - 8.;
+                }
+                let expected: BTreeMap<_, _> = coupled_exhaustive(&child.graph, cut, 100.)
+                    .into_iter()
+                    .filter(|(path, _)| !path.contains(&forbidden_id))
+                    .collect();
+                // All paths were retained below 100 before the change; refreshing
+                // coefficients/costs must neither resurrect the forbidden arc nor
+                // discard a previously expensive physical ordering.
+                let inspected = child.inspect_enumeration(100.).unwrap();
+                if let Some(routes) = inspected {
+                    assert_costs(&costs(routes), &expected);
+                }
+                let priced = child.price_phase(0, 100, false).unwrap();
+                assert!(priced.exact);
+                assert!(
+                    (priced.minimum_reduced_cost
+                        - expected.values().copied().fold(f64::INFINITY, f64::min))
+                    .abs()
+                        < 1e-8,
+                    "seed={seed}, symmetric={symmetric}, cut={cut}"
+                );
+                child.fix(0.).unwrap();
+                let negative = expected.into_iter().filter(|(_, c)| *c < 0.).collect();
+                assert_costs(&costs(child.enumerate(0.).unwrap()), &negative);
+                assert_costs(
+                    &costs(sibling.inspect_enumeration(100.).unwrap().unwrap()),
+                    &original,
+                );
+                assert_costs(
+                    &costs(parent.inspect_enumeration(100.).unwrap().unwrap()),
+                    &original,
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn g13_bounded_cycles_jumps_and_terminal_equality_match_literal_walks() {
+    use baldes::graph::{coupled::CoupledResource, ResourceKind};
+    use baldes::pricing::phases::Phase;
+    for mode in [0., 1., 2.] {
+        for jumps in [false, true] {
+            for equality in [false, true] {
+                let mut s = Solver::<2>::new(3, 1).unwrap();
+                for v in 0..3 {
+                    s.graph.vertices[v].elements.clear();
+                    s.graph.set_bounds(v, 0, 0., 4.).unwrap();
+                }
+                if equality {
+                    s.graph.resources[0] = ResourceKind::Equality;
+                }
+                s.graph.set_bounds(2, 0, 4., 4.).unwrap();
+                for (tail, head, cost) in [(0, 1, -1.), (1, 1, -2.), (1, 2, 0.)] {
+                    let id = s.graph.add_arc(tail, head, cost).unwrap();
+                    s.graph.arc_mut(id).unwrap().consumption[0] = 1.;
+                }
+                s.set_coupled_resources(&[
+                    CoupledResource::Selection {
+                        initial: 3,
+                        allowed: vec![3; 3],
+                    },
+                    CoupledResource::SimultaneousPickupDelivery {
+                        capacity: 4.,
+                        deliveries: vec![1.; 3],
+                        pickups: vec![1.; 3],
+                    },
+                ])
+                .unwrap();
+                s.set_option("BALDESuseBidirectionalSearch", mode).unwrap();
+                s.phases = vec![Phase {
+                    check_ng: true,
+                    jump_arcs: jumps,
+                    labels_per_bucket: i64::MAX,
+                }];
+                s.enumeration_preserve_arc_paths = true;
+                // Two terminal arcs plus k loops consume k+2 units. Equality
+                // cannot wait to four; an ordinary window may wait at the sink.
+                let expected: BTreeMap<_, _> = (0..=2)
+                    .filter(|k| !equality || *k == 2)
+                    .map(|k| {
+                        let mut path = vec![0];
+                        path.extend(std::iter::repeat_n(1, k));
+                        path.push(2);
+                        (path, -1. - 2. * k as f64)
+                    })
+                    .collect();
+                let priced = s.price_phase(0, 100, false).unwrap();
+                assert_eq!(
+                    priced.exact, jumps,
+                    "mode={mode} equality={equality}: {priced:?}"
+                );
+                assert_eq!(
+                    priced.minimum_reduced_cost, -5.,
+                    "mode={mode} jumps={jumps} equality={equality}"
+                );
+                assert_costs(&costs(s.enumerate(100.).unwrap()), &expected);
+                s.fix(-2.).unwrap();
+                let negative = expected.into_iter().filter(|(_, c)| *c < -2.).collect();
+                assert_costs(&costs(s.enumerate(-2.).unwrap()), &negative);
+            }
+        }
+    }
 }

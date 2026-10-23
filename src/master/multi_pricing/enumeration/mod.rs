@@ -98,17 +98,32 @@ fn collect_with_plan<const D: usize>(
         // Disposable transitions relax scalar equality transitions: clamping a
         // too-small load adds paths, never removes an equality-feasible path.
         // Collect that superset, then replay every path on the original graph.
-        let relaxed = graph
-            .resources
-            .iter()
-            .any(|r| *r == crate::graph::ResourceKind::Equality)
-            .then(|| {
-                let mut relaxed = graph.clone();
-                relaxed
-                    .resources
-                    .fill(crate::graph::ResourceKind::Disposable);
-                relaxed
-            });
+        // Coupled restrictions are also relaxed only in this outer path
+        // superset. Every candidate is certified and repriced against `graph`
+        // below before the atomic transfer. The scalar collectors themselves
+        // retain their explicit unsupported-coupled proof contract.
+        let relaxed = (graph.has_coupled_resources()
+            || graph
+                .resources
+                .iter()
+                .any(|r| *r == crate::graph::ResourceKind::Equality))
+        .then(|| -> Result<_> {
+            let mut relaxed = graph.clone();
+            relaxed
+                .resources
+                .fill(crate::graph::ResourceKind::Disposable);
+            relaxed.set_coupled_resources(&[])?;
+            Ok(relaxed)
+        })
+        .transpose()
+        .map_err(|e| e.to_string())?;
+        if matches!(cutoff, Some(super::bounds::NetworkCutoff::Cost { .. }))
+            && graph
+                .coupled_kernel()
+                .is_some_and(|kernel| kernel.has_costs())
+        {
+            return Err("UnsupportedDomain: additive cutoff omits coupled costs".into());
+        }
         let limits = PathDomainLimits {
             max_paths: paths_left,
             max_work: work_left,
@@ -214,7 +229,19 @@ fn collect_with_plan<const D: usize>(
             probe.original_cost = ids
                 .iter()
                 .map(|id| oracle.network.graph.arcs[oracle.index[id]].cost)
-                .sum();
+                .sum::<f64>()
+                + oracle
+                    .network
+                    .graph
+                    .coupled_path_cost(
+                        &probe
+                            .arcs
+                            .iter()
+                            .map(|id| oracle.index[id])
+                            .collect::<Vec<_>>(),
+                    )
+                    .map_err(|e| e.to_string())?
+                    .ok_or("infeasible coupled path")?;
             probe.cost = probe.original_cost;
             if !probe.cost.is_finite() {
                 return Err("Arithmetic: route cost".into());
@@ -562,6 +589,15 @@ fn exact_integer_encoding<const D: usize>(
             let Some(oracle) = state.oracles.iter().find(|o| o.network.id == route.network) else {
                 return Ok(false);
             };
+            if let Some(kernel) = oracle.network.graph.coupled_kernel() {
+                let arcs: Vec<_> = route.route.arcs.iter().map(|id| oracle.index[id]).collect();
+                let Some((true, bounds)) = kernel.certify(&arcs) else {
+                    return Ok(false);
+                };
+                if bounds[0] != bounds[1] || cost.add(bounds[0]).is_none() {
+                    return Ok(false);
+                }
+            }
             for &arc in &route.route.arcs {
                 let position = oracle.index[&arc];
                 if cost.add(oracle.network.graph.arcs[position].cost).is_none() {

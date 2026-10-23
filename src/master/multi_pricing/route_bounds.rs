@@ -23,6 +23,9 @@ fn reduced<const D: usize>(
     route: &Route,
     duals: &[f64],
 ) -> Option<f64> {
+    if oracle.network.graph.has_coupled_resources() {
+        return None;
+    }
     let mut value = 0.;
     for id in &route.arcs {
         let index = oracle.index[id];

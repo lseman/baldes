@@ -310,6 +310,33 @@ pub fn build_inputs<const D: usize>(
     Vec<FullInput>,
     Vec<FullKPathInput>,
 ) {
+    build_inputs_with_duals(registry, g, false)
+}
+
+/// Coefficient-consistent row prices for feasibility pricing. Keep small duals
+/// and avoid native-compatible visit-once quantization.
+pub(crate) fn build_inputs_exact<const D: usize>(
+    registry: &CutRegistry,
+    g: &Graph<D>,
+) -> (
+    Vec<LimitedInput>,
+    Vec<LimitedKPathInput>,
+    Vec<FullInput>,
+    Vec<FullKPathInput>,
+) {
+    build_inputs_with_duals(registry, g, true)
+}
+
+fn build_inputs_with_duals<const D: usize>(
+    registry: &CutRegistry,
+    g: &Graph<D>,
+    exact_duals: bool,
+) -> (
+    Vec<LimitedInput>,
+    Vec<LimitedKPathInput>,
+    Vec<FullInput>,
+    Vec<FullKPathInput>,
+) {
     let graph = g.graph_id.max(0);
     let vertices = g.vertices.len();
     let mut order = registry.pricing_order.clone();
@@ -324,10 +351,12 @@ pub fn build_inputs<const D: usize>(
     let mut full_kpath = vec![];
     for index in order {
         let cut = &registry.cuts[index];
-        if registry.retired.contains(&index) || cut.dual.abs() <= 1e-6 {
+        if registry.retired.contains(&index)
+            || cut.dual.abs() <= if exact_duals { 0. } else { 1e-6 }
+        {
             continue;
         }
-        let dual = if cut.visit_once {
+        let dual = if cut.visit_once && !exact_duals {
             (-cut.dual * 1e8 + 0.5).floor() / 1e8
         } else {
             -cut.dual

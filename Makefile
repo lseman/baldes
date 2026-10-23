@@ -12,7 +12,7 @@ RUN_CONFIG = $(CONFIG_TOOL) --config $(call quote,$(CONFIG)) --cargo $(call quot
 
 all: build
 
-$(CONFIG_TOOL): scripts/build_config.rs scripts/build_config_ui.rs
+$(CONFIG_TOOL): scripts/build/build_config.rs scripts/build/build_config_ui.rs
 	@mkdir -p target
 	$(call quote,$(RUSTC)) --edition=2021 -O $< -o $@
 
@@ -35,7 +35,7 @@ fmt:
 	$(call quote,$(CARGO)) fmt -p baldes --check
 
 test-config: $(CONFIG_TOOL)
-	$(call quote,$(RUSTC)) --edition=2021 --test scripts/build_config.rs -o target/baldes-build-tests
+	$(call quote,$(RUSTC)) --edition=2021 --test scripts/build/build_config.rs -o target/baldes-build-tests
 	@target/baldes-build-tests
 
 help:

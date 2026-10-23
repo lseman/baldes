@@ -21,6 +21,18 @@ impl<const D: usize> Enumeration<D> {
         completion: F,
     ) -> Result<Self> {
         let consumption = !reverse.is_empty();
+        let union_reversal = consumption
+            && g.coupled_kernel()
+                .is_some_and(|k| k.reversal_union_required());
+        let unsupported_front_completion = g.coupled_kernel().is_some_and(|k| k.has_slope_fronts());
+        if consumption
+            && g.coupled_kernel()
+                .is_some_and(|k| !k.reversal_eligible(reverse))
+        {
+            return Err(invalid(
+                "this coupled resource contract requires ordinary directional enumeration",
+            ));
+        }
         if consumption && g.has_time_windows() {
             return Err(invalid(
                 "multi-time-window enumeration requires ordinary directional buckets",
@@ -56,6 +68,7 @@ impl<const D: usize> Enumeration<D> {
             presence.validate_engine(g.arcs.len())?;
         }
         let preserve = controls.preserve_arc_paths
+            || g.has_coupled_resources()
             || cuts.and_then(|c| c.presence).is_some_and(|p| p.active());
         let started = Instant::now();
         let mut forward = Storage::new(controls.partitions)?;
@@ -83,6 +96,13 @@ impl<const D: usize> Enumeration<D> {
                 cut_words: [0; FULL_WORDS],
                 cut_cost: 0.,
                 presence_state: cuts.and_then(|c| c.presence).and_then(|p| p.empty_state()),
+                coupled_state: g.coupled_kernel().map(|k| {
+                    if consumption {
+                        k.reversal_root(direction)
+                    } else {
+                        k.root(direction)
+                    }
+                }),
             };
             for r in 0..g.resources.len() {
                 root.resources[r] = g
@@ -125,6 +145,7 @@ impl<const D: usize> Enumeration<D> {
             storage.insert(g, root.clone(), direction);
             let step = controls.label_limit / 50;
             let mut checkpoint = 0;
+            let mut coupled_workspace = crate::graph::coupled::CoupledWorkspace::default();
             while let Some(from) = storage.pop() {
                 if started.elapsed() > controls.time_limit {
                     return Err(incomplete("enumeration time limit exceeded"));
@@ -153,7 +174,7 @@ impl<const D: usize> Enumeration<D> {
                 };
                 for arc in &grid.direction(direction).buckets[v][bucket].arcs {
                     let physical = &g.arcs[arc.physical];
-                    let mut next = from.clone();
+                    let mut next = from.clone_without_coupled();
                     next.parent = Some(from.id);
                     next.arc = Some(arc.physical);
                     next.vertex = if direction {
@@ -162,8 +183,42 @@ impl<const D: usize> Enumeration<D> {
                         physical.tail
                     };
                     next.hops += 1;
-                    next.reduced_cost = physical.reduced_cost + from.reduced_cost;
-                    next.original_cost = from.original_cost + physical.cost;
+                    if let Some(kernel) = g.coupled_kernel() {
+                        let state = from
+                            .coupled_state
+                            .as_deref()
+                            .ok_or_else(|| invalid("missing coupled enumeration state"))?;
+                        let Some((mut next_state, _)) = (if consumption {
+                            kernel.extend_reversal_with_workspace(
+                                state,
+                                arc.physical,
+                                direction,
+                                &mut coupled_workspace,
+                            )
+                        } else {
+                            kernel.extend_with_workspace(
+                                state,
+                                arc.physical,
+                                direction,
+                                &mut coupled_workspace,
+                            )
+                        })?
+                        else {
+                            continue;
+                        };
+                        (next.reduced_cost, next.original_cost) = next_state.account_extension(
+                            state,
+                            physical.reduced_cost,
+                            physical.cost,
+                        )?;
+                        next.coupled_state = Some(next_state);
+                        if !next.reduced_cost.is_finite() || !next.original_cost.is_finite() {
+                            return Err(incomplete("coupled enumeration cost overflow"));
+                        }
+                    } else {
+                        next.reduced_cost = physical.reduced_cost + from.reduced_cost;
+                        next.original_cost = from.original_cost + physical.cost;
+                    }
                     if !next.add_elements(&physical.elements) {
                         continue;
                     }
@@ -184,7 +239,7 @@ impl<const D: usize> Enumeration<D> {
                     let Some(q) = extend_resources(g, physical, &q, direction) else {
                         continue;
                     };
-                    next.resources = q.clone();
+                    next.resources = q;
                     if let Some(c) = &cuts {
                         c.along_arc(&mut next, direction, arc.physical)?;
                     }
@@ -200,7 +255,12 @@ impl<const D: usize> Enumeration<D> {
                         if !direction && before {
                             continue;
                         }
-                        if !completion(direction, &next) {
+                        // Existing completion callbacks prove one directional role.
+                        // A union prefix also stands for its reversed suffix role.
+                        if !union_reversal
+                            && !unsupported_front_completion
+                            && !completion(direction, &next)
+                        {
                             pruning.completion_rejections += 1;
                             continue;
                         }
@@ -210,6 +270,36 @@ impl<const D: usize> Enumeration<D> {
                         }
                     }
                     if terminal {
+                        if let Some(kernel) = g.coupled_kernel() {
+                            let state = next
+                                .coupled_state
+                                .as_deref()
+                                .ok_or_else(|| invalid("missing coupled terminal state"))?;
+                            let root = kernel.root(!direction);
+                            if kernel.has_costs() {
+                                let value = if direction {
+                                    coupled_canonical_join(g, state, &root)?
+                                } else {
+                                    coupled_canonical_join(g, &root, state)?
+                                };
+                                let Some((reduced, original)) = value else {
+                                    continue;
+                                };
+                                next.reduced_cost = reduced;
+                                next.original_cost = original;
+                            } else {
+                                let correction = if direction {
+                                    kernel.join(state, &root)?
+                                } else {
+                                    kernel.join(&root, state)?
+                                };
+                                let Some(correction) = correction else {
+                                    continue;
+                                };
+                                next.reduced_cost += correction;
+                                next.original_cost += correction;
+                            }
+                        }
                         // Reaching the source window is insufficient for an
                         // equality resource: the suffix must reach the actual
                         // initial value, not another value in that window.
@@ -261,18 +351,7 @@ impl<const D: usize> Enumeration<D> {
                         if !next.add_elements(&g.vertices[terminal_root.vertex].elements) {
                             continue;
                         }
-                        let mut arcs = vec![arc.physical];
-                        let mut parent = Some(from.id);
-                        while let Some(id) = parent {
-                            let label = &storage.arena[id];
-                            if let Some(a) = label.arc {
-                                arcs.push(a);
-                            }
-                            parent = label.parent;
-                        }
-                        if direction {
-                            arcs.reverse();
-                        }
+                        let arcs = terminal_arc_path(&next, &storage.arena, direction);
                         paths.insert(Path {
                             reduced_cost: next.reduced_cost,
                             original_cost: next.original_cost,
@@ -341,9 +420,24 @@ impl<const D: usize> Enumeration<D> {
                 });
             }
         }
+        let mut coupled_completion = crate::graph::coupled::CoupledStateBounds::default();
+        if g.coupled_kernel().is_some_and(|k| k.has_costs()) {
+            for row in &opposite.partitions {
+                for &id in row {
+                    coupled_completion.include(opposite.arena[id].coupled_state.as_deref());
+                }
+            }
+        }
         for vertex in 0..grid.order.len() {
             let v = grid.order[vertex];
             for f in &crossing[v] {
+                let resource_lower = g.coupled_kernel().map_or(0., |kernel| {
+                    kernel.completion_correction_lower(
+                        true,
+                        f.coupled_state.as_deref(),
+                        &coupled_completion,
+                    )
+                });
                 let mut q = grid.coordinate(&f.resources);
                 if consumption {
                     for r in 0..grid.dimensions {
@@ -374,20 +468,88 @@ impl<const D: usize> Enumeration<D> {
                         } else {
                             key + label_key(b) + minimum_cut_join
                         };
+                        let ordered_bound = if g.coupled_kernel().is_some_and(|k| k.has_costs()) {
+                            crate::core::rounding::add_down(key, label_key(b))
+                                .and_then(|v| crate::core::rounding::add_down(v, minimum_cut_join))
+                                .and_then(|v| {
+                                    if let Some(presence) =
+                                        cuts.and_then(|c| c.presence).filter(|p| p.active())
+                                    {
+                                        presence
+                                            .join_correction_lower_bound(&f.presence_state)
+                                            .ok()
+                                            .flatten()
+                                            .and_then(|b| crate::core::rounding::add_down(v, b))
+                                    } else {
+                                        Some(v)
+                                    }
+                                })
+                                .and_then(|v| crate::core::rounding::add_down(v, resource_lower))
+                                .unwrap_or(f64::NEG_INFINITY)
+                        } else {
+                            ordered_bound
+                        };
                         if ordered_bound > controls.cutoff - EPSILON {
                             pruning.ordered(ordered_bound);
                             break;
                         }
-                        let cost = match &cuts {
-                            Some(c) => c.join(
-                                g,
-                                consumption,
-                                f,
-                                b,
-                                ((f.reduced_cost + b.reduced_cost) + 0.0) + 0.0,
-                            )?,
-                            None => f.reduced_cost + b.reduced_cost,
-                        };
+                        let (cost, original_cost) =
+                            if g.coupled_kernel().is_some_and(|kernel| kernel.has_costs()) {
+                                let f_state = f
+                                    .coupled_state
+                                    .as_deref()
+                                    .ok_or_else(|| invalid("missing coupled crossing state"))?;
+                                let b_state = b
+                                    .coupled_state
+                                    .as_deref()
+                                    .ok_or_else(|| invalid("missing coupled suffix state"))?;
+                                let Some((reduced, original)) =
+                                    coupled_canonical_join(g, f_state, b_state)?
+                                else {
+                                    continue;
+                                };
+                                (
+                                    match &cuts {
+                                        Some(c) => c.join(g, consumption, f, b, reduced)?,
+                                        None => reduced,
+                                    },
+                                    original,
+                                )
+                            } else {
+                                let correction = if let Some(kernel) = g.coupled_kernel() {
+                                    let f_state = f
+                                        .coupled_state
+                                        .as_deref()
+                                        .ok_or_else(|| invalid("missing coupled crossing state"))?;
+                                    let b_state = b
+                                        .coupled_state
+                                        .as_deref()
+                                        .ok_or_else(|| invalid("missing coupled suffix state"))?;
+                                    let Some(value) = (if consumption {
+                                        kernel.join_reversed(f_state, b_state)?
+                                    } else {
+                                        kernel.join(f_state, b_state)?
+                                    }) else {
+                                        continue;
+                                    };
+                                    value
+                                } else {
+                                    0.
+                                };
+                                (
+                                    match &cuts {
+                                        Some(c) => c.join(
+                                            g,
+                                            consumption,
+                                            f,
+                                            b,
+                                            ((f.reduced_cost + b.reduced_cost) + 0.0) + 0.0,
+                                        )?,
+                                        None => f.reduced_cost + b.reduced_cost,
+                                    } + correction,
+                                    f.original_cost + b.original_cost + correction,
+                                )
+                            };
                         if cost > controls.cutoff - EPSILON {
                             pruning.joined(cost);
                             continue;
@@ -418,34 +580,14 @@ impl<const D: usize> Enumeration<D> {
                         }) {
                             continue;
                         }
-                        let mut arcs = vec![];
-                        let mut label = f;
-                        loop {
-                            if let Some(a) = label.arc {
-                                arcs.push(a);
-                            }
-                            let Some(parent) = label.parent else {
-                                break;
-                            };
-                            label = &forward.arena[parent];
-                        }
-                        arcs.reverse();
-                        let mut suffix = vec![];
-                        let mut label = b;
-                        loop {
-                            if let Some(a) = label.arc {
-                                suffix.push(a);
-                            }
-                            let Some(parent) = label.parent else {
-                                break;
-                            };
-                            label = &opposite.arena[parent];
-                        }
-                        if consumption {
-                            arcs.extend(suffix.into_iter().map(|a| reverse[a]));
-                        } else {
-                            arcs.extend(suffix);
-                        }
+                        let arcs = crossing_arc_path(
+                            f,
+                            b,
+                            &forward.arena,
+                            &opposite.arena,
+                            consumption,
+                            reverse,
+                        );
                         let mut visited = f.visited;
                         for (x, y) in visited.iter_mut().zip(&b.visited) {
                             *x |= *y;
@@ -466,7 +608,7 @@ impl<const D: usize> Enumeration<D> {
                         }
                         paths.insert(Path {
                             reduced_cost: cost,
-                            original_cost: f.original_cost + b.original_cost,
+                            original_cost,
                             visited,
                             element_hash,
                             arcs,
@@ -499,4 +641,81 @@ impl<const D: usize> Enumeration<D> {
             pruning,
         })
     }
+}
+
+/// Physical identities and canonical arc order are retained independently of
+/// function-front normalization and the direction used to construct labels.
+fn terminal_arc_path<const D: usize>(
+    label: &Label<D>,
+    arena: &[Label<D>],
+    forward: bool,
+) -> Vec<usize> {
+    let mut arcs = Vec::new();
+    let mut label = label;
+    loop {
+        if let Some(arc) = label.arc {
+            arcs.push(arc);
+        }
+        let Some(parent) = label.parent else {
+            break;
+        };
+        label = &arena[parent];
+    }
+    if forward {
+        arcs.reverse();
+    }
+    arcs
+}
+
+fn crossing_arc_path<const D: usize>(
+    forward: &Label<D>,
+    backward: &Label<D>,
+    forward_arena: &[Label<D>],
+    backward_arena: &[Label<D>],
+    consumption: bool,
+    reverse: &[usize],
+) -> Vec<usize> {
+    let mut arcs = terminal_arc_path(forward, forward_arena, true);
+    let suffix = terminal_arc_path(backward, backward_arena, false);
+    if consumption {
+        arcs.extend(suffix.into_iter().map(|arc| reverse[arc]));
+    } else {
+        arcs.extend(suffix);
+    }
+    arcs
+}
+
+/// Continue retained forward scalar sums in physical suffix order, then add
+/// the resource objective once. Proven backward caches avoid resource replay;
+/// physical-path vectors are allocated only after accepting the joined route.
+fn coupled_canonical_join<const D: usize>(
+    g: &Graph<D>,
+    forward: &crate::graph::coupled::CoupledLabelState,
+    backward: &crate::graph::coupled::CoupledLabelState,
+) -> Result<Option<(f64, f64)>> {
+    let kernel = g
+        .coupled_kernel()
+        .ok_or_else(|| invalid("missing coupled join kernel"))?;
+    let Some(resource) = kernel.join_resource_objective(forward, backward)? else {
+        return Ok(None);
+    };
+    let mut reduced = forward
+        .scalar_reduced_cost()
+        .ok_or_else(|| invalid("missing coupled forward scalar accounting"))?;
+    let mut original = forward
+        .scalar_original_cost()
+        .ok_or_else(|| invalid("missing coupled forward scalar accounting"))?;
+    for arc in kernel.suffix_arcs(backward) {
+        reduced += g.arcs[arc].reduced_cost;
+        original += g.arcs[arc].cost;
+        if !reduced.is_finite() || !original.is_finite() {
+            return Err(incomplete("coupled enumeration base cost overflow"));
+        }
+    }
+    reduced += resource;
+    original += resource;
+    if !reduced.is_finite() || !original.is_finite() {
+        return Err(incomplete("coupled enumeration objective overflow"));
+    }
+    Ok(Some((reduced, original)))
 }

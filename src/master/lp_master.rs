@@ -1,6 +1,6 @@
 //! Abstract LP master interface for column generation backends.
 //!
-//! Both Clp and HiGHS backends implement this trait so that the column
+//! Clp, HiGHS, and Gurobi backends implement this trait so that the column
 //! generation loop, root driver, and Python bindings are solver-agnostic.
 //! Accessors borrow the backend's solution and model vectors: the loop reads
 //! them per column and per row, so they must not copy.

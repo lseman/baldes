@@ -220,6 +220,11 @@ fn collect_paths<'g, P, const D: usize>(
     ) -> Result<Option<crate::graph::ResourceValues<D>>, PathDomainFailure>,
     make_path: impl FnMut(Vec<usize>, Vec<crate::graph::ResourceValues<D>>) -> P,
 ) -> Result<CollectedPaths<'g, P, D>, PathDomainFailure> {
+    // These collectors certify a scalar relaxation with additive costs. Until
+    // coupled interval costs are carried by that relaxation, report unsupported.
+    if graph.has_coupled_resources() {
+        return Err(PathDomainFailure::UnsupportedResources);
+    }
     collect_paths_with_clock(graph, limits, extend, make_path, Instant::now)
 }
 
@@ -249,6 +254,9 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
     clock: impl FnMut() -> Instant,
     cost_bounds: Option<(&[f64], f64)>,
 ) -> Result<CollectedPaths<'g, P, D>, PathDomainFailure> {
+    if graph.has_coupled_resources() {
+        return Err(PathDomainFailure::UnsupportedResources);
+    }
     let mut budget = Budget {
         remaining: limits.max_work,
         deadline: limits.deadline,
@@ -342,7 +350,7 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
                 continue;
             }
         }
-        let Some(resources) = extend(graph, arc, frame.resources.clone())? else {
+        let Some(resources) = extend(graph, arc, frame.resources)? else {
             continue;
         };
         if arc.head == graph.sink {
@@ -368,7 +376,7 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
             arcs.push(physical);
             let mut profile = vec![];
             reserve(&mut profile, stack.len() + 1)?;
-            profile.extend(stack.iter().map(|frame| frame.resources.clone()));
+            profile.extend(stack.iter().map(|frame| frame.resources));
             profile.push(resources);
             if result.paths.len() == result.paths.capacity() {
                 let additional =

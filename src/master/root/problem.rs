@@ -199,6 +199,19 @@ impl<const D: usize> RootProblem<D> {
         for (id, count) in counts {
             cost += self.graph.arcs[self.arc_position(id).unwrap()].cost * count as f64;
         }
+        if self.graph.has_coupled_resources() {
+            let positions: Vec<_> = route
+                .arcs
+                .iter()
+                .map(|id| self.arc_position(*id).unwrap())
+                .collect();
+            cost += self
+                .graph
+                .coupled_path_cost(&positions)
+                .ok()
+                .flatten()
+                .unwrap_or(f64::INFINITY);
+        }
         (cost, identities)
     }
     pub(super) fn reprice(
@@ -266,6 +279,11 @@ impl<const D: usize> RootProblem<D> {
         if at != g.sink || visited.is_empty() {
             return None;
         }
+        let positions: Vec<_> = ids
+            .iter()
+            .map(|id| self.arc_position(*id))
+            .collect::<Option<_>>()?;
+        cost += g.coupled_path_cost(&positions).ok()??;
         Some(Route {
             nodes,
             arcs: ids.to_vec(),

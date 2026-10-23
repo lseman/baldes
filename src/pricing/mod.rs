@@ -56,6 +56,8 @@ pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     /// Use graph-scaled knapsack coefficients and unrounded nonpositive duals.
     /// This does not by itself provide a directed-rounding certificate.
     pub knapsack_exact_coefficients: bool,
+    /// Keep current row duals without compatibility quantization in phase I.
+    pub(crate) exact_cut_duals: bool,
     /// Cut inputs the engine was last prepared with.
     knapsack_pricing: crate::cuts::knapsack::KnapsackPricing,
     /// Owned physical-arc presence rows survive engine replacement and forks.

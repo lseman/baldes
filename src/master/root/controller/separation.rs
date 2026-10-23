@@ -48,8 +48,8 @@ impl<const D: usize> RootController<D> {
                     && state.cut.level <= RANK_ONE_PRIORITY
                     && !state.solver.cuts.separation_phase(&state.solver.options)?.1
                 {
-                    let options = state.solver.options.clone();
-                    state.solver.cuts.increase_phase(&options)?;
+                    let options = &state.solver.options;
+                    state.solver.cuts.increase_phase(options)?;
                 } else {
                     state.cut.tailing += 1;
                 }

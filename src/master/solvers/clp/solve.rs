@@ -14,15 +14,17 @@ impl ClpMaster {
         }
         #[cfg(feature = "highs")]
         self.edit_highs(|backend| backend.set_tolerances(primal, dual))?;
+        #[cfg(feature = "gurobi")]
+        self.edit_gurobi(|backend| backend.set_tolerances(primal, dual))?;
         self.dual_tolerance = dual;
         self.primal_tolerance = primal;
         Ok(())
     }
 
     pub fn solve(&mut self) -> bool {
-        if self.solver == MasterSolver::Highs {
+        if matches!(self.solver, MasterSolver::Highs | MasterSolver::Gurobi) {
             return matches!(
-                self.solve_highs(i32::MAX as usize, Duration::MAX),
+                self.solve_native(i32::MAX as usize, Duration::MAX),
                 Ok(LpSolveOutcome::Optimal)
             );
         }
@@ -47,8 +49,8 @@ impl ClpMaster {
         iterations: usize,
         time_limit: Duration,
     ) -> Result<ClpSolveOutcome> {
-        if self.solver == MasterSolver::Highs {
-            return Ok(match self.solve_highs(iterations, time_limit)? {
+        if matches!(self.solver, MasterSolver::Highs | MasterSolver::Gurobi) {
+            return Ok(match self.solve_native(iterations, time_limit)? {
                 LpSolveOutcome::Optimal => ClpSolveOutcome::Optimal,
                 LpSolveOutcome::PrimalInfeasible => ClpSolveOutcome::PrimalInfeasible,
                 LpSolveOutcome::DualInfeasible => ClpSolveOutcome::DualInfeasible,
@@ -98,6 +100,18 @@ impl ClpMaster {
         })
     }
 
+    pub(super) fn solve_native(
+        &mut self,
+        iterations: usize,
+        remaining: Duration,
+    ) -> Result<LpSolveOutcome> {
+        match self.solver {
+            MasterSolver::Highs => self.solve_highs(iterations, remaining),
+            MasterSolver::Gurobi => self.solve_gurobi(iterations, remaining),
+            _ => Err(invalid("native LP solver required")),
+        }
+    }
+
     pub(super) fn solve_highs(
         &mut self,
         iterations: usize,
@@ -105,7 +119,7 @@ impl ClpMaster {
     ) -> Result<LpSolveOutcome> {
         self.solved = false;
         self.status = 4;
-        self.highs_row_basic.clear();
+        self.native_row_basic.clear();
         self.solver.ensure_available()?;
         if remaining.is_zero() || iterations == 0 {
             self.status = 3;
@@ -152,7 +166,7 @@ impl ClpMaster {
                         .simplex_iterations
                         .saturating_add(backend.simplex_iterations()?);
                 }
-                self.highs_row_basic = (0..self.rhs.len())
+                self.native_row_basic = (0..self.rhs.len())
                     .map(|r| backend.row_is_basic(r))
                     .collect::<Result<Vec<_>>>()?;
                 self.objective = backend.objective;
@@ -164,6 +178,75 @@ impl ClpMaster {
             Ok(outcome)
         }
         #[cfg(not(feature = "highs"))]
+        unreachable!("availability checked above")
+    }
+
+    pub(super) fn solve_gurobi(
+        &mut self,
+        iterations: usize,
+        remaining: Duration,
+    ) -> Result<LpSolveOutcome> {
+        self.solved = false;
+        self.status = 4;
+        self.native_row_basic.clear();
+        self.solver.ensure_available()?;
+        if remaining.is_zero() || iterations == 0 {
+            self.status = 3;
+            return Ok(if remaining.is_zero() {
+                LpSolveOutcome::TimeLimit
+            } else {
+                LpSolveOutcome::IterationLimit
+            });
+        }
+        #[cfg(feature = "gurobi")]
+        {
+            let started = Instant::now();
+            self.ensure_backend()?;
+            let backend = self.gurobi_backend.as_mut().unwrap();
+            backend.set_lp_iteration_limit(iterations)?;
+            let reuse_solution = backend.solved
+                && backend.reduced_costs.len() == self.costs.len()
+                && backend.values.len() == self.costs.len()
+                && backend.duals.len() == self.rhs.len()
+                && backend.zero_tolerance == self.zero_tolerance
+                && backend.objective_offset == self.objective_offset;
+            backend.zero_tolerance = self.zero_tolerance;
+            backend.objective_offset = self.objective_offset;
+            let budget = remaining.saturating_sub(started.elapsed());
+            let outcome = if budget.is_zero() {
+                LpSolveOutcome::TimeLimit
+            } else if reuse_solution {
+                LpSolveOutcome::Optimal
+            } else {
+                backend.solve_with_time_limit(budget)?
+            };
+            self.status = match outcome {
+                LpSolveOutcome::Optimal => 0,
+                LpSolveOutcome::PrimalInfeasible => 1,
+                LpSolveOutcome::DualInfeasible => 2,
+                LpSolveOutcome::TimeLimit
+                | LpSolveOutcome::IterationLimit
+                | LpSolveOutcome::Stopped => 3,
+                _ => 4,
+            };
+            if outcome == LpSolveOutcome::Optimal {
+                if !reuse_solution {
+                    self.simplex_iterations = self
+                        .simplex_iterations
+                        .saturating_add(backend.simplex_iterations()?);
+                }
+                self.native_row_basic = (0..self.rhs.len())
+                    .map(|r| backend.row_is_basic(r))
+                    .collect::<Result<Vec<_>>>()?;
+                self.objective = backend.objective;
+                self.values.clone_from(&backend.values);
+                self.duals.clone_from(&backend.duals);
+                self.reduced_costs.clone_from(&backend.reduced_costs);
+                self.solved = true;
+            }
+            Ok(outcome)
+        }
+        #[cfg(not(feature = "gurobi"))]
         unreachable!("availability checked above")
     }
 

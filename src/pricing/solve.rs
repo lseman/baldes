@@ -49,6 +49,13 @@ impl<const D: usize> Solver<D> {
             .phases
             .get(index)
             .ok_or_else(|| invalid("pricing phase out of range"))?;
+        if self
+            .prepared
+            .as_ref()
+            .is_some_and(|g| g.coupled_kernel() != self.graph.coupled_kernel())
+        {
+            self.restore_arcs();
+        }
         self.discard_incomplete_enumeration();
         if self.enumeration.is_some() {
             self.check_presence_universe()?;

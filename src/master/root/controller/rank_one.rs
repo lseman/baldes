@@ -25,14 +25,12 @@ impl<const D: usize> RootController<D> {
         fractional: &[FractionalColumn],
     ) -> Result<(usize, bool)> {
         let before = state.solver.cuts.cuts.len();
-        let options = state.solver.options.clone();
-        let graph = state.solver.graph.clone();
-        state.solver.cuts.separate_default(
-            &graph,
-            &options,
-            &self.problem.customers,
-            fractional,
-        )?;
+        let options = &state.solver.options;
+        let graph = &state.solver.graph;
+        state
+            .solver
+            .cuts
+            .separate_default(graph, options, &self.problem.customers, fractional)?;
         let after = state.solver.cuts.cuts.len();
         let mut paths = vec![];
         for &(_, tag) in tagged {
@@ -41,7 +39,7 @@ impl<const D: usize> RootController<D> {
                 state
                     .solver
                     .cuts
-                    .route(&graph, &State::<D>::customers(route))?,
+                    .route(graph, &State::<D>::customers(route))?,
                 state.is_enumerated(route),
             ));
         }
@@ -51,7 +49,7 @@ impl<const D: usize> RootController<D> {
                 let c = state
                     .solver
                     .cuts
-                    .route_coefficient(&graph, index, path, *enumerated)?;
+                    .route_coefficient(graph, index, path, *enumerated)?;
                 if c != 0 {
                     entries.push((column, c as f64));
                 }
@@ -85,7 +83,7 @@ impl<const D: usize> RootController<D> {
                 let c = state
                     .solver
                     .cuts
-                    .route_coefficient(&graph, index, path, *enumerated)?;
+                    .route_coefficient(graph, index, path, *enumerated)?;
                 master.set_coefficient(row, column, c as f64)?;
             }
         }

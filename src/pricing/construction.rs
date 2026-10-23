@@ -2,6 +2,16 @@
 use super::*;
 
 impl<const D: usize> Solver<D> {
+    /// Install direct coupled label resources and invalidate objective-dependent
+    /// labels, fixing and enumeration. Physical arc and vertex IDs are retained.
+    pub fn set_coupled_resources(
+        &mut self,
+        resources: &[crate::graph::coupled::CoupledResource],
+    ) -> Result<()> {
+        self.graph.set_coupled_resources(resources)?;
+        self.restore_arcs();
+        Ok(())
+    }
     pub fn new(vertices: usize, resources: usize) -> Result<Self> {
         Ok(Self {
             graph: Graph::new(vertices, resources)?,
@@ -29,6 +39,7 @@ impl<const D: usize> Solver<D> {
             cuts: CutRegistry::default(),
             knapsack_resource_indices: Default::default(),
             knapsack_exact_coefficients: false,
+            exact_cut_duals: false,
             knapsack_pricing: Default::default(),
             presence_pricing: Default::default(),
             applied_cuts: (vec![], vec![], vec![], vec![]),
@@ -76,7 +87,7 @@ impl<const D: usize> Solver<D> {
             } else {
                 None
             },
-            bucket_steps: self.bucket_steps.clone(),
+            bucket_steps: self.bucket_steps,
             rollback_point_saved: self.rollback_point_saved,
             requires_rollback: false,
             round: self.round.clone(),
@@ -94,6 +105,7 @@ impl<const D: usize> Solver<D> {
             cuts: self.cuts.clone(),
             knapsack_resource_indices: self.knapsack_resource_indices.clone(),
             knapsack_exact_coefficients: self.knapsack_exact_coefficients,
+            exact_cut_duals: self.exact_cut_duals,
             knapsack_pricing: self.knapsack_pricing.clone(),
             presence_pricing: self.presence_pricing.clone(),
             applied_cuts: self.applied_cuts.clone(),

@@ -212,6 +212,7 @@ struct SparseColumns {
 pub struct HighsMaster {
     highs: NonNull<c_void>,
     thread_config: Option<(usize, usize)>,
+    adaptive_threads: bool,
     matrix_cache: OnceCell<SparseColumns>,
     pub rhs: Vec<f64>,
     pub senses: Vec<RowSense>,

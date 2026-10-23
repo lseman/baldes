@@ -77,7 +77,11 @@ impl<const D: usize> Solver<D> {
             }
             self.knapsack_pricing = knapsack;
         }
-        let next = state::build_inputs(&self.cuts, &self.graph);
+        let next = if self.exact_cut_duals {
+            state::build_inputs_exact(&self.cuts, &self.graph)
+        } else {
+            state::build_inputs(&self.cuts, &self.graph)
+        };
         if next == self.applied_cuts {
             return Ok(());
         }

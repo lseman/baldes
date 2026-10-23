@@ -48,3 +48,20 @@ fn explicit_and_all_cpu_options_reach_native_solver_and_survive_clone() {
     }
     assert!(HighsMaster::with_threads(usize::MAX).is_err());
 }
+
+#[test]
+fn adaptive_worker_budget_preserves_native_algorithm_choice_in_forks() {
+    for requested in [1, 4, 0] {
+        let master = HighsMaster::with_worker_budget(requested).unwrap();
+        let expected = if requested == 0 {
+            std::thread::available_parallelism().map_or(1, usize::from)
+        } else {
+            requested
+        };
+        assert_eq!(native_integer(&master, b"threads\0") as usize, expected);
+        assert_eq!(native_integer(&master, b"simplex_strategy\0"), 0);
+        let copy = master.try_clone().unwrap();
+        assert_eq!(native_integer(&copy, b"threads\0") as usize, expected);
+        assert_eq!(native_integer(&copy, b"simplex_strategy\0"), 0);
+    }
+}

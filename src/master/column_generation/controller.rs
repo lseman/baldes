@@ -58,6 +58,22 @@ pub trait Controller<M> {
     fn restore_feasible_columns(&mut self, _duals: &[f64]) -> Result<Vec<Column>> {
         Ok(vec![])
     }
+    /// Price a zero-real-objective phase I on independent model/pricing state.
+    /// None declines recovery. An error must leave live state unchanged.
+    /// Returned columns carry original costs, not feasibility costs. Infeasible
+    /// requires whole-domain coverage; certified mode additionally requires a
+    /// directed original-domain proof. Limits retain valid partial columns.
+    fn recover_feasibility(
+        &mut self,
+        _master: &M,
+        _warm: &WarmStart,
+        _remaining: Duration,
+        _iterations: usize,
+        _tolerance: f64,
+        _bound_mode: BoundMode,
+    ) -> Result<Option<FeasibilityRecovery>> {
+        Ok(None)
+    }
     /// Save every controller/pricing field that enumeration, regeneration,
     /// column remapping and retained-pool synchronization can change.
     /// False declines the optional handoff.

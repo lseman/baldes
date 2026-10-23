@@ -28,6 +28,9 @@ fn arc_cost_lower_bounds<const D: usize>(
         return None;
     }
     let graph = &oracle.network.graph;
+    if graph.coupled_kernel().is_some_and(|k| k.has_costs()) {
+        return None;
+    }
     let mut weights = vec![];
     for (index, (arc, coefficients)) in graph
         .arcs
@@ -395,6 +398,21 @@ fn exact_contributions_in_domain<const D: usize>(
                 if rows[row].product(coefficient, fixed.quantity).is_none() {
                     return Ok(None);
                 }
+            }
+        }
+        if let Some(kernel) = oracle.network.graph.coupled_kernel() {
+            let arcs: Vec<_> = fixed
+                .route
+                .route
+                .arcs
+                .iter()
+                .map(|id| oracle.index[id])
+                .collect();
+            let Some((true, cost)) = kernel.certify(&arcs) else {
+                return Ok(None);
+            };
+            if cost[0] != cost[1] || objective.product(cost[0], fixed.quantity).is_none() {
+                return Ok(None);
             }
         }
     }

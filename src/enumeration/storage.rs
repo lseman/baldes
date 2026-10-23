@@ -28,10 +28,45 @@ impl<const D: usize> Storage<D> {
         })
     }
     fn dominates(g: &Graph<D>, a: &Label<D>, b: &Label<D>, forward: bool) -> bool {
+        let Some(penalty) = g.coupled_dominance_penalty(
+            a.coupled_state.as_deref(),
+            b.coupled_state.as_deref(),
+            forward,
+            a.vertex,
+        ) else {
+            return false;
+        };
+        if g.coupled_kernel()
+            .map_or(false, |k| k.retains_cost_components())
+        {
+            if a.cut_cost > b.cut_cost || a.cut_words != b.cut_words {
+                return false;
+            }
+            // Enumeration dominance orders original objectives. Reduced-cost
+            // component order alone does not prove original scalar order.
+            let (Some(a_base), Some(b_base)) = (
+                a.coupled_state
+                    .as_deref()
+                    .and_then(|s| s.scalar_original_cost()),
+                b.coupled_state
+                    .as_deref()
+                    .and_then(|s| s.scalar_original_cost()),
+            ) else {
+                return false;
+            };
+            if a_base > b_base {
+                return false;
+            }
+        }
+        let cost = if penalty == 0. {
+            a.original_cost
+        } else {
+            crate::core::rounding::add_up(a.original_cost, penalty).unwrap_or(f64::INFINITY)
+        };
         a.presence_state == b.presence_state
             && a.vertex == b.vertex
             && a.visited == b.visited
-            && a.original_cost - b.original_cost < EPSILON
+            && cost - b.original_cost < EPSILON
             && g.resources.iter().enumerate().all(|(r, k)| match k {
                 ResourceKind::Disposable => {
                     if forward {
@@ -56,8 +91,7 @@ impl<const D: usize> Storage<D> {
             self.pending += 1;
             return true;
         }
-        let old = self.partitions[partition].clone();
-        for &id in &old {
+        for &id in &self.partitions[partition] {
             let previous = &self.arena[id];
             if label.original_cost + EPSILON < previous.original_cost {
                 break;
@@ -67,18 +101,19 @@ impl<const D: usize> Storage<D> {
                 return false;
             }
         }
-        let mut records = vec![];
-        for id in old {
+        let records = &mut self.partitions[partition];
+        records.retain(|&id| {
             self.checks += 1;
             if Self::dominates(g, &label, &self.arena[id], forward) {
                 self.live[id] = false;
                 if id >= self.cursor {
                     self.pending -= 1;
                 }
+                false
             } else {
-                records.push(id);
+                true
             }
-        }
+        });
         let at = records
             .partition_point(|&id| !(label.original_cost + EPSILON < self.arena[id].original_cost));
         let id = self.arena.len();
@@ -86,7 +121,6 @@ impl<const D: usize> Storage<D> {
         self.arena.push(label);
         self.live.push(true);
         records.insert(at, id);
-        self.partitions[partition] = records;
         self.pending += 1;
         true
     }

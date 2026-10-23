@@ -81,6 +81,7 @@ pub enum MasterSolver {
     Clp,
     Ipm,
     Highs,
+    Gurobi,
 }
 
 impl MasterSolver {
@@ -90,21 +91,29 @@ impl MasterSolver {
                 "HiGHS master requires the highs build feature (build with clp,highs)",
             ));
         }
+        if self == Self::Gurobi && !cfg!(feature = "gurobi") {
+            return Err(invalid(
+                "Gurobi master requires the gurobi build feature (build with clp,gurobi)",
+            ));
+        }
         Ok(())
     }
 }
 
 #[derive(Debug)]
 pub struct ClpMaster {
-    // Exactly one native matrix is owned: Clp here, or highs_backend below.
+    // Exactly one native matrix is owned by the active backend.
     // A requested solver change is materialized by ensure_backend.
     model: Option<NonNull<Model>>,
     solver: MasterSolver,
+    backend_threads: usize,
     clp_options: ClpOptions,
     ipm: ipm_state::IpmState,
-    highs_row_basic: Vec<bool>,
+    native_row_basic: Vec<bool>,
     #[cfg(feature = "highs")]
     highs_backend: Option<super::highs::HighsMaster>,
+    #[cfg(feature = "gurobi")]
+    gurobi_backend: Option<super::gurobi::GurobiMaster>,
     primal_tolerance: f64,
     pub rhs: Vec<f64>,
     pub senses: Vec<RowSense>,
@@ -200,3 +209,7 @@ mod reoptimization_tests;
 #[cfg(test)]
 #[path = "../../../../tests/unit/master/solvers/clp/recovery_tests.rs"]
 mod recovery_tests;
+
+#[cfg(all(test, unix))]
+#[path = "../../../../tests/unit/master/solvers/clp/matrix_kernels_tests.rs"]
+mod matrix_kernels_tests;

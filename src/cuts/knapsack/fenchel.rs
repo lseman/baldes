@@ -373,3 +373,7 @@ fn certify(
 #[cfg(test)]
 #[path = "../../../tests/unit/cuts/knapsack/fenchel/tests.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "clp"))]
+#[path = "../../../tests/unit/cuts/knapsack/fenchel/formulation.rs"]
+mod formulation_tests;

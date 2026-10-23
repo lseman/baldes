@@ -125,6 +125,9 @@ impl PathStorage {
         for row in &mut self.partitions {
             for path in row.iter_mut() {
                 path.reduced_cost = path.arcs.iter().map(|&a| g.arcs[a].reduced_cost).sum();
+                path.reduced_cost += g
+                    .coupled_path_cost(&path.arcs)?
+                    .ok_or_else(|| invalid("enumerated path violates coupled resources"))?;
                 if !cuts.is_empty() || !kpath.is_empty() {
                     let mut vertices = vec![g.source];
                     vertices.extend(path.arcs.iter().map(|&a| g.arcs[a].head));
@@ -199,6 +202,8 @@ impl PathStorage {
         }
         let mut result = vec![];
         for path in ordered.into_iter().flatten() {
+            g.coupled_path_cost(&path.arcs)?
+                .ok_or_else(|| invalid("enumerated route violates coupled resources"))?;
             let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
             for r in 0..g.resources.len() {
                 q[r] = g

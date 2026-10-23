@@ -701,3 +701,65 @@ fn rounded_route_coefficient_cannot_prove_original_integer_infeasibility() {
     assert_eq!(result.mip.bound, f64::NEG_INFINITY);
     assert!(result.mip.solution.is_none());
 }
+
+#[test]
+fn interval_cost_full_transfer_replays_fronts_and_declines_unproved_translations_atomically() {
+    #[cfg(feature = "highs")]
+    use baldes::master::solvers::mip::MipOptions;
+    for fractional in [false, true] {
+        let mut model: serde_json::Value =
+            serde_json::from_str(include_str!("../../examples/networks/interval_cost.json"))
+                .unwrap();
+        // This parallel arc is cheap in the scalar relaxation, but its
+        // charge domain is disjoint from the original interval state window.
+        model["networks"][0]["arcs"].as_array_mut().unwrap().push(
+            serde_json::json!({"tail":0,"head":1,"cost":-100,"consumption":[0],"entries":[[0,1]]}),
+        );
+        model["networks"][0]["coupled_resources"][0]["increments"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!(0));
+        model["networks"][0]["coupled_resources"][0]["functions"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({"points":[[5,0],[6,0]]}));
+        if fractional {
+            model["networks"][0]["coupled_resources"][0]["increments"] =
+                serde_json::json!([0.25, -0.25, 0.25, -0.25, 0.]);
+        }
+        let problem = Model::from_json(&model.to_string())
+            .unwrap()
+            .problem::<2>()
+            .unwrap();
+        let parent = multi_pricing::solve(problem, options()).unwrap();
+        assert_eq!(parent.master.status, Status::Optimal);
+        let prepared = parent
+            .snapshot
+            .enumerate(&EnumerationOptions::default())
+            .unwrap();
+        let report = prepared.enumeration_report();
+        assert_eq!(report.complete, !fractional, "{report:?}");
+        assert!(!parent.snapshot.enumeration_report().complete);
+        let resumed = prepared.solve(options()).unwrap();
+        assert_eq!(resumed.master.status, Status::Optimal);
+        assert!((resumed.master.lp - parent.master.lp).abs() < 1e-8);
+        if fractional {
+            assert_eq!(report.transferred, 0);
+            assert!(report.failure.as_ref().unwrap().contains("unknown"));
+        } else {
+            assert_eq!(report.routes, 2);
+            assert!(resumed
+                .routes
+                .iter()
+                .all(|route| route.route.original_cost == 20.));
+            #[cfg(feature = "highs")]
+            {
+                let mip = prepared
+                    .solve_enumerated_mip(&MipOptions::default())
+                    .unwrap()
+                    .unwrap();
+                assert!((mip.mip.solution.unwrap().objective - 40.).abs() < 1e-8);
+            }
+        }
+    }
+}

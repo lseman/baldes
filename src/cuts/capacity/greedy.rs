@@ -24,7 +24,7 @@ impl Separation {
             }
             let mut demand = g.demands[seed];
             let mut weight = degree[seed];
-            let totals = degree.clone();
+            let totals = &degree;
             let mut joined = g.flow[seed].clone();
             let update = |e: &mut GreedyExtension,
                           demand: f64,

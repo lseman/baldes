@@ -172,6 +172,7 @@ fn restricted_value<const D: usize>(
     let child = branch_problem(problem, branches)?;
     let mut master = ClpMaster::new()?;
     master.set_solver(options.root.master_solver);
+    master.set_backend_threads(options.root.master_threads)?;
     master.set_tolerances(1e-7, 1e-7)?;
     for row in &child.rows {
         master.add_row(row.sense, row.rhs, &[])?;
@@ -356,7 +357,10 @@ pub(super) fn choose<const D: usize>(
                                     observation = Some(history::EvaluationKind::HeuristicPricing);
                                 }
                             }
-                            if result.preprocessing.infeasible {
+                            if result.preprocessing.infeasible
+                                || (result.master.status == Status::Infeasible
+                                    && result.master.bound == f64::INFINITY)
+                            {
                                 candidate.bounds[side] = f64::INFINITY;
                             } else if result.master.bound.is_finite() {
                                 candidate.bounds[side] =

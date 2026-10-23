@@ -93,7 +93,7 @@ fn routing_fractional_capacity_snapshot_has_twenty_cuts() {
 
 #[test]
 fn kohl_time_resource_closes_r101_ten_customer_root_gap() {
-    let mut instance = Instance::read("instances/R101.txt").unwrap();
+    let mut instance = Instance::read("instances/Solomon/R101.txt").unwrap();
     instance.truncate(10).unwrap();
     let mut options = RootOptions::default();
     options.enumerate = false;

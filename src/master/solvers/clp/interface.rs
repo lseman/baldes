@@ -75,8 +75,8 @@ impl LpMaster for ClpMaster {
     }
 
     fn solve_with_time_limit(&mut self, remaining: Duration) -> Result<LpSolveOutcome> {
-        if self.solver == MasterSolver::Highs {
-            return self.solve_highs(i32::MAX as usize, remaining);
+        if matches!(self.solver, MasterSolver::Highs | MasterSolver::Gurobi) {
+            return self.solve_native(i32::MAX as usize, remaining);
         }
         let started = Instant::now();
         Ok(match self.solve_limited(i32::MAX as usize, remaining)? {

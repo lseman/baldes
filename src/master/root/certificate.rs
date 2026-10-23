@@ -90,6 +90,9 @@ pub(super) fn lower_bound<const D: usize>(
     master: &ClpMaster,
     cache: &SearchCache,
 ) -> Option<f64> {
+    if problem.graph.has_coupled_resources() {
+        return None;
+    }
     let now = Instant::now();
     let deadline = now
         .checked_add(Duration::from_millis(250))?

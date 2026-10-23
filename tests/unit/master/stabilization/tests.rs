@@ -42,7 +42,6 @@ fn unavailable_pricing_solution_retains_the_previous_angle() {
     }
 }
 
-
 #[test]
 fn directional_point_matches_compiled_r101_pricing_point() {
     let mut smoothing = DualPriceSmoothing::new(Parameters {
@@ -192,4 +191,42 @@ fn angle_threshold_is_independent_of_bound_tolerance() {
         }));
         assert_eq!(smoothing.alpha, expected_alpha, "angle {angle}");
     }
+}
+
+#[test]
+fn row_remapping_compacts_pending_center_and_handles_short_maps() {
+    let mut smoothing = DualPriceSmoothing::default();
+    smoothing.center = vec![1., 2., 3., 4.];
+    smoothing.raw = vec![5., 6., 7., 8.];
+    smoothing.pricing = vec![9., 10., 11., 12.];
+    smoothing.subgradient = vec![13., 14., 15., 16.];
+    smoothing.angle_center = vec![17., 18., 19., 20.];
+    smoothing.senses = vec![
+        RowSense::Equal,
+        RowSense::LessEqual,
+        RowSense::GreaterEqual,
+        RowSense::Equal,
+    ];
+    smoothing.next_center = Some((vec![21., 22., 23., 24.], vec![25., 26., 27., 28.]));
+    smoothing.excluded_rows = vec![0, 1, 2, 3];
+
+    smoothing.remap_rows(&[Some(0), None, Some(1)]);
+
+    assert_eq!(smoothing.center, [1., 3.]);
+    assert_eq!(smoothing.raw, [5., 7.]);
+    assert_eq!(smoothing.pricing, [9., 11.]);
+    assert_eq!(smoothing.subgradient, [13., 15.]);
+    assert_eq!(smoothing.angle_center, [17., 19.]);
+    assert_eq!(smoothing.senses, [RowSense::Equal, RowSense::GreaterEqual]);
+    assert_eq!(
+        smoothing.next_center,
+        Some((vec![21., 23.], vec![25., 27.]))
+    );
+    assert_eq!(smoothing.excluded_rows, [0, 1]);
+
+    smoothing.remap_rows(&[]);
+    assert!(smoothing.center.is_empty());
+    assert!(smoothing.raw.is_empty());
+    assert!(smoothing.pricing.is_empty());
+    assert_eq!(smoothing.next_center, Some((vec![], vec![])));
 }

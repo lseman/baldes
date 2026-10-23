@@ -40,10 +40,14 @@ simd-avx512 = ["simd"]
 # Clp restricted master and column-generation loop. Builds Clp 1.17.10 and
 # CoinUtils 2.11 from the vendor/ submodules.
 clp = ["dep:cc", "dep:serde", "dep:serde_json"]
+# Experimental C++ batch preflight for two-resource pricing; opt-in pending gains.
+native-pricing = ["clp"]
 # HiGHS LP backend and integer solving (including optional Clp-tree node MIP).
 # Links against the system
 # HiGHS shared library (libhighs.so) or a vendored copy placed in vendor/highs/.
 highs = ["dep:pkg-config"]
+# Licensed Gurobi C library, located through GUROBI_HOME.
+gurobi = []
 
 [dependencies]
 serde = { version = "=1.0.204", features = ["derive"], optional = true }
@@ -80,6 +84,14 @@ name = "options"
 path = "tests/api/options.rs"
 
 # Pricing integration tests.
+
+[[test]]
+name = "coupled_resources"
+path = "tests/pricing/coupled_resources.rs"
+
+[[test]]
+name = "paired_resources"
+path = "tests/pricing/paired_resources.rs"
 
 [[test]]
 name = "main_pricing"
@@ -160,6 +172,10 @@ name = "partial_solution"
 path = "tests/master/partial_solution.rs"
 
 [[test]]
+name = "feasibility"
+path = "tests/master/feasibility.rs"
+
+[[test]]
 name = "ipm"
 path = "tests/ipm/solver.rs"
 
@@ -186,3 +202,8 @@ path = "tests/master/accumulated_resource.rs"
 name = "multi_time_windows"
 path = "tests/pricing/multi_time_windows.rs"
 required-features = ["multi-time-windows"]
+
+[[test]]
+name = "gurobi_master"
+path = "tests/master/gurobi.rs"
+required-features = ["gurobi"]

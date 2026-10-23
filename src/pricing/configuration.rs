@@ -108,7 +108,7 @@ impl<const D: usize> Solver<D> {
                 .get("BALDESuseBidirectionalSearch")
                 .unwrap_or(2.) as i32,
             dominance_mode: self.dominance_mode,
-            steps: self.bucket_steps.clone(),
+            steps: self.bucket_steps,
             target_buckets: self
                 .options
                 .get("BALDESnumberOfBucketsPerVertex")

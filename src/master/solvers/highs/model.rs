@@ -8,6 +8,7 @@ impl HighsMaster {
         let master = Self {
             highs,
             thread_config: None,
+            adaptive_threads: false,
             matrix_cache: OnceCell::new(),
             rhs: vec![],
             senses: vec![],
@@ -40,6 +41,29 @@ impl HighsMaster {
                 "set adaptive simplex strategy",
             )?;
         }
+        Ok(master)
+    }
+
+    /// Configure an explicit worker budget while retaining adaptive simplex.
+    /// Zero uses all available CPUs. HiGHS decides actual algorithm parallelism;
+    /// a warm primal-feasible basis can favor serial primal simplex.
+    pub fn with_worker_budget(threads: usize) -> Result<Self> {
+        let mut master = Self::with_threads(threads)?;
+        // Explicit PAMI can abort during CG reoptimization in HiGHS 1.15.1.
+        // Retain the adaptive primal/dual policy used by `new` rather than
+        // forcing parallel dual simplex solely because workers are available.
+        // SAFETY: live owned handle and a static NUL-terminated option name.
+        unsafe {
+            Self::check(
+                Highs_setIntOptionValue(
+                    master.highs.as_ptr(),
+                    b"simplex_strategy\0".as_ptr().cast(),
+                    0,
+                ),
+                "set adaptive simplex strategy",
+            )?;
+        }
+        master.adaptive_threads = true;
         Ok(master)
     }
 
@@ -131,6 +155,7 @@ impl HighsMaster {
     /// refactorizes this basis once, then reuses its own solver state.
     pub fn try_clone(&self) -> Result<Self> {
         let mut copy = match self.configured_threads() {
+            Some(threads) if self.adaptive_threads => Self::with_worker_budget(threads)?,
             Some(threads) => Self::with_threads(threads)?,
             None => Self::new()?,
         };

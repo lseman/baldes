@@ -204,6 +204,16 @@ pub(crate) fn exact_route_feasibility<const D: usize>(
         }
         at = arc.head;
     }
+    if let Some(kernel) = g.coupled_kernel() {
+        let arcs = route
+            .arcs
+            .iter()
+            .map(|id| problem.arc_position(*id))
+            .collect::<Option<Vec<_>>>()?;
+        if !kernel.certify(&arcs)?.0 {
+            return Some(false);
+        }
+    }
     Some(at == g.sink && !visited.is_empty())
 }
 
@@ -236,6 +246,18 @@ pub(super) fn validated_upper<const D: usize>(
         }
         let route = routes.get(usize::try_from(tag).ok()?)?;
         exact_route_feasible(problem, route)?;
+        if let Some(kernel) = problem.graph.coupled_kernel() {
+            let arcs = route
+                .arcs
+                .iter()
+                .map(|id| problem.arc_position(*id))
+                .collect::<Option<Vec<_>>>()?;
+            let (valid, cost) = kernel.certify(&arcs)?;
+            if !valid {
+                return None;
+            }
+            objective.product(cost[1], quantity)?;
+        }
         for &(row, coefficient) in &problem.route_entries {
             rows.get_mut(row)?.product(coefficient, quantity)?;
         }
@@ -272,6 +294,18 @@ pub(super) fn validated_upper<const D: usize>(
             return None;
         }
         exact_route_feasible(problem, route)?;
+        if let Some(kernel) = problem.graph.coupled_kernel() {
+            let arcs = route
+                .arcs
+                .iter()
+                .map(|id| problem.arc_position(*id))
+                .collect::<Option<Vec<_>>>()?;
+            let (valid, cost) = kernel.certify(&arcs)?;
+            if !valid {
+                return None;
+            }
+            objective.product(cost[1], f64::from(*quantity))?;
+        }
         for &id in &route.arcs {
             objective.product(
                 problem.graph.arcs[problem.arc_position(id)?].cost,

@@ -119,6 +119,7 @@ pub(super) fn solve_seeded<const D: usize>(
         (None, ClpMaster::new()?)
     };
     master.set_solver(options.master_solver);
+    master.set_backend_threads(options.master_threads)?;
     master.set_clp_options(options.clp_options);
     if options.cg.log_interval.is_some() {
         crate::log_err!(
@@ -132,6 +133,17 @@ pub(super) fn solve_seeded<const D: usize>(
             },
             options.bound_mode.as_str()
         );
+        if matches!(
+            options.master_solver,
+            MasterSolver::Highs | MasterSolver::Gurobi
+        ) {
+            let workers = if options.master_threads == 0 {
+                std::thread::available_parallelism().map_or(1, usize::from)
+            } else {
+                options.master_threads
+            };
+            crate::log_err!("  Master worker budget: {}", workers);
+        }
     }
     // Keep Clp's default 1e-7 primal and dual tolerances.
     master.set_tolerances(1e-7, 1e-7)?;
@@ -156,7 +168,7 @@ pub(super) fn solve_seeded<const D: usize>(
     let mut resource_domain_changed = false;
     for (arc, original) in solver.graph.arcs.iter_mut().zip(&problem.graph.arcs) {
         if arc.bounds != original.bounds {
-            arc.bounds = original.bounds.clone();
+            arc.bounds = original.bounds;
             resource_domain_changed = true;
         }
     }
@@ -582,8 +594,18 @@ pub(super) fn solve_seeded<const D: usize>(
     // Extract values, duals and simplex iterations before moving master into snapshot.
     let values = master.values().to_vec();
     let duals = master.duals().to_vec();
-    let simplex_iterations = master.simplex_iterations;
-    let ipm_iterations = master.ipm_iterations;
+    let simplex_iterations = output
+        .feasibility
+        .iter()
+        .fold(master.simplex_iterations, |sum, round| {
+            sum.saturating_add(round.simplex_iterations)
+        });
+    let ipm_iterations = output
+        .feasibility
+        .iter()
+        .fold(master.ipm_iterations, |sum, round| {
+            sum.saturating_add(round.ipm_iterations)
+        });
     let snapshot = capture_state.then(|| {
         Rc::new(NodeSnapshot {
             master,

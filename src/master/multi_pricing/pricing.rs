@@ -140,7 +140,18 @@ impl<const D: usize> State<D> {
                 let cost = ids
                     .iter()
                     .map(|id| oracle.network.graph.arcs[oracle.index[id]].cost)
-                    .sum::<f64>();
+                    .sum::<f64>()
+                    + oracle
+                        .network
+                        .graph
+                        .coupled_path_cost(
+                            &route
+                                .arcs
+                                .iter()
+                                .map(|id| oracle.index[id])
+                                .collect::<Vec<_>>(),
+                        )?
+                        .ok_or_else(|| invalid("network path violates coupled resources"))?;
                 let reduced_cost = coefficients
                     .iter()
                     .fold(cost, |value, &(row, coefficient)| {

@@ -1021,7 +1021,7 @@ fn unavailable_highs_master_is_rejected_explicitly() {
 fn highs_recovers_the_r201_hundred_customer_warm_basis_failure() {
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::root::{MasterSolver, RootOptions};
-    let instance = Instance::read("instances/R201.txt").unwrap();
+    let instance = Instance::read("instances/Solomon/R201.txt").unwrap();
     let mut options = RootOptions::default();
     options.master_solver = MasterSolver::Highs;
     options.cg.time_limit = std::time::Duration::from_secs(30);

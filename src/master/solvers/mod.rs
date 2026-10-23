@@ -11,3 +11,8 @@ pub use clp::ClpMaster;
 pub use highs::HighsMaster;
 
 pub mod mip;
+
+#[cfg(feature = "gurobi")]
+pub mod gurobi;
+#[cfg(feature = "gurobi")]
+pub use gurobi::GurobiMaster;

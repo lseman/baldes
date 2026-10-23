@@ -143,6 +143,9 @@ pub struct RootOptions {
     pub bound_mode: BoundMode,
     /// IPM solves automatically disable dual stabilization.
     pub master_solver: MasterSolver,
+    /// HiGHS/Gurobi worker budget. Zero uses all CPUs available to the process.
+    /// Clp and native IPM ignore this setting.
+    pub master_threads: usize,
     /// Clp-only numerical scaling and reoptimization storage policy.
     /// Root solves default to equilibrium scaling with retained work areas.
     pub clp_options: ClpOptions,
@@ -187,6 +190,7 @@ impl Default for RootOptions {
         cg.column_cleanup_ratio = 0.66;
         Self {
             master_solver: MasterSolver::Clp,
+            master_threads: 0,
             clp_options: ClpOptions {
                 scaling: ClpScaling::Equilibrium,
                 ..ClpOptions::default()

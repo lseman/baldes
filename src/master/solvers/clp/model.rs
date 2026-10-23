@@ -5,13 +5,43 @@ impl ClpMaster {
         self.solver
     }
 
+    /// Set the HiGHS/Gurobi worker budget before materializing either backend.
+    /// Zero uses all CPUs available to this process. Forks retain this setting.
+    /// A live backend's budget cannot change, including HiGHS's shared scheduler.
+    pub fn set_backend_threads(&mut self, threads: usize) -> Result<()> {
+        if threads > i32::MAX as usize {
+            return Err(invalid("master thread count exceeds native integer range"));
+        }
+        if threads == self.backend_threads {
+            return Ok(());
+        }
+        #[cfg(feature = "highs")]
+        if self.highs_backend.is_some() {
+            return Err(invalid(
+                "set master threads before creating the HiGHS backend",
+            ));
+        }
+        #[cfg(feature = "gurobi")]
+        if self.gurobi_backend.is_some() {
+            return Err(invalid(
+                "set master threads before creating the Gurobi backend",
+            ));
+        }
+        self.backend_threads = threads;
+        Ok(())
+    }
+
+    pub fn backend_threads(&self) -> usize {
+        self.backend_threads
+    }
+
     /// Changing algorithms invalidates the cached solution. Switching between
-    /// Clp/IPM and HiGHS converts storage on the next edit or solve and starts
+    /// Clp/IPM, HiGHS, and Gurobi converts storage on the next edit or solve and starts
     /// a fresh native basis; edits within one backend retain its warm basis.
     pub fn set_solver(&mut self, solver: MasterSolver) {
         if self.solver != solver {
             self.solved = false;
-            self.highs_row_basic.clear();
+            self.native_row_basic.clear();
         }
         self.solver = solver;
     }
@@ -24,7 +54,8 @@ impl ClpMaster {
         #[cfg(feature = "highs")]
         if self.solver == MasterSolver::Highs {
             if self.highs_backend.is_none() {
-                let mut backend = super::super::highs::HighsMaster::new()?;
+                let mut backend =
+                    super::super::highs::HighsMaster::with_worker_budget(self.backend_threads)?;
                 backend.set_tolerances(self.primal_tolerance, self.dual_tolerance)?;
                 let rows = self
                     .senses
@@ -49,6 +80,53 @@ impl ClpMaster {
                     }
                 }
                 self.highs_backend = Some(backend);
+                #[cfg(feature = "gurobi")]
+                {
+                    self.gurobi_backend = None;
+                }
+                if let Some(model) = self.model.take() {
+                    // SAFETY: ownership has moved to the new backend; no Clp
+                    // pointers escape the wrapper.
+                    unsafe { Clp_deleteModel(model.as_ptr()) };
+                }
+                self.ipm = Default::default();
+                self.solved = false;
+            }
+            return Ok(());
+        }
+        #[cfg(feature = "gurobi")]
+        if self.solver == MasterSolver::Gurobi {
+            if self.gurobi_backend.is_none() {
+                let mut backend =
+                    super::super::gurobi::GurobiMaster::with_threads(self.backend_threads)?;
+                backend.set_tolerances(self.primal_tolerance, self.dual_tolerance)?;
+                let rows = self
+                    .senses
+                    .iter()
+                    .zip(&self.rhs)
+                    .map(|(&s, &b)| (s, b, &[][..]))
+                    .collect::<Vec<_>>();
+                backend.add_rows(&rows)?;
+                let columns = (0..self.costs.len())
+                    .map(|j| self.column_entries(j))
+                    .collect::<Result<Vec<_>>>()?;
+                let batch = self
+                    .costs
+                    .iter()
+                    .zip(&columns)
+                    .map(|(&c, e)| (c, e.as_slice()))
+                    .collect::<Vec<_>>();
+                backend.add_columns(&batch)?;
+                for (j, &upper) in self.upper.iter().enumerate() {
+                    if backend.upper[j] != upper {
+                        backend.set_upper(j, upper)?;
+                    }
+                }
+                self.gurobi_backend = Some(backend);
+                #[cfg(feature = "highs")]
+                {
+                    self.highs_backend = None;
+                }
                 if let Some(model) = self.model.take() {
                     // SAFETY: ownership has moved to the new backend; no Clp
                     // pointers escape the wrapper.
@@ -90,6 +168,10 @@ impl ClpMaster {
             {
                 self.highs_backend = None;
             }
+            #[cfg(feature = "gurobi")]
+            {
+                self.gurobi_backend = None;
+            }
             self.ipm = Default::default();
             self.solved = false;
         }
@@ -104,6 +186,20 @@ impl ClpMaster {
         edit: impl FnOnce(&mut super::super::highs::HighsMaster) -> Result<()>,
     ) -> Result<()> {
         if let Some(backend) = self.highs_backend.as_mut() {
+            if let Err(error) = edit(backend) {
+                self.solved = false;
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "gurobi")]
+    pub(super) fn edit_gurobi(
+        &mut self,
+        edit: impl FnOnce(&mut super::super::gurobi::GurobiMaster) -> Result<()>,
+    ) -> Result<()> {
+        if let Some(backend) = self.gurobi_backend.as_mut() {
             if let Err(error) = edit(backend) {
                 self.solved = false;
                 return Err(error);
@@ -168,6 +264,12 @@ impl ClpMaster {
             .as_ref()
             .map(|backend| backend.try_clone())
             .transpose()?;
+        #[cfg(feature = "gurobi")]
+        let gurobi_backend = self
+            .gurobi_backend
+            .as_ref()
+            .map(|backend| backend.try_clone())
+            .transpose()?;
         // SAFETY: source stays alive and is not mutated; the C++ bridge returns
         // an independently owned Clp wrapper, released by this type's Drop.
         let model = self
@@ -182,12 +284,15 @@ impl ClpMaster {
         Ok(Self {
             model,
             solver: self.solver,
+            backend_threads: self.backend_threads,
             clp_options: self.clp_options,
             ipm: self.ipm.clone(),
             #[cfg(feature = "highs")]
             highs_backend,
+            #[cfg(feature = "gurobi")]
+            gurobi_backend,
             primal_tolerance: self.primal_tolerance,
-            highs_row_basic: self.highs_row_basic.clone(),
+            native_row_basic: self.native_row_basic.clone(),
             rhs: self.rhs.clone(),
             senses: self.senses.clone(),
             costs: self.costs.clone(),
@@ -239,11 +344,14 @@ impl ClpMaster {
         Ok(Self {
             model: Some(model),
             solver: MasterSolver::Clp,
+            backend_threads: 0,
             clp_options: ClpOptions::default(),
             ipm: Default::default(),
-            highs_row_basic: vec![],
+            native_row_basic: vec![],
             #[cfg(feature = "highs")]
             highs_backend: None,
+            #[cfg(feature = "gurobi")]
+            gurobi_backend: None,
             primal_tolerance: 1e-7,
             rhs: vec![],
             senses: vec![],

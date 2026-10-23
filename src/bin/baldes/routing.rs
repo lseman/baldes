@@ -35,7 +35,8 @@ Options:
   --no-diving           Disable strong diving in the tree
   --no-mip-heuristic    Disable restricted-master integer search
   --mip-nodes N         Restricted-master integer-search node budget per call
-  --master MODE         clp (default), highs, or ipm (disables stabilization)
+  --master MODE         clp (default), highs, gurobi, or ipm (disables stabilization)
+  --master-threads N    HiGHS/Gurobi worker budget; 0 = all available CPUs (default)
   --clp-scaling MODE    equilibrium (default), auto, geometric, or off
   --clp-work-areas MODE retain (default) or discard after each LP solve
   --bound-mode MODE     numerical (default) or certified (independent bound validation)
@@ -205,12 +206,27 @@ pub(super) fn run() -> std::result::Result<(), String> {
                         mode => return Err(format!("unknown Clp work-area mode: {mode}")),
                     }
             }
+            "--master-threads" => {
+                options.master_threads = args
+                    .next()
+                    .ok_or("missing master thread count")?
+                    .parse::<usize>()
+                    .map_err(|_| "master threads must be a nonnegative integer")?;
+                if options.master_threads > i32::MAX as usize {
+                    return Err("master thread count exceeds native integer range".into());
+                }
+            }
             "--master" => {
                 options.master_solver = match args.next().ok_or("missing master mode")?.as_str() {
                     "clp" => baldes::master::root::MasterSolver::Clp,
                     "ipm" => baldes::master::root::MasterSolver::Ipm,
                     "highs" => {
                         let solver = baldes::master::root::MasterSolver::Highs;
+                        solver.ensure_available().map_err(|e| e.to_string())?;
+                        solver
+                    }
+                    "gurobi" => {
+                        let solver = baldes::master::root::MasterSolver::Gurobi;
                         solver.ensure_available().map_err(|e| e.to_string())?;
                         solver
                     }
@@ -576,6 +592,25 @@ pub(super) fn run() -> std::result::Result<(), String> {
                 "null".into()
             }
         }
+        let feasibility: Vec<_> = output
+            .master
+            .feasibility
+            .iter()
+            .map(|round| {
+                serde_json::json!({
+                    "status": round.status.as_str(),
+                    "iterations": round.iterations,
+                    "pricing_calls": round.pricing_calls,
+                    "simplex_iterations": round.simplex_iterations,
+                    "ipm_iterations": round.ipm_iterations,
+                    "seconds": round.seconds,
+                    "artificial_activity": round.artificial_activity,
+                    "lower_bound": round.lower_bound,
+                    "certified_infeasible": round.certified_infeasible,
+                })
+                .to_string()
+            })
+            .collect();
         let history:Vec<_>=output.master.history.iter().map(|h|format!("{{\"iteration\":{},\"lp\":{},\"min_reduced_cost\":{},\"new_columns\":{},\"columns\":{},\"phase\":{},\"pricing_calls\":{},\"alpha\":{},\"misprices\":{}}}",h.iteration,number(h.lp),number(h.minimum),h.new_columns,h.columns,h.phase,h.pricing_calls,number(h.alpha),h.misprices)).collect();
         let routes: Vec<_> = output
             .master
@@ -614,7 +649,7 @@ pub(super) fn run() -> std::result::Result<(), String> {
             .iter()
             .filter(|&&t| t >= 0)
             .count();
-        let json=format!("{{\"instance\":{:?},\"status\":\"{}\",\"lp\":{},\"cuts\":{},\"cut_rounds\":{},\"lp_before_cuts\":{},\"route_columns\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"incumbent\":{},\"bound\":{},\"bound_mode\":\"{}\",\"numerical_bound\":{},\"certified_bound\":{},\"iterations\":{},\"simplex_iterations\":{},\"ipm_iterations\":{},\"pricing_calls\":{},\"columns\":{},\"master_columns\":{},\"seconds\":{},\"pricing_seconds\":{},\"master_seconds\":{},\"history\":[{}],\"routes\":[{}]}}\n",instance.name,if cut_off {"Cutoff".to_string()} else {format!("{:?}",output.master.status)},number(lp_value),output.cuts,output.master.cut_rounds,number(output.lp_before_cuts),route_columns,output.fixing_calls,output.enumerated_routes,number(output.incumbent),number(output.master.bound),output.master.bound_mode.as_str(),number(output.master.numerical_bound),number(output.master.certified_bound),output.master.iterations,output.simplex_iterations,output.ipm_iterations,output.master.pricing_calls,output.master.inserted_tags.len(),output.master.columns,seconds,output.pricing_seconds,output.solver_seconds-output.pricing_seconds,history.join(","),routes.join(","));
+        let json=format!("{{\"instance\":{:?},\"status\":\"{}\",\"lp\":{},\"cuts\":{},\"cut_rounds\":{},\"lp_before_cuts\":{},\"route_columns\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"incumbent\":{},\"bound\":{},\"bound_mode\":\"{}\",\"numerical_bound\":{},\"certified_bound\":{},\"iterations\":{},\"simplex_iterations\":{},\"ipm_iterations\":{},\"pricing_calls\":{},\"columns\":{},\"master_columns\":{},\"seconds\":{},\"pricing_seconds\":{},\"master_seconds\":{},\"feasibility\":[{}],\"history\":[{}],\"routes\":[{}]}}\n",instance.name,if cut_off {"Cutoff".to_string()} else {format!("{:?}",output.master.status)},number(lp_value),output.cuts,output.master.cut_rounds,number(output.lp_before_cuts),route_columns,output.fixing_calls,output.enumerated_routes,number(output.incumbent),number(output.master.bound),output.master.bound_mode.as_str(),number(output.master.numerical_bound),number(output.master.certified_bound),output.master.iterations,output.simplex_iterations,output.ipm_iterations,output.master.pricing_calls,output.master.inserted_tags.len(),output.master.columns,seconds,output.pricing_seconds,output.solver_seconds-output.pricing_seconds,feasibility.join(","),history.join(","),routes.join(","));
         std::fs::write(path, json).map_err(|e| e.to_string())?;
     }
     println!(

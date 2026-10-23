@@ -1,4 +1,4 @@
-//! Only the optional LP backend links C++; all solver logic stays Rust.
+//! Optional LP backends link C++; `native-pricing` adds a numerical batch preflight.
 //! `--features clp` compiles Clp 1.17.10 and CoinUtils 2.11 from the vendor/
 //! submodules, as OpenRSCP's cmake/CoinClp.cmake does.
 //! `--features highs` links against HiGHS via pkg-config or a vendored copy.
@@ -19,6 +19,8 @@ fn main() {
         clp::build();
         println!("cargo:rustc-link-lib=dylib=m");
     }
+    #[cfg(feature = "gurobi")]
+    gurobi::link();
     #[cfg(feature = "highs")]
     {
         highs::link();
@@ -236,7 +238,30 @@ extern "C" void baldes_clp_solve_limits(Clp_Simplex *model, double *values) {
                     assert_eq!(method.matches(&old).count(), count);
                     method = method.replace(&old, &new);
                 }
+                let init = "  if (!scaleFactor)\n    scaleFactor = 1.0;\n";
+                assert_eq!(method.matches(init).count(), 1);
+                method = method.replace(init, &format!("{init}  baldes_clp::PairedRows pairedScratch(model->numberRows(), numberActiveColumns_);\n"));
+                for (indent, count) in [("          ", 2), ("      ", 1)] {
+                    let old = format!(
+                        "\n{indent}CoinBigIndex j;\n{indent}CoinBigIndex end = columnStart[0];"
+                    );
+                    let new = format!("\n{indent}const double *pairedRows = pairedScratch.pack(pi, piWeight);{old}");
+                    assert!(method.matches(&old).count() >= count);
+                    method = method.replacen(&old, &new, count);
+                }
+                for (indent, count) in [("            ", 2), ("        ", 1)] {
+                    let old = format!("\n{indent}double value = 0.0, modification = 0.0;\n{indent}for (j = start; j < end; j++) {{\n{indent}  int iRow = row[j];\n{indent}  value -= pi[iRow] * elementByColumn[j];\n{indent}  modification += piWeight[iRow] * elementByColumn[j];\n{indent}}}");
+                    assert_eq!(method.matches(&old).count(), count);
+                    let new = format!("\n{indent}double value = 0.0, modification = 0.0;\n{indent}if (pairedRows) {{\n{indent}  baldes_clp::transpose_pair(start, end, row, elementByColumn, pairedRows, value, modification);\n{indent}}} else {{\n{indent}  for (j = start; j < end; j++) {{\n{indent}    int iRow = row[j];\n{indent}    value -= pi[iRow] * elementByColumn[j];\n{indent}    modification += piWeight[iRow] * elementByColumn[j];\n{indent}  }}\n{indent}}}");
+                    method = method.replace(&old, &new);
+                }
                 text.replace_range(begin..end, &method);
+                text.insert_str(0, "#include \"baldes_clp_matrix_kernels.hpp\"\n");
+                fs::write(
+                    patched.join("baldes_clp_matrix_kernels.hpp"),
+                    include_str!("src/master/solvers/clp/native/baldes_clp_matrix_kernels.hpp"),
+                )
+                .unwrap();
                 let copy = patched.join(name);
                 fs::write(&copy, text).unwrap();
                 *file = copy;
@@ -284,6 +309,11 @@ extern "C" void baldes_clp_solve_limits(Clp_Simplex *model, double *values) {
         for path in [&config, &coinutils, &clp] {
             println!("cargo:rerun-if-changed={}", path.display());
         }
+        println!(
+            "cargo:rerun-if-changed={}",
+            root.join("src/master/solvers/clp/native/baldes_clp_matrix_kernels.hpp")
+                .display()
+        );
         let patched = PathBuf::from(env::var("OUT_DIR").unwrap()).join("patched");
         fs::create_dir_all(&patched).unwrap();
         let coinutils_files = sources(&coinutils, &patched);
@@ -295,6 +325,18 @@ extern "C" void baldes_clp_solve_limits(Clp_Simplex *model, double *values) {
             &[&config, &coinutils, &clp],
         );
         library("baldes_coinutils", &coinutils_files, &[&config, &coinutils]);
+        #[cfg(feature = "native-pricing")]
+        {
+            let batch = root.join("src/labeling/engine/extension_batch.cpp");
+            println!("cargo:rerun-if-changed={}", batch.display());
+            cc::Build::new()
+                .cpp(true)
+                .std("c++14")
+                .opt_level(3)
+                .flag_if_supported("-ffp-contract=off")
+                .file(batch)
+                .compile("baldes_extension_batch");
+        }
     }
 }
 
@@ -325,5 +367,34 @@ mod highs {
             return;
         }
         println!("cargo:rustc-link-lib=dylib=highs");
+    }
+}
+
+#[cfg(feature = "gurobi")]
+mod gurobi {
+    pub fn link() {
+        use std::{env, path::PathBuf};
+        println!("cargo:rerun-if-env-changed=GUROBI_HOME");
+        println!("cargo:rerun-if-env-changed=GUROBI_LIB_NAME");
+        let home = env::var_os("GUROBI_HOME")
+            .map(PathBuf::from)
+            .expect("gurobi feature requires GUROBI_HOME pointing to the Gurobi installation");
+        let lib = home.join("lib");
+        println!("cargo:rerun-if-changed={}", lib.display());
+        let name = env::var("GUROBI_LIB_NAME").unwrap_or_else(|_| {
+            let mut names: Vec<_> = std::fs::read_dir(&lib).expect("cannot read GUROBI_HOME/lib")
+                .filter_map(|entry| {
+                    let name = entry.ok()?.file_name().to_str()?.to_owned();
+                    let stem = name.strip_prefix("lib").unwrap_or(&name);
+                    let stem = stem.strip_suffix(".so").or_else(|| stem.strip_suffix(".dylib")).or_else(|| stem.strip_suffix(".lib"))?;
+                    let version = stem.strip_prefix("gurobi")?;
+                    (!version.is_empty() && version.bytes().all(|c| c.is_ascii_digit())).then(|| stem.to_owned())
+                }).collect();
+            names.sort(); names.dedup();
+            assert_eq!(names.len(), 1, "expected one versioned Gurobi library in GUROBI_HOME/lib; set GUROBI_LIB_NAME explicitly");
+            names.pop().unwrap()
+        });
+        println!("cargo:rustc-link-search=native={}", lib.display());
+        println!("cargo:rustc-link-lib=dylib={name}");
     }
 }

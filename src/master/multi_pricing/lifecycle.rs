@@ -531,7 +531,19 @@ pub(super) fn install_seed_routes<const D: usize>(
         let cost = arcs
             .iter()
             .map(|id| oracle.network.graph.arcs[oracle.index[id]].cost)
-            .sum::<f64>();
+            .sum::<f64>()
+            + oracle
+                .network
+                .graph
+                .coupled_path_cost(
+                    &seed
+                        .route
+                        .arcs
+                        .iter()
+                        .map(|id| oracle.index[id])
+                        .collect::<Vec<_>>(),
+                )?
+                .ok_or_else(|| invalid("seed path violates coupled resources"))?;
         if !cost.is_finite() {
             return Err(invalid("seed route cost overflow"));
         }

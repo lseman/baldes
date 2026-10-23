@@ -739,3 +739,62 @@ fn engine_label_budgets_remain_enforced_after_unlimited_sweeps() {
 
 #[path = "presence.rs"]
 mod presence_tests;
+
+#[test]
+fn bucket_snapshot_eligibility_preserves_hop_limits_and_finite_budgets() {
+    use baldes::labeling::engine::{EngineControls, LabelingEngine};
+    use baldes::pricing::phases::Phase;
+
+    let g = cycle_graph();
+    for bidirectional in [false, true] {
+        for max_route_arcs in [None, Some(3), Some(4)] {
+            let mut engine = LabelingEngine::prepare(
+                &g,
+                EngineControls {
+                    bidirectional,
+                    use_symmetric_execution: false,
+                    steps: [10., 0.].into(),
+                    target_buckets: 1,
+                    ..Default::default()
+                },
+                Phase {
+                    check_ng: true,
+                    jump_arcs: true,
+                    labels_per_bucket: i64::MAX,
+                },
+            )
+            .unwrap();
+            let controls = Controls {
+                max_route_arcs,
+                ..Default::default()
+            };
+            let unlimited = engine.solve(&g, &controls).unwrap();
+            assert_eq!(
+                unlimited.minimum_reduced_cost,
+                if max_route_arcs == Some(3) { -5. } else { -7. }
+            );
+            let bounded = engine
+                .solve(
+                    &g,
+                    &Controls {
+                        max_labels: 100_000,
+                        ..controls.clone()
+                    },
+                )
+                .unwrap();
+            assert_eq!(bounded.columns, unlimited.columns);
+            let error = engine
+                .solve(
+                    &g,
+                    &Controls {
+                        max_labels: 2,
+                        ..controls.clone()
+                    },
+                )
+                .unwrap_err();
+            assert!(error.message.contains("label limit"), "{error}");
+            let repeated = engine.solve(&g, &controls).unwrap();
+            assert_eq!(repeated.columns, unlimited.columns);
+        }
+    }
+}
