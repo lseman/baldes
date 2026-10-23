@@ -74,6 +74,8 @@ _deps/
 /VRPSOLVER_GAPS.md
 # Local engineering notes and investigations; public docs/ is for users.
 /internal/
+/docs/internal/
+/outputs/
 /internals/
 /reports/
 /results/
