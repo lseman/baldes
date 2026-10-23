@@ -188,18 +188,32 @@ img,svg {
 
 .hero {
   position:relative;
+  display:flex;
+  flex-direction:column;
+  min-height:calc(100vh - 85px);
+  min-height:calc(100svh - 85px);
+  border-bottom:1px solid var(--line);
+  background:radial-gradient(ellipse at 75% 38%, #06b6d408, transparent 60%)
+}
+
+.hero-main {
   display:grid;
   grid-template-columns:1fr 1.08fr;
   gap:clamp(30px,5vw,70px);
   align-items:center;
-  min-height:calc(100vh - 85px);
-  min-height:calc(100svh - 85px);
-  padding-block:72px 78px
+  flex:1;
+  width:100%;
+  padding-block:56px 72px
+}
+
+.hero-footer {
+  border-top:1px solid var(--line);
+  background:#ffffff02
 }
 
 .hero-scroll {
   position:absolute;
-  bottom:16px;
+  bottom:78px;
   left:50%;
   transform:translateX(-50%);
   display:grid;
@@ -528,8 +542,6 @@ img,svg {
   flex-wrap:wrap;
   gap:14px;
   padding-block:22px;
-  border-top:1px solid var(--line);
-  border-bottom:1px solid var(--line);
   font:10px var(--mono);
   color:var(--muted)
 }
@@ -850,7 +862,7 @@ img,svg {
 }
 
 @media(max-width:1000px) {
-  .hero {
+  .hero-main {
     grid-template-columns:1fr 1fr;
     gap:30px;
     padding-block:55px 78px
@@ -938,12 +950,17 @@ img,svg {
   }
 
   .hero {
+    min-height:calc(100svh - 66px)
+  }
+
+  .hero-main {
     grid-template-columns:1fr;
-    padding-top:40px;
-    padding-bottom:80px;
-    min-height:calc(100vh - 66px);
-    min-height:calc(100svh - 66px);
+    padding-block:40px 48px;
     gap:36px
+  }
+
+  .hero-scroll {
+    display:none
   }
 
   .hero h1 {
@@ -1302,3 +1319,90 @@ img,svg {
     color: CanvasText;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior:auto }
+  .hero-copy > *, .hero .route-card, .hero #route-lines,
+  .hero-scroll svg { animation:none }
+}
+
+/* Developer landing: scoped so generated documentation keeps its own layout. */
+.landing-dark .hero {
+  background: radial-gradient(ellipse at 82% 26%, #22d3ee12, transparent 55%),
+    radial-gradient(ellipse at 15% 80%, #a78bfa09, transparent 50%);
+}
+.landing-dark .hero h1 {
+  font-family: var(--sans);
+  font-weight: 750;
+  font-size: clamp(46px, 5.3vw, 76px);
+  letter-spacing: -.065em;
+  line-height: 1.06;
+}
+.landing-dark .hero h1 em { font-style: normal; font-weight: inherit }
+.landing-dark .hero-description { font-size: 16px; line-height: 1.8 }
+.landing-dark .hero-scroll { display: none }
+.landing-dark .button { border-radius: 8px; padding: 14px 22px }
+.landing-dark .route-card { border-radius: 16px; transform: rotate(1deg) }
+.landing-dark .section-heading h2 { font-family: var(--sans); font-weight: 650; letter-spacing: -.05em }
+.landing-dark .start-section { padding-block: 96px; background: #0d1217 }
+.landing-dark .start-section .heading-row { max-width: none; align-items: end; gap: 40px; margin-bottom: 38px }
+.landing-dark .start-section .heading-row > p { max-width: 330px; padding-bottom: 20px }
+.setup-strip { display: grid; grid-template-columns: .8fr 1.4fr; align-items: center; gap: 32px; padding: 24px 28px; border: 1px solid var(--line); border-radius: 12px; background: #ffffff03; margin-bottom: 20px }
+.setup-strip > div { position: relative; padding-left: 38px }
+.setup-strip h3 { font-size: 16px; margin-bottom: 6px }
+.setup-strip p, .install-card-heading p, .more-start p { font-size: 12px; color: var(--muted) }
+.setup-number { font: 11px var(--mono); color: var(--muted) }
+.setup-strip .setup-number { position: absolute; left: 0; top: 2px }
+.install-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px }
+.install-card { min-width: 0; padding: 28px; border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(135deg, #16212a88, #0d1217); display: flex; flex-direction: column; align-items: start }
+.install-card-heading { display: flex; align-items: center; gap: 14px; width: 100%; margin-bottom: 24px }
+.install-card-heading h3 { font-size: 17px; margin-bottom: 6px; letter-spacing: -.4px }
+.install-card-heading .setup-number { margin-left: auto }
+.language-badge { display: grid; place-items: center; flex-shrink: 0; width: 42px; height: 42px; border: 1px solid #36515d; border-radius: 10px; background: #162d36; color: #86ddeb; font: 14px var(--mono) }
+.python-badge { color: #d0bfff; background: #251e38; border-color: #4d3f68 }
+.landing-dark .start-section pre { position: relative; max-width: 100%; width: 100%; margin: 0; padding: 24px 20px; overflow-x: auto; background: #090d12; border: 1px solid #24303b; border-radius: 8px; font-size: 12px; line-height: 1.9; tab-size: 4 }
+.landing-dark .start-section pre code { font-size: inherit }
+.landing-dark .start-section pre:has(.copy-button) { padding-top: 46px }
+.install-note { color: var(--muted); font-size: 12px; line-height: 1.85; margin-block: 20px }
+.install-card .text-link { margin-top: auto; padding-top: 4px; color: #86ddeb }
+.example-grid { display: grid; grid-template-columns: .8fr 1.2fr; gap: 70px; align-items: center; margin-top: 72px }
+.example-copy h3 { font-size: clamp(28px, 3vw, 38px); line-height: 1.15; letter-spacing: -.05em; margin: 18px 0 }
+.example-copy > p:not(.eyebrow) { color: var(--muted); font-size: 13px }
+.example-features { padding: 0; list-style: none; font-size: 12px; color: #c1ced8; margin: 24px 0 }
+.example-features li { margin-block: 10px; padding-left: 20px; position: relative }
+.example-features li::before { content: '+'; color: #86ddeb; position: absolute; left: 0 }
+.landing-dark .example-grid .terminal { border-radius: 12px }
+.landing-dark .example-grid pre { border: 0; border-radius: 0; padding: 28px; font-size: 12px }
+.file-dot { width: 7px; height: 7px; border-radius: 50%; background: #bba0ff }
+.terminal-language { margin-left: auto; color: #86ddeb }
+.more-start { margin-top: 32px; padding: 20px 24px; border: 1px solid var(--line); border-radius: 10px }
+.more-start summary { cursor: pointer; font-size: 13px; color: #c1ced8 }
+.more-start .install-grid { margin-top: 28px }
+.more-start .install-grid > div { min-width: 0 }
+.more-start h3 { font-size: 15px; margin-bottom: 8px }
+.more-start p { margin-bottom: 16px }
+.more-start .text-link { margin-top: 16px }
+.landing-dark .engine-card { padding: 26px; border: 1px solid var(--line); border-radius: 12px; background: #ffffff02 }
+.landing-dark .engine-card h3 { font-family: var(--sans); font-size: 23px; font-weight: 600 }
+.landing-dark .mini-buckets, .landing-dark .mini-plot, .landing-dark .mini-tree { right: 24px; width: 85px }
+.landing-dark .guide-card { border-radius: 12px; transition: border-color .2s, background .2s }
+.landing-dark .guide-card:hover { background: #ffffff04; border-color: #86ddeb }
+@media (max-width: 900px) {
+  .example-grid { gap: 32px; grid-template-columns: 1fr 1.2fr }
+  .setup-strip { grid-template-columns: 1fr; gap: 20px }
+  .landing-dark .route-card { transform: none }
+}
+@media (max-width: 640px) {
+  .install-grid, .example-grid { grid-template-columns: 1fr }
+  .example-grid { margin-top: 48px }
+  .landing-dark .start-section { padding-block: 56px }
+  .landing-dark .start-section .heading-row { display: block }
+  .landing-dark .start-section .heading-row > p { padding-bottom: 0 }
+  .install-card, .setup-strip { padding: 22px }
+  .landing-dark .site-header { gap: 16px; flex-wrap: wrap }
+  .landing-dark .site-header nav { flex-wrap: wrap; gap: 16px }
+  .landing-dark .hero h1 { font-size: clamp(42px, 10vw, 62px) }
+}
+.landing-dark .start-section .copy-button { opacity: 1; min-height: 30px }
+
+.landing-dark .hero .route-card { transform: none }

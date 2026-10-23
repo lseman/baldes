@@ -649,3 +649,90 @@
   }
 
 }
+
+/* Reader layout: generous type, grouped navigation, and self-contained examples. */
+.docs-body { --reader-width: 780px }
+.docs-body .docs-header { backdrop-filter: blur(16px); padding-inline: 30px }
+.docs-layout { max-width: 1600px; grid-template-columns: 260px minmax(0, 1fr) 210px }
+.docs-sidebar { padding: 28px 18px; scrollbar-width: thin; scrollbar-color: #334151 transparent }
+.guide-menu summary { font-family: var(--sans); font-size: 13px; font-weight: 650; letter-spacing: 0; color: var(--ink) }
+.guide-menu nav { display: block }
+.nav-group { margin-bottom: 26px }
+.nav-group-title { font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: 1.2px; color: #8394a4; padding: 0 12px; margin-bottom: 8px }
+.guide-menu nav a { font-size: 12px; line-height: 1.5; padding: 8px 12px; border-radius: 6px; color: #a8b6c3 }
+.landing-dark .guide-menu nav a[aria-current] { color: #a1e9f3; background: #16303b; border-left-color: #22d3ee }
+.doc-main { padding: 32px clamp(24px, 4vw, 64px) 48px; width: 100%; max-width: 930px; margin-inline: auto }
+.doc-toolbar { margin-bottom: 48px; padding-bottom: 24px; flex-wrap: wrap }
+.doc-search { max-width: 280px; flex: 1 1 200px }
+.doc-search input { padding: 11px 12px; border-radius: 7px; font-size: 12px; padding-right: 88px }
+.search-shortcut { position: absolute; right: 10px; top: 12px; font: 9px var(--mono); color: var(--muted); pointer-events: none }
+.doc-toolbar .eyebrow { display: flex; gap: 12px; font-size: 10px; letter-spacing: .5px }
+.prose { font-size: 15px; line-height: 1.85; color: #becad5 }
+.prose h1 { font-family: var(--sans); font-size: clamp(32px, 3.5vw, 46px); font-weight: 700; letter-spacing: -.055em; line-height: 1.15; color: #f0f5fa; margin-bottom: 28px }
+.prose h2 { font-family: var(--sans); font-size: 26px; font-weight: 650; letter-spacing: -.035em; color: #e6eef5; margin-top: 52px; padding-top: 28px }
+.prose h3 { font-size: 18px; color: #e6eef5; letter-spacing: -.02em; margin-top: 32px }
+.prose h4 { font-size: 15px; color: #e6eef5; margin: 28px 0 12px }
+.prose h1 + p { font-size: 14px; line-height: 1.8; margin-bottom: 28px }
+.prose strong { color: #e1eaf2; font-weight: 650 }
+.prose :is(h1,h2,h3,h4) { scroll-margin-top: 110px }
+.heading-anchor { margin-left: 10px; opacity: 0; font: 16px var(--mono); text-decoration: none }
+.prose :is(h2,h3,h4):hover .heading-anchor, .heading-anchor:focus-visible { opacity: 1 }
+.prose p { margin-bottom: 20px }
+.prose li { padding-left: 4px; margin-bottom: 8px }
+.prose li::marker { color: #6b8498 }
+.landing-dark .prose :not(pre) > code { border: 1px solid #263a49; background: #15212b; color: #a4deed; border-radius: 5px; padding: 2px 5px; font-size: .84em }
+.code-block { position: relative; margin: 24px 0 30px; border: 1px solid #2c3c4b; border-radius: 10px; overflow: hidden; background: #090f16 }
+.code-heading { display: flex; align-items: center; min-height: 43px; background: #131e29; border-bottom: 1px solid #263544; padding: 10px 18px; color: #9dafbf; font: 11px var(--mono) }
+.landing-dark .prose .code-block pre { border: 0; border-radius: 0; box-shadow: none; margin: 0; padding: 22px; font-size: 12px; line-height: 1.9; background: #090f16; color: #d7e2ed }
+.prose .code-block .copy-button { top: 7px; right: 10px; opacity: 1; min-height: 28px; font-size: 10px }
+.landing-dark .prose pre { font-size: 12px; border-radius: 9px; box-shadow: none }
+.prose .table-scroll { overflow-x: auto; margin: 26px 0 32px; border: 1px solid #2b3b49; border-radius: 9px; scrollbar-width: thin }
+.prose .table-scroll:focus-visible { outline: 2px solid #22d3ee; outline-offset: 4px }
+.prose table { display: table; width: 100%; margin: 0; font-size: 12px; line-height: 1.7; overflow: visible }
+.prose th, .prose td { border: 0; border-bottom: 1px solid #253442; padding: 13px 16px; min-width: 110px }
+.prose th { font-size: 11px; font-weight: 650; color: #dce7f0; white-space: normal }
+.prose tr:last-child td { border-bottom: 0 }
+.prose td code { font-size: 11px }
+.landing-dark .prose th { background: #16222e }
+.landing-dark .prose tr:nth-child(even) { background: #111b24 }
+.prose blockquote { border: 1px solid #274554; border-left: 3px solid #22d3ee; border-radius: 0 8px 8px 0; background: #11232d; padding: 18px 22px; color: #b9cfdd; font-size: 14px }
+.prose img { display: block; height: auto; border-radius: 8px; margin-block: 24px }
+.doc-toc { padding-top: 38px; padding-right: 20px }
+.doc-toc a { font-size: 11px; padding: 4px 0; margin-bottom: 5px }
+.doc-toc a[aria-current="location"] { color: #86ddeb; font-weight: 600 }
+.doc-toc .eyebrow { color: #a3b3c0; font-size: 10px }
+.page-turn { gap: 16px; margin-top: 64px }
+.page-turn a { border-radius: 9px; padding: 22px; font-size: 13px; background: #101923 }
+.page-turn small { font-size: 9px; letter-spacing: .8px; text-transform: uppercase }
+.doc-footer { font-size: 11px; margin-top: 32px }
+.search-results { background: #101c27; border-color: #2b4558; border-radius: 10px; padding: 22px }
+.search-results a { padding: 16px 2px }
+.search-results .search-excerpt { font-size: 12px; line-height: 1.7 }
+@media (min-width: 1550px) { .docs-layout { grid-template-columns: 270px minmax(0, 1fr) 220px; max-width: 1600px } }
+@media (max-width: 1200px) { .docs-layout { grid-template-columns: 230px minmax(0, 1fr) } .doc-toc { display: none } }
+@media (max-width: 760px) {
+  .docs-layout { display: block }
+  .docs-body .docs-header { padding-inline: 22px; flex-wrap: wrap }
+  .docs-sidebar { padding: 18px 22px; background: #101821 }
+  .guide-menu nav { display: block; margin-top: 24px }
+  .nav-group { margin-bottom: 20px }
+  .guide-menu nav a { font-size: 13px; padding-block: 10px }
+  .doc-main { padding: 28px 22px 40px }
+  .doc-toolbar { margin-bottom: 34px; gap: 18px }
+  .doc-search { max-width: none; flex-basis: 100% }
+  .prose { font-size: 14px }
+  .prose h1 { font-size: 34px }
+  .prose h2 { font-size: 25px; margin-top: 40px }
+  .landing-dark .prose .code-block pre { padding: 18px; font-size: 11px }
+  .page-turn { grid-template-columns: 1fr }
+  .heading-anchor { opacity: 1 }
+}
+@media print {
+  .docs-body { background: white!important; color: black!important }
+  .prose, .prose :is(h1,h2,h3,h4,strong), .prose a { color: black!important }
+  .code-heading, .heading-anchor { display: none }
+  .code-block, .prose .table-scroll { overflow: visible; border-color: #aaa }
+  .landing-dark .prose pre, .landing-dark .prose th, .landing-dark .prose tr:nth-child(even), .prose blockquote { background: #f5f5f5; color: black }
+  .prose pre span { color: black!important }
+  .prose pre { white-space: pre-wrap }
+}
