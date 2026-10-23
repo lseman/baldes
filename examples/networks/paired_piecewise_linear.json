@@ -1,0 +1,322 @@
+{
+  "rows": [
+    {
+      "sense": "eq",
+      "rhs": 1
+    },
+    {
+      "sense": "eq",
+      "rhs": 1
+    }
+  ],
+  "networks": [
+    {
+      "id": 7,
+      "vertices": 4,
+      "multiplicity": [
+        0,
+        2
+      ],
+      "resources": [
+        {
+          "kind": "disposable",
+          "bounds": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              10
+            ]
+          ]
+        }
+      ],
+      "elementary": true,
+      "arcs": [
+        {
+          "tail": 0,
+          "head": 1,
+          "cost": 0,
+          "consumption": [
+            0
+          ],
+          "entries": [
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "tail": 1,
+          "head": 3,
+          "cost": 0,
+          "consumption": [
+            0
+          ],
+          "entries": []
+        },
+        {
+          "tail": 0,
+          "head": 2,
+          "cost": 0,
+          "consumption": [
+            0
+          ],
+          "entries": [
+            [
+              1,
+              1
+            ]
+          ]
+        },
+        {
+          "tail": 2,
+          "head": 3,
+          "cost": 0,
+          "consumption": [
+            0
+          ],
+          "entries": []
+        }
+      ],
+      "coupled_resources": [
+        {
+          "kind": "paired_piecewise_linear",
+          "initial": {
+            "points": [
+              [
+                0,
+                10
+              ],
+              [
+                1,
+                10
+              ]
+            ]
+          },
+          "initial_base": {
+            "lower": 0,
+            "upper": 0
+          },
+          "mode": "cost_bounded",
+          "arcs": [
+            {
+              "arrival": {
+                "points": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    8,
+                    9
+                  ]
+                ]
+              },
+              "increment": {
+                "points": [
+                  [
+                    0,
+                    2
+                  ],
+                  [
+                    8,
+                    2
+                  ]
+                ]
+              },
+              "lower": {
+                "points": [
+                  [
+                    3,
+                    0
+                  ],
+                  [
+                    8,
+                    0
+                  ]
+                ]
+              },
+              "upper": {
+                "points": [
+                  [
+                    3,
+                    100
+                  ],
+                  [
+                    8,
+                    100
+                  ]
+                ]
+              },
+              "waiting": 1
+            },
+            {
+              "arrival": {
+                "points": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    8,
+                    9
+                  ]
+                ]
+              },
+              "increment": {
+                "points": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    8,
+                    1
+                  ]
+                ]
+              },
+              "lower": {
+                "points": [
+                  [
+                    6,
+                    0
+                  ],
+                  [
+                    10,
+                    0
+                  ]
+                ]
+              },
+              "upper": {
+                "points": [
+                  [
+                    6,
+                    100
+                  ],
+                  [
+                    10,
+                    100
+                  ]
+                ]
+              },
+              "waiting": 2
+            },
+            {
+              "arrival": {
+                "points": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    8,
+                    9
+                  ]
+                ]
+              },
+              "increment": {
+                "points": [
+                  [
+                    0,
+                    3
+                  ],
+                  [
+                    8,
+                    3
+                  ]
+                ]
+              },
+              "lower": {
+                "points": [
+                  [
+                    3,
+                    0
+                  ],
+                  [
+                    8,
+                    0
+                  ]
+                ]
+              },
+              "upper": {
+                "points": [
+                  [
+                    3,
+                    100
+                  ],
+                  [
+                    8,
+                    100
+                  ]
+                ]
+              },
+              "waiting": 0
+            },
+            {
+              "arrival": {
+                "points": [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    8,
+                    9
+                  ]
+                ]
+              },
+              "increment": {
+                "points": [
+                  [
+                    0,
+                    2
+                  ],
+                  [
+                    8,
+                    2
+                  ]
+                ]
+              },
+              "lower": {
+                "points": [
+                  [
+                    6,
+                    0
+                  ],
+                  [
+                    10,
+                    0
+                  ]
+                ]
+              },
+              "upper": {
+                "points": [
+                  [
+                    6,
+                    100
+                  ],
+                  [
+                    10,
+                    100
+                  ]
+                ]
+              },
+              "waiting": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

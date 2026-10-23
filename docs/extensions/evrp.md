@@ -152,6 +152,56 @@ include heterogeneous/non-concave charging, repeated stations, and a route with
 two consecutive charging stops in both directions. Global versus bounded
 coverage and phase-one/phase-two work limits have separate checks.
 
+## Native physical-graph backend
+
+`Problem::price_native(duals, fleet_dual, departure, NativeOptions::default())`
+uses the ordinary Baldes labeling engine. Select
+`EvPricingBackend::Native(NativeOptions::default())` in the shared EV master to
+use it in both feasibility and travel-cost phases. The reference direct and
+subpath backends remain available; the default backend is unchanged.
+
+`Problem::native_graph(...)` also exposes the compiled `Graph<3>` for a native
+`pricing::Solver<3>`. The graph preserves location IDs and duplicates the depot
+at vertex `locations.len()` as the sink. Its active scalar resources track arc
+count and delivered load. Only customers receive elementarity sets, so station
+visits may repeat. A native PWL boolean state records whether a customer has
+been served; the sink requires that state to be one. Customer duals are charged
+on incoming arcs and the fleet dual is charged once on source departure.
+The delivery-only native simultaneous-load resource additionally guards load
+feasibility and dominance without scalar epsilon comparisons.
+
+The native `CoupledResource::Charging` retains earliest departure time as a
+continuous function of exact remaining energy. Travel consumes energy; service
+starts inside its window. Stations apply the full partial-charging envelope
+`T(x) + min_{q<=x}(F(q)-T(q))` and require service/charging to finish by closing.
+Heterogeneous and non-concave strictly increasing curves are supported without
+an energy grid. Forward labels retain owned front pieces. Backward labels retain
+the physical suffix; joins replay that suffix on the actual forward front.
+Dominance conservatively requires equal charging fronts, and reversal reuse is
+disabled. This resource adds no objective and cannot be a numeric parent.
+
+After native pricing chooses a stop order, the existing fixed-order optimizer
+reconstructs its charging amounts and independently replays the schedule. A
+failed reconstruction reports numerical failure, never infeasibility or complete
+pricing. `max_front_work` bounds each individual frontier extension, including
+suffix replay; it is not a total pricing-work budget. `max_reconstruction_work`
+separately bounds witness reconstruction. Label limits and `max_arcs` bound the
+native search. Resource arithmetic/state failures remain unknown; the native
+engine may aggregate a nonzero frontier-budget exhaustion into numerical failure.
+The `work` statistic counts witness reconstruction work, not native front work.
+
+This adapter currently supports at most fifteen customers, reflecting native
+exact NG local memory, and at most 1023 input locations because it adds a sink.
+It uses native numerical resource/cost comparisons. `Complete` and `Bounded`
+retain their numerical coverage meanings; no directed-rounding certificate is
+provided for charging. The largest absolute reduced arc cost times `max_arcs`
+must be below `1e12 - 1`, because the native engine reserves `1e12` as a sentinel;
+unsupported scales are rejected explicitly and require rescaling cost units.
+Native cuts and restrictions can be attached to the
+exposed graph/solver; the shared EV master does not add cut separation or tree
+search. The tiny regression comparisons establish agreement on the tested
+fixtures, with no performance or large-instance scaling claim.
+
 ## Shared route master and column generation
 
 `EvMaster<M: LpMaster>` uses Baldes's existing LP backend interface. Supply an
@@ -208,7 +258,7 @@ not an interrupt inside an individual pricing operation.
 ## Reproducible tiny comparisons
 
 Run `cargo run --features clp --example evrp_compare` for a CSV comparison of
-both backends with identical data and tolerances (`1e-7` for LP and reduced
+all three backends with identical data and tolerances (`1e-7` for LP and reduced
 cost). On the checked fixtures:
 
 | Case | Direct LP | Subpath LP | Full route-pool LP | Meaning |
@@ -247,5 +297,5 @@ workflow. It is not an integer branch-and-price solver. Cuts, branching/ng
 state, mixed fleets, tariffs, congestion, time-dependent travel, external
 benchmark parsers and large-instance performance engineering remain extensions.
 The E1 reference backend and E2-inspired prototype do not reproduce every
-acceleration from either paper. Existing scalar resource pricing is not used
-to claim nonlinear EV pricing completeness.
+acceleration from either paper. The native backend uses the explicit charging-front resource; scalar resource
+pricing alone does not establish nonlinear charging feasibility.

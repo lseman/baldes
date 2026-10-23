@@ -155,12 +155,16 @@ fn pool_lp(p: &Problem, pool: &[Vec<Visit>], fleet: Option<f64>) -> ClpMaster {
     lp
 }
 
-fn backends(max_arcs: usize) -> [EvPricingBackend; 2] {
+fn backends(max_arcs: usize) -> [EvPricingBackend; 3] {
     let options = DirectOptions {
         max_arcs,
         ..DirectOptions::default()
     };
     [
+        EvPricingBackend::Native(NativeOptions {
+            max_arcs,
+            ..NativeOptions::default()
+        }),
         EvPricingBackend::Direct(options),
         EvPricingBackend::Subpath(SubpathOptions {
             pricing: options,

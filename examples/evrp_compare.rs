@@ -55,6 +55,13 @@ fn main() -> baldes::Result<()> {
             ..DirectOptions::default()
         };
         for (name, backend) in [
+            (
+                "native",
+                EvPricingBackend::Native(NativeOptions {
+                    max_arcs: pricing.max_arcs,
+                    ..NativeOptions::default()
+                }),
+            ),
             ("direct", EvPricingBackend::Direct(pricing)),
             (
                 "subpath",

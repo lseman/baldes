@@ -1,10 +1,10 @@
 //! Shared EV set-partitioning master on the existing LP backend interface.
 //! Phase I minimizes artificial coverage; phase II minimizes travel cost.
-//! The two pricing backends differ only in how they find a complete route.
+//! Pricing backends differ only in how they find a complete route.
 
 use super::{
-    nonnegative, DirectOptions, EvPricingStatistics, EvPricingStatus, LocationKind, Problem,
-    Schedule, SubpathOptions, Visit,
+    nonnegative, DirectOptions, EvPricingStatistics, EvPricingStatus, LocationKind, NativeOptions,
+    Problem, Schedule, SubpathOptions, Visit,
 };
 use crate::master::{LpMaster, LpSolveOutcome, RowSense};
 use crate::{invalid, Result};
@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, Debug)]
 pub enum EvPricingBackend {
+    Native(NativeOptions),
     Direct(DirectOptions),
     Subpath(SubpathOptions),
 }
@@ -316,6 +317,7 @@ impl<M: LpMaster> EvMaster<M> {
         }
         let zero_duals = vec![0.0; self.problem.locations.len()];
         let pricing_options = match options.backend {
+            EvPricingBackend::Native(o) => o.validation_options(),
             EvPricingBackend::Direct(o) => o,
             EvPricingBackend::Subpath(o) => o.pricing,
         };
@@ -379,6 +381,9 @@ impl<M: LpMaster> EvMaster<M> {
                 &self.problem
             };
             let pricing = match options.backend {
+                EvPricingBackend::Native(o) => {
+                    problem.price_native(&duals, fleet_dual, self.departure, o)?
+                }
                 EvPricingBackend::Direct(o) => {
                     problem.price_direct(&duals, fleet_dual, self.departure, o)?
                 }

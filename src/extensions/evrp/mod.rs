@@ -9,6 +9,7 @@ mod direct;
 mod fixed_order;
 mod functions;
 mod master;
+mod native;
 mod subpath;
 pub use direct::{
     DirectOptions, EvPricingResult, EvPricingStatistics, EvPricingStatus, PricedRoute,
@@ -18,6 +19,7 @@ pub use master::{
     EvColumn, EvColumnGenerationOptions, EvColumnGenerationResult, EvColumnGenerationStatus,
     EvIteration, EvMaster, EvMasterPhase, EvMasterSnapshot, EvPricingBackend,
 };
+pub use native::NativeOptions;
 pub use subpath::SubpathOptions;
 
 /// Cumulative time to charge from empty, represented by (energy, time) knots.

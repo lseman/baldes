@@ -88,6 +88,124 @@ fn replay_partial_charging_waiting_and_station_revisit() {
 }
 
 #[test]
+fn native_pricing_excludes_station_only_routes_and_preserves_positive_columns() {
+    let mut p = problem();
+    // Station-only return costs four; the cheapest customer route costs four
+    // as well. A large fleet reward must never admit an empty customer column.
+    for bidirectional in [false, true] {
+        let options = NativeOptions {
+            bidirectional,
+            max_arcs: 4,
+            ..NativeOptions::default()
+        };
+        for fleet in [0., 100.] {
+            let r = p.price_native(&[0.; 3], fleet, 0., options).unwrap();
+            let route = r.best_route.unwrap();
+            assert!(route.charging.visits.iter().any(|v| v.location == 2));
+            assert_eq!(route.reduced_cost, 4. - fleet);
+            p.replay(&route.charging.visits, 0.).unwrap();
+        }
+        p.locations[2].kind = LocationKind::Station { curve: curve() };
+        let r = p.price_native(&[0.; 3], 100., 0., options).unwrap();
+        assert_eq!(r.status, EvPricingStatus::Complete);
+        assert!(r.best_route.is_none());
+        p.locations[2].kind = LocationKind::Customer { demand: 2. };
+    }
+}
+
+#[test]
+fn native_limits_and_failed_schedule_reconstruction_never_claim_completeness() {
+    for options in [
+        NativeOptions {
+            max_labels: 0,
+            ..NativeOptions::default()
+        },
+        NativeOptions {
+            max_front_work: 0,
+            ..NativeOptions::default()
+        },
+        NativeOptions {
+            max_reconstruction_work: 0,
+            ..NativeOptions::default()
+        },
+    ] {
+        let r = problem()
+            .price_native(&[0., 0., 20.], 0., 0., options)
+            .unwrap();
+        assert_eq!(r.status, EvPricingStatus::WorkLimit, "{r:?}");
+    }
+}
+
+#[test]
+fn native_pricing_rejects_objective_scales_reserved_for_native_sentinels() {
+    let mut p = problem();
+    for arc in p.travel.iter_mut().flatten().flatten() {
+        arc.cost = 1e12;
+    }
+    let error = p
+        .price_native(&[0.; 3], 0., 0., NativeOptions::default())
+        .unwrap_err();
+    assert!(error.message.contains("rescale cost units"));
+}
+
+#[test]
+fn native_load_dominance_preserves_the_feasible_floating_point_order() {
+    let mut p = problem();
+    p.locations = (0..6)
+        .map(|i| Location {
+            kind: if i == 0 {
+                LocationKind::Depot
+            } else {
+                LocationKind::Customer {
+                    demand: [0., 0.1, 0.2, 0.3, 0., 0.25][i],
+                }
+            },
+            window: (0., 100.),
+            service: 0.,
+        })
+        .collect();
+    p.load_capacity = 0.85;
+    p.travel = vec![vec![None; 6]; 6];
+    for (u, v) in [
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 4),
+        (0, 3),
+        (3, 2),
+        (2, 1),
+        (1, 4),
+        (4, 5),
+        (5, 0),
+    ] {
+        p.travel[u][v] = Some(Travel {
+            time: 0.,
+            energy: 0.,
+            cost: if (u, v) == (0, 3) { 1. } else { 0. },
+        });
+    }
+    // The cheaper permutation has prefix load .6000000000000001;
+    // the other has .6. Scalar epsilon dominance must not erase the latter.
+    let duals = [0., 10., 10., 10., 10., 10.];
+    let expected = exhaustive_route_best(&p, &duals, 0., 6);
+    assert_eq!(expected, Some(-49.));
+    let native = p
+        .price_native(
+            &duals,
+            0.,
+            0.,
+            NativeOptions {
+                max_arcs: 6,
+                bidirectional: false,
+                ..NativeOptions::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(native.status, EvPricingStatus::Complete);
+    assert_eq!(native.best_route.unwrap().reduced_cost, expected.unwrap());
+}
+
+#[test]
 fn replay_rejects_infeasible_schedules() {
     let p = problem();
     let mut r = route();
@@ -366,7 +484,31 @@ fn bidirectional_pricing_matches_exhaustive_route_orders_with_station_repeats() 
                 )
                 .unwrap();
             assert!(subpath.statistics.subpaths > 0);
-            for r in [direct, subpath] {
+            let native_forward = p
+                .price_native(
+                    &duals,
+                    -2.0,
+                    0.0,
+                    NativeOptions {
+                        max_arcs: 6,
+                        bidirectional: false,
+                        ..NativeOptions::default()
+                    },
+                )
+                .unwrap();
+            let native_backward = p
+                .price_native(
+                    &duals,
+                    -2.0,
+                    0.0,
+                    NativeOptions {
+                        max_arcs: 6,
+                        bidirectional: true,
+                        ..NativeOptions::default()
+                    },
+                )
+                .unwrap();
+            for r in [direct, subpath, native_forward, native_backward] {
                 assert_eq!(r.status, EvPricingStatus::Bounded, "{r:?}");
                 let route = r.best_route.unwrap();
                 p.replay(&route.charging.visits, 0.0).unwrap();
@@ -408,6 +550,22 @@ fn pricing_covers_elementary_customers_capacity_and_global_status() {
             .unwrap();
         assert_eq!(r.status, EvPricingStatus::Complete);
         assert_eq!(r.best_route.map(|r| r.reduced_cost), expected);
+        for bidirectional in [false, true] {
+            let native = p
+                .price_native(
+                    &duals,
+                    0.,
+                    0.,
+                    NativeOptions {
+                        max_arcs: 3,
+                        bidirectional,
+                        ..NativeOptions::default()
+                    },
+                )
+                .unwrap();
+            assert_eq!(native.status, EvPricingStatus::Complete, "{native:?}");
+            assert_eq!(native.best_route.map(|r| r.reduced_cost), expected);
+        }
     }
 }
 
@@ -668,7 +826,31 @@ fn both_pricers_match_enumeration_with_two_customers_across_subpaths() {
                     },
                 )
                 .unwrap();
-            for r in [direct, subpath] {
+            let native_forward = p
+                .price_native(
+                    &duals,
+                    -1.0,
+                    0.0,
+                    NativeOptions {
+                        max_arcs: 7,
+                        bidirectional: false,
+                        ..NativeOptions::default()
+                    },
+                )
+                .unwrap();
+            let native_backward = p
+                .price_native(
+                    &duals,
+                    -1.0,
+                    0.0,
+                    NativeOptions {
+                        max_arcs: 7,
+                        bidirectional: true,
+                        ..NativeOptions::default()
+                    },
+                )
+                .unwrap();
+            for r in [direct, subpath, native_forward, native_backward] {
                 assert_eq!(r.status, EvPricingStatus::Bounded, "{r:?}");
                 assert_eq!(
                     r.best_route.map(|r| r.reduced_cost),

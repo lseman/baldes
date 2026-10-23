@@ -1,0 +1,179 @@
+{
+  "rows": [
+    {
+      "sense": "eq",
+      "rhs": 1
+    },
+    {
+      "sense": "eq",
+      "rhs": 1
+    }
+  ],
+  "networks": [
+    {
+      "id": 7,
+      "vertices": 4,
+      "multiplicity": [
+        0,
+        2
+      ],
+      "resources": [
+        {
+          "kind": "disposable",
+          "bounds": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              10
+            ]
+          ]
+        }
+      ],
+      "elementary": true,
+      "arcs": [
+        {
+          "tail": 0,
+          "head": 1,
+          "cost": 0,
+          "consumption": [
+            0
+          ],
+          "entries": [
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "tail": 1,
+          "head": 3,
+          "cost": 0,
+          "consumption": [
+            0
+          ],
+          "entries": []
+        },
+        {
+          "tail": 0,
+          "head": 2,
+          "cost": 0,
+          "consumption": [
+            0
+          ],
+          "entries": [
+            [
+              1,
+              1
+            ]
+          ]
+        },
+        {
+          "tail": 2,
+          "head": 3,
+          "cost": 0,
+          "consumption": [
+            0
+          ],
+          "entries": []
+        }
+      ],
+      "coupled_resources": [
+        {
+          "kind": "interval_cost",
+          "initial": {
+            "lower": 0,
+            "upper": 4
+          },
+          "bounds": {
+            "lower": 0,
+            "upper": 4
+          },
+          "increments": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "functions": [
+            {
+              "points": [
+                [
+                  0,
+                  30
+                ],
+                [
+                  2,
+                  10
+                ],
+                [
+                  4,
+                  30
+                ]
+              ]
+            },
+            {
+              "points": [
+                [
+                  0,
+                  30
+                ],
+                [
+                  2,
+                  10
+                ],
+                [
+                  4,
+                  30
+                ]
+              ]
+            },
+            {
+              "points": [
+                [
+                  0,
+                  30
+                ],
+                [
+                  2,
+                  10
+                ],
+                [
+                  4,
+                  30
+                ]
+              ]
+            },
+            {
+              "points": [
+                [
+                  0,
+                  30
+                ],
+                [
+                  2,
+                  10
+                ],
+                [
+                  4,
+                  30
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
