@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Download and extract the latest stable Gurobi Linux release into external/."""
+
+import argparse
+import hashlib
+import platform
+import re
+import shutil
+import sys
+import tarfile
+import tempfile
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+CHECKSUM_ROOT = "https://checksum.gurobi.com"
+PACKAGE_ROOT = "https://packages.gurobi.com"
+EXTERNAL = Path(__file__).resolve().parents[2] / "external"
+
+
+def open_url(url):
+    request = urllib.request.Request(url, headers={"User-Agent": "BALDES-gurobi-downloader"})
+    return urllib.request.urlopen(request, timeout=60)
+
+
+def fetch_text(url):
+    with open_url(url) as response:
+        return response.read().decode("utf-8")
+
+
+def latest_version(index):
+    """Select stable versions numerically; exclude beta/alpha releases."""
+    versions = re.findall(r'href=[\'\"]/?(\d+\.\d+\.\d+)/[\'\"]', index)
+    if not versions:
+        raise ValueError("No stable Gurobi releases found in the official checksum index")
+    return max(versions, key=lambda value: tuple(map(int, value.split("."))))
+
+
+def detect_platform():
+    if platform.system() != "Linux":
+        raise ValueError("Automatic installation currently supports Linux only")
+    architecture = platform.machine().lower()
+    names = {"x86_64": "linux64", "amd64": "linux64", "aarch64": "armlinux64",
+             "arm64": "armlinux64", "ppc64le": "pwlinux64"}
+    if architecture not in names:
+        raise ValueError(f"Unsupported Linux architecture: {architecture}")
+    return names[architecture]
+
+
+def checksum(text, filename):
+    for line in text.splitlines():
+        fields = line.split()
+        if (len(fields) == 2 and re.fullmatch(r"[0-9a-fA-F]{32}", fields[0])
+                and fields[1].lstrip("*") == filename):
+            return fields[0].lower()
+    raise ValueError(f"Invalid published checksum for {filename}")
+
+
+def digest(path):
+    # Gurobi publishes MD5 checksums; both archive and checksum use HTTPS.
+    result = hashlib.md5(usedforsecurity=False)
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            result.update(chunk)
+    return result.hexdigest()
+
+
+def download(url, destination, expected):
+    if destination.is_file() and digest(destination) == expected:
+        print(f"Using verified archive: {destination}", flush=True)
+        return
+    print(f"Downloading {url}", flush=True)
+    # A failed transfer never replaces an existing archive or leaves a partial one.
+    with tempfile.TemporaryDirectory(prefix=".gurobi-download-", dir=destination.parent) as work:
+        temporary = Path(work) / destination.name
+        with open_url(url) as response, temporary.open("wb") as output:
+            shutil.copyfileobj(response, output, length=1024 * 1024)
+        if digest(temporary) != expected:
+            raise ValueError(f"Checksum mismatch for {destination.name}")
+        temporary.replace(destination)
+    print("Published checksum verified.", flush=True)
+
+
+def extract(archive, destination, version, target):
+    root = f"gurobi{version.replace('.', '')}"
+    installation = destination / root / target
+    if (installation / "include/gurobi_c.h").is_file() and (installation / "bin/gurobi_cl").is_file():
+        print(f"Already installed: {installation}")
+        return installation
+    if (destination / root).exists():
+        raise ValueError(f"Incomplete installation exists at {destination / root}; move it aside and rerun")
+    if not hasattr(tarfile, "data_filter"):
+        raise ValueError("Safe extraction requires Python with tarfile.data_filter (Python 3.12+)")
+    print(f"Extracting {archive.name}", flush=True)
+    with tempfile.TemporaryDirectory(prefix=".gurobi-extract-", dir=destination) as work:
+        with tarfile.open(archive, "r:gz") as source:
+            # Restrict the package layout in addition to tarfile's path/link checks.
+            for member in source.getmembers():
+                if member.name.split("/", 1)[0] != root:
+                    raise ValueError(f"Unexpected archive member: {member.name}")
+            source.extractall(work, filter="data")
+        staged = Path(work) / root / target
+        if not (staged / "include/gurobi_c.h").is_file() or not (staged / "bin/gurobi_cl").is_file():
+            raise ValueError("Archive does not contain the expected Gurobi installation")
+        (Path(work) / root).rename(destination / root)
+    return installation
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--version", help="Download a specific X.Y.Z release instead of the latest stable release")
+    parser.add_argument("--destination", type=Path, default=EXTERNAL, help="Download/extraction directory (default: repository external/)")
+    parser.add_argument("--platform", choices=["linux64", "armlinux64", "pwlinux64"], help="Override detected Linux platform")
+    args = parser.parse_args(argv)
+    try:
+        if args.version and not re.fullmatch(r"\d+\.\d+\.\d+", args.version):
+            raise ValueError("--version must have the form X.Y.Z")
+        target = args.platform or detect_platform()
+        version = args.version or latest_version(fetch_text(CHECKSUM_ROOT + "/"))
+        filename = f"gurobi{version}_{target}.tar.gz"
+        expected = checksum(fetch_text(f"{CHECKSUM_ROOT}/{version}/{filename}.md5"), filename)
+        destination = args.destination.expanduser().resolve()
+        destination.mkdir(parents=True, exist_ok=True)
+        major_minor = ".".join(version.split(".")[:2])
+        archive = destination / filename
+        download(f"{PACKAGE_ROOT}/{major_minor}/{filename}", archive, expected)
+        installation = extract(archive, destination, version, target)
+        print(f"\nGUROBI_HOME={installation}")
+        print("Set Gurobi installation to this path in make config and enable Gurobi backend.")
+        print("Gurobi requires a valid license to solve models.")
+        return 0
+    except (OSError, ValueError, tarfile.TarError, urllib.error.URLError) as error:
+        print(f"gurobi_downloader: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
