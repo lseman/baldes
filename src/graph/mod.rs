@@ -1,5 +1,6 @@
 //! Physical graph input. Physical IDs never index bucket or label storage.
 pub mod buckets;
+pub mod coupled;
 pub mod resources;
 pub use resources::{ResourceValues, ScalarValues};
 pub mod relaxation;
@@ -15,6 +16,7 @@ pub enum ResourceKind {
     Equality,
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "clp", derive(serde::Deserialize, serde::Serialize))]
 pub struct Window {
     pub lower: f64,
     pub upper: f64,
@@ -67,6 +69,7 @@ pub struct Graph<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub graph_id: i32,
     pub main_resource: Option<usize>,
     grouped: bool,
+    coupled: Option<Box<coupled::CoupledKernel>>,
     #[cfg(feature = "multi-time-windows")]
     time_windows: std::collections::BTreeMap<(usize, usize), Vec<Window>>,
 }
@@ -86,6 +89,7 @@ impl<const D: usize> Graph<D> {
             graph_id,
             main_resource,
             grouped,
+            coupled,
             #[cfg(feature = "multi-time-windows")]
             time_windows,
         } = self;
@@ -97,6 +101,7 @@ impl<const D: usize> Graph<D> {
             && *graph_id == other.graph_id
             && *main_resource == other.main_resource
             && *grouped == other.grouped
+            && *coupled == other.coupled
             && *resources == other.resources
             && vertices.len() == other.vertices.len()
             && arcs.len() == other.arcs.len())
@@ -171,6 +176,7 @@ impl<const D: usize> Graph<D> {
             graph_id: -1,
             main_resource: None,
             grouped: false,
+            coupled: None,
             #[cfg(feature = "multi-time-windows")]
             time_windows: Default::default(),
         })
@@ -335,6 +341,9 @@ impl<const D: usize> Graph<D> {
             return Err(invalid("invalid graph dimensions or distinct terminals"));
         }
         self.validate_time_windows()?;
+        if let Some(kernel) = &self.coupled {
+            kernel.validate_for(self)?;
+        }
         let mut ids = HashSet::new();
         for a in &self.arcs {
             if a.consumption.len() < self.resources.len()

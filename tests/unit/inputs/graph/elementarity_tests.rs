@@ -1,7 +1,7 @@
 use super::*;
 #[test]
 fn routing_elementarity_uses_customer_ids_and_omits_depots() {
-    let mut instance = Instance::read("instances/R201.txt").unwrap();
+    let mut instance = Instance::read("instances/Solomon/R201.txt").unwrap();
     instance.truncate(10).unwrap();
     for graph in [
         instance.graph(12, Rounding::None).unwrap(),

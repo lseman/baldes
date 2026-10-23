@@ -197,7 +197,8 @@ impl BucketGraph {
     pub fn rebuild<const D: usize>(&mut self, g: &Graph<D>, forward: bool) -> Result<()> {
         self.regenerate(forward)?;
         let mut counter = 0;
-        for &index in &self.arc_order.clone() {
+        for position in 0..self.arc_order.len() {
+            let index = self.arc_order[position];
             let arc = &g.arcs[index];
             let v = self.internal[if forward { arc.tail } else { arc.head }];
             let count = self.direction(forward).buckets[v].len();
