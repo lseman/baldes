@@ -1,4 +1,4 @@
-# P-step CVRP extension
+# P-step CVRP and VRPTW extension
 
 [Documentation index](../README.md)
 
@@ -183,3 +183,96 @@ E-n22 p=4 needed the extended limit. Converged backend bounds agreed within
 numerical p-step LP bound. The larger p=4 full-pool model was not independently
 solved for that instance. Raw records, binary/input hashes, and compiler
 metadata are under `results/pstep-pricing-20261021/final/` and `verified/`.
+
+## Experimental CUDA pricing
+
+Build with an NVIDIA CUDA toolkit (`nvcc` on PATH) and a working CUDA driver:
+
+```sh
+cargo build --release --features clp,cuda --bin baldes
+./target/release/baldes pstep instances/cvrplib/P-n16-k8.vrp --p 3 --gpu --rounding none
+cargo test --release --features cuda --lib extensions::pstep
+cargo run --release --features cuda --example pstep_gpu_bench
+python3 scripts/benchmarks/benchmark_pstep_cuda.py
+```
+
+`--gpu` is the CLI shorthand for `--pricing cuda`.
+
+`PricingMethod::Cuda` runs exact elementary enumeration for each endpoint/load
+extreme on an NVIDIA GPU. It supports effective p <= 6, uses double precision,
+and preserves CPU enumeration traversal and tie order. It is opt-in; `Auto`
+keeps selecting CPU methods. The LP and reduced-cost replay remain on CPU.
+`threads` applies to CPU methods; CUDA reports zero CPU pricing workers.
+
+The prototype allocates and transfers data each round. Timing includes these
+costs, synchronization, and result replay. Runtime errors and extension limits
+abort the entire round. The deadline is checked after synchronization: an active
+kernel is not preempted, and an over-budget result is discarded. Large p or
+large dense instances can therefore overrun a requested wall-clock limit.
+
+The synthetic benchmark warms every configuration once, then alternates five
+measured rounds on identical problems and duals, comparing every returned path.
+The CVRPLIB script uses three fresh-process runs per configuration, alternates
+CPU/CUDA order, fixes rounding to `none`, and checks converged LP bounds.
+
+## Time windows
+
+The CLI automatically enforces finite service-start windows in Solomon inputs:
+
+```sh
+cargo build --release --features clp,cuda --bin baldes
+./target/release/baldes pstep instances/Solomon/C201.txt --p 3 --gpu --rounding none --json c201-gpu.json
+./target/release/baldes pstep instances/Solomon/C201.txt --p 3 --pricing enumeration --threads 16 --rounding none --json c201-cpu.json
+cargo test --features cuda,clp --test pstep_vrptw
+cargo run --release --features cuda --example pstep_vrptw_bench -- instances/Solomon/C201.txt instances/Solomon/C202.txt
+```
+
+Rust callers use `TimeWindowProblem::from_instance`. `TimeWindowProblem` wraps
+the existing CVRP data and adds windows and service durations for both depot
+copies and every customer. Travel duration equals travel cost, in the same units
+as the windows. Finite ordered windows and nonnegative service times are required.
+`Auto` uses CPU enumeration; `Cuda` uses the GPU; bucket pricing is currently
+unsupported for this model. CUDA still requires effective p <= 6.
+
+The master has four blocks of n rows: degree, endpoint flow, cumulative load,
+and service-start flow. A timed step contributes its start time positively at
+its first customer and its end time negatively at its last customer. Service
+starts of outgoing steps must therefore cover incoming end times. This follows
+the endpoint-time extension in [Vaes (2022), sections 3.2–3.3](https://thesis.eur.nl/pub/65803/Thesis-Wouter-Vaes.pdf).
+
+For a fixed path, propagation represents its earliest end service time as
+`max(start + transit, barrier)`. `transit` includes service on each arc's tail;
+`barrier` accounts for waiting. Latest feasible starts are bounded by every
+visited due time. Pricing considers the nondominated earliest scheduling
+breakpoint and the latest feasible start, together with the existing load
+extremes. This retains compatible time assignments in the master instead of
+only filtering individually feasible segments.
+
+The result remains an unlimited-fleet **LP relaxation**, with no integer route
+certificate. The JSON identifies `problem: VRPTW` and `time_windows_enforced`.
+A converged LP bound is distinct from a restricted-master objective. GPU/CPU
+comparisons must use identical rounding; the examples explicitly use `none`.
+
+### Measured Solomon comparison
+
+On a Ryzen 9 9950X and RTX 5090, three fresh-process runs with all 100
+customers and `--rounding none` gave these median LP solve times. P-step CPU
+pricing used 16 workers; the normal solver used its default settings.
+
+| Instance | Default solver | P-step CPU p=2 | P-step GPU p=2 | P-step CPU p=3 | P-step GPU p=3 |
+|---|---:|---:|---:|---:|---:|
+| C201 | 0.127 s | 1.031 s | 1.187 s | 2.612 s | 2.053 s |
+| C202 | 8.449 s | 2.489 s | 2.719 s | 7.523 s | 5.677 s |
+
+All CPU/GPU p-step pairs converged to matching bounds. The default solver
+obtained 591.55655667 for both cases. C201 p-step obtained the same bound;
+C202 p-step obtained 590.78102398 at p=2 and 591.54926228 at p=3, so its
+faster times do not represent equally strong bounds. GPU startup outweighed
+pricing savings at p=2. At p=3, warmed, matched-dual pricing rounds were
+6.96x (C201) and 7.25x (C202) faster on GPU; whole-solve improvements were
+1.27x and 1.33x because LP solving remained on CPU.
+
+[Machine details, input/binary hashes, timing ranges and LP bounds](../benchmarks/pstep-vrptw.json)
+record the measurements. These timings precede the `--gpu` alias and integration
+of the unrelated imported-pricing update; the measured CUDA and VRPTW algorithms
+are identical. The normal solver comparison uses its stronger route LP.

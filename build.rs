@@ -1,9 +1,20 @@
-//! Only the optional LP backend links C++; all solver logic stays Rust.
+//! Optional LP backends and CUDA pricing link native code.
 //! `--features clp` compiles Clp 1.17.10 and CoinUtils 2.11 from the vendor/
 //! submodules, as OpenRSCP's cmake/CoinClp.cmake does.
 //! `--features highs` links against HiGHS via pkg-config or a vendored copy.
 fn main() {
     git_version();
+    #[cfg(feature = "cuda")]
+    {
+        println!("cargo:rerun-if-changed=src/extensions/pstep/pricing/cuda.cu");
+        cc::Build::new()
+            .cuda(true)
+            .cudart("shared")
+            .flag("-O3")
+            .flag("--fmad=false")
+            .file("src/extensions/pstep/pricing/cuda.cu")
+            .compile("baldes_pstep_cuda");
+    }
     println!("cargo:rerun-if-env-changed=BALDES_RESOURCE_DIMENSIONS");
     let dimensions = std::env::var("BALDES_RESOURCE_DIMENSIONS")
         .unwrap_or_else(|_| "2".into())

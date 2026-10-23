@@ -8,6 +8,8 @@ use crate::{incomplete, invalid, Result};
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
+#[cfg(feature = "cuda")]
+mod cuda;
 mod enumeration;
 
 /// Exact pricing backend. Enumeration keeps only the best path per job,
@@ -18,6 +20,9 @@ pub enum PricingMethod {
     Auto,
     Enumeration,
     Bucket,
+    /// Exact CUDA enumeration, limited to p <= 6.
+    #[cfg(feature = "cuda")]
+    Cuda,
 }
 
 #[derive(Clone, Debug)]
@@ -47,10 +52,10 @@ impl Default for PricingOptions {
 }
 
 #[derive(Clone, Debug)]
-pub struct PricingRound {
+pub struct PricingRound<S = Step> {
     /// Best path from every feasible endpoint/extreme job, in deterministic
     /// job order. Positive reduced cost steps may be included.
-    pub steps: Vec<Step>,
+    pub steps: Vec<S>,
     pub minimum_reduced_cost: Option<f64>,
     pub jobs: usize,
     pub workers: usize,
@@ -60,10 +65,10 @@ pub struct PricingRound {
 }
 
 #[derive(Clone, Copy)]
-struct Job {
-    start: usize,
-    end: usize,
-    maximum: bool,
+pub(super) struct Job {
+    pub(super) start: usize,
+    pub(super) end: usize,
+    pub(super) maximum: bool,
 }
 
 impl Problem {
@@ -92,41 +97,7 @@ impl Problem {
         // resource windows small when the caller supplies a very large p.
         let p = options.p.min(n + 1);
         let method = enumeration::select_method(n, p, options.method);
-        let mut jobs = Vec::new();
-        for start in 0..=n {
-            for end in 1..=n + 1 {
-                if start == end
-                    || (start == 0 && end == n + 1 && p == 1)
-                    || (start != 0 && p > n)
-                    || (start != 0 && end <= n && p >= n)
-                    || (start != 0
-                        && end <= n
-                        && self.demands[start - 1] + self.demands[end - 1] > self.capacity)
-                {
-                    continue;
-                }
-                if start == 0 {
-                    jobs.push(Job {
-                        start,
-                        end,
-                        maximum: false,
-                    });
-                } else {
-                    if end <= n {
-                        jobs.push(Job {
-                            start,
-                            end,
-                            maximum: false,
-                        });
-                    }
-                    jobs.push(Job {
-                        start,
-                        end,
-                        maximum: true,
-                    });
-                }
-            }
-        }
+        let jobs = endpoint_jobs(self, p);
         let started = Instant::now();
         let workers = options.threads.min(jobs.len());
         if jobs.is_empty() {
@@ -139,6 +110,10 @@ impl Problem {
                 enumerated_extensions: 0,
                 method,
             });
+        }
+        #[cfg(feature = "cuda")]
+        if method == PricingMethod::Cuda {
+            return cuda::price(self, &jobs, p, duals, objective_weight, options);
         }
         let chunk_size = (jobs.len() + workers - 1) / workers;
         let workers = jobs.chunks(chunk_size).len();
@@ -524,4 +499,57 @@ fn relaxed_minimum(
         result.columns.into_iter().next(),
         result.statistics.generated,
     ))
+}
+
+pub(super) fn endpoint_jobs(problem: &Problem, p: usize) -> Vec<Job> {
+    let n = problem.demands.len();
+    let mut jobs = Vec::new();
+    for start in 0..=n {
+        for end in 1..=n + 1 {
+            if start == end
+                || (start == 0 && end == n + 1 && p == 1)
+                || (start != 0 && p > n)
+                || (start != 0 && end <= n && p >= n)
+                || (start != 0
+                    && end <= n
+                    && problem.demands[start - 1] + problem.demands[end - 1] > problem.capacity)
+            {
+                continue;
+            }
+            if start == 0 {
+                jobs.push(Job {
+                    start,
+                    end,
+                    maximum: false,
+                });
+            } else {
+                if end <= n {
+                    jobs.push(Job {
+                        start,
+                        end,
+                        maximum: false,
+                    });
+                }
+                jobs.push(Job {
+                    start,
+                    end,
+                    maximum: true,
+                });
+            }
+        }
+    }
+
+    jobs
+}
+
+#[cfg(feature = "cuda")]
+pub(super) fn price_timed_cuda(
+    problem: &super::TimeWindowProblem,
+    jobs: &[Job],
+    p: usize,
+    duals: &[f64],
+    weight: f64,
+    options: &PricingOptions,
+) -> Result<PricingRound<super::TimedStep>> {
+    cuda::price_timed(problem, jobs, p, duals, weight, options)
 }

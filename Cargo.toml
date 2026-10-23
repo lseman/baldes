@@ -31,6 +31,8 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+# Exact small-p enumeration on NVIDIA CUDA (requires nvcc).
+cuda = ["dep:cc"]
 # Runtime-dispatched AVX2 dominance scans and rank-one bitsets; portable fallback.
 simd = []
 # Disjoint service-start windows on disposable scalar resources.
@@ -205,3 +207,7 @@ required-features = ["multi-time-windows"]
 name = "gurobi_master"
 path = "tests/master/gurobi.rs"
 required-features = ["gurobi"]
+
+[[test]]
+name = "pstep_vrptw"
+path = "tests/pricing/pstep_vrptw.rs"

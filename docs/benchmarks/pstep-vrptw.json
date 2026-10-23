@@ -1,0 +1,199 @@
+{
+  "hardware": {
+    "cpu": "AMD Ryzen 9 9950X",
+    "gpu": "NVIDIA RTX 5090",
+    "cpu_workers": 16
+  },
+  "rounding": "none",
+  "customers": 100,
+  "repetitions": 3,
+  "pricing_warmups": 1,
+  "cg_warmups": 0,
+  "pricing": [
+    {
+      "instance": "C201",
+      "p": 2,
+      "Enumeration": {
+        "median_seconds": 0.003300219,
+        "min_seconds": 0.00328323,
+        "max_seconds": 0.003308449
+      },
+      "Cuda": {
+        "median_seconds": 0.001597937,
+        "min_seconds": 0.001501283,
+        "max_seconds": 0.001668634
+      },
+      "speedup": 2.065299820956646
+    },
+    {
+      "instance": "C201",
+      "p": 3,
+      "Enumeration": {
+        "median_seconds": 0.099687335,
+        "min_seconds": 0.099424769,
+        "max_seconds": 0.100738581
+      },
+      "Cuda": {
+        "median_seconds": 0.014328508,
+        "min_seconds": 0.014225273,
+        "max_seconds": 0.014399334
+      },
+      "speedup": 6.957272522721835
+    },
+    {
+      "instance": "C202",
+      "p": 2,
+      "Enumeration": {
+        "median_seconds": 0.003922417,
+        "min_seconds": 0.003907877,
+        "max_seconds": 0.003937856
+      },
+      "Cuda": {
+        "median_seconds": 0.001970428,
+        "min_seconds": 0.001967178,
+        "max_seconds": 0.002013256
+      },
+      "speedup": 1.9906421346022285
+    },
+    {
+      "instance": "C202",
+      "p": 3,
+      "Enumeration": {
+        "median_seconds": 0.170278108,
+        "min_seconds": 0.168042953,
+        "max_seconds": 0.170723324
+      },
+      "Cuda": {
+        "median_seconds": 0.023478264,
+        "min_seconds": 0.023421327,
+        "max_seconds": 0.023574519
+      },
+      "speedup": 7.252585114470134
+    }
+  ],
+  "cg": [
+    {
+      "instance": "C201",
+      "p": 2,
+      "enumeration": {
+        "median_seconds": 1.031299307,
+        "min_seconds": 1.030544457,
+        "max_seconds": 1.034484912,
+        "bound": 591.5565566715014,
+        "pricing_seconds": 0.040400877,
+        "lp_seconds": 0.9545757819999999
+      },
+      "cuda": {
+        "median_seconds": 1.186956543,
+        "min_seconds": 1.136676828,
+        "max_seconds": 1.204231978,
+        "bound": 591.5565566715014,
+        "pricing_seconds": 0.14639033600000004,
+        "lp_seconds": 0.9549021279999999
+      },
+      "speedup": 0.8688602064515517
+    },
+    {
+      "instance": "C201",
+      "p": 3,
+      "enumeration": {
+        "median_seconds": 2.61237058,
+        "min_seconds": 2.599570473,
+        "max_seconds": 2.615548965,
+        "bound": 591.5565566689369,
+        "pricing_seconds": 0.8908802309999999,
+        "lp_seconds": 1.6685291809999996
+      },
+      "cuda": {
+        "median_seconds": 2.05324159,
+        "min_seconds": 1.999937331,
+        "max_seconds": 2.053579322,
+        "bound": 591.5565566689369,
+        "pricing_seconds": 0.338682482,
+        "lp_seconds": 1.671362526
+      },
+      "speedup": 1.272315246643723
+    },
+    {
+      "instance": "C202",
+      "p": 2,
+      "enumeration": {
+        "median_seconds": 2.488988292,
+        "min_seconds": 2.468701644,
+        "max_seconds": 2.507974409,
+        "bound": 590.7810239765861,
+        "pricing_seconds": 0.058525227,
+        "lp_seconds": 2.327081243999999
+      },
+      "cuda": {
+        "median_seconds": 2.718801216,
+        "min_seconds": 2.6004871659999997,
+        "max_seconds": 2.774332349,
+        "bound": 590.7810239765861,
+        "pricing_seconds": 0.230836089,
+        "lp_seconds": 2.3876303939999994
+      },
+      "speedup": 0.915472700744886
+    },
+    {
+      "instance": "C202",
+      "p": 3,
+      "enumeration": {
+        "median_seconds": 7.523193896,
+        "min_seconds": 7.491690468,
+        "max_seconds": 7.544862563,
+        "bound": 591.5492622797935,
+        "pricing_seconds": 2.3648368459999998,
+        "lp_seconds": 5.04583033
+      },
+      "cuda": {
+        "median_seconds": 5.677419067,
+        "min_seconds": 5.607328228,
+        "max_seconds": 5.68565015,
+        "bound": 591.5492622797935,
+        "pricing_seconds": 0.5656465020000001,
+        "lp_seconds": 5.015135881999999
+      },
+      "speedup": 1.3251080829542015
+    }
+  ],
+  "default": [
+    {
+      "instance": "C201",
+      "median_seconds": 0.127416808,
+      "min_seconds": 0.126899555,
+      "max_seconds": 0.128093373,
+      "bound": 591.5565566715014
+    },
+    {
+      "instance": "C202",
+      "median_seconds": 8.449099764,
+      "min_seconds": 8.443654855,
+      "max_seconds": 8.541261118,
+      "bound": 591.5565566714722
+    }
+  ],
+  "pricing_binary_sha256": "ef1b8984da1dfc81e5bd6715328c7de8c7c3bebe2f16f2a55c3069eeb3da81f0",
+  "build": {
+    "binary": "/tmp/baldes-pstep-cuda/target/release/baldes",
+    "sha256": "64a057e38b1f78cd574c7d22c3afe6970feec13cd10fbf4cd7ba0136f299f3c0",
+    "inputs": {
+      "C201": "d8d9834087ae2326fa23a8510533060233dc9fb481873be60956eb26a880ad63",
+      "C202": "dfc8ecad79f6c7ffb096cd36994143569f0babe284d5ad194683271d81063772"
+    },
+    "rounding": "none",
+    "time_windows_enforced": true,
+    "seconds": 30,
+    "repetitions": 3,
+    "iterations": 1000,
+    "gpu": "NVIDIA GeForce RTX 5090, 615.78.08",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "base_commit": "bd408347f8b4ae7e53aac2fa916ad0f4a2b62a41",
+    "features": [
+      "clp",
+      "cuda"
+    ],
+    "profile": "release",
+    "cpu_workers": 16
+  }
+}

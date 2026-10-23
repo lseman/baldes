@@ -1,5 +1,5 @@
 use baldes::extensions::pstep::{
-    ColumnGenerationOptions, EnumerationOptions, PricingMethod, Problem,
+    ColumnGenerationOptions, EnumerationOptions, PricingMethod, Problem, TimeWindowProblem,
 };
 use baldes::inputs::{Instance, Rounding};
 use baldes::master::{clp::ClpMaster, LpMaster};
@@ -7,13 +7,14 @@ use std::time::Duration;
 
 const HELP: &str = "Usage: baldes pstep INSTANCE [OPTIONS]
 
-Solve the unlimited-fleet CVRP p-step LP using exact parallel pricing.
+Solve the unlimited-fleet CVRP/VRPTW p-step LP (finite windows are enforced) using exact parallel pricing.
 This command computes a numerical LP bound, not an integer routing solution.
 
 Options:
   --p N                 Arcs per step (default: 2; depot starts may be shorter)
   --threads N           Parallel endpoint/extreme pricing workers (default: up to 8)
-  --pricing METHOD      auto, enumeration or bucket (default: auto)
+  --gpu                 Use CUDA pricing (requires --features cuda)
+  --pricing METHOD      auto, enumeration, bucket or cuda (feature cuda) (default: auto)
   --time SECONDS        Overall solve time limit (default: 300)
   --iterations N        LP solve limit (default: 1000)
   --labels N            Label/extension limit per pricing job (default: 1000000)
@@ -43,6 +44,17 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
             println!("{HELP}");
             return Ok(());
         }
+        if arg == "--gpu" {
+            #[cfg(feature = "cuda")]
+            {
+                options.pricing.method = PricingMethod::Cuda;
+                continue;
+            }
+            #[cfg(not(feature = "cuda"))]
+            {
+                return Err("--gpu requires a build with --features clp,cuda".into());
+            }
+        }
         if arg == "--enumerate" {
             enumerate = true;
             continue;
@@ -66,6 +78,8 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
                     "auto" => PricingMethod::Auto,
                     "enumeration" => PricingMethod::Enumeration,
                     "bucket" => PricingMethod::Bucket,
+                    #[cfg(feature = "cuda")]
+                    "cuda" => PricingMethod::Cuda,
                     _ => return Err(format!("invalid pricing method: {value}")),
                 }
             }
@@ -95,23 +109,38 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
         instance.rounding = mode;
     }
     let problem = Problem::from_instance(&instance).map_err(|e| e.to_string())?;
+    let timed = if instance.has_time_windows() {
+        Some(TimeWindowProblem::from_instance(&instance).map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
     let p = options.pricing.p;
     let threads = options.pricing.threads;
     let pricing_method = options.pricing.method;
-    let result = problem
-        .solve_column_generation(ClpMaster::new().map_err(|e| e.to_string())?, options)
-        .map_err(|e| e.to_string())?;
+    let backend = ClpMaster::new().map_err(|e| e.to_string())?;
+    let result = if let Some(timed) = &timed {
+        timed.solve_column_generation(backend, options)
+    } else {
+        problem.solve_column_generation(backend, options)
+    }
+    .map_err(|e| e.to_string())?;
     let mut enumerated_bound = None;
     if enumerate {
-        let pool = problem
-            .enumerate(EnumerationOptions {
-                p,
-                ..Default::default()
-            })
-            .map_err(|e| e.to_string())?;
-        let mut lp = pool
-            .into_master(ClpMaster::new().map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
+        let limits = EnumerationOptions {
+            p,
+            ..Default::default()
+        };
+        let backend = ClpMaster::new().map_err(|e| e.to_string())?;
+        let mut lp = if let Some(timed) = &timed {
+            timed
+                .enumerate(limits)
+                .and_then(|pool| pool.into_master(backend))
+        } else {
+            problem
+                .enumerate(limits)
+                .and_then(|pool| pool.into_master(backend))
+        }
+        .map_err(|e| e.to_string())?;
         if !lp.solve() {
             return Err("enumerated p-step LP did not solve to optimality".into());
         }
@@ -125,6 +154,8 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
     }
     let report = serde_json::json!({
         "instance": instance.name, "customers": problem.demands.len(), "p": p,
+        "problem": if timed.is_some() { "VRPTW" } else { "CVRP" },
+        "time_windows_enforced": timed.is_some(),
         "requested_threads": threads, "pricing_workers": result.pricing_workers,
         "status": format!("{:?}", result.status), "lp_bound": result.lp_bound,
         "restricted_objective": result.restricted_objective, "enumerated_bound": enumerated_bound,

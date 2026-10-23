@@ -10,8 +10,10 @@ use crate::{incomplete, invalid, Result};
 
 mod master;
 mod pricing;
+mod vrptw;
 pub use master::{ColumnGenerationOptions, ColumnGenerationResult, ColumnGenerationStatus};
 pub use pricing::{PricingMethod, PricingOptions, PricingRound};
+pub use vrptw::{TimeWindowFormulation, TimeWindowProblem, TimedStep};
 
 /// Directed CVRP with start depot 0, customers 1..=n and end depot n+1.
 /// `None` denotes a missing arc; diagonal and depot-invalid arcs are ignored.
