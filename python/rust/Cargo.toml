@@ -2,6 +2,7 @@
 name = "pybaldes"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.85"
 description = "Python bindings for BALDES 2.0 RCSP solver"
 
 [lib]
@@ -17,4 +18,4 @@ multi-time-windows = ["baldes/multi-time-windows"]
 
 [dependencies]
 baldes = { path = "../.." }
-pyo3 = { version = "0.23", features = ["extension-module", "abi3-py39"] }
+pyo3 = { version = "0.30.1", features = ["extension-module", "abi3-py39"] }

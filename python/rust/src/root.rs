@@ -213,7 +213,7 @@ fn _solve_root(
         enumerated_routes: usize,
     }
     let output = py
-        .allow_threads(move || -> baldes::Result<_> {
+        .detach(move || -> baldes::Result<_> {
             let mut graph = if cvrp {
                 instance.capacity_graph(ng, rounding)?
             } else {
