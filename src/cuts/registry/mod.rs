@@ -143,6 +143,8 @@ pub struct FractionalColumn {
 #[derive(Clone, Debug)]
 pub struct SeparationParameters {
     pub max_cuts: usize,
+    /// Maximum cuts touching a vertex through support or memory; zero disables.
+    pub max_per_vertex: usize,
     pub max_triplets: usize,
     pub max_rank: i32,
     pub start_rank: i32,
@@ -162,6 +164,7 @@ impl Default for SeparationParameters {
     fn default() -> Self {
         Self {
             max_cuts: 20,
+            max_per_vertex: 0,
             max_triplets: 10000,
             max_rank: 5,
             start_rank: 0,

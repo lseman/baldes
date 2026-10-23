@@ -1,6 +1,38 @@
 use super::*;
 
 impl Separation {
+    /// Unique support and memory vertices in each prepared graph. Arc memory
+    /// touches both endpoints; repeated arcs/sets count once per cut.
+    pub(super) fn cut_vertices(&self, cut: &NativeCut) -> BTreeSet<(i32, i32)> {
+        let mut touched = BTreeSet::new();
+        for (graph, info) in self.graph_info.iter().enumerate() {
+            let Some(info) = info else { continue };
+            let graph = graph as i32;
+            let sets = if cut.kind == 0 {
+                &info.packing_set_vertices
+            } else {
+                &info.covering_set_vertices
+            };
+            for &set in &cut.set_ids {
+                for &v in &sets[set as usize] {
+                    touched.insert((graph, v));
+                }
+            }
+            if let Some(memory) = cut.memory.get(&graph) {
+                for &id in memory {
+                    if cut.memory_type == 1 {
+                        let incidence = self.incidence(graph);
+                        touched.insert((graph, incidence.arc_tail[id as usize]));
+                        touched.insert((graph, incidence.arc_head[id as usize]));
+                    } else {
+                        touched.insert((graph, id));
+                    }
+                }
+            }
+        }
+        touched
+    }
+
     /// Adds a memory set to the cut (and parallel arcs for arc memory).
     pub(super) fn augment_memory(&self, cut: &mut NativeCut, graph: i32, mem: &BTreeSet<i32>) {
         if mem.is_empty() {

@@ -5,7 +5,7 @@ from pybaldes import Solver
 
 def test_option_discovery_is_supported_canonical_and_feature_specific():
     names = Solver.option_names()
-    assert len(names) in (39, 41)
+    assert len(names) in (40, 42)
     assert len(names) == len(set(names))
     assert all(name.startswith("BALDES") for name in names)
     assert all(Solver.option_support(name)[0] for name in names)

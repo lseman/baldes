@@ -28,6 +28,22 @@ cargo run --release --features clp --bin baldes -- \
   vrptw instances/R101.txt --customers 25 --capacity-cuts --rank1 --time 60
 ```
 
+An experimental rank-one selection budget can limit how many active cuts touch
+any vertex through their support or memory:
+
+```sh
+--rank1 --option BALDESrankOneCutsMaxPerVertex=8
+```
+
+The default is `0` (disabled). Positive values count each cut once per vertex
+and graph, including both endpoints of memory arcs. Existing nonretired cuts
+consume the budget across separation rounds and packing/covering passes.
+Candidates that exceed it are skipped in the separator's existing score order;
+lower-ranked candidates may fill the remaining slots. Existing cuts are retained,
+even if already over budget. This trades potential bound strength for cheaper
+pricing; `8` is an example to benchmark, not a tuned recommendation. The Rust
+registry API exposes the same control as `SeparationParameters::max_per_vertex`.
+
 A complete Rust example:
 
 ```rust

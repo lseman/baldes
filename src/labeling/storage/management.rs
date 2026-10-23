@@ -17,7 +17,6 @@ impl<const D: usize> LabelStorage<D> {
         let crossing = vec![vec![]; buckets.len()];
         Self {
             labels: LabelArena::default(),
-            hot: vec![],
             buckets,
             crossing,
             root: None,
@@ -33,7 +32,6 @@ impl<const D: usize> LabelStorage<D> {
             return;
         }
         self.labels.clear();
-        self.hot.clear();
         for bucket in self.buckets.iter_mut().flatten() {
             bucket.active.clear();
             bucket.hot.truncate(0);
@@ -49,7 +47,6 @@ impl<const D: usize> LabelStorage<D> {
     pub fn retain(&mut self, mut label: StoredLabel<D>) -> usize {
         let id = self.labels.len();
         label.id = id;
-        self.hot.push(HotLabel::of(&label));
         self.labels.push(label);
         id
     }
@@ -58,7 +55,6 @@ impl<const D: usize> LabelStorage<D> {
     pub(crate) fn retain_for<R: ArenaRecord<D>>(&mut self, mut label: StoredLabel<D>) -> usize {
         let id = self.labels.len();
         label.id = id;
-        self.hot.push(HotLabel::of(&label));
         self.labels.push_for::<R>(label);
         id
     }
@@ -72,7 +68,6 @@ impl<const D: usize> LabelStorage<D> {
         local_id: u64,
     ) -> usize {
         let id = self.labels.len();
-        self.hot.push(HotLabel::of(label));
         self.labels.push_borrowed_for::<R>(label, local_id);
         id
     }

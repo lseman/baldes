@@ -105,6 +105,7 @@ impl CutRegistry {
         }
         let params = Parameters {
             max_num_rows: p.max_rank,
+            max_per_vertex: p.max_per_vertex,
             max_num_per_round: p.max_cuts as i32,
             memory_type: p.memory_type as i32,
             arc_memory_type: p.arc_memory_type,
@@ -131,6 +132,43 @@ impl CutRegistry {
         let refs: Vec<&GraphData> = graphs.iter().collect();
         if !state.prepare(&refs, incidences) {
             return Err(invalid("native rank-one separation preparation failed"));
+        }
+        if p.max_per_vertex > 0 {
+            for (index, cut) in self.cuts.iter().enumerate() {
+                if self.retired.contains(&index) {
+                    continue;
+                }
+                for &graph in &graph_ids {
+                    let mut touched = BTreeSet::new();
+                    for v in 0..vertices {
+                        if cut.pricing_weight_for_graph(graph, v) != 0 {
+                            touched.insert(v);
+                        }
+                    }
+                    match cut.memory_kind {
+                        MemoryKind::Vertex => {
+                            for (v, present) in cut.memory_for_graph(graph).into_iter().enumerate()
+                            {
+                                if present {
+                                    touched.insert(v);
+                                }
+                            }
+                        }
+                        MemoryKind::Arc => {
+                            let memory = cut.arc_memory_for_graph(graph);
+                            for arc in &g.arcs {
+                                if memory.contains(&arc.id) {
+                                    touched.insert(arc.tail);
+                                    touched.insert(arc.head);
+                                }
+                            }
+                        }
+                    }
+                    for v in touched {
+                        *state.vertex_cut_load.entry((graph, v as i32)).or_default() += 1;
+                    }
+                }
+            }
         }
         // Matching arc-memory cuts inherit the memories of active cuts from
         // earlier rounds. Translate physical customer IDs back to separator
@@ -309,9 +347,14 @@ impl CutRegistry {
         if !(0..=2).contains(&kind) {
             return Err(invalid("BALDESrankOneCutsTypeToSeparate must be 0, 1 or 2"));
         }
+        let max_per_vertex = options.get("BALDESrankOneCutsMaxPerVertex")?;
+        if max_per_vertex < 0. {
+            return Err(invalid("BALDESrankOneCutsMaxPerVertex must be nonnegative"));
+        }
         let policy = memory_policy(options)?;
         let p = &mut self.parameters;
         p.violation_epsilon = 0.02;
+        p.max_per_vertex = max_per_vertex as usize;
         p.max_triplets = triplets as usize;
         p.local_search_rounds = iterations.min(1e9) as i32;
         p.ls_iterations_negative = raw_iterations < 0.;

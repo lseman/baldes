@@ -630,3 +630,51 @@ fn coupled_continuation_metadata_uses_physical_vertex_in_a_reordered_bucket() {
         assert_eq!(storage.buckets[2][0].active.len(), 2);
     }
 }
+
+#[test]
+fn hot_column_compaction_preserves_all_fields_and_allocations() {
+    for len in 0..=9 {
+        let original: Vec<_> = (0..len).map(|i| (i * 7) % 13).collect();
+        for mask in 0..(1 << len) {
+            let mut columns = HotColumns::<2>::default();
+            for i in 0..len {
+                let x = i as f64;
+                columns.push(HotLabel {
+                    key: x,
+                    cost: -x,
+                    additional_cost: x + 0.5,
+                    resources: [x + 1., x + 2.],
+                    hops: i * 3,
+                    ng: (i * 5) as u16,
+                });
+            }
+            let selected: Vec<_> = (0..len).filter(|&i| mask & (1 << i) != 0).collect();
+            let expected: Vec<_> = selected.iter().map(|&i| columns.get(i)).collect();
+            let retained: Vec<_> = selected.iter().map(|&i| original[i]).collect();
+            let capacities = |c: &HotColumns<2>| {
+                [
+                    c.key.capacity(),
+                    c.cost.capacity(),
+                    c.additional_cost.capacity(),
+                    c.resources[0].capacity(),
+                    c.resources[1].capacity(),
+                    c.hops.capacity(),
+                    c.ng.capacity(),
+                ]
+            };
+            let before = capacities(&columns);
+            columns.retain_subsequence(&original, &retained);
+            assert_eq!(columns.key.len(), expected.len());
+            assert_eq!(capacities(&columns), before);
+            for (i, expected) in expected.iter().enumerate() {
+                let actual = columns.get(i);
+                assert_eq!(actual.key, expected.key);
+                assert_eq!(actual.cost.to_bits(), expected.cost.to_bits());
+                assert_eq!(actual.additional_cost, expected.additional_cost);
+                assert_eq!(actual.resources, expected.resources);
+                assert_eq!(actual.hops, expected.hops);
+                assert_eq!(actual.ng, expected.ng);
+            }
+        }
+    }
+}

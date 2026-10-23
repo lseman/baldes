@@ -133,8 +133,6 @@ impl<const D: usize> LabelBucket<D> {
 #[derive(Clone, Debug)]
 pub struct LabelStorage<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub labels: LabelArena<D>,
-    /// `HotLabel::of(&labels[i])`, kept contiguous so bucket scans stay in cache.
-    pub hot: Vec<HotLabel<D>>,
     pub buckets: Vec<Vec<LabelBucket<D>>>,
     pub crossing: Vec<Vec<usize>>,
     pub root: Option<usize>,

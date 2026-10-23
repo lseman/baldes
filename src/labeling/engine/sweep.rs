@@ -106,13 +106,13 @@ impl<'a, const D: usize> Sweep<'a, D> {
         retained.reserve(active.len());
         let before = self.statistics.other_dominance_checks;
         let hop_limit = controls.max_route_arcs.is_some();
-        for &candidate in active {
+        for (position, &candidate) in active.iter().enumerate() {
             let candidate_label = storage.labels.view(candidate);
             if candidate_label.expanded() {
                 retained.push(candidate);
                 continue;
             }
-            let candidate_hot = &storage.hot[candidate];
+            let candidate_hot = &bucket.hot.get(position);
             let threshold = EPSILON + candidate_hot.key;
             let descriptors = self
                 .ctx
@@ -194,11 +194,8 @@ impl<'a, const D: usize> Sweep<'a, D> {
         }
         let storage = &mut *self.storage;
         let bucket = &mut storage.buckets[id.vertex][id.bucket];
-        // Rebuild in retained order without discarding the column capacities.
-        bucket.hot.truncate(0);
-        for &i in retained.iter() {
-            bucket.hot.push(storage.hot[i]);
-        }
+        // Compact the existing hot columns in the same order as the IDs.
+        bucket.hot.retain_subsequence(&bucket.active, retained);
         // Hand the filtered vector to the bucket and reuse its old allocation
         // as the next bucket's scratch. Surviving labels keep their order.
         std::mem::swap(&mut bucket.active, retained);
@@ -501,10 +498,7 @@ impl<'a, const D: usize> Sweep<'a, D> {
             }
             for id in component {
                 let b = &self.storage.buckets[id.vertex][id.bucket];
-                let mut lower = b
-                    .active
-                    .first()
-                    .map_or(NO_ROUTE_COST, |&i| self.storage.hot[i].key);
+                let mut lower = b.active.first().map_or(NO_ROUTE_COST, |_| b.hot.key[0]);
                 for p in
                     &self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket].predecessors
                 {

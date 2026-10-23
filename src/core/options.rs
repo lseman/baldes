@@ -128,6 +128,12 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         support: OptionSupport::Implemented("src/cuts/registry/rank_one.rs; src/cuts/kpath/mod.rs"),
     },
     OptionInfo {
+        name: "BALDESrankOneCutsMaxPerVertex",
+        kind: OptionKind::Int,
+        default: 0.0,
+        support: OptionSupport::Implemented("src/cuts/registry/rank_one.rs"),
+    },
+    OptionInfo {
         name: "BALDESrankOneCutsMemoryType",
         kind: OptionKind::Int,
         default: 2.0,

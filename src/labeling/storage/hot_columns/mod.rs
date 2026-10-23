@@ -48,6 +48,23 @@ impl<const D: usize> HotColumns<D> {
         self.ng.copy_within(from, to);
     }
 
+    /// Keep a subsequence of the original active IDs, preserving column order
+    /// and allocation capacity. Both slices contain unique IDs in bucket order.
+    pub(crate) fn retain_subsequence(&mut self, original: &[usize], retained: &[usize]) {
+        debug_assert_eq!(original.len(), self.key.len());
+        let mut kept = 0;
+        for (read, &id) in original.iter().enumerate() {
+            if retained.get(kept) == Some(&id) {
+                if kept != read {
+                    self.move_run(read..read + 1, kept);
+                }
+                kept += 1;
+            }
+        }
+        debug_assert_eq!(kept, retained.len());
+        self.truncate(kept);
+    }
+
     pub fn truncate(&mut self, n: usize) {
         self.key.truncate(n);
         self.cost.truncate(n);

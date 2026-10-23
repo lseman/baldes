@@ -140,3 +140,93 @@ fn rank_one_rounds_inherit_only_active_arc_memories() {
         }
     }
 }
+
+#[test]
+fn vertex_budget_includes_active_cuts_and_releases_retired_cuts() {
+    for memory_type in [
+        MemoryType::Vertex,
+        MemoryType::Arc,
+        MemoryType::Default,
+        MemoryType::AllVertices,
+    ] {
+        let mut graph = Graph::<2>::new(5, 1).unwrap();
+        graph.graph_id = 7;
+        for tail in 0..5 {
+            for head in 0..5 {
+                if tail != head {
+                    graph.add_arc(tail, head, 1.).unwrap();
+                }
+            }
+        }
+        let columns: Vec<_> = [vec![1, 2], vec![1, 3], vec![2, 3]]
+            .into_iter()
+            .map(|vertices| FractionalColumn {
+                vertices,
+                value: 0.5,
+                graph_id: 7,
+                enumerated: false,
+            })
+            .collect();
+        let mut registry = CutRegistry::default();
+        registry.parameters.max_rank = 3;
+        registry.parameters.graph_id = 7;
+        registry.parameters.memory_type = memory_type;
+        registry.parameters.max_per_vertex = 1;
+        assert_eq!(registry.separate(&graph, &[3, 1, 2], &columns).unwrap(), 1);
+        let original = registry.cuts[0].clone();
+        assert_eq!(registry.separate(&graph, &[2, 3, 1], &columns).unwrap(), 0);
+        assert_eq!(registry.cuts[0], original);
+        registry.retire(0);
+        assert_eq!(registry.separate(&graph, &[1, 2, 3], &columns).unwrap(), 1);
+    }
+}
+
+#[test]
+fn vertex_budget_option_reaches_default_separator_and_rejects_negative_limits() {
+    let mut graph = Graph::<2>::new(5, 1).unwrap();
+    for tail in 0..5 {
+        for head in 0..5 {
+            if tail != head {
+                graph.add_arc(tail, head, 1.).unwrap();
+            }
+        }
+    }
+    let columns: Vec<_> = [vec![1, 2], vec![1, 3], vec![2, 3]]
+        .into_iter()
+        .map(|vertices| FractionalColumn {
+            vertices,
+            value: 0.5,
+            graph_id: 0,
+            enumerated: false,
+        })
+        .collect();
+    let mut options = Options::default();
+    options.set("BALDESrankOneCutsMaxNumRows", 3.).unwrap();
+    options.set("BALDESrankOneCutsLSnumIterations", 0.).unwrap();
+    options.set("BALDESrankOneCutsMaxPerVertex", 1.).unwrap();
+    let mut registry = CutRegistry::default();
+    registry.separation_phase = 3;
+    assert_eq!(
+        registry
+            .separate_default(&graph, &options, &[1, 2, 3], &columns)
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        registry
+            .separate_default(&graph, &options, &[1, 2, 3], &columns)
+            .unwrap(),
+        0
+    );
+    options.set("BALDESrankOneCutsMaxPerVertex", 0.).unwrap();
+    assert_eq!(
+        registry
+            .separate_default(&graph, &options, &[1, 2, 3], &columns)
+            .unwrap(),
+        1
+    );
+    options.set("BALDESrankOneCutsMaxPerVertex", -1.).unwrap();
+    assert!(registry
+        .separate_default(&graph, &options, &[1, 2, 3], &columns)
+        .is_err());
+}

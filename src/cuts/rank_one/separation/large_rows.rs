@@ -15,6 +15,16 @@ impl Separation {
             cuts.clear();
             return;
         }
+        let limit = self.params.max_per_vertex;
+        let mut loads = BTreeMap::new();
+        if limit > 0 {
+            loads.clone_from(&self.vertex_cut_load);
+            for cut in out.iter() {
+                for key in self.cut_vertices(cut) {
+                    *loads.entry(key).or_default() += 1;
+                }
+            }
+        }
         let mut added = 0;
         for (_, handle) in cuts.ordered() {
             if added >= max_num {
@@ -34,6 +44,18 @@ impl Separation {
                 }
                 if !self.set_cut_memory(&mut cut, columns) {
                     continue;
+                }
+            }
+            if limit > 0 {
+                let touched = self.cut_vertices(&cut);
+                if touched
+                    .iter()
+                    .any(|key| loads.get(key).copied().unwrap_or(0) >= limit)
+                {
+                    continue;
+                }
+                for key in touched {
+                    *loads.entry(key).or_default() += 1;
                 }
             }
             out.push(cut);
@@ -198,3 +220,7 @@ impl Separation {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/cuts/rank_one/vertex_budget.rs"]
+mod vertex_budget_tests;

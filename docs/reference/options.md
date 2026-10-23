@@ -4,7 +4,7 @@
 [Enumerated MIP](../solver/enumerated-mip.md)
 
 The public option names start with `BALDES`. The standard build exposes
-**39 supported pricing options**. Builds with both `clp` and `highs` expose
+**40 supported pricing options**. Builds with both `clp` and `highs` expose
 **two additional enumerated-MIP controls**. Each option below has a consumer;
 some apply only to a particular operation or a configured cut family.
 
@@ -61,6 +61,7 @@ reconfigure its existing separator.
 | `BALDESmaxNGneighbourhoodSize` | Int | `0.0` | [src/master/root/controller/relaxation.rs](../../src/master/root/controller/relaxation.rs) |
 | `BALDESrankOneCutsMaxNumRows` | Int | `5.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |
 | `BALDESrankOneCutsMaxNumPerRound` | Int | `100.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs); [src/cuts/kpath/mod.rs](../../src/cuts/kpath/mod.rs) |
+| `BALDESrankOneCutsMaxPerVertex` | Int | `0.0` | Experimental support/memory overlap budget; zero disables. |
 | `BALDESrankOneCutsMemoryType` | Int | `2.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |
 | `BALDESrankOneCutsLSnumIterations` | Int | `1000.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |
 | `BALDESredCostFixingFalseGap` | Double | `0.0` | [src/pricing/fixing_workflow.rs](../../src/pricing/fixing_workflow.rs) |

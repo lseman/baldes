@@ -182,9 +182,9 @@ impl<const D: usize> LabelingEngine<D> {
         let mut label = label;
         (label.cut_words, label.additional_cost) = self.root_cut_state(vertex);
         let storage = self.storage_mut(forward);
+        let hot = HotLabel::of(&label);
         let id = storage.retain(label);
         storage.root = Some(id);
-        let hot = storage.hot[id];
         storage.buckets[internal][bucket].active.push(id);
         storage.buckets[internal][bucket].hot.push(hot);
         storage.buckets[internal][bucket].next_id = 1;

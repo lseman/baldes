@@ -169,7 +169,7 @@ fn other_bucket_filter_preserves_distinct_presence_and_filters_equal_presence() 
                             .hot
                             .get(i)
                             .key,
-                        sweep.storage.hot[id].key
+                        sweep.storage.labels.view(id).key()
                     );
                 }
                 // A no-change call must not replay scratch labels from the

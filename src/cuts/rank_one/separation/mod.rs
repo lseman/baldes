@@ -238,6 +238,8 @@ pub struct NativeCut {
 pub struct Parameters {
     pub max_num_rows: i32,
     pub max_num_per_round: i32,
+    /// Maximum cuts touching a vertex through support or memory; zero disables.
+    pub max_per_vertex: usize,
     pub memory_type: i32,
     pub arc_memory_type: i32,
     pub sp_dependent_memory: bool,
@@ -256,6 +258,7 @@ impl Default for Parameters {
         Self {
             max_num_rows: 0,
             max_num_per_round: 0,
+            max_per_vertex: 0,
             memory_type: 0,
             arc_memory_type: 0,
             sp_dependent_memory: false,
@@ -390,6 +393,8 @@ pub struct Separation {
     pub cut_memory_type: i32,
     pub current_max_rank: i32,
     pub active_cuts: Vec<NativeCut>,
+    /// Existing registry cuts touching each (graph, vertex), excluding retired cuts.
+    pub vertex_cut_load: BTreeMap<(i32, i32), usize>,
     pub packing_neighbours: Vec<Bits>,
     pub packing_neighbour_lists: Vec<Vec<i32>>,
     pub table_100: Vec<Vec<Vec<i32>>>,
