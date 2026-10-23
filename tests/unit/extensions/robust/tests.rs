@@ -85,10 +85,10 @@ pub(super) fn enumerate(p: &Problem) -> Vec<(Vec<usize>, f64)> {
             path.push(next);
             let mut prefix = path.clone();
             prefix.push(p.depot);
-            let ok = prefix.windows(2).take(path.len() - 1).try_fold(
-                p.initial_state(),
-                |s, w| p.extend(&s, w[0], w[1]),
-            );
+            let ok = prefix
+                .windows(2)
+                .take(path.len() - 1)
+                .try_fold(p.initial_state(), |s, w| p.extend(&s, w[0], w[1]));
             if ok.is_some() {
                 dfs(p, path, out);
             }
@@ -167,7 +167,10 @@ fn worst_case_load_adds_the_largest_demand_deviations() {
         }
         let route = (0..=k).chain([0]).collect::<Vec<_>>();
         let load = p.replay(&route).unwrap().states[k].load.clone();
-        let mut deviations = p.nodes[1..].iter().map(|n| n.demand_deviation).collect::<Vec<_>>();
+        let mut deviations = p.nodes[1..]
+            .iter()
+            .map(|n| n.demand_deviation)
+            .collect::<Vec<_>>();
         deviations.sort_by(|a, b| b.total_cmp(a));
         let nominal = p.nodes.iter().map(|n| n.demand).sum::<f64>();
         for (g, &value) in load.iter().enumerate() {
@@ -195,7 +198,13 @@ fn pricing_matches_enumeration_for_every_budget() {
             let p = random(seed, 6, gq, gt, 0.5);
             let mut rng = Lcg(seed * 31 + gq as u64);
             let duals = (0..p.nodes.len())
-                .map(|i| if i == 0 { 0.0 } else { (80.0 * rng.next()).floor() })
+                .map(|i| {
+                    if i == 0 {
+                        0.0
+                    } else {
+                        (80.0 * rng.next()).floor()
+                    }
+                })
                 .collect::<Vec<_>>();
             let best = enumerate(&p)
                 .iter()
@@ -208,12 +217,18 @@ fn pricing_matches_enumeration_for_every_budget() {
                 };
                 let result = p.price(&duals, 3.0, options).unwrap();
                 assert_eq!(result.status, PricingStatus::Complete);
-                let found = result.routes.first().map_or(f64::INFINITY, |r| r.reduced_cost);
+                let found = result
+                    .routes
+                    .first()
+                    .map_or(f64::INFINITY, |r| r.reduced_cost);
                 assert!(
                     (found - best).abs() < 1e-9 || found == best,
                     "seed {seed} budgets ({gq},{gt}) dominance {dominance}: {found} vs {best}"
                 );
-                assert!(result.routes.windows(2).all(|w| w[0].reduced_cost <= w[1].reduced_cost));
+                assert!(result
+                    .routes
+                    .windows(2)
+                    .all(|w| w[0].reduced_cost <= w[1].reduced_cost));
             }
         }
     }

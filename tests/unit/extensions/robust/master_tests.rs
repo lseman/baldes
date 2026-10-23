@@ -1,6 +1,6 @@
 use super::tests::{enumerate, random};
 use super::*;
-use crate::master::{clp::ClpMaster, LpMaster};
+use crate::master::{clp::ClpMaster, LpMaster as _};
 
 fn solve(p: &Problem) -> (RobustColumnGenerationResult, Vec<f64>) {
     let mut master = RobustMaster::new(p.clone(), ClpMaster::new().unwrap(), 1e4).unwrap();
@@ -8,7 +8,13 @@ fn solve(p: &Problem) -> (RobustColumnGenerationResult, Vec<f64>) {
         .optimize(RobustColumnGenerationOptions::default())
         .unwrap();
     let duals = (0..p.nodes.len())
-        .map(|v| if v == p.depot { 0.0 } else { master.lp().duals()[v - 1] })
+        .map(|v| {
+            if v == p.depot {
+                0.0
+            } else {
+                master.lp().duals()[v - 1]
+            }
+        })
         .collect();
     (result, duals)
 }
@@ -19,8 +25,13 @@ fn column_generation_converges_with_no_negative_route_left() {
         let p = random(seed, 7, 2, 2, 0.25);
         let (result, duals) = solve(&p);
         assert_eq!(result.status, RobustColumnGenerationStatus::Converged);
-        assert!(result.artificial_usage < 1e-9);
-        let minimum = enumerate(&p)
+        // Artificials cover exactly the customers no robust route can serve.
+        let routes = enumerate(&p);
+        let uncovered = (1..p.nodes.len())
+            .filter(|v| !routes.iter().any(|(r, _)| r.contains(v)))
+            .count();
+        assert!((result.artificial_usage - uncovered as f64).abs() < 1e-9);
+        let minimum = routes
             .iter()
             .map(|(r, c)| r.iter().fold(*c, |c, &v| c - duals[v]))
             .fold(f64::INFINITY, f64::min);
@@ -39,15 +50,5 @@ fn lp_bound_grows_with_the_time_budget() {
             assert!(objective >= previous - 1e-6, "seed {seed} gamma {gamma}");
             previous = objective;
         }
-    }
-}
-
-#[test]
-fn diag_coverage() {
-    for seed in 1..5 {
-        let p = random(seed, 7, 2, 2, 0.25);
-        let routes = enumerate(&p);
-        let uncovered: Vec<_> = (1..p.nodes.len()).filter(|v| !routes.iter().any(|(r, _)| r.contains(v))).collect();
-        eprintln!("seed {seed}: uncovered {uncovered:?}");
     }
 }

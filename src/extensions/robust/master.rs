@@ -213,7 +213,7 @@ impl<M: LpMaster> RobustMaster<M> {
             let negative = pricing
                 .routes
                 .first()
-                .map_or(false, |r| r.reduced_cost < -options.reduced_cost_tolerance);
+                .is_some_and(|r| r.reduced_cost < -options.reduced_cost_tolerance);
             result.status = match pricing.status {
                 _ if negative => RobustColumnGenerationStatus::NumericalFailure,
                 PricingStatus::Complete => RobustColumnGenerationStatus::Converged,

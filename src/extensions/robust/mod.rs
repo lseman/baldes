@@ -90,7 +90,9 @@ impl Problem {
             || self.travel.len() != n
             || self.travel.iter().any(|r| r.len() != n)
         {
-            return Err(invalid("invalid robust VRPTW dimensions, depot or capacity"));
+            return Err(invalid(
+                "invalid robust VRPTW dimensions, depot or capacity",
+            ));
         }
         for (i, node) in self.nodes.iter().enumerate() {
             let (open, close) = node.window;
@@ -105,9 +107,13 @@ impl Problem {
                 return Err(invalid("invalid robust VRPTW node data"));
             }
         }
-        if self.travel.iter().flatten().flatten().any(|a| {
-            !nonnegative(a.time) || !nonnegative(a.time_deviation) || !a.cost.is_finite()
-        }) {
+        if self
+            .travel
+            .iter()
+            .flatten()
+            .flatten()
+            .any(|a| !nonnegative(a.time) || !nonnegative(a.time_deviation) || !a.cost.is_finite())
+        {
             return Err(invalid("invalid robust VRPTW travel data"));
         }
         Ok(())
@@ -117,7 +123,9 @@ impl Problem {
     /// t̂_ij = 0.1·trunc(10·αt·t_ij), from nominal data already in `self`.
     pub fn with_relative_deviations(mut self, alpha_demand: f64, alpha_time: f64) -> Result<Self> {
         if !nonnegative(alpha_demand) || !nonnegative(alpha_time) {
-            return Err(invalid("relative deviations must be finite and nonnegative"));
+            return Err(invalid(
+                "relative deviations must be finite and nonnegative",
+            ));
         }
         for (i, node) in self.nodes.iter_mut().enumerate() {
             node.demand_deviation = if i == self.depot {
@@ -201,9 +209,9 @@ impl Problem {
     }
 }
 
-#[cfg(test)]
-#[path = "../../../tests/unit/extensions/robust/tests.rs"]
-mod tests;
 #[cfg(all(test, feature = "clp"))]
 #[path = "../../../tests/unit/extensions/robust/master_tests.rs"]
 mod master_tests;
+#[cfg(test)]
+#[path = "../../../tests/unit/extensions/robust/tests.rs"]
+mod tests;

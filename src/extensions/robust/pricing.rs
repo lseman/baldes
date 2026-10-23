@@ -89,7 +89,7 @@ impl Problem {
             return Err(invalid("invalid robust pricing duals or options"));
         }
         let n = self.nodes.len();
-        let words = n.div_ceil(64);
+        let words = (n + 63) / 64;
         let mut stats = PricingStatistics {
             labels: 1,
             ..Default::default()
