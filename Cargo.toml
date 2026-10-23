@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "baldes"
-version = "2.0.0"
+version = "2.0.1"
 edition = "2021"
 rust-version = "1.70"
 description = "BALDES 2.0: bucket-graph labeling RCSP solver and branch-cut-and-price root, written in Rust"
@@ -40,8 +40,6 @@ simd-avx512 = ["simd"]
 # Clp restricted master and column-generation loop. Builds Clp 1.17.10 and
 # CoinUtils 2.11 from the vendor/ submodules.
 clp = ["dep:cc", "dep:serde", "dep:serde_json"]
-# Experimental C++ batch preflight for two-resource pricing; opt-in pending gains.
-native-pricing = ["clp"]
 # HiGHS LP backend and integer solving (including optional Clp-tree node MIP).
 # Links against the system
 # HiGHS shared library (libhighs.so) or a vendored copy placed in vendor/highs/.
