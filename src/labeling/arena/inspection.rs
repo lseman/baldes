@@ -14,6 +14,18 @@ impl<const D: usize> Deref for LabelArena<D> {
             Records::Compact8(v) => self
                 .inspected
                 .get_or_init(|| v.iter().enumerate().map(|(id, l)| l.unpack(id)).collect()),
+            Records::Auxiliary2(v) => self
+                .inspected
+                .get_or_init(|| v.iter().enumerate().map(|(id, l)| l.unpack(id)).collect()),
+            Records::Auxiliary4(v) => self
+                .inspected
+                .get_or_init(|| v.iter().enumerate().map(|(id, l)| l.unpack(id)).collect()),
+            Records::Auxiliary8(v) => self
+                .inspected
+                .get_or_init(|| v.iter().enumerate().map(|(id, l)| l.unpack(id)).collect()),
+            Records::AuxiliaryFull(v) => self
+                .inspected
+                .get_or_init(|| v.iter().enumerate().map(|(id, l)| l.unpack(id)).collect()),
             Records::Branched(v) => self
                 .inspected
                 .get_or_init(|| v.iter().enumerate().map(|(id, l)| l.unpack(id)).collect()),

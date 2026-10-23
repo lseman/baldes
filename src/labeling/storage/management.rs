@@ -63,3 +63,17 @@ impl<const D: usize> LabelStorage<D> {
         id
     }
 }
+
+impl<const D: usize> LabelStorage<D> {
+    #[inline(never)]
+    pub(crate) fn retain_borrowed_for<R: ArenaRecord<D>>(
+        &mut self,
+        label: &StoredLabel<D>,
+        local_id: u64,
+    ) -> usize {
+        let id = self.labels.len();
+        self.hot.push(HotLabel::of(label));
+        self.labels.push_borrowed_for::<R>(label, local_id);
+        id
+    }
+}

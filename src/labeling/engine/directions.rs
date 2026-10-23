@@ -13,6 +13,9 @@ impl<const D: usize> LabelingEngine<D> {
             phase: self.phase,
             consumption_joins: self.consumption_joins,
             symmetric_costs: &self.symmetric_costs,
+            coupled_costs: self.coupled_costs,
+            coupled_completion: &self.coupled_completion,
+            resource_error: &self.resource_error,
         }
     }
 
@@ -62,6 +65,9 @@ impl<const D: usize> LabelingEngine<D> {
             phase: self.phase,
             consumption_joins: self.consumption_joins,
             symmetric_costs: &self.symmetric_costs,
+            coupled_costs: self.coupled_costs,
+            coupled_completion: &self.coupled_completion,
+            resource_error: &self.resource_error,
         };
         let (storage, other) = if forward {
             (&mut self.forward, &self.backward)
@@ -75,6 +81,8 @@ impl<const D: usize> LabelingEngine<D> {
             statistics: &mut self.statistics,
             extension_checks: &mut self.extension_checks,
             filter_checks: &mut self.filter_checks,
+            filter_scratch: Default::default(),
+            coupled_workspace: Default::default(),
             terminals,
             labels: (&counts.0, &counts.1),
         }
@@ -136,6 +144,9 @@ impl<const D: usize> LabelingEngine<D> {
             phase: self.phase,
             consumption_joins: self.consumption_joins,
             symmetric_costs: &self.symmetric_costs,
+            coupled_costs: self.coupled_costs,
+            coupled_completion: &self.coupled_completion,
+            resource_error: &self.resource_error,
         };
         let vertices = self.extension_checks.len();
         let (mut statistics, mut extension_checks, mut filter_checks) =
@@ -149,6 +160,8 @@ impl<const D: usize> LabelingEngine<D> {
             statistics: &mut self.statistics,
             extension_checks: &mut self.extension_checks,
             filter_checks: &mut self.filter_checks,
+            filter_scratch: Default::default(),
+            coupled_workspace: Default::default(),
             terminals: &mut forward_terminals,
             labels: (&forward_count, &backward_count),
         };
@@ -158,6 +171,8 @@ impl<const D: usize> LabelingEngine<D> {
             statistics: &mut statistics,
             extension_checks: &mut extension_checks,
             filter_checks: &mut filter_checks,
+            filter_scratch: Default::default(),
+            coupled_workspace: Default::default(),
             terminals: &mut backward_terminals,
             labels: (&backward_count, &forward_count),
         };

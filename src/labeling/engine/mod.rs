@@ -1,6 +1,17 @@
 //! Component-ordered forward/backward pricing with typed label storage.
+#[derive(Clone, Debug, Default)]
+struct CoupledCompletion {
+    global: crate::graph::coupled::CoupledStateBounds,
+    buckets: Vec<Vec<crate::graph::coupled::CoupledStateBounds>>,
+    // Own-direction hulls include crossing/archived retained labels too.
+    queries: Vec<Vec<crate::graph::coupled::CoupledStateBounds>>,
+    pairs: Vec<Vec<Option<Vec<crate::graph::coupled::CoupledPairSummary>>>>,
+    identity: Option<std::sync::Arc<()>>,
+}
+
 use super::arena::{
-    ArenaRecord, BranchedLabel, ExtendedLabel, LabelData, LabelRef, OrdinaryLabel, RecordKind,
+    ArenaRecord, AuxiliaryLabel, BranchedLabel, ExtendedLabel, LabelData, LabelRef, OrdinaryLabel,
+    RecordKind,
 };
 use super::pool::SolutionPool;
 
@@ -15,7 +26,7 @@ use crate::graph::ng::PreparedNg;
 use crate::graph::{Graph, ResourceKind};
 use crate::pricing::phases::Phase;
 use crate::{incomplete, invalid, Result};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;
 pub(crate) const RESOURCE_REPLAY_MISMATCH: &str = "reconstructed route violates resource windows";
 #[derive(Clone, Debug)]
@@ -82,6 +93,11 @@ pub struct LabelingEngine<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS 
     extension_checks: Vec<i32>,
     filter_checks: Vec<i32>,
     pub cuts: EngineCuts,
+    coupled_costs: bool,
+    coupled_present: bool,
+    coupled_identity: Option<std::sync::Arc<()>>,
+    coupled_completion: [CoupledCompletion; 2],
+    resource_error: AtomicBool,
 }
 /// Replays a sweep's terminal candidates into the pool, in recorded order.
 fn insert_terminals(
@@ -115,3 +131,6 @@ mod sweep;
 use context::Context;
 
 mod directions;
+
+#[cfg(feature = "native-pricing")]
+mod extension_batch;

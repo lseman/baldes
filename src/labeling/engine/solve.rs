@@ -3,6 +3,8 @@ use super::*;
 impl<const D: usize> LabelingEngine<D> {
     pub fn solve(&mut self, g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
         self.cuts.presence.validate_engine(g.arcs.len())?;
+        self.resource_error.store(false, Ordering::Relaxed);
+        self.coupled_completion = std::array::from_fn(|_| Default::default());
         self.ensure_reversal_costs(g)?;
         if controls.max_columns == 0 || controls.max_labels == 0 {
             return Err(invalid("positive pricing limits required"));
@@ -14,15 +16,25 @@ impl<const D: usize> LabelingEngine<D> {
         self.filter_checks.fill(0);
         self.half_ready = false;
         self.full_ready = false;
-        self.last_costs = g.arcs.iter().map(|a| a.reduced_cost).collect();
+        self.last_costs.clear();
+        self.last_costs
+            .extend(g.arcs.iter().map(|a| a.reduced_cost));
         self.forward
             .reset(self.grid.forward.buckets.iter().map(Vec::len));
         self.backward
             .reset(self.grid.backward.buckets.iter().map(Vec::len));
         let ordinary = !self.has_cuts() && self.branching.resources == 0;
         let branch_only = !self.has_cuts() && self.branching.resources != 0;
-        self.forward.labels.set_mode(ordinary, branch_only);
-        self.backward.labels.set_mode(ordinary, branch_only);
+        self.forward.labels.set_resource_mode(
+            ordinary,
+            branch_only,
+            self.coupled_present || self.cuts.presence.active(),
+        );
+        self.backward.labels.set_resource_mode(
+            ordinary,
+            branch_only,
+            self.coupled_present || self.cuts.presence.active(),
+        );
         self.statistics = Statistics::default();
         self.root(g, true)?;
         if self.runtime_bidirectional() && !self.consumption_joins {
@@ -45,6 +57,7 @@ impl<const D: usize> LabelingEngine<D> {
             self.run_direction(g, true, controls, started, &mut pool)?;
             self.statistics.forward_time = started.elapsed().as_secs_f64();
         }
+        self.refresh_coupled_completion(g);
         // Small heuristic sweeps may perform fewer than 64 extensions and
         // have no concatenation pass. They still consume the call deadline.
         if started.elapsed() >= controls.time_limit {
@@ -58,6 +71,9 @@ impl<const D: usize> LabelingEngine<D> {
             }
             let concatenation_started = Instant::now();
             self.update_unreachable(self.consumption_joins);
+            // Crossing labels share a traversal stack; each traversal resets
+            // its contents while retaining capacity from the previous label.
+            let mut work = Vec::new();
             for internal in 0..self.grid.order.len() {
                 let v = self.grid.order[internal];
                 let mut cutoff = pool.cutoff(v);
@@ -79,10 +95,16 @@ impl<const D: usize> LabelingEngine<D> {
                     };
                     let key =
                         label.key() + self.cuts.knapsack.partial_cost(g, label.resources(), true);
-                    let key = self
-                        .ctx()
-                        .presence_completion_key(key, label.presence_state());
-                    let mut work = vec![(bucket, 0usize)];
+                    let base_key = key;
+                    let key = self.ctx().resource_completion_key(
+                        g,
+                        true,
+                        label.coupled_state(),
+                        label.presence_state(),
+                        key,
+                    );
+                    work.clear();
+                    work.push((bucket, 0usize));
                     while let Some((k, min)) = work.pop() {
                         let row = &self.storage(self.consumption_joins).buckets[internal][k];
                         if self
@@ -92,20 +114,33 @@ impl<const D: usize> LabelingEngine<D> {
                         {
                             continue;
                         }
-                        for &b in &row.active {
-                            let other = self.storage(self.consumption_joins).labels.view(b);
-                            if self.ctx().completion_sum(key, other.key()) >= cutoff {
-                                break;
-                            }
-                            concatenation_tests += 1;
-                            if let Some(cost) = self.ctx().join_cost(g, v, label, other) {
-                                if cost < cutoff
-                                    && controls
-                                        .max_route_arcs
-                                        .is_none_or(|limit| label.hops() + other.hops() <= limit)
-                                {
-                                    pool.insert(v, cost, 0., (Some(f), Some(b)));
-                                    cutoff = pool.cutoff(v);
+                        if let Some(scan_key) = self.ctx().bucket_completion(
+                            g,
+                            true,
+                            label,
+                            base_key,
+                            BucketId {
+                                vertex: internal,
+                                bucket: k,
+                            },
+                            row.hot.key.first().copied(),
+                            cutoff,
+                        ) {
+                            for &b in &row.active {
+                                let other = self.storage(self.consumption_joins).labels.view(b);
+                                if self.ctx().completion_sum(scan_key, other.key()) >= cutoff {
+                                    break;
+                                }
+                                concatenation_tests += 1;
+                                if let Some(cost) = self.ctx().join_cost(g, v, label, other) {
+                                    if cost < cutoff
+                                        && controls.max_route_arcs.is_none_or(|limit| {
+                                            label.hops() + other.hops() <= limit
+                                        })
+                                    {
+                                        pool.insert(v, cost, 0., (Some(f), Some(b)));
+                                        cutoff = pool.cutoff(v);
+                                    }
                                 }
                             }
                         }
@@ -194,6 +229,9 @@ impl<const D: usize> LabelingEngine<D> {
                 columns.push(route);
             }
         }
+        if self.resource_error.load(Ordering::Relaxed) {
+            return Err(incomplete("coupled resource arithmetic or state failure"));
+        }
         Ok(PricingResult {
             columns,
             minimum_reduced_cost: minimum,
@@ -245,6 +283,7 @@ impl<const D: usize> LabelingEngine<D> {
         }
         self.half_ready = false;
         self.full_ready = false;
+        self.coupled_completion = std::array::from_fn(|_| Default::default());
         let saved = self.controls.clone();
         let phase = self.phase;
         self.controls.direction_flags = 2;
@@ -271,6 +310,12 @@ impl<const D: usize> LabelingEngine<D> {
             self.run_direction(g, false, controls, started, &mut pool)?;
             self.update_unreachable(true);
             self.update_unreachable(false);
+            if self.resource_error.load(Ordering::Relaxed) {
+                return Err(incomplete(
+                    "coupled resource continuation arithmetic failure",
+                ));
+            }
+            self.refresh_coupled_completion(g);
             self.full_ready = true;
             Ok(())
         })();

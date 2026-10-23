@@ -151,6 +151,7 @@ fn equality_dominance_retains_binary_interval_endpoints() {
         ng: 0,
         branch_state: None,
         presence_state: None,
+        coupled_state: None,
         parent: None,
         arc: None,
         hops: 1,
@@ -316,6 +317,7 @@ fn owned_insertion_moves_branch_state_and_borrowed_insertion_clones_on_acceptanc
         ng: 0,
         branch_state: Some(Box::new([5; 16])),
         presence_state: None,
+        coupled_state: None,
         parent: None,
         arc: None,
         hops: 1,
@@ -388,6 +390,7 @@ fn general_dominance_checks_all_fixed_array_coordinates() {
         ng: 0,
         branch_state: None,
         presence_state: None,
+        coupled_state: None,
         parent: None,
         arc: None,
         hops: 1,
@@ -466,6 +469,7 @@ fn presence_states_survive_arena_promotion_and_prevent_false_dominance() {
         ng: 0,
         branch_state: None,
         presence_state: Some(vec![state].into_boxed_slice()),
+        coupled_state: None,
         parent: None,
         arc: None,
         hops: 1,
@@ -550,5 +554,79 @@ fn presence_states_survive_arena_promotion_and_prevent_false_dominance() {
                 &Some(vec![a.clone()].into_boxed_slice())
             );
         }
+    }
+}
+
+#[test]
+fn coupled_continuation_metadata_uses_physical_vertex_in_a_reordered_bucket() {
+    use crate::graph::coupled::{CoupledResource, PiecewiseLinearFunction};
+    use crate::graph::Window;
+    let mut graph = Graph::<2>::new(4, 0).unwrap();
+    for (tail, head, cost) in [(0, 1, -0.5), (0, 1, 0.), (1, 3, 0.)] {
+        graph.add_arc(tail, head, cost).unwrap();
+    }
+    graph
+        .set_coupled_resources(&[CoupledResource::IntervalCost {
+            initial: Window::new(0., 1.).unwrap(),
+            bounds: Window::new(0., 1.).unwrap(),
+            increments: vec![0.; 3],
+            functions: vec![
+                PiecewiseLinearFunction::new(vec![[0., 0.], [1., 1.]]).unwrap(),
+                PiecewiseLinearFunction::new(vec![[0., 0.], [1., 0.]]).unwrap(),
+                PiecewiseLinearFunction::new(vec![[1., 0.], [2., 0.]]).unwrap(),
+            ],
+        }])
+        .unwrap();
+    let kernel = graph.coupled_kernel().unwrap();
+    let root = kernel.root(true);
+    let make = |arc: usize| {
+        let (mut state, _) = kernel.extend(&root, arc, true).unwrap().unwrap();
+        let (cost, original_cost) = state
+            .account_extension(&root, graph.arcs[arc].reduced_cost, graph.arcs[arc].cost)
+            .unwrap();
+        StoredLabel {
+            id: 0,
+            local_id: 0,
+            // Internal slot 2 represents physical vertex 1. Physical vertex 2
+            // is isolated and would incorrectly certify a frozen continuation.
+            bucket: BucketId {
+                vertex: 2,
+                bucket: 0,
+            },
+            vertex: 1,
+            cost,
+            original_cost,
+            resources: [0.; 2].into(),
+            ng: 0,
+            branch_state: None,
+            presence_state: None,
+            coupled_state: Some(state),
+            parent: None,
+            arc: Some(arc),
+            hops: 1,
+            expanded: false,
+            cut_words: [0; LIMITED_WORDS],
+            additional_cost: 0.,
+            half_potential: 0.,
+        }
+    };
+    for order in [[0, 1], [1, 0]] {
+        let mut storage = LabelStorage::new([1; 4]);
+        let mut stats = Statistics::default();
+        for arc in order {
+            assert!(storage.insert(
+                &graph,
+                make(arc),
+                true,
+                InsertionTest::Full,
+                10,
+                false,
+                &[],
+                &mut stats
+            ));
+        }
+        // At x=1 the initially cheaper rising front finishes at +0.5;
+        // the initially more expensive flat front finishes at zero.
+        assert_eq!(storage.buckets[2][0].active.len(), 2);
     }
 }

@@ -8,6 +8,16 @@ impl<'a, const D: usize> From<&'a StoredLabel<D>> for LabelRef<'a, D> {
 }
 
 impl<'a, const D: usize> LabelRef<'a, D> {
+    pub fn coupled_state(self) -> Option<&'a crate::graph::coupled::CoupledLabelState> {
+        match self {
+            Self::Auxiliary2(l, _) => l.coupled_state.as_deref(),
+            Self::Auxiliary4(l, _) => l.coupled_state.as_deref(),
+            Self::Auxiliary8(l, _) => l.coupled_state.as_deref(),
+            Self::AuxiliaryFull(l, _) => l.coupled_state.as_deref(),
+            Self::Full(l) => l.coupled_state.as_deref(),
+            _ => None,
+        }
+    }
     view_accessors!(vertex: usize, cost: f64, original_cost: f64, additional_cost: f64, ng: u16, resources: &'a [f64],
         branch_state: &'a BranchState, presence_state: &'a crate::cuts::soft_conflicts::LabelState, hops: usize,
         cut_words: &'a [u32], key: f64);
@@ -20,6 +30,10 @@ impl<'a, const D: usize> LabelRef<'a, D> {
             Self::Compact2(l, _) => l.base.expanded,
             Self::Compact4(l, _) => l.base.expanded,
             Self::Compact8(l, _) => l.base.expanded,
+            Self::Auxiliary2(l, _) => l.base.expanded,
+            Self::Auxiliary4(l, _) => l.base.expanded,
+            Self::Auxiliary8(l, _) => l.base.expanded,
+            Self::AuxiliaryFull(l, _) => l.base.expanded,
             Self::Full(l) => l.expanded,
         }
     }
@@ -50,6 +64,22 @@ impl<'a, const D: usize> LabelRef<'a, D> {
                 vertex: l.base.bucket_vertex as usize,
                 bucket: l.base.bucket as usize,
             },
+            Self::Auxiliary2(l, _) => BucketId {
+                vertex: l.base.bucket_vertex as usize,
+                bucket: l.base.bucket as usize,
+            },
+            Self::Auxiliary4(l, _) => BucketId {
+                vertex: l.base.bucket_vertex as usize,
+                bucket: l.base.bucket as usize,
+            },
+            Self::Auxiliary8(l, _) => BucketId {
+                vertex: l.base.bucket_vertex as usize,
+                bucket: l.base.bucket as usize,
+            },
+            Self::AuxiliaryFull(l, _) => BucketId {
+                vertex: l.base.bucket_vertex as usize,
+                bucket: l.base.bucket as usize,
+            },
             Self::Full(l) => l.bucket,
         }
     }
@@ -62,6 +92,10 @@ impl<'a, const D: usize> LabelRef<'a, D> {
             Self::Compact2(l, _) => (l.base.parent != NONE).then_some(l.base.parent as usize),
             Self::Compact4(l, _) => (l.base.parent != NONE).then_some(l.base.parent as usize),
             Self::Compact8(l, _) => (l.base.parent != NONE).then_some(l.base.parent as usize),
+            Self::Auxiliary2(l, _) => (l.base.parent != NONE).then_some(l.base.parent as usize),
+            Self::Auxiliary4(l, _) => (l.base.parent != NONE).then_some(l.base.parent as usize),
+            Self::Auxiliary8(l, _) => (l.base.parent != NONE).then_some(l.base.parent as usize),
+            Self::AuxiliaryFull(l, _) => (l.base.parent != NONE).then_some(l.base.parent as usize),
             Self::Full(l) => l.parent,
         }
     }
@@ -74,6 +108,10 @@ impl<'a, const D: usize> LabelRef<'a, D> {
             Self::Compact2(l, _) => (l.base.arc != NONE).then_some(l.base.arc as usize),
             Self::Compact4(l, _) => (l.base.arc != NONE).then_some(l.base.arc as usize),
             Self::Compact8(l, _) => (l.base.arc != NONE).then_some(l.base.arc as usize),
+            Self::Auxiliary2(l, _) => (l.base.arc != NONE).then_some(l.base.arc as usize),
+            Self::Auxiliary4(l, _) => (l.base.arc != NONE).then_some(l.base.arc as usize),
+            Self::Auxiliary8(l, _) => (l.base.arc != NONE).then_some(l.base.arc as usize),
+            Self::AuxiliaryFull(l, _) => (l.base.arc != NONE).then_some(l.base.arc as usize),
             Self::Full(l) => l.arc,
         }
     }
@@ -85,6 +123,10 @@ impl<'a, const D: usize> LabelRef<'a, D> {
             Self::Compact2(l, id) => l.unpack(id),
             Self::Compact4(l, id) => l.unpack(id),
             Self::Compact8(l, id) => l.unpack(id),
+            Self::Auxiliary2(l, id) => l.unpack(id),
+            Self::Auxiliary4(l, id) => l.unpack(id),
+            Self::Auxiliary8(l, id) => l.unpack(id),
+            Self::AuxiliaryFull(l, id) => l.unpack(id),
             Self::Full(l) => l.clone(),
         }
     }

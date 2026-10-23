@@ -148,6 +148,7 @@ pub struct PricingResult {
 }
 #[derive(Clone, Debug)]
 struct Label<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    coupled_state: Option<Box<crate::graph::coupled::CoupledLabelState>>,
     vertex: usize,
     cost: f64,
     original_cost: f64,
@@ -206,8 +207,24 @@ pub(crate) fn extend_resource<const D: usize>(
 }
 
 fn dominates<const D: usize>(g: &Graph<D>, a: &Label<D>, b: &Label<D>, hop_limit: bool) -> bool {
+    // This reference label type has no cut/additional-cost component. The
+    // coupled gate below checks independently tracked scalar/resource order;
+    // the cut-bearing engine additionally requires identical cut words.
+    let Some(penalty) = g.coupled_dominance_penalty(
+        a.coupled_state.as_deref(),
+        b.coupled_state.as_deref(),
+        true,
+        a.vertex,
+    ) else {
+        return false;
+    };
+    let cost = if penalty == 0. {
+        a.cost
+    } else {
+        crate::core::rounding::add_up(a.cost, penalty).unwrap_or(f64::INFINITY)
+    };
     if a.vertex != b.vertex
-        || a.cost - b.cost >= EPSILON
+        || cost - b.cost >= EPSILON
         || a.ng & !b.ng != 0
         || (hop_limit && a.hops > b.hops)
     {
@@ -271,6 +288,7 @@ pub fn reference_price<const D: usize>(g: &Graph<D>, controls: &Controls) -> Res
         }
     }
     let root = Label {
+        coupled_state: g.coupled_kernel().map(|k| k.root(true)),
         vertex: g.source,
         cost: 0.,
         original_cost: 0.,
@@ -336,10 +354,29 @@ pub fn reference_price<const D: usize>(g: &Graph<D>, controls: &Controls) -> Res
             let Some(memory) = ng.forward[index].extend(from.ng, ng.vertex_bits[a.head]) else {
                 continue;
             };
+            let (coupled_state, cost, original_cost) = if let Some(kernel) = g.coupled_kernel() {
+                let state = from
+                    .coupled_state
+                    .as_deref()
+                    .ok_or_else(|| invalid("missing coupled reference state"))?;
+                let Some((mut next_state, _)) = kernel.extend(state, index, true)? else {
+                    continue;
+                };
+                let (cost, original_cost) =
+                    next_state.account_extension(state, a.reduced_cost, a.cost)?;
+                (Some(next_state), cost, original_cost)
+            } else {
+                (
+                    None,
+                    from.cost + a.reduced_cost,
+                    from.original_cost + a.cost,
+                )
+            };
             let next = Label {
+                coupled_state,
                 vertex: a.head,
-                cost: from.cost + a.reduced_cost,
-                original_cost: from.original_cost + a.cost,
+                cost,
+                original_cost,
                 resources,
                 ng: memory,
                 parent: Some(id),

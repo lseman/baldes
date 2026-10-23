@@ -9,6 +9,10 @@ impl<const D: usize> LabelArena<D> {
             Records::Compact2(v) => v.len(),
             Records::Compact4(v) => v.len(),
             Records::Compact8(v) => v.len(),
+            Records::Auxiliary2(v) => v.len(),
+            Records::Auxiliary4(v) => v.len(),
+            Records::Auxiliary8(v) => v.len(),
+            Records::AuxiliaryFull(v) => v.len(),
             Records::Full(v) => v.len(),
         }
     }
@@ -25,6 +29,10 @@ impl<const D: usize> LabelArena<D> {
             Records::Compact2(v) => v.capacity(),
             Records::Compact4(v) => v.capacity(),
             Records::Compact8(v) => v.capacity(),
+            Records::Auxiliary2(v) => v.capacity(),
+            Records::Auxiliary4(v) => v.capacity(),
+            Records::Auxiliary8(v) => v.capacity(),
+            Records::AuxiliaryFull(v) => v.capacity(),
             Records::Full(v) => v.capacity(),
         }
     }
@@ -40,6 +48,12 @@ impl<const D: usize> LabelArena<D> {
             Records::Compact2(v) => v.capacity() * std::mem::size_of::<ExtendedLabel<2, D>>(),
             Records::Compact4(v) => v.capacity() * std::mem::size_of::<ExtendedLabel<4, D>>(),
             Records::Compact8(v) => v.capacity() * std::mem::size_of::<ExtendedLabel<8, D>>(),
+            Records::Auxiliary2(v) => v.capacity() * std::mem::size_of::<AuxiliaryLabel<2, D>>(),
+            Records::Auxiliary4(v) => v.capacity() * std::mem::size_of::<AuxiliaryLabel<4, D>>(),
+            Records::Auxiliary8(v) => v.capacity() * std::mem::size_of::<AuxiliaryLabel<8, D>>(),
+            Records::AuxiliaryFull(v) => {
+                v.capacity() * std::mem::size_of::<AuxiliaryLabel<LIMITED_WORDS, D>>()
+            }
             Records::Full(v) => v.capacity() * std::mem::size_of::<StoredLabel<D>>(),
         };
         records
@@ -57,6 +71,10 @@ impl<const D: usize> LabelArena<D> {
             Records::Compact2(_) => RecordKind::Compact2,
             Records::Compact4(_) => RecordKind::Compact4,
             Records::Compact8(_) => RecordKind::Compact8,
+            Records::Auxiliary2(_) => RecordKind::Auxiliary2,
+            Records::Auxiliary4(_) => RecordKind::Auxiliary4,
+            Records::Auxiliary8(_) => RecordKind::Auxiliary8,
+            Records::AuxiliaryFull(_) => RecordKind::AuxiliaryFull,
             Records::Full(_) => RecordKind::Full,
         }
     }
@@ -134,6 +152,10 @@ impl<const D: usize> LabelArena<D> {
             Records::Compact2(v) => LabelRef::Compact2(&v[id], id),
             Records::Compact4(v) => LabelRef::Compact4(&v[id], id),
             Records::Compact8(v) => LabelRef::Compact8(&v[id], id),
+            Records::Auxiliary2(v) => LabelRef::Auxiliary2(&v[id], id),
+            Records::Auxiliary4(v) => LabelRef::Auxiliary4(&v[id], id),
+            Records::Auxiliary8(v) => LabelRef::Auxiliary8(&v[id], id),
+            Records::AuxiliaryFull(v) => LabelRef::AuxiliaryFull(&v[id], id),
             Records::Full(v) => (&v[id]).into(),
         }
     }

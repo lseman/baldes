@@ -6,7 +6,7 @@ pub use super::arena::LabelArena;
 /// labels with heap state into the arena after acceptance.
 pub(crate) trait LabelInput<const D: usize> {
     fn label(&self) -> &StoredLabel<D>;
-    fn into_label(self) -> StoredLabel<D>;
+    fn retain_for<R: ArenaRecord<D>>(self, storage: &mut LabelStorage<D>, local_id: u64) -> usize;
 }
 impl<const D: usize> LabelInput<D> for StoredLabel<D> {
     #[inline(always)]
@@ -14,8 +14,13 @@ impl<const D: usize> LabelInput<D> for StoredLabel<D> {
         self
     }
     #[inline(always)]
-    fn into_label(self) -> StoredLabel<D> {
-        self
+    fn retain_for<R: ArenaRecord<D>>(
+        mut self,
+        storage: &mut LabelStorage<D>,
+        local_id: u64,
+    ) -> usize {
+        self.local_id = local_id;
+        storage.retain_for::<R>(self)
     }
 }
 impl<const D: usize> LabelInput<D> for &StoredLabel<D> {
@@ -24,8 +29,8 @@ impl<const D: usize> LabelInput<D> for &StoredLabel<D> {
         self
     }
     #[inline(always)]
-    fn into_label(self) -> StoredLabel<D> {
-        self.clone()
+    fn retain_for<R: ArenaRecord<D>>(self, storage: &mut LabelStorage<D>, local_id: u64) -> usize {
+        storage.retain_borrowed_for::<R>(self, local_id)
     }
 }
 use super::{Statistics, EPSILON};
@@ -52,6 +57,7 @@ pub struct StoredLabel<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> 
     pub branch_state: crate::pricing::restrictions::BranchState,
     /// Full original-variable incidence for presence-based nonlinear rows.
     pub presence_state: crate::cuts::soft_conflicts::LabelState,
+    pub coupled_state: Option<Box<crate::graph::coupled::CoupledLabelState>>,
     pub parent: Option<usize>,
     pub arc: Option<usize>,
     pub hops: usize,

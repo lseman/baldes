@@ -15,6 +15,7 @@ impl<const D: usize> LabelingEngine<D> {
         inputs: Vec<LimitedInput>,
         kpath: Vec<LimitedKPathInput>,
     ) -> bool {
+        self.coupled_completion = std::array::from_fn(|_| Default::default());
         self.half_ready = false;
         self.full_ready = false;
         let mut cuts = EngineCuts {
@@ -97,6 +98,7 @@ impl<const D: usize> LabelingEngine<D> {
 
     /// update_lim_mem_duals: same cut rows, new duals. Labels are discarded.
     pub fn update_cut_duals(&mut self, inputs: Vec<LimitedInput>, kpath: Vec<LimitedKPathInput>) {
+        self.coupled_completion = std::array::from_fn(|_| Default::default());
         self.half_ready = false;
         self.full_ready = false;
         state::update_duals(
@@ -118,9 +120,10 @@ impl<const D: usize> LabelingEngine<D> {
         if !self.cuts.knapsack.active {
             return;
         }
-        let components = self.grid.direction(forward).components.clone();
-        for component in components {
-            for id in component {
+        let component_count = self.grid.direction(forward).components.len();
+        for component in 0..component_count {
+            for index in 0..self.grid.direction(forward).components[component].len() {
+                let id = self.grid.direction(forward).components[component][index];
                 let bucket = &self.storage(forward).buckets[id.vertex][id.bucket];
                 let mut lower = NO_ROUTE_COST;
                 for &index in &bucket.active {
@@ -175,6 +178,7 @@ impl<const D: usize> LabelingEngine<D> {
             jump_arcs: true,
             labels_per_bucket: i64::MAX,
         };
+        self.coupled_completion = std::array::from_fn(|_| Default::default());
         self.half_ready = false;
         self.full_ready = false;
         self.last_costs = g.arcs.iter().map(|a| a.reduced_cost).collect();
@@ -184,8 +188,16 @@ impl<const D: usize> LabelingEngine<D> {
             .reset(self.grid.backward.buckets.iter().map(Vec::len));
         let ordinary = !self.has_cuts() && self.branching.resources == 0;
         let branch_only = !self.has_cuts() && self.branching.resources != 0;
-        self.forward.labels.set_mode(ordinary, branch_only);
-        self.backward.labels.set_mode(ordinary, branch_only);
+        self.forward.labels.set_resource_mode(
+            ordinary,
+            branch_only,
+            self.coupled_present || self.cuts.presence.active(),
+        );
+        self.backward.labels.set_resource_mode(
+            ordinary,
+            branch_only,
+            self.coupled_present || self.cuts.presence.active(),
+        );
         self.statistics = Statistics::default();
         self.extension_checks.fill(0);
         self.filter_checks.fill(0);
@@ -206,6 +218,10 @@ impl<const D: usize> LabelingEngine<D> {
             if !self.consumption_joins {
                 self.update_unreachable(false);
             }
+            if self.resource_error.load(Ordering::Relaxed) {
+                return Err(incomplete("coupled resource completion arithmetic failure"));
+            }
+            self.refresh_coupled_completion(g);
             self.full_ready = true;
             Ok(())
         })();

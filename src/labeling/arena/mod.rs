@@ -53,6 +53,19 @@ pub(crate) struct BranchedLabel<const D: usize = { crate::DEFAULT_RESOURCE_DIMEN
     branch_state: BranchState,
 }
 
+/// Compact metadata with owned non-scalar payloads. Active cut words are sized
+/// independently; coupling no longer forces every label into a wide record.
+#[derive(Clone, Debug)]
+pub(crate) struct AuxiliaryLabel<const WORDS: usize, const D: usize> {
+    base: OrdinaryLabel<D>,
+    cut_words: [u32; WORDS],
+    additional_cost: f64,
+    half_potential: f64,
+    branch_state: BranchState,
+    presence_state: crate::cuts::soft_conflicts::LabelState,
+    coupled_state: Option<Box<crate::graph::coupled::CoupledLabelState>>,
+}
+
 /// Accessors specialize to direct field reads for ordinary and full records.
 /// The hot kernels use this trait statically, without virtual calls.
 pub(crate) trait LabelData {
@@ -65,6 +78,9 @@ pub(crate) trait LabelData {
     fn presence_state(&self) -> &crate::cuts::soft_conflicts::LabelState {
         &EMPTY_PRESENCE
     }
+    fn coupled_state(&self) -> Option<&crate::graph::coupled::CoupledLabelState> {
+        None
+    }
     fn hops(&self) -> usize;
     fn cut_words(&self) -> &[u32];
     fn additional_cost(&self) -> f64;
@@ -75,9 +91,17 @@ pub(crate) trait LabelData {
 pub(crate) trait ArenaRecord<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>:
     LabelData + 'static
 {
+    const OWNS_AUXILIARY: bool = false;
     fn get(arena: &LabelArena<D>, id: usize) -> Option<&Self>;
     fn expanded(&self) -> bool;
     fn try_push(_arena: &mut LabelArena<D>, _label: &mut StoredLabel<D>) -> bool {
+        false
+    }
+    fn try_push_borrowed(
+        _arena: &mut LabelArena<D>,
+        _label: &StoredLabel<D>,
+        _local_id: u64,
+    ) -> bool {
         false
     }
     #[inline(always)]
@@ -97,6 +121,10 @@ pub(crate) enum RecordKind {
     Compact2,
     Compact4,
     Compact8,
+    Auxiliary2,
+    Auxiliary4,
+    Auxiliary8,
+    AuxiliaryFull,
     Full,
 }
 
@@ -109,6 +137,10 @@ pub(crate) enum LabelRef<'a, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIO
     Compact2(&'a ExtendedLabel<2, D>, usize),
     Compact4(&'a ExtendedLabel<4, D>, usize),
     Compact8(&'a ExtendedLabel<8, D>, usize),
+    Auxiliary2(&'a AuxiliaryLabel<2, D>, usize),
+    Auxiliary4(&'a AuxiliaryLabel<4, D>, usize),
+    Auxiliary8(&'a AuxiliaryLabel<8, D>, usize),
+    AuxiliaryFull(&'a AuxiliaryLabel<LIMITED_WORDS, D>, usize),
     Full(&'a StoredLabel<D>),
 }
 
@@ -116,7 +148,7 @@ macro_rules! view_accessors {
     ($($name:ident: $ty:ty),* $(,)?) => {$(
         #[inline(always)]
         pub fn $name(self) -> $ty {
-            match self { Self::Ordinary(l, _) => l.$name(), Self::Extended(l, _) => l.$name(), Self::Branched(l, _) => l.$name(), Self::Compact2(l, _) => l.$name(), Self::Compact4(l, _) => l.$name(), Self::Compact8(l, _) => l.$name(),  Self::Full(l) => l.$name() }
+            match self { Self::Ordinary(l, _) => l.$name(), Self::Extended(l, _) => l.$name(), Self::Branched(l, _) => l.$name(), Self::Compact2(l, _) => l.$name(), Self::Compact4(l, _) => l.$name(), Self::Compact8(l, _) => l.$name(), Self::Auxiliary2(l, _) => l.$name(), Self::Auxiliary4(l, _) => l.$name(), Self::Auxiliary8(l, _) => l.$name(), Self::AuxiliaryFull(l, _) => l.$name(),   Self::Full(l) => l.$name() }
         }
     )*};
 }
@@ -129,6 +161,10 @@ enum Records<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     Compact2(Vec<ExtendedLabel<2, D>>),
     Compact4(Vec<ExtendedLabel<4, D>>),
     Compact8(Vec<ExtendedLabel<8, D>>),
+    Auxiliary2(Vec<AuxiliaryLabel<2, D>>),
+    Auxiliary4(Vec<AuxiliaryLabel<4, D>>),
+    Auxiliary8(Vec<AuxiliaryLabel<8, D>>),
+    AuxiliaryFull(Vec<AuxiliaryLabel<LIMITED_WORDS, D>>),
     Full(Vec<StoredLabel<D>>),
 }
 
@@ -171,3 +207,7 @@ mod view;
 mod access;
 mod allocation;
 mod expansion;
+
+#[cfg(test)]
+#[path = "../../../tests/unit/labeling/arena/auxiliary_tests.rs"]
+mod auxiliary_tests;

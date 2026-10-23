@@ -12,6 +12,9 @@ pub(super) struct Context<'a, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSI
     pub(super) phase: Phase,
     pub(super) consumption_joins: bool,
     pub(super) symmetric_costs: &'a [f64],
+    pub(super) coupled_costs: bool,
+    pub(super) coupled_completion: &'a [CoupledCompletion; 2],
+    pub(super) resource_error: &'a AtomicBool,
 }
 impl<'a, const D: usize> Context<'a, D> {
     pub(super) fn has_cuts(&self) -> bool {
@@ -83,6 +86,18 @@ impl<'a, const D: usize> Context<'a, D> {
             (LabelRef::Compact8(f, _), LabelRef::Compact8(b, _)) => {
                 self.concatenate_records(g, vertex, f, b)
             }
+            (LabelRef::Auxiliary2(f, _), LabelRef::Auxiliary2(b, _)) => {
+                self.concatenate_records(g, vertex, f, b)
+            }
+            (LabelRef::Auxiliary4(f, _), LabelRef::Auxiliary4(b, _)) => {
+                self.concatenate_records(g, vertex, f, b)
+            }
+            (LabelRef::Auxiliary8(f, _), LabelRef::Auxiliary8(b, _)) => {
+                self.concatenate_records(g, vertex, f, b)
+            }
+            (LabelRef::AuxiliaryFull(f, _), LabelRef::AuxiliaryFull(b, _)) => {
+                self.concatenate_records(g, vertex, f, b)
+            }
             (LabelRef::Full(f), LabelRef::Full(b)) => self.concatenate_records(g, vertex, f, b),
             _ => self.concatenate_records(g, vertex, &f, &b),
         }
@@ -100,11 +115,64 @@ impl<'a, const D: usize> Context<'a, D> {
         {
             return (false, 0.);
         }
-        let cost = (f.cost() + b.cost())
+        let coupled_cost = if let Some(kernel) = g.coupled_kernel() {
+            let (Some(f), Some(b)) = (f.coupled_state(), b.coupled_state()) else {
+                self.resource_error.store(true, Ordering::Relaxed);
+                return (false, 0.);
+            };
+            match if kernel.has_costs() && !self.consumption_joins {
+                kernel.join_resource_objective(f, b)
+            } else if self.consumption_joins {
+                kernel.join_reversed(f, b)
+            } else {
+                kernel.join(f, b)
+            } {
+                Ok(Some(cost)) => cost,
+                Ok(None) => return (false, 0.),
+                Err(_) => {
+                    self.resource_error.store(true, Ordering::Relaxed);
+                    return (false, 0.);
+                }
+            }
+        } else {
+            0.
+        };
+        // Scalar arc sums and resource objectives have distinct rounding
+        // histories. Never recover the scalar base by subtracting minima from
+        // mixed keys, or combine independently minimized halves before replay.
+        let scalar_cost = if let Some(kernel) = g
+            .coupled_kernel()
+            .filter(|kernel| kernel.has_costs() && !self.consumption_joins)
+        {
+            let (Some(f_state), Some(b_state)) = (f.coupled_state(), b.coupled_state()) else {
+                self.resource_error.store(true, Ordering::Relaxed);
+                return (false, 0.);
+            };
+            let Some(mut base) = f_state.scalar_reduced_cost() else {
+                self.resource_error.store(true, Ordering::Relaxed);
+                return (false, 0.);
+            };
+            for arc in kernel.suffix_arcs(b_state) {
+                base += g.arcs[arc].reduced_cost;
+                if !base.is_finite() {
+                    self.resource_error.store(true, Ordering::Relaxed);
+                    return (false, 0.);
+                }
+            }
+            base
+        } else {
+            f.cost() + b.cost()
+        };
+        let cost = scalar_cost
+            + coupled_cost
             + self
                 .cuts
                 .knapsack
                 .join_cost(g, f.resources(), b.resources(), self.consumption_joins);
+        if g.has_coupled_resources() && !cost.is_finite() {
+            self.resource_error.store(true, Ordering::Relaxed);
+            return (false, 0.);
+        }
         let mut overlap = f.ng() & b.ng();
         if self.consumption_joins {
             for (bit, e) in self.ng.local_elements[vertex].iter().enumerate() {
@@ -159,7 +227,11 @@ impl<'a, const D: usize> Context<'a, D> {
     /// the backward root, or the forward one for symmetric joins; backward: the
     /// forward root at the source). The join's result is not tested.
     pub(super) fn terminal_cost(&self, g: &Graph<D>, forward: bool, label: &StoredLabel<D>) -> f64 {
-        if !self.has_cuts() && !self.cuts.knapsack.active && !self.cuts.presence.active() {
+        if !g.has_coupled_resources()
+            && !self.has_cuts()
+            && !self.cuts.knapsack.active
+            && !self.cuts.presence.active()
+        {
             return label.cost;
         }
         let root_forward = !forward || self.consumption_joins;
@@ -170,17 +242,22 @@ impl<'a, const D: usize> Context<'a, D> {
         root.ng = self.ng.vertex_bits[root_vertex];
         root.branch_state = None;
         root.presence_state = self.cuts.presence.empty_state();
+        root.coupled_state = g.coupled_kernel().map(|k| k.root(root_forward));
         for (r, _) in g.resources.iter().enumerate() {
             root.resources[r] = g
                 .root_resource(r, root_forward)
                 .expect("validated terminal resource");
         }
         (root.cut_words, root.additional_cost) = self.root_cut_state(root_vertex);
-        if forward {
-            self.concatenate(g, g.sink, label.into(), (&root).into()).1
+        let (feasible, cost) = if forward {
+            self.concatenate(g, g.sink, label.into(), (&root).into())
         } else {
             self.concatenate(g, g.source, (&root).into(), label.into())
-                .1
+        };
+        if feasible {
+            cost
+        } else {
+            f64::INFINITY
         }
     }
     #[inline(always)]
@@ -224,6 +301,18 @@ impl<'a, const D: usize> Context<'a, D> {
             LabelRef::Compact8(label, id) => {
                 self.extend_record::<BRANCHING, _>(g, forward, arc, label, id)
             }
+            LabelRef::Auxiliary2(label, id) => {
+                self.extend_record::<BRANCHING, _>(g, forward, arc, label, id)
+            }
+            LabelRef::Auxiliary4(label, id) => {
+                self.extend_record::<BRANCHING, _>(g, forward, arc, label, id)
+            }
+            LabelRef::Auxiliary8(label, id) => {
+                self.extend_record::<BRANCHING, _>(g, forward, arc, label, id)
+            }
+            LabelRef::AuxiliaryFull(label, id) => {
+                self.extend_record::<BRANCHING, _>(g, forward, arc, label, id)
+            }
             LabelRef::Full(label) => {
                 self.extend_record::<BRANCHING, _>(g, forward, arc, label, label.id)
             }
@@ -253,6 +342,34 @@ impl<'a, const D: usize> Context<'a, D> {
         from: &L,
         id: usize,
     ) -> Option<(StoredLabel<D>, crate::graph::ResourceValues<D>)> {
+        self.extend_record_with_workspace::<BRANCHING, CUTS, L>(
+            g,
+            forward,
+            arc,
+            from,
+            id,
+            &mut Default::default(),
+            None,
+        )
+    }
+    /// Hot sweeps retain one private workspace across physical extensions.
+    /// A native preflight may supply resources; all remaining state updates
+    /// share the same path and retain the original insertion order.
+    #[inline(always)]
+    pub(super) fn extend_record_with_workspace<
+        const BRANCHING: bool,
+        const CUTS: bool,
+        L: LabelData,
+    >(
+        &self,
+        g: &Graph<D>,
+        forward: bool,
+        arc: &BucketArc,
+        from: &L,
+        id: usize,
+        workspace: &mut crate::graph::coupled::CoupledWorkspace,
+        prepared: Option<crate::graph::ResourceValues<D>>,
+    ) -> Option<(StoredLabel<D>, crate::graph::ResourceValues<D>)> {
         let physical = &g.arcs[arc.physical];
         if self
             .forbidden_arcs
@@ -263,25 +380,48 @@ impl<'a, const D: usize> Context<'a, D> {
         {
             return None;
         }
-        let mut q = crate::graph::ResourceValues::<D>::from_slice(from.resources());
-        if self.phase.jump_arcs {
-            if let Some(jump) = arc.jump {
-                let point = self.grid.direction(forward).corners[arc.from.vertex][jump];
-                for (axis, &slot) in self.grid.resource_slots.iter().enumerate() {
-                    if g.resources[slot] == ResourceKind::Equality {
-                        continue;
+        let resources = if let Some(resources) = prepared {
+            resources
+        } else {
+            let mut q = crate::graph::ResourceValues::<D>::from_slice(from.resources());
+            if self.phase.jump_arcs {
+                if let Some(jump) = arc.jump {
+                    let point = self.grid.direction(forward).corners[arc.from.vertex][jump];
+                    for (axis, &slot) in self.grid.resource_slots.iter().enumerate() {
+                        if g.resources[slot] == ResourceKind::Equality {
+                            continue;
+                        }
+                        q[slot] = if forward {
+                            q[slot].max(point[axis])
+                        } else {
+                            q[slot].min(point[axis])
+                        };
                     }
-                    q[slot] = if forward {
-                        q[slot].max(point[axis])
-                    } else {
-                        q[slot].min(point[axis])
-                    };
                 }
             }
-        }
-        let resources: crate::graph::ResourceValues<D> =
             crate::labeling::ScalarResourceKernel::<D>::extend_active(g, physical, q.0, forward)?
-                .into();
+                .into()
+        };
+        let (mut coupled_state, coupled_cost) = if let Some(kernel) = g.coupled_kernel() {
+            let Some(state) = from.coupled_state() else {
+                self.resource_error.store(true, Ordering::Relaxed);
+                return None;
+            };
+            match if self.consumption_joins {
+                kernel.extend_reversal_with_workspace(state, arc.physical, forward, workspace)
+            } else {
+                kernel.extend_with_workspace(state, arc.physical, forward, workspace)
+            } {
+                Ok(Some((state, cost))) => (Some(state), cost),
+                Ok(None) => return None,
+                Err(_) => {
+                    self.resource_error.store(true, Ordering::Relaxed);
+                    return None;
+                }
+            }
+        } else {
+            (None, 0.)
+        };
         let vertex = if forward {
             physical.head
         } else {
@@ -328,6 +468,35 @@ impl<'a, const D: usize> Context<'a, D> {
         } else {
             from.presence_state().clone()
         };
+        let reduced_increment = self
+            .symmetric_costs
+            .get(arc.physical)
+            .copied()
+            .unwrap_or(physical.reduced_cost);
+        let (cost, original_cost) = if let Some(next) = coupled_state.as_mut() {
+            let Some(previous) = from.coupled_state() else {
+                self.resource_error.store(true, Ordering::Relaxed);
+                return None;
+            };
+            // Arc/cut support changes above retain their separate additional
+            // accumulator. Only physical scalar costs enter this baseline.
+            match next.account_extension(previous, reduced_increment, physical.cost) {
+                Ok(costs) => costs,
+                Err(_) => {
+                    self.resource_error.store(true, Ordering::Relaxed);
+                    return None;
+                }
+            }
+        } else {
+            (
+                reduced_increment + from.cost() + coupled_cost,
+                physical.cost + from.original_cost() + coupled_cost,
+            )
+        };
+        if g.has_coupled_resources() && (!cost.is_finite() || !original_cost.is_finite()) {
+            self.resource_error.store(true, Ordering::Relaxed);
+            return None;
+        }
         Some((
             StoredLabel {
                 id: 0,
@@ -337,14 +506,9 @@ impl<'a, const D: usize> Context<'a, D> {
                     bucket,
                 },
                 vertex,
-                cost: self
-                    .symmetric_costs
-                    .get(arc.physical)
-                    .copied()
-                    .unwrap_or(physical.reduced_cost)
-                    + from.cost(),
-                original_cost: physical.cost + from.original_cost(),
-                resources: resources.clone(),
+                cost,
+                original_cost,
+                resources,
                 ng,
                 // Like NG state, a crossing label excludes its meeting vertex.
                 branch_state: if BRANCHING {
@@ -353,6 +517,7 @@ impl<'a, const D: usize> Context<'a, D> {
                     None
                 },
                 presence_state,
+                coupled_state,
                 parent: Some(id),
                 arc: Some(arc.physical),
                 hops: from.hops() + 1,

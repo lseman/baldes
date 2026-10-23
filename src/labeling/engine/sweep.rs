@@ -1,4 +1,12 @@
 use super::*;
+
+/// Scratch belongs to one direction's sweep. No labels or search outcomes are
+/// cached across calls; only allocation capacity is reused between buckets.
+#[derive(Default)]
+pub(super) struct FilterScratch {
+    retained: Vec<usize>,
+    work: Vec<(usize, usize, i32, bool)>,
+}
 /// One direction's labeling sweep: the shared read-only context, that
 /// direction's storage, and private counters merged afterwards. Terminal pool
 /// candidates are recorded and replayed in sweep order, so a forward and a
@@ -9,6 +17,9 @@ pub(super) struct Sweep<'a, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSION
     pub(super) statistics: &'a mut Statistics,
     pub(super) extension_checks: &'a mut [i32],
     pub(super) filter_checks: &'a mut [i32],
+    pub(super) filter_scratch: FilterScratch,
+    /// Owned by this direction; scratch never escapes into retained labels.
+    pub(super) coupled_workspace: crate::graph::coupled::CoupledWorkspace,
     /// (group, cost, label) of each terminal candidate, in insertion order.
     pub(super) terminals: &'a mut Vec<(usize, f64, usize)>,
     /// This direction's and the other direction's label counts, for the
@@ -72,8 +83,9 @@ impl<'a, const D: usize> Sweep<'a, D> {
         if !self.ctx.controls.filter_other_buckets {
             return;
         }
-        let graph = &self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket];
-        let depth = self.ctx.grid.direction(forward).depth[id.vertex];
+        let direction = self.ctx.grid.direction(forward);
+        let graph = &direction.buckets[id.vertex][id.bucket];
+        let depth = direction.depth[id.vertex];
         if depth == 0 {
             return;
         }
@@ -89,31 +101,35 @@ impl<'a, const D: usize> Sweep<'a, D> {
             return;
         }
         let active = &bucket.active;
-        let mut retained = Vec::with_capacity(active.len());
+        let FilterScratch { retained, work } = &mut self.filter_scratch;
+        retained.clear();
+        retained.reserve(active.len());
         let before = self.statistics.other_dominance_checks;
-        let mut work = vec![];
+        let hop_limit = controls.max_route_arcs.is_some();
         for &candidate in active {
-            if self.storage.labels.view(candidate).expanded() {
+            let candidate_label = storage.labels.view(candidate);
+            if candidate_label.expanded() {
                 retained.push(candidate);
                 continue;
             }
-            let threshold = EPSILON + self.storage.hot[candidate].key;
+            let candidate_hot = &storage.hot[candidate];
+            let threshold = EPSILON + candidate_hot.key;
+            let descriptors = self
+                .ctx
+                .cuts
+                .info
+                .vertices
+                .get(candidate_label.vertex())
+                .map_or(&[][..], |v| v.dominance.as_slice());
+            let candidate_presence = candidate_label.presence_state();
+            let candidate_branch = candidate_label.branch_state();
+            let candidate_coupled = candidate_label.coupled_state();
             work.clear();
             work.push((id.bucket, 0usize, depth, false));
             let mut dominated = false;
             while let Some((k, min, remaining, check)) = work.pop() {
                 self.statistics.other_bucket_searches += 1;
                 if check {
-                    let storage = &*self.storage;
-                    let candidate_label = storage.labels.view(candidate);
-                    let descriptors = self
-                        .ctx
-                        .cuts
-                        .info
-                        .vertices
-                        .get(candidate_label.vertex())
-                        .map_or(&[][..], |v| v.dominance.as_slice());
-                    let candidate_hot = &storage.hot[candidate];
                     let bucket = &storage.buckets[id.vertex][k];
                     for (j, &other) in bucket.active.iter().enumerate() {
                         let hot = &bucket.hot.get(j);
@@ -121,25 +137,21 @@ impl<'a, const D: usize> Sweep<'a, D> {
                             break;
                         }
                         self.statistics.other_dominance_checks += 1;
-                        if storage.labels.view(other).presence_state()
-                            == candidate_label.presence_state()
-                            && (!BRANCHING
-                                || storage.labels.view(other).branch_state()
-                                    == candidate_label.branch_state())
-                            && LabelStorage::dominates_hot_slices(
+                        let other_label = storage.labels.view(other);
+                        if other_label.presence_state() == candidate_presence
+                            && (!BRANCHING || other_label.branch_state() == candidate_branch)
+                            && LabelStorage::dominates_coupled_slices(
                                 g,
                                 hot,
                                 candidate_hot,
                                 forward,
+                                candidate_label.vertex(),
                                 InsertionTest::Full,
-                                controls.max_route_arcs.is_some(),
+                                hop_limit,
                                 descriptors,
-                                || {
-                                    (
-                                        storage.labels.view(other).cut_words(),
-                                        candidate_label.cut_words(),
-                                    )
-                                },
+                                other_label.coupled_state(),
+                                candidate_coupled,
+                                || (other_label.cut_words(), candidate_label.cut_words()),
                             )
                         {
                             dominated = true;
@@ -155,16 +167,14 @@ impl<'a, const D: usize> Sweep<'a, D> {
                 }
                 // The predecessors before the first one under `min`, pushed
                 // last first so that they are searched in order.
-                let predecessors =
-                    &self.ctx.grid.direction(forward).buckets[id.vertex][k].predecessors;
+                let predecessors = &direction.buckets[id.vertex][k].predecessors;
                 let count = predecessors
                     .iter()
                     .take_while(|p| p.bucket.bucket >= min)
                     .count();
                 for p in predecessors[..count].iter().rev() {
-                    let previous =
-                        &self.ctx.grid.direction(forward).buckets[id.vertex][p.bucket.bucket];
-                    let lower = self.storage.buckets[id.vertex][p.bucket.bucket].lower_cost;
+                    let previous = &direction.buckets[id.vertex][p.bucket.bucket];
+                    let lower = storage.buckets[id.vertex][p.bucket.bucket].lower_cost;
                     if threshold > lower || previous.component == component {
                         work.push((p.bucket.bucket, min.max(p.minimum), remaining - 1, true));
                     }
@@ -186,10 +196,13 @@ impl<'a, const D: usize> Sweep<'a, D> {
         let bucket = &mut storage.buckets[id.vertex][id.bucket];
         // Rebuild in retained order without discarding the column capacities.
         bucket.hot.truncate(0);
-        for &i in &retained {
+        for &i in retained.iter() {
             bucket.hot.push(storage.hot[i]);
         }
-        bucket.active = retained;
+        // Hand the filtered vector to the bucket and reuse its old allocation
+        // as the next bucket's scratch. Surviving labels keep their order.
+        std::mem::swap(&mut bucket.active, retained);
+        retained.clear();
     }
     pub(super) fn run_direction(
         &mut self,
@@ -245,6 +258,22 @@ impl<'a, const D: usize> Sweep<'a, D> {
                 .run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel<4, D>>(g, controls, started),
             RecordKind::Compact8 => self
                 .run_records::<BRANCHING, FORWARD, CUTS, ExtendedLabel<8, D>>(g, controls, started),
+            RecordKind::Auxiliary2 => self
+                .run_records::<BRANCHING, FORWARD, CUTS, AuxiliaryLabel<2, D>>(
+                    g, controls, started,
+                ),
+            RecordKind::Auxiliary4 => self
+                .run_records::<BRANCHING, FORWARD, CUTS, AuxiliaryLabel<4, D>>(
+                    g, controls, started,
+                ),
+            RecordKind::Auxiliary8 => self
+                .run_records::<BRANCHING, FORWARD, CUTS, AuxiliaryLabel<8, D>>(
+                    g, controls, started,
+                ),
+            RecordKind::AuxiliaryFull => self
+                .run_records::<BRANCHING, FORWARD, CUTS, AuxiliaryLabel<LIMITED_WORDS, D>>(
+                    g, controls, started,
+                ),
             RecordKind::Full => {
                 self.run_records::<BRANCHING, FORWARD, CUTS, StoredLabel<D>>(g, controls, started)
             }
@@ -276,6 +305,11 @@ impl<'a, const D: usize> Sweep<'a, D> {
         // preserves the expansion order while insertions mutate storage.
         let mut labels = Vec::new();
         let mut pending = Vec::new();
+        let prefilter_labels = controls.max_labels == usize::MAX;
+        #[cfg(feature = "native-pricing")]
+        let mut batch = extension_batch::ExtensionBatch::default();
+        #[cfg(feature = "native-pricing")]
+        let batch_supported = prefilter_labels && extension_batch::ExtensionBatch::supported(g);
         for component in components {
             loop {
                 let mut repeat = false;
@@ -294,7 +328,38 @@ impl<'a, const D: usize> Sweep<'a, D> {
                     // Same-bucket extensions go to `pending`, so this bucket's
                     // active list is fixed for the whole arc loop.
                     labels.clear();
-                    labels.extend_from_slice(&self.storage.buckets[id.vertex][id.bucket].active);
+                    if prefilter_labels {
+                        // Eligibility cannot change during the arc loop: same-bucket
+                        // insertions are deferred and expansion happens afterwards.
+                        // Filter once instead of testing every label on every arc.
+                        for &index in &self.storage.buckets[id.vertex][id.bucket].active {
+                            let eligible = if let Some(from) = R::get(&self.storage.labels, index) {
+                                !from.expanded()
+                                    && controls
+                                        .max_route_arcs
+                                        .is_none_or(|limit| from.hops() < limit)
+                            } else {
+                                let from = self.storage.labels.wide_record(index);
+                                !from.expanded
+                                    && controls
+                                        .max_route_arcs
+                                        .is_none_or(|limit| from.hops < limit)
+                            };
+                            if eligible {
+                                labels.push(index);
+                            }
+                        }
+                    } else {
+                        // Preserve per-record budget checks before eligibility.
+                        labels
+                            .extend_from_slice(&self.storage.buckets[id.vertex][id.bucket].active);
+                    }
+                    #[cfg(feature = "native-pricing")]
+                    let use_batch = batch_supported && labels.len() >= 32;
+                    #[cfg(feature = "native-pricing")]
+                    if use_batch {
+                        batch.snapshot(self.storage, &labels);
+                    }
                     for k in 0..arc_count {
                         let arc = self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket]
                             .arcs[k]
@@ -304,14 +369,18 @@ impl<'a, const D: usize> Sweep<'a, D> {
                         {
                             continue;
                         }
-                        for &index in &labels {
+                        #[cfg(feature = "native-pricing")]
+                        if use_batch {
+                            batch.run(self.ctx, g, &arc, forward);
+                        }
+                        for (_position, &index) in labels.iter().enumerate() {
                             clock = clock.wrapping_add(1);
                             if clock % 64 == 0 && started.elapsed() >= controls.time_limit {
                                 return Err(incomplete("pricing hard time limit exceeded"));
                             }
                             // usize::MAX denotes an unlimited label budget. In that
                             // case neither direction needs to publish or read counts.
-                            if controls.max_labels != usize::MAX {
+                            if !prefilter_labels {
                                 let own = self.storage.labels.len();
                                 self.labels.0.store(own, Ordering::Relaxed);
                                 if own + self.labels.1.load(Ordering::Relaxed)
@@ -320,41 +389,65 @@ impl<'a, const D: usize> Sweep<'a, D> {
                                     return Err(incomplete("pricing label limit exceeded"));
                                 }
                             }
-                            let (from_vertex, extension) =
-                                if let Some(from) = R::get(&self.storage.labels, index) {
-                                    if from.expanded()
-                                        || controls
-                                            .max_route_arcs
-                                            .is_some_and(|limit| from.hops() >= limit)
-                                    {
-                                        continue;
-                                    }
-                                    (
-                                        from.vertex(),
-                                        self.ctx.extend_record_with_cuts::<BRANCHING, CUTS, _>(
-                                            g,
-                                            forward,
-                                            &arc,
-                                            from,
-                                            from.ancestry_id(index),
-                                        ),
-                                    )
-                                } else {
-                                    let from = self.storage.labels.wide_record(index);
-                                    if from.expanded
-                                        || controls
-                                            .max_route_arcs
-                                            .is_some_and(|limit| from.hops >= limit)
-                                    {
-                                        continue;
-                                    }
-                                    (
-                                        from.vertex,
-                                        self.ctx.extend_record_with_cuts::<BRANCHING, CUTS, _>(
-                                            g, forward, &arc, from, from.id,
-                                        ),
-                                    )
+                            #[cfg(feature = "native-pricing")]
+                            let prepared = if use_batch {
+                                let Some(resources) = batch.resources::<D>(_position) else {
+                                    continue;
                                 };
+                                Some(resources)
+                            } else {
+                                None
+                            };
+                            #[cfg(not(feature = "native-pricing"))]
+                            let prepared: Option<
+                                crate::graph::ResourceValues<D>,
+                            > = None;
+                            let (from_vertex, extension) = if let Some(from) =
+                                R::get(&self.storage.labels, index)
+                            {
+                                if !prefilter_labels
+                                    && (from.expanded()
+                                        || controls
+                                            .max_route_arcs
+                                            .is_some_and(|limit| from.hops() >= limit))
+                                {
+                                    continue;
+                                }
+                                (
+                                    from.vertex(),
+                                    self.ctx.extend_record_with_workspace::<BRANCHING, CUTS, _>(
+                                        g,
+                                        forward,
+                                        &arc,
+                                        from,
+                                        from.ancestry_id(index),
+                                        &mut self.coupled_workspace,
+                                        prepared,
+                                    ),
+                                )
+                            } else {
+                                let from = self.storage.labels.wide_record(index);
+                                if !prefilter_labels
+                                    && (from.expanded
+                                        || controls
+                                            .max_route_arcs
+                                            .is_some_and(|limit| from.hops >= limit))
+                                {
+                                    continue;
+                                }
+                                (
+                                    from.vertex,
+                                    self.ctx.extend_record_with_workspace::<BRANCHING, CUTS, _>(
+                                        g,
+                                        forward,
+                                        &arc,
+                                        from,
+                                        from.id,
+                                        &mut self.coupled_workspace,
+                                        prepared,
+                                    ),
+                                )
+                            };
                             let Some((mut label, resources)) = extension else {
                                 continue;
                             };
@@ -406,7 +499,7 @@ impl<'a, const D: usize> Sweep<'a, D> {
                                 .component
                                 == self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket]
                                     .component;
-                            let inserted = if BRANCHING {
+                            let inserted = if BRANCHING || R::OWNS_AUXILIARY {
                                 self.insert::<BRANCHING, R, _>(g, forward, label, hot, controls)
                             } else {
                                 self.insert::<BRANCHING, R, _>(g, forward, &label, hot, controls)
@@ -421,7 +514,7 @@ impl<'a, const D: usize> Sweep<'a, D> {
                         .labels
                         .expand(&self.storage.buckets[id.vertex][id.bucket].active);
                     for (label, hot) in pending.drain(..) {
-                        let inserted = if BRANCHING {
+                        let inserted = if BRANCHING || R::OWNS_AUXILIARY {
                             self.insert::<BRANCHING, R, _>(g, forward, label, hot, controls)
                         } else {
                             self.insert::<BRANCHING, R, _>(g, forward, &label, hot, controls)

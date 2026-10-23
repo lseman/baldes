@@ -58,6 +58,9 @@ impl<const D: usize> LabelStorage<D> {
     ) -> bool {
         let label = input.label();
         let b = label.bucket;
+        // Bucket IDs use the internal ordering; continuation metadata uses
+        // physical graph vertices, retained independently by the label.
+        let physical_vertex = label.vertex;
         let labels = &self.labels;
         let bucket = &mut self.buckets[b.vertex][b.bucket];
         // Native single-label phases retain the cheapest prefix, regardless of
@@ -75,9 +78,7 @@ impl<const D: usize> LabelStorage<D> {
             bucket.next_id += 1;
             bucket.active.clear();
             bucket.hot.truncate(0);
-            let mut kept_label = input.into_label();
-            kept_label.local_id = local_id;
-            let id = self.retain_for::<R>(kept_label);
+            let id = input.retain_for::<R>(self, local_id);
             let bucket = &mut self.buckets[b.vertex][b.bucket];
             bucket.active.push(id);
             bucket.hot.push(candidate);
@@ -111,14 +112,17 @@ impl<const D: usize> LabelStorage<D> {
             let hot = bucket.hot.get(position);
             if labels.presence_for::<R>(previous) == &label.presence_state
                 && (!BRANCHING || labels.branch_for::<R>(previous) == &label.branch_state)
-                && Self::dominates_hot_slices(
+                && Self::dominates_coupled_slices(
                     g,
                     &hot,
                     &candidate,
                     forward,
+                    physical_vertex,
                     test,
                     hop_limit,
                     cuts,
+                    labels.view(previous).coupled_state(),
+                    label.coupled_state.as_deref(),
                     || (labels.words_for::<R>(previous), &label.cut_words),
                 )
             {
@@ -133,9 +137,7 @@ impl<const D: usize> LabelStorage<D> {
         }
         let local_id = bucket.next_id;
         bucket.next_id += 1;
-        let mut kept_label = input.into_label();
-        kept_label.local_id = local_id;
-        let inserted = self.retain_for::<R>(kept_label);
+        let inserted = input.retain_for::<R>(self, local_id);
         let labels = &self.labels;
         let bucket = &mut self.buckets[b.vertex][b.bucket];
         bucket.active.insert(position, inserted);
@@ -173,14 +175,17 @@ impl<const D: usize> LabelStorage<D> {
             let hot = bucket.hot.get(next);
             if labels.presence_for::<R>(inserted) == labels.presence_for::<R>(id)
                 && (!BRANCHING || labels.branch_for::<R>(inserted) == labels.branch_for::<R>(id))
-                && Self::dominates_hot_slices(
+                && Self::dominates_coupled_slices(
                     g,
                     &candidate,
                     &hot,
                     forward,
+                    physical_vertex,
                     test,
                     hop_limit,
                     cuts,
+                    labels.view(inserted).coupled_state(),
+                    labels.view(id).coupled_state(),
                     || (labels.words_for::<R>(inserted), labels.words_for::<R>(id)),
                 )
             {

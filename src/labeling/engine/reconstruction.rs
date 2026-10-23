@@ -85,6 +85,9 @@ impl<const D: usize> LabelingEngine<D> {
         if nodes.last().copied() != Some(g.sink as i32) {
             return Err(invalid("labeling predecessor chain does not reach sink"));
         }
+        original_cost += g
+            .coupled_path_cost(&arcs)?
+            .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
         Ok(Some(Route {
             nodes,
             arcs: arcs.into_iter().map(|i| g.arcs[i].id).collect(),

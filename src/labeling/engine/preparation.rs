@@ -24,6 +24,11 @@ impl<const D: usize> LabelingEngine<D> {
             extension_checks: vec![0; self.extension_checks.len()],
             filter_checks: vec![0; self.filter_checks.len()],
             cuts: self.cuts.clone(),
+            coupled_costs: self.coupled_costs,
+            coupled_present: self.coupled_present,
+            coupled_identity: self.coupled_identity.clone(),
+            coupled_completion: std::array::from_fn(|_| Default::default()),
+            resource_error: AtomicBool::new(false),
         }
     }
 
@@ -37,6 +42,8 @@ impl<const D: usize> LabelingEngine<D> {
         )?;
         let reverse = crate::graph::symmetry::reverse_arcs(g).unwrap_or_default();
         let consumption_joins = controls.bidirectional
+            && g.coupled_kernel()
+                .is_none_or(|k| !g.resources.is_empty() && k.reversal_eligible(&reverse))
             && controls.use_symmetric_execution
             && !reverse.is_empty()
             && crate::graph::symmetry::consumption_symmetric(g, &grid, &reverse);
@@ -45,7 +52,7 @@ impl<const D: usize> LabelingEngine<D> {
             grid.middle = (grid.lower[0][0] + grid.upper[grid.order.len() - 1][0]) * 0.5;
             for v in 0..grid.forward.buckets.len() {
                 for k in 0..grid.forward.buckets[v].len() {
-                    let arcs = grid.forward.buckets[v][k].arcs.clone();
+                    let arcs = &grid.forward.buckets[v][k].arcs;
                     let flags: Vec<_> = arcs.iter().map(|a| grid.flags(g, true, a)).collect();
                     for (a, flags) in grid.forward.buckets[v][k].arcs.iter_mut().zip(flags) {
                         a.flags = flags;
@@ -79,6 +86,11 @@ impl<const D: usize> LabelingEngine<D> {
             extension_checks: vec![0; g.vertices.len()],
             filter_checks: vec![0; g.vertices.len()],
             cuts: EngineCuts::default(),
+            coupled_costs: g.coupled_kernel().is_some_and(|k| k.has_costs()),
+            coupled_present: g.has_coupled_resources(),
+            coupled_identity: g.coupled_kernel().map(|k| k.cache_identity().clone()),
+            coupled_completion: std::array::from_fn(|_| Default::default()),
+            resource_error: AtomicBool::new(false),
         })
     }
 
@@ -147,6 +159,13 @@ impl<const D: usize> LabelingEngine<D> {
             ng: self.ng.vertex_bits[vertex],
             branch_state: None,
             presence_state: self.cuts.presence.empty_state(),
+            coupled_state: g.coupled_kernel().map(|k| {
+                if self.consumption_joins {
+                    k.reversal_root(forward)
+                } else {
+                    k.root(forward)
+                }
+            }),
             parent: None,
             arc: None,
             hops: 0,
@@ -185,10 +204,23 @@ impl<const D: usize> LabelingEngine<D> {
     /// Refresh conservative cost potentials after dual changes. Costs with
     /// nonzero reversal cycles require ordinary directional labeling.
     pub(super) fn ensure_reversal_costs(&mut self, g: &Graph<D>) -> Result<()> {
-        if !self.consumption_joins {
+        let same_resources = match (&self.coupled_identity, g.coupled_kernel()) {
+            (None, None) => true,
+            (Some(id), Some(kernel)) => std::sync::Arc::ptr_eq(id, kernel.cache_identity()),
+            _ => false,
+        };
+        if same_resources && !self.consumption_joins {
             return Ok(());
         }
-        if !self.cuts.presence.active() {
+        if same_resources
+            && !self.cuts.presence.active()
+            && g.coupled_kernel()
+                .is_none_or(|k| k.reversal_eligible(&self.reverse))
+            && self.reverse.iter().enumerate().all(|(i, &r)| {
+                self.forbidden_arcs.get(i).copied().unwrap_or(false)
+                    == self.forbidden_arcs.get(r).copied().unwrap_or(false)
+            })
+        {
             if let Some(costs) = crate::graph::symmetry::reversal_costs(g, &self.reverse) {
                 self.symmetric_costs = costs;
                 return Ok(());

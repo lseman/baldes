@@ -46,6 +46,34 @@ impl<const D: usize> LabelArena<D> {
                     v[id].base.expanded = true;
                 }
             }
+            Records::Auxiliary2(v) => {
+                self.inspected.take();
+                for &id in ids {
+                    count += (!v[id].base.expanded) as usize;
+                    v[id].base.expanded = true;
+                }
+            }
+            Records::Auxiliary4(v) => {
+                self.inspected.take();
+                for &id in ids {
+                    count += (!v[id].base.expanded) as usize;
+                    v[id].base.expanded = true;
+                }
+            }
+            Records::Auxiliary8(v) => {
+                self.inspected.take();
+                for &id in ids {
+                    count += (!v[id].base.expanded) as usize;
+                    v[id].base.expanded = true;
+                }
+            }
+            Records::AuxiliaryFull(v) => {
+                self.inspected.take();
+                for &id in ids {
+                    count += (!v[id].base.expanded) as usize;
+                    v[id].base.expanded = true;
+                }
+            }
             Records::Full(v) => {
                 for &id in ids {
                     count += (!v[id].expanded) as usize;
@@ -101,6 +129,34 @@ impl<const D: usize> LabelArena<D> {
                     }
                 }
             }
+            Records::Auxiliary2(v) => {
+                for label in v {
+                    if predicate(&label.base.resources) {
+                        label.base.expanded = false;
+                    }
+                }
+            }
+            Records::Auxiliary4(v) => {
+                for label in v {
+                    if predicate(&label.base.resources) {
+                        label.base.expanded = false;
+                    }
+                }
+            }
+            Records::Auxiliary8(v) => {
+                for label in v {
+                    if predicate(&label.base.resources) {
+                        label.base.expanded = false;
+                    }
+                }
+            }
+            Records::AuxiliaryFull(v) => {
+                for label in v {
+                    if predicate(&label.base.resources) {
+                        label.base.expanded = false;
+                    }
+                }
+            }
             Records::Full(v) => {
                 for label in v {
                     if predicate(&label.resources) {
@@ -126,7 +182,11 @@ impl<const D: usize> LabelArena<D> {
             | Records::Branched(_)
             | Records::Compact2(_)
             | Records::Compact4(_)
-            | Records::Compact8(_) => unreachable!(),
+            | Records::Compact8(_)
+            | Records::Auxiliary2(_)
+            | Records::Auxiliary4(_)
+            | Records::Auxiliary8(_)
+            | Records::AuxiliaryFull(_) => unreachable!(),
         }
     }
 }

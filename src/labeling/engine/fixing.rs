@@ -16,20 +16,33 @@ impl<const D: usize> LabelingEngine<D> {
         if !threshold.is_finite() {
             return Err(invalid("finite fixing threshold required"));
         }
+        if g.coupled_kernel()
+            .is_some_and(|kernel| kernel.has_slope_fronts())
+        {
+            return Ok(FixingReport::default());
+        }
+        // Both roles must be disproved before fixing a dual-orientation arc.
+        if self.consumption_joins
+            && g.coupled_kernel()
+                .is_some_and(|k| k.reversal_union_required())
+        {
+            return Ok(FixingReport::default());
+        }
         let mut report = FixingReport::default();
         let mut concatenation_tests = 0;
+        let mut removals = Vec::new();
         for forward in [true, false] {
             if self.consumption_joins && !forward {
                 continue;
             }
             let mut cache = PairingCache::default();
-            let components = self.grid.direction(forward).components.clone();
+            let components = &self.grid.direction(forward).components;
             let mut removed = std::collections::BTreeSet::new();
             for component in components {
-                for source in component {
+                for &source in component {
                     let arcs = self.grid.direction(forward).buckets[source.vertex][source.bucket]
                         .arcs
-                        .clone();
+                        .as_slice();
                     for arc in arcs {
                         if arc.jump.is_some() {
                             continue;
@@ -55,7 +68,7 @@ impl<const D: usize> LabelingEngine<D> {
                                     .active
                                     .iter()
                                     .any(|&id| {
-                                        self.extend(g, true, &arc, self.forward.labels.view(id))
+                                        self.extend(g, true, arc, self.forward.labels.view(id))
                                             .is_some_and(|label| {
                                                 self.ctx().terminal_cost(g, true, &label)
                                                     < threshold
@@ -96,13 +109,17 @@ impl<const D: usize> LabelingEngine<D> {
                             &self.storage(forward).buckets[source.vertex][source.bucket].active
                         {
                             if let Some(l) =
-                                self.extend(g, forward, &arc, self.storage(forward).labels.view(id))
+                                self.extend(g, forward, arc, self.storage(forward).labels.view(id))
                             {
                                 let key = l.key()
                                     + self.cuts.knapsack.partial_cost(g, &l.resources, forward);
-                                minimum = minimum.min(
-                                    self.ctx().presence_completion_key(key, &l.presence_state),
-                                );
+                                minimum = minimum.min(self.ctx().resource_completion_key(
+                                    g,
+                                    forward,
+                                    l.coupled_state.as_deref(),
+                                    &l.presence_state,
+                                    key,
+                                ));
                                 extended.push(l);
                             }
                         }
@@ -140,9 +157,20 @@ impl<const D: usize> LabelingEngine<D> {
                                                 &l.resources,
                                                 forward,
                                             );
-                                        let key = self
-                                            .ctx()
-                                            .presence_completion_key(key, &l.presence_state);
+                                        let Some(key) = self.ctx().bucket_completion(
+                                            g,
+                                            forward,
+                                            l.into(),
+                                            key,
+                                            BucketId {
+                                                vertex: storage_vertex,
+                                                bucket,
+                                            },
+                                            opposite.hot.key.first().copied(),
+                                            threshold,
+                                        ) else {
+                                            continue 'pairs;
+                                        };
                                         for &id in &opposite.active {
                                             let other = storage.labels.view(id);
                                             if self.ctx().completion_sum(key, other.key())
@@ -185,20 +213,26 @@ impl<const D: usize> LabelingEngine<D> {
                     }
                 }
             }
+            if self.resource_error.load(Ordering::Relaxed) {
+                return Err(incomplete("coupled resource fixing arithmetic failure"));
+            }
+            if forward {
+                report.eliminated_forward = removed.len();
+            } else {
+                report.eliminated_backward = removed.len();
+            }
+            removals.push((forward, removed));
+        }
+        for (forward, removed) in removals {
             let direction = if forward {
                 &mut self.grid.forward
             } else {
                 &mut self.grid.backward
             };
             for row in &mut direction.buckets {
-                for b in row {
-                    b.arcs.retain(|a| !removed.contains(&a.id));
+                for bucket in row {
+                    bucket.arcs.retain(|a| !removed.contains(&a.id));
                 }
-            }
-            if forward {
-                report.eliminated_forward = removed.len();
-            } else {
-                report.eliminated_backward = removed.len();
             }
         }
         self.statistics.concatenation_tests += concatenation_tests;
@@ -208,6 +242,7 @@ impl<const D: usize> LabelingEngine<D> {
                 self.grid.regenerate_jumps(g, false);
             }
             self.full_ready = false;
+            self.coupled_completion = std::array::from_fn(|_| Default::default());
             self.half_ready = false;
         }
         Ok(report)

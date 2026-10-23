@@ -56,6 +56,7 @@ fn other_bucket_filter_preserves_distinct_presence_and_filters_equal_presence() 
                     ng: 0,
                     branch_state: None,
                     presence_state: Some(vec![state].into_boxed_slice()),
+                    coupled_state: None,
                     parent: None,
                     arc: None,
                     hops: 1,
@@ -64,8 +65,18 @@ fn other_bucket_filter_preserves_distinct_presence_and_filters_equal_presence() 
                     additional_cost: 0.,
                     half_potential: 0.,
                 };
-                let lower = make(predecessor, a, -2.);
+                let lower = make(predecessor, a.clone(), -2.);
                 let candidate = make(candidate_bucket, b, -1.);
+                let mut expanded = make(candidate_bucket, a.clone(), 0.);
+                expanded.expanded = true;
+                let mut distinct = row.empty_state();
+                row.visit(&mut distinct, 1).unwrap();
+                let followup = [
+                    expanded,
+                    make(candidate_bucket, distinct.clone(), 1.),
+                    make(candidate_bucket, a, 2.),
+                    make(candidate_bucket, distinct, 3.),
+                ];
                 assert_eq!(
                     LabelStorage::dominates(
                         &graph,
@@ -111,11 +122,14 @@ fn other_bucket_filter_preserves_distinct_presence_and_filters_equal_presence() 
                     vertex,
                     bucket: candidate_bucket,
                 };
-                if branching {
-                    sweep.filter::<true>(&graph, forward, bucket, &Controls::default());
-                } else {
-                    sweep.filter::<false>(&graph, forward, bucket, &Controls::default());
-                }
+                let filter = |sweep: &mut Sweep<'_, 2>| {
+                    if branching {
+                        sweep.filter::<true>(&graph, forward, bucket, &Controls::default());
+                    } else {
+                        sweep.filter::<false>(&graph, forward, bucket, &Controls::default());
+                    }
+                };
+                filter(&mut sweep);
                 assert_eq!(
                     sweep.storage.buckets[vertex][candidate_bucket]
                         .active
@@ -123,7 +137,93 @@ fn other_bucket_filter_preserves_distinct_presence_and_filters_equal_presence() 
                     equal,
                     "forward={forward} equal={equal} branching={branching}"
                 );
+
+                // Revisit the bucket using the same scratch after both an
+                // all-removed and a none-removed first call. Keep expanded
+                // labels and surviving order; rebuild matching hot columns.
+                let target = &mut sweep.storage.buckets[vertex][candidate_bucket];
+                target.active.clear();
+                target.hot.truncate(0);
+                let mut ids = vec![];
+                for label in followup {
+                    let hot = HotLabel::of(&label);
+                    let id = sweep.storage.retain(label);
+                    ids.push(id);
+                    let target = &mut sweep.storage.buckets[vertex][candidate_bucket];
+                    target.active.push(id);
+                    target.hot.push(hot);
+                }
+                // Stale traversal entries must be discarded before searching.
+                sweep.filter_scratch.work.push((usize::MAX, 0, 0, true));
+                let before = sweep.statistics.other_dominated;
+                filter(&mut sweep);
+                assert_eq!(sweep.statistics.other_dominated, before + 1);
+                let expected = vec![ids[0], ids[1], ids[3]];
+                assert_eq!(
+                    sweep.storage.buckets[vertex][candidate_bucket].active,
+                    expected
+                );
+                for (i, &id) in expected.iter().enumerate() {
+                    assert_eq!(
+                        sweep.storage.buckets[vertex][candidate_bucket]
+                            .hot
+                            .get(i)
+                            .key,
+                        sweep.storage.hot[id].key
+                    );
+                }
+                // A no-change call must not replay scratch labels from the
+                // previous partial removal into the bucket.
+                filter(&mut sweep);
+                assert_eq!(
+                    sweep.storage.buckets[vertex][candidate_bucket].active,
+                    expected
+                );
             }
         }
     }
+}
+
+#[test]
+fn finite_label_budget_is_checked_even_when_all_records_are_expanded() {
+    let mut graph = Graph::<2>::new(3, 1).unwrap();
+    for vertex in 0..3 {
+        graph.set_bounds(vertex, 0, 0., 10.).unwrap();
+    }
+    for (tail, head) in [(0, 1), (1, 2)] {
+        let arc = graph.add_arc(tail, head, -1.).unwrap();
+        graph.arc_mut(arc).unwrap().consumption[0] = 1.;
+    }
+    let mut engine = LabelingEngine::prepare(
+        &graph,
+        EngineControls {
+            bidirectional: false,
+            steps: [10., 0.].into(),
+            target_buckets: 1,
+            ..Default::default()
+        },
+        Phase {
+            check_ng: true,
+            jump_arcs: true,
+            labels_per_bucket: i64::MAX,
+        },
+    )
+    .unwrap();
+    engine.root(&graph, true).unwrap();
+    let root = engine.forward.root.unwrap();
+    engine.forward.labels.expand(&[root]);
+    let counts = (AtomicUsize::new(0), AtomicUsize::new(0));
+    let mut terminals = vec![];
+    let mut sweep = engine.sweep(true, &mut terminals, &counts);
+    let error = sweep
+        .run_records::<false, true, false, OrdinaryLabel<2>>(
+            &graph,
+            &Controls {
+                max_labels: 1,
+                ..Default::default()
+            },
+            Instant::now(),
+        )
+        .unwrap_err();
+    assert!(error.message.contains("label limit"), "{error}");
 }
