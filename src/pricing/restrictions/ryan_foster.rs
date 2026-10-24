@@ -1,5 +1,6 @@
 //! Ryan–Foster constraints and binary resources for labeling.
 use crate::{invalid, Graph, Result};
+use std::sync::Arc;
 
 /// A pair of physical customer vertices (the standard routing packing sets).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,8 +42,9 @@ impl RyanFosterConstraint {
     }
 }
 
-/// Allocate no label words when no branch resource is active.
-pub type BranchState = Option<Box<[u32; 16]>>;
+/// Allocate no label words when no branch resource is active. Clones share
+/// words until a visit changes a branch resource.
+pub type BranchState = Option<Arc<[u32; 16]>>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BinaryConsumption {
@@ -119,7 +121,7 @@ impl RyanFosterResources {
         if !self.can_visit(state, vertex) {
             return false;
         }
-        let words = state.get_or_insert_with(|| Box::new([0; 16]));
+        let words = Arc::make_mut(state.get_or_insert_with(|| Arc::new([0; 16])));
         for op in ops {
             let mask = 1 << (op.resource % 32);
             if op.toggle {
@@ -146,3 +148,7 @@ impl RyanFosterResources {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/pricing/ryan_foster_tests.rs"]
+mod tests;

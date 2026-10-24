@@ -373,9 +373,8 @@ impl<'a, const D: usize> Sweep<'a, D> {
                             .extend_from_slice(&self.storage.buckets[id.vertex][id.bucket].active);
                     }
                     for k in 0..arc_count {
-                        let arc = self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket]
-                            .arcs[k]
-                            .clone();
+                        let arc =
+                            self.ctx.grid.direction(forward).buckets[id.vertex][id.bucket].arcs[k];
                         if (!self.ctx.phase.jump_arcs && arc.jump.is_some())
                             || arc.flags & flags == 0
                         {

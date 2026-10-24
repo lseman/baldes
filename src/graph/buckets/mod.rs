@@ -8,7 +8,7 @@ pub struct BucketId {
     pub vertex: usize,
     pub bucket: usize,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct BucketArc {
     pub id: usize,
     pub from: BucketId,

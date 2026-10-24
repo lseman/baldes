@@ -55,7 +55,7 @@ fn other_bucket_filter_preserves_distinct_presence_and_filters_equal_presence() 
                     resources: direction.corners[vertex][bucket].into(),
                     ng: 0,
                     branch_state: None,
-                    presence_state: Some(vec![state].into_boxed_slice()),
+                    presence_state: Some(vec![state].into()),
                     coupled_state: None,
                     parent: None,
                     arc: None,

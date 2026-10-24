@@ -301,7 +301,7 @@ fn empty_cut_dominance_does_not_load_cold_words() {
 }
 
 #[test]
-fn owned_insertion_moves_branch_state_and_borrowed_insertion_clones_on_acceptance() {
+fn owned_insertion_moves_branch_state_and_borrowed_insertion_shares_on_acceptance() {
     let graph = Graph::<2>::new(3, 1).unwrap();
     let make = || StoredLabel {
         id: 0,
@@ -315,7 +315,7 @@ fn owned_insertion_moves_branch_state_and_borrowed_insertion_clones_on_acceptanc
         original_cost: 2.,
         resources: [0.; 2].into(),
         ng: 0,
-        branch_state: Some(Box::new([5; 16])),
+        branch_state: Some(std::sync::Arc::new([5; 16])),
         presence_state: None,
         coupled_state: None,
         parent: None,
@@ -369,7 +369,7 @@ fn owned_insertion_moves_branch_state_and_borrowed_insertion_clones_on_acceptanc
     ));
     let state = borrowed.labels.view(0).branch_state();
     assert_eq!(state, &label.branch_state);
-    assert_ne!(state.as_deref().unwrap().as_ptr(), pointer);
+    assert_eq!(state.as_deref().unwrap().as_ptr(), pointer);
     assert_eq!(label.branch_state.as_deref().unwrap().as_ptr(), pointer);
 }
 
@@ -468,7 +468,7 @@ fn presence_states_survive_arena_promotion_and_prevent_false_dominance() {
         resources: [0.; 2].into(),
         ng: 0,
         branch_state: None,
-        presence_state: Some(vec![state].into_boxed_slice()),
+        presence_state: Some(vec![state].into()),
         coupled_state: None,
         parent: None,
         arc: None,
@@ -551,7 +551,7 @@ fn presence_states_survive_arena_promotion_and_prevent_false_dominance() {
             assert_eq!(storage.buckets[1][0].active.len(), 2);
             assert_eq!(
                 storage.labels.view(0).presence_state(),
-                &Some(vec![a.clone()].into_boxed_slice())
+                &Some(vec![a.clone()].into())
             );
         }
     }

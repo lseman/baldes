@@ -119,8 +119,13 @@ impl<const D: usize> Solver<D> {
         let was_extended = !self.applied_cuts.0.is_empty() || !self.applied_cuts.1.is_empty();
         let needs_extended = !next.0.is_empty() || !next.1.is_empty();
         if let Some(engine) = &mut self.engine {
-            if !enumerated && only_duals && was_extended && needs_extended {
-                engine.update_cut_duals(next.0.clone(), next.1.clone());
+            if !enumerated
+                && only_duals
+                && was_extended
+                && needs_extended
+                && engine.cut_structure_matches(&next.0, &next.1)
+            {
+                engine.update_cut_duals_borrowed(&next.0, &next.1);
             } else {
                 if !engine.load_cuts(&self.graph, next.0.clone(), next.1.clone()) {
                     self.engine = None;

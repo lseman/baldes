@@ -71,8 +71,13 @@ impl PresencePricing {
     }
 
     pub fn empty_state(&self) -> LabelState {
-        self.active()
-            .then(|| self.rows.iter().map(|r| r.row.empty_state()).collect())
+        self.active().then(|| {
+            self.rows
+                .iter()
+                .map(|r| r.row.empty_state())
+                .collect::<Vec<_>>()
+                .into()
+        })
     }
 
     fn states<'a>(&self, state: &'a LabelState) -> Result<&'a [PresenceState]> {
@@ -109,6 +114,15 @@ impl PresencePricing {
         if !self.active() {
             return Ok((None, 0.));
         }
+        // Validate the state and arc before sharing. Repeated events are also
+        // no-ops: a zero coefficient delta alone would not imply equal state.
+        if self.rows.iter().zip(states).all(|(input, state)| {
+            input.arc_events[arc]
+                .iter()
+                .all(|&event| state.words[event / 64] & (1 << (event % 64)) != 0)
+        }) {
+            return Ok((state.clone(), 0.));
+        }
         let mut next = states.to_vec();
         let mut cost = 0.;
         for (input, state) in self.rows.iter().zip(&mut next) {
@@ -124,7 +138,7 @@ impl PresencePricing {
                 return Err(invalid("soft-conflict pricing cost overflow"));
             }
         }
-        Ok((Some(next.into_boxed_slice()), cost))
+        Ok((Some(next.into()), cost))
     }
 
     /// Adjustment to already accumulated forward/backward reduced costs.
@@ -161,22 +175,24 @@ impl PresencePricing {
     /// Physical-route master coefficients, using the same event mapping as
     /// incremental pricing. Traversals repeated in the route remain presence.
     pub fn route_coefficients(&self, arcs: &[usize]) -> Result<Vec<usize>> {
-        let mut state = self.empty_state();
+        let mut states: Vec<_> = self
+            .rows
+            .iter()
+            .map(|input| input.row.empty_state())
+            .collect();
         for &arc in arcs {
             if arc >= self.arcs {
                 return Err(invalid("soft-conflict physical arc outside mapping"));
             }
-            if let Some(states) = &mut state {
-                for (input, state) in self.rows.iter().zip(states.iter_mut()) {
-                    for &event in &input.arc_events[arc] {
-                        input.row.visit(state, event)?;
-                    }
+            for (input, state) in self.rows.iter().zip(&mut states) {
+                for &event in &input.arc_events[arc] {
+                    input.row.visit(state, event)?;
                 }
             }
         }
         self.rows
             .iter()
-            .zip(self.states(&state)?)
+            .zip(&states)
             .map(|(r, s)| r.row.coefficient(s))
             .collect()
     }

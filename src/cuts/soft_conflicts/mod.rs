@@ -4,6 +4,7 @@
 //! A graph adapter must emit an event on every arc representing that variable.
 //! This module does not register a separator or modify labeling automatically.
 use crate::{invalid, Result};
+use std::sync::Arc;
 mod pricing;
 pub use pricing::{PresencePricing, PricingInput};
 
@@ -31,7 +32,8 @@ pub struct PresenceState {
 }
 
 /// Optional per-row route incidence carried by extended labeling records.
-pub type LabelState = Option<Box<[PresenceState]>>;
+/// Labels share immutable incidence until an arc adds a previously unseen event.
+pub type LabelState = Option<Arc<[PresenceState]>>;
 
 impl PresenceRow {
     pub fn new(events: usize, pairs: Vec<(usize, usize)>, mode: Mode) -> Result<Self> {

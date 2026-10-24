@@ -44,9 +44,9 @@ fn auxiliary_payloads_move_without_wide_promotion_and_survive_inspection() {
         let mut input = label();
         input.cut_words[words - 1] = 19;
         input.additional_cost = -0.;
-        input.branch_state = Some(Box::new([3u32; 16]));
+        input.branch_state = Some(std::sync::Arc::new([3u32; 16]));
         let row = PresenceRow::new(2, vec![(0, 1)], Mode::AnyPair).unwrap();
-        input.presence_state = Some(vec![row.empty_state()].into_boxed_slice());
+        input.presence_state = Some(vec![row.empty_state()].into());
         input.coupled_state = Some(graph.coupled_kernel().unwrap().root(true));
         let address = input.coupled_state.as_deref().unwrap() as *const _;
         arena.push(input);
@@ -105,7 +105,7 @@ fn retained_borrowed_metadata_overrides_ids_and_preserves_full_fallback() {
             input.cut_words[words - 1] = 13;
         }
         if branched {
-            input.branch_state = Some(Box::new([5u32; 16]));
+            input.branch_state = Some(std::sync::Arc::new([5u32; 16]));
         }
         arena.push_borrowed_for::<StoredLabel<2>>(&input, 11);
         assert!(arena.kind() != RecordKind::Full);

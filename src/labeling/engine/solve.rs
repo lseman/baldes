@@ -291,8 +291,10 @@ impl<const D: usize> LabelingEngine<D> {
         self.phase.labels_per_bucket = i64::MAX;
         let result = (|| {
             for v in 0..self.forward.crossing.len() {
-                let crossing = self.forward.crossing[v].clone();
-                for id in crossing {
+                // Insertion changes the label arena and buckets, not these
+                // crossing IDs. End each ID borrow before mutating the engine.
+                for position in 0..self.forward.crossing[v].len() {
+                    let id = self.forward.crossing[v][position];
                     let mut label = self.forward.labels.view(id).to_owned();
                     self.vertex_step(&mut label);
                     let hot = HotLabel::of(&label);

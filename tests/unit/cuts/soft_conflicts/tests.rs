@@ -317,3 +317,40 @@ fn presence_envelope_overflow_is_unknown_and_negative_dual_overlap_is_allowed() 
     );
     assert_eq!(negative.join_cost(&state, &state).unwrap(), -0.5);
 }
+
+#[test]
+fn unchanged_presence_transitions_share_state_and_siblings_remain_independent() {
+    let pricing = PresencePricing::new(
+        4,
+        vec![PricingInput {
+            row: PresenceRow::new(2, vec![(0, 1)], Mode::PairCount).unwrap(),
+            arc_events: vec![vec![], vec![0], vec![0, 0], vec![1]],
+            dual: 0.75,
+        }],
+    )
+    .unwrap();
+    let root = pricing.empty_state();
+    let (idle, cost) = pricing.extend(&root, 0).unwrap();
+    assert_eq!(cost, 0.);
+    assert!(Arc::ptr_eq(root.as_ref().unwrap(), idle.as_ref().unwrap()));
+    let (left, cost) = pricing.extend(&root, 1).unwrap();
+    assert_eq!(cost, 0.); // A new bit matters even before it completes a pair.
+    assert!(!Arc::ptr_eq(root.as_ref().unwrap(), left.as_ref().unwrap()));
+    assert_ne!(left, root);
+    let (repeated, cost) = pricing.extend(&left, 2).unwrap();
+    assert_eq!(cost, 0.);
+    assert!(Arc::ptr_eq(
+        left.as_ref().unwrap(),
+        repeated.as_ref().unwrap()
+    ));
+    let (complete, cost) = pricing.extend(&left, 3).unwrap();
+    assert_eq!(cost, -0.75);
+    let (right, cost) = pricing.extend(&root, 3).unwrap();
+    assert_eq!(cost, 0.);
+    assert_eq!(pricing.join_cost(&left, &right).unwrap(), -0.75);
+    assert_ne!(left, complete);
+    assert!(Arc::ptr_eq(root.as_ref().unwrap(), idle.as_ref().unwrap()));
+    // The fast path must still reject invalid states and physical arcs.
+    assert!(pricing.extend(&None, 0).is_err());
+    assert!(pricing.extend(&root, 4).is_err());
+}
