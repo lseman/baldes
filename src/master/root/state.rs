@@ -79,23 +79,36 @@ impl<const D: usize> State<D> {
             cut.dual = row.map_or(0., |r| duals[r]);
         }
         if !self.cut.rows.is_empty() {
-            let scaled = |row: usize| (-duals[row] * 1e8 + 0.5).floor();
+            // Strong k-path cuts are not sorted: they keep registry order.
             let mut order: Vec<usize> = (0..self.cut.rows.len())
-                .filter(|&i| self.cut.rows[i].is_some_and(|r| duals[r].abs() > 1e-6))
+                .filter(|&i| {
+                    !self.solver.cuts.cuts[i].visit_once
+                        && self.cut.rows[i].is_some_and(|r| duals[r].abs() > 1e-6)
+                })
                 .collect();
-            order.sort_by(|&a, &b| {
-                let ka = -scaled(self.cut.rows[a].unwrap()).abs();
-                let kb = -scaled(self.cut.rows[b].unwrap()).abs();
-                ka.total_cmp(&kb).then(a.cmp(&b))
-            });
+            sort_rank_one_pricing_order(&mut order, |i| -duals[self.cut.rows[i].unwrap()]);
             self.solver.cuts.pricing_order = order;
+            // Keep raw duals: native retrieval filters them before the 1e-8
+            // rounding, so a dual just above 1e-6 stays active.
+            self.solver.cuts.round_duals = true;
             for (i, row) in self.cut.rows.iter().enumerate() {
-                self.solver.cuts.cuts[i].dual = match row {
-                    Some(r) => -scaled(*r) / 1e8,
-                    None => 0.,
-                };
+                self.solver.cuts.cuts[i].dual = row.map_or(0., |r| duals[r]);
             }
         }
         Ok(offset)
     }
 }
+
+/// Native rank-one retrieval stable-sorts the unrounded pricing values,
+/// largest first; values within 1e-6 keep cut-id order. The tolerant
+/// comparator is not transitive, so use the libstdc++ algorithm.
+pub(super) fn sort_rank_one_pricing_order(order: &mut [usize], value: impl Fn(usize) -> f64) {
+    crate::cuts::shared::stdsort::stable_sort(order, |&a, &b| {
+        let (va, vb) = (value(a), value(b));
+        va > vb + 1e-6 || (!(vb - 1e-6 > va) && a < b)
+    });
+}
+
+#[cfg(test)]
+#[path = "../../../tests/unit/master/root/state/tests.rs"]
+mod tests;

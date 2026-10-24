@@ -390,7 +390,7 @@ fn build_inputs_with_duals<const D: usize>(
         {
             continue;
         }
-        let dual = if cut.visit_once && !exact_duals {
+        let dual = if (cut.visit_once || registry.round_duals) && !exact_duals {
             (-cut.dual * 1e8 + 0.5).floor() / 1e8
         } else {
             -cut.dual

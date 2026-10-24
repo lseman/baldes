@@ -58,6 +58,29 @@ impl<const D: usize> LabelingEngine<D> {
             self.statistics.forward_time = started.elapsed().as_secs_f64();
         }
         self.refresh_coupled_completion(g);
+        // The native solver balances the half-way point right after backward
+        // extension, so the move survives a concatenation timeout.
+        if parallel && self.phase.exact() {
+            let f = self
+                .forward
+                .buckets
+                .iter()
+                .flatten()
+                .map(|b| b.active.len())
+                .sum::<usize>() as f64;
+            let b = self
+                .backward
+                .buckets
+                .iter()
+                .flatten()
+                .map(|b| b.active.len())
+                .sum::<usize>() as f64;
+            if f / b > 1.2 {
+                self.pending_middle = Some(false);
+            } else if b / f > 1.2 {
+                self.pending_middle = Some(true);
+            }
+        }
         // Small heuristic sweeps may perform fewer than 64 extensions and
         // have no concatenation pass. They still consume the call deadline.
         if started.elapsed() >= controls.time_limit {
@@ -161,25 +184,6 @@ impl<const D: usize> LabelingEngine<D> {
             }
             self.statistics.concatenation_time = concatenation_started.elapsed().as_secs_f64();
             if self.phase.exact() && !self.consumption_joins {
-                let f = self
-                    .forward
-                    .buckets
-                    .iter()
-                    .flatten()
-                    .map(|b| b.active.len())
-                    .sum::<usize>() as f64;
-                let b = self
-                    .backward
-                    .buckets
-                    .iter()
-                    .flatten()
-                    .map(|b| b.active.len())
-                    .sum::<usize>() as f64;
-                if f / b > 1.2 {
-                    self.pending_middle = Some(false);
-                } else if b / f > 1.2 {
-                    self.pending_middle = Some(true);
-                }
                 self.half_ready = self.controls.direction_flags == 1;
             }
         }

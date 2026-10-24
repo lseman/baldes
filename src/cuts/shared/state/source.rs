@@ -15,6 +15,7 @@ pub(crate) struct CutInputSource {
     graph: i32,
     vertices: usize,
     exact_duals: bool,
+    round_duals: bool,
     cuts: Vec<(usize, RankOneCut)>,
     active: Vec<bool>,
     pricing_order: Vec<usize>,
@@ -27,8 +28,8 @@ fn active(registry: &CutRegistry, index: usize, exact_duals: bool) -> bool {
         && !(registry.cuts[index].dual.abs() <= if exact_duals { 0. } else { 1e-6 })
 }
 
-fn price(cut: &RankOneCut, exact_duals: bool) -> f64 {
-    if cut.visit_once && !exact_duals {
+fn price(registry: &CutRegistry, cut: &RankOneCut, exact_duals: bool) -> f64 {
+    if (cut.visit_once || registry.round_duals) && !exact_duals {
         (-cut.dual * 1e8 + 0.5).floor() / 1e8
     } else {
         -cut.dual
@@ -125,6 +126,7 @@ pub(crate) fn build_inputs_cached<const D: usize>(
         graph,
         vertices: g.vertices.len(),
         exact_duals,
+        round_duals: registry.round_duals,
         cuts: registry
             .cuts
             .iter()
@@ -152,6 +154,7 @@ impl CutInputSource {
         self.graph == g.graph_id.max(0)
             && self.vertices == g.vertices.len()
             && self.exact_duals == exact_duals
+            && self.round_duals == registry.round_duals
             && self.pricing_order == registry.pricing_order
             && self.retired == registry.retired
             && self.active.len() == registry.cuts.len()
@@ -189,7 +192,7 @@ impl CutInputSource {
         macro_rules! refresh {
             ($lane:tt) => {
                 for (row, &index) in inputs.$lane.iter_mut().zip(&self.rows[$lane]) {
-                    let dual = price(&registry.cuts[index], self.exact_duals);
+                    let dual = price(registry, &registry.cuts[index], self.exact_duals);
                     changed |= row.dual != dual;
                     row.dual = dual;
                 }

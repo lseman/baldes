@@ -213,6 +213,9 @@ pub struct CutRegistry {
     pub retired: BTreeSet<usize>,
     /// Cut indices in pricing order (set_pricing_cut_order); the rest follow.
     pub pricing_order: Vec<usize>,
+    /// Price nonexact cuts with native 1e-8 dual rounding after filtering
+    /// their raw duals; otherwise only strong k-path duals are rounded.
+    pub round_duals: bool,
     pub parameters: SeparationParameters,
     pub separation_phase: i32,
     pub covering_sets_present: bool,
@@ -447,6 +450,7 @@ impl Default for CutRegistry {
             knapsack_cuts: vec![],
             retired: BTreeSet::new(),
             pricing_order: vec![],
+            round_duals: false,
             parameters: SeparationParameters::default(),
             separation_phase: 1,
             covering_sets_present: false,

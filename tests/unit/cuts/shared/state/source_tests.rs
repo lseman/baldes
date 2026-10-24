@@ -223,3 +223,25 @@ fn inactive_source_shapes_are_not_cloned_and_latest_shape_is_built_on_activation
         assert!(!next_source.matches(&changed, &graph, exact));
     }
 }
+
+#[test]
+fn rounded_duals_filter_raw_values_before_native_rounding() {
+    let mut registry = CutRegistry::default();
+    registry.cuts = vec![cut(0, false)];
+    let graph = Graph::<2>::new(6, 0).unwrap();
+    // Above the 1e-6 activity threshold, but rounds to exactly 1e-6.
+    registry.cuts[0].dual = -1.004e-6;
+    let (raw, source) = build_inputs_cached(&registry, &graph, false);
+    assert_eq!(raw.0.len(), 1);
+    assert_eq!(raw.0[0].dual, 1.004e-6);
+    registry.round_duals = true;
+    assert!(!source.matches(&registry, &graph, false));
+    let (rounded, source) = build_inputs_cached(&registry, &graph, false);
+    assert_eq!(rounded.0.len(), 1);
+    assert_eq!(rounded.0[0].dual, 1e-6);
+    assert_inputs(&rounded, &build_inputs_with_duals(&registry, &graph, false));
+    // Exact pricing keeps the actual row price.
+    assert!(!source.matches(&registry, &graph, true));
+    let (exact, _) = build_inputs_cached(&registry, &graph, true);
+    assert_eq!(exact.0[0].dual, 1.004e-6);
+}
