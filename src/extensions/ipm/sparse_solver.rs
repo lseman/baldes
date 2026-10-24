@@ -1,5 +1,8 @@
-use super::factor::{block_order, minimum_degree, Factor, Symbolic, Uplooking};
+use super::factor::{block_order, minimum_degree, Factor, FactorWorkspace, Symbolic, Uplooking};
+use super::parallel::Execution;
 use super::{finite, Error, Result, SparseMatrix};
+use super::{Parallel, ParallelType};
+use rayon::prelude::*;
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -103,15 +106,32 @@ pub struct HiPOLDLT {
     matrix: SparseMatrix,
     diagonal: Vec<usize>,
     uplooking: Option<Uplooking>,
+    execution: Execution,
+    factor_workspace: FactorWorkspace,
 }
 
 impl HiPOLDLT {
     pub fn new(a: SparseMatrix) -> Result<Self> {
+        Self::new_ordered(a, false)
+    }
+    fn new_ordered(a: SparseMatrix, natural: bool) -> Result<Self> {
         let pattern = augmented(&a, &vec![1.; a.cols], &vec![1.; a.cols], &vec![1.; a.rows])?;
-        let symbolic = Symbolic::analyze(&pattern, block_order(&a), a.cols);
+        let order = if natural {
+            (0..pattern.cols).collect()
+        } else {
+            block_order(&a)
+        };
+        let symbolic = Symbolic::analyze(&pattern, order, a.cols);
         Self::from_symbolic(a, pattern, symbolic)
     }
-    fn from_symbolic(a: SparseMatrix, pattern: SparseMatrix, symbolic: Symbolic) -> Result<Self> {
+    fn from_symbolic(
+        a: SparseMatrix,
+        pattern: SparseMatrix,
+        mut symbolic: Symbolic,
+    ) -> Result<Self> {
+        if symbolic.assembly_is_missing() {
+            symbolic.prepare_assembly(&pattern);
+        }
         let uplooking = Uplooking::new(&symbolic, a.cols);
         let diagonal = (0..pattern.cols)
             .map(|j| {
@@ -129,6 +149,8 @@ impl HiPOLDLT {
             matrix: pattern,
             diagonal,
             uplooking,
+            execution: Execution::default(),
+            factor_workspace: FactorWorkspace::default(),
         })
     }
     fn with_appended_columns(&self, a: SparseMatrix) -> Result<Option<Self>> {
@@ -137,11 +159,13 @@ impl HiPOLDLT {
             None => return Ok(None),
         };
         let pattern = augmented(&a, &vec![1.; a.cols], &vec![1.; a.cols], &vec![1.; a.rows])?;
-        Self::from_symbolic(a, pattern, symbolic).map(Some)
+        let mut solver = Self::from_symbolic(a, pattern, symbolic)?;
+        solver.execution = self.execution.clone();
+        Ok(Some(solver))
     }
     /// Numeric refactorization reuses symbolic analysis. Failure invalidates the old factor.
     pub fn factorize(&mut self, theta: &[f64], rp: &[f64], rd: &[f64]) -> Result<()> {
-        self.factor = None;
+        let previous = self.factor.take();
         validate(&self.a, theta, rp, rd)?;
         // A and the KKT sparsity pattern are fixed for this solver's lifetime.
         // Only diagonal values change between Newton iterations; retain the
@@ -152,14 +176,30 @@ impl HiPOLDLT {
         for (i, &v) in rd.iter().enumerate() {
             self.matrix.val[self.diagonal[self.a.cols + i]] = v;
         }
-        let factor = match self
+        let uplooking = self
             .uplooking
             .as_ref()
-            .and_then(|plan| plan.factorize(&self.symbolic, &self.matrix).ok())
-        {
-            Some(factor) => factor,
-            None => self.symbolic.factorize(&self.matrix, true)?,
+            .filter(|_| self.symbolic.parallel_levels(&self.execution) == (false, false));
+        // The up-looking kernel allocates its compressed output directly.
+        // Release its previous factor first so the allocator can reuse it;
+        // only the multifrontal kernel consumes output storage for recycling.
+        let previous = if uplooking.is_some() {
+            drop(previous);
+            None
+        } else {
+            previous
         };
+        let factor =
+            match uplooking.and_then(|plan| plan.factorize(&self.symbolic, &self.matrix).ok()) {
+                Some(factor) => factor,
+                None => self.symbolic.factorize_cached(
+                    &self.matrix,
+                    true,
+                    &self.execution,
+                    &mut self.factor_workspace,
+                    previous,
+                )?,
+            };
         self.factor = Some(factor);
         Ok(())
     }
@@ -221,10 +261,15 @@ pub struct NormalEqLDLT {
     matrix: SparseMatrix,
     row_entries: Vec<Vec<(usize, usize)>>,
     work: Vec<f64>,
+    execution: Execution,
+    factor_workspace: FactorWorkspace,
 }
 
 impl NormalEqLDLT {
     pub fn new(a: SparseMatrix) -> Result<Self> {
+        Self::new_ordered(a, false)
+    }
+    fn new_ordered(a: SparseMatrix, natural: bool) -> Result<Self> {
         let mut graph = vec![BTreeSet::new(); a.rows];
         let mut row_entries = vec![Vec::new(); a.rows];
         for j in 0..a.cols {
@@ -245,7 +290,12 @@ impl NormalEqLDLT {
             entries.extend(neighbors.iter().map(|&i| (i, j, 1.)));
         }
         let pattern = SparseMatrix::from_triplets(a.rows, a.rows, &entries)?;
-        let symbolic = Symbolic::analyze(&pattern, minimum_degree(graph), a.rows);
+        let order = if natural {
+            (0..a.rows).collect()
+        } else {
+            minimum_degree(graph)
+        };
+        let symbolic = Symbolic::analyze(&pattern, order, a.rows);
         let work = vec![0.; a.rows];
         Ok(Self {
             a,
@@ -255,10 +305,12 @@ impl NormalEqLDLT {
             matrix: pattern,
             row_entries,
             work,
+            execution: Execution::default(),
+            factor_workspace: FactorWorkspace::default(),
         })
     }
     pub fn factorize(&mut self, theta: &[f64], rp: &[f64], rd: &[f64]) -> Result<()> {
-        self.factor = None;
+        let previous = self.factor.take();
         validate(&self.a, theta, rp, rd)?;
         self.dinv.clear();
         self.dinv
@@ -280,7 +332,13 @@ impl NormalEqLDLT {
                 self.work[i] = 0.;
             }
         }
-        self.factor = Some(self.symbolic.factorize(&self.matrix, false)?);
+        self.factor = Some(self.symbolic.factorize_cached(
+            &self.matrix,
+            false,
+            &self.execution,
+            &mut self.factor_workspace,
+            previous,
+        )?);
         Ok(())
     }
     pub fn solve(&self, xi_d: &[f64], xi_p: &[f64]) -> Result<(Vec<f64>, Vec<f64>)> {
@@ -386,6 +444,78 @@ impl SparseSolver {
             Backend::HiPO(HiPOLDLT::new(a)?)
         };
         Ok(Self { backend, n, m })
+    }
+    /// Build with a private CPU pool shared by tree, node, and candidate work.
+    /// Auto compares augmented and normal-equation symbolic work in parallel.
+    pub fn with_parallel(
+        a: SparseMatrix,
+        kind: SolverType,
+        parallel: Parallel,
+        parallel_type: ParallelType,
+        threads: usize,
+    ) -> Result<Self> {
+        let execution = Execution::new(parallel, parallel_type, threads)?;
+        let mut solver = if let Some(pool) = &execution.pool {
+            let approaches = if kind == SolverType::Auto {
+                vec![SolverType::HiPO, SolverType::NormalEquations]
+            } else {
+                vec![kind]
+            };
+            let candidates: Vec<_> = approaches
+                .into_iter()
+                .flat_map(|kind| [(kind, false), (kind, true)])
+                .collect();
+            let results: Vec<Result<Self>> = pool.install(|| {
+                candidates
+                    .par_iter()
+                    .map(|&(kind, natural)| {
+                        let backend = match kind {
+                            SolverType::NormalEquations => {
+                                Backend::Normal(NormalEqLDLT::new_ordered(a.clone(), natural)?)
+                            }
+                            _ => Backend::HiPO(HiPOLDLT::new_ordered(a.clone(), natural)?),
+                        };
+                        Ok(Self {
+                            backend,
+                            n: a.cols,
+                            m: a.rows,
+                        })
+                    })
+                    .collect()
+            });
+            let mut best: Option<Self> = None;
+            let mut failure = None;
+            for result in results {
+                match result {
+                    Ok(candidate) => {
+                        if best
+                            .as_ref()
+                            .map_or(true, |b| candidate.work_estimate() < b.work_estimate())
+                        {
+                            best = Some(candidate);
+                        }
+                    }
+                    Err(error) => failure = Some(error),
+                }
+            }
+            match best {
+                Some(best) => best,
+                None => return Err(failure.expect("at least two candidates")),
+            }
+        } else {
+            Self::new(a, kind)?
+        };
+        match &mut solver.backend {
+            Backend::HiPO(s) => s.execution = execution,
+            Backend::Normal(s) => s.execution = execution,
+        }
+        Ok(solver)
+    }
+    fn work_estimate(&self) -> usize {
+        match &self.backend {
+            Backend::HiPO(s) => s.symbolic.work_estimate(),
+            Backend::Normal(s) => s.symbolic.work_estimate(),
+        }
     }
     pub(crate) fn with_appended_columns(
         &self,

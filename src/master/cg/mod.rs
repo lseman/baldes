@@ -322,6 +322,7 @@ pub use controller::{Controller, NoController};
 mod driver;
 mod setup;
 pub use driver::optimize;
+pub(crate) use driver::optimize_with_log_context;
 mod enumeration;
 mod feasibility;
 

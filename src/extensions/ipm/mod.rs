@@ -5,6 +5,8 @@
 
 mod factor;
 mod matrix;
+mod parallel;
+pub use parallel::{Parallel, ParallelType};
 mod model;
 mod solver;
 mod sparse_solver;

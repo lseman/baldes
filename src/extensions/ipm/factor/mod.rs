@@ -1,7 +1,15 @@
 //! Sparse symbolic elimination and multifrontal LDLᵀ. Dense storage is local to a front.
+use super::parallel::Execution;
 use super::{finite, Error, Result, SparseMatrix};
+use rayon::prelude::*;
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
+mod workspace;
+use workspace::Assembly;
+pub(crate) use workspace::FactorWorkspace;
+mod dense;
+use dense::bk_into;
 mod storage;
 use storage::LowerFactor;
 mod uplooking;
@@ -155,6 +163,8 @@ pub(crate) struct Symbolic {
     order: Vec<usize>,
     inverse: Vec<usize>,
     fronts: Vec<Front>,
+    levels: Vec<Vec<usize>>,
+    assembly: Arc<Vec<Assembly>>,
 }
 
 impl Symbolic {
@@ -236,7 +246,9 @@ impl Symbolic {
         Some(Self {
             order,
             inverse,
+            levels: Self::tree_levels(&fronts),
             fronts,
+            assembly: Arc::new(Vec::new()),
         })
     }
 
@@ -301,13 +313,18 @@ impl Symbolic {
                 fronts[parent].children.push(s);
             }
         }
-        Self {
+        let mut symbolic = Self {
             order,
             inverse,
+            levels: Self::tree_levels(&fronts),
             fronts,
-        }
+            assembly: Arc::new(Vec::new()),
+        };
+        symbolic.prepare_assembly(a);
+        symbolic
     }
 
+    #[cfg(test)]
     pub fn factorize(&self, a: &SparseMatrix, regularize: bool) -> Result<Factor> {
         let n = self.order.len();
         let mut columns = vec![vec![]; n];
@@ -433,6 +450,69 @@ impl Symbolic {
             stats,
         })
     }
+
+    fn tree_levels(fronts: &[Front]) -> Vec<Vec<usize>> {
+        let mut depth = vec![0; fronts.len()];
+        let mut levels: Vec<Vec<usize>> = Vec::new();
+        for (s, front) in fronts.iter().enumerate() {
+            depth[s] = front
+                .children
+                .iter()
+                .map(|&c| depth[c] + 1)
+                .max()
+                .unwrap_or(0);
+            if levels.len() <= depth[s] {
+                levels.resize_with(depth[s] + 1, Vec::new);
+            }
+            levels[depth[s]].push(s);
+        }
+        levels
+    }
+
+    pub fn assembly_is_missing(&self) -> bool {
+        self.assembly.len() != self.fronts.len()
+    }
+
+    pub fn parallel_levels(&self, execution: &Execution) -> (bool, bool) {
+        // Tiny leaf fronts are cheaper on the up-looking path. Require enough
+        // independent arithmetic to amortize assembly and pool scheduling.
+        let substantial = |&s: &usize| {
+            let f = &self.fronts[s];
+            let size = f.end - f.lo + f.updates.len();
+            size.saturating_mul(size).saturating_mul(f.end - f.lo) >= 4096
+        };
+        execution.levels(
+            self.levels
+                .iter()
+                .any(|level| level.iter().filter(|s| substantial(s)).count() >= 4),
+            self.fronts
+                .iter()
+                .any(|f| f.end - f.lo >= 32 && f.end - f.lo + f.updates.len() >= 512),
+        )
+    }
+
+    pub fn work_estimate(&self) -> usize {
+        self.fronts.iter().fold(0usize, |sum, f| {
+            let size = f.end - f.lo + f.updates.len();
+            sum.saturating_add(size.saturating_mul(size).saturating_mul(f.end - f.lo))
+        })
+    }
+
+    #[cfg(test)]
+    pub fn factorize_with(
+        &self,
+        a: &SparseMatrix,
+        regularize: bool,
+        execution: &Execution,
+    ) -> Result<Factor> {
+        self.factorize_cached(
+            a,
+            regularize,
+            execution,
+            &mut FactorWorkspace::default(),
+            None,
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -502,6 +582,7 @@ impl Factor {
     }
 }
 
+#[cfg(test)]
 fn swap(f: &mut [f64], n: usize, a: usize, b: usize, perm: &mut [usize]) {
     if a == b {
         return;
@@ -515,12 +596,25 @@ fn swap(f: &mut [f64], n: usize, a: usize, b: usize, perm: &mut [usize]) {
     perm.swap(a, b);
 }
 
+#[cfg(test)]
 fn bk(
     f: &mut [f64],
     n: usize,
     np: usize,
     regularize: bool,
     stats: &mut FactorStats,
+) -> Result<(Vec<Block>, Vec<usize>)> {
+    bk_with_parallel(f, n, np, regularize, stats, false)
+}
+
+#[cfg(test)]
+fn bk_with_parallel(
+    f: &mut [f64],
+    n: usize,
+    np: usize,
+    regularize: bool,
+    stats: &mut FactorStats,
+    node: bool,
 ) -> Result<(Vec<Block>, Vec<usize>)> {
     let mut blocks = vec![Block::Skip; np];
     let mut perm: Vec<_> = (0..np).collect();
@@ -576,10 +670,14 @@ fn bk(
             for i in k + 1..n {
                 f[i * n + k] /= d;
             }
-            for j in k + 1..n {
-                for i in j..n {
-                    f[i * n + j] -= f[i * n + k] * d * f[j * n + k];
-                    f[j * n + i] = f[i * n + j];
+            if node && n - k >= 128 {
+                frontal_update(f, n, k, [d, 0., 0.], false, true);
+            } else {
+                for j in k + 1..n {
+                    for i in j..n {
+                        f[i * n + j] -= f[i * n + k] * d * f[j * n + k];
+                        f[j * n + i] = f[i * n + j];
+                    }
                 }
             }
             k += 1;
@@ -607,11 +705,15 @@ fn bk(
                 f[i * n + k] = (c * u - b * v) / det;
                 f[i * n + k + 1] = (a * v - b * u) / det;
             }
-            for j in k + 2..n {
-                for i in j..n {
-                    f[i * n + j] -= f[i * n + k] * (a * f[j * n + k] + b * f[j * n + k + 1])
-                        + f[i * n + k + 1] * (b * f[j * n + k] + c * f[j * n + k + 1]);
-                    f[j * n + i] = f[i * n + j];
+            if node && n - k >= 128 {
+                frontal_update(f, n, k, [a, b, c], true, true);
+            } else {
+                for j in k + 2..n {
+                    for i in j..n {
+                        f[i * n + j] -= f[i * n + k] * (a * f[j * n + k] + b * f[j * n + k + 1])
+                            + f[i * n + k + 1] * (b * f[j * n + k] + c * f[j * n + k + 1]);
+                        f[j * n + i] = f[i * n + j];
+                    }
                 }
             }
             f[(k + 1) * n + k] = 0.0;
@@ -624,6 +726,40 @@ fn bk(
         ));
     }
     Ok((blocks, perm))
+}
+
+// Pivot choice stays serial. Disjoint trailing rows share immutable multipliers.
+#[cfg(test)]
+fn frontal_update(f: &mut [f64], n: usize, k: usize, d: [f64; 3], two: bool, node: bool) {
+    let start = k + if two { 2 } else { 1 };
+    let multipliers: Vec<_> = (start..n)
+        .map(|i| (f[i * n + k], if two { f[i * n + k + 1] } else { 0. }))
+        .collect();
+    let update = |(offset, row): (usize, &mut [f64])| {
+        let i = start + offset;
+        let (u, v) = multipliers[offset];
+        for j in start..=i {
+            let (x, y) = multipliers[j - start];
+            row[j] -= if two {
+                u * (d[0] * x + d[1] * y) + v * (d[1] * x + d[2] * y)
+            } else {
+                u * d[0] * x
+            };
+        }
+    };
+    if node && n - start >= 128 {
+        f[start * n..]
+            .par_chunks_mut(n)
+            .enumerate()
+            .for_each(update);
+    } else {
+        f[start * n..].chunks_mut(n).enumerate().for_each(update);
+    }
+    for i in start..n {
+        for j in start..i {
+            f[j * n + i] = f[i * n + j];
+        }
+    }
 }
 
 #[cfg(test)]

@@ -34,6 +34,21 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
     controller: &mut C,
     options: Options,
 ) -> Result<Output> {
+    optimize_with_log_context(master, supplied, price, controller, options, None)
+}
+
+pub(crate) fn optimize_with_log_context<
+    M: LpMaster,
+    P: FnMut(usize, &[f64]) -> Result<Answer>,
+    C: Controller<M>,
+>(
+    master: &mut M,
+    supplied: &[Phase],
+    price: P,
+    controller: &mut C,
+    options: Options,
+    log_context: Option<&str>,
+) -> Result<Output> {
     if options.log_interval == Some(0) {
         return Err(invalid("CG log interval must be positive"));
     }
@@ -43,7 +58,8 @@ pub fn optimize<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Contr
     } else {
         vec![]
     };
-    let mut progress = crate::master::progress::ProgressLog::new(options.log_interval, counts);
+    let mut progress =
+        crate::master::progress::ProgressLog::new(options.log_interval, counts, log_context);
     let result = optimize_inner(master, supplied, price, controller, options, &mut progress);
     if logging {
         progress.finish(

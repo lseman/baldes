@@ -229,3 +229,45 @@ The master counter resets on a fork, like the simplex counter. Centering now
 adapts to the affine step, bounded between `1e-4` and `0.1`; the previous
 expression was always `0.1` for valid step lengths. Stopping tolerances and
 original-coordinate feasibility checks are unchanged.
+
+### Parallel factorization
+
+`Options` exposes `parallel` (`Parallel::Off`, `On`, or `Choose`),
+`parallel_type` (`ParallelType::Tree`, `Node`, or `Both`), and `threads`.
+The defaults are `Choose`, `Both`, and zero (available CPU parallelism).
+Set `threads: 1` to run serially. `Off` creates no worker pool and retains
+serial ordering selection and the up-looking augmented-system fast path.
+
+```rust
+use baldes::extensions::ipm::{Options, Parallel, ParallelType};
+let options = Options {
+    parallel: Parallel::On,
+    parallel_type: ParallelType::Both,
+    threads: 4,
+    ..Options::default()
+};
+```
+
+`On` uses the requested factorization level. Tree mode processes independent
+fronts at each elimination-tree level. Node mode parallelizes trailing dense
+updates within a front; pivot selection remains serial. Small dense updates
+stay serial to avoid scheduling overhead. Both levels share one private worker
+pool, bounded by `threads`, including nested work. Solver clones share the pool
+but own independent factorization data.
+
+`Choose` ignores `parallel_type`: tree work is enabled when a level has at
+least four fronts whose individual work estimates reach 4,096 (front size
+squared times pivot count). Node work is enabled for fronts of at least 512
+rows with at least 32 pivots. These conservative thresholds keep small sparse
+systems on the serial fast path. `Off` also ignores `parallel_type`.
+Parallel setup compares minimum-degree and natural orderings for an explicitly
+selected Newton approach. With `SolverType::Auto`, it prepares both orderings for both the
+augmented and normal-equation approaches concurrently. Selection minimizes a
+deterministic estimate of symbolic factorization work, rather than wall time.
+Explicit `HiPO` and `NormalEquations` choices retain their requested approach.
+With one worker, setup retains the serial fill heuristic.
+
+Changing thread or effective parallel options on a persistent `Solver` rebuilds its
+preparation. Numeric failures invalidate the old factor, as in serial mode.
+Parallel tree levels can retain more frontal workspace than serial traversal.
+These controls currently belong to the native IPM Rust API.

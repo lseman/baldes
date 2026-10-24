@@ -1,5 +1,5 @@
 //! Reproducible sparse KKT benchmark: cargo run --release --example ipm_sparse_bench.
-use baldes::extensions::ipm::{SolverType, SparseMatrix, SparseSolver};
+use baldes::extensions::ipm::{Parallel, ParallelType, SolverType, SparseMatrix, SparseSolver};
 use std::{hint::black_box, time::Instant};
 
 fn main() {
@@ -20,7 +20,9 @@ fn main() {
             }
         }
         let a = SparseMatrix::from_triplets(m, n, &entries).unwrap();
-        measure(name, a, repeats);
+        if selected(name) {
+            measure(name, a, repeats);
+        }
     }
     // Captured routing master: exercise the actual row/column sparsity as well
     // as synthetic patterns. The KKT witness below is independent of its LP optimum.
@@ -41,21 +43,67 @@ fn main() {
             entries.push((i.parse().unwrap(), j, v.parse().unwrap()));
         }
     }
-    measure(
-        "r201-master",
-        SparseMatrix::from_triplets(shape[0], shape[1], &entries).unwrap(),
-        repeats,
-    );
+    if selected("r201-master") {
+        measure(
+            "r201-master",
+            SparseMatrix::from_triplets(shape[0], shape[1], &entries).unwrap(),
+            repeats,
+        );
+    }
+    for (name, sizes) in [
+        ("dense-front", vec![512]),
+        ("forest", vec![128; 4]),
+        ("unbalanced", vec![32, 64, 128, 256]),
+    ] {
+        if !selected(name) {
+            continue;
+        }
+        let m: usize = sizes.iter().sum();
+        let mut entries: Vec<_> = (0..m).map(|i| (i, i, 1.)).collect();
+        let mut offset = 0;
+        for (block, size) in sizes.iter().enumerate() {
+            for i in offset..offset + size {
+                entries.push((i, m + block, 0.25 + (i % 7) as f64 * 0.01));
+            }
+            offset += size;
+        }
+        measure(
+            name,
+            SparseMatrix::from_triplets(m, m + sizes.len(), &entries).unwrap(),
+            repeats,
+        );
+    }
+}
+
+fn selected(name: &str) -> bool {
+    std::env::args()
+        .nth(4)
+        .map_or(true, |filter| filter == "all" || filter == name)
 }
 
 fn measure(name: &str, a: SparseMatrix, repeats: usize) {
+    // Optional arguments after repeats: threads and off/tree/node/both/choose.
+    let threads = std::env::args()
+        .nth(2)
+        .map(|v| v.parse().unwrap())
+        .unwrap_or(1);
+    let mode = std::env::args().nth(3).unwrap_or_else(|| "off".into());
+    let (parallel, parallel_type) = match mode.as_str() {
+        "off" => (Parallel::Off, ParallelType::Both),
+        "choose" => (Parallel::Choose, ParallelType::Both),
+        "tree" => (Parallel::On, ParallelType::Tree),
+        "node" => (Parallel::On, ParallelType::Node),
+        "both" => (Parallel::On, ParallelType::Both),
+        _ => panic!("expected off/tree/node/both/choose"),
+    };
     let (m, n) = (a.rows(), a.cols());
     let expected: Vec<_> = (0..n + m).map(|i| (i % 17) as f64 / 17. - 0.5).collect();
     let rp = vec![0.1; n];
     let rd = vec![0.2; m];
     for kind in [SolverType::HiPO, SolverType::NormalEquations] {
         let start = Instant::now();
-        let mut solver = SparseSolver::new(a.clone(), kind).unwrap();
+        let mut solver =
+            SparseSolver::with_parallel(a.clone(), kind, parallel, parallel_type, threads).unwrap();
         let setup = start.elapsed();
         let mut factor_ns = Vec::new();
         let mut solve_ns = Vec::new();
@@ -91,7 +139,7 @@ fn measure(name: &str, a: SparseMatrix, repeats: usize) {
         assert!(max_error < 1e-8, "{name} {kind:?}: {max_error}");
         factor_ns.sort_unstable();
         solve_ns.sort_unstable();
-        println!("{name} {kind:?} rows={m} cols={n} nnz={} setup_ms={:.3} factor_us={:.3} solve_us={:.3} max_error={max_error:.3e}",
+        println!("{name} {kind:?} mode={mode} threads={threads} rows={m} cols={n} nnz={} setup_ms={:.3} factor_us={:.3} solve_us={:.3} max_error={max_error:.3e}",
                 a.nnz(), setup.as_secs_f64() * 1000., factor_ns[repeats / 2] as f64 / 1000., solve_ns[repeats / 2] as f64 / 1000.);
     }
 }

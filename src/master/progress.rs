@@ -92,10 +92,14 @@ fn header(cuts: &[(&str, usize)]) -> String {
 }
 
 impl ProgressLog {
-    pub(super) fn new(interval: Option<usize>, cuts: Vec<(&'static str, usize)>) -> Self {
+    pub(super) fn new(
+        interval: Option<usize>,
+        cuts: Vec<(&'static str, usize)>,
+        context: Option<&str>,
+    ) -> Self {
         if interval.is_some() {
             let mut out = io::stderr().lock();
-            let _ = crate::logging::banner(&mut out, "COLUMN GENERATION");
+            let _ = crate::logging::banner_with_context(&mut out, "COLUMN GENERATION", context);
             let _ = writeln!(out, "{}", "─".repeat(115 + cuts.len() * 9));
             let _ = writeln!(out, "{}", header(&cuts));
             let _ = writeln!(out, "{}", "─".repeat(115 + cuts.len() * 9));

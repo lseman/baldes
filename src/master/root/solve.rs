@@ -121,8 +121,8 @@ pub(super) fn solve_seeded<const D: usize>(
     master.set_solver(options.master_solver);
     master.set_backend_threads(options.master_threads)?;
     master.set_clp_options(options.clp_options);
-    if options.cg.log_interval.is_some() {
-        crate::log_err!(
+    let log_context = if options.cg.log_interval.is_some() {
+        let mut context = format!(
             "  Master: {:?} | Node depth: {} | Stabilization: {} | Bound mode: {}",
             options.master_solver,
             options.node_depth,
@@ -142,9 +142,12 @@ pub(super) fn solve_seeded<const D: usize>(
             } else {
                 options.master_threads
             };
-            crate::log_err!("  Master worker budget: {}", workers);
+            context.push_str(&format!(" | Workers: {workers}"));
         }
-    }
+        Some(context)
+    } else {
+        None
+    };
     // Keep Clp's default 1e-7 primal and dual tolerances.
     master.set_tolerances(1e-7, 1e-7)?;
     master.zero_tolerance = 1e-7;
@@ -508,7 +511,7 @@ pub(super) fn solve_seeded<const D: usize>(
             .time_limit
             .min(deadline.saturating_duration_since(std::time::Instant::now()));
     }
-    let optimized = cg::optimize::<ClpMaster, _, _>(
+    let optimized = cg::optimize_with_log_context::<ClpMaster, _, _>(
         &mut master,
         &schedule,
         |phase, duals| {
@@ -579,6 +582,7 @@ pub(super) fn solve_seeded<const D: usize>(
         },
         &mut controller,
         options.cg,
+        log_context.as_deref(),
     );
     let mut output = match optimized {
         Ok(output) => output,

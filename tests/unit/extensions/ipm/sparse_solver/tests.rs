@@ -72,10 +72,13 @@ fn appended_primal_symbolics_preserve_kkt_solutions_and_reject_new_fill() {
     }
     let a = SparseMatrix::from_triplets(4, 9, &entries).unwrap();
     let extended = original.with_appended_columns(a.clone()).unwrap().unwrap();
-    for uplooking in [true, false] {
+    for (uplooking, threads) in [(true, 1), (false, 1), (false, 3)] {
         let mut solver = extended.clone();
         if !uplooking {
             solver.uplooking = None;
+        }
+        if threads > 1 {
+            solver.execution = Execution::new(Parallel::On, ParallelType::Both, threads).unwrap();
         }
         let expected: Vec<_> = (0..13).map(|i| i as f64 / 7. - 0.5).collect();
         for diagonal in [0.1, 3.] {

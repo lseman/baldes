@@ -1,0 +1,2215 @@
+{
+  "date": "2026-10-24T02:54:59.441187+00:00",
+  "runs": [
+    {
+      "repeat": 0,
+      "mode": "off",
+      "threads": 1,
+      "binary": "baseline",
+      "elapsed_s": 11.288896859998204,
+      "maxrss_kib": 27252,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 1.962,
+          "factor_us": 229.718,
+          "solve_us": 22.889,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 1.551,
+          "factor_us": 77.246,
+          "solve_us": 9.96,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.346,
+          "factor_us": 17.969,
+          "solve_us": 12.219,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.164,
+          "factor_us": 36.828,
+          "solve_us": 5.909,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.626,
+          "factor_us": 22.508,
+          "solve_us": 10.669,
+          "max_error": 2.776e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.359,
+          "factor_us": 76.866,
+          "solve_us": 5.13,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 9.148,
+          "factor_us": 220.519,
+          "solve_us": 58.887,
+          "max_error": 3.408e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 4.679,
+          "factor_us": 453.976,
+          "solve_us": 18.429,
+          "max_error": 3.598e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 530.5,
+          "factor_us": 146992.214,
+          "solve_us": 102.125,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 569.032,
+          "factor_us": 147581.523,
+          "solve_us": 99.505,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 28.32,
+          "factor_us": 1711.471,
+          "solve_us": 31.808,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 49.035,
+          "factor_us": 1796.887,
+          "solve_us": 27.729,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 74.155,
+          "factor_us": 9985.303,
+          "solve_us": 38.978,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 84.344,
+          "factor_us": 10094.277,
+          "solve_us": 35.739,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "mode": "off",
+      "threads": 1,
+      "binary": "candidate",
+      "elapsed_s": 1.8356037859994103,
+      "maxrss_kib": 26332,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.177,
+          "factor_us": 200.909,
+          "solve_us": 23.968,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 1.65,
+          "factor_us": 78.936,
+          "solve_us": 9.899,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.394,
+          "factor_us": 15.219,
+          "solve_us": 12.45,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.166,
+          "factor_us": 30.018,
+          "solve_us": 6.01,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.658,
+          "factor_us": 22.069,
+          "solve_us": 10.6,
+          "max_error": 2.776e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.365,
+          "factor_us": 50.557,
+          "solve_us": 5.13,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 9.063,
+          "factor_us": 231.348,
+          "solve_us": 61.887,
+          "max_error": 3.408e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 4.742,
+          "factor_us": 267.936,
+          "solve_us": 23.479,
+          "max_error": 3.598e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 499.548,
+          "factor_us": 6775.269,
+          "solve_us": 99.405,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 518.145,
+          "factor_us": 7055.535,
+          "solve_us": 95.745,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 25.54,
+          "factor_us": 518.353,
+          "solve_us": 31.819,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 45.981,
+          "factor_us": 550.231,
+          "solve_us": 28.189,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 67.998,
+          "factor_us": 996.278,
+          "solve_us": 39.558,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 79.107,
+          "factor_us": 1156.01,
+          "solve_us": 35.398,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "mode": "both",
+      "threads": 4,
+      "binary": "baseline",
+      "elapsed_s": 8.8355775500022,
+      "maxrss_kib": 54764,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.291,
+          "factor_us": 959.87,
+          "solve_us": 40.528,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 2.073,
+          "factor_us": 304.004,
+          "solve_us": 16.479,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.591,
+          "factor_us": 362.961,
+          "solve_us": 28.718,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.363,
+          "factor_us": 74.986,
+          "solve_us": 6.58,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.743,
+          "factor_us": 385.07,
+          "solve_us": 29.418,
+          "max_error": 2.942e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.615,
+          "factor_us": 176.781,
+          "solve_us": 9.59,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 10.446,
+          "factor_us": 2483.411,
+          "solve_us": 166.121,
+          "max_error": 3.245e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 5.926,
+          "factor_us": 558.862,
+          "solve_us": 20.919,
+          "max_error": 3.404e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 547.874,
+          "factor_us": 106152.39,
+          "solve_us": 146.933,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 548.334,
+          "factor_us": 106408.587,
+          "solve_us": 110.235,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 29.432,
+          "factor_us": 653.547,
+          "solve_us": 40.247,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 49.14,
+          "factor_us": 766.54,
+          "solve_us": 36.658,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 73.576,
+          "factor_us": 10146.704,
+          "solve_us": 46.358,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 85.955,
+          "factor_us": 10342.704,
+          "solve_us": 45.387,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "mode": "both",
+      "threads": 4,
+      "binary": "candidate",
+      "elapsed_s": 1.7405015430013009,
+      "maxrss_kib": 55508,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.785,
+          "factor_us": 425.618,
+          "solve_us": 26.538,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 2.252,
+          "factor_us": 177.651,
+          "solve_us": 12.39,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.663,
+          "factor_us": 234.038,
+          "solve_us": 16.049,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.411,
+          "factor_us": 70.866,
+          "solve_us": 7.219,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.981,
+          "factor_us": 187.981,
+          "solve_us": 13.689,
+          "max_error": 2.942e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.634,
+          "factor_us": 84.216,
+          "solve_us": 6.04,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 11.267,
+          "factor_us": 631.907,
+          "solve_us": 56.387,
+          "max_error": 3.245e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 5.476,
+          "factor_us": 286.225,
+          "solve_us": 24.688,
+          "max_error": 3.404e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 499.933,
+          "factor_us": 4086.408,
+          "solve_us": 100.685,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 520.571,
+          "factor_us": 5287.356,
+          "solve_us": 97.235,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 26.781,
+          "factor_us": 226.398,
+          "solve_us": 32.519,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 46.565,
+          "factor_us": 307.484,
+          "solve_us": 28.739,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 68.614,
+          "factor_us": 999.708,
+          "solve_us": 39.458,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 77.8,
+          "factor_us": 1224.147,
+          "solve_us": 39.708,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "mode": "choose",
+      "threads": 4,
+      "binary": "baseline",
+      "elapsed_s": 8.792006306997791,
+      "maxrss_kib": 57508,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.214,
+          "factor_us": 291.855,
+          "solve_us": 22.979,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 1.872,
+          "factor_us": 99.175,
+          "solve_us": 10.139,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.613,
+          "factor_us": 15.489,
+          "solve_us": 12.629,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.342,
+          "factor_us": 41.478,
+          "solve_us": 6.069,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.986,
+          "factor_us": 29.959,
+          "solve_us": 13.81,
+          "max_error": 2.776e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.465,
+          "factor_us": 82.216,
+          "solve_us": 5.27,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 10.989,
+          "factor_us": 235.398,
+          "solve_us": 61.827,
+          "max_error": 3.263e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 5.524,
+          "factor_us": 509.704,
+          "solve_us": 19.729,
+          "max_error": 3.404e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 560.307,
+          "factor_us": 106945.429,
+          "solve_us": 240.958,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 558.626,
+          "factor_us": 107349.708,
+          "solve_us": 143.383,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 29.58,
+          "factor_us": 739.012,
+          "solve_us": 40.728,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 51.651,
+          "factor_us": 737.902,
+          "solve_us": 35.468,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 73.378,
+          "factor_us": 9923.346,
+          "solve_us": 62.037,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 85.742,
+          "factor_us": 9854.519,
+          "solve_us": 46.657,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "mode": "choose",
+      "threads": 4,
+      "binary": "candidate",
+      "elapsed_s": 1.9198785190019407,
+      "maxrss_kib": 56772,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.654,
+          "factor_us": 231.328,
+          "solve_us": 22.869,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 1.935,
+          "factor_us": 105.004,
+          "solve_us": 10.569,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.638,
+          "factor_us": 16.019,
+          "solve_us": 12.699,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.407,
+          "factor_us": 68.736,
+          "solve_us": 7.1,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.929,
+          "factor_us": 23.049,
+          "solve_us": 11.01,
+          "max_error": 2.776e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.642,
+          "factor_us": 86.126,
+          "solve_us": 6.079,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 11.247,
+          "factor_us": 235.108,
+          "solve_us": 61.647,
+          "max_error": 3.263e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 5.615,
+          "factor_us": 316.964,
+          "solve_us": 24.138,
+          "max_error": 3.404e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 526.506,
+          "factor_us": 6091.264,
+          "solve_us": 111.594,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 539.238,
+          "factor_us": 8112.109,
+          "solve_us": 124.614,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 26.983,
+          "factor_us": 333.692,
+          "solve_us": 33.058,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 47.572,
+          "factor_us": 386.18,
+          "solve_us": 29.558,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 71.204,
+          "factor_us": 1129.871,
+          "solve_us": 46.798,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 83.228,
+          "factor_us": 1252.355,
+          "solve_us": 37.718,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "mode": "off",
+      "threads": 1,
+      "binary": "candidate",
+      "elapsed_s": 1.8450394259998575,
+      "maxrss_kib": 26316,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.15,
+          "factor_us": 202.96,
+          "solve_us": 22.259,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 1.611,
+          "factor_us": 78.556,
+          "solve_us": 10.21,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.388,
+          "factor_us": 15.519,
+          "solve_us": 12.279,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.163,
+          "factor_us": 29.638,
+          "solve_us": 5.889,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.654,
+          "factor_us": 22.189,
+          "solve_us": 10.56,
+          "max_error": 2.776e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.36,
+          "factor_us": 50.648,
+          "solve_us": 5.13,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 9.263,
+          "factor_us": 230.158,
+          "solve_us": 61.227,
+          "max_error": 3.408e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 4.781,
+          "factor_us": 268.066,
+          "solve_us": 23.159,
+          "max_error": 3.598e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 502.056,
+          "factor_us": 6864.734,
+          "solve_us": 100.985,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 518.65,
+          "factor_us": 7081.354,
+          "solve_us": 97.665,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 25.906,
+          "factor_us": 526.523,
+          "solve_us": 32.439,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 45.958,
+          "factor_us": 554.431,
+          "solve_us": 28.528,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 68.804,
+          "factor_us": 1000.628,
+          "solve_us": 39.178,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 78.806,
+          "factor_us": 1164.15,
+          "solve_us": 35.878,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "mode": "off",
+      "threads": 1,
+      "binary": "baseline",
+      "elapsed_s": 11.17663432700283,
+      "maxrss_kib": 26644,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 1.903,
+          "factor_us": 231.078,
+          "solve_us": 22.858,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 1.648,
+          "factor_us": 79.646,
+          "solve_us": 10.47,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.355,
+          "factor_us": 16.57,
+          "solve_us": 12.78,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.173,
+          "factor_us": 39.738,
+          "solve_us": 6.17,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.662,
+          "factor_us": 23.319,
+          "solve_us": 11.02,
+          "max_error": 2.776e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.374,
+          "factor_us": 79.736,
+          "solve_us": 5.319,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 9.389,
+          "factor_us": 228.709,
+          "solve_us": 61.216,
+          "max_error": 3.408e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 4.899,
+          "factor_us": 460.936,
+          "solve_us": 18.659,
+          "max_error": 3.598e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 537.021,
+          "factor_us": 144619.957,
+          "solve_us": 102.995,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 553.505,
+          "factor_us": 146127.799,
+          "solve_us": 97.265,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 28.5,
+          "factor_us": 1697.542,
+          "solve_us": 31.528,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 49.274,
+          "factor_us": 1808.886,
+          "solve_us": 27.718,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 73.585,
+          "factor_us": 10582.492,
+          "solve_us": 38.758,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 83.619,
+          "factor_us": 10533.734,
+          "solve_us": 35.288,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "mode": "both",
+      "threads": 4,
+      "binary": "candidate",
+      "elapsed_s": 1.921676636000484,
+      "maxrss_kib": 52160,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.805,
+          "factor_us": 296.404,
+          "solve_us": 26.259,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 2.02,
+          "factor_us": 116.944,
+          "solve_us": 10.13,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.74,
+          "factor_us": 184.68,
+          "solve_us": 13.199,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.381,
+          "factor_us": 39.688,
+          "solve_us": 6.069,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 1.033,
+          "factor_us": 215.769,
+          "solve_us": 13.81,
+          "max_error": 2.942e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.508,
+          "factor_us": 86.075,
+          "solve_us": 5.74,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 10.739,
+          "factor_us": 683.024,
+          "solve_us": 57.657,
+          "max_error": 3.245e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 5.202,
+          "factor_us": 315.423,
+          "solve_us": 23.739,
+          "max_error": 3.404e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 522.025,
+          "factor_us": 6168.1,
+          "solve_us": 109.645,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 541.997,
+          "factor_us": 7864.872,
+          "solve_us": 124.873,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 28.038,
+          "factor_us": 325.483,
+          "solve_us": 33.279,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 47.535,
+          "factor_us": 299.305,
+          "solve_us": 29.219,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 71.627,
+          "factor_us": 1064.005,
+          "solve_us": 40.658,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 83.985,
+          "factor_us": 1207.967,
+          "solve_us": 47.988,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "mode": "both",
+      "threads": 4,
+      "binary": "baseline",
+      "elapsed_s": 9.096457102998102,
+      "maxrss_kib": 56144,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.266,
+          "factor_us": 907.703,
+          "solve_us": 41.958,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 2.199,
+          "factor_us": 283.306,
+          "solve_us": 13.349,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.573,
+          "factor_us": 306.664,
+          "solve_us": 17.029,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.327,
+          "factor_us": 80.506,
+          "solve_us": 6.85,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.752,
+          "factor_us": 319.003,
+          "solve_us": 16.859,
+          "max_error": 2.942e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.487,
+          "factor_us": 185.74,
+          "solve_us": 8.9,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 11.369,
+          "factor_us": 2459.592,
+          "solve_us": 105.535,
+          "max_error": 3.245e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 5.59,
+          "factor_us": 599.439,
+          "solve_us": 23.409,
+          "max_error": 3.404e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 552.868,
+          "factor_us": 112516.211,
+          "solve_us": 147.053,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 568.256,
+          "factor_us": 107263.803,
+          "solve_us": 100.065,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 28.924,
+          "factor_us": 638.727,
+          "solve_us": 40.958,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 49.61,
+          "factor_us": 836.417,
+          "solve_us": 37.188,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 75.173,
+          "factor_us": 10232.26,
+          "solve_us": 49.418,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 86.339,
+          "factor_us": 10321.765,
+          "solve_us": 44.717,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "mode": "choose",
+      "threads": 4,
+      "binary": "candidate",
+      "elapsed_s": 1.897643271000561,
+      "maxrss_kib": 58652,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.878,
+          "factor_us": 226.889,
+          "solve_us": 22.859,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 1.989,
+          "factor_us": 105.235,
+          "solve_us": 10.37,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.664,
+          "factor_us": 15.589,
+          "solve_us": 12.609,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.415,
+          "factor_us": 41.807,
+          "solve_us": 6.289,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.936,
+          "factor_us": 23.008,
+          "solve_us": 10.94,
+          "max_error": 2.776e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.519,
+          "factor_us": 60.447,
+          "solve_us": 5.58,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 11.205,
+          "factor_us": 233.798,
+          "solve_us": 61.837,
+          "max_error": 3.263e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 5.521,
+          "factor_us": 308.864,
+          "solve_us": 24.019,
+          "max_error": 3.404e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 522.038,
+          "factor_us": 6191.259,
+          "solve_us": 130.603,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 544.153,
+          "factor_us": 7331.89,
+          "solve_us": 100.945,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 27.295,
+          "factor_us": 319.714,
+          "solve_us": 32.879,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 48.203,
+          "factor_us": 362.511,
+          "solve_us": 29.478,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 71.112,
+          "factor_us": 1082.234,
+          "solve_us": 40.418,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 83.081,
+          "factor_us": 1262.805,
+          "solve_us": 38.059,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "mode": "choose",
+      "threads": 4,
+      "binary": "baseline",
+      "elapsed_s": 9.014534147998347,
+      "maxrss_kib": 53620,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.545,
+          "factor_us": 295.664,
+          "solve_us": 22.799,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 2.179,
+          "factor_us": 100.474,
+          "solve_us": 9.999,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.597,
+          "factor_us": 15.629,
+          "solve_us": 12.999,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.391,
+          "factor_us": 42.088,
+          "solve_us": 6.159,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.812,
+          "factor_us": 22.828,
+          "solve_us": 11.099,
+          "max_error": 2.776e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.543,
+          "factor_us": 87.396,
+          "solve_us": 5.27,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 11.148,
+          "factor_us": 236.648,
+          "solve_us": 62.097,
+          "max_error": 3.263e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 5.68,
+          "factor_us": 513.173,
+          "solve_us": 20.099,
+          "max_error": 3.404e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 538.054,
+          "factor_us": 107705.59,
+          "solve_us": 244.547,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 554.879,
+          "factor_us": 114577.554,
+          "solve_us": 115.234,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 29.567,
+          "factor_us": 661.886,
+          "solve_us": 38.148,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 52.566,
+          "factor_us": 756.221,
+          "solve_us": 36.928,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 75.472,
+          "factor_us": 9729.116,
+          "solve_us": 49.927,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 86.7,
+          "factor_us": 10256.369,
+          "solve_us": 48.358,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "mode": "off",
+      "threads": 1,
+      "binary": "baseline",
+      "elapsed_s": 11.159800949000783,
+      "maxrss_kib": 27220,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 1.947,
+          "factor_us": 227.648,
+          "solve_us": 23.189,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 1.752,
+          "factor_us": 76.356,
+          "solve_us": 9.96,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.341,
+          "factor_us": 17.999,
+          "solve_us": 12.18,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.187,
+          "factor_us": 37.128,
+          "solve_us": 5.989,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.633,
+          "factor_us": 22.569,
+          "solve_us": 10.609,
+          "max_error": 2.776e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.36,
+          "factor_us": 77.036,
+          "solve_us": 5.12,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 9.093,
+          "factor_us": 221.779,
+          "solve_us": 59.427,
+          "max_error": 3.408e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 4.686,
+          "factor_us": 459.327,
+          "solve_us": 18.479,
+          "max_error": 3.598e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 531.51,
+          "factor_us": 144753.7,
+          "solve_us": 102.465,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 543.675,
+          "factor_us": 145875.472,
+          "solve_us": 98.095,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 27.226,
+          "factor_us": 1697.862,
+          "solve_us": 31.879,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 48.654,
+          "factor_us": 1804.607,
+          "solve_us": 28.108,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 72.761,
+          "factor_us": 10726.344,
+          "solve_us": 38.768,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 82.693,
+          "factor_us": 10425.429,
+          "solve_us": 36.068,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "mode": "off",
+      "threads": 1,
+      "binary": "candidate",
+      "elapsed_s": 1.8398382459999993,
+      "maxrss_kib": 26368,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.102,
+          "factor_us": 205.899,
+          "solve_us": 22.259,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 1.678,
+          "factor_us": 83.135,
+          "solve_us": 10.34,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.513,
+          "factor_us": 15.48,
+          "solve_us": 12.389,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.168,
+          "factor_us": 29.528,
+          "solve_us": 5.98,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.671,
+          "factor_us": 22.259,
+          "solve_us": 10.719,
+          "max_error": 2.776e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.364,
+          "factor_us": 50.517,
+          "solve_us": 5.279,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 9.189,
+          "factor_us": 227.098,
+          "solve_us": 60.467,
+          "max_error": 3.408e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 5.055,
+          "factor_us": 267.436,
+          "solve_us": 23.109,
+          "max_error": 3.598e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 499.918,
+          "factor_us": 6852.665,
+          "solve_us": 100.364,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 518.159,
+          "factor_us": 7066.254,
+          "solve_us": 96.745,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 25.354,
+          "factor_us": 522.773,
+          "solve_us": 31.908,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 45.411,
+          "factor_us": 557.631,
+          "solve_us": 27.818,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 68.364,
+          "factor_us": 995.668,
+          "solve_us": 39.478,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 78.841,
+          "factor_us": 1160.17,
+          "solve_us": 35.068,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "mode": "both",
+      "threads": 4,
+      "binary": "baseline",
+      "elapsed_s": 9.046346169001481,
+      "maxrss_kib": 63532,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.339,
+          "factor_us": 585.24,
+          "solve_us": 25.429,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 1.691,
+          "factor_us": 251.397,
+          "solve_us": 11.98,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.587,
+          "factor_us": 282.705,
+          "solve_us": 17.529,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.385,
+          "factor_us": 106.745,
+          "solve_us": 9.449,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.825,
+          "factor_us": 395.19,
+          "solve_us": 28.838,
+          "max_error": 2.942e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.535,
+          "factor_us": 178.181,
+          "solve_us": 9.99,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 11.351,
+          "factor_us": 2322.549,
+          "solve_us": 144.332,
+          "max_error": 3.245e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 5.479,
+          "factor_us": 610.309,
+          "solve_us": 24.609,
+          "max_error": 3.404e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 553.846,
+          "factor_us": 110550.112,
+          "solve_us": 255.887,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 563.528,
+          "factor_us": 108093.429,
+          "solve_us": 135.333,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 28.558,
+          "factor_us": 725.182,
+          "solve_us": 39.378,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 49.035,
+          "factor_us": 737.042,
+          "solve_us": 35.628,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 73.583,
+          "factor_us": 10217.101,
+          "solve_us": 47.688,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 87.244,
+          "factor_us": 10399.261,
+          "solve_us": 44.098,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "mode": "both",
+      "threads": 4,
+      "binary": "candidate",
+      "elapsed_s": 1.9275642809989222,
+      "maxrss_kib": 57500,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.649,
+          "factor_us": 414.668,
+          "solve_us": 26.639,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 2.041,
+          "factor_us": 177.881,
+          "solve_us": 12.139,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.7,
+          "factor_us": 231.608,
+          "solve_us": 16.029,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.395,
+          "factor_us": 73.607,
+          "solve_us": 7.0,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 1.075,
+          "factor_us": 185.801,
+          "solve_us": 14.219,
+          "max_error": 2.942e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.558,
+          "factor_us": 86.986,
+          "solve_us": 6.06,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 10.679,
+          "factor_us": 818.277,
+          "solve_us": 59.927,
+          "max_error": 3.245e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 5.448,
+          "factor_us": 313.704,
+          "solve_us": 24.538,
+          "max_error": 3.404e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 522.878,
+          "factor_us": 6054.687,
+          "solve_us": 131.774,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 546.844,
+          "factor_us": 7394.996,
+          "solve_us": 97.965,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 27.753,
+          "factor_us": 299.915,
+          "solve_us": 33.628,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 48.313,
+          "factor_us": 367.431,
+          "solve_us": 30.199,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 71.363,
+          "factor_us": 1088.834,
+          "solve_us": 39.218,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 82.084,
+          "factor_us": 1250.806,
+          "solve_us": 37.158,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "mode": "choose",
+      "threads": 4,
+      "binary": "baseline",
+      "elapsed_s": 8.73665425499712,
+      "maxrss_kib": 56484,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 2.443,
+          "factor_us": 282.215,
+          "solve_us": 22.979,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 1.798,
+          "factor_us": 96.825,
+          "solve_us": 9.629,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.708,
+          "factor_us": 19.709,
+          "solve_us": 15.999,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.423,
+          "factor_us": 40.418,
+          "solve_us": 5.94,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.888,
+          "factor_us": 22.389,
+          "solve_us": 10.599,
+          "max_error": 2.776e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.581,
+          "factor_us": 80.365,
+          "solve_us": 5.139,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 11.032,
+          "factor_us": 228.528,
+          "solve_us": 59.777,
+          "max_error": 3.263e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 6.226,
+          "factor_us": 491.234,
+          "solve_us": 19.089,
+          "max_error": 3.404e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 536.614,
+          "factor_us": 106707.601,
+          "solve_us": 115.894,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 552.495,
+          "factor_us": 106681.862,
+          "solve_us": 99.145,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 29.388,
+          "factor_us": 677.145,
+          "solve_us": 41.198,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 50.654,
+          "factor_us": 756.41,
+          "solve_us": 38.758,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 75.693,
+          "factor_us": 10562.932,
+          "solve_us": 61.857,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 87.222,
+          "factor_us": 10264.588,
+          "solve_us": 59.237,
+          "max_error": 1.54e-15
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "mode": "choose",
+      "threads": 4,
+      "binary": "candidate",
+      "elapsed_s": 1.8779916390012659,
+      "maxrss_kib": 52268,
+      "rows": [
+        {
+          "case": "diagonal",
+          "backend": "HiPO",
+          "setup_ms": 3.085,
+          "factor_us": 228.638,
+          "solve_us": 23.059,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "diagonal",
+          "backend": "NormalEquations",
+          "setup_ms": 1.94,
+          "factor_us": 104.115,
+          "solve_us": 10.32,
+          "max_error": 1.388e-16
+        },
+        {
+          "case": "banded",
+          "backend": "HiPO",
+          "setup_ms": 0.683,
+          "factor_us": 15.779,
+          "solve_us": 12.7,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "banded",
+          "backend": "NormalEquations",
+          "setup_ms": 0.408,
+          "factor_us": 41.818,
+          "solve_us": 6.27,
+          "max_error": 1.055e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "HiPO",
+          "setup_ms": 0.959,
+          "factor_us": 29.289,
+          "solve_us": 14.059,
+          "max_error": 2.776e-15
+        },
+        {
+          "case": "overlapping",
+          "backend": "NormalEquations",
+          "setup_ms": 0.502,
+          "factor_us": 59.887,
+          "solve_us": 5.57,
+          "max_error": 2.692e-15
+        },
+        {
+          "case": "r201-master",
+          "backend": "HiPO",
+          "setup_ms": 11.356,
+          "factor_us": 237.638,
+          "solve_us": 62.787,
+          "max_error": 3.263e-13
+        },
+        {
+          "case": "r201-master",
+          "backend": "NormalEquations",
+          "setup_ms": 5.39,
+          "factor_us": 296.685,
+          "solve_us": 24.599,
+          "max_error": 3.404e-13
+        },
+        {
+          "case": "dense-front",
+          "backend": "HiPO",
+          "setup_ms": 525.15,
+          "factor_us": 5648.568,
+          "solve_us": 129.033,
+          "max_error": 3.22e-15
+        },
+        {
+          "case": "dense-front",
+          "backend": "NormalEquations",
+          "setup_ms": 545.965,
+          "factor_us": 6807.357,
+          "solve_us": 122.084,
+          "max_error": 4.552e-15
+        },
+        {
+          "case": "forest",
+          "backend": "HiPO",
+          "setup_ms": 27.837,
+          "factor_us": 316.594,
+          "solve_us": 33.708,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "forest",
+          "backend": "NormalEquations",
+          "setup_ms": 48.794,
+          "factor_us": 360.591,
+          "solve_us": 29.428,
+          "max_error": 1.11e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "HiPO",
+          "setup_ms": 70.482,
+          "factor_us": 1078.164,
+          "solve_us": 39.588,
+          "max_error": 1.554e-15
+        },
+        {
+          "case": "unbalanced",
+          "backend": "NormalEquations",
+          "setup_ms": 82.939,
+          "factor_us": 1274.314,
+          "solve_us": 47.608,
+          "max_error": 1.54e-15
+        }
+      ]
+    }
+  ],
+  "environment": {
+    "rustc": "1.97.1",
+    "llvm": "22.1.6",
+    "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+    "target": "x86_64-unknown-linux-gnu",
+    "release_profile": {
+      "opt_level": 3,
+      "lto": "thin"
+    },
+    "rustflags": "",
+    "repetitions_per_process": 30,
+    "independent_process_runs": 3,
+    "maxrss_source": "wait4 ru_maxrss (KiB on Linux)"
+  }
+}

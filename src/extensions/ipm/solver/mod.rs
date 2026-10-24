@@ -17,6 +17,12 @@ pub struct Options {
     pub solver: SolverType,
     /// Ruiz equilibration passes on the standard-form matrix (zero disables).
     pub scaling_iterations: usize,
+    /// Off, forced on, or automatic tree/node selection.
+    pub parallel: super::Parallel,
+    /// Used only when parallel is On.
+    pub parallel_type: super::ParallelType,
+    /// Maximum worker count; zero uses available CPU parallelism.
+    pub threads: usize,
 }
 impl Default for Options {
     fn default() -> Self {
@@ -27,6 +33,9 @@ impl Default for Options {
             max_iterations: 500,
             solver: SolverType::HiPO,
             scaling_iterations: 5,
+            parallel: super::Parallel::Choose,
+            parallel_type: super::ParallelType::Both,
+            threads: 0,
         }
     }
 }

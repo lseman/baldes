@@ -883,3 +883,50 @@ fn persistent_column_order_preserves_free_fixed_and_slack_recovery() {
     assert_eq!(solver.statistics().symbolic_extensions, 1);
     assert_eq!(solver.solve(&grown, &options).unwrap().iterations, 0);
 }
+
+#[test]
+fn parallel_modes_solve_and_reconfigure_persistent_solver() {
+    use baldes::extensions::ipm::{Parallel, ParallelType};
+    let model = ModelData {
+        a: SparseMatrix::from_triplets(1, 2, &[(0, 0, 1.), (0, 1, 1.)]).unwrap(),
+        b: vec![1.],
+        c: vec![1., 2.],
+        lower: vec![0.; 2],
+        upper: vec![f64::INFINITY; 2],
+        sense: vec![Sense::Equal],
+    };
+    let mut solver = Solver::default();
+    for kind in [
+        SolverType::HiPO,
+        SolverType::NormalEquations,
+        SolverType::Auto,
+    ] {
+        for parallel in [Parallel::Off, Parallel::On, Parallel::Choose] {
+            for parallel_type in [ParallelType::Tree, ParallelType::Node, ParallelType::Both] {
+                let options = Options {
+                    solver: kind,
+                    parallel,
+                    parallel_type,
+                    threads: 2,
+                    ..Options::default()
+                };
+                let result = solver.solve(&model, &options).unwrap();
+                assert_eq!(result.status, Status::Optimal);
+                assert!((result.objective - 1.).abs() < 1e-7);
+            }
+        }
+    }
+    for parallel in [Parallel::Off, Parallel::Choose] {
+        let mut options = Options {
+            parallel,
+            parallel_type: ParallelType::Tree,
+            threads: 2,
+            ..Options::default()
+        };
+        solver.solve(&model, &options).unwrap();
+        let analyses = solver.statistics().symbolic_analyses;
+        options.parallel_type = ParallelType::Node;
+        solver.solve(&model, &options).unwrap();
+        assert_eq!(solver.statistics().symbolic_analyses, analyses);
+    }
+}

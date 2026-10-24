@@ -50,6 +50,9 @@ highs = ["dep:pkg-config"]
 gurobi = []
 
 [dependencies]
+# Keep the CPU pool compatible with Rust 1.70.
+rayon = "=1.10.0"
+rayon-core = "=1.12.1"
 serde = { version = "=1.0.204", features = ["derive"], optional = true }
 # Preserve the crate MSRV for the optional JSON front end.
 serde_json = { version = "=1.0.122", features = ["float_roundtrip"], optional = true }

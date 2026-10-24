@@ -25,6 +25,9 @@ pub(super) struct Prepared {
     model: ModelData,
     scaling_iterations: usize,
     kind: SolverType,
+    parallel: super::super::Parallel,
+    parallel_type: super::super::ParallelType,
+    threads: usize,
     pub(super) f: StandardForm,
     pub(super) row_scale: Vec<f64>,
     pub(super) col_scale: Vec<f64>,
@@ -45,6 +48,10 @@ impl Prepared {
             && self.model.sense == model.sense
             && self.scaling_iterations == options.scaling_iterations
             && self.kind == options.solver
+            && self.parallel == options.parallel
+            && (options.parallel != super::super::Parallel::On
+                || self.parallel_type == options.parallel_type)
+            && self.threads == options.threads
     }
 
     fn new(model: &ModelData, options: &Options, previous: Option<&Self>) -> Result<(Self, bool)> {
@@ -54,19 +61,34 @@ impl Prepared {
         }
         let (row_scale, col_scale) = scale(&mut f, options.scaling_iterations)?;
         let extended = previous
-            .filter(|p| p.kind == options.solver)
+            .filter(|p| {
+                p.kind == options.solver
+                    && p.parallel == options.parallel
+                    && (options.parallel != super::super::Parallel::On
+                        || p.parallel_type == options.parallel_type)
+                    && p.threads == options.threads
+            })
             .map(|p| p.ls.with_appended_columns(f.a.clone(), options.solver))
             .transpose()?
             .flatten();
         let reused = extended.is_some();
         let ls = match extended {
             Some(ls) => ls,
-            None => SparseSolver::new(f.a.clone(), options.solver)?,
+            None => SparseSolver::with_parallel(
+                f.a.clone(),
+                options.solver,
+                options.parallel,
+                options.parallel_type,
+                options.threads,
+            )?,
         };
         let mut out = Self {
             model: model.clone(),
             scaling_iterations: options.scaling_iterations,
             kind: options.solver,
+            parallel: options.parallel,
+            parallel_type: options.parallel_type,
+            threads: options.threads,
             f,
             row_scale,
             col_scale,

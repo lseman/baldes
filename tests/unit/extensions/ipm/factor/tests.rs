@@ -220,3 +220,241 @@ fn two_by_two_and_pivot_interchange() {
         }
     }
 }
+
+#[test]
+fn parallel_fronts_and_dense_pivots_match_serial() {
+    use crate::extensions::ipm::{Parallel, ParallelType};
+    // Several dense components give both wide tree levels and large fronts.
+    // Zero leading diagonals force 2x2 pivots in every component.
+    let size = 132;
+    let n = 3 * size;
+    let mut entries = Vec::new();
+    for block in 0..3 {
+        for i in 0..size {
+            for j in 0..size {
+                let value = if i == j {
+                    if i < 2 {
+                        0.
+                    } else {
+                        10.
+                    }
+                } else if i < 2 && j < 2 {
+                    2.
+                } else {
+                    ((i + j) % 7 + 1) as f64 * 0.001
+                };
+                entries.push((block * size + i, block * size + j, value));
+            }
+        }
+    }
+    let a = SparseMatrix::from_triplets(n, n, &entries).unwrap();
+    let symbolic = Symbolic::analyze(&a, (0..n).collect(), n);
+    let expected: Vec<_> = (0..n).map(|i| (i % 13) as f64 - 6.).collect();
+    let rhs = a.mul(&expected);
+    let serial = symbolic.factorize(&a, false).unwrap();
+    assert!(serial.stats.num_2x2 >= 3);
+    for threads in [1, 2, 4] {
+        for kind in [ParallelType::Tree, ParallelType::Node, ParallelType::Both] {
+            let execution = Execution::new(Parallel::On, kind, threads).unwrap();
+            let factor = symbolic.factorize_with(&a, false, &execution).unwrap();
+            assert_eq!(factor.order, serial.order);
+            assert_eq!(factor.stats.num_2x2, serial.stats.num_2x2);
+            for (x, y) in factor.solve(&rhs).unwrap().iter().zip(&expected) {
+                assert!((x - y).abs() < 1e-9, "threads={threads} kind={kind:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn parallel_tree_handles_parent_updates_and_failure() {
+    use crate::extensions::ipm::{Parallel, ParallelType};
+    // Star elimination produces independent leaves feeding one parent.
+    let n = 40;
+    let mut entries: Vec<_> = (0..n).map(|i| (i, i, 4.)).collect();
+    for i in 0..n - 1 {
+        entries.extend([(i, n - 1, 0.1), (n - 1, i, 0.1)]);
+    }
+    let a = SparseMatrix::from_triplets(n, n, &entries).unwrap();
+    let symbolic = Symbolic::analyze(&a, (0..n).collect(), n - 1);
+    let execution = Execution::new(Parallel::On, ParallelType::Both, 3).unwrap();
+    let expected = vec![1.; n];
+    let result = symbolic
+        .factorize_with(&a, false, &execution)
+        .unwrap()
+        .solve(&a.mul(&expected))
+        .unwrap();
+    assert!(result.iter().all(|x| (x - 1.).abs() < 1e-12));
+    let zero = SparseMatrix::from_triplets(2, 2, &[(0, 0, 0.), (1, 1, 0.)]).unwrap();
+    let symbolic = Symbolic::analyze(&zero, vec![0, 1], 2);
+    assert!(symbolic.factorize_with(&zero, false, &execution).is_err());
+}
+
+#[test]
+fn lower_triangle_kernel_matches_reference_with_partial_and_indefinite_pivots() {
+    let mut state = 19u64;
+    let mut random = || {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        ((state >> 32) % 2001) as f64 / 500. - 2.
+    };
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(3)
+        .build()
+        .unwrap();
+    for n in [0, 1, 2, 7, 33, 65, 129, 260] {
+        for np in [n / 2, n] {
+            let mut values = vec![0.; n * n];
+            for i in 0..n {
+                for j in 0..=i {
+                    let value = random();
+                    values[i * n + j] = value;
+                    values[j * n + i] = value;
+                }
+            }
+            let mut reference = values.clone();
+            let mut expected_stats = FactorStats {
+                min_abs_pivot: f64::INFINITY,
+                ..FactorStats::default()
+            };
+            let (expected_blocks, expected_perm) =
+                bk(&mut reference, n, np, true, &mut expected_stats).unwrap();
+            for node in [false, true] {
+                let mut actual = values.clone();
+                // Poison the unused upper half: a triangular kernel must not read it.
+                for i in 0..n {
+                    for j in i + 1..n {
+                        actual[i * n + j] = f64::NAN;
+                    }
+                }
+                let mut blocks = Vec::new();
+                let mut perm = Vec::new();
+                let mut multipliers = Vec::new();
+                let mut stats = FactorStats {
+                    min_abs_pivot: f64::INFINITY,
+                    ..FactorStats::default()
+                };
+                pool.install(|| {
+                    bk_into(
+                        &mut actual,
+                        n,
+                        np,
+                        true,
+                        &mut stats,
+                        node,
+                        &mut blocks,
+                        &mut perm,
+                        &mut multipliers,
+                    )
+                })
+                .unwrap();
+                assert_eq!(perm, expected_perm, "n={n} np={np} node={node}");
+                assert_eq!(format!("{blocks:?}"), format!("{expected_blocks:?}"));
+                assert_eq!(stats.perturbed_pivots, expected_stats.perturbed_pivots);
+                assert_eq!(stats.num_2x2, expected_stats.num_2x2);
+                for i in 0..n {
+                    for j in 0..=i {
+                        assert_eq!(
+                            actual[i * n + j],
+                            reference[i * n + j],
+                            "n={n} np={np} i={i} j={j} node={node}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn cached_factorization_reuses_storage_and_recovers_from_failure() {
+    use crate::extensions::ipm::{Parallel, ParallelType};
+    let n = 18;
+    // Multiple children feed a front that interchanges pivots. Reverse ordering
+    // checks that the precomputed CSC positions are not original row positions.
+    let mut entries = Vec::new();
+    for i in 0..n {
+        entries.push((i, i, if i % 3 == 0 { 0.001 } else { 5. }));
+        if i + 1 < n {
+            entries.extend([(i, i + 1, 2.), (i + 1, i, 2.)]);
+        }
+        if i + 3 < n {
+            entries.extend([(i, i + 3, 0.1), (i + 3, i, 0.1)]);
+        }
+    }
+    let mut a = SparseMatrix::from_triplets(n, n, &entries).unwrap();
+    let symbolic = Symbolic::analyze(&a, (0..n).rev().collect(), n);
+    let mut workspace = FactorWorkspace::default();
+    let mut previous = None;
+    for mode in [Parallel::Off, Parallel::On, Parallel::Choose] {
+        let execution = Execution::new(mode, ParallelType::Both, 3).unwrap();
+        let mut buffers = None;
+        for iteration in 0..5 {
+            for j in 0..n {
+                for p in a.ptr[j]..a.ptr[j + 1] {
+                    if a.idx[p] == j {
+                        a.val[p] += 0.01;
+                    }
+                }
+            }
+            let reference = symbolic.factorize(&a, false).unwrap();
+            let expected: Vec<_> = (0..n).map(|i| i as f64 - 5.).collect();
+            let rhs = a.mul(&expected);
+            let factor = symbolic
+                .factorize_cached(&a, false, &execution, &mut workspace, previous.take())
+                .unwrap();
+            assert_eq!(factor.order, reference.order);
+            assert_eq!(factor.stats.num_2x2, reference.stats.num_2x2);
+            for (actual, expected) in factor.solve(&rhs).unwrap().iter().zip(expected) {
+                assert!((actual - expected).abs() < 1e-10, "iteration={iteration}");
+            }
+            if let Some(before) = &buffers {
+                assert_eq!(&workspace.retained_buffers(), before);
+            }
+            buffers = Some(workspace.retained_buffers());
+            previous = Some(factor);
+        }
+        let saved = a.val.clone();
+        a.val.fill(0.);
+        assert!(symbolic
+            .factorize_cached(&a, false, &execution, &mut workspace, previous.take())
+            .is_err());
+        a.val = saved;
+    }
+    // A solver clone starts with independent, empty scratch.
+    let mut cloned = workspace.clone();
+    let factor = symbolic
+        .factorize_cached(&a, false, &Execution::default(), &mut cloned, None)
+        .unwrap();
+    assert!(factor
+        .solve(&a.mul(&vec![1.; n]))
+        .unwrap()
+        .iter()
+        .all(|v| (v - 1.).abs() < 1e-10));
+}
+
+#[test]
+fn numeric_workspace_rebuilds_for_a_different_symbolic_plan_of_the_same_size() {
+    let entries: Vec<_> = (0..4)
+        .flat_map(|i| (0..4).map(move |j| (i, j, if i == j { 5. } else { 0.2 })))
+        .collect();
+    let a = SparseMatrix::from_triplets(4, 4, &entries).unwrap();
+    let first = Symbolic::analyze(&a, (0..4).collect(), 1);
+    let second = Symbolic::analyze(&a, (0..4).collect(), 2);
+    assert_eq!(first.fronts.len(), second.fronts.len());
+    let mut work = FactorWorkspace::default();
+    let mut previous = None;
+    for plan in [&first, &second, &first] {
+        let factor = plan
+            .factorize_cached(&a, false, &Execution::default(), &mut work, previous.take())
+            .unwrap();
+        for (value, want) in factor
+            .solve(&a.mul(&[1., 2., 3., 4.]))
+            .unwrap()
+            .iter()
+            .zip([1., 2., 3., 4.])
+        {
+            assert!((value - want).abs() < 1e-12);
+        }
+        previous = Some(factor);
+    }
+}
