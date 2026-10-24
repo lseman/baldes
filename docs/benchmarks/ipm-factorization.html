@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="IPM factorization: cached assembly and lower-triangle updates This comparison measures the native Rust IPM before and after the assembly-map,workspace, and dense-kernel changes. Th">
+<meta name="theme-color" content="#0b0e11">
+<title>IPM factorization: cached assembly and lower-triangle updates — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/benchmarks/ipm-factorization.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="root.html">Root benchmarks</a><a href="ipm-factorization.html" aria-current="page">IPM factorization: cached assembly and lower-triangle updates</a><a href="rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="rank-one-three-row.html">Parallel three-row rank-one separation</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/benchmarks/ipm-factorization.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Benchmarks</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="ipm-factorization-cached-assembly-and-lower-triangle-updates">IPM factorization: cached assembly and lower-triangle updates</h1>
+<p>This comparison measures the native Rust IPM before and after the assembly-map,
+workspace, and dense-kernel changes. The baseline already includes the tree/node
+parallel controls. These are BALDES-to-BALDES measurements, not a comparison
+against HiGHS timings.</p>
+<h2 id="changes">Changes</h2>
+<ul>
+<li>Compute CSC-to-front scatter positions and child-to-parent row maps during
+symbolic analysis. Share immutable maps across solver clones.</li>
+<li>Retain dense scratch, pivot permutations, multiplier vectors, and output
+column capacity across Newton steps. Reset scratch when the symbolic plan
+changes; solver clones start with independent empty scratch.</li>
+<li>Update the contiguous lower triangle and read symmetric pivot candidates from
+that triangle. Avoid mirroring the trailing matrix after every pivot. The
+previous full-matrix kernel remains an independent test oracle.</li>
+<li>Batch tree work over retained scratch buffers. Nested node work uses the same
+bounded Rayon pool; no workspace lock is held during nested execution.</li>
+<li>Recycle consumed Schur buffers through a size-binned pool, capped at 8 MiB per
+solver. The limit covers spare buffers, not live contributions or factors.
+Releasing consumed contributions avoids retaining every clique on deep trees.</li>
+<li>Preserve the serial up-looking fast path and release its old compressed
+factor before allocating the next output.</li>
+</ul>
+<p>The dense update is still a rank-1/rank-2 kernel. Blocked panel factorization,
+relaxed supernodes, and dependency-driven subtree scheduling remain future work.</p>
+<h2 id="method">Method</h2>
+<p>Measured on an AMD Ryzen 9 9950X (16 cores, 32 logical CPUs), Linux x86_64,
+with rustc 1.97.1 / LLVM 22.1.6. Both binaries use the repository's release
+profile (opt-level 3, thin LTO), the same expanded benchmark, and the same input
+and diagonal sequences. No compiler or other validation job ran during timing.</p>
+<p>Each process performs one warmup and 30 measured refactorizations. Diagonals
+vary as <code>1 + iteration / repeats</code>. Tables give the median of three independent
+process medians, with the range of those medians where shown. Baseline/candidate
+execution order alternates between repetitions. Setup, factorization, and
+solve timings are collected separately. One worker is used for <code>off</code>, four for
+<code>both</code> and <code>choose</code>; there is no CPU affinity pinning.</p>
+<p>The dense-front fixture has 512 identity columns and one column touching all
+512 rows. The forest has four independent 128-row components of that form;
+the unbalanced forest has components of sizes 32, 64, 128, and 256. The routing
+case is the captured <code>r201_master.txt</code> fixture. Every solve is checked against
+a known KKT witness, with maximum absolute solution error below 1e-8.</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--example<span class="w"> </span>ipm_sparse_bench
+<span class="c1"># Arguments: repetitions, threads, mode, optional exact case name.</span>
+target/release/examples/ipm_sparse_bench<span class="w"> </span><span class="m">30</span><span class="w"> </span><span class="m">4</span><span class="w"> </span>both
+target/release/examples/ipm_sparse_bench<span class="w"> </span><span class="m">30</span><span class="w"> </span><span class="m">1</span><span class="w"> </span>off
+target/release/examples/ipm_sparse_bench<span class="w"> </span><span class="m">30</span><span class="w"> </span><span class="m">4</span><span class="w"> </span>choose
+<span class="c1"># Example: isolate a large front.</span>
+target/release/examples/ipm_sparse_bench<span class="w"> </span><span class="m">30</span><span class="w"> </span><span class="m">4</span><span class="w"> </span>both<span class="w"> </span>dense-front
+</code></pre></div>
+<h2 id="warm-factorization">Warm factorization</h2>
+<p>All times are microseconds. Speedup is baseline divided by candidate; values
+below one indicate a slowdown. Ranges show variation across process medians,
+not per-iteration confidence intervals.</p>
+<h3 id="both">both</h3>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Backend</th>
+<th style="text-align:right">Before</th>
+<th style="text-align:right">After</th>
+<th style="text-align:right">After range</th>
+<th style="text-align:right">Speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>diagonal</td>
+<td>HiPO</td>
+<td style="text-align:right">907.70</td>
+<td style="text-align:right">414.67</td>
+<td style="text-align:right">296.40–425.62</td>
+<td style="text-align:right">2.19×</td>
+</tr>
+<tr>
+<td>diagonal</td>
+<td>NormalEquations</td>
+<td style="text-align:right">283.31</td>
+<td style="text-align:right">177.65</td>
+<td style="text-align:right">116.94–177.88</td>
+<td style="text-align:right">1.59×</td>
+</tr>
+<tr>
+<td>banded</td>
+<td>HiPO</td>
+<td style="text-align:right">306.66</td>
+<td style="text-align:right">231.61</td>
+<td style="text-align:right">184.68–234.04</td>
+<td style="text-align:right">1.32×</td>
+</tr>
+<tr>
+<td>banded</td>
+<td>NormalEquations</td>
+<td style="text-align:right">80.51</td>
+<td style="text-align:right">70.87</td>
+<td style="text-align:right">39.69–73.61</td>
+<td style="text-align:right">1.14×</td>
+</tr>
+<tr>
+<td>overlapping</td>
+<td>HiPO</td>
+<td style="text-align:right">385.07</td>
+<td style="text-align:right">187.98</td>
+<td style="text-align:right">185.80–215.77</td>
+<td style="text-align:right">2.05×</td>
+</tr>
+<tr>
+<td>overlapping</td>
+<td>NormalEquations</td>
+<td style="text-align:right">178.18</td>
+<td style="text-align:right">86.08</td>
+<td style="text-align:right">84.22–86.99</td>
+<td style="text-align:right">2.07×</td>
+</tr>
+<tr>
+<td>r201-master</td>
+<td>HiPO</td>
+<td style="text-align:right">2459.59</td>
+<td style="text-align:right">683.02</td>
+<td style="text-align:right">631.91–818.28</td>
+<td style="text-align:right">3.60×</td>
+</tr>
+<tr>
+<td>r201-master</td>
+<td>NormalEquations</td>
+<td style="text-align:right">599.44</td>
+<td style="text-align:right">313.70</td>
+<td style="text-align:right">286.23–315.42</td>
+<td style="text-align:right">1.91×</td>
+</tr>
+<tr>
+<td>dense-front</td>
+<td>HiPO</td>
+<td style="text-align:right">110550.11</td>
+<td style="text-align:right">6054.69</td>
+<td style="text-align:right">4086.41–6168.10</td>
+<td style="text-align:right">18.26×</td>
+</tr>
+<tr>
+<td>dense-front</td>
+<td>NormalEquations</td>
+<td style="text-align:right">107263.80</td>
+<td style="text-align:right">7395.00</td>
+<td style="text-align:right">5287.36–7864.87</td>
+<td style="text-align:right">14.50×</td>
+</tr>
+<tr>
+<td>forest</td>
+<td>HiPO</td>
+<td style="text-align:right">653.55</td>
+<td style="text-align:right">299.92</td>
+<td style="text-align:right">226.40–325.48</td>
+<td style="text-align:right">2.18×</td>
+</tr>
+<tr>
+<td>forest</td>
+<td>NormalEquations</td>
+<td style="text-align:right">766.54</td>
+<td style="text-align:right">307.48</td>
+<td style="text-align:right">299.31–367.43</td>
+<td style="text-align:right">2.49×</td>
+</tr>
+<tr>
+<td>unbalanced</td>
+<td>HiPO</td>
+<td style="text-align:right">10217.10</td>
+<td style="text-align:right">1064.01</td>
+<td style="text-align:right">999.71–1088.83</td>
+<td style="text-align:right">9.60×</td>
+</tr>
+<tr>
+<td>unbalanced</td>
+<td>NormalEquations</td>
+<td style="text-align:right">10342.70</td>
+<td style="text-align:right">1224.15</td>
+<td style="text-align:right">1207.97–1250.81</td>
+<td style="text-align:right">8.45×</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="off">off</h3>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Backend</th>
+<th style="text-align:right">Before</th>
+<th style="text-align:right">After</th>
+<th style="text-align:right">After range</th>
+<th style="text-align:right">Speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>diagonal</td>
+<td>HiPO</td>
+<td style="text-align:right">229.72</td>
+<td style="text-align:right">202.96</td>
+<td style="text-align:right">200.91–205.90</td>
+<td style="text-align:right">1.13×</td>
+</tr>
+<tr>
+<td>diagonal</td>
+<td>NormalEquations</td>
+<td style="text-align:right">77.25</td>
+<td style="text-align:right">78.94</td>
+<td style="text-align:right">78.56–83.14</td>
+<td style="text-align:right">0.98×</td>
+</tr>
+<tr>
+<td>banded</td>
+<td>HiPO</td>
+<td style="text-align:right">17.97</td>
+<td style="text-align:right">15.48</td>
+<td style="text-align:right">15.22–15.52</td>
+<td style="text-align:right">1.16×</td>
+</tr>
+<tr>
+<td>banded</td>
+<td>NormalEquations</td>
+<td style="text-align:right">37.13</td>
+<td style="text-align:right">29.64</td>
+<td style="text-align:right">29.53–30.02</td>
+<td style="text-align:right">1.25×</td>
+</tr>
+<tr>
+<td>overlapping</td>
+<td>HiPO</td>
+<td style="text-align:right">22.57</td>
+<td style="text-align:right">22.19</td>
+<td style="text-align:right">22.07–22.26</td>
+<td style="text-align:right">1.02×</td>
+</tr>
+<tr>
+<td>overlapping</td>
+<td>NormalEquations</td>
+<td style="text-align:right">77.04</td>
+<td style="text-align:right">50.56</td>
+<td style="text-align:right">50.52–50.65</td>
+<td style="text-align:right">1.52×</td>
+</tr>
+<tr>
+<td>r201-master</td>
+<td>HiPO</td>
+<td style="text-align:right">221.78</td>
+<td style="text-align:right">230.16</td>
+<td style="text-align:right">227.10–231.35</td>
+<td style="text-align:right">0.96×</td>
+</tr>
+<tr>
+<td>r201-master</td>
+<td>NormalEquations</td>
+<td style="text-align:right">459.33</td>
+<td style="text-align:right">267.94</td>
+<td style="text-align:right">267.44–268.07</td>
+<td style="text-align:right">1.71×</td>
+</tr>
+<tr>
+<td>dense-front</td>
+<td>HiPO</td>
+<td style="text-align:right">144753.70</td>
+<td style="text-align:right">6852.66</td>
+<td style="text-align:right">6775.27–6864.73</td>
+<td style="text-align:right">21.12×</td>
+</tr>
+<tr>
+<td>dense-front</td>
+<td>NormalEquations</td>
+<td style="text-align:right">146127.80</td>
+<td style="text-align:right">7066.25</td>
+<td style="text-align:right">7055.53–7081.35</td>
+<td style="text-align:right">20.68×</td>
+</tr>
+<tr>
+<td>forest</td>
+<td>HiPO</td>
+<td style="text-align:right">1697.86</td>
+<td style="text-align:right">522.77</td>
+<td style="text-align:right">518.35–526.52</td>
+<td style="text-align:right">3.25×</td>
+</tr>
+<tr>
+<td>forest</td>
+<td>NormalEquations</td>
+<td style="text-align:right">1804.61</td>
+<td style="text-align:right">554.43</td>
+<td style="text-align:right">550.23–557.63</td>
+<td style="text-align:right">3.25×</td>
+</tr>
+<tr>
+<td>unbalanced</td>
+<td>HiPO</td>
+<td style="text-align:right">10582.49</td>
+<td style="text-align:right">996.28</td>
+<td style="text-align:right">995.67–1000.63</td>
+<td style="text-align:right">10.62×</td>
+</tr>
+<tr>
+<td>unbalanced</td>
+<td>NormalEquations</td>
+<td style="text-align:right">10425.43</td>
+<td style="text-align:right">1160.17</td>
+<td style="text-align:right">1156.01–1164.15</td>
+<td style="text-align:right">8.99×</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="choose">choose</h3>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Backend</th>
+<th style="text-align:right">Before</th>
+<th style="text-align:right">After</th>
+<th style="text-align:right">After range</th>
+<th style="text-align:right">Speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>diagonal</td>
+<td>HiPO</td>
+<td style="text-align:right">291.86</td>
+<td style="text-align:right">228.64</td>
+<td style="text-align:right">226.89–231.33</td>
+<td style="text-align:right">1.28×</td>
+</tr>
+<tr>
+<td>diagonal</td>
+<td>NormalEquations</td>
+<td style="text-align:right">99.17</td>
+<td style="text-align:right">105.00</td>
+<td style="text-align:right">104.11–105.23</td>
+<td style="text-align:right">0.94×</td>
+</tr>
+<tr>
+<td>banded</td>
+<td>HiPO</td>
+<td style="text-align:right">15.63</td>
+<td style="text-align:right">15.78</td>
+<td style="text-align:right">15.59–16.02</td>
+<td style="text-align:right">0.99×</td>
+</tr>
+<tr>
+<td>banded</td>
+<td>NormalEquations</td>
+<td style="text-align:right">41.48</td>
+<td style="text-align:right">41.82</td>
+<td style="text-align:right">41.81–68.74</td>
+<td style="text-align:right">0.99×</td>
+</tr>
+<tr>
+<td>overlapping</td>
+<td>HiPO</td>
+<td style="text-align:right">22.83</td>
+<td style="text-align:right">23.05</td>
+<td style="text-align:right">23.01–29.29</td>
+<td style="text-align:right">0.99×</td>
+</tr>
+<tr>
+<td>overlapping</td>
+<td>NormalEquations</td>
+<td style="text-align:right">82.22</td>
+<td style="text-align:right">60.45</td>
+<td style="text-align:right">59.89–86.13</td>
+<td style="text-align:right">1.36×</td>
+</tr>
+<tr>
+<td>r201-master</td>
+<td>HiPO</td>
+<td style="text-align:right">235.40</td>
+<td style="text-align:right">235.11</td>
+<td style="text-align:right">233.80–237.64</td>
+<td style="text-align:right">1.00×</td>
+</tr>
+<tr>
+<td>r201-master</td>
+<td>NormalEquations</td>
+<td style="text-align:right">509.70</td>
+<td style="text-align:right">308.86</td>
+<td style="text-align:right">296.69–316.96</td>
+<td style="text-align:right">1.65×</td>
+</tr>
+<tr>
+<td>dense-front</td>
+<td>HiPO</td>
+<td style="text-align:right">106945.43</td>
+<td style="text-align:right">6091.26</td>
+<td style="text-align:right">5648.57–6191.26</td>
+<td style="text-align:right">17.56×</td>
+</tr>
+<tr>
+<td>dense-front</td>
+<td>NormalEquations</td>
+<td style="text-align:right">107349.71</td>
+<td style="text-align:right">7331.89</td>
+<td style="text-align:right">6807.36–8112.11</td>
+<td style="text-align:right">14.64×</td>
+</tr>
+<tr>
+<td>forest</td>
+<td>HiPO</td>
+<td style="text-align:right">677.14</td>
+<td style="text-align:right">319.71</td>
+<td style="text-align:right">316.59–333.69</td>
+<td style="text-align:right">2.12×</td>
+</tr>
+<tr>
+<td>forest</td>
+<td>NormalEquations</td>
+<td style="text-align:right">756.22</td>
+<td style="text-align:right">362.51</td>
+<td style="text-align:right">360.59–386.18</td>
+<td style="text-align:right">2.09×</td>
+</tr>
+<tr>
+<td>unbalanced</td>
+<td>HiPO</td>
+<td style="text-align:right">9923.35</td>
+<td style="text-align:right">1082.23</td>
+<td style="text-align:right">1078.16–1129.87</td>
+<td style="text-align:right">9.17×</td>
+</tr>
+<tr>
+<td>unbalanced</td>
+<td>NormalEquations</td>
+<td style="text-align:right">10256.37</td>
+<td style="text-align:right">1262.81</td>
+<td style="text-align:right">1252.36–1274.31</td>
+<td style="text-align:right">8.12×</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="setup-and-solve-costs-with-four-workers-both">Setup and solve costs with four workers (<code>both</code>)</h2>
+<p>Setup times are milliseconds; solve times are microseconds. Setup includes
+ordering candidates and the new immutable assembly maps. Warmup allocations
+are excluded from the measured refactorization loop.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Backend</th>
+<th style="text-align:right">Setup before</th>
+<th style="text-align:right">Setup after</th>
+<th style="text-align:right">Solve before</th>
+<th style="text-align:right">Solve after</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>diagonal</td>
+<td>HiPO</td>
+<td style="text-align:right">2.291</td>
+<td style="text-align:right">2.785</td>
+<td style="text-align:right">40.528</td>
+<td style="text-align:right">26.538</td>
+</tr>
+<tr>
+<td>diagonal</td>
+<td>NormalEquations</td>
+<td style="text-align:right">2.073</td>
+<td style="text-align:right">2.041</td>
+<td style="text-align:right">13.349</td>
+<td style="text-align:right">12.139</td>
+</tr>
+<tr>
+<td>banded</td>
+<td>HiPO</td>
+<td style="text-align:right">0.587</td>
+<td style="text-align:right">0.700</td>
+<td style="text-align:right">17.529</td>
+<td style="text-align:right">16.029</td>
+</tr>
+<tr>
+<td>banded</td>
+<td>NormalEquations</td>
+<td style="text-align:right">0.363</td>
+<td style="text-align:right">0.395</td>
+<td style="text-align:right">6.850</td>
+<td style="text-align:right">7.000</td>
+</tr>
+<tr>
+<td>overlapping</td>
+<td>HiPO</td>
+<td style="text-align:right">0.752</td>
+<td style="text-align:right">1.033</td>
+<td style="text-align:right">28.838</td>
+<td style="text-align:right">13.810</td>
+</tr>
+<tr>
+<td>overlapping</td>
+<td>NormalEquations</td>
+<td style="text-align:right">0.535</td>
+<td style="text-align:right">0.558</td>
+<td style="text-align:right">9.590</td>
+<td style="text-align:right">6.040</td>
+</tr>
+<tr>
+<td>r201-master</td>
+<td>HiPO</td>
+<td style="text-align:right">11.351</td>
+<td style="text-align:right">10.739</td>
+<td style="text-align:right">144.332</td>
+<td style="text-align:right">57.657</td>
+</tr>
+<tr>
+<td>r201-master</td>
+<td>NormalEquations</td>
+<td style="text-align:right">5.590</td>
+<td style="text-align:right">5.448</td>
+<td style="text-align:right">23.409</td>
+<td style="text-align:right">24.538</td>
+</tr>
+<tr>
+<td>dense-front</td>
+<td>HiPO</td>
+<td style="text-align:right">552.868</td>
+<td style="text-align:right">522.025</td>
+<td style="text-align:right">147.053</td>
+<td style="text-align:right">109.645</td>
+</tr>
+<tr>
+<td>dense-front</td>
+<td>NormalEquations</td>
+<td style="text-align:right">563.528</td>
+<td style="text-align:right">541.997</td>
+<td style="text-align:right">110.235</td>
+<td style="text-align:right">97.965</td>
+</tr>
+<tr>
+<td>forest</td>
+<td>HiPO</td>
+<td style="text-align:right">28.924</td>
+<td style="text-align:right">27.753</td>
+<td style="text-align:right">40.247</td>
+<td style="text-align:right">33.279</td>
+</tr>
+<tr>
+<td>forest</td>
+<td>NormalEquations</td>
+<td style="text-align:right">49.140</td>
+<td style="text-align:right">47.535</td>
+<td style="text-align:right">36.658</td>
+<td style="text-align:right">29.219</td>
+</tr>
+<tr>
+<td>unbalanced</td>
+<td>HiPO</td>
+<td style="text-align:right">73.583</td>
+<td style="text-align:right">71.363</td>
+<td style="text-align:right">47.688</td>
+<td style="text-align:right">39.458</td>
+</tr>
+<tr>
+<td>unbalanced</td>
+<td>NormalEquations</td>
+<td style="text-align:right">86.339</td>
+<td style="text-align:right">82.084</td>
+<td style="text-align:right">44.717</td>
+<td style="text-align:right">39.708</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="peak-resident-memory">Peak resident memory</h2>
+<p>These are medians of whole-process maximum RSS from <code>wait4</code>, in MiB. A process
+runs all cases and both backends, so this includes ordering, live fronts, retained
+allocator storage, thread stacks, and cached buffers; it is not a per-front or
+per-backend allocation count. The raw measurements retain each process peak.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Mode</th>
+<th style="text-align:right">Before</th>
+<th style="text-align:right">After</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>off</td>
+<td style="text-align:right">26.58</td>
+<td style="text-align:right">25.71</td>
+</tr>
+<tr>
+<td>both</td>
+<td style="text-align:right">54.83</td>
+<td style="text-align:right">54.21</td>
+</tr>
+<tr>
+<td>choose</td>
+<td style="text-align:right">55.16</td>
+<td style="text-align:right">55.44</td>
+</tr>
+</tbody>
+</table></div>
+<p>The largest absolute solution error across all runs was 3.598e-13.</p>
+<h2 id="interpretation-and-limits">Interpretation and limits</h2>
+<p>Compare before/after within the same mode. A faster forced-parallel path can
+still be slower than the serial up-looking algorithm on a small sparse matrix.
+<code>Choose</code> retains that fast path when the structural heuristic finds insufficient
+work. Setup and solve costs should be included when judging end-to-end impact.</p>
+<p>The synthetic fronts demonstrate dense-kernel and assembly behavior, not speedups
+for arbitrary routing instances. These measurements do not cover NUMA scaling,
+very deep elimination trees, or multiple simultaneous solver instances.</p>
+<h2 id="provenance">Provenance</h2>
+<p>The implementation was informed by inspection of HiPO's
+<a href="https://github.com/ERGO-Code/HiGHS/blob/73cac48c5340d775a477087198611862559be250/highs/ipm/hipo/factorhighs/Analyse.cpp#L757">precomputed assembly indices</a>
+and <a href="https://github.com/ERGO-Code/HiGHS/blob/73cac48c5340d775a477087198611862559be250/highs/ipm/hipo/factorhighs/HybridHybridFormatHandler.cpp#L25">frontal storage reuse</a>.
+The Rust kernel preserves this project's pivot policy and regularization rules.</p>
+<p>Baseline source fingerprints (the worktree snapshot immediately before these
+optimizations, including the preceding parallel-control changes):</p>
+<ul>
+<li><code>factor.rs</code>: SHA-256 <code>ca014762d3fe2b3a94f900196bad8c73226ebdb96312c67da9ee62196623c014</code></li>
+<li><code>sparse_solver.rs</code>: SHA-256 <code>4a493de1b8c823445075c31f4170f42ba1e54ce9af248516d1bc25cd03685ca7</code></li>
+</ul>
+<p>Raw results: <a href="https://github.com/lseman/baldes/blob/main/docs/benchmarks/ipm-factorization.json">ipm-factorization.json</a>.</p>
+<h2 id="validation">Validation</h2>
+<ul>
+<li><code>cargo test -p baldes --lib --test ipm</code>: 381 tests passed.</li>
+<li><code>cargo test -p baldes --doc</code>: four doctests passed.</li>
+<li><code>cargo fmt -p baldes --check</code>: passed.</li>
+<li><code>cargo clippy -p baldes --lib --tests</code>: passed with existing repository warnings.</li>
+</ul>
+<p>Regression coverage includes exact comparison against the previous dense kernel,
+partial fronts, 1×1/2×2 pivots, an unused upper triangle containing NaNs, changed
+numeric values, changed symbolic plans of the same size, appended-column symbolic
+reuse, thread modes, workspace reuse, failure recovery, and the Schur cache limit.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="root.html"><small>Previous guide</small>Root benchmarks <span aria-hidden="true">↗</span></a><a href="rank-one-local-search.html"><small>Next guide</small>Parallel four- and five-row rank-one local search <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#changes">Changes</a><a class="toc-level-2" href="#method">Method</a><a class="toc-level-2" href="#warm-factorization">Warm factorization</a><a class="toc-level-3" href="#both">both</a><a class="toc-level-3" href="#off">off</a><a class="toc-level-3" href="#choose">choose</a><a class="toc-level-2" href="#setup-and-solve-costs-with-four-workers-both">Setup and solve costs with four workers (both)</a><a class="toc-level-2" href="#peak-resident-memory">Peak resident memory</a><a class="toc-level-2" href="#interpretation-and-limits">Interpretation and limits</a><a class="toc-level-2" href="#provenance">Provenance</a><a class="toc-level-2" href="#validation">Validation</a></nav></aside>
+</div>
+</body></html>

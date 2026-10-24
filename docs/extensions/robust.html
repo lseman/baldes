@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Robust vehicle routing The production robust VRPTW implementation uses the ordinary bucket graphlabeling engine and standard root/tree solvers. Labels carry budgeted demandand trav">
+<meta name="theme-color" content="#0b0e11">
+<title>Robust vehicle routing — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/robust.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP and VRPTW extension</a><a href="evrp.html">EVRP implementation status</a><a href="robust.html" aria-current="page">Robust vehicle routing</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/robust.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Extensions</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="robust-vehicle-routing">Robust vehicle routing</h1>
+<p>The production robust VRPTW implementation uses the ordinary bucket graph
+labeling engine and standard root/tree solvers. Labels carry budgeted demand
+and travel-time states in addition to their nominal bucket resources. Forward
+and backward extension, dominance, and concatenation use those robust states.</p>
+<h2 id="cli">CLI</h2>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp
+target/release/baldes<span class="w"> </span>solve<span class="w"> </span>instances/Solomon/R112.txt<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--customers<span class="w"> </span><span class="m">25</span><span class="w"> </span>--tree<span class="w"> </span>--cuts<span class="w"> </span>--robust<span class="w"> </span><span class="m">1</span>,2,0.5,0.5
+</code></pre></div>
+<p>The format is <code>--robust GAMMA_DEMAND,GAMMA_TIME,ALPHA_DEMAND,ALPHA_TIME</code>:</p>
+<ul>
+<li><code>GAMMA_DEMAND</code> bounds how many demands can deviate per route.</li>
+<li><code>GAMMA_TIME</code> bounds how many travel times can deviate per route.</li>
+<li>Demand deviations are <code>trunc(ALPHA_DEMAND * demand)</code>.</li>
+<li>Travel-time deviations are <code>0.1 * trunc(10 * ALPHA_TIME * travel_time)</code>
+in instance units.</li>
+</ul>
+<p>For both budgets equal to one, use <code>--robust 1,1,0.5,0.5</code>; for both equal to
+two, use <code>--robust 2,2,0.5,0.5</code>. A zero budget disables that uncertainty.
+Robust Solomon input requires time windows and <code>--rounding tenth</code>, the default.
+Remove <code>--tree</code> for a root relaxation solve.</p>
+<h2 id="rust-and-the-example">Rust and the example</h2>
+<p>Build robust data with <code>extensions::robust::Problem::from_instance</code> and
+<code>Uncertainty</code>, or supply <code>Node</code> and <code>Travel</code> data directly. Then call
+<code>Problem::native_graph</code> (or <code>native_graph_with_memory</code>), construct a
+<code>master::root::RootProblem</code>, and use <code>master::root::solve</code> or
+<code>master::tree::solve</code>. The graph retains the budgeted resources throughout
+pricing; no separate robust master is needed.</p>
+<p>The example uses this production path and prints a 36-row root LP sweep:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--example<span class="w"> </span>robust_c201<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>instances/Solomon/C201.txt<span class="w"> </span><span class="m">15</span><span class="w"> </span><span class="m">0</span>.5
+</code></pre></div>
+<p>Arguments are the instance, customer prefix, and relative deviation for both
+uncertainties. Each budget ranges over <code>0,1,2,3,5,10</code>. The example uses full
+customer NG memories to price elementary routes, with cuts and enumeration
+disabled. It shares the CLI's Solomon conversion, including integer-scaled
+time resources. CSV status names come from the standard CG solver; <code>Optimal</code>
+denotes completion of the root LP, not an integer optimality claim. <code>lp_bound</code>
+is <code>NaN</code> when artificial activity remains positive or the solve is incomplete.</p>
+<h2 id="independent-validation-reference">Independent validation reference</h2>
+<p><code>extensions::robust::reference</code> retains the independent forward-only elementary
+labeler and minimal LP master for small-instance checks:</p>
+<ul>
+<li><code>reference::price</code> compares pricing minima with the bucket graph engine.</li>
+<li><code>reference::RobustMaster</code> compares elementary LP objectives.</li>
+<li><code>Problem::replay</code> checks individual routes against the uncertainty recurrences.</li>
+</ul>
+<p>Production code should use the bucket graph path above. The former root-level
+<code>RobustMaster</code>, pricing types, and <code>Problem::price</code> remain as deprecated
+compatibility entry points. New validation code should import <code>reference</code>
+explicitly. Removing compatibility entry points is deferred until the full
+benchmark sweep and migration checks are complete.</p>
+<p>Regression tests compare forward-only and bidirectional bucket pricing against
+both brute-force enumeration and the independent reference, including sparse
+asymmetric arcs and nonzero depot indices. Separate tests check every route
+split for robust concatenation and compare bucket-root LPs with the reference
+master.</p>
+<h2 id="table-7-solver-sweep">Table 7 solver sweep</h2>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes
+python3<span class="w"> </span>scripts/benchmarks/benchmark_robust.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>results/robust-table7<span class="w"> </span>--jobs<span class="w"> </span><span class="m">4</span><span class="w"> </span>--time<span class="w"> </span><span class="m">60</span>
+</code></pre></div>
+<p>The default grid uses the first 25 customers of C1/R1/RC1 Solomon instances,
+excluding R101–R104 and RC105 as specified in the local paper
+<code>papers/munari_robust.pdf</code>, pages 24–25. Each of the 24 remaining instances
+gets one nominal solve and 54 uncertainty settings: demand-only, time-only,
+and joint uncertainty, each with Γ = 1…6 and α = 0.10, 0.25, 0.50.</p>
+<p>This is a solver screening pass with a 60-second limit per case. The paper's
+limit was 3,600 seconds; use <code>--time 3600</code> to match it. <code>--instances R112</code>
+selects a smaller smoke sweep. The output directory must be new so earlier
+results are preserved.</p>
+<p>The runner copies the tested binary and records its hash, source/input hashes,
+settings and commands. It writes per-case logs, solver JSON, independent replay
+results, <code>results.csv</code>, and <code>summary.json</code>. Replay checks exact customer cover,
+fleet size, route costs, worst-case demand, and worst-case service-start times
+in integer tenth units. The summary also detects contradictions between lower
+bounds and feasible incumbents as uncertainty increases. <code>all_optimal</code> requires
+all cases to finish <code>Optimal</code> with valid incumbents, closed gaps, and no such
+contradictions. Time limits and incomplete solves remain unresolved.</p>
+<p>This sweep does not perform the paper's 10,000-realization Monte Carlo risk
+simulation and is not a reproduction of its risk estimates.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="evrp.html"><small>Previous guide</small>EVRP implementation status <span aria-hidden="true">↗</span></a><a href="ipm.html"><small>Next guide</small>BALDES IPM in Rust <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#cli">CLI</a><a class="toc-level-2" href="#rust-and-the-example">Rust and the example</a><a class="toc-level-2" href="#independent-validation-reference">Independent validation reference</a><a class="toc-level-2" href="#table-7-solver-sweep">Table 7 solver sweep</a></nav></aside>
+</div>
+</body></html>

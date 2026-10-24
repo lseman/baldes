@@ -26,8 +26,8 @@
       <div class="hero-copy">
         <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> OPEN SOURCE / ROUTING OPTIMIZATION</p>
         <h1 id="hero-title">Hard routing.<br><em>Open possibilities.</em></h1>
-        <p class="hero-description">From your first Python model to branch-and-price in Rust. Build with bucket-graph pricing, strengthen bounds with cuts, and keep the algorithms within reach.</p>
-        <div class="hero-actions"><a class="button button-dark" href="#quickstart">Start building <span aria-hidden="true">↗</span></a><a class="text-link" href="docs/">Explore the docs <span aria-hidden="true">↓</span></a></div>
+        <p class="hero-description">Solve vehicle routing problems with capacity constraints and time windows. Use Python for root relaxations, the CLI for feasible routes and integer search, or Rust to build your own solver.</p>
+        <div class="hero-actions"><a class="button button-dark" href="#quickstart">Start building <span aria-hidden="true">↗</span></a><a class="text-link" href="docs/guides/first-solve.html">Your first solve <span aria-hidden="true">↓</span></a></div>
         <div class="hero-footnote"><span>Rust performance</span><span>Python interface</span><span>MIT licensed</span></div>
       </div>
       <figure class="route-card" aria-labelledby="route-title">
@@ -55,6 +55,11 @@
     <section id="quickstart" class="start-section" aria-labelledby="start-title">
       <div class="section-wrap">
         <div class="section-heading heading-row"><div><p class="eyebrow">01 / YOUR FIRST SOLVE</p><h2 id="start-title">Less setup.<br>More possibilities.</h2></div><p>Choose your interface. The same Rust engine powers the CLI and Python root solver.</p></div>
+        <div class="guide-grid" aria-label="Choose a solver workflow">
+          <a class="guide-card" href="docs/guides/first-solve.html#find-a-feasible-solution"><span class="eyebrow">FEASIBLE ROUTES</span><h3>Start with a heuristic.</h3><p>Use HGS to find an integer routing plan within a time budget.</p><span class="guide-arrow" aria-hidden="true">↗</span></a>
+          <a class="guide-card" href="docs/guides/first-solve.html#solve-a-root-relaxation"><span class="eyebrow">LOWER BOUNDS</span><h3>Solve the relaxation.</h3><p>Inspect an LP bound and route columns. Route values may be fractional.</p><span class="guide-arrow" aria-hidden="true">↗</span></a>
+          <a class="guide-card" href="docs/guides/first-solve.html#search-for-an-integer-solution"><span class="eyebrow">INTEGER SEARCH</span><h3>Explore the tree.</h3><p>Run branch-and-price and track the incumbent, bound, and remaining gap.</p><span class="guide-arrow" aria-hidden="true">↗</span></a>
+        </div>
         <div class="setup-strip"><div><span class="setup-number">01</span><h3>Get the source.</h3><p>Clone once, with the bundled Clp sources.</p></div><pre><code class="language-bash">git<span class="w"> </span>clone<span class="w"> </span>--recurse-submodules<span class="w"> </span>https://github.com/lseman/baldes.git
 <span class="nb">cd</span><span class="w"> </span>baldes</code></pre></div>
         <div class="install-grid">

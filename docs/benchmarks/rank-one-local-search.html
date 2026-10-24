@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Parallel four- and five-row rank-one local search Measured October 24, 2026 on an AMD Ryzen 9 9950X (16 physical cores, 32 logicalCPUs), Rust 1.97.1, release profile (opt-level=3, ">
+<meta name="theme-color" content="#0b0e11">
+<title>Parallel four- and five-row rank-one local search — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/benchmarks/rank-one-local-search.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="root.html">Root benchmarks</a><a href="ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a><a href="rank-one-local-search.html" aria-current="page">Parallel four- and five-row rank-one local search</a><a href="rank-one-three-row.html">Parallel three-row rank-one separation</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/benchmarks/rank-one-local-search.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Benchmarks</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="parallel-four--and-five-row-rank-one-local-search">Parallel four- and five-row rank-one local search</h1>
+<p>Measured October 24, 2026 on an AMD Ryzen 9 9950X (16 physical cores, 32 logical
+CPUs), Rust 1.97.1, release profile (<code>opt-level=3</code>, thin LTO).
+The baseline is commit <code>90a0d692</code>, including the parallel three-row enumeration.
+Both CLI executables use <code>--features clp</code> with optional SIMD disabled.</p>
+<h2 id="implementation">Implementation</h2>
+<p>For four- and five-row classes with at least 32 starts and more than one Rayon
+worker, build starting row sets in the original RNG order, improve independent
+starts in parallel, then replay deduplication, sub-cut checks and candidate
+insertion in start order. This retains the same first duplicate winner, IDs,
+score ties and RNG stream across successive classes. Four- and five-row stages
+remain sequential. The large precomputed difference bitsets and value tables
+are borrowed by all workers, rather than cloned.</p>
+<p>Batches contain <code>clamp(4 * threads, 32, 256)</code> starts, bounding temporary storage
+independently of the iteration budget. Deduplication persists across batches.
+Small restart budgets, one-thread execution and six-to-eight-row classes retain
+the original interleaved serial evaluation. The tuple/enumeration alternatives
+are unchanged. The existing <code>RAYON_NUM_THREADS</code> setting controls the worker pool;
+there is no new solver option.</p>
+<h2 id="root-solves">Root solves</h2>
+<p>Each variant has one warmup followed by three measured runs, alternating which
+variant runs first. R103 and R201 use 100 customers, Clp, reference NG
+neighbourhoods of eight customers, unrounded Euclidean distances
+(<code>--rounding none</code>), rank-one cuts, numerical bounds, no fixing/enumeration,
+and the default 1,000 local-search starts and maximum of five cut rows.
+Native BLAS/OpenMP thread budgets are fixed to one.</p>
+<p>The four-thread comparison pins both executables to CPUs 0–3. The 32-thread
+comparison pins both to CPUs 0–31, covering the default available CPU count on
+this machine. Builds and benchmark runs were sequential, with no concurrent
+build during timing. These are local measurements on two instances.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Instance</th>
+<th style="text-align:right">Threads</th>
+<th style="text-align:right">Original median (s)</th>
+<th style="text-align:right">Parallel median (s)</th>
+<th style="text-align:right">Time reduction</th>
+<th style="text-align:right">Original range (s)</th>
+<th style="text-align:right">Parallel range (s)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R103</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">1.645</td>
+<td style="text-align:right">1.521</td>
+<td style="text-align:right">7.6%</td>
+<td style="text-align:right">1.644–1.647</td>
+<td style="text-align:right">1.514–1.798</td>
+</tr>
+<tr>
+<td>R201</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">5.793</td>
+<td style="text-align:right">5.551</td>
+<td style="text-align:right">4.2%</td>
+<td style="text-align:right">5.778–5.812</td>
+<td style="text-align:right">5.514–5.551</td>
+</tr>
+<tr>
+<td>R103</td>
+<td style="text-align:right">32</td>
+<td style="text-align:right">1.630</td>
+<td style="text-align:right">1.491</td>
+<td style="text-align:right">8.5%</td>
+<td style="text-align:right">1.629–1.660</td>
+<td style="text-align:right">1.488–1.492</td>
+</tr>
+<tr>
+<td>R201</td>
+<td style="text-align:right">32</td>
+<td style="text-align:right">5.830</td>
+<td style="text-align:right">5.516</td>
+<td style="text-align:right">5.4%</td>
+<td style="text-align:right">5.816–5.863</td>
+<td style="text-align:right">5.458–5.535</td>
+</tr>
+</tbody>
+</table></div>
+<p>Every warmup and measured solve reported <code>Optimal</code>, with matching LP/bound
+values, cut counts, cut rounds, generated-column counts, pricing calls, root
+iterations and simplex iterations. R103 generated 348 cuts and reached LP
+1213.623943085003; R201 generated 828 cuts and reached LP 1147.8037726210775.
+The four-thread R103 candidate had one slower sample (1.798 s), so its median
+gain is not a guarantee for individual runs.</p>
+<h2 id="local-search-kernel">Local-search kernel</h2>
+<p>The ignored unit benchmark uses deterministic synthetic columns: 100 rows,
+256 elementary columns visiting six distinct rows each, ring neighbourhoods of
+eight rows, and 1,000 starts. It times start generation, local improvement,
+violation filtering, deduplication and candidate insertion for a single class.
+Sub-cut checks are skipped, matching the default. Table construction and pool
+creation are outside the timed region. One warmup
+pair precedes three measured pairs, alternating order; the table gives medians.
+Every output and next RNG draw must match the original serial oracle.</p>
+<p>These synthetic columns are not captured routing LP solutions. Four-row
+packing/covering and five-row packing produce no accepted candidates here;
+five-row covering produces 23. Separate regression fixtures exercise accepted
+four- and five-row packing/covering cuts and duplicate suppression across batches.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Separation</th>
+<th style="text-align:right">Rows</th>
+<th style="text-align:right">Threads</th>
+<th style="text-align:right">Serial (ms)</th>
+<th style="text-align:right">Parallel (ms)</th>
+<th style="text-align:right">Speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Packing</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">8.578</td>
+<td style="text-align:right">8.655</td>
+<td style="text-align:right">0.99×</td>
+</tr>
+<tr>
+<td>Packing</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">8.091</td>
+<td style="text-align:right">4.004</td>
+<td style="text-align:right">2.02×</td>
+</tr>
+<tr>
+<td>Packing</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">8</td>
+<td style="text-align:right">8.457</td>
+<td style="text-align:right">3.204</td>
+<td style="text-align:right">2.64×</td>
+</tr>
+<tr>
+<td>Packing</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">32</td>
+<td style="text-align:right">8.401</td>
+<td style="text-align:right">3.240</td>
+<td style="text-align:right">2.59×</td>
+</tr>
+<tr>
+<td>Covering</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">162.800</td>
+<td style="text-align:right">163.960</td>
+<td style="text-align:right">0.99×</td>
+</tr>
+<tr>
+<td>Covering</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">160.785</td>
+<td style="text-align:right">46.727</td>
+<td style="text-align:right">3.44×</td>
+</tr>
+<tr>
+<td>Covering</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">8</td>
+<td style="text-align:right">164.206</td>
+<td style="text-align:right">27.598</td>
+<td style="text-align:right">5.95×</td>
+</tr>
+<tr>
+<td>Covering</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">32</td>
+<td style="text-align:right">163.342</td>
+<td style="text-align:right">13.560</td>
+<td style="text-align:right">12.05×</td>
+</tr>
+<tr>
+<td>Packing</td>
+<td style="text-align:right">5</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">10.831</td>
+<td style="text-align:right">10.468</td>
+<td style="text-align:right">1.03×</td>
+</tr>
+<tr>
+<td>Packing</td>
+<td style="text-align:right">5</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">10.512</td>
+<td style="text-align:right">5.620</td>
+<td style="text-align:right">1.87×</td>
+</tr>
+<tr>
+<td>Packing</td>
+<td style="text-align:right">5</td>
+<td style="text-align:right">8</td>
+<td style="text-align:right">10.625</td>
+<td style="text-align:right">4.176</td>
+<td style="text-align:right">2.54×</td>
+</tr>
+<tr>
+<td>Packing</td>
+<td style="text-align:right">5</td>
+<td style="text-align:right">32</td>
+<td style="text-align:right">10.872</td>
+<td style="text-align:right">3.510</td>
+<td style="text-align:right">3.10×</td>
+</tr>
+<tr>
+<td>Covering</td>
+<td style="text-align:right">5</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">395.554</td>
+<td style="text-align:right">394.445</td>
+<td style="text-align:right">1.00×</td>
+</tr>
+<tr>
+<td>Covering</td>
+<td style="text-align:right">5</td>
+<td style="text-align:right">4</td>
+<td style="text-align:right">393.299</td>
+<td style="text-align:right">110.681</td>
+<td style="text-align:right">3.55×</td>
+</tr>
+<tr>
+<td>Covering</td>
+<td style="text-align:right">5</td>
+<td style="text-align:right">8</td>
+<td style="text-align:right">395.236</td>
+<td style="text-align:right">66.370</td>
+<td style="text-align:right">5.96×</td>
+</tr>
+<tr>
+<td>Covering</td>
+<td style="text-align:right">5</td>
+<td style="text-align:right">32</td>
+<td style="text-align:right">396.033</td>
+<td style="text-align:right">36.878</td>
+<td style="text-align:right">10.74×</td>
+</tr>
+</tbody>
+</table></div>
+<p>One-thread timings stayed within approximately three percent of the original.
+Packing benefits less than covering because the serial construction and ordered
+merge form a larger share of this workload. The root-solve timings above measure
+the resulting end-to-end effect rather than extrapolating from these kernels.</p>
+<h2 id="validation-and-reproduction">Validation and reproduction</h2>
+<p>The default-feature library suite passed 362 tests (three ignored). The new
+serial-oracle tests cover all seven five-row packing and ten five-row covering
+classes, successive calls with a persistent RNG/candidate arena, sub-cut checks,
+neighbour restrictions, 0/1/31/32/65 starts, 1/2/4 threads, nonzero initial IDs,
+accepted cuts, signed covering multipliers, and duplicate suppression spanning
+multiple batches. Six-row packing is checked as a serial fallback.
+Formatting, Clippy (existing repository warnings), and Node syntax validation
+also completed.</p>
+<p>Build and save the baseline executable from <code>90a0d692</code>, then build the candidate
+with the same release settings:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh"><span class="nv">CARGO_INCREMENTAL</span><span class="o">=</span><span class="m">0</span><span class="w"> </span>cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--offline<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>-j<span class="w"> </span><span class="m">2</span>
+<span class="c1"># Save target/release/baldes before switching to the candidate source.</span>
+</code></pre></div>
+<p>Run the paired root benchmark from the repository root, using a fresh output
+directory each time:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh"><span class="nv">BALDES_LS_OUT</span><span class="o">=</span>results/rank-one-local-search/paired-4<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>node<span class="w"> </span>scripts/benchmarks/benchmark_rank_one_local_search.mjs<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>/path/to/baseline<span class="w"> </span>/path/to/candidate
+
+<span class="nv">BALDES_LS_THREADS</span><span class="o">=</span><span class="m">32</span><span class="w"> </span><span class="nv">BALDES_LS_CPUS</span><span class="o">=</span><span class="m">0</span>-31<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">BALDES_LS_OUT</span><span class="o">=</span>results/rank-one-local-search/paired-32<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>node<span class="w"> </span>scripts/benchmarks/benchmark_rank_one_local_search.mjs<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>/path/to/baseline<span class="w"> </span>/path/to/candidate
+
+<span class="nv">BALDES_LS_BENCH_STARTS</span><span class="o">=</span><span class="m">1000</span><span class="w"> </span><span class="nv">CARGO_INCREMENTAL</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--release<span class="w"> </span>--offline<span class="w"> </span>--lib<span class="w"> </span>-j<span class="w"> </span><span class="m">2</span><span class="w"> </span>benchmark_parallel_local_search_starts<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--<span class="w"> </span>--ignored<span class="w"> </span>--nocapture<span class="w"> </span>--test-threads<span class="o">=</span><span class="m">1</span>
+
+<span class="nv">CARGO_INCREMENTAL</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="nv">CARGO_PROFILE_DEV_DEBUG</span><span class="o">=</span><span class="m">0</span><span class="w"> </span>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--offline<span class="w"> </span>--lib<span class="w"> </span>-j<span class="w"> </span><span class="m">2</span>
+cargo<span class="w"> </span>fmt<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--check
+<span class="nv">CARGO_INCREMENTAL</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="nv">CARGO_PROFILE_DEV_DEBUG</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>cargo<span class="w"> </span>clippy<span class="w"> </span>--offline<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--lib<span class="w"> </span>--tests<span class="w"> </span>-j<span class="w"> </span><span class="m">2</span>
+node<span class="w"> </span>--check<span class="w"> </span>scripts/benchmarks/benchmark_rank_one_local_search.mjs
+</code></pre></div>
+<p>Raw samples, binary hashes, CPU/thread settings, build/test logs and summaries
+are retained locally under <code>results/rank-one-local-search-20261024/</code>.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="ipm-factorization.html"><small>Previous guide</small>IPM factorization: cached assembly and lower-triangle updates <span aria-hidden="true">↗</span></a><a href="rank-one-three-row.html"><small>Next guide</small>Parallel three-row rank-one separation <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#implementation">Implementation</a><a class="toc-level-2" href="#root-solves">Root solves</a><a class="toc-level-2" href="#local-search-kernel">Local-search kernel</a><a class="toc-level-2" href="#validation-and-reproduction">Validation and reproduction</a></nav></aside>
+</div>
+</body></html>
