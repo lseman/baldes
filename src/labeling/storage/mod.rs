@@ -160,3 +160,7 @@ impl<const D: usize> Default for HotColumns<D> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/labeling/storage/packed_insertion_tests.rs"]
+mod packed_insertion_tests;

@@ -295,7 +295,7 @@ fn compose_cached(
     }
     let outer = Cached::new(outer, false, work)?;
     if policy == FrontOperationPolicy::NativeFrontAlgebra
-        && lower != inner.function.domain().0
+        && lower < inner.function.domain().0
         && near(lower, inner.function.domain().0)?
     {
         return Err(unsupported("native snapped composition start"));
@@ -307,6 +307,29 @@ fn compose_cached(
             return Err(unsupported("native near-disjoint composition interval"));
         }
         return Ok(None);
+    }
+    // The native helper treats a tolerance-sized interval as a constant
+    // front evaluated at its requested start, rather than fitting a secant.
+    // Keep exact domain intersection above: tolerance must not invent a domain.
+    if policy == FrontOperationPolicy::NativeFrontAlgebra && near(lo, hi)? {
+        work.charge(inner.function.pairs().len() + outer.function.pairs().len())?;
+        let inner_value = inner
+            .function
+            .evaluate(lo, super::EvaluationPolicy::NativeTolerance)
+            .map_err(FrontierUnknown::Arithmetic)?
+            .ok_or_else(|| unsupported("native singleton inner evaluation outside domain"))?;
+        let value = outer
+            .function
+            .evaluate(inner_value, super::EvaluationPolicy::NativeTolerance)
+            .map_err(FrontierUnknown::Arithmetic)?
+            .ok_or_else(|| unsupported("native singleton outer evaluation outside domain"))?;
+        let pairs = if lo == hi {
+            vec![(value, lo)]
+        } else {
+            vec![(value, lo), (0., hi)]
+        };
+        work.pairs(pairs.len())?;
+        return Ok(Some(prepared(pairs)?));
     }
     let (outer_lo, outer_hi) = outer.function.domain();
     if inner.knots.len() == 1 {
@@ -325,6 +348,7 @@ fn compose_cached(
     let mut last: Option<(f64, f64)> = None;
     let mut native_inner_end = None;
     let mut native_outer_anchor = None;
+    let mut native_outer_next = None;
     for index in 1..inner.knots.len() {
         work.charge(1)?;
         let (gx, gy) = inner.knots[index - 1];
@@ -342,6 +366,7 @@ fn compose_cached(
         let (anchor_x, anchor_y) = if policy == FrontOperationPolicy::NativeFrontAlgebra {
             let y = match native_inner_end {
                 Some(y) => y,
+                None if near(lo, inner.function.domain().0)? => inner.knots[0].1,
                 None => segment_value(gx, gy, slope, x0)?,
             };
             (x0, y)
@@ -351,18 +376,6 @@ fn compose_cached(
         let mut y0 = segment_value(anchor_x, anchor_y, slope, x0)?;
         let mut y1 = segment_value(anchor_x, anchor_y, slope, x1)?;
         native_inner_end = Some(y1);
-        if policy == FrontOperationPolicy::NativeFrontAlgebra {
-            for value in [y0, y1] {
-                let at = outer.knots.partition_point(|&(x, _)| x < value);
-                for &(knot, _) in
-                    &outer.knots[at.saturating_sub(1)..(at + 1).min(outer.knots.len())]
-                {
-                    if knot != value && near(knot, value)? {
-                        return Err(unsupported("native near-knot composition endpoint"));
-                    }
-                }
-            }
-        }
         if y0 > outer_hi || y1 < outer_lo {
             if policy == FrontOperationPolicy::NativeFrontAlgebra
                 && (near(y0, outer_hi)? || near(y1, outer_lo)?)
@@ -417,8 +430,29 @@ fn compose_cached(
                 ))
             }
         }
-        let mut next = outer.knots.partition_point(|&(x, _)| x <= y0);
-        while next < outer.knots.len() && outer.knots[next].0 < y1 {
+        let mut next = if native {
+            match native_outer_next {
+                Some(next) => next,
+                None => {
+                    // getYvalueAndSegId advances past a near upper knot but
+                    // returns the value at the actual argument. Its first
+                    // coordinate instead snaps both the value and segment.
+                    let at = outer.knots.partition_point(|&(x, _)| x < y0);
+                    if near(y0, outer_lo)? {
+                        1
+                    } else if at < outer.knots.len() && near(outer.knots[at].0, y0)? {
+                        at + 1
+                    } else {
+                        at
+                    }
+                }
+            }
+        } else {
+            outer.knots.partition_point(|&(x, _)| x <= y0)
+        };
+        while next < outer.knots.len()
+            && (outer.knots[next].0 < y1 || (native && near(outer.knots[next].0, y1)?))
+        {
             let (target, cached_value) = outer.knots[next];
             let value = if let Some((y, value)) = native_outer_anchor {
                 let value = segment_value(y, value, outer.function.pairs()[next].0, target)?;
@@ -427,14 +461,22 @@ fn compose_cached(
             } else {
                 cached_value
             };
-            let x = crossing(anchor_x, anchor_y, slope, target)?;
+            let x = if native && near(target, y1)? {
+                x1
+            } else {
+                crossing(anchor_x, anchor_y, slope, target)?
+            };
             if x < x0 || x > x1 {
                 return Err(unsupported("rounded composition knot crossing"));
             }
-            emit(&mut output, &mut last, x, value, policy, work)?;
+            emit(&mut output, &mut last, x, value, policy, false, work)?;
             next += 1;
         }
-        let end = if let Some((y, value)) = native_outer_anchor {
+        let end = if native && last.is_some_and(|(x, _)| x == x1) {
+            // A snapped outer knot already emitted this endpoint. The native
+            // inner-end branch skips it and retains the knot's accumulated value.
+            last.unwrap().1
+        } else if let Some((y, value)) = native_outer_anchor {
             // At an exact final knot `next` still names its incoming segment.
             // Once it was consumed, use the following segment's slope.
             if y1 == y {
@@ -454,7 +496,20 @@ fn compose_cached(
         if native && outer.knots.get(next).is_some_and(|&(knot, _)| knot == y1) {
             native_outer_anchor = Some((y1, end));
         }
-        emit(&mut output, &mut last, x1, end, policy, work)?;
+        if native {
+            native_outer_next = Some(next);
+        }
+        let inner_endpoint =
+            !(native && outer.knots.get(next).is_some_and(|&(knot, _)| knot == y1));
+        emit(
+            &mut output,
+            &mut last,
+            x1,
+            end,
+            policy,
+            inner_endpoint,
+            work,
+        )?;
     }
     if output.is_empty() {
         Ok(None)
@@ -481,6 +536,7 @@ fn emit(
     x: f64,
     value: f64,
     policy: FrontOperationPolicy,
+    inner_endpoint: bool,
     work: &mut Work,
 ) -> Result<()> {
     work.charge(1)?;
@@ -488,28 +544,34 @@ fn emit(
     if x == previous_x && value == previous_value {
         return Ok(());
     }
+    // Unlike an outer-knot crossing, a nearby inner endpoint emits no piece
+    // in the native helper. Keep the previous value/coordinate as its anchor.
+    if policy == FrontOperationPolicy::NativeFrontAlgebra && inner_endpoint && near(x, previous_x)?
+    {
+        return Ok(());
+    }
     if x <= previous_x {
         return Err(unsupported("composition output coordinates collapsed"));
     }
     let span = checked(x - previous_x, "composition secant span")?;
-    if policy == FrontOperationPolicy::NativeFrontAlgebra && near(x, previous_x)? {
-        return Err(unsupported("native near-singleton composition"));
-    }
     let slope = checked(
         checked(value - previous_value, "composition secant difference")? / span,
         "composition secant division",
     )?;
     let merge = if policy == FrontOperationPolicy::NativeFrontAlgebra && output.len() > 1 {
         let old = output.last().unwrap().0;
-        if old != slope && near(old, slope)? {
-            return Err(unsupported("native near-slope composition merge"));
-        }
-        old == slope
+        near(old, slope)?
     } else {
         false
     };
     if merge {
-        output.last_mut().unwrap().1 = x;
+        let previous = output.last_mut().unwrap();
+        // The original helper keeps the prior slope at an outer knot, but
+        // replaces it with the new secant at an inner-segment endpoint.
+        if inner_endpoint {
+            previous.0 = slope;
+        }
+        previous.1 = x;
     } else {
         work.pairs(output.len() + 1)?;
         output.push((slope, x));
@@ -643,33 +705,6 @@ mod tests {
         );
     }
     #[test]
-    fn near_knot_native_composition_is_unknown_without_a_recovered_snap() {
-        let outer = f(&[(-0.88, 0.), (0.15, 0.7), (-0.57, 2.)]);
-        let inner = f(&[(0.037, 0.), (0.387, 0.9), (0.456, 2.)]);
-        assert!(matches!(
-            compose_increasing(
-                &outer,
-                &inner,
-                0.251,
-                1.59,
-                FrontOperationPolicy::NativeFrontAlgebra,
-                FrontierBudget::default(),
-            ),
-            FrontierOutcome::Unknown(_)
-        ));
-        assert!(matches!(
-            compose_increasing(
-                &outer,
-                &inner,
-                0.251,
-                1.59,
-                FrontOperationPolicy::StrictDomain,
-                FrontierBudget::default(),
-            ),
-            FrontierOutcome::Complete(_)
-        ));
-    }
-    #[test]
     fn clipping_point_and_budget_are_not_guessed_infeasible() {
         let outer = f(&[(7., 2.)]);
         let inner = f(&[(0., 0.), (2., 2.)]);
@@ -769,5 +804,219 @@ mod tests {
                 FrontierOutcome::Complete(_)
             ));
         }
+    }
+    #[test]
+    fn native_snaps_and_near_slope_merges_match_original_helper_bits() {
+        // Original ELF SHA256 103caf4a...15889d6, helper 0x649680.
+        // Fixed-array(12)/vector ABI checked against the complete assembly;
+        // fixtures were executed in a separate original-library probe process.
+        type Fixture<'a> = (
+            &'a [(f64, f64)],
+            &'a [(f64, f64)],
+            f64,
+            f64,
+            &'a [(u64, u64)],
+        );
+        let cases: &[Fixture<'_>] = &[
+            // snap-start
+            (
+                &[(1.0, 0.0), (2.0, 10.0)],
+                &[(2.0, 0.0), (3.0, 2.0)],
+                1e-05,
+                2.0,
+                &[
+                    (0x4014000000000000, 0x3ee4f8b588e368f1),
+                    (0x4017ffffffffffff, 0x4000000000000000),
+                ],
+            ),
+            // tiny-interval
+            (
+                &[(1.0, 0.0), (2.0, 10.0)],
+                &[(2.0, 0.0), (3.0, 2.0)],
+                0.5,
+                0.50001,
+                &[
+                    (0x4020000000000000, 0x3fe0000000000000),
+                    (0x0000000000000000, 0x3fe00014f8b588e3),
+                ],
+            ),
+            // near-endpoint-slopes
+            (
+                &[(0.0, 0.0), (1.0, 1.0), (1.00001, 2.0)],
+                &[(0.0, 0.0), (1.0, 1.0), (1.0, 2.0)],
+                0.0,
+                2.0,
+                &[
+                    (0x0000000000000000, 0x0000000000000000),
+                    (0x3ff0000000000000, 0x4000000000000000),
+                ],
+            ),
+            // near-knot-slopes
+            (
+                &[(0.0, 0.0), (1.0, 1.0), (1.00001, 2.0)],
+                &[(0.0, 0.0), (1.0, 2.0)],
+                0.0,
+                2.0,
+                &[
+                    (0x0000000000000000, 0x0000000000000000),
+                    (0x3ff0000000000000, 0x4000000000000000),
+                ],
+            ),
+            // near-inner-end-slopes
+            (
+                &[(0.0, 0.0), (1.0, 1.0), (1.00001, 4.0)],
+                &[(0.0, 0.0), (1.0, 2.0)],
+                0.0,
+                2.0,
+                &[
+                    (0x0000000000000000, 0x0000000000000000),
+                    (0x3ff0000a7c5ac472, 0x4000000000000000),
+                ],
+            ),
+        ];
+        for &(outer, inner, lo, hi, expected) in cases {
+            let outer = f(outer);
+            let inner = f(inner);
+            let actual = complete(compose_increasing(
+                &outer,
+                &inner,
+                lo,
+                hi,
+                FrontOperationPolicy::NativeFrontAlgebra,
+                FrontierBudget::default(),
+            ));
+            let bits: Vec<_> = actual
+                .pairs()
+                .iter()
+                .map(|&(a, b)| (a.to_bits(), b.to_bits()))
+                .collect();
+            assert_eq!(bits, expected, "domain={lo:?}..{hi:?}");
+            let prepared = match PreparedCompositionMap::new(&inner, FrontierBudget::default()) {
+                FrontierOutcome::Complete(map) => map,
+                other => panic!("{other:?}"),
+            };
+            let cached = complete(prepared.compose(
+                &outer,
+                lo,
+                hi,
+                FrontOperationPolicy::NativeFrontAlgebra,
+                FrontierBudget::default(),
+            ));
+            assert_eq!(cached.pairs(), actual.pairs());
+        }
+    }
+
+    #[test]
+    fn native_constant_short_front_does_not_change_strict_composition() {
+        let outer = f(&[(1., 0.), (2., 10.)]);
+        let inner = f(&[(2., 0.), (3., 2.)]);
+        let strict = complete(compose_increasing(
+            &outer,
+            &inner,
+            0.5,
+            0.50001,
+            FrontOperationPolicy::StrictDomain,
+            FrontierBudget::default(),
+        ));
+        assert!((strict.pairs()[1].0 - 6.).abs() < 1e-8);
+        let native = complete(compose_increasing(
+            &outer,
+            &inner,
+            0.5,
+            0.50001,
+            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontierBudget::default(),
+        ));
+        assert_eq!(native.pairs()[1].0, 0.);
+        assert!(matches!(
+            compose_increasing(
+                &outer,
+                &inner,
+                0.5,
+                0.50001,
+                FrontOperationPolicy::NativeFrontAlgebra,
+                FrontierBudget {
+                    max_pairs: 0,
+                    ..FrontierBudget::default()
+                }
+            ),
+            FrontierOutcome::Unknown(FrontierUnknown::PairLimit)
+        ));
+        assert!(matches!(
+            compose_increasing(
+                &outer,
+                &inner,
+                -0.00001,
+                1.,
+                FrontOperationPolicy::NativeFrontAlgebra,
+                FrontierBudget::default()
+            ),
+            FrontierOutcome::Unknown(_)
+        ));
+    }
+    #[test]
+    fn native_near_knots_preserve_segment_advancement_and_endpoint_snaps() {
+        // Original helper fixture: near-knot-end.
+        let actual = complete(compose_increasing(
+            &f(&[(-0.88, 0.0), (0.15, 0.7), (-0.57, 2.0)]),
+            &f(&[(0.037, 0.0), (0.387, 0.9), (0.456, 2.0)]),
+            0.251,
+            1.59,
+            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontierBudget::default(),
+        ));
+        assert_eq!(
+            actual
+                .pairs()
+                .iter()
+                .map(|&(a, b)| (a.to_bits(), b.to_bits()))
+                .collect::<Vec<_>>(),
+            vec![
+                (0xbfeb8421e8881436, 0x3fd010624dd2f1aa),
+                (0x3fadb8bac710cb2f, 0x3feccccccccccccd),
+                (0x3fb18384685be48d, 0x3ff970a3d70a3d71)
+            ]
+        );
+        // Original helper fixture: near-knot-start.
+        let actual = complete(compose_increasing(
+            &f(&[(0.0, 0.0), (1.0, 1.0), (2.0, 4.0)]),
+            &f(&[(0.99999, 0.0), (1.0, 2.0)]),
+            0.0,
+            1.0,
+            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontierBudget::default(),
+        ));
+        assert_eq!(
+            actual
+                .pairs()
+                .iter()
+                .map(|&(a, b)| (a.to_bits(), b.to_bits()))
+                .collect::<Vec<_>>(),
+            vec![
+                (0x3fefffeb074a771d, 0x0000000000000000),
+                (0x4000000000000000, 0x3ff0000000000000)
+            ]
+        );
+        // Original helper fixture: near-knot-end-carried.
+        let actual = complete(compose_increasing(
+            &f(&[(0.0, 0.0), (1.0, 1.0), (2.0, 4.0)]),
+            &f(&[(0.0, 0.0), (0.99999, 1.0), (1.0, 2.0)]),
+            0.0,
+            2.0,
+            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontierBudget::default(),
+        ));
+        assert_eq!(
+            actual
+                .pairs()
+                .iter()
+                .map(|&(a, b)| (a.to_bits(), b.to_bits()))
+                .collect::<Vec<_>>(),
+            vec![
+                (0x0000000000000000, 0x0000000000000000),
+                (0x3ff0000000000000, 0x3ff0000000000000),
+                (0x3fffffeb074a771c, 0x4000000000000000)
+            ]
+        );
     }
 }

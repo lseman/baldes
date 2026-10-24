@@ -23,6 +23,7 @@ pub struct PreparedClampFilter {
     upper: Arc<PreparedSlopeFunction>,
     lower_segments: Arc<[Segment]>,
     upper_segments: Arc<[Segment]>,
+    constant_bounds: bool,
 }
 impl PartialEq for PreparedClampFilter {
     fn eq(&self, b: &Self) -> bool {
@@ -39,6 +40,8 @@ impl PreparedClampFilter {
             upper: Arc::new(upper.clone()),
             lower_segments: segments(lower)?,
             upper_segments: segments(upper)?,
+            constant_bounds: lower.pairs()[1..].iter().all(|&(slope, _)| slope == 0.)
+                && upper.pairs()[1..].iter().all(|&(slope, _)| slope == 0.),
         })
     }
     pub fn apply(
@@ -75,13 +78,22 @@ impl PreparedClampFilter {
                 }
                 continue;
             }
-            // Native truncation can snap a nonidentical endpoint. This helper
-            // does not infer a topology from that tolerance.
+            // Native truncation can snap a nonidentical endpoint. A point
+            // already satisfying constant bounds is an exception: both native
+            // bound helpers retain its original coordinate/value, and snapping
+            // a bound anchor cannot change a constant. Do not infer a domain
+            // extension or substitute the native lower FILTER for our clamp.
             if policy == FrontOperationPolicy::NativeFrontAlgebra {
-                for endpoint in [lo, hi] {
-                    for source in [domain.0, domain.1, ll, lh, ul, uh] {
-                        if endpoint != source && near(endpoint, source)? {
-                            return Err(unsupported("near-nonidentical bound endpoint"));
+                let unchanged_point = component.pairs().len() == 1
+                    && self.constant_bounds
+                    && component.pairs()[0].0 >= self.lower_segments[0].value
+                    && component.pairs()[0].0 <= self.upper_segments[0].value;
+                if !unchanged_point {
+                    for endpoint in [lo, hi] {
+                        for source in [domain.0, domain.1, ll, lh, ul, uh] {
+                            if endpoint != source && near(endpoint, source)? {
+                                return Err(unsupported("near-nonidentical bound endpoint"));
+                            }
                         }
                     }
                 }
@@ -651,5 +663,79 @@ mod tests {
             ),
             FrontierOutcome::Unknown(FrontierUnknown::WorkLimit)
         ));
+    }
+
+    #[test]
+    fn native_point_inside_constant_bounds_keeps_nearby_domain_endpoints() {
+        // Original helpers at ELF 0x723340/0x7200c0 retain (value=2,x=1)
+        // for these two constant domains. Their count=1 representation adds
+        // a zero-length zero-slope segment; the prepared form is one point.
+        let front = SlopeFront::from_prepared(function(&[(2., 1.)]));
+        for upper_end in [2., 1.00001] {
+            let lower = function(&[(0., 0.99999), (0., upper_end)]);
+            let upper = function(&[(10., 0.99999), (0., upper_end)]);
+            let result = complete(clamp_filter(
+                &front,
+                &lower,
+                &upper,
+                FrontOperationPolicy::NativeFrontAlgebra,
+                FrontierBudget::default(),
+            ));
+            assert_eq!(result.components().len(), 1);
+            assert_eq!(result.components()[0].pairs(), &[(2., 1.)]);
+            assert!(!result.used_tolerant_alignment());
+        }
+    }
+
+    #[test]
+    fn native_point_exception_does_not_widen_domains_or_guess_clamp_values() {
+        let front = SlopeFront::from_prepared(function(&[(2., 1.)]));
+        let upper = function(&[(10., 0.99999), (0., 2.)]);
+        // The native helper accepts this near-disjoint domain by tolerance.
+        // Its success must not turn our exact-domain resource contract feasible.
+        let disjoint = function(&[(0., 1.00001), (0., 2.)]);
+        assert!(matches!(
+            clamp_filter(
+                &front,
+                &disjoint,
+                &upper,
+                FrontOperationPolicy::NativeFrontAlgebra,
+                FrontierBudget::default()
+            ),
+            FrontierOutcome::Unknown(FrontierUnknown::Unsupported("near-disjoint bound domains"))
+        ));
+        assert!(matches!(
+            clamp_filter(
+                &front,
+                &disjoint,
+                &upper,
+                FrontOperationPolicy::StrictDomain,
+                FrontierBudget::default()
+            ),
+            FrontierOutcome::Empty
+        ));
+        // Raising the point is our lower-clamp contract, not the native lower
+        // filter. Keep that near-endpoint case unresolved in native policy.
+        let raises = function(&[(3., 0.99999), (0., 2.)]);
+        assert!(matches!(
+            clamp_filter(
+                &front,
+                &raises,
+                &upper,
+                FrontOperationPolicy::NativeFrontAlgebra,
+                FrontierBudget::default()
+            ),
+            FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "near-nonidentical bound endpoint"
+            ))
+        ));
+        let strict = complete(clamp_filter(
+            &front,
+            &raises,
+            &upper,
+            FrontOperationPolicy::StrictDomain,
+            FrontierBudget::default(),
+        ));
+        assert_eq!(strict.components()[0].pairs(), &[(3., 1.)]);
     }
 }

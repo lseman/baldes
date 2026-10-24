@@ -249,9 +249,23 @@ recovered arithmetic/comparison choices where supported; it does not promise
 reproduction of the reference's underpricing on accepted nonconvex waiting
 fixtures. A computed front minimum, a source replay and a directed global pricing
 certificate remain distinct. Unproved operations return an explicit incomplete
-result; raw directed certificates and unsafe pruning remain disabled. Core and
-binding compile checks pass. General operators are implemented with explicit
-unknown outcomes for unproved numerical cases; the runtime gate remains deferred.
+result; raw directed certificates and unsafe pruning remain disabled.
+
+The native-front composition policy handles in-domain start snapping,
+tolerance-sized constant intervals, near-knot segment advancement, and the
+separate near-equal-slope merge rules for outer knots and inner endpoints.
+These choices do not change `strict_domain` arithmetic. A point front already
+satisfying constant bounds can retain nearby bound-domain endpoints when it
+lies inside their exact intersection. Tolerance does not extend a disjoint domain.
+
+Runtime checks include direct coupled/paired route tests and selected original
+binary helpers. The October 24 comparison matched 1,600 finite composition cases
+and 36,872 extended-label insertions with nonempty cut descriptors. These are
+bounded operator/consumer checks, not complete resource or solver equivalence.
+Near-disjoint domains, unproved bound crossings and other unsupported numerical
+cases still return explicit incomplete outcomes. Evidence and reproduction
+artifacts are retained locally under
+`results/metasolver-parity-fixes-20261024/`.
 
 ## Rust
 
