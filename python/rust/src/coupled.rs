@@ -73,6 +73,17 @@ fn required_field<'py>(dictionary: &Bound<'py, PyDict>, name: &str) -> PyResult<
         .ok_or_else(|| PyValueError::new_err(format!("missing field: {name}")))
 }
 
+/// JSON encodes pairs as lists; accept both lists and tuples with exactly two values.
+fn wire_pairs(value: &Bound<'_, PyAny>) -> PyResult<Vec<(f64, f64)>> {
+    let pairs = value
+        .extract::<Vec<[f64; 2]>>()
+        .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    Ok(pairs
+        .into_iter()
+        .map(|[first, second]| (first, second))
+        .collect())
+}
+
 #[pymethods]
 impl EncodedFunction {
     /// Construct literal argument/value knots with a strict closed domain.
@@ -160,13 +171,13 @@ impl EncodedFunction {
             "knots" => {
                 exact_fields(definition, &["encoding", "function"])?;
                 exact_fields(function, &["points"])?;
-                Self::knots(required_field(function, "points")?.extract()?)
+                Self::knots(wire_pairs(&required_field(function, "points")?)?)
             }
             "slope_segments" => {
                 exact_fields(definition, &["encoding", "function", "policy"])?;
                 exact_fields(function, &["pairs"])?;
                 let policy = required_field(definition, "policy")?.extract::<String>()?;
-                Self::slope_segments(required_field(function, "pairs")?.extract()?, &policy)
+                Self::slope_segments(wire_pairs(&required_field(function, "pairs")?)?, &policy)
             }
             _ => Err(PyValueError::new_err("unknown function encoding")),
         }
@@ -300,8 +311,10 @@ impl ResourceModel {
             .into_iter()
             .map(|function| slope_function(&function.definition, leaf_policy))
             .collect::<PyResult<Vec<_>>>()?;
-        let initial = run(|| baldes::Window::new(initial_lower, initial_upper))?;
-        let bounds = run(|| baldes::Window::new(lower, upper))?;
+        let initial = baldes::Window::new(initial_lower, initial_upper)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let bounds = baldes::Window::new(lower, upper)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
         if increments.len() != functions.len()
             || increments.iter().any(|value| !value.is_finite())
             || ![initial_lower, initial_upper, lower, upper]
@@ -416,7 +429,8 @@ impl ResourceModel {
                 )),
             };
         let (policy, leaf_policy) = front_policy(policy)?;
-        let initial_base = run(|| baldes::Window::new(initial_lower, initial_upper))?;
+        let initial_base = baldes::Window::new(initial_lower, initial_upper)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
         if !initial_lower.is_finite() || !initial_upper.is_finite() {
             return Err(PyValueError::new_err(
                 "slope paired initial window must be finite",

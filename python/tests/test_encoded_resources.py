@@ -80,6 +80,25 @@ def test_wire_validation_rejects_unknown_fields_missing_policy_and_invalid_order
         EncodedFunction.from_dict(wire)
 
 
+@pytest.mark.parametrize("pairs", [[], [[0.0]], [[0.0, 1.0, 2.0]], [["bad", 0.0]]])
+@pytest.mark.parametrize("encoding, field", [("knots", "points"), ("slope_segments", "pairs")])
+def test_wire_pairs_reject_malformed_sequences(encoding, field, pairs):
+    wire = {"encoding": encoding, "function": {field: pairs}}
+    if encoding == "slope_segments":
+        wire["policy"] = "strict_domain"
+    with pytest.raises(ValueError):
+        EncodedFunction.from_dict(wire)
+
+
+@pytest.mark.parametrize("function", [
+    lambda: EncodedFunction.knots([(0.0, 1.0), (2.0, 3.0)]),
+    lambda: EncodedFunction.slope_segments([(2.0, 0.0), (3.0, 5.0)]),
+])
+def test_dictionary_round_trip_accepts_python_pairs(function):
+    original = function()
+    assert EncodedFunction.from_dict(original.to_dict()).to_dict() == original.to_dict()
+
+
 def test_literal_value_rejects_nonfinite_argument():
     function = EncodedFunction.affine(0.0, 1.0, 0.0, 1.0)
     with pytest.raises(ValueError):
@@ -105,9 +124,12 @@ def test_encoded_numeric_maps_dependencies_and_costs_share_original_objective(mo
         dependent, [EncodedFunction.knots([(0.0, 0.0), (10.0, 10.0)])] * 2,
     )
     model.install(solver)
+    # Pricing returns negative reduced-cost columns; the dual leaves the
+    # original objective unchanged while making this route improving.
+    solver.update_reduced_costs([1.0, 1.0], [0.0, 10.0, 0.0])
     minimum, routes = solver.price(10)
     # Base 2 -> 1 -> .5; dependent 0 -> 2 -> 3; charges 2 + 3.
-    assert minimum == 7.0
+    assert minimum == -3.0
     assert routes[0].original_cost == 7.0
     assert routes[0].nodes() == [0, 1, 2]
 

@@ -9,6 +9,7 @@ description = "Rust-backed RCSP pricing and VRPTW/CVRP root solving with capacit
 requires-python = ">=3.9"
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE", "vendor/Clp/LICENSE", "vendor/CoinUtils/LICENSE"]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
