@@ -69,7 +69,7 @@ the Clp master needed for routing root solves.
 Solve a root relaxation with time windows:
 
 ```bash
-./target/release/baldes solve instances/R101.txt --customers 25 --time 60 --verbose
+./target/release/baldes solve instances/Solomon/R101.txt --customers 25 --time 60 --verbose
 ```
 
 Find a feasible capacitated routing solution with HGS:
@@ -105,7 +105,7 @@ with bounds, routes, and iteration history:
 import pybaldes
 
 result = pybaldes.solve_root(
-    "instances/R101.txt",
+    "instances/Solomon/R101.txt",
     problem_type="vrptw",
     customers=25,
     time_limit=60,
@@ -123,6 +123,8 @@ solvers, or use the low-level `Solver` for pricing. See the
 [Python guide](docs/guides/python.md) for examples, options, and result export.
 
 ## Documentation
+
+New here? Start with [Your first solve](docs/guides/first-solve.md).
 
 - [Build and installation](docs/guides/build.md)
 - [CLI usage and options](docs/guides/cli.md)

@@ -12,7 +12,7 @@ structure before searching.
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  vrptw instances/R101.txt --customers 10 --tree --time 60
+  vrptw instances/Solomon/R101.txt --customers 10 --tree --time 60
 ```
 
 `--nodes N` sets the tree node budget (default 10,000). `--json FILE` writes
@@ -29,7 +29,7 @@ use baldes::{
 use std::time::Duration;
 
 fn main() -> baldes::Result<()> {
-    let mut instance = Instance::read("instances/R101.txt")?;
+    let mut instance = Instance::read("instances/Solomon/R101.txt")?;
     instance.truncate(10)?;
     let graph = instance.graph(8, Rounding::None)?;
     let problem = RootProblem::set_partitioning(graph, instance.vehicles as f64)?;

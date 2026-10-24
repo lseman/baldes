@@ -1,9 +1,23 @@
 # BALDES documentation
 
-Start with the [project README](../README.md) for installation and quick examples.
+New to BALDES? Follow [Your first solve](guides/first-solve.md) to build the CLI,
+run a small instance, and understand the result.
 Commands in these guides run from the repository root.
 
+## Choose your task
+
+| I want to… | Start here |
+| --- | --- |
+| Run a small example and understand its output | [Your first solve](guides/first-solve.md) |
+| Find a feasible routing solution quickly | [HGS and CLI usage](guides/cli.md) |
+| Search for an integer solution with bounds | [Branch-and-price tree](solver/tree.md) |
+| Model customer data in Python | [Python API](guides/python.md) |
+| Use multiple route families in one master | [Multi-pricing](extensions/mp.md) |
+| Configure backends or troubleshoot a build | [Build and installation](guides/build.md) |
+
 ## Getting started
+
+- [Your first solve](guides/first-solve.md): a complete CLI walkthrough, result interpretation, and common setup fixes.
 
 - [Build and installation](guides/build.md): dependencies, optional backends, and Make configuration.
 - [Source layout](guides/source-layout.md): production modules, CLI commands, and test organization.

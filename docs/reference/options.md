@@ -134,7 +134,7 @@ CLI overrides are repeatable:
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  vrptw instances/R101.txt --customers 10 \
+  vrptw instances/Solomon/R101.txt --customers 10 \
   --option BALDESlabelDominanceStrategy=1 --time 60
 ```
 
@@ -206,7 +206,7 @@ Select HiGHS for restricted-master LP solves with `--master highs`:
 
 ```sh
 cargo build --release --features clp,highs
-./target/release/baldes vrptw instances/R101.txt --customers 25 --master highs --log
+./target/release/baldes vrptw instances/Solomon/R101.txt --customers 25 --master highs --log
 ```
 
 HiGHS preserves the requested stabilization setting; use `--no-stabilization`
@@ -271,7 +271,7 @@ The interval applies to each CG solve, including descendant nodes and tree
 trials. Each node reports its depth, master algorithm, and stabilization mode.
 
 ```sh
-./target/release/baldes vrptw instances/R101.txt --customers 25 \
+./target/release/baldes vrptw instances/Solomon/R101.txt --customers 25 \
   --hgs-time 2 --hgs-columns 100 --master ipm --verbose
 ```
 

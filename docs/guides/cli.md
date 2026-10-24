@@ -5,9 +5,9 @@
 Commands below run from the repository root after building with `--features clp`.
 
 ```bash
-./target/release/baldes solve instances/R101.txt --customers 25 --rank1
+./target/release/baldes solve instances/Solomon/R101.txt --customers 25 --rank1
 ./target/release/baldes solve instances/cvrplib/A-n32-k5.vrp --capacity-cuts
-./target/release/baldes hgs instances/R101.txt --population-size 50 --nb-iter 5000
+./target/release/baldes hgs instances/Solomon/R101.txt --population-size 50 --nb-iter 5000
 ```
 
 Use `solve` for routing: Solomon inputs enforce time windows and service

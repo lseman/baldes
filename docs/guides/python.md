@@ -19,7 +19,7 @@ python -m pip install .
 import pybaldes
 
 result = pybaldes.solve_root(
-    "instances/R101.txt",
+    "instances/Solomon/R101.txt",
     problem_type="vrptw",  # or "cvrp" for CVRPLIB .vrp files
     customers=25,
     capacity_cuts=True,
@@ -84,7 +84,7 @@ For example, seed a native IPM root solve with HGS and log progress:
 
 ```python
 result = pybaldes.solve_root(
-    "instances/R101.txt", customers=25,
+    "instances/Solomon/R101.txt", customers=25,
     master_solver="ipm", hgs_time=2, hgs_columns="all", verbose=True,
 )
 print(result.to_json())

@@ -161,7 +161,7 @@ A complete Rust example, requiring `clp`:
 use baldes::{master::root::RootOptions, inputs::{Instance, Rounding}};
 
 fn main() -> baldes::Result<()> {
-    let mut instance = Instance::read("instances/R101.txt")?;
+    let mut instance = Instance::read("instances/Solomon/R101.txt")?;
     instance.truncate(10)?;
     let mut options = RootOptions::default();
     options.cg.smoothing.initial_alpha = 0.5;
@@ -177,7 +177,7 @@ Set `options.cg.stabilize = false` to disable it in Rust. The CLI exposes:
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  vrptw instances/R101.txt --customers 10 --no-stabilization
+  vrptw instances/Solomon/R101.txt --customers 10 --no-stabilization
 ```
 
 Python exposes the enable/disable switch through the public root API:
@@ -186,7 +186,7 @@ Python exposes the enable/disable switch through the public root API:
 import pybaldes
 
 result = pybaldes.solve_root(
-    "instances/R101.txt", customers=10, stabilize=False,
+    "instances/Solomon/R101.txt", customers=10, stabilize=False,
 )
 print(result.status, result.lp)
 ```

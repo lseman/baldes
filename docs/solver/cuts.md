@@ -25,7 +25,7 @@ solve automatically.
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  vrptw instances/R101.txt --customers 25 --capacity-cuts --rank1 --time 60
+  vrptw instances/Solomon/R101.txt --customers 25 --capacity-cuts --rank1 --time 60
 ```
 
 An experimental rank-one selection budget can limit how many active cuts touch
@@ -50,7 +50,7 @@ A complete Rust example:
 use baldes::{master::root::RootOptions, inputs::{Instance, Rounding}};
 
 fn main() -> baldes::Result<()> {
-    let mut instance = Instance::read("instances/R101.txt")?;
+    let mut instance = Instance::read("instances/Solomon/R101.txt")?;
     instance.truncate(25)?;
     let rounding = Rounding::None;
     let capacity = instance.capacity_cut_config(rounding, false);

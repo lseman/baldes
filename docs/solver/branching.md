@@ -31,7 +31,7 @@ priorities explicitly. Every supplied priority must be finite.
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  vrptw instances/R101.txt --customers 10 --tree \
+  vrptw instances/Solomon/R101.txt --customers 10 --tree \
   --branching ryan-foster --time 60
 ```
 
@@ -281,6 +281,6 @@ incumbent-minus-parent gap.
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  vrptw instances/R101.txt --customers 10 --tree \
+  vrptw instances/Solomon/R101.txt --customers 10 --tree \
   --branching hybrid --time 60 --json /tmp/tree.json
 ```

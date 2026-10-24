@@ -13,7 +13,7 @@ Build and enable the optional tree path:
 
 ```sh
 cargo run --features clp,highs --bin baldes -- \
-  vrptw instances/R101.txt --customers 10 --tree --enumerated-mip
+  vrptw instances/Solomon/R101.txt --customers 10 --tree --enumerated-mip
 ```
 
 `TreeOptions::enumerated_mip = Some(MipOptions::default())` enables the same

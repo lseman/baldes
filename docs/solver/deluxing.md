@@ -49,7 +49,7 @@ branch rows and full-memory cut coefficients, before filtering. Existing
 The CLI enables both with `--deluxing`:
 
 ```sh
-cargo run --release --features clp,highs -- vrptw instances/R101.txt --tree --deluxing
+cargo run --release --features clp,highs -- vrptw instances/Solomon/R101.txt --tree --deluxing
 ```
 
 `--deluxing` requires `--tree` and the `highs` build feature, and conflicts with
