@@ -1,4 +1,5 @@
-use super::*;
+use super::reference::{price, PricingOptions, PricingStatus};
+use super::{Node, Problem, Travel};
 
 pub(super) struct Lcg(pub u64);
 impl Lcg {
@@ -215,7 +216,7 @@ fn pricing_matches_enumeration_for_every_budget() {
                     dominance,
                     ..Default::default()
                 };
-                let result = p.price(&duals, 3.0, options).unwrap();
+                let result = price(&p, &duals, 3.0, options).unwrap();
                 assert_eq!(result.status, PricingStatus::Complete);
                 let found = result
                     .routes
@@ -241,6 +242,6 @@ fn label_limit_is_reported() {
         max_labels: 3,
         ..Default::default()
     };
-    let result = p.price(&vec![0.0; p.nodes.len()], 0.0, options).unwrap();
+    let result = price(&p, &vec![0.0; p.nodes.len()], 0.0, options).unwrap();
     assert_eq!(result.status, PricingStatus::LabelLimit);
 }

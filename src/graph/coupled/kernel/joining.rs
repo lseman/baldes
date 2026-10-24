@@ -30,6 +30,9 @@ impl CoupledKernel {
                 return Ok(None);
             }
         }
+        if !self.budgets_join(f, b)? {
+            return Ok(None);
+        }
         let mut front_correction = 0.;
         for (left, right) in f.fronts.iter().zip(&b.fronts) {
             let Some(joined) = left.joined_minimum(right)? else {
@@ -146,6 +149,9 @@ impl CoupledKernel {
             if finite(load[0] + load[2])? > capacity {
                 return Ok(None);
             }
+        }
+        if !self.budgets_join(f, b)? {
+            return Ok(None);
         }
         // Numeric-only canonical joins retain one state vector and literal
         // cost accumulator. Rebuilding a boxed physical label per suffix arc

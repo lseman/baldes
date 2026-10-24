@@ -19,7 +19,8 @@ into `target/baldes-build`. No prebuilt executable is needed in this directory.
 
 ## Benchmarks
 
-Requires Node.js and a built solver with the appropriate backend/features.
+Requires a built solver with the appropriate backend/features. JavaScript
+runners require Node.js; Python runners use the standard library.
 Inputs must already exist at the paths specified by each script. Routing runners
 currently use Solomon files at `instances/C202.txt`, etc., and CVRPLIB files at
 `instances/cvrplib/`; the downloader preserves the upstream archive layout, so
@@ -33,6 +34,7 @@ prepare these paths before running. Runs can take several minutes.
 | `benchmark_pstep_pricing.mjs` | `[BINARY] [OUTPUT]`: compare bucket and enumeration pricing backends. |
 | `benchmark_ce.mjs` | `name=/path/to/binary [...]`: compare column-elimination solves. |
 | `benchmark_ce_lp_threads.mjs` | `MODEL.mps [OUTPUT] [THREAD_COUNTS]`: compare HiGHS simplex/HiPO thread counts on an exported LP; requires the `highs` executable. |
+| `benchmark_robust.py` | `--output DIR [--jobs 4] [--time 60]`: run the 1,320-case Table 7 solver grid and independently replay robust incumbents. Uses `instances/Solomon/` and a Clp binary; see [robust routing](../docs/extensions/robust.md). |
 
 For example:
 

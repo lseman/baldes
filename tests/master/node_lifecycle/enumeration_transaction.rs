@@ -282,3 +282,75 @@ fn successful_handoff_repeats_only_after_formulation_changes() {
         );
     }
 }
+
+#[test]
+fn handoff_forgets_removed_columns_so_they_can_be_loaded_again() {
+    use baldes::master::clp::ClpMaster;
+    struct Replace {
+        done: bool,
+        include_original: bool,
+    }
+    impl Controller<ClpMaster> for Replace {
+        fn begin_enumeration_transaction(&mut self, _: f64) -> baldes::Result<bool> {
+            Ok(!self.done)
+        }
+        fn enumerated_universe(
+            &mut self,
+            _: &[f64],
+            _: f64,
+        ) -> baldes::Result<Option<Vec<Column>>> {
+            self.done = true;
+            let mut universe = vec![column(1)];
+            if self.include_original {
+                universe.push(column(0));
+            }
+            Ok(Some(universe))
+        }
+        fn regenerate_enumerated_columns(
+            &mut self,
+            _: &[Column],
+            _: &[f64],
+            _: f64,
+            _: &[Column],
+        ) -> baldes::Result<Vec<Column>> {
+            Ok(vec![])
+        }
+    }
+    // The old column can return either in the enumerated universe or in a
+    // later pricing pass after the restricted universe has been abandoned.
+    for include_original in [false, true] {
+        let mut master = ClpMaster::new().unwrap();
+        master.add_row(RowSense::Equal, 1., &[]).unwrap();
+        master.add_column(10., &[(0, 1.)]).unwrap();
+        let output = cg::optimize(
+            &mut master,
+            &[],
+            |_, duals| {
+                let mut original = column(0);
+                original.reduced_cost = original.cost - duals[0];
+                Ok(Answer {
+                    minimum: original.reduced_cost,
+                    columns: vec![original],
+                    exact: true,
+                    bound_minimum: None,
+                })
+            },
+            &mut Replace {
+                done: false,
+                include_original,
+            },
+            Options {
+                known: vec![column(0)],
+                enumerated_columns_added: usize::MAX,
+                stabilize: false,
+                max_iterations: 10,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(output.status, Status::Optimal);
+        assert_eq!(output.lp, 10., "include_original={include_original}");
+        assert!(output.column_tags.contains(&0));
+        assert_eq!(output.bound, 10.);
+    }
+}

@@ -235,6 +235,22 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             out.status = Status::TimeLimit;
             return finish(out, loaded, cut_artificials, pool, smoothing);
         }
+        if controller.refresh_master_columns(master, &mut loaded)? {
+            controller.synchronize_generated_columns(&mut pool, &loaded)?;
+            seen = loaded.iter().flatten().map(Column::signature).collect();
+            pool_seen = pool.iter().map(Column::signature).collect();
+            // Integer-domain bounds survive, but the new coefficient contract
+            // needs its own LP convergence estimate.
+            pricing_estimate = f64::NEG_INFINITY;
+            ipm_accuracy = IpmAccuracy::new();
+            accurate_next = false;
+            enumeration_transferred = false;
+            round_primal_bound = 1e12;
+            smoothing.restart_schedule((schedule.len() - 1) as i32);
+            stage = schedule.len() - 1;
+            stage_bound = -1e12;
+            round_penalty_updates = 0;
+        }
         let requested_gap = (!accurate_next).then(|| ipm_accuracy.tolerance());
         let outcome = master.solve_for_column_generation(
             options.time_limit.saturating_sub(started.elapsed()),
@@ -792,7 +808,6 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     &out,
                     &loaded,
                     &cut_artificials,
-                    &seen,
                     &pool,
                     &pool_seen,
                     options.enumerated_columns_added,

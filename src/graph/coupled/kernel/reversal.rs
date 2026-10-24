@@ -80,7 +80,7 @@ impl CoupledKernel {
         }
         self.check_state(f)?;
         self.check_state(reversed_prefix)?;
-        if f.suffix.is_some() || !self.initial.is_empty() {
+        if f.suffix.is_some() || !self.initial.is_empty() || !self.budgeted.is_empty() {
             return Err(invalid("unsupported coupled prefix reversal"));
         }
         if self.reversal_union

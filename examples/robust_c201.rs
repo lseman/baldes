@@ -1,14 +1,14 @@
-//! Root LP bounds of the robust VRPTW on a Solomon prefix, over (Γq, Γt).
+//! Bucket-graph root LP bounds of robust VRPTW over (Γq, Γt).
 //! Usage: robust_c201 [instance] [customers] [alpha]. Requires `clp`.
-//! Distances are truncated to one decimal and used as cost and time; the
-//! deviations follow Munari et al.: trunc(αq), 0.1·trunc(10αt).
+//! Uses the same Solomon conversion and robust resources as CLI `--robust`.
+//! Full customer NG memories retain the elementary reference LP's domain.
 
 #[cfg(feature = "clp")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use baldes::extensions::robust::{
-        Node, Problem, RobustColumnGenerationOptions, RobustMaster, Travel,
-    };
-    use baldes::master::clp::ClpMaster;
+    use baldes::extensions::robust::{Problem, Uncertainty};
+    use baldes::inputs::{Instance, Rounding};
+    use baldes::master::cg::{Options, Status};
+    use baldes::master::root::{self, RootOptions, RootProblem};
     use std::time::Instant;
 
     let args = std::env::args().collect::<Vec<_>>();
@@ -17,64 +17,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_or("instances/Solomon/C201.txt", |s| s.as_str());
     let customers: usize = args.get(2).map_or(Ok(15), |s| s.parse())?;
     let alpha: f64 = args.get(3).map_or(Ok(0.5), |s| s.parse())?;
-
-    let text = std::fs::read_to_string(path)?;
-    let capacity = text
-        .lines()
-        .skip_while(|l| !l.contains("CAPACITY"))
-        .nth(1)
-        .and_then(|l| l.split_whitespace().nth(1))
-        .ok_or("missing capacity")?
-        .parse::<f64>()?;
-    let rows = text
-        .lines()
-        .filter_map(|l| {
-            let v = l
-                .split_whitespace()
-                .map(str::parse::<f64>)
-                .collect::<Result<Vec<_>, _>>()
-                .ok()?;
-            (v.len() == 7).then_some(v)
-        })
-        .take(customers + 1)
-        .collect::<Vec<_>>();
-    let nodes = rows
-        .iter()
-        .map(|r| Node {
-            demand: r[3],
-            demand_deviation: 0.0,
-            window: (r[4], r[5]),
-            service: r[6],
-        })
-        .collect();
-    let travel = rows
-        .iter()
-        .enumerate()
-        .map(|(i, a)| {
-            rows.iter()
-                .enumerate()
-                .map(|(j, b)| {
-                    let d = ((a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
-                    let d = (10.0 * d).trunc() / 10.0;
-                    (i != j).then_some(Travel {
-                        time: d,
-                        time_deviation: 0.0,
-                        cost: d,
-                    })
-                })
-                .collect()
-        })
-        .collect();
-    let base = Problem {
-        nodes,
-        travel,
-        depot: 0,
-        capacity,
-        demand_budget: 0,
-        time_budget: 0,
-    }
-    .with_relative_deviations(alpha, alpha)
-    .map_err(|e| format!("{e:?}"))?;
+    let error = |e: baldes::core::error::OrError| format!("{e:?}");
+    let mut instance = Instance::read(path).map_err(error)?;
+    instance.truncate(customers).map_err(error)?;
+    let base = Problem::from_instance(
+        &instance,
+        Rounding::Tenth,
+        Uncertainty::parse(&format!("0,0,{alpha},{alpha}")).map_err(error)?,
+    )
+    .map_err(error)?;
 
     println!(
         "customers,alpha,gamma_q,gamma_t,status,lp_bound,artificial,iterations,columns,seconds"
@@ -86,22 +37,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             problem.demand_budget = gq;
             problem.time_budget = gt;
             let started = Instant::now();
-            let mut master = RobustMaster::new(
-                problem,
-                ClpMaster::new().map_err(|e| format!("{e:?}"))?,
-                1e5,
+            let graph = problem
+                .native_graph(&vec![0.; problem.nodes.len()], 0., customers)
+                .map_err(error)?;
+            let options = RootOptions {
+                enumerate: false,
+                cg: Options {
+                    multiplicity: customers as f64,
+                    artificial_cost: 1e5,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let result = root::solve(
+                RootProblem::set_partitioning(graph, customers as f64).map_err(error)?,
+                options,
             )
-            .map_err(|e| format!("{e:?}"))?;
-            let result = master
-                .optimize(RobustColumnGenerationOptions::default())
-                .map_err(|e| format!("{e:?}"))?;
+            .map_err(error)?;
+            let artificial: f64 = result
+                .master
+                .artificials
+                .iter()
+                .map(|&c| result.values[c].max(0.))
+                .sum();
+            let lp = if result.master.status == Status::Optimal && artificial <= 1e-6 {
+                result.master.bound
+            } else {
+                f64::NAN
+            };
+            let columns = result
+                .master
+                .column_tags
+                .iter()
+                .filter(|&&tag| tag >= 0)
+                .count();
             println!(
-                "{customers},{alpha},{gq},{gt},{:?},{:.4},{:.4},{},{},{:.3}",
-                result.status,
-                result.lp_objective.unwrap_or(f64::NAN),
-                result.artificial_usage,
-                result.iterations.len(),
-                master.columns().len(),
+                "{customers},{alpha},{gq},{gt},{:?},{lp:.4},{artificial:.4},{},{columns},{:.3}",
+                result.master.status,
+                result.master.iterations,
                 started.elapsed().as_secs_f64()
             );
         }

@@ -64,6 +64,7 @@ pub fn solve<const D: usize>(
     {
         return Err(invalid("tree requires a routing set-partitioning master with nonnegative costs and unique arc ids"));
     }
+    let objective_lattice = objective_lattice::ObjectiveLattice::prepare(&problem);
     // Resolve and validate the partition once for the whole tree.
     let mut options = options;
     if let Some(config) = &mut options.branching.clusters {
@@ -250,6 +251,9 @@ pub fn solve<const D: usize>(
         // numerical estimates never enter certified-mode node evaluations.
         if result.master.bound.is_finite() {
             node.bound = node.bound.max(result.master.bound);
+            if let Some(lattice) = &objective_lattice {
+                node.bound = lattice.strengthen(node.bound);
+            }
         }
         for route in &result.routes {
             pool.add(&problem, &route.arcs);

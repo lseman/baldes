@@ -8,16 +8,28 @@
 //! Robustness is checked by the dynamic programs of Munari et al. (2018):
 //! the worst-case load and service start are kept for each γ = 0..=Γ. Time
 //! cannot use the Γ largest deviations, because waiting absorbs some of them.
+//!
+//! Production pricing uses [`Problem::native_graph`] with the standard
+//! `crate::master::root::solve` adapter (Clp feature), or CLI `--robust`.
+//! The independent forward labeler in [`reference`] is for validation only.
 
 use crate::{invalid, Result};
 
-mod master;
-mod pricing;
-pub use master::{
+mod native;
+pub mod reference;
+mod solomon;
+#[doc(hidden)]
+#[deprecated(note = "validation-only API; use robust::reference explicitly")]
+pub use reference::{PricedRoute, PricingOptions, PricingResult, PricingStatistics, PricingStatus};
+#[doc(hidden)]
+#[deprecated(
+    note = "validation-only API; use robust::reference explicitly, or native_graph with the standard root solver for production"
+)]
+pub use reference::{
     RobustColumn, RobustColumnGenerationOptions, RobustColumnGenerationResult,
     RobustColumnGenerationStatus, RobustIteration, RobustMaster,
 };
-pub use pricing::{PricedRoute, PricingOptions, PricingResult, PricingStatistics, PricingStatus};
+pub use solomon::Uncertainty;
 
 fn nonnegative(x: f64) -> bool {
     x.is_finite() && x >= 0.0
@@ -83,6 +95,18 @@ pub struct RobustSchedule {
 }
 
 impl Problem {
+    /// Compatibility entry point for the validation-only forward labeler.
+    /// Production pricing uses [`Self::native_graph`] and the standard solver.
+    #[deprecated(note = "use reference::price for validation, or native_graph for production")]
+    pub fn price(
+        &self,
+        duals: &[f64],
+        fleet_dual: f64,
+        options: reference::PricingOptions,
+    ) -> Result<reference::PricingResult> {
+        reference::price(self, duals, fleet_dual, options)
+    }
+
     pub fn validate(&self) -> Result<()> {
         let n = self.nodes.len();
         if self.depot >= n
@@ -212,6 +236,9 @@ impl Problem {
 #[cfg(all(test, feature = "clp"))]
 #[path = "../../../tests/unit/extensions/robust/master_tests.rs"]
 mod master_tests;
+#[cfg(test)]
+#[path = "../../../tests/unit/extensions/robust/native_tests.rs"]
+mod native_tests;
 #[cfg(test)]
 #[path = "../../../tests/unit/extensions/robust/tests.rs"]
 mod tests;

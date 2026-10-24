@@ -28,6 +28,22 @@ impl Interval {
             hi: -multiply_down(-c, b)?,
         })
     }
+    fn max(self, b: Self) -> Self {
+        Self {
+            lo: self.lo.max(b.lo),
+            hi: self.hi.max(b.hi),
+        }
+    }
+    /// Some(true) when every value is at most `upper`, Some(false) when none is.
+    fn at_most(self, upper: f64) -> Option<bool> {
+        if self.hi <= upper {
+            Some(true)
+        } else if self.lo > upper {
+            Some(false)
+        } else {
+            None
+        }
+    }
     fn within(self, b: Window) -> Option<bool> {
         if self.hi < b.lower || self.lo > b.upper {
             Some(false)
@@ -81,6 +97,46 @@ impl CoupledKernel {
                     }
                     if domain == 0 {
                         return Some((false, [0.; 2]));
+                    }
+                }
+                CoupledResource::BudgetedLoad {
+                    capacity,
+                    budget,
+                    demands,
+                    deviations,
+                } => {
+                    let mut load = vec![Interval::point(0.); budget + 1];
+                    for &arc in arcs {
+                        let q = Interval::point(*demands.get(arc)?);
+                        let worst = q.add(Interval::point(deviations[arc]))?;
+                        for g in (1..load.len()).rev() {
+                            load[g] = load[g].add(q)?.max(load[g - 1].add(worst)?);
+                        }
+                        load[0] = load[0].add(q)?;
+                        if !load[*budget].at_most(*capacity)? {
+                            return Some((false, [0.; 2]));
+                        }
+                    }
+                }
+                CoupledResource::BudgetedTime {
+                    initial,
+                    budget,
+                    durations,
+                    deviations,
+                    windows,
+                } => {
+                    let mut start = vec![Interval::point(*initial); budget + 1];
+                    for &arc in arcs {
+                        let d = Interval::point(*durations.get(arc)?);
+                        let worst = d.add(Interval::point(deviations[arc]))?;
+                        let open = Interval::point(windows[arc].lower);
+                        for g in (1..start.len()).rev() {
+                            start[g] = start[g].add(d)?.max(start[g - 1].add(worst)?).max(open);
+                        }
+                        start[0] = start[0].add(d)?.max(open);
+                        if !start[*budget].at_most(windows[arc].upper)? {
+                            return Some((false, [0.; 2]));
+                        }
                     }
                 }
                 CoupledResource::SimultaneousPickupDelivery {

@@ -26,6 +26,7 @@ pub use history::{BranchEvaluationHistory, BranchHistoryOptions, BranchHistoryPo
 mod diving;
 #[cfg(feature = "highs")]
 mod integer;
+mod objective_lattice;
 pub use super::branching::{BranchConstraint, BranchingOptions};
 pub mod strong;
 pub use diving::DivingOptions;

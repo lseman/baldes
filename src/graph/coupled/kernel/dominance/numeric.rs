@@ -82,6 +82,8 @@ impl NumericCostOrder {
                 CoupledResource::CumulativeCost { .. }
                     | CoupledResource::Selection { .. }
                     | CoupledResource::SimultaneousPickupDelivery { .. }
+                    | CoupledResource::BudgetedLoad { .. }
+                    | CoupledResource::BudgetedTime { .. }
             )
         });
         Self {

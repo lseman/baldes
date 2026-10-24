@@ -56,6 +56,16 @@ pub trait Controller<M> {
     fn master_solved(&mut self, _master: &M, _tags: &[i32], _artificials: &[usize]) -> Result<()> {
         Ok(())
     }
+    /// Refresh loaded coefficients after a pricing-universe transition.
+    /// Return true when the LP or its coefficient contract changed, requiring
+    /// a new solve and pricing convergence estimate before termination.
+    fn refresh_master_columns(
+        &mut self,
+        _master: &mut M,
+        _loaded: &mut [Option<Column>],
+    ) -> Result<bool> {
+        Ok(false)
+    }
     fn incumbent(&self) -> f64 {
         f64::INFINITY
     }

@@ -20,6 +20,9 @@ Options:
   --steps S|TIME,CAPACITY Initial bucket widths in graph resource units; one value
                         applies to both resources (0 = automatic; default: 0)
   --reference-ng        Use reference-compatible customer neighborhoods
+  --robust GQ,GT,AQ,AT  Robust VRPTW (Munari et al., 2019): at most GQ demands and
+                        GT travel times deviate by trunc(AQ*q) and 0.1*trunc(10*AT*t)
+                        (solve/vrptw with time windows and tenth rounding)
   --rounding MODE       Distances: none, nearest, tenth or ceil (default: tenth)
   --cuts                Enable all applicable cuts (2-path requires time windows)
   --rank1               Enable rank-one cuts
@@ -109,6 +112,7 @@ pub(super) fn run() -> std::result::Result<(), String> {
     let mut hgs_seed = 0;
     let mut hgs_time = None;
     let mut hgs_columns = baldes::inputs::HgsColumns::Best;
+    let mut robust = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" | "-h" => {
@@ -136,6 +140,13 @@ pub(super) fn run() -> std::result::Result<(), String> {
                 ignore_time_windows = true;
             }
             "--reference-ng" => reference_ng = true,
+            "--robust" => {
+                let text = args.next().ok_or("missing robust uncertainty")?;
+                robust = Some(
+                    baldes::extensions::robust::Uncertainty::parse(&text)
+                        .map_err(|e| e.to_string())?,
+                );
+            }
             "--bound-mode" => {
                 options.bound_mode = baldes::master::root::BoundMode::parse(
                     &args.next().ok_or("missing bound mode")?,
@@ -504,6 +515,23 @@ pub(super) fn run() -> std::result::Result<(), String> {
         instance.graph(ng, rounding)
     }
     .map_err(|e| e.to_string())?;
+    if let Some(uncertainty) = robust {
+        if capacity_only {
+            return Err("--robust requires time windows".into());
+        }
+        // HGS routes are only nominally feasible.
+        if hgs_time.is_some() {
+            return Err("--robust conflicts with --hgs-time".into());
+        }
+        let problem =
+            baldes::extensions::robust::Problem::from_instance(&instance, rounding, uncertainty)
+                .map_err(|e| e.to_string())?;
+        // Keep the nominal graph's NG memories so Γ = 0 matches it exactly.
+        let memory: Vec<_> = graph.vertices.iter().map(|v| v.memory.clone()).collect();
+        graph = problem
+            .native_graph_with_memory(&vec![0.; problem.nodes.len()], 0., &memory)
+            .map_err(|e| e.to_string())?;
+    }
     let n = instance.customers.len() - 1;
     if reference_ng {
         let sink = n + 1;

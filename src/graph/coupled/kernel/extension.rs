@@ -6,6 +6,7 @@ impl CoupledKernel {
         Box::new(CoupledLabelState {
             selection: StateValues::from_slice(&self.selection_initial),
             loads: StateValues::filled(self.load_capacities.len(), [0.; 3]),
+            budgets: budgeted::PreparedBudgeted::root(&self.budgeted, forward),
             reversal_peaks: None,
             numeric: StateValues::from_slice(&self.initial),
             slope_fronts: self
@@ -67,6 +68,8 @@ impl CoupledKernel {
                     };
                 account_safe
                     && dominance::loads_dominate(a, b)
+                    // Entry kinds are unknown here; equality is order-free.
+                    && a.budgets == b.budgets
                     && a.fronts == b.fronts
                     && a.slope_fronts == b.slope_fronts
                     && a.slope_relations == b.slope_relations
@@ -130,6 +133,7 @@ impl CoupledKernel {
         let mut next = CoupledLabelState {
             selection: state.selection.clone(),
             loads: state.loads.clone(),
+            budgets: state.budgets.clone(),
             reversal_peaks: state.reversal_peaks.clone(),
             numeric: state.numeric.clone(),
             suffix: None,
@@ -174,6 +178,9 @@ impl CoupledKernel {
             {
                 return Ok(None);
             }
+        }
+        if !self.budgets_extend(&mut next.budgets, arc, forward)? {
+            return Ok(None);
         }
         for (old, &i) in state.fronts.iter().zip(&self.front_indices) {
             let CoupledResource::IntervalCost {

@@ -1284,3 +1284,47 @@ fn routing_rejects_invalid_master_worker_budgets() {
         .unwrap();
     assert!(String::from_utf8_lossy(&output.stderr).contains("missing master thread count"));
 }
+
+#[test]
+fn robust_tree_resumes_consistent_cut_pricing_after_enumeration() {
+    for (instance, uncertainty, stabilize, optimum) in [
+        ("R112", "0,1,0,0.5", true, 393.),
+        ("R107", "0,4,0,0.5", false, 463.5),
+    ] {
+        let mut cmd = command();
+        cmd.arg("solve")
+            .arg(format!(
+                "{}/instances/Solomon/{instance}.txt",
+                env!("CARGO_MANIFEST_DIR")
+            ))
+            .args([
+                "--customers",
+                "25",
+                "--tree",
+                "--cuts",
+                "--robust",
+                uncertainty,
+                "--time",
+                "30",
+            ]);
+        if !stabilize {
+            cmd.arg("--no-stabilization");
+        }
+        let result = cmd.output().unwrap();
+        let stdout = String::from_utf8_lossy(&result.stdout);
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        assert!(
+            stdout.contains(&format!("instance={instance} status=Optimal")),
+            "{stdout}"
+        );
+        assert!(
+            stdout.contains(&format!("incumbent={optimum:.2}")),
+            "{stdout}"
+        );
+        assert!(stdout.contains(&format!("bound={optimum:.2}")), "{stdout}");
+    }
+}

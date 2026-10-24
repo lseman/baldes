@@ -135,6 +135,14 @@ impl<const D: usize> Controller<ClpMaster> for RootController<D> {
         self.refresh_pool(pool)
     }
 
+    fn refresh_master_columns(
+        &mut self,
+        master: &mut ClpMaster,
+        loaded: &mut [Option<Column>],
+    ) -> Result<bool> {
+        self.restore_limited_memory_columns(master, loaded)
+    }
+
     fn uses_inactive_column_pool(&self) -> bool {
         let state = self.state.borrow();
         // A finite pricing universe and its full-memory cut contract own

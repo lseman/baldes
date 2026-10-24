@@ -35,6 +35,7 @@ Commands in these guides run from the repository root.
 - [Finite column imports](extensions/column-imports.md): original-vector patterns and multiplicity constraints.
 - [P-step CVRP](extensions/pstep.md): compact p-step LP relaxation.
 - [Electric-vehicle routing](extensions/evrp.md): charging models, schedule replay, and current limitations.
+- [Robust vehicle routing](extensions/robust.md): budgeted demand and travel-time uncertainty in bucket graph labeling, plus an independent validation reference.
 - [Interior-point solver](extensions/ipm.md): native LP backend, interfaces, and implementation details.
 - [Column elimination (CE)](extensions/ce.md): decision-diagram route relaxation and refinement.
 

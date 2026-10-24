@@ -102,6 +102,13 @@ impl<const D: usize> RootController<D> {
         // Cost-dependent fixing, completion bounds and cutoff enumeration from
         // the original objective cannot restrict feasibility pricing.
         state.solver.restore_arcs();
+        let mut phase_columns = warm.columns.clone();
+        super::pool::restore_limited_memory_columns(
+            &self.problem,
+            &mut state,
+            &mut phase_master,
+            &mut phase_columns,
+        )?;
         state.solver.rollback_point_saved = false;
         state.solver.graph.suppress_coupled_costs();
         state.solver.requires_rollback = false;

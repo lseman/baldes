@@ -21,7 +21,6 @@ pub(super) fn transfer<M: LpMaster, C: Controller<M>>(
     output: &Output,
     loaded: &[Option<Column>],
     cut_artificials: &[(usize, usize)],
-    seen: &HashSet<ColumnKey>,
     pool: &[Column],
     pool_seen: &HashSet<ColumnKey>,
     insertion_limit: usize,
@@ -65,7 +64,8 @@ pub(super) fn transfer<M: LpMaster, C: Controller<M>>(
                         .ok_or_else(|| invalid("enumeration removed a cut artificial"))
                 })
                 .collect::<Result<_>>()?,
-            seen: seen.clone(),
+            // Removed paths remain eligible for reinsertion.
+            seen: HashSet::new(),
             pool: pool.to_vec(),
             pool_seen: pool_seen.clone(),
         };
@@ -76,7 +76,7 @@ pub(super) fn transfer<M: LpMaster, C: Controller<M>>(
             .filter_map(|(&tag, retained)| retained.map(|_| tag))
             .collect();
         next.output.artificials = output.artificials.iter().filter_map(|&i| map[i]).collect();
-        let mut loaded_set = seen.clone();
+        let mut loaded_set = HashSet::new();
         for column in regenerated {
             let index = next.master.add_column(column.cost, &column.entries)?;
             apply_column_cap(&mut next.master, controller, index, column.tag)?;

@@ -1,5 +1,6 @@
 //! Cached-column coefficient synchronization and row remapping.
 use super::*;
+use std::collections::HashMap;
 
 /// Reuse the refreshed integer cut incidence of loaded routes. Base/branch
 /// coefficients stay in their original representation, including tiny values
@@ -44,7 +45,64 @@ pub(super) fn synchronize_pool(
     Ok(())
 }
 
+pub(super) fn restore_limited_memory_columns<const D: usize>(
+    problem: &RootProblem<D>,
+    state: &mut State<D>,
+    master: &mut ClpMaster,
+    loaded: &mut [Option<Column>],
+) -> Result<bool> {
+    if state.solver.enumeration.is_some() || state.cut.enumerated.is_empty() {
+        return Ok(false);
+    }
+    // Enumeration prices full-memory coefficients. Once ordinary labeling
+    // resumes (for example after phase I), loaded routes must use the same
+    // limited-memory coefficients as the labeling engine.
+    let mut refreshed = vec![];
+    for (index, column) in loaded.iter().enumerate() {
+        let Some(column) = column else { continue };
+        let route = state
+            .routes
+            .get(usize::try_from(column.tag).map_err(|_| invalid("cached route tag"))?)
+            .ok_or_else(|| invalid("cached route tag"))?;
+        let mut entries = problem.base_entries(route)?;
+        entries.extend(
+            state
+                .cut
+                .cached_entries(problem, &state.solver, route, false)?,
+        );
+        entries.sort_by_key(|&(row, _)| row);
+        refreshed.push((index, entries));
+    }
+    for (index, entries) in refreshed {
+        let column = loaded[index].as_mut().unwrap();
+        let old: HashMap<_, _> = column.entries.iter().copied().collect();
+        let new: HashMap<_, _> = entries.iter().copied().collect();
+        for row in old
+            .keys()
+            .chain(new.keys())
+            .copied()
+            .collect::<HashSet<_>>()
+        {
+            let value = new.get(&row).copied().unwrap_or(0.);
+            if old.get(&row).copied().unwrap_or(0.) != value {
+                master.set_coefficient(row, index, value)?;
+            }
+        }
+        column.entries = entries;
+    }
+    state.cut.enumerated.clear();
+    Ok(true)
+}
+
 impl<const D: usize> RootController<D> {
+    pub(super) fn restore_limited_memory_columns(
+        &mut self,
+        master: &mut ClpMaster,
+        loaded: &mut [Option<Column>],
+    ) -> Result<bool> {
+        restore_limited_memory_columns(&self.problem, &mut self.state.borrow_mut(), master, loaded)
+    }
+
     pub(super) fn refresh_pool(&mut self, pool: &mut [Column]) -> Result<()> {
         let state = self.state.borrow();
         for column in pool {

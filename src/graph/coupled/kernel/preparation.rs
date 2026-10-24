@@ -158,6 +158,7 @@ impl CoupledKernel {
                     _ => None,
                 })
                 .collect(),
+            budgeted: budgeted::PreparedBudgeted::prepare(g, definitions),
             relation_indices: definitions
                 .iter()
                 .enumerate()

@@ -3,6 +3,7 @@ use super::*;
 mod accounting;
 pub(super) mod bounds;
 mod bucketing;
+mod budgeted;
 #[cfg(feature = "clp")]
 mod certificate;
 mod charging;
@@ -49,6 +50,8 @@ struct Suffix {
 pub struct CoupledLabelState {
     selection: StateValues<u64, 2>,
     loads: StateValues<[f64; 3], 1>,
+    /// Budgeted worst-case vectors, concatenated in declaration order.
+    budgets: Vec<f64>,
     reversal_peaks: Option<Box<StateValues<f64, 1>>>,
     numeric: StateValues<f64, 4>,
     suffix: Option<Box<Suffix>>,
@@ -72,6 +75,7 @@ pub struct CoupledKernel {
     cost_scale: f64,
     selection_initial: Vec<u64>,
     load_capacities: Vec<f64>,
+    budgeted: Vec<budgeted::PreparedBudgeted>,
     reversal_union: bool,
     cost_resource: bool,
     front_indices: Vec<usize>,
@@ -129,6 +133,7 @@ impl CoupledKernel {
             || state.numeric.len() != self.initial.len()
             || state.selection.len() != self.selection_initial.len()
             || state.loads.len() != self.load_capacities.len()
+            || state.budgets.len() != budgeted::PreparedBudgeted::width(&self.budgeted)
             || state.reversal_peaks.as_ref().is_some_and(|p| {
                 state.suffix.is_some()
                     || p.len() != state.loads.len()

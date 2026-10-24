@@ -169,6 +169,27 @@ pub enum CoupledResource {
         deliveries: Vec<f64>,
         pickups: Vec<f64>,
     },
+    /// Worst-case load when at most `budget` served demands take their
+    /// deviation (budgeted uncertainty). Arc quantities describe the service
+    /// at that arc's head. Labels keep the worst load for each 0..=budget.
+    BudgetedLoad {
+        capacity: f64,
+        budget: usize,
+        demands: Vec<f64>,
+        deviations: Vec<f64>,
+    },
+    /// Worst-case service start when at most `budget` arcs take their
+    /// duration deviation. On arc i the duration (tail service plus travel)
+    /// is `durations[i]`, or `durations[i] + deviations[i]`; service waits
+    /// for and must start within `windows[i]`, the head's window. Waiting
+    /// can absorb deviations, so this is not the sum of the largest ones.
+    BudgetedTime {
+        initial: f64,
+        budget: usize,
+        durations: Vec<f64>,
+        deviations: Vec<f64>,
+        windows: Vec<Window>,
+    },
     /// On arc i, x += increments[i], then cost += x * weights[i]. The cost
     /// correction is added to both original and reduced arc costs. Signed,
     /// finite data are supported; no monotone dominance is assumed.
@@ -416,6 +437,39 @@ impl CoupledResource {
                 }
                 numbers(deliveries, n, true)?;
                 numbers(pickups, n, true)?;
+            }
+            Self::BudgetedLoad {
+                capacity,
+                demands,
+                deviations,
+                ..
+            } => {
+                if !capacity.is_finite() || *capacity < 0. {
+                    return Err(invalid("invalid budgeted load capacity"));
+                }
+                numbers(demands, n, true)?;
+                numbers(deviations, n, true)?;
+            }
+            Self::BudgetedTime {
+                initial,
+                durations,
+                deviations,
+                windows,
+                ..
+            } => {
+                if !initial.is_finite() || windows.len() != n {
+                    return Err(invalid(
+                        "budgeted time needs a finite start and one head window per arc",
+                    ));
+                }
+                numbers(durations, n, true)?;
+                numbers(deviations, n, true)?;
+                for window in windows {
+                    if !window.lower.is_finite() || !window.upper.is_finite() {
+                        return Err(invalid("budgeted time windows must be finite"));
+                    }
+                    Window::new(window.lower, window.upper)?;
+                }
             }
             Self::CumulativeCost {
                 initial,

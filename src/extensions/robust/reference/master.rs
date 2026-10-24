@@ -1,4 +1,4 @@
-//! Robust set-partitioning master (4.1)-(4.3) on the LP backend interface.
+//! Validation-only robust set-partitioning master on the LP backend interface.
 //! Each customer row has an artificial column with cost `penalty`; positive
 //! artificial usage at convergence means the penalty was too small or the
 //! instance has no robust feasible cover. No integer or branching claims.
@@ -190,7 +190,7 @@ impl<M: LpMaster> RobustMaster<M> {
                 .iter()
                 .map(|row| row.map_or(0.0, |r| self.lp.duals()[r]))
                 .collect::<Vec<_>>();
-            let pricing = self.problem.price(&duals, 0.0, options.pricing)?;
+            let pricing = super::price(&self.problem, &duals, 0.0, options.pricing)?;
             let mut added = 0;
             for route in &pricing.routes {
                 if route.reduced_cost < -options.reduced_cost_tolerance

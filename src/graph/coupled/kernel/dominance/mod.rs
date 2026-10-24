@@ -72,6 +72,7 @@ impl CoupledKernel {
         if a.suffix.is_none() != forward
             || b.suffix.is_none() != forward
             || !loads_dominate(a, b)
+            || !self.budgets_dominate(&a.budgets, &b.budgets, forward)
             || a.selection
                 .iter()
                 .zip(&b.selection)

@@ -1,9 +1,9 @@
-//! Reference forward, elementary labeling for the robust RCESPP.
+//! Validation-only forward, elementary labeling for the robust RCESPP.
 //! Labels carry γ-indexed worst-case loads and start times (4.5)-(4.8) and
 //! are pruned by Proposition 4.1: cost, visited subset and both vectors
 //! componentwise. Bidirectional search, ng-routes and cuts are not yet used.
 
-use super::{Problem, RobustState};
+use super::super::{Problem, RobustState};
 use crate::{invalid, Result};
 
 #[derive(Clone, Copy, Debug)]
@@ -73,7 +73,7 @@ fn subset(a: &[u64], b: &[u64]) -> bool {
 impl Problem {
     /// Price elementary robust routes under customer duals (one per node,
     /// zero at the depot) and a fleet dual subtracted once per route.
-    pub fn price(
+    pub(super) fn reference_price(
         &self,
         duals: &[f64],
         fleet_dual: f64,
