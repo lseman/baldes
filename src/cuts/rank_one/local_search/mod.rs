@@ -75,3 +75,7 @@ mod search;
 #[cfg(test)]
 #[path = "../../../../tests/unit/cuts/rank_one/local_search/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/cuts/rank_one/local_search/parallel.rs"]
+mod parallel_tests;

@@ -1,4 +1,5 @@
 use super::*;
+use rayon::prelude::*;
 
 impl<const COVERING: bool> LocalSearch<COVERING> {
     pub(super) fn counts(c: &ColumnInfo) -> &Vec<i32> {
@@ -263,24 +264,68 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
             return;
         }
         let mut seen: HashSet<Vec<i32>> = HashSet::new();
+        let parallel = (4..=5).contains(&num_rows_cut)
+            && self.num_iterations >= 32
+            && rayon::current_num_threads() > 1;
+        if parallel {
+            // Bound memory independently of the configured restart count. The
+            // RNG is used only while building starts, in the original order.
+            let batch_size = (rayon::current_num_threads() * 4).clamp(32, 256);
+            let mut max_state = None;
+            for first in (0..self.num_iterations as usize).step_by(batch_size) {
+                let count = batch_size.min(self.num_iterations as usize - first);
+                let starts: Vec<_> = (0..count)
+                    .map(|_| self.build_start(parent, columns, numerators, denominator))
+                    .collect();
+                let max_state = *max_state.get_or_insert_with(|| {
+                    self.compute_max_state(
+                        columns,
+                        starts[0].len(),
+                        &numerators[..num_rows_cut as usize],
+                    )
+                });
+                let results: Vec<_> = starts
+                    .into_par_iter()
+                    .map(|mut rows| {
+                        let mut multipliers = numerators[..num_rows_cut as usize].to_vec();
+                        let violation = self.run_local_search(
+                            parent,
+                            columns,
+                            &mut rows,
+                            &mut multipliers,
+                            denominator,
+                            rhs,
+                            max_state,
+                        );
+                        (rows, multipliers, violation)
+                    })
+                    .collect();
+                // Indexed collection retains restart order, including across
+                // batches. This preserves duplicate winners and score ties.
+                for (rows, multipliers, violation) in results {
+                    self.insert_result(
+                        parent,
+                        columns,
+                        cuts,
+                        &mut seen,
+                        rows,
+                        multipliers,
+                        violation,
+                        num_rows_cut,
+                        rhs,
+                        denominator,
+                        class,
+                    );
+                }
+            }
+            return;
+        }
         // The bound depends on the column counts and multiplier multiset,
         // which stay fixed across restarts of this class. Initialize lazily
         // so a search with no starts still performs no bound calculation.
         let mut max_state = None;
         for _ in 0..self.num_iterations {
-            let mut rows = vec![];
-            if COVERING {
-                self.build_covering_row_set(columns, &mut rows, numerators, 0.5);
-            } else {
-                self.build_packing_row_set(
-                    parent,
-                    columns,
-                    &mut rows,
-                    numerators,
-                    denominator,
-                    0.5,
-                );
-            }
+            let mut rows = self.build_start(parent, columns, numerators, denominator);
             let mut multipliers: Vec<i32> = numerators[..num_rows_cut as usize].to_vec();
             let max_state = *max_state
                 .get_or_insert_with(|| self.compute_max_state(columns, rows.len(), &multipliers));
@@ -293,87 +338,121 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
                 rhs,
                 max_state,
             );
-            let mut key = rows.clone();
-            key.sort();
-            if seen.contains(&key) {
-                continue;
-            }
-            let ratio = violation / rhs;
-            if !(ratio > self.violation_tolerance) {
-                continue;
-            }
-            if num_rows_cut == 4 {
-                if !self.skip_subcut_checks {
-                    let violated = if COVERING {
-                        subcuts::three_rows_cov_violated(
-                            parent,
-                            columns,
-                            &rows,
-                            &parent.permutations_4rows,
-                        )
-                    } else {
-                        subcuts::three_rows_pack_violated(
-                            parent,
-                            columns,
-                            &rows,
-                            &parent.permutations_4rows,
-                        )
-                    };
-                    if violated {
-                        continue;
-                    }
-                }
-            } else if num_rows_cut == 5 && !self.skip_subcut_checks {
+            self.insert_result(
+                parent,
+                columns,
+                cuts,
+                &mut seen,
+                rows,
+                multipliers,
+                violation,
+                num_rows_cut,
+                rhs,
+                denominator,
+                class,
+            );
+        }
+    }
+
+    fn build_start(
+        &mut self,
+        parent: &Separation,
+        columns: &[ColumnInfo],
+        numerators: &[i32],
+        denominator: i32,
+    ) -> Vec<i32> {
+        let mut rows = Vec::new();
+        if COVERING {
+            self.build_covering_row_set(columns, &mut rows, numerators, 0.5);
+        } else {
+            self.build_packing_row_set(parent, columns, &mut rows, numerators, denominator, 0.5);
+        }
+        rows
+    }
+
+    /// Apply deduplication, sub-cut checks and IDs in restart order. Workers
+    /// never mutate the candidate tree or the separator's arena.
+    #[allow(clippy::too_many_arguments)]
+    fn insert_result(
+        &self,
+        parent: &mut Separation,
+        columns: &[ColumnInfo],
+        cuts: &mut CandidateSet,
+        seen: &mut HashSet<Vec<i32>>,
+        rows: Vec<i32>,
+        mut multipliers: Vec<i32>,
+        violation: f64,
+        num_rows_cut: i32,
+        rhs: f64,
+        denominator: i32,
+        class: i32,
+    ) {
+        let mut key = rows.clone();
+        key.sort();
+        if seen.contains(&key) {
+            return;
+        }
+        let ratio = violation / rhs;
+        if !(ratio > self.violation_tolerance) {
+            return;
+        }
+        if num_rows_cut == 4 {
+            if !self.skip_subcut_checks {
                 let violated = if COVERING {
                     subcuts::three_rows_cov_violated(
                         parent,
                         columns,
                         &rows,
-                        &parent.permutations_5rows,
-                    ) || subcuts::four_rows_cov_violated(
-                        parent,
-                        columns,
-                        &rows,
-                        &self.column_indices,
+                        &parent.permutations_4rows,
                     )
                 } else {
                     subcuts::three_rows_pack_violated(
                         parent,
                         columns,
                         &rows,
-                        &parent.permutations_5rows,
-                    ) || subcuts::four_rows_pack_violated(
-                        parent,
-                        columns,
-                        &rows,
-                        &self.column_indices,
+                        &parent.permutations_4rows,
                     )
                 };
                 if violated {
-                    continue;
+                    return;
                 }
             }
-            if COVERING {
-                for m in multipliers.iter_mut().take(num_rows_cut as usize) {
-                    *m = -*m;
-                }
+        } else if num_rows_cut == 5 && !self.skip_subcut_checks {
+            let violated = if COVERING {
+                subcuts::three_rows_cov_violated(parent, columns, &rows, &parent.permutations_5rows)
+                    || subcuts::four_rows_cov_violated(parent, columns, &rows, &self.column_indices)
+            } else {
+                subcuts::three_rows_pack_violated(
+                    parent,
+                    columns,
+                    &rows,
+                    &parent.permutations_5rows,
+                ) || subcuts::four_rows_pack_violated(parent, columns, &rows, &self.column_indices)
+            };
+            if violated {
+                return;
             }
-            let id = parent.round_cut_counter;
-            parent.round_cut_counter += 1;
-            let cut = parent.push_candidate(NativeCut {
-                id,
-                rhs,
-                kind: COVERING as i32,
-                num_rows: num_rows_cut,
-                class,
-                denominator: if COVERING { -denominator } else { denominator },
-                numerators: multipliers,
-                set_ids: rows,
-                memory_type: self.cut_memory_type,
-                memory: BTreeMap::new(),
-            });
-            parent.insert_candidate(cuts, (0.5 - 1e8 * ratio).floor() / 1e8, cut);
-            seen.insert(key);
         }
+        if COVERING {
+            for m in multipliers.iter_mut().take(num_rows_cut as usize) {
+                *m = -*m;
+            }
+        }
+        let id = parent.round_cut_counter;
+        parent.round_cut_counter += 1;
+        let cut = parent.push_candidate(NativeCut {
+            id,
+            rhs,
+            kind: COVERING as i32,
+            num_rows: num_rows_cut,
+            class,
+            denominator: if COVERING { -denominator } else { denominator },
+            numerators: multipliers,
+            set_ids: rows,
+            memory_type: self.cut_memory_type,
+            memory: BTreeMap::new(),
+        });
+        parent.insert_candidate(cuts, (0.5 - 1e8 * ratio).floor() / 1e8, cut);
+        seen.insert(key);
     }
 }
