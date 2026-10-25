@@ -127,3 +127,4 @@ Thumbs.db
 !/mtw/run_pybaldes_main.py
 !/mtw/test_pybaldes_main.py
 !/mtw/bp_mtw_baldes.py
+!/mtw/make_pybaldes_paper.py

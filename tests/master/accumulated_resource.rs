@@ -83,7 +83,7 @@ fn stored_threshold_membership_matches_adjacent_floats() {
                 });
                 assert_eq!(
                     branch.coefficient(&p, &route),
-                    if rule.satisfied_by(q) { 0. } else { 2. }
+                    if rule.satisfied_by(q) { 0. } else { 1. }
                 );
                 route.arcs = vec![parallel, back, parallel, end];
                 assert_eq!(branch.coefficient(&p, &route), 0.);
@@ -94,7 +94,7 @@ fn stored_threshold_membership_matches_adjacent_floats() {
                 arc: target,
                 ..down
             });
-            assert_eq!(branch.coefficient(&p, &route), 2.);
+            assert_eq!(branch.coefficient(&p, &route), 1.);
         }
     }
 }
@@ -283,4 +283,33 @@ fn accumulated_branch_enforcement_keeps_master_rows_in_both_build_modes() {
     } else {
         assert_eq!(window, None);
     }
+}
+
+#[test]
+#[cfg(all(feature = "clp", feature = "accumulated-resource-master"))]
+fn impossible_resource_window_remains_a_master_only_resource_branch() {
+    use baldes::master::{branching::BranchConstraint, root::RootProblem};
+    let mut s = solver(ResourceKind::Disposable);
+    let arc = s.graph.add_arc(0, 1, 1.).unwrap();
+    s.graph.add_arc(1, 2, 0.).unwrap();
+    let mut problem = RootProblem::set_partitioning(s.graph, 1.).unwrap();
+    // Head upper bound is 3: the upper child excludes every use of this arc.
+    problem
+        .branch(BranchConstraint::AccumulatedResource(
+            AccumulatedResourceBranch {
+                arc,
+                resource: 4,
+                threshold: 4.,
+                upper: true,
+            },
+        ))
+        .unwrap();
+    assert!(problem
+        .graph
+        .arcs
+        .iter()
+        .find(|a| a.id == arc)
+        .unwrap()
+        .bounds[4]
+        .is_none());
 }

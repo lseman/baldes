@@ -40,6 +40,12 @@ impl NumericCostOrder {
                     weights,
                     sink_upper,
                     ..
+                }
+                | CoupledResource::CustomResource {
+                    increments,
+                    weights,
+                    forward_bound: sink_upper,
+                    ..
                 } => {
                     let increasing = increments.iter().all(|&x| x >= 0.);
                     let decreasing = increments.iter().all(|&x| x <= 0.);
@@ -91,6 +97,7 @@ impl NumericCostOrder {
             matches!(
                 definition,
                 CoupledResource::CumulativeCost { .. }
+                    | CoupledResource::CustomResource { .. }
                     | CoupledResource::Selection { .. }
                     | CoupledResource::SimultaneousPickupDelivery { .. }
                     | CoupledResource::BudgetedLoad { .. }

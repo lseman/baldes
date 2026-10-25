@@ -130,12 +130,15 @@ impl<const D: usize> RootProblem<D> {
         physical: usize,
     ) -> Result<()> {
         constraint.validate(self)?;
-        // An empty intersection forbids this optional arc, rather than the
-        // whole node. Express it as an additive zero-flow row for propagation.
+        // In pricing mode, express an empty optional-arc intersection as an
+        // additive zero-flow row. Master-only mode must retain the resource
+        // branch identity and keep its dual out of pricing.
         let constraint = if let BranchConstraint::AccumulatedResourceGroup(c) = constraint {
             BranchConstraint::AccumulatedResourceGroup(c.prepare(&self.graph)?)
         } else if let BranchConstraint::AccumulatedResource(c) = &constraint {
-            if c.window(&self.graph)?.is_none() {
+            if crate::master::branching::enforcement::ACCUMULATED_RESOURCE_IN_PRICING
+                && c.window(&self.graph)?.is_none()
+            {
                 BranchConstraint::ArcFlow {
                     arc: self.arc_position(c.arc).unwrap(),
                     sense: RowSense::LessEqual,

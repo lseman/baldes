@@ -185,20 +185,27 @@ impl AccumulatedResourceGroupBranch {
         }
     }
     pub(crate) fn coefficient(&self, route: &Route, nonlinear_only: bool) -> f64 {
-        route
-            .arcs
-            .iter()
-            .enumerate()
-            .filter(|&(i, &arc)| {
-                self.arcs.binary_search(&arc).is_ok()
-                    && (!nonlinear_only || self.blocked.binary_search(&arc).is_err())
-                    && route
-                        .resource_profile
-                        .get(i + 1)
-                        .and_then(|q| q.get(self.resource))
-                        .map_or(true, |&q| !self.rule(arc).satisfied_by(q))
-            })
-            .count() as f64
+        let violation = route.arcs.iter().enumerate().any(|(i, &arc)| {
+            self.arcs.binary_search(&arc).is_ok()
+                && route
+                    .resource_profile
+                    .get(i + 1)
+                    .and_then(|q| q.get(self.resource))
+                    .map_or(true, |&q| !self.rule(arc).satisfied_by(q))
+        }) as u8 as f64;
+        if nonlinear_only && super::enforcement::ACCUMULATED_RESOURCE_IN_PRICING {
+            // Blocked arcs already contribute through the additive entries.
+            // Correct that decomposition even for a repeated group occurrence:
+            // the complete route coefficient is a Boolean violation indicator.
+            violation
+                - route
+                    .arcs
+                    .iter()
+                    .map(|&arc| self.additive(arc))
+                    .sum::<f64>()
+        } else {
+            violation
+        }
     }
     pub(crate) fn same_split(&self, other: &Self) -> bool {
         self.packing_row == other.packing_row

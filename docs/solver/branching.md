@@ -179,6 +179,9 @@ The implementation tightens the physical arc's resource window. Existing
 forward/backward extensions, resource replay and enumeration enforce it.
 Inherited columns also receive a nonnegative violation row, so an old schedule
 cannot satisfy the new master solely because its arc path is still present.
+The row coefficient is zero when every selected occurrence satisfies the split,
+and one otherwise, including when a relaxed route repeats a selected arc or
+packing group. It is a route violation indicator, rather than a violation count.
 
 Build with `--features clp,accumulated-resource-master` (or
 `CONFIG_ACCUMULATED_RESOURCE=master` in `make config`) to enforce these
@@ -189,6 +192,8 @@ change which schedules pricing generates: tightening a lower window can add
 waiting to a cheap path in pricing mode, while master-only mode retains its
 original earliest schedule and may reject it through the violation row. The two
 build modes therefore need not produce the same child LP objective.
+An empty resource-window intersection also remains a resource violation row in
+master-only mode; it does not introduce an arc-flow dual into pricing.
 Resource-domain changes discard inherited labels/enumeration before repricing;
 parent and sibling graphs remain independent. Original resource limits remain
 in effect. The existing requirement for backward equality resources to have a
@@ -207,10 +212,11 @@ Rust master callers can construct `AccumulatedResourceGroupBranch` with a backin
 packing-row index and unique physical arc IDs. The row must have upper RHS at
 most one and nonnegative coefficients, with each member arc contributing at least
 one. This proves at most one group occurrence in an integer solution; arbitrary
-arc sets do not define a valid binary disjunction. Nonempty member windows are
-tightened together. Empty member windows contribute zero-flow enforcement for
-those arcs, while other members remain available. Parent and sibling states
-stay independent.
+arc sets do not define a valid binary disjunction. In pricing mode, nonempty
+member windows are tightened together and empty member windows contribute
+zero-flow enforcement for those arcs. Master-only mode retains the original
+windows and uses the route violation row for all members. Other members remain
+available, and parent and sibling states stay independent.
 
 Complete enumeration retains distinct physical paths even when their packing
 support is identical. A costlier path can have a different resource profile

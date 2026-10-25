@@ -151,12 +151,12 @@ pub enum CoupledResource {
     /// `allowed` holds arc incompatibilities (one mask per arc) and
     /// `vertices` vertex incompatibilities (one mask per vertex, or empty
     /// for none); a route keeps the values every arc and visited vertex
-    /// allow. `relaxed` makes vertex masks check-only: a vertex rejects a
-    /// label whose domain misses its mask but does not narrow the domain.
-    /// Arc masks and the source mask always narrow. When the master
-    /// solution uses a route breaking the exact rule, the vertices of its
-    /// shortest violating window start narrowing, and the stronger
-    /// relaxation removes that route. Certification, incumbents and final
+    /// allow. With `relaxed`, each arc and arriving vertex first check
+    /// feasibility, then an unremembered vertex restores the initial domain,
+    /// forgetting prior eliminations. Forward extension checks the head;
+    /// backward extension checks the tail. The master remembers every vertex
+    /// of a minimal violating interval, including both endpoints, so subsequent
+    /// labels retain those eliminations. Certification, incumbents and final
     /// routes always apply the exact rule.
     Selection {
         initial: u64,
@@ -217,6 +217,22 @@ pub enum CoupledResource {
         sink_upper: Option<f64>,
         #[cfg_attr(feature = "clp", serde(default))]
         source_upper: Option<f64>,
+    },
+    /// Zero-initialized cumulative resource with independent dominance constants.
+    /// On arc i, x += increments[i], then cost += x * weights[i]. There are
+    /// no vertex transitions or hard resource bounds. Signed finite data are
+    /// supported. This fixed numeric resource is separate from `Plugin`.
+    CustomResource {
+        increments: Vec<f64>,
+        weights: Vec<f64>,
+        /// Optional promise bounding the total weight of any completion.
+        /// Used for forward dominance with nonnegative increments and weights.
+        #[cfg_attr(feature = "clp", serde(default))]
+        forward_bound: Option<f64>,
+        /// Optional promise bounding the increments of any prefix. Used for
+        /// backward dominance with nonnegative increments and weights.
+        #[cfg_attr(feature = "clp", serde(default))]
+        backward_bound: Option<f64>,
     },
     /// Bounded affine dependency: y += offsets[i] + factors[i] * parent_after.
     /// The parent must be an earlier numeric resource.
@@ -279,6 +295,7 @@ impl CoupledResource {
         matches!(
             self,
             Self::CumulativeCost { .. }
+                | Self::CustomResource { .. }
                 | Self::Dependent { .. }
                 | Self::PiecewiseLinearDependent { .. }
                 | Self::PiecewiseLinearResource { .. }
@@ -462,13 +479,21 @@ impl CoupledResource {
                 }
             }
             Self::CumulativeCost {
-                initial,
                 increments,
                 weights,
                 sink_upper,
                 source_upper,
+                ..
+            }
+            | Self::CustomResource {
+                increments,
+                weights,
+                forward_bound: sink_upper,
+                backward_bound: source_upper,
             } => {
-                finite(*initial)?;
+                if let Self::CumulativeCost { initial, .. } = self {
+                    finite(*initial)?;
+                }
                 numbers(increments, n, false)?;
                 numbers(weights, n, false)?;
                 if [sink_upper, source_upper]
@@ -477,7 +502,7 @@ impl CoupledResource {
                     .any(|k| !k.is_finite() || *k < 0.)
                 {
                     return Err(invalid(
-                        "cumulative depot bounds must be finite and nonnegative",
+                        "cumulative dominance bounds must be finite and nonnegative",
                     ));
                 }
             }

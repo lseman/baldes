@@ -12,19 +12,14 @@ pub(super) fn validate<const D: usize>(
 }
 
 pub(super) fn coefficient(rule: AccumulatedResourceBranch, route: &Route) -> f64 {
-    route
-        .arcs
-        .iter()
-        .enumerate()
-        .filter(|&(i, &id)| {
-            if id != rule.arc {
-                return false;
-            }
-            route
-                .resource_profile
-                .get(i + 1)
-                .and_then(|q| q.get(rule.resource))
-                .map_or(true, |&q| !rule.satisfied_by(q))
-        })
-        .count() as f64
+    route.arcs.iter().enumerate().any(|(i, &id)| {
+        if id != rule.arc {
+            return false;
+        }
+        route
+            .resource_profile
+            .get(i + 1)
+            .and_then(|q| q.get(rule.resource))
+            .map_or(true, |&q| !rule.satisfied_by(q))
+    }) as u8 as f64
 }

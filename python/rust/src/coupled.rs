@@ -235,7 +235,8 @@ impl ResourceModel {
     }
     /// Arc vectors use original insertion order. Bits represent allowed values.
     /// ``vertices`` holds one mask per vertex; ``relaxed`` makes those masks
-    /// check-only until the master tightens them.
+    /// checked before forgotten vertices reset the domain; the master tightens
+    /// memory along improper routes.
     #[pyo3(signature = (initial, allowed, vertices=None, relaxed=false))]
     fn add_selection(
         &mut self,
@@ -286,6 +287,22 @@ impl ResourceModel {
             weights,
             sink_upper,
             source_upper,
+        })
+    }
+    /// Zero-initialized cumulative resource with independent dominance bounds.
+    #[pyo3(signature = (increments, weights, forward_bound=None, backward_bound=None))]
+    fn add_custom_resource(
+        &mut self,
+        increments: Vec<f64>,
+        weights: Vec<f64>,
+        forward_bound: Option<f64>,
+        backward_bound: Option<f64>,
+    ) -> usize {
+        self.push(CoupledResource::CustomResource {
+            increments,
+            weights,
+            forward_bound,
+            backward_bound,
         })
     }
     /// Optimize one shared free initial value over all per-arc PWL charges.

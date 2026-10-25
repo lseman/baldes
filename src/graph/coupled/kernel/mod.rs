@@ -77,9 +77,9 @@ pub struct CoupledKernel {
     initial: Vec<f64>,
     cost_scale: f64,
     selection_initial: Vec<u64>,
-    /// Per selection resource: None when vertex masks are folded into the
-    /// arc masks; Some for relaxed vertex masks.
-    selection_memory: Vec<Option<selection::RelaxedSelection>>,
+    /// Directional vertex masks and forgetting memory; None for exact arc-only
+    /// resources, which need only the transition's arc intersection.
+    selection_memory: Vec<Option<selection::PreparedSelection>>,
     /// Physical arc heads and the source, for exact vertex masks.
     selection_heads: std::sync::Arc<[usize]>,
     selection_source: usize,
@@ -211,7 +211,7 @@ impl<const D: usize> Graph<D> {
     pub fn coupled_kernel(&self) -> Option<&CoupledKernel> {
         self.coupled.as_deref()
     }
-    /// Narrow relaxed selection arcs along this route's violating windows.
+    /// Retain selection eliminations at every vertex of violating windows.
     pub(crate) fn strengthen_selection(&mut self, arcs: &[usize]) -> bool {
         self.coupled
             .as_mut()
@@ -245,3 +245,7 @@ mod nonlinear_phase_tests;
 #[cfg(test)]
 #[path = "../../../../tests/unit/graph/coupled/kernel/canonical_numeric_join_tests.rs"]
 mod canonical_numeric_join_tests;
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/graph/coupled/kernel/custom_resource_tests.rs"]
+mod custom_resource_tests;

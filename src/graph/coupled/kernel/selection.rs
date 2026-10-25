@@ -1,42 +1,74 @@
-//! Relaxed selection memory: check-only vertex masks that the master narrows.
+//! Directional selection masks and per-vertex forgetting memory.
 use super::*;
 
-/// One relaxed selection resource. Each arc carries its head's vertex mask;
-/// the head narrows the domain only once it is remembered.
+/// Vertex masks and whole-resource memory, independently for each selection.
 #[derive(Clone, Debug, PartialEq)]
-pub(super) struct RelaxedSelection {
+pub(super) struct PreparedSelection {
     heads: Vec<usize>,
+    tails: Vec<usize>,
     masks: Vec<u64>,
+    initial: u64,
+    source: usize,
+    sink: usize,
+    relaxed: bool,
     remembered: Vec<bool>,
 }
-impl RelaxedSelection {
-    pub(super) fn new<const D: usize>(g: &Graph<D>, vertices: &[u64]) -> Self {
+impl PreparedSelection {
+    pub(super) fn new<const D: usize>(
+        g: &Graph<D>,
+        vertices: &[u64],
+        initial: u64,
+        relaxed: bool,
+    ) -> Self {
         Self {
             heads: g.arcs.iter().map(|a| a.head).collect(),
-            masks: g.arcs.iter().map(|a| vertices[a.head]).collect(),
-            remembered: vec![false; g.vertices.len()],
+            tails: g.arcs.iter().map(|a| a.tail).collect(),
+            masks: if vertices.is_empty() {
+                vec![u64::MAX; g.vertices.len()]
+            } else {
+                vertices.to_vec()
+            },
+            initial,
+            source: g.source,
+            sink: g.sink,
+            relaxed,
+            remembered: vec![!relaxed; g.vertices.len()],
         }
     }
-    /// The domain after entering `arc`'s head, or None when it misses the
-    /// head's mask. A forgotten head checks without narrowing.
+    fn at_vertex(&self, domain: u64, vertex: usize) -> u64 {
+        if self.remembered[vertex] {
+            domain & self.masks[vertex]
+        } else {
+            // Forget all earlier eliminations in this resource's value slice.
+            self.initial
+        }
+    }
+    pub(super) fn root(&self, forward: bool) -> u64 {
+        self.at_vertex(self.initial, if forward { self.source } else { self.sink })
+    }
+    /// Check the arriving vertex before forgetting. Backward arcs arrive at
+    /// their tail. Arc incompatibilities are always checked before a reset.
     #[inline]
-    pub(super) fn enter(&self, domain: u64, arc: usize) -> Option<u64> {
-        let kept = domain & self.masks[arc];
-        if kept == 0 {
+    pub(super) fn enter(&self, domain: u64, arc: usize, forward: bool) -> Option<u64> {
+        let vertex = if forward {
+            self.heads[arc]
+        } else {
+            self.tails[arc]
+        };
+        if domain & self.masks[vertex] == 0 {
             return None;
         }
-        Some(if self.remembered[self.heads[arc]] {
-            kept
-        } else {
-            domain
-        })
+        Some(self.at_vertex(domain, vertex))
     }
 }
 
 impl CoupledKernel {
     /// Whether any selection resource has relaxed vertex masks.
     pub(crate) fn selection_relaxed(&self) -> bool {
-        self.selection_memory.iter().any(Option::is_some)
+        self.selection_memory
+            .iter()
+            .flatten()
+            .any(|memory| memory.relaxed)
     }
 
     /// The exact selection rule: every resource keeps a value along `arcs`
@@ -52,26 +84,25 @@ impl CoupledKernel {
         })
     }
 
-    /// Remember the heads of each relaxed resource's violating windows in
-    /// `arcs`. A window [i, j] is shortest: its masks intersect to empty and
-    /// no proper subwindow does. With its heads remembered (arc masks always
-    /// narrow), forward and backward extension reject it, and a join that
-    /// splits it intersects to empty, so the relaxation excludes this route
-    /// (findViolatingSubPaths / forbidSubPath). Returns whether any vertex
-    /// started narrowing.
+    /// Remember every vertex, including both endpoints, of each minimal
+    /// violating vertex interval. Stored domains then retain the contradiction
+    /// in either direction and across every forward/backward split.
     pub(crate) fn strengthen_selection(&mut self, arcs: &[usize]) -> bool {
         let windows: Vec<(usize, Vec<usize>)> = self
             .selection_masks()
             .enumerate()
-            .filter(|(r, _)| self.selection_memory[*r].is_some())
-            .map(|(r, masks)| (r, violating_arcs(&masks, arcs)))
+            .filter(|(r, _)| {
+                self.selection_memory[*r]
+                    .as_ref()
+                    .is_some_and(|m| m.relaxed)
+            })
+            .map(|(r, masks)| (r, violating_vertices(&masks, arcs)))
             .collect();
         let mut changed = false;
         for (r, window) in windows {
             let relaxed = self.selection_memory[r].as_mut().expect("relaxed resource");
-            for arc in window {
-                let head = relaxed.heads[arc];
-                changed |= !std::mem::replace(&mut relaxed.remembered[head], true);
+            for vertex in window {
+                changed |= !std::mem::replace(&mut relaxed.remembered[vertex], true);
             }
         }
         if changed {
@@ -90,6 +121,8 @@ impl CoupledKernel {
                 vertices,
                 ..
             } => Some(ExactMasks {
+                initial: *initial,
+                source: self.selection_source,
                 start: initial
                     & vertices
                         .get(self.selection_source)
@@ -106,6 +139,8 @@ impl CoupledKernel {
 
 /// Exact masks of one selection resource.
 struct ExactMasks<'a> {
+    initial: u64,
+    source: usize,
     start: u64,
     allowed: &'a [u64],
     vertices: &'a [u64],
@@ -118,34 +153,47 @@ impl ExactMasks<'_> {
     }
 }
 
-/// Every arc of each shortest empty window [i, j] of exact masks.
-fn violating_arcs(masks: &ExactMasks<'_>, arcs: &[usize]) -> Vec<usize> {
-    let Some(exact) = arcs
-        .iter()
-        .map(|&arc| masks.arc(arc))
-        .collect::<Option<Vec<_>>>()
-    else {
-        return vec![];
+/// Minimal empty intervals of visited vertices and their intervening arcs.
+/// Interior windows start from the resource universe, without reapplying the
+/// source vertex mask. Remember both endpoints even when an arc causes failure.
+fn violating_vertices(masks: &ExactMasks<'_>, arcs: &[usize]) -> Vec<usize> {
+    let mut vertices = vec![masks.source];
+    for &arc in arcs {
+        let Some(&head) = masks.heads.get(arc) else {
+            return vec![];
+        };
+        if masks.allowed.get(arc).is_none() {
+            return vec![];
+        }
+        vertices.push(head);
+    }
+    let vertex_mask = |position: usize| {
+        masks
+            .vertices
+            .get(vertices[position])
+            .copied()
+            .unwrap_or(u64::MAX)
     };
-    let mut window = vec![];
-    for end in 0..exact.len() {
-        // The latest start whose window up to `end` is already empty.
-        let mut domain = masks.start & exact[end];
+    let mut remembered = vec![];
+    for end in 0..vertices.len() {
+        let mut domain = masks.initial & vertex_mask(end);
         let mut start = end;
         while domain != 0 && start > 0 {
             start -= 1;
-            domain &= exact[start];
+            domain &= masks.allowed[arcs[start]] & vertex_mask(start);
         }
         if domain != 0 {
             continue;
         }
-        // Shortest only if the window without its last arc is nonempty.
-        let shorter = exact[start..end].iter().fold(masks.start, |d, &m| d & m);
+        let mut shorter = masks.initial & vertex_mask(start);
+        for i in start..end.saturating_sub(1) {
+            shorter &= masks.allowed[arcs[i]] & vertex_mask(i + 1);
+        }
         if start == end || shorter != 0 {
-            window.extend_from_slice(&arcs[start..=end]);
+            remembered.extend_from_slice(&vertices[start..=end]);
         }
     }
-    window
+    remembered
 }
 
 #[cfg(test)]
@@ -192,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn relaxed_selection_keeps_arc_masks_exact() {
+    fn forgetting_restores_prior_arc_eliminations_and_tightening_remembers_both_endpoints() {
         let mut graph = graph(true);
         let mut definitions = graph.coupled_kernel().unwrap().definitions().to_vec();
         let CoupledResource::Selection {
@@ -205,10 +253,195 @@ mod tests {
         allowed[0] = 1;
         allowed[1] = 2;
         graph.set_coupled_resources(&definitions).unwrap();
+        let mut kernel = graph.coupled_kernel().unwrap().clone();
+        let route = [0, 1, 2];
+        assert_eq!(kernel.replay(&route).unwrap(), Some(0.));
+        assert!(!kernel.selection_proper(&route));
+        assert!(kernel.strengthen_selection(&route));
         assert_eq!(
-            graph.coupled_kernel().unwrap().replay(&[0, 1, 2]).unwrap(),
-            None
+            kernel.selection_memory[0].as_ref().unwrap().remembered,
+            [true, true, true, false]
         );
+        assert_eq!(kernel.replay(&route).unwrap(), None);
+        assert!(!kernel.strengthen_selection(&route));
+        for split in 0..=route.len() {
+            assert!(!accepts_split(&kernel, &route, split));
+        }
+    }
+
+    fn follow(
+        kernel: &CoupledKernel,
+        arcs: &[usize],
+        forward: bool,
+    ) -> Option<Box<CoupledLabelState>> {
+        let mut state = kernel.root(forward);
+        let mut workspace = CoupledWorkspace::default();
+        let path: Vec<_> = if forward {
+            arcs.to_vec()
+        } else {
+            arcs.iter().rev().copied().collect()
+        };
+        for arc in path {
+            state = kernel
+                .extend_internal(&state, arc, forward, false, false, &mut workspace)
+                .unwrap()?
+                .0;
+        }
+        Some(state)
+    }
+
+    fn accepts_split(kernel: &CoupledKernel, arcs: &[usize], split: usize) -> bool {
+        match (
+            follow(kernel, &arcs[..split], true),
+            follow(kernel, &arcs[split..], false),
+        ) {
+            (Some(f), Some(b)) => {
+                let ordinary = kernel.join(&f, &b).unwrap().is_some();
+                assert_eq!(
+                    ordinary,
+                    kernel.join_resource_objective(&f, &b).unwrap().is_some()
+                );
+                ordinary
+            }
+            _ => false,
+        }
+    }
+
+    #[test]
+    fn directional_vertex_masks_and_roots_match_native_primitive_cases() {
+        let g = graph(true);
+        let mut memory = PreparedSelection::new(&g, &[1, 2, 3, 2], 3, true);
+        assert_eq!(memory.root(true), 3);
+        assert_eq!(memory.root(false), 3);
+        // Arc 0 goes from vertex 0 (mask 1) to vertex 1 (mask 2).
+        assert_eq!(memory.enter(1, 0, true), None);
+        assert_eq!(memory.enter(1, 0, false), Some(3));
+        assert_eq!(memory.enter(2, 0, true), Some(3));
+        memory.remembered.fill(true);
+        assert_eq!(memory.root(true), 1);
+        assert_eq!(memory.root(false), 2);
+        assert_eq!(memory.enter(1, 0, false), Some(1));
+        assert_eq!(memory.enter(3, 0, true), Some(2));
+    }
+
+    #[test]
+    fn arc_only_relaxation_also_forgets_at_unrestricted_vertices() {
+        let mut g = graph(true);
+        let mut allowed = vec![3; 5];
+        allowed[0] = 1;
+        allowed[1] = 2;
+        g.set_coupled_resources(&[CoupledResource::Selection {
+            initial: 3,
+            allowed,
+            vertices: vec![],
+            relaxed: true,
+        }])
+        .unwrap();
+        let mut kernel = g.coupled_kernel().unwrap().clone();
+        assert!(kernel.selection_relaxed());
+        assert_eq!(kernel.replay(&[0, 1, 2]).unwrap(), Some(0.));
+        assert!(kernel.strengthen_selection(&[0, 1, 2]));
+        for split in 0..=3 {
+            assert!(!accepts_split(&kernel, &[0, 1, 2], split));
+        }
+    }
+
+    #[test]
+    fn interior_windows_do_not_reapply_source_masks_and_memory_is_per_resource() {
+        let mut g = graph(true);
+        let definitions = [
+            CoupledResource::Selection {
+                initial: 3,
+                allowed: vec![3; 5],
+                vertices: vec![1, 3, 2, 3],
+                relaxed: true,
+            },
+            CoupledResource::Selection {
+                initial: 3,
+                allowed: vec![3; 5],
+                vertices: vec![3; 4],
+                relaxed: true,
+            },
+        ];
+        g.set_coupled_resources(&definitions).unwrap();
+        let mut kernel = g.coupled_kernel().unwrap().clone();
+        assert!(kernel.strengthen_selection(&[0, 1, 2]));
+        assert_eq!(
+            kernel.selection_memory[0].as_ref().unwrap().remembered,
+            [true, true, true, false]
+        );
+        assert_eq!(
+            kernel.selection_memory[1].as_ref().unwrap().remembered,
+            [false; 4]
+        );
+        for split in 0..=3 {
+            assert!(!accepts_split(&kernel, &[0, 1, 2], split));
+        }
+    }
+
+    #[test]
+    fn exhaustive_masks_preserve_exact_routes_and_tightening_rejects_bad_routes_at_every_split() {
+        let mut g = graph(true);
+        let route = [0, 1, 2];
+        // Exhaust all two-value vertex masks and two conflicting arc masks.
+        for bits in 0..1024usize {
+            let vertices = vec![
+                1 + (bits & 1) as u64,
+                ((bits >> 1) & 3) as u64,
+                ((bits >> 3) & 3) as u64,
+                ((bits >> 5) & 3) as u64,
+            ];
+            let mut allowed = vec![3; 5];
+            allowed[0] = ((bits >> 7) & 3) as u64;
+            allowed[1] = ((bits >> 9) & 1) as u64 + 1;
+            // Independent exact complete-route intersection.
+            let proper = vertices
+                .iter()
+                .chain(allowed[..3].iter())
+                .fold(3, |a, &b| a & b)
+                != 0;
+            g.set_coupled_resources(&[CoupledResource::Selection {
+                initial: 3,
+                allowed,
+                vertices,
+                relaxed: true,
+            }])
+            .unwrap();
+            let original = g.coupled_kernel().unwrap().clone();
+            let mut exact_definitions = original.definitions().to_vec();
+            let CoupledResource::Selection { relaxed, .. } = &mut exact_definitions[0] else {
+                unreachable!()
+            };
+            *relaxed = false;
+            g.set_coupled_resources(&exact_definitions).unwrap();
+            let exact = g.coupled_kernel().unwrap();
+            let mut tightened = original.clone();
+            if !proper {
+                tightened.strengthen_selection(&route);
+            }
+            for split in 0..=3 {
+                assert_eq!(
+                    accepts_split(exact, &route, split),
+                    proper,
+                    "exact {bits}/{split}"
+                );
+                if proper {
+                    assert!(accepts_split(&original, &route, split), "{bits}/{split}");
+                }
+                assert_eq!(
+                    accepts_split(&tightened, &route, split),
+                    proper,
+                    "{bits}/{split}"
+                );
+            }
+            // Snapshots keep their original per-vertex memory.
+            assert!(original.selection_memory[0]
+                .as_ref()
+                .unwrap()
+                .remembered
+                .iter()
+                .all(|&v| !v));
+        }
     }
 
     #[cfg(feature = "clp")]
@@ -216,8 +449,22 @@ mod tests {
     fn relaxed_vertex_selection_matches_exact_master_and_never_accepts_improper_incumbent() {
         use crate::master::root::{self, RootOptions, RootProblem};
         for direction in [0., 1., 2.] {
-            for relaxed in [false, true] {
-                let graph = graph(relaxed);
+            for (relaxed, arc_only) in [(false, false), (true, false), (false, true), (true, true)]
+            {
+                let mut graph = graph(relaxed);
+                if arc_only {
+                    let mut definitions = graph.coupled_kernel().unwrap().definitions().to_vec();
+                    let CoupledResource::Selection {
+                        allowed, vertices, ..
+                    } = &mut definitions[0]
+                    else {
+                        unreachable!()
+                    };
+                    vertices.clear();
+                    allowed[0] = 1;
+                    allowed[1] = 2;
+                    graph.set_coupled_resources(&definitions).unwrap();
+                }
                 let kernel = graph.coupled_kernel().unwrap().clone();
                 let problem = RootProblem::set_partitioning(graph, 2.).unwrap();
                 let mut options = RootOptions::default();

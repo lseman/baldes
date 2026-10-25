@@ -546,20 +546,26 @@ impl PreparedBounds {
         for (r, definition) in definitions.iter().enumerate() {
             match definition {
                 CoupledResource::CumulativeCost {
-                    initial,
                     increments,
                     weights: w,
                     source_upper,
                     ..
+                }
+                | CoupledResource::CustomResource {
+                    increments,
+                    weights: w,
+                    backward_bound: source_upper,
+                    ..
                 } => {
                     let i = slots[r].unwrap();
+                    let initial = initial[i];
                     let (min, max) = increments
                         .iter()
                         .fold((0f64, 0f64), |(min, max), &x| (min.min(x), max.max(x)));
                     let integral =
                         initial.fract() == 0. && increments.iter().all(|x| x.fract() == 0.);
                     let domain = hops.map(|h| {
-                        Range::point(*initial)
+                        Range::point(initial)
                             .add(Range { lo: min, hi: max }.multiply(Range::point(h)))
                     });
                     let exact = integral
@@ -571,11 +577,11 @@ impl PreparedBounds {
                     } else {
                         Range {
                             lo: if min >= 0. {
-                                *initial
+                                initial
                             } else {
                                 f64::NEG_INFINITY
                             },
-                            hi: if max <= 0. { *initial } else { f64::INFINITY },
+                            hi: if max <= 0. { initial } else { f64::INFINITY },
                         }
                     };
                     // The source bound promises that no prefix adds more than
@@ -583,7 +589,7 @@ impl PreparedBounds {
                     // reference's backward max(0, x_a - x_b) * bound).
                     if let Some(k) = source_upper {
                         if min >= 0. && w.iter().all(|&x| x >= 0.) {
-                            if let Some(hi) = crate::core::rounding::add_up(*initial, *k) {
+                            if let Some(hi) = crate::core::rounding::add_up(initial, *k) {
                                 numeric[i].hi = numeric[i].hi.min(hi);
                             }
                         }

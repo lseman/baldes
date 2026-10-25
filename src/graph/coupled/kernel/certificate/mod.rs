@@ -210,6 +210,11 @@ impl CoupledKernel {
                         increments,
                         weights,
                         ..
+                    }
+                    | CoupledResource::CustomResource {
+                        increments,
+                        weights,
+                        ..
                     } => {
                         let i = self.slots[r]?;
                         numeric[i] = numeric[i].add(Interval::point(*increments.get(arc)?))?;

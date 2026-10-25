@@ -273,6 +273,11 @@ impl PreparedTransitions {
                             increments,
                             weights,
                             ..
+                        }
+                        | CoupledResource::CustomResource {
+                            increments,
+                            weights,
+                            ..
                         } => Some(NumericOperation::Cumulative {
                             slot: slots[r].unwrap(),
                             increment: increments[arc],

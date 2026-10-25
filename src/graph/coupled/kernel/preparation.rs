@@ -11,6 +11,10 @@ impl CoupledKernel {
         for (i, r) in definitions.iter().enumerate() {
             r.validate(g, i, definitions)?;
             match r {
+                CoupledResource::CustomResource { .. } => {
+                    slots.push(Some(initial.len()));
+                    initial.push(0.);
+                }
                 CoupledResource::CumulativeCost { initial: x, .. }
                 | CoupledResource::Dependent { initial: x, .. }
                 | CoupledResource::PiecewiseLinearDependent { initial: x, .. }
@@ -26,25 +30,8 @@ impl CoupledKernel {
         let numeric_cost_order =
             dominance::NumericCostOrder::new(definitions, &slots, initial.len());
         let optimization = PreparedBounds::new(g, definitions, &slots, &initial);
-        let mut transitions =
+        let transitions =
             PreparedTransitions::new(definitions, &slots, initial.len(), g.arcs.len(), 1.);
-        // Exact vertex incompatibilities act on every arc entering a vertex.
-        let selections = definitions.iter().filter_map(|r| match r {
-            CoupledResource::Selection {
-                vertices, relaxed, ..
-            } => Some((vertices, *relaxed)),
-            _ => None,
-        });
-        for (k, (vertices, relaxed)) in selections.enumerate() {
-            if vertices.is_empty() || relaxed {
-                continue;
-            }
-            let mut arcs = transitions.arcs.to_vec();
-            for (arc, prepared) in arcs.iter_mut().enumerate() {
-                prepared.selection[k] &= vertices[g.arcs[arc].head];
-            }
-            transitions.arcs = arcs.into();
-        }
         let route_domains =
             domains::RouteDomains::prepare(g, &transitions, &optimization.numeric, &initial);
         let front_indices: Vec<_> = definitions
@@ -164,11 +151,13 @@ impl CoupledKernel {
                 .iter()
                 .filter_map(|r| match r {
                     CoupledResource::Selection {
-                        vertices, relaxed, ..
-                    } => Some(
-                        (*relaxed && !vertices.is_empty())
-                            .then(|| selection::RelaxedSelection::new(g, vertices)),
-                    ),
+                        initial,
+                        vertices,
+                        relaxed,
+                        ..
+                    } => Some((*relaxed || !vertices.is_empty()).then(|| {
+                        selection::PreparedSelection::new(g, vertices, *initial, *relaxed)
+                    })),
                     _ => None,
                 })
                 .collect(),
@@ -209,6 +198,7 @@ impl CoupledKernel {
                 matches!(
                     r,
                     CoupledResource::CumulativeCost { .. }
+                        | CoupledResource::CustomResource { .. }
                         | CoupledResource::IntervalCost { .. }
                         | CoupledResource::SlopeIntervalCost { .. }
                         | CoupledResource::PiecewiseLinearCost { .. }

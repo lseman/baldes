@@ -3,8 +3,14 @@ use super::*;
 
 impl CoupledKernel {
     pub fn root(&self, forward: bool) -> Box<CoupledLabelState> {
+        let mut selection = StateValues::from_slice(&self.selection_initial);
+        for (domain, memory) in selection.iter_mut().zip(&self.selection_memory) {
+            if let Some(memory) = memory {
+                *domain = memory.root(forward);
+            }
+        }
         Box::new(CoupledLabelState {
-            selection: StateValues::from_slice(&self.selection_initial),
+            selection,
             loads: StateValues::filled(self.load_capacities.len(), [0.; 3]),
             budgets: budgeted::PreparedBudgeted::root(&self.budgeted, forward),
             reversal_peaks: None,
@@ -163,7 +169,7 @@ impl CoupledKernel {
                 return Ok(None);
             }
             if let Some(relaxed) = memory {
-                let Some(next) = relaxed.enter(kept, arc) else {
+                let Some(next) = relaxed.enter(kept, arc, forward) else {
                     return Ok(None);
                 };
                 kept = next;

@@ -12,11 +12,16 @@ impl CoupledKernel {
             return false;
         }
         self.definitions.iter().all(|resource| match resource {
-            // Vertex masks act at arc heads, which reversal changes.
+            // Directional vertex masks and forgetting require their own
+            // reversal transform, beyond symmetric arc intersections.
             CoupledResource::Selection {
-                allowed, vertices, ..
+                allowed,
+                vertices,
+                relaxed,
+                ..
             } => {
-                vertices.is_empty()
+                !relaxed
+                    && vertices.is_empty()
                     && reverse
                         .iter()
                         .enumerate()

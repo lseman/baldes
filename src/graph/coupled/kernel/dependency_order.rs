@@ -47,7 +47,9 @@ impl DependencyOrder {
         }
         let mut numeric_orders = vec![[true; 2]; domains.len()];
         for (r, definition) in definitions.iter().enumerate() {
-            if let CoupledResource::CumulativeCost { increments, .. } = definition {
+            if let CoupledResource::CumulativeCost { increments, .. }
+            | CoupledResource::CustomResource { increments, .. } = definition
+            {
                 let slot = slots[r].unwrap();
                 let bounded = domains[slot].finite()
                     && increments

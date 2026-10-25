@@ -97,7 +97,10 @@ impl BranchConstraint {
                 vertex, graph_id, ..
             } => packing_set_assignment::coefficient(p, arc, *vertex, *graph_id),
             Self::RyanFoster(_) | Self::AccumulatedResource(_) => 0.,
-            Self::AccumulatedResourceGroup(c) => c.additive(p.graph.arcs[arc].id),
+            Self::AccumulatedResourceGroup(c) if enforcement::ACCUMULATED_RESOURCE_IN_PRICING => {
+                c.additive(p.graph.arcs[arc].id)
+            }
+            Self::AccumulatedResourceGroup(_) => 0.,
             Self::ClusterBoundary { vertices, .. } => cluster::boundary_coefficient(
                 vertices,
                 p.graph.arcs[arc].tail,

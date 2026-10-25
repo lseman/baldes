@@ -87,7 +87,7 @@ impl<const D: usize> Solver<D> {
         Ok(true)
     }
     /// Relaxed selection (augmentNGneighbourhoods' selection step): narrow
-    /// the check-only arcs along the violating windows of the improper paths.
+    /// the selection memory at all vertices of improper paths' violating windows.
     /// Returns the number of paths the stronger relaxation now excludes.
     pub fn strengthen_selection(
         &mut self,
