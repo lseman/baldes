@@ -40,7 +40,8 @@ impl Problem {
     /// Compile to a native physical graph. Original location IDs are preserved;
     /// one additional vertex duplicates the depot as the sink. Only customers
     /// receive elementarity sets. Stations remain repeatable. Native exact NG
-    /// memory currently permits at most fifteen customers in this adapter.
+    /// memory permits at most `NG_MEMORY_CAPACITY` customers in this adapter
+    /// (15 by default, 31 or 63 with the `ng-memory-*` features).
     /// The scalar coordinates are arc count and delivered load. A native PWL
     /// state map records whether a customer was served, excluding empty routes.
     /// Callers can attach native cuts/restrictions through `pricing::Solver`.
@@ -58,8 +59,13 @@ impl Problem {
             .iter()
             .filter(|l| matches!(l.kind, LocationKind::Customer { .. }))
             .count();
-        if customers > 15 || options.max_arcs as u128 > (1u128 << 52) {
-            return Err(invalid("native EV pricing supports at most fifteen customers and an exactly representable arc bound"));
+        if customers > crate::graph::ng::NG_MEMORY_CAPACITY
+            || options.max_arcs as u128 > (1u128 << 52)
+        {
+            return Err(invalid(format!(
+                "native EV pricing supports at most {} customers and an exactly representable arc bound",
+                crate::graph::ng::NG_MEMORY_CAPACITY
+            )));
         }
         let mut graph = Graph::<3>::new(
             n.checked_add(1)

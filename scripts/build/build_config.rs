@@ -81,6 +81,8 @@ struct Config {
     /// Enforce accumulated-resource branches through master rows only.
     accumulated_resource_master: bool,
     rank_one_node_memory: bool,
+    /// Native NG local memory per vertex: 15, 31 or 63 elements.
+    ng_memory: usize,
     release: bool,
     native_cpu: bool,
     simd: SimdMode,
@@ -105,6 +107,7 @@ impl Default for Config {
             ryan_foster_master: false,
             accumulated_resource_master: false,
             rank_one_node_memory: false,
+            ng_memory: 15,
             release: true,
             native_cpu: false,
             simd: SimdMode::Off,
@@ -153,6 +156,14 @@ impl Config {
                         "arc" => false,
                         "node" => true,
                         _ => return Err("CONFIG_RANK_ONE_MEMORY must be arc or node".into()),
+                    }
+                }
+                "CONFIG_NG_MEMORY" => {
+                    config.ng_memory = match value {
+                        "15" => 15,
+                        "31" => 31,
+                        "63" => 63,
+                        _ => return Err("CONFIG_NG_MEMORY must be 15, 31 or 63".into()),
                     }
                 }
                 "CONFIG_ACCUMULATED_RESOURCE" => {
@@ -268,7 +279,7 @@ impl Config {
         format!(
             "# BALDES build configuration; edit with make config.\n\
             CONFIG_PROFILE={}\nCONFIG_CLP={}\nCONFIG_HIGHS={}\nCONFIG_GUROBI={}\nCONFIG_CLI={}\nCONFIG_MULTI_TIME_WINDOWS={}\n\
-            CONFIG_RYAN_FOSTER={}\nCONFIG_ACCUMULATED_RESOURCE={}\nCONFIG_RANK_ONE_MEMORY={}\n\
+            CONFIG_RYAN_FOSTER={}\nCONFIG_ACCUMULATED_RESOURCE={}\nCONFIG_RANK_ONE_MEMORY={}\nCONFIG_NG_MEMORY={}\n\
             CONFIG_SIMD={}\nCONFIG_NATIVE_CPU={}\nCONFIG_RELEASE_DEBUG={}\nCONFIG_OFFLINE={}\nCONFIG_LOCKED={}\n\
             CONFIG_JOBS={}\nCONFIG_RESOURCE_DIMENSIONS={}\nCONFIG_TARGET={}\nCONFIG_HIGHS_DIR={}\nCONFIG_GUROBI_HOME={}\n",
             if self.release { "release" } else { "dev" },
@@ -280,6 +291,7 @@ impl Config {
             if self.ryan_foster_master { "master" } else { "pricing" },
             if self.accumulated_resource_master { "master" } else { "pricing" },
             if self.rank_one_node_memory { "node" } else { "arc" },
+            self.ng_memory,
             self.simd.name(),
             yn(self.native_cpu),
             yn(self.release_debug),
@@ -344,6 +356,8 @@ impl Config {
             (self.ryan_foster_master, "ryan-foster-master"),
             (self.accumulated_resource_master, "accumulated-resource-master"),
             (self.rank_one_node_memory, "rank-one-node-memory"),
+            (self.ng_memory == 31, "ng-memory-31"),
+            (self.ng_memory == 63, "ng-memory-63"),
             (self.simd == SimdMode::Avx2, "simd"),
             (self.simd == SimdMode::Avx512, "simd-avx512"),
         ]
@@ -470,6 +484,13 @@ impl Config {
             16 => self.ryan_foster_master = !self.ryan_foster_master,
             17 => self.accumulated_resource_master = !self.accumulated_resource_master,
             18 => self.rank_one_node_memory = !self.rank_one_node_memory,
+            19 => {
+                self.ng_memory = match self.ng_memory {
+                    15 => 31,
+                    31 => 63,
+                    _ => 15,
+                }
+            }
             12 => self.simd = self.simd.next(CpuSimd::detect(), self.target.is_empty()),
             _ => {}
         }
@@ -487,6 +508,7 @@ impl Config {
             Item::value(16, "BUILD", "Ryan–Foster enforcement", if self.ryan_foster_master { "Master" } else { "Pricing" }, "Fixed at compile time. Pricing keeps branch-violating columns out of labeling. Master enforces branches only through master rows; pricing ignores them, so bounds at branched nodes can be weaker."),
             Item::value(17, "BUILD", "Accumulated-resource branching", if self.accumulated_resource_master { "Master" } else { "Pricing" }, "Fixed at compile time. Pricing tightens the branched arc windows during labeling. Master enforces branches only through master rows; pricing keeps the original windows, so bounds at branched nodes can be weaker."),
             Item::value(18, "BUILD", "Rank-one memory", if self.rank_one_node_memory { "Node" } else { "Arc / runtime" }, "Node forces generated arc-memory rank-one cuts to use node memory. Arc preserves runtime memory settings. Full vertex-memory modes and manually registered rows retain their declared representation."),
+            Item::value(19, "BUILD", "NG memory", self.ng_memory.to_string(), "Cycle 15 / 31 / 63 elements of native NG local memory per vertex. Wider memory admits larger ng neighborhoods but enlarges every label. Default: 15."),
             Item::value(12, "PERFORMANCE", "SIMD acceleration", self.simd.name(), "Cycle Off / AVX2 / AVX-512, skipping modes unsupported by this CPU. Host target only. AVX-512 requires Rust 1.89+. Runtime detection keeps portable fallback."),
             Item::toggle(4, "PERFORMANCE", "Native CPU", self.native_cpu, "Optimize for this computer with target-cpu=native. Clear the target triple before enabling; use portable builds for distribution."),
             Item::toggle(5, "PERFORMANCE", "Release debug symbols", self.release_debug, "Keep debug symbols in release builds for perf and other profilers. The development profile retains Cargo's normal debug settings."),
@@ -1133,7 +1155,7 @@ mod tests {
         c.edit(11, Some("0".into())).unwrap();
         assert_eq!(c.resource_dimensions, 0);
         assert!(c.cargo("clean").unwrap().vars.is_empty());
-        assert_eq!(c.rows().len(), 19);
+        assert_eq!(c.rows().len(), 20);
     }
     #[test]
     fn ryan_foster_enforcement_round_trips_and_selects_its_feature() {
@@ -1170,6 +1192,23 @@ mod tests {
         assert!(args(&c, "build").iter().any(|a| a.contains("rank-one-node-memory")));
         assert!(Config::parse("CONFIG_RANK_ONE_MEMORY=other").is_err());
         assert!(!Config::parse("CONFIG_RANK_ONE_MEMORY=arc").unwrap().rank_one_node_memory);
+    }
+    #[test]
+    fn ng_memory_round_trips_and_selects_its_feature() {
+        let mut c = Config::default();
+        assert!(!args(&c, "build").iter().any(|a| a.contains("ng-memory")));
+        assert!(c.text().contains("CONFIG_NG_MEMORY=15"));
+        c.edit(19, None).unwrap();
+        assert_eq!(c.ng_memory, 31);
+        assert!(args(&c, "build").iter().any(|a| a.contains("ng-memory-31")));
+        c.edit(19, None).unwrap();
+        assert_eq!(c.ng_memory, 63);
+        assert!(c.text().contains("CONFIG_NG_MEMORY=63"));
+        assert_eq!(Config::parse(&c.text()).unwrap(), c);
+        assert!(args(&c, "build").iter().any(|a| a.contains("ng-memory-63")));
+        c.edit(19, None).unwrap();
+        assert_eq!(c.ng_memory, 15);
+        assert!(Config::parse("CONFIG_NG_MEMORY=16").is_err());
     }
     #[test]
     fn clean_does_not_receive_build_flags() {

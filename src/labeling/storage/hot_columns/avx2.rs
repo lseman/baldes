@@ -18,7 +18,7 @@ impl<const D: usize> HotColumns<D> {
         threshold: f64,
         candidate_r0: f64,
         candidate_r1: f64,
-        candidate_ng: u16,
+        candidate_ng: NgMask,
     ) -> usize {
         use std::arch::x86_64::*;
         let n = self.key.len();
@@ -57,8 +57,14 @@ impl<const D: usize> HotColumns<D> {
                     pass &= _mm256_movemask_pd(mask);
                 }
                 if NG {
-                    let stored =
-                        _mm256_cvtepu16_epi64(_mm_loadl_epi64(self.ng.as_ptr().add(i).cast()));
+                    // Widen four NG masks to four u64 lanes.
+                    let ng = self.ng.as_ptr().add(i).cast();
+                    #[cfg(not(any(feature = "ng-memory-31", feature = "ng-memory-63")))]
+                    let stored = _mm256_cvtepu16_epi64(_mm_loadl_epi64(ng));
+                    #[cfg(all(feature = "ng-memory-31", not(feature = "ng-memory-63")))]
+                    let stored = _mm256_cvtepu32_epi64(_mm_loadu_si128(ng));
+                    #[cfg(feature = "ng-memory-63")]
+                    let stored = _mm256_loadu_si256(ng);
                     let c = _mm256_set1_epi64x(candidate_ng as i64);
                     let excluded = if PREFIX {
                         _mm256_andnot_si256(c, stored)

@@ -18,7 +18,7 @@ impl<const WORDS: usize, const D: usize> LabelData for ExtendedLabel<WORDS, D> {
         self.base.resources()
     }
     #[inline(always)]
-    fn ng(&self) -> u16 {
+    fn ng(&self) -> NgMask {
         self.base.ng()
     }
     #[inline(always)]
@@ -61,7 +61,7 @@ impl<const D: usize> LabelData for BranchedLabel<D> {
         self.base.resources()
     }
     #[inline(always)]
-    fn ng(&self) -> u16 {
+    fn ng(&self) -> NgMask {
         self.base.ng()
     }
     #[inline(always)]
@@ -104,7 +104,7 @@ impl<const D: usize> LabelData for OrdinaryLabel<D> {
         &self.resources
     }
     #[inline(always)]
-    fn ng(&self) -> u16 {
+    fn ng(&self) -> NgMask {
         self.ng
     }
     #[inline(always)]
@@ -150,7 +150,7 @@ impl<const D: usize> LabelData for StoredLabel<D> {
         &self.resources
     }
     #[inline(always)]
-    fn ng(&self) -> u16 {
+    fn ng(&self) -> NgMask {
         self.ng
     }
     #[inline(always)]
@@ -200,7 +200,7 @@ impl<const D: usize> LabelData for LabelRef<'_, D> {
         (*self).resources()
     }
     #[inline(always)]
-    fn ng(&self) -> u16 {
+    fn ng(&self) -> NgMask {
         (*self).ng()
     }
     #[inline(always)]
@@ -255,7 +255,7 @@ impl<const WORDS: usize, const D: usize> LabelData for AuxiliaryLabel<WORDS, D> 
         self.base.resources()
     }
     #[inline(always)]
-    fn ng(&self) -> u16 {
+    fn ng(&self) -> NgMask {
         self.base.ng()
     }
     #[inline(always)]

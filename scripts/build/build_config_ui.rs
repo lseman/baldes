@@ -485,7 +485,7 @@ mod tests {
         }
         let mut ids: Vec<_> = rows.iter().map(|item| item.id).collect();
         ids.sort_unstable();
-        assert_eq!(ids, (0..19).collect::<Vec<_>>());
+        assert_eq!(ids, (0..20).collect::<Vec<_>>());
     }
 
     #[test]

@@ -45,6 +45,11 @@ ryan-foster-master = []
 accumulated-resource-master = []
 # Generate node memory instead of arc memory for rank-one cuts.
 rank-one-node-memory = []
+# Native NG local memory per vertex: 15 elements by default, 31 or 63 with
+# these features (the larger wins when both are enabled). Wider masks enlarge
+# every label.
+ng-memory-31 = []
+ng-memory-63 = []
 # Eight-label AVX-512F scans (Rust >= 1.89); AVX2/scalar fallback at runtime.
 simd-avx512 = ["simd"]
 # Clp restricted master and column-generation loop. Builds Clp 1.17.10 and

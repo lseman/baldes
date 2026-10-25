@@ -17,6 +17,8 @@ gurobi = ["baldes/gurobi"]
 simd = ["baldes/simd"]
 multi-time-windows = ["baldes/multi-time-windows"]
 rank-one-node-memory = ["baldes/rank-one-node-memory"]
+ng-memory-31 = ["baldes/ng-memory-31"]
+ng-memory-63 = ["baldes/ng-memory-63"]
 
 [dependencies]
 baldes = { path = "../.." }

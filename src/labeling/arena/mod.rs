@@ -3,6 +3,7 @@
 use super::storage::StoredLabel;
 use crate::cuts::state::LIMITED_WORDS;
 use crate::graph::buckets::BucketId;
+use crate::graph::ng::NgMask;
 use crate::pricing::restrictions::BranchState;
 use std::ops::{Deref, DerefMut};
 use std::sync::OnceLock;
@@ -26,7 +27,7 @@ pub(crate) struct OrdinaryLabel<const D: usize = { crate::DEFAULT_RESOURCE_DIMEN
     vertex: u32,
     hops: u32,
     local_id: u32,
-    ng: u16,
+    ng: NgMask,
     expanded: bool,
 }
 
@@ -73,7 +74,7 @@ pub(crate) trait LabelData {
     fn cost(&self) -> f64;
     fn original_cost(&self) -> f64;
     fn resources(&self) -> &[f64];
-    fn ng(&self) -> u16;
+    fn ng(&self) -> NgMask;
     fn branch_state(&self) -> &BranchState;
     fn presence_state(&self) -> &crate::cuts::soft_conflicts::LabelState {
         &EMPTY_PRESENCE

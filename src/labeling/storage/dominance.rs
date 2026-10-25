@@ -158,7 +158,7 @@ impl<const D: usize> LabelStorage<D> {
         threshold: f64,
         candidate_r0: f64,
         candidate_r1: f64,
-        candidate_ng: u16,
+        candidate_ng: NgMask,
         forward: bool,
         ng: bool,
     ) -> usize {

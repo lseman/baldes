@@ -28,7 +28,8 @@ fn compare<const P: bool, const F: bool, const R: usize, const N: bool>() {
                 values[(i * 7) % values.len()],
                 values[(i * 5 + 1) % values.len()],
             ],
-            ng: (i as u16).wrapping_mul(7919),
+            // Spread masks over the whole configured width, including its top bit.
+            ng: (i as NgMask).wrapping_mul(7919).rotate_left(i as u32),
             hops: 0,
         });
     }
@@ -38,7 +39,7 @@ fn compare<const P: bool, const F: bool, const R: usize, const N: bool>() {
         for from in 0..=len {
             for &a in &values {
                 for &b in &values {
-                    for ng in [0, 1, 0x5555, u16::MAX] {
+                    for ng in [0, 1, 0x5555, NgMask::MAX >> 1, NgMask::MAX] {
                         let expected = (from..len)
                             .find(|&i| {
                                 let mut pass = true;

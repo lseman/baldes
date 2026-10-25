@@ -190,8 +190,9 @@ native search. Resource arithmetic/state failures remain unknown; the native
 engine may aggregate a nonzero frontier-budget exhaustion into numerical failure.
 The `work` statistic counts witness reconstruction work, not native front work.
 
-This adapter currently supports at most fifteen customers, reflecting native
-exact NG local memory, and at most 1023 input locations because it adds a sink.
+This adapter supports at most fifteen customers by default, reflecting native
+exact NG local memory (31 or 63 with the `ng-memory-31` or `ng-memory-63`
+build feature), and at most 1023 input locations because it adds a sink.
 It uses native numerical resource/cost comparisons. `Complete` and `Bounded`
 retain their numerical coverage meanings; no directed-rounding certificate is
 provided for charging. The largest absolute reduced arc cost times `max_arcs`

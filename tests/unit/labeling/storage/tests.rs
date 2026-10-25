@@ -645,7 +645,7 @@ fn hot_column_compaction_preserves_all_fields_and_allocations() {
                     additional_cost: x + 0.5,
                     resources: [x + 1., x + 2.],
                     hops: i * 3,
-                    ng: (i * 5) as u16,
+                    ng: (i * 5) as NgMask,
                 });
             }
             let selected: Vec<_> = (0..len).filter(|&i| mask & (1 << i) != 0).collect();

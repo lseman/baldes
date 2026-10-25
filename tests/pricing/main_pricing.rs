@@ -1,4 +1,4 @@
-use baldes::graph::ng::PreparedNg;
+use baldes::graph::ng::{NgMask, PreparedNg, NG_MEMORY_CAPACITY};
 use baldes::labeling::{extend_resources, NO_ROUTE_COST};
 use baldes::{price, Controls, Graph, ResourceKind};
 use std::time::Duration;
@@ -191,6 +191,47 @@ fn repricing_is_transactional_and_previous_routes_are_owned() {
         -3.
     );
     assert_eq!(saved.cost, 2.);
+}
+#[test]
+fn ng_memory_capacity_follows_the_compiled_width() {
+    let cap = NG_MEMORY_CAPACITY;
+    assert_eq!(cap, NgMask::BITS as usize - 1);
+    let mut g = graph(cap + 3, 0, &[]);
+    let customers: Vec<_> = (1..=cap + 1).collect();
+    g.set_ng(1, &customers[..cap]).unwrap();
+    assert!(PreparedNg::new(&g).is_ok());
+    g.set_ng(1, &customers).unwrap();
+    assert!(PreparedNg::new(&g).is_err());
+}
+#[test]
+fn highest_live_ng_coordinate_forbids_repeated_visits() {
+    // Customers 1..=cap; `cap` takes the highest live local coordinate of
+    // vertices 1 and cap, and the cycle cap -> 1 -> cap must be rejected.
+    let cap = NG_MEMORY_CAPACITY;
+    let sink = cap + 1;
+    let mut g = graph(
+        cap + 2,
+        1,
+        &[
+            (0, cap, -1., 1.),
+            (cap, 1, -1., 1.),
+            (1, cap, -1., 1.),
+            (cap, sink, 0., 1.),
+            (1, sink, 0., 1.),
+        ],
+    );
+    assert_eq!(
+        price(&g, &Controls::default())
+            .unwrap()
+            .minimum_reduced_cost,
+        -3.
+    );
+    let customers: Vec<_> = (1..=cap).collect();
+    g.set_ng(1, &customers).unwrap();
+    g.set_ng(cap, &customers).unwrap();
+    let result = price(&g, &Controls::default()).unwrap();
+    assert_eq!(result.minimum_reduced_cost, -2.);
+    assert_eq!(result.columns[0].nodes, [0, cap as i32, 1, sink as i32]);
 }
 #[test]
 fn grouped_elements_forbid_different_vertices_with_the_same_element() {

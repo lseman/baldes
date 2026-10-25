@@ -92,7 +92,7 @@ impl<const D: usize> HotColumns<D> {
         threshold: f64,
         candidate_r0: f64,
         candidate_r1: f64,
-        candidate_ng: u16,
+        candidate_ng: NgMask,
     ) -> usize {
         #[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
         if D >= 2
@@ -149,7 +149,7 @@ impl<const D: usize> HotColumns<D> {
         threshold: f64,
         candidate_r0: f64,
         candidate_r1: f64,
-        candidate_ng: u16,
+        candidate_ng: NgMask,
     ) -> usize {
         if D < 2 {
             return from;
@@ -157,7 +157,7 @@ impl<const D: usize> HotColumns<D> {
         let n = self.key.len();
         // One label's test on values, so the 8-wide block below reads
         // fixed-size arrays without bounds checks and vectorizes.
-        let test = |key: f64, r0: f64, r1: f64, ng: u16| -> bool {
+        let test = |key: f64, r0: f64, r1: f64, ng: NgMask| -> bool {
             let mut pass = true;
             for (r, x) in [r0, r1].into_iter().enumerate().take(RESOURCES) {
                 let candidate = if r == 0 { candidate_r0 } else { candidate_r1 };
@@ -199,7 +199,7 @@ impl<const D: usize> HotColumns<D> {
             let key: &[f64; 8] = self.key[i..i + 8].try_into().unwrap();
             let r0: &[f64; 8] = self.resources[0][i..i + 8].try_into().unwrap();
             let r1: &[f64; 8] = self.resources[1][i..i + 8].try_into().unwrap();
-            let ng: &[u16; 8] = self.ng[i..i + 8].try_into().unwrap();
+            let ng: &[NgMask; 8] = self.ng[i..i + 8].try_into().unwrap();
             let mut mask = 0u32;
             for j in 0..8 {
                 mask |= (test(key[j], r0[j], r1[j], ng[j]) as u32) << j;

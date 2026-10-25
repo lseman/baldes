@@ -53,6 +53,23 @@ pricing use the selected cut representation consistently.
 Python builds expose the same feature, for example
 `maturin develop --features rank-one-node-memory`.
 
+### NG memory size
+
+Each vertex remembers at most 15 ng elements by default. Build with
+`--features ng-memory-31` or `--features ng-memory-63` to raise the limit to 31
+or 63; when both are enabled, 63 applies. In `make config`, cycle
+**NG memory → 15 / 31 / 63**, or set `CONFIG_NG_MEMORY=31` (or `63`) in the
+saved configuration.
+
+The limit applies after arc memory is merged into each vertex. Graphs that
+exceed it fail during preparation with `native NG local memory exceeds N
+elements`. Wider memory stores a 32- or 64-bit ng word in every label instead of
+16 bits, so labeling uses more memory and bandwidth; keep the default unless the
+neighborhoods need it. Rust code can read the compiled limit from
+`baldes::graph::ng::NG_MEMORY_CAPACITY`, and Python from
+`pybaldes.ng_memory_capacity` (for example after
+`maturin develop --features ng-memory-31`).
+
 ## Gurobi master backend
 
 Download and extract the latest stable Linux release into the repository's

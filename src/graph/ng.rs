@@ -1,35 +1,49 @@
 //! Remembered element sets, arc NG information and NG transitions.
-//! Native local coordinate 15 is reserved; at most 15 live elements per vertex.
+//! The highest native local coordinate is reserved, so each vertex holds at most
+//! `NG_MEMORY_CAPACITY` live elements: 15 by default, 31 with `ng-memory-31`
+//! and 63 with `ng-memory-63` (the larger size wins when both are enabled).
 use super::Graph;
 use crate::{invalid, Result};
 use std::collections::BTreeSet;
+/// Local NG memory word of a label.
+#[cfg(feature = "ng-memory-63")]
+pub type NgMask = u64;
+/// Local NG memory word of a label.
+#[cfg(all(feature = "ng-memory-31", not(feature = "ng-memory-63")))]
+pub type NgMask = u32;
+/// Local NG memory word of a label.
+#[cfg(not(any(feature = "ng-memory-31", feature = "ng-memory-63")))]
+pub type NgMask = u16;
+/// Live elements per vertex; the highest bit of `NgMask` is reserved.
+pub const NG_MEMORY_CAPACITY: usize = NgMask::BITS as usize - 1;
+const RESERVED: NgMask = 1 << NG_MEMORY_CAPACITY;
 #[derive(Clone, Debug, Default)]
 pub struct Transition {
-    pub forbidden: u16,
-    pub base: u16,
+    pub forbidden: NgMask,
+    pub base: NgMask,
     pub transfer: Vec<(u8, u8)>,
 }
 impl Transition {
-    pub fn extend(&self, before: u16, vertex_bits: u16) -> Option<u16> {
+    pub fn extend(&self, before: NgMask, vertex_bits: NgMask) -> Option<NgMask> {
         if before & self.forbidden != 0 {
             return None;
         }
         let mut next = self.base;
         for &(source, target) in &self.transfer {
-            let target = 1u16 << target;
+            let target: NgMask = 1 << target;
             next = (next & !target)
-                | if before & (1u16 << source) != 0 {
+                | if before & (1 << source) != 0 {
                     target
                 } else {
                     0
                 };
         }
-        Some((next | vertex_bits) & !(1 << 15))
+        Some((next | vertex_bits) & !RESERVED)
     }
 }
 #[derive(Clone, Debug)]
 pub struct PreparedNg {
-    pub vertex_bits: Vec<u16>,
+    pub vertex_bits: Vec<NgMask>,
     pub local_elements: Vec<Vec<usize>>,
     pub forward: Vec<Transition>,
     pub backward: Vec<Transition>,
@@ -73,8 +87,10 @@ impl PreparedNg {
         for v in 0..n {
             let mut own = member[v].clone();
             own.extend(incoming[v].intersection(&outgoing[v]));
-            if own.len() > 15 {
-                return Err(invalid("native NG local memory exceeds fifteen elements"));
+            if own.len() > NG_MEMORY_CAPACITY {
+                return Err(invalid(format!(
+                    "native NG local memory exceeds {NG_MEMORY_CAPACITY} elements"
+                )));
             }
             let mut positions = vec![None; e];
             for (i, &id) in own.iter().enumerate() {
@@ -83,7 +99,9 @@ impl PreparedNg {
             let bits = g.vertices[v]
                 .elements
                 .iter()
-                .fold(0, |bits, &id| bits | (1 << positions[id].unwrap()));
+                .fold(0 as NgMask, |bits, &id| {
+                    bits | (1 << positions[id].unwrap())
+                });
             local.push(positions);
             vertex_bits.push(bits);
         }

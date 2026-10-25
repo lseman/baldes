@@ -36,6 +36,7 @@ impl<const D: usize> LabelInput<D> for &StoredLabel<D> {
 use super::{Statistics, EPSILON};
 use crate::cuts::state::{packed_dominate, DominanceDescriptor, LIMITED_WORDS};
 use crate::graph::buckets::BucketId;
+use crate::graph::ng::NgMask;
 use crate::graph::{Graph, ResourceKind};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InsertionTest {
@@ -53,7 +54,7 @@ pub struct StoredLabel<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> 
     pub cost: f64,
     pub original_cost: f64,
     pub resources: crate::graph::ResourceValues<D>,
-    pub ng: u16,
+    pub ng: NgMask,
     pub branch_state: crate::pricing::restrictions::BranchState,
     /// Full original-variable incidence for presence-based nonlinear rows.
     pub presence_state: crate::cuts::soft_conflicts::LabelState,
@@ -83,7 +84,7 @@ pub struct HotLabel<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub additional_cost: f64,
     pub resources: [f64; D],
     pub hops: usize,
-    pub ng: u16,
+    pub ng: NgMask,
 }
 impl<const D: usize> HotLabel<D> {
     #[inline]
@@ -107,7 +108,7 @@ pub struct HotColumns<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub additional_cost: Vec<f64>,
     pub resources: [Vec<f64>; D],
     pub hops: Vec<usize>,
-    pub ng: Vec<u16>,
+    pub ng: Vec<NgMask>,
 }
 
 #[derive(Clone, Debug, Default)]

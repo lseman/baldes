@@ -232,7 +232,7 @@ impl Problem {
         g.sink = j;
         // p<=3 paths are already elementary (distinct terminals, no loops,
         // no arcs into source or out of sink). Longer steps use exact cycle
-        // exclusion below instead of the core's 15-element local NG mask.
+        // exclusion below instead of the core's bounded local NG mask.
         g.elementary = false;
         // Hop equality prevents waiting from fabricating extra arcs. Load
         // windows all have lower bound zero: waiting cannot improve a path,

@@ -4,7 +4,7 @@ pub mod engine;
 pub mod pool;
 mod resources;
 pub mod storage;
-use crate::graph::ng::PreparedNg;
+use crate::graph::ng::{NgMask, PreparedNg};
 use crate::graph::{Arc, Graph, ResourceKind};
 use crate::{incomplete, invalid, Result};
 pub use resources::ScalarResourceKernel;
@@ -153,7 +153,7 @@ struct Label<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     cost: f64,
     original_cost: f64,
     resources: crate::graph::ResourceValues<D>,
-    ng: u16,
+    ng: NgMask,
     parent: Option<usize>,
     arc: Option<usize>,
     hops: usize,

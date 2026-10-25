@@ -549,6 +549,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Phase>()?;
     coupled::register(m)?;
     m.add("resource_dimensions", baldes::DEFAULT_RESOURCE_DIMENSIONS)?;
+    m.add("ng_memory_capacity", baldes::graph::ng::NG_MEMORY_CAPACITY)?;
     m.add("has_clp", cfg!(feature = "clp"))?;
     m.add("has_highs", cfg!(feature = "highs"))?;
     m.add("has_gurobi", cfg!(feature = "gurobi"))?;

@@ -3,7 +3,7 @@ use super::*;
 /// Enumeration's limited-memory projection borrows expensive resource payloads.
 struct EnumerationProjection<'a, const D: usize> {
     label: &'a crate::enumeration::Label<D>,
-    ng: u16,
+    ng: NgMask,
     cut_words: [u32; LIMITED_WORDS],
     half_potential: f64,
 }
@@ -21,7 +21,7 @@ impl<const D: usize> LabelData for EnumerationProjection<'_, D> {
     fn resources(&self) -> &[f64] {
         &self.label.resources
     }
-    fn ng(&self) -> u16 {
+    fn ng(&self) -> NgMask {
         self.ng
     }
     fn branch_state(&self) -> &crate::pricing::restrictions::BranchState {

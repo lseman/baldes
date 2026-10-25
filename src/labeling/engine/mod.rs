@@ -22,7 +22,7 @@ use crate::cuts::state::{
     LIMITED_WORDS,
 };
 use crate::graph::buckets::{BucketArc, BucketGraph, BucketId};
-use crate::graph::ng::PreparedNg;
+use crate::graph::ng::{NgMask, PreparedNg};
 use crate::graph::{Graph, ResourceKind};
 use crate::pricing::phases::Phase;
 use crate::{incomplete, invalid, Result};
