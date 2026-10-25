@@ -583,10 +583,71 @@ The model is restricted before the requested root or tree solve.</p>
 <span class="w">  </span>--resource-branches<span class="w"> </span>examples/networks/resource_group_upper.json<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--tree<span class="w"> </span>--bound-mode<span class="w"> </span>certified<span class="w"> </span>--json<span class="w"> </span>-
 </code></pre></div>
+<h2 id="synchronized-service-across-vehicles">Synchronized service across vehicles</h2>
+<p>Pass <code>synchronized_services</code> to a native solve to require simultaneous service
+of a job by several distinct vehicle copies. A member identifies the service
+vertex in one pricing network; each service has at most one member per network.
+A network with multiplicity two can supply two interchangeable vehicles using
+two copies of the same elementary route.</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">SynchronizedService</span><span class="p">,</span> <span class="n">SynchronizedServiceMember</span>
+
+<span class="n">service</span> <span class="o">=</span> <span class="n">SynchronizedService</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="mi">17</span><span class="p">,</span>
+    <span class="n">resource</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>                 <span class="c1"># scalar service-start time</span>
+    <span class="n">vehicles_required</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">reward</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>                 <span class="c1"># counted once, not once per vehicle</span>
+    <span class="n">start</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1440</span><span class="p">),</span>            <span class="c1"># inclusive integer domain</span>
+    <span class="n">members</span><span class="o">=</span><span class="p">(</span><span class="n">SynchronizedServiceMember</span><span class="p">(</span><span class="n">network</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">vertex</span><span class="o">=</span><span class="mi">17</span><span class="p">),</span>
+             <span class="n">SynchronizedServiceMember</span><span class="p">(</span><span class="n">network</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">vertex</span><span class="o">=</span><span class="mi">8</span><span class="p">)),</span>
+<span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">tree</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">synchronized_services</span><span class="o">=</span><span class="p">(</span><span class="n">service</span><span class="p">,))</span>
+</code></pre></div>
+<p>The native master appends a binary <code>served</code> variable and the coverage equality
+<code>sum(visits) = vehicles_required * served</code>. Per-network linking rows additionally
+enforce <code>visits_in_network &lt;= min(fleet_size, vehicles_required) * served</code>.
+This is optional service: an unserved job has no visits. Keep its reward out of
+incoming arc costs and remove ordinary unit-cover rows for that job; the solver
+retains all caller-supplied costs and constraints. Physical fleet limits remain
+in force. Rust callers set <code>mp::Options.synchronized_services</code>; JSON solve options
+accept the same array of definitions. The CLI accepts
+<code>--synchronized-services services.json</code> alongside <code>--tree</code>.</p>
+<p>Synchronization uses an independent disposable resource with nonnegative arc
+consumption. Its value at the member vertex must represent service start; put
+service duration in outgoing arc consumption. Disjoint service-start windows
+work with <code>multi-time-windows</code>. Start domains contain integers between
+<code>-2**52</code> and <code>2**52</code>, inclusive; choose time units to obtain the desired grid.
+Ordinary pricing-grid limits also apply to resource values.
+Coupled resources in participating networks and resource-load rows on the
+synchronized axis are rejected.</p>
+<p>Root solves are LP relaxations and may contain unsynchronized columns. The
+native tree propagates common earliest starts across all selected routes and
+checks the complete joint schedule using exact resource replay. When that
+cannot certify a witness, it splits a common integer start domain and clips
+all participating networks. Restrictions survive snapshot forks, retained and
+inactive columns, enumeration and fixed routes. Published integer route
+profiles include the common starts. Time and node limits retain open nodes and
+a relaxation bound; they never turn a failed synchronization check into an
+incumbent or an infeasibility proof.</p>
+<p>An LP snapshot can be restricted explicitly with
+<code>node.with_synchronized_start(id=17, lower=300, upper=600)</code>. Its synchronization
+definitions are immutable. Complete-domain MIP is deferred while any common
+start domain is non-singleton, since its route-only matrix is then a relaxation.</p>
+<p>The DSN adapter <code>mtw/synchronized_baldes.py</code> builds grouped antenna networks,
+charges one reward per request, and independently checks returned schedules:</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">synchronized_baldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">solve_synchronized</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">solve_synchronized</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">time_limit</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span>
+</code></pre></div>
+<p>A runnable two-fleet example is included:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--<span class="w"> </span>networks<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>examples/networks/synchronization.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--synchronized-services<span class="w"> </span>examples/networks/synchronization-services.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tree<span class="w"> </span>--json<span class="w"> </span>-
+</code></pre></div>
+<p>Both vehicles start service at time 5; the minimization objective is -1.</p>
 </article>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="../guides/python.html"><small>Previous guide</small>Python: pybaldes <span aria-hidden="true">↗</span></a><a href="../guides/build.html"><small>Next guide</small>Configuring and building BALDES <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#node-lifecycle">Node lifecycle</a><a class="toc-level-2" href="#assignment-tree">Assignment tree</a><a class="toc-level-2" href="#finite-column-imports">Finite column imports</a><a class="toc-level-2" href="#independent-master-variables">Independent master variables</a><a class="toc-level-2" href="#original-activities-multiplicities-and-nonlinear-rows">Original activities, multiplicities and nonlinear rows</a><a class="toc-level-2" href="#limitations">Limitations</a><a class="toc-level-2" href="#cli">CLI</a><a class="toc-level-2" href="#python">Python</a><a class="toc-level-2" href="#complete-enumeration-and-integer-transfer">Complete enumeration and integer transfer</a><a class="toc-level-2" href="#grouped-accumulated-resource-branches">Grouped accumulated-resource branches</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#node-lifecycle">Node lifecycle</a><a class="toc-level-2" href="#assignment-tree">Assignment tree</a><a class="toc-level-2" href="#finite-column-imports">Finite column imports</a><a class="toc-level-2" href="#independent-master-variables">Independent master variables</a><a class="toc-level-2" href="#original-activities-multiplicities-and-nonlinear-rows">Original activities, multiplicities and nonlinear rows</a><a class="toc-level-2" href="#limitations">Limitations</a><a class="toc-level-2" href="#cli">CLI</a><a class="toc-level-2" href="#python">Python</a><a class="toc-level-2" href="#complete-enumeration-and-integer-transfer">Complete enumeration and integer transfer</a><a class="toc-level-2" href="#grouped-accumulated-resource-branches">Grouped accumulated-resource branches</a><a class="toc-level-2" href="#synchronized-service-across-vehicles">Synchronized service across vehicles</a></nav></aside>
 </div>
 </body></html>

@@ -69,15 +69,19 @@ Multiple resources compose in declaration order.</p>
 </tr>
 <tr>
 <td><code>Selection</code></td>
-<td>Intersect the remaining value domain with the arc's allowed mask; reject the empty domain. Bits 0 and 1 give a binary domain; up to 64 values are supported.</td>
+<td>Intersect the remaining value domain with arc and vertex masks; reject an empty domain. Up to 64 values are supported. Optional <code>vertices</code> gives one mask per vertex. Forward extension checks the head; backward extension checks the tail. With <code>relaxed</code>, an unremembered vertex resets the domain to <code>initial</code> after checking feasibility, forgetting earlier arc and vertex eliminations. The routing master remembers all vertices of minimal violating intervals, including both endpoints. This also applies with omitted vertex masks. Incumbents always use the exact rule.</td>
 </tr>
 <tr>
 <td><code>SimultaneousPickupDelivery</code></td>
-<td>Deliver before picking up at each stop, with all route deliveries loaded at departure. Enforce capacity at departure and between all stops.</td>
+<td>Deliver before picking up at each stop, with all route deliveries loaded at departure. Enforce capacity at departure and between all stops, admitting loads up to <code>capacity + tolerance</code> (default 1e-6, also used by load dominance; 0 is exact).</td>
 </tr>
 <tr>
 <td><code>CumulativeCost</code></td>
-<td>Update <code>x += increment[arc]</code>, then add <code>x * weight[arc]</code> to the objective.</td>
+<td>Update <code>x += increment[arc]</code>, then add <code>x * weight[arc]</code> to the objective. Optional <code>sink_upper</code> and <code>source_upper</code> are the resource's upper bounds at the sink and source. With nonnegative data, dominance reads <code>sink_upper</code> as a bound on the weight of any completion (a forward label with a larger <code>x</code> pays <code>(x_a - x_b) * sink_upper</code>) and <code>source_upper</code> as a bound on the increments of any prefix (backward labels).</td>
+</tr>
+<tr>
+<td><code>CustomResource</code></td>
+<td>Zero-initialized cumulative state and cost: <code>x += increment[arc]</code>, then charge <code>x * weight[arc]</code>. Optional <code>forward_bound</code> and <code>backward_bound</code> provide independent dominance constants. No vertex transition or hard state bounds.</td>
 </tr>
 <tr>
 <td><code>Dependent</code></td>
@@ -109,6 +113,23 @@ but must be finite. Arithmetic overflow is reported as an error. Dependencies us
 the parent's value after its transition on the same arc, and do not wait or
 clamp to bounds. These are explicit modeling contracts; arbitrary
 external dependency-type conventions are not asserted to have identical semantics.</p>
+<p><code>CustomResource</code> exposes the fixed cumulative-style custom family separately from
+<code>CumulativeCost</code>. It shares the numeric kernel, joins, dependency handling and
+directed path certification, but always starts its state and objective at zero.
+Signed finite increments and weights are allowed. <code>forward_bound</code> promises an
+upper bound on the total weight of any completion; <code>backward_bound</code> promises an
+upper bound on the increments of any prefix. These optional constants only help
+dominance with nonnegative increments and weights. They do not impose hard
+feasibility limits, and omitting them keeps conservative dominance. Both must be
+finite and nonnegative when supplied.</p>
+<p>Rust uses <code>CoupledResource::CustomResource { increments, weights, forward_bound, backward_bound }</code>. Python uses
+<code>model.add_custom_resource(increments, weights, forward_bound=None, backward_bound=None)</code>.
+For example, increments <code>[2, 1]</code> and weights <code>[3, 4]</code> charge <code>2*3 + 3*4 = 18</code>.
+The JSON descriptor retains its own kind:</p>
+<div class="code-block"><div class="code-heading"><span>JSON</span></div><pre><code class="language-json"><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="s2">"custom_resource"</span><span class="p">,</span><span class="nt">"increments"</span><span class="p">:[</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span><span class="nt">"weights"</span><span class="p">:[</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">],</span><span class="nt">"forward_bound"</span><span class="p">:</span><span class="mi">7</span><span class="p">,</span><span class="nt">"backward_bound"</span><span class="p">:</span><span class="mi">3</span><span class="p">}</span>
+</code></pre></div>
+<p>There is no <code>initial</code> parameter. This descriptor is a built-in numeric cost
+resource; use <code>CoupledPlugin</code> for extension-defined feasibility callbacks.</p>
 <p>Piecewise-linear functions have at least two knots <code>[argument,value]</code>, strictly
 increasing finite arguments, and finite adjacent argument/value differences.
 They are continuous and may increase, decrease or have flat segments. Exact
@@ -247,8 +268,13 @@ physical suffix program; joins apply that suffix to the actual forward relation.
 This preserves lower-bound clamping and waiting without assuming that they have
 an additive inverse. A feasibility adjoint is available internally, but backward
 cost joins currently use replay and can cost more than a specialized suffix
-envelope. Completion bounds remain conservative and dominance requires equal
-paired relations. Reversal reuse is disabled.</p>
+envelope. Completion bounds remain conservative. Forward feasibility dominance
+requires a front that covers the other front and stays below it; backward
+feasibility dominance compares known upper fronts by coverage and the opposite
+value order. Numerical comparisons use absolute tolerance <code>1e-4</code> or relative
+<code>2.22e-10</code>. Cost-unbounded fronts with an upper bound of at least <code>1e12</code> can
+compensate a higher front through a cost penalty, provided the independent
+scalar and resource cost orders also hold. Reversal reuse is disabled.</p>
 <p>This is a numerical resource contract. Arithmetic ambiguity or excessive
 front work produces an error; it is never converted to infeasibility or a
 complete-pricing claim. Directed path certification currently returns unknown
@@ -275,6 +301,16 @@ minimum, including the initial value. The alternate
 <code>final_minus_initial_minimum</code> subtracts the initial minimum. A fresh root charges
 zero under both conventions. Phase I suppresses this objective while keeping
 dependent transitions and bounds.</p>
+<p>Raw paired forward dominance compares covering fronts under the selected policy.
+In feasibility mode with <code>strict_domain</code>, backward labels also retain an upper
+front when the slope functions can be converted into knot functions without
+changing their stored segment slopes. Unsupported conversions, singleton
+function domains, terminal upper bounds above the <code>1e12</code> numerical infinity
+marker, and failed adjoints leave that upper front unknown; joins
+continue to replay the physical suffix. Different suffix programs can dominate
+only when every active feasibility relation has a known upper front and no
+other resource requires replay-dependent comparison. <code>native_front_algebra</code>
+continues to use suffix replay without this backward dominance optimization.</p>
 <p>The raw implementation retains front-operation provenance and uses a correct
 running-minimum waiting envelope. The name <code>native_front_algebra</code> selects
 recovered arithmetic/comparison choices where supported; it does not promise
@@ -312,6 +348,7 @@ artifacts are retained locally under
 <span class="n">physical</span><span class="p">.</span><span class="n">set_coupled_resources</span><span class="p">(</span><span class="o">&amp;</span><span class="p">[</span>
 <span class="w">    </span><span class="n">CoupledResource</span><span class="p">::</span><span class="n">SimultaneousPickupDelivery</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="n">capacity</span><span class="p">:</span><span class="w"> </span><span class="mf">4.</span><span class="p">,</span><span class="w"> </span><span class="n">deliveries</span><span class="p">,</span><span class="w"> </span><span class="n">pickups</span><span class="p">,</span>
+<span class="w">        </span><span class="n">tolerance</span><span class="p">:</span><span class="w"> </span><span class="nc">baldes</span><span class="p">::</span><span class="n">graph</span><span class="p">::</span><span class="n">coupled</span><span class="p">::</span><span class="n">DEFAULT_LOAD_TOLERANCE</span><span class="p">,</span>
 <span class="w">    </span><span class="p">},</span>
 <span class="p">])</span><span class="o">?</span><span class="p">;</span>
 <span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">price</span><span class="p">(</span><span class="o">&amp;</span><span class="n">physical</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="nb">Default</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
@@ -345,7 +382,7 @@ charges while retaining their state transitions and feasibility constraints.</p>
 <span class="n">minimum</span><span class="p">,</span> <span class="n">routes</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">price</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span>
 <span class="k">assert</span> <span class="n">routes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">nodes</span><span class="p">()</span> <span class="o">==</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
 </code></pre></div>
-<p><code>add_selection</code>, <code>add_cumulative_cost</code>, <code>add_dependent</code>, and
+<p><code>add_selection</code>, <code>add_cumulative_cost</code>, <code>add_custom_resource</code>, <code>add_dependent</code>, and
 <code>add_piecewise_linear_dependent</code> install the other
 resource families through the same model. <code>Route.original_cost</code> reports the
 original coupled objective; <code>Route.cost</code> reports its priced cost.</p>
