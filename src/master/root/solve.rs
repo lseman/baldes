@@ -1,4 +1,5 @@
 use super::*;
+use crate::pricing::restrictions::RYAN_FOSTER_IN_PRICING;
 
 pub fn solve<const D: usize>(
     problem: RootProblem<D>,
@@ -192,7 +193,7 @@ pub(super) fn solve_seeded<const D: usize>(
     for (name, value) in &options.pricing_options {
         solver.set_option(name, *value)?;
     }
-    solver.set_ryan_foster(
+    solver.set_ryan_foster(if RYAN_FOSTER_IN_PRICING {
         problem
             .branch_constraints
             .iter()
@@ -203,8 +204,10 @@ pub(super) fn solve_seeded<const D: usize>(
                     None
                 }
             })
-            .collect(),
-    )?;
+            .collect()
+    } else {
+        vec![]
+    })?;
     solver.set_forbidden_arcs(
         arc_bounds
             .iter()

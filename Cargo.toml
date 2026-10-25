@@ -37,6 +37,9 @@ cuda = ["dep:cc"]
 simd = []
 # Disjoint service-start windows on disposable scalar resources.
 multi-time-windows = []
+# Enforce Ryan–Foster branches only through master rows; pricing ignores
+# them. Without it, pricing also enforces them with binary resources.
+ryan-foster-master = []
 # Eight-label AVX-512F scans (Rust >= 1.89); AVX2/scalar fallback at runtime.
 simd-avx512 = ["simd"]
 # Clp restricted master and column-generation loop. Builds Clp 1.17.10 and

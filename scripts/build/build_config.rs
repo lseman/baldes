@@ -76,6 +76,8 @@ struct Config {
     gurobi: bool,
     cli: bool,
     multi_time_windows: bool,
+    /// Enforce Ryan–Foster branches through master rows instead of pricing.
+    ryan_foster_master: bool,
     release: bool,
     native_cpu: bool,
     simd: SimdMode,
@@ -97,6 +99,7 @@ impl Default for Config {
             gurobi: false,
             cli: false,
             multi_time_windows: false,
+            ryan_foster_master: false,
             release: true,
             native_cpu: false,
             simd: SimdMode::Off,
@@ -140,6 +143,13 @@ impl Config {
                 "CONFIG_GUROBI" => config.gurobi = boolean()?,
                 "CONFIG_CLI" => config.cli = boolean()?,
                 "CONFIG_MULTI_TIME_WINDOWS" => config.multi_time_windows = boolean()?,
+                "CONFIG_RYAN_FOSTER" => {
+                    config.ryan_foster_master = match value {
+                        "pricing" => false,
+                        "master" => true,
+                        _ => return Err("CONFIG_RYAN_FOSTER must be pricing or master".into()),
+                    }
+                }
                 "CONFIG_SIMD" => {
                     config.simd = match value {
                         "off" | "n" => SimdMode::Off,
@@ -235,6 +245,7 @@ impl Config {
         format!(
             "# BALDES build configuration; edit with make config.\n\
             CONFIG_PROFILE={}\nCONFIG_CLP={}\nCONFIG_HIGHS={}\nCONFIG_GUROBI={}\nCONFIG_CLI={}\nCONFIG_MULTI_TIME_WINDOWS={}\n\
+            CONFIG_RYAN_FOSTER={}\n\
             CONFIG_SIMD={}\nCONFIG_NATIVE_CPU={}\nCONFIG_RELEASE_DEBUG={}\nCONFIG_OFFLINE={}\nCONFIG_LOCKED={}\n\
             CONFIG_JOBS={}\nCONFIG_RESOURCE_DIMENSIONS={}\nCONFIG_TARGET={}\nCONFIG_HIGHS_DIR={}\nCONFIG_GUROBI_HOME={}\n",
             if self.release { "release" } else { "dev" },
@@ -243,6 +254,7 @@ impl Config {
             yn(self.gurobi),
             yn(self.cli),
             yn(self.multi_time_windows),
+            if self.ryan_foster_master { "master" } else { "pricing" },
             self.simd.name(),
             yn(self.native_cpu),
             yn(self.release_debug),
@@ -304,6 +316,7 @@ impl Config {
             (self.highs, "highs"),
             (self.gurobi, "gurobi"),
             (self.multi_time_windows, "multi-time-windows"),
+            (self.ryan_foster_master, "ryan-foster-master"),
             (self.simd == SimdMode::Avx2, "simd"),
             (self.simd == SimdMode::Avx512, "simd-avx512"),
         ]
@@ -427,6 +440,7 @@ impl Config {
                 }
             }
             15 => self.multi_time_windows = !self.multi_time_windows,
+            16 => self.ryan_foster_master = !self.ryan_foster_master,
             12 => self.simd = self.simd.next(CpuSimd::detect(), self.target.is_empty()),
             _ => {}
         }
@@ -441,6 +455,7 @@ impl Config {
             Item::toggle(2, "BACKEND", "HiGHS backend", self.highs, "LP and mixed-integer solver. Requires libhighs with 32-bit HighsInt, discovered through the installation path, pkg-config or system libraries."),
             Item::toggle(13, "BACKEND", "Gurobi backend", self.gurobi, "LP master solver. Requires a Gurobi installation and valid license. Set Gurobi installation below or export GUROBI_HOME. Routing CLI also requires Clp."),
             Item::toggle(15, "BUILD", "Multi-time windows", self.multi_time_windows, "Disjoint service-start domains for scalar pricing resources."),
+            Item::value(16, "BUILD", "Ryan–Foster enforcement", if self.ryan_foster_master { "Master" } else { "Pricing" }, "Fixed at compile time. Pricing keeps branch-violating columns out of labeling. Master enforces branches only through master rows; pricing ignores them, so bounds at branched nodes can be weaker."),
             Item::value(12, "PERFORMANCE", "SIMD acceleration", self.simd.name(), "Cycle Off / AVX2 / AVX-512, skipping modes unsupported by this CPU. Host target only. AVX-512 requires Rust 1.89+. Runtime detection keeps portable fallback."),
             Item::toggle(4, "PERFORMANCE", "Native CPU", self.native_cpu, "Optimize for this computer with target-cpu=native. Clear the target triple before enabling; use portable builds for distribution."),
             Item::toggle(5, "PERFORMANCE", "Release debug symbols", self.release_debug, "Keep debug symbols in release builds for perf and other profilers. The development profile retains Cargo's normal debug settings."),
@@ -1087,7 +1102,19 @@ mod tests {
         c.edit(11, Some("0".into())).unwrap();
         assert_eq!(c.resource_dimensions, 0);
         assert!(c.cargo("clean").unwrap().vars.is_empty());
-        assert_eq!(c.rows().len(), 16);
+        assert_eq!(c.rows().len(), 17);
+    }
+    #[test]
+    fn ryan_foster_enforcement_round_trips_and_selects_its_feature() {
+        let mut c = Config::default();
+        assert!(!args(&c, "build").iter().any(|a| a.contains("ryan-foster-master")));
+        c.edit(16, None).unwrap();
+        assert!(c.ryan_foster_master);
+        assert!(c.text().contains("CONFIG_RYAN_FOSTER=master"));
+        assert_eq!(Config::parse(&c.text()).unwrap(), c);
+        assert!(args(&c, "build").iter().any(|a| a.contains("ryan-foster-master")));
+        assert!(Config::parse("CONFIG_RYAN_FOSTER=labels").is_err());
+        assert!(!Config::parse("CONFIG_RYAN_FOSTER=pricing").unwrap().ryan_foster_master);
     }
     #[test]
     fn clean_does_not_receive_build_flags() {

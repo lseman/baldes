@@ -283,6 +283,22 @@ pub fn solve<const D: usize>(
             closed_bound = closed_bound.min(node.bound);
             continue;
         }
+        if !crate::pricing::restrictions::RYAN_FOSTER_IN_PRICING
+            && result.master.status == Status::Stalled
+            && node
+                .branches
+                .iter()
+                .any(|b| matches!(b, BranchConstraint::RyanFoster(_)))
+        {
+            // Master-row Ryan–Foster: pricing never sees the branch, so exact
+            // pricing can stall with artificials left after phase I. Like
+            // the reference solver (pure phase I determined infeasibility),
+            // prune the node. Not a proof: this build gives up optimality.
+            if let Some(history) = &mut subtree_history {
+                history.close(node.lineage);
+            }
+            continue;
+        }
         if result.master.status != Status::Optimal
             || result
                 .master
