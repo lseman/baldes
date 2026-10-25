@@ -71,6 +71,11 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
     seeds: &[NetworkRoute],
 ) -> Result<Output<D>> {
     problem.validate()?;
+    let synchronized_services = synchronization::prepare(
+        &mut problem,
+        &mut variables,
+        std::mem::take(&mut options.synchronized_services),
+    )?;
     master_variables::install(&mut problem, &mut variables)?;
     if options.cg.warm_start.is_some() || !options.cg.known.is_empty() {
         return Err(invalid("shared root requires a fresh column registry"));
@@ -127,12 +132,14 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
             knapsack_rows: vec![],
             presence_rows: vec![],
             resource_groups: vec![],
+            synchronized_windows: vec![],
             proved_zero_arcs: vec![],
             proved_multiplicity_upper: None,
         });
     }
     let master_only = oracles.is_empty();
     let mut state = State {
+        synchronized_services,
         oracles,
         shared_offset,
         routes: vec![],

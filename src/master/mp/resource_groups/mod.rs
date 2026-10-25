@@ -6,7 +6,7 @@ use crate::{
 };
 use std::borrow::Cow;
 mod candidates;
-mod profiles;
+pub(super) mod profiles;
 pub use candidates::ResourceGroupCandidate;
 
 /// Physical occurrences of one shared packing group in one pricing network.
@@ -53,11 +53,12 @@ fn windows_graph<const D: usize>(oracle: &Oracle<D>) -> Result<(Graph<D>, HashSe
                 .filter(|&a| group.additive(a) != 0.),
         );
     }
+    synchronization::install_windows(oracle, &mut graph, &mut blocked);
     Ok((graph, blocked))
 }
 
 pub(super) fn domain_graph<const D: usize>(oracle: &Oracle<D>) -> Result<Cow<'_, Graph<D>>> {
-    if oracle.resource_groups.is_empty() {
+    if oracle.resource_groups.is_empty() && oracle.synchronized_windows.is_empty() {
         return Ok(Cow::Borrowed(&oracle.network.graph));
     }
     let (mut graph, blocked) = windows_graph(oracle)?;
@@ -93,6 +94,19 @@ pub(super) fn check_load_rows<const D: usize>(
         .iter()
         .find(|o| o.network.id == network)
         .ok_or_else(|| invalid("unknown resource group network"))?;
+    if oracle
+        .synchronized_windows
+        .iter()
+        .any(|&(_, r, _)| r == resource)
+        || state.synchronized_services.iter().any(|s| {
+            s.definition.resource == resource
+                && s.definition.members.iter().any(|m| m.network == network)
+        })
+    {
+        return Err(invalid(
+            "resource-load rows cannot use a synchronized service axis",
+        ));
+    }
     if state.universe.is_none()
         && oracle.network.graph.resources.get(resource)
             == Some(&crate::graph::ResourceKind::Disposable)

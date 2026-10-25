@@ -7,6 +7,7 @@ const HELP: &str = "Usage: baldes multi-pricing MODEL.json [OPTIONS]
 
 Solve shared master rows with multiple pricing networks (Clp).
   --tree                 Run the assignment branch-and-price tree
+  --synchronized-services FILE  JSON array of common-start service definitions
   --resource-branches FILE  Apply a JSON array of grouped-resource restrictions
   --enumerate            Attempt bounded full-domain all-network transfer
   --enumerated-mip       Solve transferred nodes with HiGHS (--tree; highs feature)
@@ -91,6 +92,12 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
                 options.log_interval = Some(value()?.parse::<usize>().map_err(|e| e.to_string())?)
             }
             "--json" => json = Some(value()?),
+            "--synchronized-services" => {
+                let path = value()?;
+                let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+                options.synchronized_services = serde_json::from_str(&text)
+                    .map_err(|e| format!("synchronized services JSON: {e}"))?;
+            }
             "--option" => {
                 let assignment = value()?;
                 let (name, val) = assignment

@@ -84,6 +84,35 @@ class PricingNetwork:
 
 
 @dataclass(frozen=True)
+class SynchronizedServiceMember:
+    network: int
+    vertex: int
+
+
+@dataclass(frozen=True)
+class SynchronizedService:
+    """Optional service by distinct vehicles at one common integer start.
+
+    ``start`` is an inclusive pair of integer resource values. The native
+    master adds coverage and a single reward; route costs must exclude that
+    reward. Each member identifies the service vertex in one fleet network.
+    """
+
+    id: int
+    resource: int
+    vehicles_required: int
+    reward: float
+    start: Tuple[int, int]
+    members: Tuple[SynchronizedServiceMember, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "start", tuple(self.start))
+        object.__setattr__(self, "members", tuple(self.members))
+        if not all(isinstance(m, SynchronizedServiceMember) for m in self.members):
+            raise TypeError("members must contain SynchronizedServiceMember objects")
+
+
+@dataclass(frozen=True)
 class NetworkProblem:
     rows: Tuple[SharedRow, ...]
     networks: Tuple[PricingNetwork, ...]
@@ -205,6 +234,10 @@ class NetworkNode:
                     upper=upper, members=[asdict(m) for m in members])
         return NetworkNode(self._native.with_resource_group_branch(json.dumps(data, allow_nan=False)))
 
+    def with_synchronized_start(self, id: int, lower: int, upper: int) -> NetworkNode:
+        """Fork with an inclusive common integer start domain for one service."""
+        return NetworkNode(self._native.with_synchronized_start(id, lower, upper))
+
     def fix_route(self, route_index: int, quantity: int = 1) -> NetworkNode:
         if isinstance(quantity, bool) or not isinstance(quantity, int):
             raise TypeError("quantity must be a positive integer")
@@ -269,6 +302,9 @@ def _options(options: Mapping[str, Any]) -> str:
     options = dict(options)
     if "pricing_options" in options:
         options["pricing_options"] = {} if options["pricing_options"] is None else dict(options["pricing_options"])
+    if "synchronized_services" in options:
+        options["synchronized_services"] = [asdict(s) if isinstance(s, SynchronizedService) else s
+                                            for s in options["synchronized_services"]]
     return json.dumps(options, allow_nan=False)
 
 
@@ -293,6 +329,7 @@ def solve_networks(
     artificial_cost: float = 2.76,
     log_interval: Optional[int] = None,
     pricing_options: Optional[Mapping[str, float]] = None,
+    synchronized_services: Tuple[SynchronizedService, ...] = (),
 ) -> NetworkResult:
     """Solve a shared LP or assignment tree. Unknown bounds serialize as null.
 
@@ -304,7 +341,7 @@ def solve_networks(
         raise TypeError("problem must be a NetworkProblem")
     if not _core.has_clp:
         raise RuntimeError("multi-network solving requires a build with Clp")
-    options = dict(tree=tree, enumerate=enumerate, enumeration_route_limit=enumeration_route_limit,
+    options = dict(synchronized_services=synchronized_services, tree=tree, enumerate=enumerate, enumeration_route_limit=enumeration_route_limit,
                    enumeration_work_limit=enumeration_work_limit, enumeration_stored_arc_limit=enumeration_stored_arc_limit,
                    enumeration_time_limit=enumeration_time_limit, enumerated_mip=enumerated_mip,
                    mip_time_limit=mip_time_limit, mip_node_limit=mip_node_limit,

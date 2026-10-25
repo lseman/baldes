@@ -1,7 +1,7 @@
 //! Refresh schedules in place, preserving physical-path caps and stable tags.
 use super::*;
 
-pub(super) fn refresh<const D: usize>(
+pub(in crate::master::mp) fn refresh<const D: usize>(
     node: &mut NodeSnapshot<D>,
     touched: &HashSet<i32>,
 ) -> Result<bool> {
@@ -48,7 +48,7 @@ pub(super) fn refresh<const D: usize>(
                 ))
             }
         }
-        if compatible {
+        if compatible && oracle.synchronized_windows.is_empty() {
             continue;
         }
         let canonical = domain

@@ -49,6 +49,7 @@ impl<const D: usize> NodeSnapshot<D> {
             master: self.master.try_clone()?,
             warm: self.warm.clone(),
             state: State {
+                synchronized_services: self.state.synchronized_services.clone(),
                 oracles: self
                     .state
                     .oracles
@@ -65,6 +66,7 @@ impl<const D: usize> NodeSnapshot<D> {
                         knapsack_rows: o.knapsack_rows.clone(),
                         presence_rows: o.presence_rows.clone(),
                         resource_groups: o.resource_groups.clone(),
+                        synchronized_windows: o.synchronized_windows.clone(),
                         proved_zero_arcs: o.proved_zero_arcs.clone(),
                         proved_multiplicity_upper: o.proved_multiplicity_upper,
                     })
@@ -90,6 +92,21 @@ impl<const D: usize> NodeSnapshot<D> {
     /// Resume this node with a new time/iteration budget and no external registry.
     pub fn solve(&self, mut options: Options) -> Result<Output<D>> {
         validate_options(&options)?;
+        if !options.synchronized_services.is_empty() {
+            if options.synchronized_services
+                != self
+                    .state
+                    .synchronized_services
+                    .iter()
+                    .map(|s| s.definition.clone())
+                    .collect::<Vec<_>>()
+            {
+                return Err(invalid(
+                    "snapshot synchronization definitions cannot be changed",
+                ));
+            }
+            options.synchronized_services.clear();
+        }
         let deadline = Instant::now()
             .checked_add(options.cg.time_limit)
             .ok_or_else(|| invalid("network time limit"))?;

@@ -227,3 +227,8 @@ required-features = ["gurobi"]
 [[test]]
 name = "pstep_vrptw"
 path = "tests/pricing/pstep_vrptw.rs"
+
+[[test]]
+name = "synchronization"
+path = "tests/master/synchronization.rs"
+required-features = ["clp"]

@@ -94,6 +94,11 @@ impl<const D: usize> NodeSnapshot<D> {
                 quantity,
             });
         }
+        if let Some(scheduled) = synchronization::witness(&self.state, &routes)? {
+            routes = scheduled;
+        } else {
+            return Ok(None);
+        }
         Ok(validate_routes(&self.state, &routes, &master_values)?
             .map(|objective| (objective, routes, master_values)))
     }
@@ -104,6 +109,9 @@ pub(super) fn validate_routes<const D: usize>(
     routes: &[FixedRoute],
     master_values: &[(i32, f64)],
 ) -> Result<Option<f64>> {
+    if synchronization::witness(state, routes)?.is_none() {
+        return Ok(None);
+    }
     let Some((mut rows, mut objective, counts)) = bounds::exact_contributions(state, routes)?
     else {
         return Ok(None);
@@ -189,8 +197,16 @@ fn solve<const D: usize>(
         }
     }
     let networks: Vec<_> = match &start {
-        Start::Fresh(problem, _) => {
+        Start::Fresh(problem, variables) => {
             problem.validate()?;
+            if options.node_limit == 0 || options.time_limit.is_zero() {
+                // Zero-budget runs still reject malformed synchronization input.
+                synchronization::prepare(
+                    &mut problem.clone(),
+                    &mut variables.clone(),
+                    options.node.synchronized_services.clone(),
+                )?;
+            }
             problem.networks.iter().map(|n| n.id).collect()
         }
         Start::Snapshot(node) => node.state.oracles.iter().map(|o| o.network.id).collect(),

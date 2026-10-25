@@ -124,6 +124,16 @@ impl<const D: usize> NodeSnapshot<D> {
         &self,
         options: &MipOptions,
     ) -> Result<Option<EnumeratedMipOutput>> {
+        // Before start domains are fixed, the finite master is only a
+        // synchronization relaxation. Leave it to the native time tree.
+        if self
+            .state
+            .synchronized_services
+            .iter()
+            .any(|s| s.domain[0] != s.domain[1])
+        {
+            return Ok(None);
+        }
         if self.state.universe.is_none() {
             return Ok(None);
         }
@@ -265,6 +275,15 @@ impl<const D: usize> NodeSnapshot<D> {
                     });
                 }
                 routes.extend(self.state.fixed_routes.clone());
+                if mip.solution.is_some() {
+                    if let Some(scheduled) = synchronization::witness(&self.state, &routes)? {
+                        routes = scheduled;
+                    } else {
+                        mip.solution = None;
+                        mip.status = MipStatus::Incomplete;
+                        mip.bound = f64::NEG_INFINITY;
+                    }
+                }
                 if mip.solution.is_some() {
                     if let Some(upper) =
                         super::super::tree::validate_routes(&self.state, &routes, &master_values)?

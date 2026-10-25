@@ -75,6 +75,14 @@ impl NetworkNode {
             snapshot: input.apply(&self.snapshot).map_err(error)?,
         })
     }
+    fn with_synchronized_start(&self, id: i32, lower: i64, upper: i64) -> PyResult<Self> {
+        Ok(Self {
+            snapshot: self
+                .snapshot
+                .with_synchronized_start(id, lower, upper)
+                .map_err(error)?,
+        })
+    }
     fn fix_route(&self, route_index: usize, quantity: f64) -> PyResult<Self> {
         Ok(Self {
             snapshot: self
@@ -141,8 +149,7 @@ fn _solve_networks(
             .map_err(error)?;
         Ok((json, None))
     } else {
-        let output =
-            mp::solve(problem, options.node_options().map_err(error)?).map_err(error)?;
+        let output = mp::solve(problem, options.node_options().map_err(error)?).map_err(error)?;
         let (json, node) = pack_root(output, started)?;
         Ok((json, Some(node)))
     }

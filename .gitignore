@@ -128,3 +128,6 @@ Thumbs.db
 !/mtw/test_pybaldes_main.py
 !/mtw/bp_mtw_baldes.py
 !/mtw/make_pybaldes_paper.py
+
+!/mtw/synchronized_baldes.py
+!/mtw/test_synchronized_baldes.py

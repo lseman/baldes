@@ -23,6 +23,8 @@ mod lifecycle;
 mod nonlinear;
 mod presence_rows;
 mod resource_groups;
+mod synchronization;
+pub use synchronization::{SynchronizedService, SynchronizedServiceMember};
 mod resource_rows;
 pub use presence_rows::PresenceCoefficients;
 pub use resource_groups::{ResourceGroupCandidate, ResourceGroupMember};
@@ -95,6 +97,8 @@ impl<const D: usize> Problem<D> {
 
 #[derive(Clone, Debug)]
 pub struct Options {
+    /// Optional integer-time, simultaneous service by distinct route copies.
+    pub synchronized_services: Vec<SynchronizedService>,
     pub cg: cg::Options,
     pub pricing_options: Vec<(String, f64)>,
     pub enumeration: Option<EnumerationOptions>,
@@ -105,6 +109,7 @@ impl Default for Options {
         let mut cg = cg::Options::default();
         cg.artificial_cost = 2.76;
         Self {
+            synchronized_services: vec![],
             cg,
             pricing_options: vec![],
             enumeration: None,
@@ -146,6 +151,7 @@ struct Oracle<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     knapsack_rows: Vec<(usize, usize)>,
     presence_rows: Vec<(usize, usize)>,
     resource_groups: Vec<(usize, super::branching::AccumulatedResourceGroupBranch)>,
+    synchronized_windows: Vec<(usize, usize, Window)>,
     proved_zero_arcs: Vec<bool>,
     proved_multiplicity_upper: Option<f64>,
 }
@@ -179,6 +185,7 @@ impl<const D: usize> Oracle<D> {
     }
 }
 struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    synchronized_services: Vec<synchronization::Service>,
     oracles: Vec<Oracle<D>>,
     shared_offset: usize,
     routes: Vec<Arc<NetworkRoute>>,

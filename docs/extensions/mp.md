@@ -645,3 +645,79 @@ cargo run --release --features clp --bin baldes -- multi-pricing \
   --resource-branches examples/networks/resource_group_upper.json \
   --tree --bound-mode certified --json -
 ```
+
+## Synchronized service across vehicles
+
+Pass `synchronized_services` to a native solve to require simultaneous service
+of a job by several distinct vehicle copies. A member identifies the service
+vertex in one pricing network; each service has at most one member per network.
+A network with multiplicity two can supply two interchangeable vehicles using
+two copies of the same elementary route.
+
+```python
+from pybaldes import SynchronizedService, SynchronizedServiceMember
+
+service = SynchronizedService(
+    id=17,
+    resource=0,                 # scalar service-start time
+    vehicles_required=2,
+    reward=1.0,                 # counted once, not once per vehicle
+    start=(0, 1440),            # inclusive integer domain
+    members=(SynchronizedServiceMember(network=7, vertex=17),
+             SynchronizedServiceMember(network=42, vertex=8)),
+)
+result = problem.solve(tree=True, synchronized_services=(service,))
+```
+
+The native master appends a binary `served` variable and the coverage equality
+`sum(visits) = vehicles_required * served`. Per-network linking rows additionally
+enforce `visits_in_network <= min(fleet_size, vehicles_required) * served`.
+This is optional service: an unserved job has no visits. Keep its reward out of
+incoming arc costs and remove ordinary unit-cover rows for that job; the solver
+retains all caller-supplied costs and constraints. Physical fleet limits remain
+in force. Rust callers set `mp::Options.synchronized_services`; JSON solve options
+accept the same array of definitions. The CLI accepts
+`--synchronized-services services.json` alongside `--tree`.
+
+Synchronization uses an independent disposable resource with nonnegative arc
+consumption. Its value at the member vertex must represent service start; put
+service duration in outgoing arc consumption. Disjoint service-start windows
+work with `multi-time-windows`. Start domains contain integers between
+`-2**52` and `2**52`, inclusive; choose time units to obtain the desired grid.
+Ordinary pricing-grid limits also apply to resource values.
+Coupled resources in participating networks and resource-load rows on the
+synchronized axis are rejected.
+
+Root solves are LP relaxations and may contain unsynchronized columns. The
+native tree propagates common earliest starts across all selected routes and
+checks the complete joint schedule using exact resource replay. When that
+cannot certify a witness, it splits a common integer start domain and clips
+all participating networks. Restrictions survive snapshot forks, retained and
+inactive columns, enumeration and fixed routes. Published integer route
+profiles include the common starts. Time and node limits retain open nodes and
+a relaxation bound; they never turn a failed synchronization check into an
+incumbent or an infeasibility proof.
+
+An LP snapshot can be restricted explicitly with
+`node.with_synchronized_start(id=17, lower=300, upper=600)`. Its synchronization
+definitions are immutable. Complete-domain MIP is deferred while any common
+start domain is non-singleton, since its route-only matrix is then a relaxation.
+
+The DSN adapter `mtw/synchronized_baldes.py` builds grouped antenna networks,
+charges one reward per request, and independently checks returned schedules:
+
+```python
+from synchronized_baldes import solve_synchronized
+result = solve_synchronized(data, time_limit=300)
+```
+
+A runnable two-fleet example is included:
+
+```sh
+cargo run --release --features clp -- networks \
+  examples/networks/synchronization.json \
+  --synchronized-services examples/networks/synchronization-services.json \
+  --tree --json -
+```
+
+Both vehicles start service at time 5; the minimization objective is -1.

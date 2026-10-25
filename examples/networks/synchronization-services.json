@@ -1,0 +1,22 @@
+[
+  {
+    "id": 17,
+    "resource": 0,
+    "vehicles_required": 2,
+    "reward": 1,
+    "start": [
+      0,
+      10
+    ],
+    "members": [
+      {
+        "network": 7,
+        "vertex": 1
+      },
+      {
+        "network": 42,
+        "vertex": 1
+      }
+    ]
+  }
+]

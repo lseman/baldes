@@ -146,5 +146,5 @@ pub(super) fn children<const D: usize>(
             }
         }
     }
-    Ok(None)
+    synchronization::children(output, tolerance)
 }

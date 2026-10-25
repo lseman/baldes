@@ -201,6 +201,7 @@ impl Model {
 #[serde(default, deny_unknown_fields)]
 pub struct SolveOptions {
     pub tree: bool,
+    pub synchronized_services: Vec<SynchronizedService>,
     pub enumerate: bool,
     pub enumeration_route_limit: usize,
     pub enumeration_work_limit: usize,
@@ -223,6 +224,7 @@ impl Default for SolveOptions {
     fn default() -> Self {
         Self {
             tree: false,
+            synchronized_services: vec![],
             enumerate: false,
             enumeration_route_limit: 10000,
             enumeration_work_limit: 10000000,
@@ -249,6 +251,7 @@ impl SolveOptions {
     }
     pub fn node_options(&self) -> Result<Options> {
         let mut options = Options::default();
+        options.synchronized_services = self.synchronized_services.clone();
         if self.enumerated_mip && (!self.tree || !cfg!(feature = "highs")) {
             return Err(invalid(
                 "enumerated MIP requires tree=True and the highs feature",
