@@ -71,7 +71,8 @@ Retained enumeration is filtered by the same rule. Existing NG routes that
 repeat a pair endpoint are retired from the child master. A violation row also
 keeps inherited and newly added master columns consistent with the branch.
 
-Build with `--features clp,ryan-foster-master` to enforce Ryan–Foster only
+Build with `--features clp,ryan-foster-master` (or `CONFIG_RYAN_FOSTER=master`
+in `make config`) to enforce Ryan–Foster only
 through master rows. Pricing then receives neither the hard binary-resource
 restriction nor the violation row's dual cost. After exact column generation
 returns no new improving master columns, numerical mode uses the completed
@@ -178,6 +179,16 @@ The implementation tightens the physical arc's resource window. Existing
 forward/backward extensions, resource replay and enumeration enforce it.
 Inherited columns also receive a nonnegative violation row, so an old schedule
 cannot satisfy the new master solely because its arc path is still present.
+
+Build with `--features clp,accumulated-resource-master` (or
+`CONFIG_ACCUMULATED_RESOURCE=master` in `make config`) to enforce these
+branches only through their master rows. Pricing then keeps the original arc
+windows, and nodes close with the same numerical master-only policy as
+master-row Ryan–Foster branching above. With disposable resources this can also
+change which schedules pricing generates: tightening a lower window can add
+waiting to a cheap path in pricing mode, while master-only mode retains its
+original earliest schedule and may reject it through the violation row. The two
+build modes therefore need not produce the same child LP objective.
 Resource-domain changes discard inherited labels/enumeration before repricing;
 parent and sibling graphs remain independent. Original resource limits remain
 in effect. The existing requirement for backward equality resources to have a

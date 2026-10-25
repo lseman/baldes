@@ -35,6 +35,7 @@ fn auxiliary_payloads_move_without_wide_promotion_and_survive_inspection() {
         .set_coupled_resources(&[CoupledResource::Selection {
             initial: 3,
             allowed: vec![3],
+            vertices: vec![],
             relaxed: false,
         }])
         .unwrap();

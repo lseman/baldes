@@ -717,10 +717,19 @@ fn child_regeneration_rechecks_ryan_foster_for_cached_columns() {
         )
         .unwrap();
         assert!(child.fixing_calls > 0, "together={together}: {child:?}");
-        for column in child.master.warm_start.columns.iter().flatten() {
-            let nodes = &child.routes[column.tag as usize].nodes;
-            assert!(rule.satisfied_by(nodes.iter().map(|&v| v as usize)));
-            assert!(rule.elementary_on_pair(nodes.iter().map(|&v| v as usize)));
+        if baldes::master::branching::enforcement::RYAN_FOSTER_IN_PRICING {
+            for column in child.master.warm_start.columns.iter().flatten() {
+                let nodes = &child.routes[column.tag as usize].nodes;
+                assert!(rule.satisfied_by(nodes.iter().map(|&v| v as usize)));
+                assert!(rule.elementary_on_pair(nodes.iter().map(|&v| v as usize)));
+            }
+        }
+        // Master-only enforcement may retain violating cached columns, but its
+        // branch row must keep their solution values at zero in either build.
+        for (route, value) in child.route_values() {
+            if value > 1e-8 {
+                assert!(rule.satisfied_by(route.nodes.iter().map(|&v| v as usize)));
+            }
         }
         assert_eq!(
             format!("{:?}", parent.master.warm_start.generated_pool),

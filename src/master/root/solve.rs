@@ -1,5 +1,5 @@
 use super::*;
-use crate::pricing::restrictions::RYAN_FOSTER_IN_PRICING;
+use crate::master::branching::enforcement;
 
 pub fn solve<const D: usize>(
     problem: RootProblem<D>,
@@ -193,21 +193,7 @@ pub(super) fn solve_seeded<const D: usize>(
     for (name, value) in &options.pricing_options {
         solver.set_option(name, *value)?;
     }
-    solver.set_ryan_foster(if RYAN_FOSTER_IN_PRICING {
-        problem
-            .branch_constraints
-            .iter()
-            .filter_map(|(_, c)| {
-                if let BranchConstraint::RyanFoster(c) = c {
-                    Some(*c)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    } else {
-        vec![]
-    })?;
+    solver.set_ryan_foster(enforcement::pricing_ryan_foster(&problem))?;
     solver.set_forbidden_arcs(
         arc_bounds
             .iter()
@@ -596,27 +582,7 @@ pub(super) fn solve_seeded<const D: usize>(
             output
         }
     };
-    if !RYAN_FOSTER_IN_PRICING
-        && phase_floor == 0
-        && output.status == cg::Status::Optimal
-        && !output.pruned_by_bound
-        && problem
-            .branch_constraints
-            .iter()
-            .any(|(_, branch)| matches!(branch, BranchConstraint::RyanFoster(_)))
-        && output.artificials.iter().all(|&c| master.values[c] <= 1e-6)
-    {
-        // Native master-only branching closes a completed column-generation
-        // evaluation at its RMP objective when no new master-improving column
-        // remains. Its RF row duals never enter the pricing oracle. Keep that
-        // numerical policy separate from original-domain certification.
-        output.numerical_bound = output.numerical_bound.max(output.lp);
-        if output.bound_mode == BoundMode::Numerical {
-            output.bound = output.numerical_bound;
-        }
-        output.warm_start.numerical_bound = output.numerical_bound;
-        output.warm_start.bound = output.bound;
-    }
+    enforcement::close_at_master_objective(&problem, phase_floor, &master.values, &mut output);
     output.warm_start.initial_rows = initial_rows;
     let state = state.borrow();
     // Extract values, duals and simplex iterations before moving master into snapshot.

@@ -38,7 +38,7 @@ impl NumericCostOrder {
                 CoupledResource::CumulativeCost {
                     increments,
                     weights,
-                    future_weight,
+                    sink_upper,
                     ..
                 } => {
                     let increasing = increments.iter().all(|&x| x >= 0.);
@@ -65,10 +65,10 @@ impl NumericCostOrder {
                     };
                     let slot = slots[r].expect("validated numeric resource slot");
                     order[slot] = kind;
-                    future[slot] = future_weight.map(|w| Range {
-                        lo: w.lower,
-                        hi: w.upper,
-                    });
+                    // Like the reference: [0, sink bound] in the positive cone.
+                    if kind == Slot::Positive {
+                        future[slot] = sink_upper.map(|k| Range { lo: 0., hi: k });
+                    }
                 }
                 CoupledResource::PiecewiseLinearCost { functions, .. } => {
                     // Its argument stays equal under DependencyOrder. Ordered
@@ -226,7 +226,8 @@ mod tests {
             initial: 0.,
             increments,
             weights,
-            future_weight: None,
+            sink_upper: None,
+            source_upper: None,
         }
     }
     #[test]
@@ -269,22 +270,23 @@ mod tests {
         }
     }
     #[test]
-    fn bounded_future_weight_lets_a_larger_state_pay_for_every_short_completion() {
+    fn sink_bound_lets_a_larger_state_pay_for_every_short_completion() {
         let (increments, weights) = ([1., 2.], [1., 3.]);
-        let bounded = |future_weight| {
+        let bounded = |sink_upper| {
             NumericCostOrder::new(
                 &[CoupledResource::CumulativeCost {
                     initial: 0.,
                     increments: increments.to_vec(),
                     weights: weights.to_vec(),
-                    future_weight,
+                    sink_upper,
+                    source_upper: None,
                 }],
                 &[Some(0)],
                 1,
             )
         };
         // At most four future arcs, each weighing at most 3.
-        let order = bounded(Some(Window::new(0., 12.).unwrap()));
+        let order = bounded(Some(12.));
         assert!(order.preserves(&[3.], &[0.], 0., 36.));
         assert!(!order.preserves(&[3.], &[0.], 0., 35.));
         assert!(!bounded(None).preserves(&[3.], &[0.], 0., 36.));

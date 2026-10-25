@@ -6,10 +6,11 @@ use descriptor::{FrontierBudget, FrontierOutcome, SlopeFront};
 pub(super) struct SlopeLabel {
     pub(super) front: Option<SlopeFront>,
     pub(super) minimum: f64,
+    pub(super) upper: Option<relation::RelationFront>,
 }
 impl PartialEq for SlopeLabel {
     fn eq(&self, other: &Self) -> bool {
-        if self.minimum.to_bits() != other.minimum.to_bits() {
+        if self.minimum.to_bits() != other.minimum.to_bits() || self.upper != other.upper {
             return false;
         }
         match (&self.front, &other.front) {
@@ -78,6 +79,7 @@ impl SlopeLabel {
         Self {
             front: forward.then(|| front.clone()),
             minimum: 0.,
+            upper: None,
         }
     }
     pub(super) fn extend(
@@ -125,6 +127,7 @@ impl SlopeLabel {
         Ok(Some(Self {
             front: Some(front),
             minimum: finite(witness.value)?,
+            upper: None,
         }))
     }
 }

@@ -234,12 +234,20 @@ impl ResourceModel {
         })
     }
     /// Arc vectors use original insertion order. Bits represent allowed values.
-    /// ``relaxed`` starts with check-only arcs that the master tightens.
-    #[pyo3(signature = (initial, allowed, relaxed=false))]
-    fn add_selection(&mut self, initial: u64, allowed: Vec<u64>, relaxed: bool) -> usize {
+    /// ``vertices`` holds one mask per vertex; ``relaxed`` makes those masks
+    /// check-only until the master tightens them.
+    #[pyo3(signature = (initial, allowed, vertices=None, relaxed=false))]
+    fn add_selection(
+        &mut self,
+        initial: u64,
+        allowed: Vec<u64>,
+        vertices: Option<Vec<u64>>,
+        relaxed: bool,
+    ) -> usize {
         self.push(CoupledResource::Selection {
             initial,
             allowed,
+            vertices: vertices.unwrap_or_default(),
             relaxed,
         })
     }
@@ -260,25 +268,25 @@ impl ResourceModel {
             tolerance,
         })
     }
-    /// x += increment, cost += x * weight on each arc. ``future_weight``
-    /// optionally bounds (lower, upper) the total weight of any completion.
-    #[pyo3(signature = (initial, increments, weights, future_weight=None))]
+    /// x += increment, cost += x * weight on each arc. ``sink_upper`` and
+    /// ``source_upper`` are this resource's upper bounds at the sink and the
+    /// source; dominance uses them to trade a larger state against cost.
+    #[pyo3(signature = (initial, increments, weights, sink_upper=None, source_upper=None))]
     fn add_cumulative_cost(
         &mut self,
         initial: f64,
         increments: Vec<f64>,
         weights: Vec<f64>,
-        future_weight: Option<(f64, f64)>,
-    ) -> PyResult<usize> {
-        let future_weight = future_weight
-            .map(|(lower, upper)| run(|| baldes::Window::new(lower, upper)))
-            .transpose()?;
-        Ok(self.push(CoupledResource::CumulativeCost {
+        sink_upper: Option<f64>,
+        source_upper: Option<f64>,
+    ) -> usize {
+        self.push(CoupledResource::CumulativeCost {
             initial,
             increments,
             weights,
-            future_weight,
-        }))
+            sink_upper,
+            source_upper,
+        })
     }
     /// Optimize one shared free initial value over all per-arc PWL charges.
     fn add_interval_cost(

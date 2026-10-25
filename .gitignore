@@ -121,3 +121,9 @@ Thumbs.db
 /examples/verify_*.rs
 
 /external/
+/mtw/*
+!/mtw/baldes_pricing.py
+!/mtw/test_pricing_baldes.py
+!/mtw/run_pybaldes_main.py
+!/mtw/test_pybaldes_main.py
+!/mtw/bp_mtw_baldes.py

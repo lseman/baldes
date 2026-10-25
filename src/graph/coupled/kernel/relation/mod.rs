@@ -280,14 +280,48 @@ impl RelationFront {
         })
     }
     /// This forward front is defined wherever `other` is and is no higher
-    /// there. Fronts are piecewise linear, so each of `other`'s pieces is
-    /// checked at the merged breakpoints; one piece of this front must cover
-    /// each sub-interval by itself. Overlapping pieces are never combined,
-    /// which can only reject. Forward extension is monotone in the front,
-    /// so every completion of `other` stays available at no higher value.
+    /// there, comparing values as the reference does: within 1e-4, or a
+    /// relative 2.22e-10, counts as equal. Forward extension is monotone in
+    /// the front, so every completion of `other` stays available.
+    #[cfg(test)]
     pub(in crate::graph::coupled) fn covers_below(&self, other: &Self) -> bool {
+        self.excess(other).is_some_and(|excess| excess <= 0.)
+    }
+    /// This backward upper front is defined wherever `other` is and is no
+    /// lower there: it admits every prefix `other` admits.
+    pub(in crate::graph::coupled) fn covers_above(&self, other: &Self) -> bool {
+        self.signed_excess(other, -1.)
+            .is_some_and(|excess| excess <= 0.)
+    }
+    /// The backward root: any dependent value up to the reference's 1e12
+    /// infinity over the head domain; the adjoint applies the arc bounds.
+    pub(in crate::graph::coupled) fn unbounded_upper(lower: f64, upper: f64) -> Self {
+        Self::from_pieces(vec![RelationPiece {
+            metadata: 0,
+            left: [lower, 1e12],
+            right: [upper, 1e12],
+            waiting: false,
+        }])
+    }
+    /// None unless this front is defined wherever `other` is; otherwise an
+    /// upper bound on max(this - other) over `other`'s domain, with
+    /// tolerance-equal values counting as 0. Fronts are piecewise linear, so
+    /// each of `other`'s pieces is checked at the merged breakpoints; one
+    /// piece of this front must cover each sub-interval by itself (its
+    /// values bound the front's minimum there). Overlapping pieces are never
+    /// combined, which can only overestimate.
+    pub(in crate::graph::coupled) fn excess(&self, other: &Self) -> Option<f64> {
+        self.signed_excess(other, 1.)
+    }
+    /// `excess` of sign * (this - other).
+    fn signed_excess(&self, other: &Self, sign: f64) -> Option<f64> {
+        let near = |a: f64, b: f64| {
+            let d = (a - b).abs();
+            d < 0.0001 || d < (a + b).abs() * 2.220446049250313e-10
+        };
         let mut knots = Vec::new();
-        other.pieces.iter().all(|b| {
+        let mut excess = f64::NEG_INFINITY;
+        for b in &other.pieces {
             knots.clear();
             knots.push(b.left[0]);
             knots.extend(
@@ -299,19 +333,29 @@ impl RelationFront {
             knots.push(b.right[0]);
             knots.sort_by(f64::total_cmp);
             knots.dedup();
-            let below = |a: &RelationPiece, x: f64| {
-                matches!((a.value(x), b.value(x)), (Ok(va), Ok(vb)) if va <= vb)
+            let gap = |a: &RelationPiece, x: f64| {
+                let (va, vb) = (a.value(x).ok()?, b.value(x).ok()?);
+                let d = finite(sign * (va - vb)).ok()?;
+                Some(if near(va, vb) { d.min(0.) } else { d })
             };
-            let covers = |lo: f64, hi: f64| {
+            // The smallest bound any single covering piece gives on [lo, hi].
+            let cover = |lo: f64, hi: f64| {
                 self.pieces
                     .iter()
-                    .any(|a| a.left[0] <= lo && hi <= a.right[0] && below(a, lo) && below(a, hi))
+                    .filter(|a| a.left[0] <= lo && hi <= a.right[0])
+                    .filter_map(|a| Some(gap(a, lo)?.max(gap(a, hi)?)))
+                    .min_by(f64::total_cmp)
             };
-            if knots.len() == 1 {
-                return covers(knots[0], knots[0]);
+            let spans: Vec<(f64, f64)> = if knots.len() == 1 {
+                vec![(knots[0], knots[0])]
+            } else {
+                knots.windows(2).map(|w| (w[0], w[1])).collect()
+            };
+            for (lo, hi) in spans {
+                excess = excess.max(cover(lo, hi)?);
             }
-            knots.windows(2).all(|w| covers(w[0], w[1]))
-        })
+        }
+        excess.is_finite().then_some(excess)
     }
     #[cfg(test)]
     pub(super) fn value(&self, x: f64) -> Result<Option<f64>> {
@@ -1292,6 +1336,17 @@ mod covering_tests {
                 })
                 .collect(),
         )
+    }
+
+    #[test]
+    fn relation_dominance_applies_absolute_and_relative_tolerance() {
+        let flat = |value| front(&[([0., value], [2., value])]);
+        assert!(flat(1. + 0.5e-4).covers_below(&flat(1.)));
+        assert!(!flat(1. + 2e-4).covers_below(&flat(1.)));
+        assert!(flat(1e8 + 0.01).covers_below(&flat(1e8)));
+        assert!(!flat(1e8 + 0.1).covers_below(&flat(1e8)));
+        assert!(flat(1. - 0.5e-4).covers_above(&flat(1.)));
+        assert!(!flat(1. - 2e-4).covers_above(&flat(1.)));
     }
 
     #[test]

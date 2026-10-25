@@ -5,12 +5,23 @@ use relation::{BoundedCostFront, PreparedRelationArc, RelationFront, RelationWor
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum PairedLabel {
     Forward(RelationFront),
-    Backward { cache: Option<BoundedCostFront> },
+    /// `upper`: in feasibility mode, the highest dependent value at each base
+    /// value from which the suffix stays feasible; None when unknown.
+    Backward {
+        cache: Option<BoundedCostFront>,
+        upper: Option<RelationFront>,
+    },
 }
 impl PairedLabel {
     pub(super) fn forward(&self) -> Option<&RelationFront> {
         match self {
             Self::Forward(f) => Some(f),
+            _ => None,
+        }
+    }
+    pub(super) fn backward_upper(&self) -> Option<&RelationFront> {
+        match self {
+            Self::Backward { upper, .. } => upper.as_ref(),
             _ => None,
         }
     }
@@ -58,6 +69,12 @@ impl PreparedPaired {
     pub(super) fn has_costs(&self) -> bool {
         self.mode != PairedResourceMode::Feasibility
     }
+    /// Cost-unbounded mode with no reachable upper bound (the reference's
+    /// 1e12 infinity): every future step is max(value, lower), which grows
+    /// by at most a common shift, so a higher front can pay its excess.
+    pub(super) fn shifts(&self) -> bool {
+        self.mode == PairedResourceMode::CostUnbounded && self.ceiling >= 1e12
+    }
     pub(super) fn final_objective(&self, minimum: f64, scale: f64) -> Result<f64> {
         if self.has_costs() && scale != 0. {
             finite(scale * finite(minimum - self.initial.minimum())?)
@@ -69,7 +86,10 @@ impl PreparedPaired {
         if forward {
             PairedLabel::Forward((*self.initial).clone())
         } else {
-            PairedLabel::Backward { cache: None }
+            PairedLabel::Backward {
+                cache: None,
+                upper: None,
+            }
         }
     }
     pub(super) fn objective(&self, state: &PairedLabel, scale: f64) -> Result<f64> {
@@ -92,7 +112,7 @@ impl PreparedPaired {
             (true, PairedLabel::Forward(front)) => Ok(front
                 .extend_prepared(&self.arcs[arc], workspace)?
                 .map(PairedLabel::Forward)),
-            (false, PairedLabel::Backward { cache }) => {
+            (false, PairedLabel::Backward { cache, upper }) => {
                 let next = if self.exact {
                     if let Some(old) = cache {
                         old.checked_prepend(&self.arcs[arc])
@@ -113,7 +133,35 @@ impl PreparedPaired {
                 } else {
                     None
                 };
-                Ok(Some(PairedLabel::Backward { cache: next }))
+                // The adjoint is advisory: a numerical failure leaves the
+                // front unknown and never rejects the suffix.
+                let upper = if self.mode == PairedResourceMode::Feasibility {
+                    match upper {
+                        Some(old) => old
+                            .extend_backward_upper_prepared(&self.arcs[arc])
+                            .ok()
+                            .flatten(),
+                        None if first_backward => {
+                            let a = self.arcs[arc].arc();
+                            let lo = a.lower.prepared_domain();
+                            let hi = a.upper.prepared_domain();
+                            let (lower, upper) = (lo.lower.max(hi.lower), lo.upper.min(hi.upper));
+                            // The numerical infinity root must not truncate a
+                            // genuinely larger terminal dependent domain.
+                            (lower <= upper && a.upper.points.iter().all(|p| p[1] <= 1e12))
+                                .then(|| RelationFront::unbounded_upper(lower, upper))
+                                .and_then(|root| {
+                                    root.extend_backward_upper_prepared(&self.arcs[arc])
+                                        .ok()
+                                        .flatten()
+                                })
+                        }
+                        None => None,
+                    }
+                } else {
+                    None
+                };
+                Ok(Some(PairedLabel::Backward { cache: next, upper }))
             }
             _ => Err(invalid("paired label direction mismatch")),
         }
@@ -124,7 +172,7 @@ impl PreparedPaired {
         if !self.exact {
             return None;
         }
-        let (PairedLabel::Forward(f), PairedLabel::Backward { cache: Some(b) }) = (f, b) else {
+        let (PairedLabel::Forward(f), PairedLabel::Backward { cache: Some(b), .. }) = (f, b) else {
             return None;
         };
         b.checked_compatible_join(f)
@@ -160,7 +208,7 @@ pub(super) fn domains_may_intersect(
     if policy == bucketing::FrontBucketPolicy::Disabled {
         return true;
     }
-    let (PairedLabel::Forward(f), PairedLabel::Backward { cache: Some(b) }) = (f, b) else {
+    let (PairedLabel::Forward(f), PairedLabel::Backward { cache: Some(b), .. }) = (f, b) else {
         return true;
     };
     bucketing::FrontBucketViews::new(f, policy).any(|view| {

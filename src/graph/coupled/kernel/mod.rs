@@ -77,9 +77,12 @@ pub struct CoupledKernel {
     initial: Vec<f64>,
     cost_scale: f64,
     selection_initial: Vec<u64>,
-    /// Per selection resource: None applies every arc mask; Some(memory)
-    /// narrows the domain only on remembered arcs and checks the others.
-    selection_memory: Vec<Option<Vec<bool>>>,
+    /// Per selection resource: None when vertex masks are folded into the
+    /// arc masks; Some for relaxed vertex masks.
+    selection_memory: Vec<Option<selection::RelaxedSelection>>,
+    /// Physical arc heads and the source, for exact vertex masks.
+    selection_heads: std::sync::Arc<[usize]>,
+    selection_source: usize,
     /// Pickup/delivery capacity plus its tolerance: the largest admitted load.
     load_capacities: Vec<f64>,
     /// Pickup/delivery dominance tolerance, as in the capacity checks.

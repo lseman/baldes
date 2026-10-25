@@ -79,6 +79,9 @@ impl CoupledKernel {
         if !self.relation_indices.is_empty() || !self.plugins.is_empty() {
             return None;
         }
+        if !self.selection_proper(arcs) {
+            return Some((false, [0.; 2]));
+        }
         let mut numeric: Vec<_> = self.initial.iter().copied().map(Interval::point).collect();
         let (valid, front_cost) = self.certify_fronts(arcs)?;
         if !valid {
@@ -90,17 +93,7 @@ impl CoupledKernel {
         };
         for r in self.definitions.iter() {
             match r {
-                CoupledResource::Selection {
-                    initial, allowed, ..
-                } => {
-                    let mut domain = *initial;
-                    for &arc in arcs {
-                        domain &= *allowed.get(arc)?;
-                    }
-                    if domain == 0 {
-                        return Some((false, [0.; 2]));
-                    }
-                }
+                CoupledResource::Selection { .. } => {}
                 CoupledResource::BudgetedLoad {
                     capacity,
                     budget,

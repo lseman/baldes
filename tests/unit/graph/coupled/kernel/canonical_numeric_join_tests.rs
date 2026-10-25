@@ -11,7 +11,8 @@ fn numeric_suffix_join_retains_literal_order_without_rebuilding_labels() {
             initial: 0.,
             increments: vec![1.; 3],
             weights: vec![1e16, -1e16, 1.],
-            future_weight: None,
+            sink_upper: None,
+            source_upper: None,
         }],
     )
     .unwrap();

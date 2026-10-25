@@ -2,12 +2,6 @@
 use crate::{invalid, Graph, Result};
 use std::sync::Arc;
 
-/// Whether pricing enforces Ryan–Foster branches, fixed per build by the
-/// `ryan-foster-master` feature. Master rows enforce them in both modes;
-/// without pricing enforcement, violating columns reach the master, where
-/// their row keeps them at zero, and pricing bounds ignore the row's dual.
-pub const RYAN_FOSTER_IN_PRICING: bool = !cfg!(feature = "ryan-foster-master");
-
 /// A pair of physical customer vertices (the standard routing packing sets).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RyanFosterConstraint {

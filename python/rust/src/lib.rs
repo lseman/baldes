@@ -4,10 +4,10 @@ use baldes::ResourceKind;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
+mod coupled;
 #[cfg(feature = "clp")]
 mod mp;
 mod root;
-mod coupled;
 
 fn run<T>(f: impl FnOnce() -> baldes::Result<T>) -> PyResult<T> {
     baldes::core::error::catch(f)
@@ -373,6 +373,19 @@ impl Solver {
                 .update_reduced_costs(&costs, &duals, false)
         })
     }
+    /// Replace reduced arc costs while retaining original costs and graph preparation.
+    fn set_reduced_costs(&mut self, costs: Vec<f64>) -> PyResult<()> {
+        let solver = self.solver.get_mut().unwrap();
+        if costs.len() != solver.graph.arcs.len() || costs.iter().any(|c| !c.is_finite()) {
+            return Err(PyValueError::new_err(
+                "reduced costs must be finite and contain one value per arc",
+            ));
+        }
+        for (arc, cost) in solver.graph.arcs.iter_mut().zip(costs) {
+            arc.reduced_cost = cost;
+        }
+        Ok(())
+    }
     /// Set the bidirectional search mode: 0=off, 1=normal, 2=half-way.
     fn set_bidirectional_mode(&mut self, mode: i32) -> PyResult<()> {
         self.set_option("BALDESuseBidirectionalSearch", mode as f64)
@@ -410,6 +423,45 @@ impl Solver {
                     certified: result.exact,
                 })
                 .collect(),
+        ))
+    }
+    /// Price columns and report whether the minimum is exact for this pricing domain.
+    ///
+    /// ``exact=True`` runs the unlimited-label phase once and includes positive-cost
+    /// routes. Otherwise staged pricing may return improving heuristic columns.
+    /// Only use the minimum as a bound when the returned exactness flag is true.
+    #[pyo3(signature = (maximum, *, exact=false))]
+    fn price_with_status(
+        &mut self,
+        maximum: i32,
+        exact: bool,
+    ) -> PyResult<(f64, Vec<Route>, bool)> {
+        let maximum = positive(maximum)?;
+        let result = run(|| {
+            let solver = self.solver.get_mut().unwrap();
+            if exact {
+                let previous = solver.phases[0];
+                solver.phases[0] = baldes::pricing::phases::Phase {
+                    check_ng: true,
+                    jump_arcs: true,
+                    labels_per_bucket: i64::MAX,
+                };
+                let result = solver.price_phase(0, maximum, false);
+                solver.phases[0] = previous;
+                result
+            } else {
+                solver.price(maximum, true)
+            }
+        })?;
+        let certified = result.exact;
+        Ok((
+            result.minimum_reduced_cost,
+            result
+                .columns
+                .into_iter()
+                .map(|route| Route { route, certified })
+                .collect(),
+            certified,
         ))
     }
     /// Run enumeration to collect up to ``maximum`` routes.

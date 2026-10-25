@@ -44,6 +44,22 @@ feature to the existing wheel build). The stateful solver exposes:
 solver.set_vertex_time_windows(1, 0, [(8.0, 12.0), (16.0, 20.0)])
 ```
 
+For Python network models, use `PricingResource(time_windows=...)` with one
+entry per vertex:
+
+```python
+from pybaldes import PricingResource
+
+time = PricingResource(
+    bounds=[(0.0, 30.0)] * 3,
+    time_windows=[None, [(8.0, 12.0), (16.0, 20.0)], None],
+)
+```
+
+`None` entries use ordinary bounds. The field survives network JSON round trips
+and is omitted when unset, allowing ordinary models on builds without the feature.
+Window validation and normalization take place in Rust when solving the model.
+
 Network JSON, built with `clp,multi-time-windows`, accepts `time_windows` on a
 resource: one entry per vertex, each either null (ordinary bounds) or a nonempty
 list of [lower, upper] pairs. For a three-vertex network:

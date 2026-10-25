@@ -314,7 +314,8 @@ mod tests {
                     initial: 2.,
                     increments: vec![0.],
                     weights: vec![0.],
-                    future_weight: None,
+                    sink_upper: None,
+                    source_upper: None,
                 },
                 CoupledResource::EncodedPiecewiseLinearCost {
                     parent: 0,

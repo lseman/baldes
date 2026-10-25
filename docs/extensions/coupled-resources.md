@@ -21,9 +21,9 @@ Multiple resources compose in declaration order.
 | `IntervalCost` | Choose one shared initial value in the initial interval; on every arc add its increment, enforce state/charge domains, and charge the PWL function. Minimize the full route sum over that choice. |
 | `SlopeIntervalCost` | Retain prepared slope segments through translation, restriction and addition, with an explicit front-operation policy. |
 | `SlopePaired` | Retain prepared slope relations with general arrival composition, waiting and function-valued bounds, explicit operation policy and absolute-final or final-minus-initial cost normalization. Runtime validation is deferred. |
-| `Selection` | Intersect the remaining value domain with the arc's allowed mask; reject the empty domain. Bits 0 and 1 give a binary domain; up to 64 values are supported. With `relaxed`, arcs start check-only (reject a missing value without narrowing) and the routing master narrows them along the shortest violating window of each improper route in its solution; incumbents always use the exact rule. |
+| `Selection` | Intersect the remaining value domain with the arc's allowed mask; reject the empty domain. Bits 0 and 1 give a binary domain; up to 64 values are supported. Optional `vertices` gives one mask per vertex (vertex incompatibilities). With `relaxed`, vertex masks start check-only (reject a missing value without narrowing) while arc masks keep narrowing; the routing master makes the vertices of each improper route's shortest violating window narrow. Incumbents always use the exact rule. |
 | `SimultaneousPickupDelivery` | Deliver before picking up at each stop, with all route deliveries loaded at departure. Enforce capacity at departure and between all stops, admitting loads up to `capacity + tolerance` (default 1e-6, also used by load dominance; 0 is exact). |
-| `CumulativeCost` | Update `x += increment[arc]`, then add `x * weight[arc]` to the objective. Optional `future_weight` bounds the total weight of any route completion; with it, dominance accepts a label with a larger `x` that pays `(x_a - x_b) * weight` from its numeric cost. |
+| `CumulativeCost` | Update `x += increment[arc]`, then add `x * weight[arc]` to the objective. Optional `sink_upper` and `source_upper` are the resource's upper bounds at the sink and source. With nonnegative data, dominance reads `sink_upper` as a bound on the weight of any completion (a forward label with a larger `x` pays `(x_a - x_b) * sink_upper`) and `source_upper` as a bound on the increments of any prefix (backward labels). |
 | `Dependent` | Update `y += offset[arc] + factor[arc] * parent_after`; reject values outside the declared closed bounds. The parent must be an earlier numeric resource. |
 | `PiecewiseLinearDependent` | Update `y += function[arc](parent_after)` within the function's finite argument domain, then enforce the dependent state bounds. |
 | `PiecewiseLinearResource` | Replace `x` with `function[arc](x_before)`, enforcing the input domain and output window. |
@@ -207,8 +207,13 @@ physical suffix program; joins apply that suffix to the actual forward relation.
 This preserves lower-bound clamping and waiting without assuming that they have
 an additive inverse. A feasibility adjoint is available internally, but backward
 cost joins currently use replay and can cost more than a specialized suffix
-envelope. Completion bounds remain conservative and dominance requires equal
-paired relations. Reversal reuse is disabled.
+envelope. Completion bounds remain conservative. Forward feasibility dominance
+requires a front that covers the other front and stays below it; backward
+feasibility dominance compares known upper fronts by coverage and the opposite
+value order. Numerical comparisons use absolute tolerance `1e-4` or relative
+`2.22e-10`. Cost-unbounded fronts with an upper bound of at least `1e12` can
+compensate a higher front through a cost penalty, provided the independent
+scalar and resource cost orders also hold. Reversal reuse is disabled.
 
 This is a numerical resource contract. Arithmetic ambiguity or excessive
 front work produces an error; it is never converted to infeasibility or a
@@ -242,6 +247,17 @@ minimum, including the initial value. The alternate
 `final_minus_initial_minimum` subtracts the initial minimum. A fresh root charges
 zero under both conventions. Phase I suppresses this objective while keeping
 dependent transitions and bounds.
+
+Raw paired forward dominance compares covering fronts under the selected policy.
+In feasibility mode with `strict_domain`, backward labels also retain an upper
+front when the slope functions can be converted into knot functions without
+changing their stored segment slopes. Unsupported conversions, singleton
+function domains, terminal upper bounds above the `1e12` numerical infinity
+marker, and failed adjoints leave that upper front unknown; joins
+continue to replay the physical suffix. Different suffix programs can dominate
+only when every active feasibility relation has a known upper front and no
+other resource requires replay-dependent comparison. `native_front_algebra`
+continues to use suffix replay without this backward dominance optimization.
 
 The raw implementation retains front-operation provenance and uses a correct
 running-minimum waiting envelope. The name `native_front_algebra` selects

@@ -3,6 +3,7 @@ use super::*;
 use descriptor::{
     FrontierBudget, PairedCostNormalization, PreparedSlopeRelationArc, SlopeFront, SlopeRelationArc,
 };
+use relation::{PreparedRelationArc, RelationFront};
 use slope_interval::{outcome, SlopeLabel};
 
 #[derive(Clone, Debug)]
@@ -11,6 +12,7 @@ pub(super) struct PreparedSlopePaired {
     initial_minimum: f64,
     arcs: std::sync::Arc<[PreparedSlopeRelationArc]>,
     sources: std::sync::Arc<[SlopeRelationArc]>,
+    backward: std::sync::Arc<[Option<PreparedRelationArc>]>,
     mode: PairedResourceMode,
     normalization: PairedCostNormalization,
     policy: FrontOperationPolicy,
@@ -32,6 +34,31 @@ fn constant(function: &PreparedSlopeFunction) -> Option<f64> {
         .skip(1)
         .all(|p| p.0 == 0.)
         .then(|| function.pairs()[0].0)
+}
+// Conversion is advisory. Singleton domains and unrepresentable slopes keep
+// suffix replay as the authoritative feasibility check.
+fn relation_function(function: &PreparedSlopeFunction) -> Option<PiecewiseLinearFunction> {
+    let pairs = function.pairs();
+    let mut points = vec![[pairs[0].1, pairs[0].0]];
+    for &(slope, end) in &pairs[1..] {
+        let [start, value] = *points.last()?;
+        let next = value + slope * (end - start);
+        if (next - value) / (end - start) != slope {
+            return None;
+        }
+        points.push([end, next]);
+    }
+    PiecewiseLinearFunction::new(points).ok()
+}
+fn backward_arc(arc: &SlopeRelationArc) -> Option<PreparedRelationArc> {
+    PreparedRelationArc::new(&PairedResourceArc {
+        arrival: relation_function(&arc.arrival)?,
+        increment: relation_function(&arc.increment)?,
+        lower: relation_function(&arc.lower)?,
+        upper: relation_function(&arc.upper)?,
+        waiting: arc.waiting,
+    })
+    .ok()
 }
 impl PreparedSlopePaired {
     pub(super) fn new(
@@ -102,10 +129,40 @@ impl PreparedSlopePaired {
             initial_minimum: finite(witness.value)?,
             arcs: prepared.into(),
             sources: arcs.to_vec().into(),
+            backward: arcs
+                .iter()
+                .map(|arc| {
+                    (mode == PairedResourceMode::Feasibility
+                        && policy == FrontOperationPolicy::StrictDomain)
+                        .then(|| backward_arc(arc))
+                        .flatten()
+                })
+                .collect::<Vec<_>>()
+                .into(),
             mode,
             normalization,
             policy,
         })
+    }
+    /// Forward fronts cover and stay below under this resource's policy.
+    /// Backward feasibility uppers cover and stay above; unknowns require replay.
+    pub(super) fn dominates(&self, a: &SlopeLabel, b: &SlopeLabel, forward: bool) -> bool {
+        if a == b {
+            return true;
+        }
+        if !forward {
+            return match (&a.upper, &b.upper) {
+                (Some(a), Some(b)) => a.covers_above(b),
+                _ => false,
+            };
+        }
+        match (forward, &a.front, &b.front) {
+            (true, Some(a), Some(b)) => a.covers_below(b, self.policy),
+            _ => false,
+        }
+    }
+    pub(super) fn has_costs(&self) -> bool {
+        self.mode != PairedResourceMode::Feasibility
     }
     pub(super) fn root(&self, forward: bool) -> SlopeLabel {
         if forward {
@@ -114,6 +171,7 @@ impl PreparedSlopePaired {
             SlopeLabel {
                 front: None,
                 minimum: 0.,
+                upper: None,
             }
         }
     }
@@ -122,10 +180,34 @@ impl PreparedSlopePaired {
         old: &SlopeLabel,
         arc: usize,
         forward: bool,
+        first_backward: bool,
         scale: f64,
     ) -> Result<Option<SlopeLabel>> {
         if !forward {
-            return Ok(Some(old.clone()));
+            let mut next = old.clone();
+            next.upper = self.backward[arc].as_ref().and_then(|prepared| {
+                let root;
+                let upper = if let Some(upper) = old.upper.as_ref() {
+                    upper
+                } else if first_backward {
+                    let arc = prepared.arc();
+                    let lo = arc.lower.prepared_domain();
+                    let hi = arc.upper.prepared_domain();
+                    let (lower, upper) = (lo.lower.max(hi.lower), lo.upper.min(hi.upper));
+                    if lower > upper || arc.upper.points.iter().any(|p| p[1] > 1e12) {
+                        return None;
+                    }
+                    root = RelationFront::unbounded_upper(lower, upper);
+                    &root
+                } else {
+                    return None;
+                };
+                upper
+                    .extend_backward_upper_prepared(prepared)
+                    .ok()
+                    .flatten()
+            });
+            return Ok(Some(next));
         }
         let front = old
             .front
@@ -147,12 +229,13 @@ impl PreparedSlopePaired {
         Ok(Some(SlopeLabel {
             front: Some(front),
             minimum: finite(objective)?,
+            upper: None,
         }))
     }
 }
 impl CoupledLabelState {
-    /// Computed paired slope fronts. Backward states retain the operator arc
-    /// program instead of an unsupported one-dimensional inverse envelope.
+    /// Computed forward paired slope fronts. Backward states retain the operator
+    /// arc program plus an advisory feasibility upper front when available.
     pub fn slope_relation_fronts(&self) -> impl Iterator<Item = Option<&SlopeFront>> {
         self.slope_relations
             .iter()
@@ -163,6 +246,99 @@ impl CoupledLabelState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn feasibility_fronts_compare_in_both_directions_and_preserve_prefix_acceptance() {
+        let mut graph = graph(
+            PairedResourceMode::Feasibility,
+            PairedCostNormalization::AbsoluteFinalValue,
+        );
+        // Alternative suffixes allow dependent values up to 9 and 7.
+        let mut definitions = graph.coupled_kernel().unwrap().definitions().to_vec();
+        let CoupledResource::SlopePaired { arcs, .. } = &mut definitions[0] else {
+            unreachable!()
+        };
+        arcs[0].upper = function(10., 0.);
+        arcs[1].upper = function(8., 0.);
+        graph.set_coupled_resources(&definitions).unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let root = kernel.root(false);
+        let wide = kernel.extend(&root, 0, false).unwrap().unwrap().0;
+        let narrow = kernel.extend(&root, 1, false).unwrap().unwrap().0;
+        assert!(wide.slope_relations[0].upper.is_some());
+        assert!(narrow.slope_relations[0].upper.is_some());
+        assert_eq!(kernel.dominance_penalty(&wide, &narrow, false), Some(0.));
+        assert_eq!(kernel.dominance_penalty(&narrow, &wide, false), None);
+        // Check the upper front against literal replay for attainable constant prefixes.
+        for value in 0..=12 {
+            let mut prefix = kernel.root(true);
+            prefix.slope_relations[0] =
+                SlopeLabel::root(&SlopeFront::from_prepared(function(value as f64, 0.)), true);
+            if kernel.join(&prefix, &narrow).unwrap().is_some() {
+                assert!(kernel.join(&prefix, &wide).unwrap().is_some());
+            }
+        }
+        let prepared = &kernel.slope_paired[0];
+        let low = SlopeLabel::root(&SlopeFront::from_prepared(function(1., 0.)), true);
+        let high = SlopeLabel::root(&SlopeFront::from_prepared(function(2., 0.)), true);
+        assert!(prepared.dominates(&low, &high, true));
+        assert!(!prepared.dominates(&high, &low, true));
+    }
+
+    #[test]
+    fn terminal_bounds_above_numerical_infinity_keep_the_adjoint_unknown() {
+        let mut graph = graph(
+            PairedResourceMode::Feasibility,
+            PairedCostNormalization::AbsoluteFinalValue,
+        );
+        let mut definitions = graph.coupled_kernel().unwrap().definitions().to_vec();
+        let CoupledResource::SlopePaired { initial, arcs, .. } = &mut definitions[0] else {
+            unreachable!()
+        };
+        *initial = function(1.5e12, 0.);
+        for arc in arcs {
+            arc.upper = function(2e12, 0.);
+        }
+        graph.set_coupled_resources(&definitions).unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let suffix = kernel
+            .extend(&kernel.root(false), 1, false)
+            .unwrap()
+            .unwrap()
+            .0;
+        assert!(suffix.slope_relations[0].upper.is_none());
+        let prefix = kernel
+            .extend(&kernel.root(true), 0, true)
+            .unwrap()
+            .unwrap()
+            .0;
+        assert!(kernel.join(&prefix, &suffix).unwrap().is_some());
+    }
+
+    #[test]
+    fn unknown_backward_conversion_stays_unknown_after_prepend() {
+        let mut graph = graph(
+            PairedResourceMode::Feasibility,
+            PairedCostNormalization::AbsoluteFinalValue,
+        );
+        let mut definitions = graph.coupled_kernel().unwrap().definitions().to_vec();
+        let CoupledResource::SlopePaired { arcs, .. } = &mut definitions[0] else {
+            unreachable!()
+        };
+        // A singleton bound is supported by raw slopes but cannot be converted
+        // into a two-knot piecewise-linear function.
+        arcs[1].upper = PreparedSlopeFunction::constant_point(100., 1.).unwrap();
+        graph.set_coupled_resources(&definitions).unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let suffix = kernel
+            .extend(&kernel.root(false), 1, false)
+            .unwrap()
+            .unwrap()
+            .0;
+        assert!(suffix.slope_relations[0].upper.is_none());
+        let suffix = kernel.extend(&suffix, 0, false).unwrap().unwrap().0;
+        assert!(suffix.slope_relations[0].upper.is_none());
+    }
+
     fn function(value: f64, slope: f64) -> PreparedSlopeFunction {
         descriptor::RawAffine::new(value, slope)
             .unwrap()

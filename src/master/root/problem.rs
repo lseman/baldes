@@ -120,6 +120,10 @@ impl<const D: usize> RootProblem<D> {
         self.branch_constraints.push((0, constraint.clone()));
         Ok(true)
     }
+    /// The node's branch constraints, in insertion order.
+    pub(crate) fn branches(&self) -> impl Iterator<Item = &BranchConstraint> {
+        self.branch_constraints.iter().map(|(_, branch)| branch)
+    }
     pub(crate) fn append_constraint(
         &mut self,
         constraint: BranchConstraint,
@@ -146,10 +150,13 @@ impl<const D: usize> RootProblem<D> {
         let logical = self.rows.len();
         let (sense, mut rhs) = constraint.row();
         rhs -= self.fixed_sum(|route| Ok(constraint.coefficient(self, route)))?;
-        if let BranchConstraint::AccumulatedResource(c) = &constraint {
+        let in_pricing = crate::master::branching::enforcement::installs_in_pricing(&constraint);
+        if let (true, BranchConstraint::AccumulatedResource(c)) = (in_pricing, &constraint) {
             let window = c.window(&self.graph)?.expect("nonempty resource branch");
             self.graph.arc_mut(c.arc)?.bounds[c.resource] = Some(window);
-        } else if let BranchConstraint::AccumulatedResourceGroup(c) = &constraint {
+        } else if let (true, BranchConstraint::AccumulatedResourceGroup(c)) =
+            (in_pricing, &constraint)
+        {
             c.install(&mut self.graph)?;
         }
 

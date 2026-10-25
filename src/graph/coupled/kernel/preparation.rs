@@ -26,8 +26,25 @@ impl CoupledKernel {
         let numeric_cost_order =
             dominance::NumericCostOrder::new(definitions, &slots, initial.len());
         let optimization = PreparedBounds::new(g, definitions, &slots, &initial);
-        let transitions =
+        let mut transitions =
             PreparedTransitions::new(definitions, &slots, initial.len(), g.arcs.len(), 1.);
+        // Exact vertex incompatibilities act on every arc entering a vertex.
+        let selections = definitions.iter().filter_map(|r| match r {
+            CoupledResource::Selection {
+                vertices, relaxed, ..
+            } => Some((vertices, *relaxed)),
+            _ => None,
+        });
+        for (k, (vertices, relaxed)) in selections.enumerate() {
+            if vertices.is_empty() || relaxed {
+                continue;
+            }
+            let mut arcs = transitions.arcs.to_vec();
+            for (arc, prepared) in arcs.iter_mut().enumerate() {
+                prepared.selection[k] &= vertices[g.arcs[arc].head];
+            }
+            transitions.arcs = arcs.into();
+        }
         let route_domains =
             domains::RouteDomains::prepare(g, &transitions, &optimization.numeric, &initial);
         let front_indices: Vec<_> = definitions
@@ -135,16 +152,23 @@ impl CoupledKernel {
             selection_initial: definitions
                 .iter()
                 .filter_map(|r| match r {
-                    CoupledResource::Selection { initial, .. } => Some(*initial),
+                    CoupledResource::Selection {
+                        initial, vertices, ..
+                    } => Some(initial & vertices.get(g.source).copied().unwrap_or(u64::MAX)),
                     _ => None,
                 })
                 .collect(),
+            selection_heads: g.arcs.iter().map(|a| a.head).collect(),
+            selection_source: g.source,
             selection_memory: definitions
                 .iter()
                 .filter_map(|r| match r {
                     CoupledResource::Selection {
-                        allowed, relaxed, ..
-                    } => Some(relaxed.then(|| vec![false; allowed.len()])),
+                        vertices, relaxed, ..
+                    } => Some(
+                        (*relaxed && !vertices.is_empty())
+                            .then(|| selection::RelaxedSelection::new(g, vertices)),
+                    ),
                     _ => None,
                 })
                 .collect(),

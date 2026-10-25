@@ -609,6 +609,7 @@ fn coupled_solver(symmetric: bool, cut: bool) -> Solver<2> {
         CoupledResource::Selection {
             initial: 3,
             allowed,
+            vertices: vec![],
             relaxed: false,
         },
         CoupledResource::SimultaneousPickupDelivery {
@@ -786,6 +787,7 @@ fn g13_bounded_cycles_jumps_and_terminal_equality_match_literal_walks() {
                     CoupledResource::Selection {
                         initial: 3,
                         allowed: vec![3; 3],
+                        vertices: vec![],
                         relaxed: false,
                     },
                     CoupledResource::SimultaneousPickupDelivery {
@@ -829,5 +831,30 @@ fn g13_bounded_cycles_jumps_and_terminal_equality_match_literal_walks() {
                 assert_costs(&costs(s.enumerate(-2.).unwrap()), &negative);
             }
         }
+    }
+}
+
+#[test]
+fn symmetric_consumption_join_counts_nonzero_source_state_once() {
+    for (initial, explicit) in [(2., false), (2., true), (3., false), (3., true)] {
+        let mut symmetric = solver(true, false);
+        for vertex in 0..5 {
+            symmetric
+                .graph
+                .set_bounds(vertex, 0, initial, initial + 3.)
+                .unwrap();
+        }
+        symmetric.graph.initial[0] = explicit.then_some(initial);
+        let expected = exhaustive(&symmetric.graph, false, 100.);
+        assert!(expected.keys().any(|path| path.len() == 3));
+        assert!(!expected.keys().any(|path| path.len() > 3));
+        let mut directed = solver(true, false);
+        directed.graph = symmetric.graph.clone();
+        directed
+            .set_option("BALDESuseBidirectionalSearch", 0.)
+            .unwrap();
+        assert_costs(&costs(directed.enumerate(100.).unwrap()), &expected);
+        assert_costs(&costs(symmetric.enumerate(100.).unwrap()), &expected);
+        assert!(symmetric.engine.as_ref().unwrap().consumption_joins);
     }
 }

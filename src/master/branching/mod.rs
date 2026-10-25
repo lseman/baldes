@@ -2,6 +2,7 @@
 mod accumulated_resource;
 mod arc_flow;
 mod cluster;
+pub mod enforcement;
 pub(crate) mod generator_identity;
 mod grouped_resource;
 mod number_of_vehicles;

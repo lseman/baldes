@@ -88,9 +88,10 @@ impl CoupledKernel {
         forward: bool,
         frozen_fronts: bool,
     ) -> Option<f64> {
-        // Raw front operator certificates are not established. Retain every
-        // candidate rather than spending a rounded scalar-key margin.
-        if self.has_slope_fronts() {
+        // Raw slope-interval cost fronts have no established dominance
+        // certificate; retain every candidate. Paired slope relations compare
+        // their fronts below.
+        if !self.slope_indices.is_empty() {
             return None;
         }
         // Reject cheap direction/discrete/component mismatches before
@@ -154,7 +155,10 @@ impl CoupledKernel {
                 }
             };
         let frozen_fronts = frozen_fronts && tracked_order;
-        if !forward && a.suffix.as_ref()?.program != b.suffix.as_ref()?.program {
+        if !forward
+            && a.suffix.as_ref()?.program != b.suffix.as_ref()?.program
+            && !self.backward_programs_free(a, b)
+        {
             return None;
         }
         // Retain full validation before any accepted dominance result. A
@@ -196,9 +200,11 @@ impl CoupledKernel {
         // Paired checks are deliberately last among these necessary
         // preconditions: rejected scalar/discrete/program pairs need no walk
         // through the retained function and backward-adjoint pieces.
-        if !self.plugins_dominate(a, b, forward)
-            || !self.relations_dominate(a, b, forward, tracked_order)
-        {
+        if !self.plugins_dominate(a, b, forward) {
+            return None;
+        }
+        let relation_penalty = self.relations_dominate(a, b, forward, tracked_order)?;
+        if !self.slope_relations_dominate(a, b, forward, tracked_order) {
             return None;
         }
         if !forward {
@@ -218,10 +224,11 @@ impl CoupledKernel {
         }
         if charged {
             // The prepared per-operation proof above establishes literal
-            // numeric component order. No current key gap or positive
-            // compensation participates in charged-resource dominance.
-            return Some(0.);
+            // numeric component order. Only a cost-unbounded relation's
+            // shifted front adds compensation.
+            return Some(relation_penalty);
         }
+        penalty = add_up(penalty, relation_penalty)?;
         for (i, (&a, &b)) in a.numeric.iter().zip(&b.numeric).enumerate() {
             if a == b {
                 continue;
@@ -260,11 +267,51 @@ impl CoupledKernel {
         Some(penalty)
     }
 
-    /// Forward relation fronts dominate by covering and staying below; the
-    /// final minimum is then no higher for every completion. A charged
-    /// relation also needs the scalar prefix order proven by `tracked_order`,
-    /// since its own objective term is then no higher as well. Backward
-    /// labels retain only the arc program, so they must match exactly.
+    /// Backward labels with different suffix arc programs may still compare
+    /// when nothing else replays the program at a join: no deferred numeric
+    /// transitions or plugins, and only feasibility paired relations (including
+    /// slope relations), whose known upper fronts carry the comparison.
+    fn backward_programs_free(&self, a: &CoupledLabelState, b: &CoupledLabelState) -> bool {
+        !self.transitions.deferred
+            && self.plugins.is_empty()
+            && self.slope_indices.is_empty()
+            && self.slope_paired.iter().all(|p| !p.has_costs())
+            && a.slope_relations
+                .iter()
+                .chain(&b.slope_relations)
+                .all(|label| label.upper.is_some())
+            && self.paired.iter().all(|p| !p.has_costs())
+            && a.relations
+                .iter()
+                .chain(&b.relations)
+                .all(|label| label.backward_upper().is_some())
+    }
+
+    /// Paired slope relations: forward fronts cover and stay below, with the
+    /// same scalar-order requirement as function relations when charged.
+    fn slope_relations_dominate(
+        &self,
+        a: &CoupledLabelState,
+        b: &CoupledLabelState,
+        forward: bool,
+        tracked_order: bool,
+    ) -> bool {
+        a.slope_relations.len() == b.slope_relations.len()
+            && a.slope_relations
+                .iter()
+                .zip(&b.slope_relations)
+                .zip(&self.slope_paired)
+                .all(|((left, right), prepared)| {
+                    if left == right {
+                        return true;
+                    }
+                    let charged = prepared.has_costs() && self.cost_scale != 0.;
+                    (!charged || (tracked_order && self.cost_scale > 0.))
+                        && prepared.dominates(left, right, forward)
+                })
+    }
+
+    /// Every plugin's own direction-specific dominance test.
     fn plugins_dominate(
         &self,
         a: &CoupledLabelState,
@@ -279,28 +326,58 @@ impl CoupledKernel {
                 .all(|((a, b), plugin)| plugin.0.dominates(a, b, forward))
     }
 
+    /// Forward relation fronts dominate by covering and staying below; the
+    /// final minimum is then no higher for every completion. A charged
+    /// relation also needs the scalar prefix order proven by `tracked_order`,
+    /// since its own objective term is then no higher as well. In
+    /// cost-unbounded mode without upper bounds a front may exceed the other
+    /// by delta and pay scale * (delta + min_b - min_a) (the reference's
+    /// max(a - b) cost charge). Backward labels retain only the arc program,
+    /// so they must match exactly. Returns the penalty.
     fn relations_dominate(
         &self,
         a: &CoupledLabelState,
         b: &CoupledLabelState,
         forward: bool,
         tracked_order: bool,
-    ) -> bool {
-        a.relations.len() == b.relations.len()
-            && a.relations.iter().zip(&b.relations).zip(&self.paired).all(
-                |((left, right), prepared)| {
-                    if left == right {
-                        return true;
-                    }
-                    let (Some(left), Some(right)) = (left.forward(), right.forward()) else {
-                        return false;
-                    };
-                    let charged = prepared.has_costs() && self.cost_scale != 0.;
-                    forward
-                        && (!charged || (tracked_order && self.cost_scale > 0.))
-                        && left.covers_below(right)
-                },
-            )
+    ) -> Option<f64> {
+        if a.relations.len() != b.relations.len() {
+            return None;
+        }
+        let mut penalty = 0.;
+        for ((left, right), prepared) in a.relations.iter().zip(&b.relations).zip(&self.paired) {
+            if left == right {
+                continue;
+            }
+            if !forward {
+                // Feasibility relations keep a backward upper front.
+                match (left.backward_upper(), right.backward_upper()) {
+                    (Some(a), Some(b)) if a.covers_above(b) => continue,
+                    _ => return None,
+                }
+            }
+            let (Some(left), Some(right)) = (left.forward(), right.forward()) else {
+                return None;
+            };
+            let charged = prepared.has_costs() && self.cost_scale != 0.;
+            if !forward || (charged && !(tracked_order && self.cost_scale > 0.)) {
+                return None;
+            }
+            let excess = left.excess(right)?;
+            if excess <= 0. {
+                continue;
+            }
+            if !(charged && prepared.shifts()) {
+                return None;
+            }
+            let gap = Range::point(excess)
+                .add(Range::point(right.minimum()))
+                .subtract(Range::point(left.minimum()))
+                .multiply(Range::point(self.cost_scale))
+                .hi;
+            penalty = add_up(penalty, gap.max(0.))?;
+        }
+        Some(penalty)
     }
 }
 impl<const D: usize> Graph<D> {
@@ -331,6 +408,103 @@ impl<const D: usize> Graph<D> {
 mod front_continuation_tests {
     use super::*;
     use crate::graph::coupled::PiecewiseLinearFunction;
+
+    #[test]
+    fn unbounded_relation_shift_pays_for_a_higher_nonconstant_front() {
+        use crate::graph::coupled::{PairedResourceArc, PairedResourceMode};
+        let line = |a, b| PiecewiseLinearFunction::new(vec![[0., a], [2., b]]).unwrap();
+        let mut graph = Graph::<2>::new(2, 0).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        let arc = |increment| PairedResourceArc {
+            arrival: line(0., 2.),
+            increment,
+            lower: line(0., 0.),
+            upper: line(1e12, 1e12),
+            waiting: 1,
+        };
+        graph
+            .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+                initial: line(0., 0.),
+                initial_base: Window::new(0., 2.).unwrap(),
+                arcs: vec![arc(line(0., 2.)), arc(line(0., 0.))],
+                mode: PairedResourceMode::CostUnbounded,
+            }])
+            .unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let root = kernel.root(true);
+        let mut high = kernel.extend(&root, 0, true).unwrap().unwrap().0;
+        let mut low = kernel.extend(&root, 1, true).unwrap().unwrap().0;
+        high.account_extension(&root, 0., 0.).unwrap();
+        low.account_extension(&root, 0., 0.).unwrap();
+        let penalty = kernel.dominance_penalty(&high, &low, true).unwrap();
+        assert!((2. ..=2. + 1e-12).contains(&penalty), "{penalty}");
+        assert_eq!(kernel.dominance_penalty(&low, &high, true), Some(0.));
+    }
+
+    #[test]
+    fn backward_paired_fronts_compare_different_suffix_programs() {
+        use crate::graph::coupled::{PairedResourceArc, PairedResourceMode};
+        let line = |a, b| PiecewiseLinearFunction::new(vec![[0., a], [2., b]]).unwrap();
+        let mut graph = Graph::<2>::new(2, 0).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        let arc = |upper| PairedResourceArc {
+            arrival: line(0., 2.),
+            increment: line(1., 1.),
+            lower: line(0., 0.),
+            upper: line(upper, upper),
+            waiting: 0,
+        };
+        graph
+            .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+                initial: line(5., 5.),
+                initial_base: Window::new(0., 2.).unwrap(),
+                arcs: vec![arc(10.), arc(8.)],
+                mode: PairedResourceMode::Feasibility,
+            }])
+            .unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let root = kernel.root(false);
+        let wide = kernel.extend(&root, 0, false).unwrap().unwrap().0;
+        let narrow = kernel.extend(&root, 1, false).unwrap().unwrap().0;
+        assert_ne!(
+            wide.suffix.as_ref().unwrap().program,
+            narrow.suffix.as_ref().unwrap().program
+        );
+        assert_eq!(kernel.dominance_penalty(&wide, &narrow, false), Some(0.));
+        assert_eq!(kernel.dominance_penalty(&narrow, &wide, false), None);
+    }
+
+    #[test]
+    fn paired_terminal_above_numerical_infinity_retains_suffix_replay() {
+        use crate::graph::coupled::{PairedResourceArc, PairedResourceMode};
+        let line = |value| PiecewiseLinearFunction::new(vec![[0., value], [2., value]]).unwrap();
+        let mut graph = Graph::<2>::new(2, 0).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph
+            .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+                initial: line(1.5e12),
+                initial_base: Window::new(0., 2.).unwrap(),
+                arcs: vec![PairedResourceArc {
+                    arrival: PiecewiseLinearFunction::new(vec![[0., 0.], [2., 2.]]).unwrap(),
+                    increment: line(1.),
+                    lower: line(0.),
+                    upper: line(2e12),
+                    waiting: 0,
+                }],
+                mode: PairedResourceMode::Feasibility,
+            }])
+            .unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let suffix = kernel
+            .extend(&kernel.root(false), 0, false)
+            .unwrap()
+            .unwrap()
+            .0;
+        assert!(suffix.relations[0].backward_upper().is_none());
+        assert!(kernel.join(&kernel.root(true), &suffix).unwrap().is_some());
+    }
 
     #[test]
     fn rounded_future_charge_cannot_prune_the_better_physical_route() {
@@ -484,7 +658,8 @@ mod front_continuation_tests {
                     initial: 0.,
                     increments: vec![0.; 4],
                     weights: vec![0.; 4],
-                    future_weight: None,
+                    sink_upper: None,
+                    source_upper: None,
                 },
                 CoupledResource::PiecewiseLinearCost {
                     parent: 0,
@@ -520,6 +695,54 @@ mod front_continuation_tests {
     }
 
     #[test]
+    fn cumulative_source_bound_prices_backward_weight_differences() {
+        let prepare = |source_upper| {
+            let mut graph = Graph::<2>::new(3, 0).unwrap();
+            for (tail, head) in [(0, 1), (1, 2), (1, 2)] {
+                graph.add_arc(tail, head, 0.).unwrap();
+            }
+            graph
+                .set_coupled_resources(&[CoupledResource::CumulativeCost {
+                    initial: 0.,
+                    // Zero suffix increments isolate the entry-state correction from
+                    // the independent accumulated-cost ordering precondition.
+                    increments: vec![1., 0., 0.],
+                    weights: vec![0., 1., 3.],
+                    sink_upper: None,
+                    source_upper,
+                }])
+                .unwrap();
+            graph
+        };
+        let suffixes = |graph: &Graph<2>| {
+            let kernel = graph.coupled_kernel().unwrap();
+            let root = kernel.root(false);
+            let light = kernel.extend(&root, 1, false).unwrap().unwrap().0;
+            let heavy = kernel.extend(&root, 2, false).unwrap().unwrap().0;
+            (kernel.clone(), light, heavy)
+        };
+        let (kernel, light, heavy) = suffixes(&prepare(None));
+        assert_eq!(kernel.dominance_penalty(&heavy, &light, false), None);
+        let (kernel, light, heavy) = suffixes(&prepare(Some(5.)));
+        // Entry states lie in [0, 5]: the heavier suffix costs at most
+        // (3 - 1) * 5 more, plus the dot-product rounding allowance.
+        let penalty = kernel.dominance_penalty(&heavy, &light, false).unwrap();
+        assert!((10. ..=10. + 1e-9).contains(&penalty), "{penalty}");
+        let penalty = kernel.dominance_penalty(&light, &heavy, false).unwrap();
+        assert!((0. ..=1e-9).contains(&penalty), "{penalty}");
+        let mut graph = prepare(Some(5.));
+        let mut definitions = graph.coupled_kernel().unwrap().definitions().to_vec();
+        let CoupledResource::CumulativeCost { increments, .. } = &mut definitions[0] else {
+            unreachable!()
+        };
+        increments.fill(1.);
+        graph.set_coupled_resources(&definitions).unwrap();
+        let (kernel, light, heavy) = suffixes(&graph);
+        assert!(heavy.numeric_cost > light.numeric_cost);
+        assert_eq!(kernel.dominance_penalty(&heavy, &light, false), None);
+    }
+
+    #[test]
     fn nonnegative_numeric_continuations_restore_zero_compensation_state_dominance() {
         let mut graph = Graph::<2>::new(3, 0).unwrap();
         for (tail, head) in [(0, 1), (0, 1), (1, 2)] {
@@ -530,7 +753,8 @@ mod front_continuation_tests {
                 initial: 0.,
                 increments: vec![1., 2., 1.],
                 weights: vec![1., 1., 3.],
-                future_weight: None,
+                sink_upper: None,
+                source_upper: None,
             }])
             .unwrap();
         let kernel = graph.coupled_kernel().unwrap();
@@ -572,7 +796,8 @@ mod front_continuation_tests {
                         initial: 0.,
                         increments: vec![0.; 3],
                         weights: vec![0.; 3],
-                        future_weight: None,
+                        sink_upper: None,
+                        source_upper: None,
                     },
                     CoupledResource::PiecewiseLinearCost {
                         parent: 0,
@@ -608,7 +833,8 @@ mod front_continuation_tests {
                     initial: 0.,
                     increments: vec![0.; 3],
                     weights: vec![0.; 3],
-                    future_weight: None,
+                    sink_upper: None,
+                    source_upper: None,
                 },
                 CoupledResource::PiecewiseLinearCost {
                     parent: 0,
@@ -661,7 +887,8 @@ mod front_continuation_tests {
                     initial: 0.,
                     increments: vec![1., 2., 1.],
                     weights: vec![1., 1., 3.],
-                    future_weight: None,
+                    sink_upper: None,
+                    source_upper: None,
                 },
                 CoupledResource::Dependent {
                     parent: 0,

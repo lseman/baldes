@@ -351,6 +351,7 @@ mod tests {
                 CoupledResource::Selection {
                     initial: 3,
                     allowed: vec![3, 2, 3],
+                    vertices: vec![],
                     relaxed: false,
                 },
                 CoupledResource::SimultaneousPickupDelivery {

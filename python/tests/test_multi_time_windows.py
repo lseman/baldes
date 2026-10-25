@@ -24,3 +24,36 @@ def test_multiple_windows_wait_and_reject_bounds_inside_a_gap():
         solver.set_vertex_time_windows(1, 0, [])
     solver.set_vertex_bounds(1, 0, 3.0, 7.0)
     assert solver.solve() is None
+
+
+def test_network_resource_windows_round_trip_and_waiting():
+    from dataclasses import replace
+    from pybaldes import (
+        NetworkProblem, PricingArc, PricingNetwork, PricingResource, SharedRow, has_clp,
+    )
+    if not has_clp:
+        pytest.skip("Clp build required")
+    resource = PricingResource(
+        bounds=[(0., 20.)] * 3,
+        time_windows=[None, [[0., 2.], [8., 12.]], None],
+    )
+    assert resource.time_windows == (None, ((0., 2.), (8., 12.)), None)
+    model = NetworkProblem([SharedRow("eq", 1.)], [PricingNetwork(
+        7, 3, (0., 1.), [
+            PricingArc(0, 1, 2., consumption=[4.], entries=[(0, 1.)]),
+            PricingArc(1, 2, 1., consumption=[2.]),
+        ], resources=[resource],
+    )])
+    assert NetworkProblem.from_json(model.to_json()) == model
+    result = model.solve(stabilize=False)
+    assert result.status == "Optimal"
+    assert result.lp == pytest.approx(3.)
+    assert result.routes[0].resources == (10.,)
+    # Bounds entirely inside the gap must not turn the union into its hull.
+    blocked = replace(resource, bounds=((0., 20.), (3., 7.), (0., 20.)))
+    invalid = replace(model, networks=(replace(model.networks[0], resources=(blocked,)),))
+    try:
+        output = invalid.solve(stabilize=False)
+    except ValueError:
+        return
+    assert output.status != "Optimal"

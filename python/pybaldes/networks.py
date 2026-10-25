@@ -18,13 +18,26 @@ class SharedRow:
 
 @dataclass(frozen=True)
 class PricingResource:
+    """Scalar resource with optional per-vertex service-start windows.
+
+    ``time_windows`` requires a build with ``multi-time-windows``. Each vertex
+    entry is None (ordinary bounds) or a nonempty sequence of (lower, upper)
+    intervals. Ordinary bounds intersect the configured windows.
+    """
+
     kind: str = "disposable"
     initial: Optional[float] = None
     bounds: Optional[Tuple[Tuple[float, float], ...]] = None
+    time_windows: Optional[Tuple[Optional[Tuple[Tuple[float, float], ...]], ...]] = None
 
     def __post_init__(self) -> None:
         if self.bounds is not None:
             object.__setattr__(self, "bounds", tuple(tuple(b) for b in self.bounds))
+        if self.time_windows is not None:
+            object.__setattr__(self, "time_windows", tuple(
+                None if windows is None else tuple(tuple(w) for w in windows)
+                for windows in self.time_windows
+            ))
 
 
 @dataclass(frozen=True)
@@ -101,7 +114,12 @@ class NetworkProblem:
 
     def to_json(self, *, indent: Optional[int] = 2) -> str:
         """The same model format accepted by ``baldes networks MODEL.json``."""
-        return json.dumps(asdict(self), allow_nan=False, indent=indent)
+        data = asdict(self)
+        for network in data["networks"]:
+            for resource in network["resources"]:
+                if resource["time_windows"] is None:
+                    del resource["time_windows"]
+        return json.dumps(data, allow_nan=False, indent=indent)
 
     def solve(self, **options: Any) -> NetworkResult:
         return solve_networks(self, **options)

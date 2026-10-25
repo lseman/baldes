@@ -92,6 +92,7 @@ mod tests {
             .set_coupled_resources(&[CoupledResource::Selection {
                 initial: 1,
                 allowed: vec![1],
+                vertices: vec![],
                 relaxed: false,
             }])
             .unwrap();

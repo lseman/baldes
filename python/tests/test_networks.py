@@ -91,6 +91,7 @@ def test_python_construction_and_resource_inputs():
             PricingArc(1, 2, 1., consumption=[0.]),
         ], resources=[PricingResource(bounds=[(0., 2.)] * 3)])],
     )
+    assert "time_windows" not in json.loads(model.to_json())["networks"][0]["resources"][0]
     result = model.solve()
     assert result.status == "Optimal" and result.lp == pytest.approx(3.)
     assert result.routes[0].network == 19

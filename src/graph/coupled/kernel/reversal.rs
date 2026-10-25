@@ -12,10 +12,16 @@ impl CoupledKernel {
             return false;
         }
         self.definitions.iter().all(|resource| match resource {
-            CoupledResource::Selection { allowed, .. } => reverse
-                .iter()
-                .enumerate()
-                .all(|(i, &r)| allowed[i] == allowed[r]),
+            // Vertex masks act at arc heads, which reversal changes.
+            CoupledResource::Selection {
+                allowed, vertices, ..
+            } => {
+                vertices.is_empty()
+                    && reverse
+                        .iter()
+                        .enumerate()
+                        .all(|(i, &r)| allowed[i] == allowed[r])
+            }
             CoupledResource::SimultaneousPickupDelivery {
                 capacity,
                 deliveries,
@@ -133,6 +139,7 @@ mod tests {
                 CoupledResource::Selection {
                     initial: 3,
                     allowed: vec![3; 4],
+                    vertices: vec![],
                     relaxed: false,
                 },
                 CoupledResource::SimultaneousPickupDelivery {
@@ -325,7 +332,8 @@ mod tests {
                     initial: 0.,
                     increments: vec![0.; 4],
                     weights: vec![0.; 4],
-                    future_weight: None,
+                    sink_upper: None,
+                    source_upper: None,
                 }),
             }
             graph.set_coupled_resources(&definitions).unwrap();

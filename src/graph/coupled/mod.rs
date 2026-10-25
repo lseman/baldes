@@ -148,15 +148,21 @@ pub enum CoupledResource {
     /// its mask; an empty intersection is infeasible. A two-value domain is a
     /// binary selection resource. Up to 64 distinct values are supported.
     ///
-    /// `relaxed` starts pricing with every arc check-only: an arc rejects a
+    /// `allowed` holds arc incompatibilities (one mask per arc) and
+    /// `vertices` vertex incompatibilities (one mask per vertex, or empty
+    /// for none); a route keeps the values every arc and visited vertex
+    /// allow. `relaxed` makes vertex masks check-only: a vertex rejects a
     /// label whose domain misses its mask but does not narrow the domain.
-    /// When the master solution uses a route breaking the exact rule, the
-    /// arcs of its shortest violating window start narrowing the domain, and
-    /// the stronger relaxation removes that route. Certification, incumbents
-    /// and final routes always apply the exact rule.
+    /// Arc masks and the source mask always narrow. When the master
+    /// solution uses a route breaking the exact rule, the vertices of its
+    /// shortest violating window start narrowing, and the stronger
+    /// relaxation removes that route. Certification, incumbents and final
+    /// routes always apply the exact rule.
     Selection {
         initial: u64,
         allowed: Vec<u64>,
+        #[cfg_attr(feature = "clp", serde(default))]
+        vertices: Vec<u64>,
         #[cfg_attr(feature = "clp", serde(default))]
         relaxed: bool,
     },
@@ -201,12 +207,16 @@ pub enum CoupledResource {
         initial: f64,
         increments: Vec<f64>,
         weights: Vec<f64>,
-        /// Optional bounds on the total weight of any route completion
-        /// (forward: the remaining arcs; backward: the arcs before). When
-        /// set, forward dominance may accept a label with a larger state
-        /// x, charging its numeric cost the extra (x_a - x_b) * weight.
+        /// Optional upper bounds of this resource at the sink and at the
+        /// source. Dominance reads them as promises, for nonnegative
+        /// increments and weights: `sink_upper` bounds the total weight of
+        /// any completion, so a forward label with a larger x pays
+        /// (x_a - x_b) * sink_upper; `source_upper` bounds the increments
+        /// of any prefix, which bounds the entry x of a backward label.
         #[cfg_attr(feature = "clp", serde(default))]
-        future_weight: Option<Window>,
+        sink_upper: Option<f64>,
+        #[cfg_attr(feature = "clp", serde(default))]
+        source_upper: Option<f64>,
     },
     /// Bounded affine dependency: y += offsets[i] + factors[i] * parent_after.
     /// The parent must be an earlier numeric resource.
@@ -385,11 +395,21 @@ impl CoupledResource {
                 }
             }
             Self::Selection {
-                initial, allowed, ..
+                initial,
+                allowed,
+                vertices,
+                ..
             } => {
                 if *initial == 0 || allowed.len() != n {
                     return Err(invalid(
                         "selection needs a nonempty initial domain and one mask per arc",
+                    ));
+                }
+                if !vertices.is_empty()
+                    && (vertices.len() != g.vertices.len() || initial & vertices[g.source] == 0)
+                {
+                    return Err(invalid(
+                        "selection vertex masks need one per vertex and must admit the source",
                     ));
                 }
             }
@@ -445,15 +465,20 @@ impl CoupledResource {
                 initial,
                 increments,
                 weights,
-                future_weight,
+                sink_upper,
+                source_upper,
             } => {
                 finite(*initial)?;
                 numbers(increments, n, false)?;
                 numbers(weights, n, false)?;
-                if let Some(w) = future_weight {
-                    finite(w.lower)?;
-                    finite(w.upper)?;
-                    Window::new(w.lower, w.upper)?;
+                if [sink_upper, source_upper]
+                    .into_iter()
+                    .flatten()
+                    .any(|k| !k.is_finite() || *k < 0.)
+                {
+                    return Err(invalid(
+                        "cumulative depot bounds must be finite and nonnegative",
+                    ));
                 }
             }
             Self::PiecewiseLinearResource {

@@ -20,6 +20,7 @@ impl CoupledKernel {
                         slope_interval::SlopeLabel {
                             front: None,
                             minimum: 0.,
+                            upper: None,
                         }
                     }
                 })
@@ -157,13 +158,17 @@ impl CoupledKernel {
             .zip(&prepared.selection)
             .zip(&self.selection_memory)
         {
-            let kept = *domain & allowed;
+            let mut kept = *domain & allowed;
             if kept == 0 {
                 return Ok(None);
             }
-            if memory.as_ref().map_or(true, |remembered| remembered[arc]) {
-                *domain = kept;
+            if let Some(relaxed) = memory {
+                let Some(next) = relaxed.enter(kept, arc) else {
+                    return Ok(None);
+                };
+                kept = next;
             }
+            *domain = kept;
         }
         for (index, ((load, &step), &capacity)) in next
             .loads
@@ -235,7 +240,17 @@ impl CoupledKernel {
             next.slope_fronts.push(front);
         }
         for (old, prepared) in state.slope_relations.iter().zip(&self.slope_paired) {
-            let Some(front) = prepared.extend(old, arc, forward, self.cost_scale)? else {
+            let Some(front) = prepared.extend(
+                old,
+                arc,
+                forward,
+                state
+                    .suffix
+                    .as_ref()
+                    .is_some_and(|s| s.program.iter().next().is_none()),
+                self.cost_scale,
+            )?
+            else {
                 return Ok(None);
             };
             next.slope_relations.push(front);

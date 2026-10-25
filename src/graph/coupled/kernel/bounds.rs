@@ -482,14 +482,38 @@ impl CoupledKernel {
         if a.coefficients == b.coefficients {
             return Some(0.);
         }
-        let a: Vec<_> = a.coefficients.iter().copied().map(Range::point).collect();
-        let b: Vec<_> = b.coefficients.iter().copied().map(Range::point).collect();
-        let gap = correction(&a, &self.optimization.numeric, &self.initial).subtract(correction(
-            &b,
-            &self.optimization.numeric,
-            &self.initial,
-        ));
-        gap.hi.is_finite().then_some(gap.hi.max(0.))
+        let numeric = &self.optimization.numeric;
+        let ca: Vec<_> = a.coefficients.iter().copied().map(Range::point).collect();
+        let cb: Vec<_> = b.coefficients.iter().copied().map(Range::point).collect();
+        let separate = correction(&ca, numeric, &self.initial)
+            .subtract(correction(&cb, numeric, &self.initial))
+            .hi;
+        // Both suffixes see the same entry state x, so in real arithmetic
+        // the gap is sum((a_i - b_i) * (x_i - initial_i)): the reference's
+        // max(0, x_a - x_b) * bound for a cumulative source bound. Each
+        // suffix's binary64 dot product adds at most (n + 2) * eps * sum|c x|.
+        let correlated = || {
+            let mut gap = Range::point(0.);
+            let mut magnitude = Range::point(0.);
+            for (((&ai, &bi), x), &init) in a
+                .coefficients
+                .iter()
+                .zip(&b.coefficients)
+                .zip(numeric)
+                .zip(&self.initial)
+            {
+                let delta = Range::point(ai).subtract(Range::point(bi));
+                gap = gap.add(delta.multiply(x.subtract(Range::point(init))));
+                let size = Range::point(x.lo.abs().max(x.hi.abs()).max(init.abs()));
+                magnitude = magnitude
+                    .add(Range::point(ai.abs()).multiply(size))
+                    .add(Range::point(bi.abs()).multiply(size));
+            }
+            let eps = (numeric.len() as f64 + 2.) * f64::EPSILON;
+            gap.add(magnitude.multiply(Range::point(2. * eps))).hi
+        };
+        let gap = separate.min(correlated());
+        gap.is_finite().then_some(gap.max(0.))
     }
 }
 
@@ -525,6 +549,7 @@ impl PreparedBounds {
                     initial,
                     increments,
                     weights: w,
+                    source_upper,
                     ..
                 } => {
                     let i = slots[r].unwrap();
@@ -553,6 +578,16 @@ impl PreparedBounds {
                             hi: if max <= 0. { *initial } else { f64::INFINITY },
                         }
                     };
+                    // The source bound promises that no prefix adds more than
+                    // it, which bounds a backward label's entry state (the
+                    // reference's backward max(0, x_a - x_b) * bound).
+                    if let Some(k) = source_upper {
+                        if min >= 0. && w.iter().all(|&x| x >= 0.) {
+                            if let Some(hi) = crate::core::rounding::add_up(*initial, *k) {
+                                numeric[i].hi = numeric[i].hi.min(hi);
+                            }
+                        }
+                    }
                     let (min, max) = w
                         .iter()
                         .fold((0f64, 0f64), |(min, max), &x| (min.min(x), max.max(x)));
@@ -612,6 +647,7 @@ mod coupled_hull_tests {
                 CoupledResource::Selection {
                     initial: 3,
                     allowed: vec![3],
+                    vertices: vec![],
                     relaxed: false,
                 },
                 CoupledResource::SimultaneousPickupDelivery {
@@ -624,7 +660,8 @@ mod coupled_hull_tests {
                     initial: 0.,
                     increments: vec![0.],
                     weights: vec![1.],
-                    future_weight: None,
+                    sink_upper: None,
+                    source_upper: None,
                 },
             ],
         )
@@ -849,6 +886,7 @@ mod pairing_tests {
                 CoupledResource::Selection {
                     initial: 3,
                     allowed: vec![1, 2, 1, 2],
+                    vertices: vec![],
                     relaxed: false,
                 },
                 CoupledResource::SimultaneousPickupDelivery {
@@ -861,7 +899,8 @@ mod pairing_tests {
                     initial: 0.,
                     increments: vec![1., 2., 3., 4.],
                     weights: vec![-2., 3., -1., 2.],
-                    future_weight: None,
+                    sink_upper: None,
+                    source_upper: None,
                 },
             ],
         )
@@ -972,7 +1011,8 @@ mod merge_tests {
                 initial: 2.,
                 increments: vec![1.],
                 weights: vec![-3.],
-                future_weight: None,
+                sink_upper: None,
+                source_upper: None,
             }])
             .unwrap();
         let kernel = graph.coupled_kernel().unwrap();

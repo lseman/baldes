@@ -1,5 +1,4 @@
 use super::*;
-use crate::pricing::restrictions::RYAN_FOSTER_IN_PRICING;
 
 impl<const D: usize> std::fmt::Debug for NodeSnapshot<D> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -68,14 +67,8 @@ impl<const D: usize> NodeSnapshot<D> {
                     continue;
                 };
                 let route = &self.routes[column.tag as usize];
-                // Native RF binary resources also make each pair endpoint
-                // elementary. Retire old NG cycles outside the new relaxation.
-                if let (true, BranchConstraint::RyanFoster(rule)) =
-                    (RYAN_FOSTER_IN_PRICING, constraint)
-                {
-                    if !rule.elementary_on_pair(route.nodes.iter().map(|&v| v as usize)) {
-                        master.set_upper(c, 0.)?;
-                    }
+                if crate::master::branching::enforcement::retires_column(constraint, route) {
+                    master.set_upper(c, 0.)?;
                 }
                 let coefficient = constraint.coefficient(&problem, route);
                 if coefficient != 0. {

@@ -114,6 +114,26 @@ To include HiGHS, install its shared library as described in the
 python -m pip install . --config-settings=build-args="--features highs"
 ```
 
+## Repeated low-level pricing
+
+Retain a `Solver` across column-generation iterations. `set_reduced_costs(costs)`
+updates one reduced cost per arc while preserving original costs and prepared
+bucket graphs. `update_reduced_costs(costs, duals)` also replaces original costs;
+use it when those original costs change.
+
+```python
+solver.set_reduced_costs(reduced_arc_costs)
+minimum, columns, exact = solver.price_with_status(30)
+if not columns and not exact:
+    minimum, columns, exact = solver.price_with_status(30, exact=True)
+```
+
+The default call uses staged pricing and may return improving heuristic columns.
+`exact=True` runs the unlimited-label phase once and can also return nonnegative
+columns. Only use `minimum` as a pricing bound when the returned `exact` flag is
+true. Exactness here concerns the configured pricing domain, including its NG
+relaxation; it is not an independent arithmetic certificate for the master.
+
 ## Multiple pricing networks
 
 `NetworkProblem` and `solve_networks` expose a shared master with independent

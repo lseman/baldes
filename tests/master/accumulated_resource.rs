@@ -212,13 +212,27 @@ fn threshold_children_preserve_rows_bounds_and_restore_the_parent() {
             cold.branch(branch.clone()).unwrap();
             let fresh = root::solve(cold, options.clone()).unwrap();
             assert_eq!(child.master.status, fresh.master.status);
-            assert!((fresh.master.lp - 1.).abs() < 1e-8);
+            // Pricing enforcement can wait at the new lower window on the
+            // cheap route. Master-only enforcement keeps the original earliest
+            // schedule, so the upper child uses the expensive route instead.
+            let expected = if upper
+                && !baldes::master::branching::enforcement::ACCUMULATED_RESOURCE_IN_PRICING
+            {
+                2.
+            } else {
+                1.
+            };
+            assert!(
+                (fresh.master.lp - expected).abs() < 1e-8,
+                "upper={upper}: {fresh:?}"
+            );
             if child.master.pruned_by_bound {
                 // The inherited incumbent can close the node before the new
                 // schedule is reoptimized. Its RMP objective is not the root LP.
-                assert!((child.master.bound - fresh.master.lp).abs() < 1e-8);
-                assert!((child.incumbent - fresh.master.lp).abs() < 1e-8);
-                assert!(child.master.lp >= fresh.master.lp - 1e-8);
+                assert!(child.master.bound <= fresh.master.lp + 1e-8);
+                assert!(child.master.bound >= parent.master.bound - 1e-8);
+                assert!((child.master.bound - child.incumbent).abs() < 1e-8);
+                assert!(child.incumbent <= fresh.master.lp + 1e-8);
             } else {
                 assert!((child.master.lp - fresh.master.lp).abs() < 1e-8);
             }
@@ -232,5 +246,41 @@ fn threshold_children_preserve_rows_bounds_and_restore_the_parent() {
         let restored = root::inherit_branches(snapshot, &[], options.clone()).unwrap();
         assert_eq!(restored.master.status, parent.master.status);
         assert!((restored.master.lp - parent.master.lp).abs() < 1e-8);
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn accumulated_branch_enforcement_keeps_master_rows_in_both_build_modes() {
+    use baldes::master::{
+        branching::{enforcement::ACCUMULATED_RESOURCE_IN_PRICING, BranchConstraint},
+        root::RootProblem,
+    };
+    let mut s = solver(ResourceKind::Disposable);
+    let arc = s.graph.add_arc(0, 1, 1.).unwrap();
+    s.graph.add_arc(1, 2, 0.).unwrap();
+    let mut problem = RootProblem::set_partitioning(s.graph, 1.).unwrap();
+    let old_rows = problem.rows.len();
+    let branch = AccumulatedResourceBranch {
+        arc,
+        resource: 4,
+        threshold: 1.,
+        upper: false,
+    };
+    problem
+        .branch(BranchConstraint::AccumulatedResource(branch))
+        .unwrap();
+    assert_eq!(problem.rows.len(), old_rows + 1);
+    let window = problem
+        .graph
+        .arcs
+        .iter()
+        .find(|a| a.id == arc)
+        .unwrap()
+        .bounds[4];
+    if ACCUMULATED_RESOURCE_IN_PRICING {
+        assert_eq!(window.unwrap().upper, branch.boundary());
+    } else {
+        assert_eq!(window, None);
     }
 }

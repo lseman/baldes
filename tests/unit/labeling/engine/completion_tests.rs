@@ -10,7 +10,8 @@ fn model() -> Graph<2> {
             initial: 0.,
             increments: vec![1., 1.],
             weights: vec![1., -2.],
-            future_weight: None,
+            sink_upper: None,
+            source_upper: None,
         }])
         .unwrap();
     graph

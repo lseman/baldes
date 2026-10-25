@@ -415,6 +415,50 @@ impl SlopeFront {
             tolerant_alignment: tolerant,
         })
     }
+    /// This front is defined wherever `other` is and is no higher there.
+    /// A front's value is the minimum over its components. Each of
+    /// `other`'s components is checked at its knots merged with this
+    /// front's knots inside its domain; one component of this front must
+    /// cover each sub-interval by itself (components are continuous, so its
+    /// endpoint values bound it). Under the native policy, domains snap and
+    /// values compare as the reference does (1e-4, or relative 2.22e-10);
+    /// under the strict policy both are exact. Arithmetic failure rejects.
+    pub(crate) fn covers_below(&self, other: &Self, policy: FrontOperationPolicy) -> bool {
+        let evaluation = match policy {
+            FrontOperationPolicy::StrictDomain => EvaluationPolicy::StrictDomain,
+            FrontOperationPolicy::NativeFrontAlgebra => EvaluationPolicy::NativeTolerance,
+        };
+        let value = |f: &PreparedSlopeFunction, x: f64| f.evaluate(x, evaluation).ok().flatten();
+        let below = |a: f64, b: f64| a <= b || near(a, b, policy).unwrap_or(false);
+        let mut knots = Vec::new();
+        other.components.iter().all(|b| {
+            let (lo, hi) = b.domain();
+            knots.clear();
+            knots.extend(b.pairs().iter().map(|p| p.1));
+            knots.extend(
+                self.components
+                    .iter()
+                    .flat_map(|a| a.pairs().iter().map(|p| p.1))
+                    .filter(|&x| lo < x && x < hi),
+            );
+            knots.sort_by(f64::total_cmp);
+            knots.dedup();
+            let covers = |l: f64, h: f64| {
+                let (Some(bl), Some(bh)) = (value(b, l), value(b, h)) else {
+                    return false;
+                };
+                self.components.iter().any(|a| {
+                    matches!((value(a, l), value(a, h)),
+                        (Some(al), Some(ah)) if below(al, bl) && below(ah, bh))
+                })
+            };
+            if knots.len() == 1 {
+                return covers(knots[0], knots[0]);
+            }
+            knots.windows(2).all(|w| covers(w[0], w[1]))
+        })
+    }
+
     /// Minimum of the computed slope front, not of a separate source program.
     /// Ordered endpoint accumulation suffices for each monotone slope segment.
     pub fn minimum(&self, budget: FrontierBudget) -> FrontierOutcome<FrontAlgebraWitness> {
