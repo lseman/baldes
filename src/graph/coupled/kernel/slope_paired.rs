@@ -1,4 +1,5 @@
 //! Paired raw slope relations: physical dependent state and objective stay separate.
+use super::bounds::Range;
 use super::*;
 use descriptor::{
     FrontierBudget, PairedCostNormalization, PreparedSlopeRelationArc, SlopeFront, SlopeRelationArc,
@@ -16,6 +17,9 @@ pub(super) struct PreparedSlopePaired {
     mode: PairedResourceMode,
     normalization: PairedCostNormalization,
     policy: FrontOperationPolicy,
+    /// Cost-unbounded native mode without a reachable upper bound (the
+    /// reference's 1e12 infinity): a higher front may pay its excess.
+    shifts: bool,
 }
 impl PartialEq for PreparedSlopePaired {
     fn eq(&self, b: &Self) -> bool {
@@ -80,6 +84,7 @@ impl PreparedSlopePaired {
         let Some(witness) = outcome(front.minimum(budget))? else {
             return Err(invalid("empty raw paired initial front"));
         };
+        let mut shifts = false;
         if mode != PairedResourceMode::Feasibility {
             let first = arcs
                 .first()
@@ -99,6 +104,9 @@ impl PreparedSlopePaired {
                     "raw paired cost requires shared ordered constant dependent bounds",
                 ));
             }
+            shifts = mode == PairedResourceMode::CostUnbounded
+                && policy == FrontOperationPolicy::NativeFrontAlgebra
+                && upper >= 1e12;
             if mode == PairedResourceMode::CostBounded {
                 if witness.value < lower || arcs.iter().any(|arc| arc.waiting < 0) {
                     return Err(invalid("bounded raw paired cost requires nonnegative waiting and initial minimum above the lower bound"));
@@ -142,24 +150,46 @@ impl PreparedSlopePaired {
             mode,
             normalization,
             policy,
+            shifts,
         })
     }
     /// Forward fronts cover and stay below under this resource's policy.
-    /// Backward feasibility uppers cover and stay above; unknowns require replay.
-    pub(super) fn dominates(&self, a: &SlopeLabel, b: &SlopeLabel, forward: bool) -> bool {
+    /// Backward feasibility uppers cover and stay above; unknowns require
+    /// replay. A shifting resource's forward front may instead exceed by
+    /// delta: every future step is max(value + increment, lower), which keeps
+    /// the pointwise gap, so a's terminal minimum exceeds b's by at most delta.
+    /// The objective is scale times that minimum plus a common baseline, so
+    /// the penalty is scale * delta + objective_b - objective_a. Returns the
+    /// penalty, or None.
+    pub(super) fn penalty(
+        &self,
+        a: &SlopeLabel,
+        b: &SlopeLabel,
+        forward: bool,
+        scale: f64,
+    ) -> Option<f64> {
         if a == b {
-            return true;
+            return Some(0.);
         }
         if !forward {
             return match (&a.upper, &b.upper) {
-                (Some(a), Some(b)) => a.covers_above(b),
-                _ => false,
+                (Some(a), Some(b)) if a.covers_above(b) => Some(0.),
+                _ => None,
             };
         }
-        match (forward, &a.front, &b.front) {
-            (true, Some(a), Some(b)) => a.covers_below(b, self.policy),
-            _ => false,
+        let (Some(front_a), Some(front_b)) = (&a.front, &b.front) else {
+            return None;
+        };
+        if !(self.shifts && scale != 0.) {
+            return front_a.covers_below(front_b, self.policy).then_some(0.);
         }
+        let excess = front_a.excess(front_b, self.policy)?;
+        let gap = Range::point(excess)
+            .multiply(Range::point(scale))
+            .add(Range::point(b.minimum))
+            .subtract(Range::point(a.minimum))
+            .hi;
+        gap.is_finite().then_some(gap.max(0.))
     }
     pub(super) fn has_costs(&self) -> bool {
         self.mode != PairedResourceMode::Feasibility
@@ -280,8 +310,8 @@ mod tests {
         let prepared = &kernel.slope_paired[0];
         let low = SlopeLabel::root(&SlopeFront::from_prepared(function(1., 0.)), true);
         let high = SlopeLabel::root(&SlopeFront::from_prepared(function(2., 0.)), true);
-        assert!(prepared.dominates(&low, &high, true));
-        assert!(!prepared.dominates(&high, &low, true));
+        assert_eq!(prepared.penalty(&low, &high, true, 1.), Some(0.));
+        assert_eq!(prepared.penalty(&high, &low, true, 1.), None);
     }
 
     #[test]
@@ -369,6 +399,63 @@ mod tests {
             }])
             .unwrap();
         graph
+    }
+    fn shifted_prefixes(
+        policy: FrontOperationPolicy,
+        upper: f64,
+    ) -> (Graph<2>, Box<CoupledLabelState>, Box<CoupledLabelState>) {
+        let mut graph = Graph::new(3, 0).unwrap();
+        for (tail, head) in [(0, 1), (0, 1), (1, 2)] {
+            graph.add_arc(tail, head, 0.).unwrap();
+        }
+        let arc = |increment| SlopeRelationArc {
+            increment,
+            upper: function(upper, 0.),
+            lower: function(0., 0.),
+            ..arc()
+        };
+        graph
+            .set_coupled_resources(&[CoupledResource::SlopePaired {
+                initial: function(0., 0.),
+                initial_base: Window::new(0., 2.).unwrap(),
+                // The falling prefix ends at 2 - x, the flat one at 1.
+                arcs: vec![
+                    arc(function(2., -1.)),
+                    arc(function(1., 0.)),
+                    arc(function(0., 0.)),
+                ],
+                mode: PairedResourceMode::CostUnbounded,
+                normalization: PairedCostNormalization::AbsoluteFinalValue,
+                policy,
+            }])
+            .unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let root = kernel.root(true);
+        let prefix = |arc| {
+            let mut state = kernel.extend(&root, arc, true).unwrap().unwrap().0;
+            state.account_extension(&root, 0., 0.).unwrap();
+            state
+        };
+        let (falling, flat) = (prefix(0), prefix(1));
+        (graph, falling, flat)
+    }
+    #[test]
+    fn native_unbounded_raw_paired_front_pays_its_excess() {
+        let native = FrontOperationPolicy::NativeFrontAlgebra;
+        let (graph, falling, flat) = shifted_prefixes(native, 1e12);
+        let kernel = graph.coupled_kernel().unwrap();
+        // Falling exceeds flat by 1 at x=0: 1 + objective 1 - objective 0.
+        let penalty = kernel.dominance_penalty(&falling, &flat, true).unwrap();
+        assert!((2. ..=2. + 1e-12).contains(&penalty), "{penalty}");
+        // Flat exceeds falling by 1 at x=2, already paid by its objective.
+        assert_eq!(kernel.dominance_penalty(&flat, &falling, true), Some(0.));
+        // A reachable upper bound or the strict policy keeps exact coverage.
+        for (policy, upper) in [(native, 100.), (FrontOperationPolicy::StrictDomain, 1e12)] {
+            let (graph, falling, flat) = shifted_prefixes(policy, upper);
+            let kernel = graph.coupled_kernel().unwrap();
+            assert_eq!(kernel.dominance_penalty(&falling, &flat, true), None);
+            assert_eq!(kernel.dominance_penalty(&flat, &falling, true), None);
+        }
     }
     fn minimum(state: &CoupledLabelState) -> f64 {
         match state
@@ -556,7 +643,7 @@ mod tests {
     }
     #[cfg(feature = "clp")]
     #[test]
-    fn raw_paired_phase_i_preserves_physical_front_and_declines_certification() {
+    fn raw_paired_phase_i_preserves_physical_front_and_certifies_strict_controls() {
         let graph = graph(
             PairedResourceMode::CostBounded,
             PairedCostNormalization::AbsoluteFinalValue,
@@ -566,7 +653,7 @@ mod tests {
         let (state, cost) = kernel.replay_state(&[0, 1]).unwrap().unwrap();
         assert_eq!(cost, 0.);
         assert_eq!(minimum(&state), 7.);
-        assert!(kernel.certify(&[0, 1]).is_none());
+        assert_eq!(kernel.certify(&[0, 1]), Some((true, [0., 0.])));
         let json = serde_json::to_string(kernel.definitions()).unwrap();
         let restored: Vec<CoupledResource> = serde_json::from_str(&json).unwrap();
         assert_eq!(restored, kernel.definitions());

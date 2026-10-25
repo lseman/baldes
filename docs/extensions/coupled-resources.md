@@ -138,13 +138,17 @@ Each forward extension translates the coordinate, restricts the allowed domain,
 adds the charge front and scans its segment endpoints for a minimum. Backward
 labels retain ordered suffix replay for the final joined objective. Unproved
 operations produce an explicit incomplete result. Forward dominance accepts
-bitwise-equal fronts, ordered by the independent scalar prefix costs, and
-otherwise only identically zero fronts under the `strict_domain` policy when
-every charge is zero or costs are suppressed in phase I; such a front dominates
-when each of the other's components lies in one of its components. Unequal
-costly fronts never compare, because translation and addition re-round segment
-spans and can reverse a current pointwise order. Backward labels compare only
-with identical suffix programs. Completion bounds, fixing and certificates
+bitwise-equal fronts, ordered by the independent scalar prefix costs. Under
+`strict_domain` it otherwise accepts only identically zero fronts when every
+charge is zero or costs are suppressed in phase I; such a front dominates when
+each of the other's components lies in one of its components. Unequal costly
+strict fronts never compare, because translation and addition re-round segment
+spans and can reverse a current pointwise order. Under `native_front_algebra` a
+covering front may exceed the other by delta, with values within the reference
+tolerance counted as equal, and pays `delta` plus the difference of current
+minima; this follows the reference's tolerant front comparison and is a parity
+rule rather than a binary64 proof. Backward labels compare only with identical
+suffix programs. Completion bounds, fixing and certificates
 remain conservative. The result is a
 minimum of the computed front algebra, not a promise of a global minimum over
 every sequential binary64 evaluation of the source program. Compile checks pass;
@@ -280,6 +284,11 @@ zero under both conventions. Phase I suppresses this objective while keeping
 dependent transitions and bounds.
 
 Raw paired forward dominance compares covering fronts under the selected policy.
+In `cost_unbounded` mode with `native_front_algebra` and no reachable upper bound
+(every upper at or above the `1e12` marker), a front may instead exceed the other
+by delta and pay `scale * delta` plus the objective difference, following the
+reference's shifted-front comparison. This is a parity rule under the recovered
+tolerance, not a binary64 proof; `strict_domain` keeps exact coverage.
 In feasibility mode with `strict_domain`, backward labels also retain an upper
 front when the slope functions can be converted into knot functions without
 changing their stored segment slopes. Unsupported conversions, singleton

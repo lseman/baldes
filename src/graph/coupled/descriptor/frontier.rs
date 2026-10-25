@@ -424,14 +424,29 @@ impl SlopeFront {
     /// values compare as the reference does (1e-4, or relative 2.22e-10);
     /// under the strict policy both are exact. Arithmetic failure rejects.
     pub(crate) fn covers_below(&self, other: &Self, policy: FrontOperationPolicy) -> bool {
+        self.excess(other, policy) == Some(0.)
+    }
+
+    /// The largest amount by which this front exceeds `other` on `other`'s
+    /// domain, or None when it does not cover that domain. Checked knot-wise
+    /// exactly as `covers_below`; a value no higher than (or, under the
+    /// native policy, near) `other` contributes zero.
+    pub(crate) fn excess(&self, other: &Self, policy: FrontOperationPolicy) -> Option<f64> {
         let evaluation = match policy {
             FrontOperationPolicy::StrictDomain => EvaluationPolicy::StrictDomain,
             FrontOperationPolicy::NativeFrontAlgebra => EvaluationPolicy::NativeTolerance,
         };
         let value = |f: &PreparedSlopeFunction, x: f64| f.evaluate(x, evaluation).ok().flatten();
-        let below = |a: f64, b: f64| a <= b || near(a, b, policy).unwrap_or(false);
+        let gap = |a: f64, b: f64| {
+            if a <= b || near(a, b, policy).unwrap_or(false) {
+                Some(0.)
+            } else {
+                Some(a - b).filter(|gap| gap.is_finite())
+            }
+        };
         let mut knots = Vec::new();
-        other.components.iter().all(|b| {
+        let mut worst = 0f64;
+        for b in other.components.iter() {
             let (lo, hi) = b.domain();
             knots.clear();
             knots.extend(b.pairs().iter().map(|p| p.1));
@@ -443,20 +458,27 @@ impl SlopeFront {
             );
             knots.sort_by(f64::total_cmp);
             knots.dedup();
+            // The least excess of any single component covering [l, h];
+            // components are continuous, so endpoint gaps bound it.
             let covers = |l: f64, h: f64| {
-                let (Some(bl), Some(bh)) = (value(b, l), value(b, h)) else {
-                    return false;
-                };
-                self.components.iter().any(|a| {
-                    matches!((value(a, l), value(a, h)),
-                        (Some(al), Some(ah)) if below(al, bl) && below(ah, bh))
-                })
+                let (bl, bh) = (value(b, l)?, value(b, h)?);
+                self.components
+                    .iter()
+                    .filter_map(|a| {
+                        let (al, ah) = (value(a, l)?, value(a, h)?);
+                        Some(gap(al, bl)?.max(gap(ah, bh)?))
+                    })
+                    .min_by(f64::total_cmp)
             };
             if knots.len() == 1 {
-                return covers(knots[0], knots[0]);
+                worst = worst.max(covers(knots[0], knots[0])?);
+                continue;
             }
-            knots.windows(2).all(|w| covers(w[0], w[1]))
-        })
+            for w in knots.windows(2) {
+                worst = worst.max(covers(w[0], w[1])?);
+            }
+        }
+        Some(worst)
     }
 
     /// Minimum of the computed slope front, not of a separate source program.

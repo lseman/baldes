@@ -65,13 +65,15 @@ impl PreparedSlopeCharge {
         Ok(label.front.as_ref().expect("prepared charge front"))
     }
 }
-/// Per-resource facts behind the domain-only dominance rule. Unequal costly
-/// fronts never compare: a pointwise order is not preserved by future
-/// operations, because translation re-rounds every segment span and addition
-/// re-accumulates split segments, so an earlier gap can reverse.
+/// Per-resource facts behind forward slope-interval dominance. Under the
+/// strict policy unequal costly fronts never compare: a pointwise order is
+/// not preserved by future operations, because translation re-rounds every
+/// segment span and addition re-accumulates split segments, so an earlier gap
+/// can reverse. The native policy instead follows the reference's tolerant
+/// front comparison; it is a parity rule, not a binary64 proof.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct PreparedSlopeDominance {
-    strict: bool,
+    policy: FrontOperationPolicy,
     zero_charges: bool,
 }
 impl PreparedSlopeDominance {
@@ -83,31 +85,63 @@ impl PreparedSlopeDominance {
             unreachable!()
         };
         Self {
-            strict: *policy == FrontOperationPolicy::StrictDomain,
+            policy: *policy,
             zero_charges: functions.iter().all(zero_valued),
         }
     }
-    /// Forward a dominates b when both fronts are identically zero, every
-    /// future charge is zero (or suppressed) and each component of b lies in
-    /// one component of a. Zero values survive every operation exactly, and
-    /// literal translation, restriction and strict-domain intersection are
-    /// monotone in each coordinate, so a stays feasible wherever b does with
-    /// the same zero minimum. Tolerant native alignment can snap a and b to
-    /// different boundaries and is excluded.
-    pub(super) fn dominates(&self, a: &SlopeLabel, b: &SlopeLabel, scale: f64) -> bool {
-        let (Some(a), Some(b)) = (&a.front, &b.front) else {
-            return false;
+    /// Continuation penalty of unequal forward labels a and b, or None.
+    ///
+    /// Strict policy: both fronts are identically zero, every future charge is
+    /// zero (or suppressed) and each component of b lies in one component of
+    /// a. Zero values survive every operation exactly, and literal
+    /// translation, restriction and strict intersection are monotone in each
+    /// coordinate, so a stays feasible wherever b does at the same zero
+    /// minimum; the penalty is zero.
+    ///
+    /// Native policy: a covers b's domain and exceeds it by at most delta
+    /// (values within the reference tolerance count as equal). Translation,
+    /// restriction and common charges keep that pointwise gap, so a's final
+    /// minimum exceeds b's by at most delta, paid as
+    /// scale * (delta + min_b - min_a) against the current objectives. A
+    /// charged comparison needs `tracked_order`, the independent scalar order.
+    pub(super) fn penalty(
+        &self,
+        a: &SlopeLabel,
+        b: &SlopeLabel,
+        scale: f64,
+        tracked_order: bool,
+    ) -> Option<f64> {
+        let (Some(front_a), Some(front_b)) = (&a.front, &b.front) else {
+            return None;
         };
-        self.strict
-            && (scale == 0. || self.zero_charges)
-            && a.components().iter().chain(b.components()).all(zero_valued)
-            && b.components().iter().all(|b| {
-                let (lo, hi) = b.domain();
-                a.components().iter().any(|a| {
-                    let (start, end) = a.domain();
-                    start <= lo && hi <= end
-                })
-            })
+        match self.policy {
+            FrontOperationPolicy::StrictDomain => ((scale == 0. || self.zero_charges)
+                && front_a
+                    .components()
+                    .iter()
+                    .chain(front_b.components())
+                    .all(zero_valued)
+                && front_b.components().iter().all(|b| {
+                    let (lo, hi) = b.domain();
+                    front_a.components().iter().any(|a| {
+                        let (start, end) = a.domain();
+                        start <= lo && hi <= end
+                    })
+                }))
+            .then_some(0.),
+            FrontOperationPolicy::NativeFrontAlgebra => {
+                if scale != 0. && !tracked_order {
+                    return None;
+                }
+                let excess = front_a.excess(front_b, self.policy)?;
+                let gap = bounds::Range::point(excess)
+                    .multiply(bounds::Range::point(scale))
+                    .add(bounds::Range::point(b.minimum))
+                    .subtract(bounds::Range::point(a.minimum))
+                    .hi;
+                gap.is_finite().then_some(gap.max(0.))
+            }
+        }
     }
 }
 fn zero_valued(function: &PreparedSlopeFunction) -> bool {
@@ -547,6 +581,55 @@ mod tests {
         let (graph, wide, narrow) = parallel_prefixes(charges, [0., 0.]);
         let kernel = graph.coupled_kernel().unwrap();
         assert_eq!(kernel.dominance_penalty(&wide, &narrow, true), None);
+    }
+    #[test]
+    fn native_raw_fronts_compare_with_an_excess_penalty() {
+        let rising =
+            || PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 2.)]).unwrap();
+        let charges = || vec![rising(), constant(1., 0., 2.), constant(0., 0., 2.)];
+        let native = |functions| {
+            let mut resource = definition(functions);
+            let CoupledResource::SlopeIntervalCost { policy, .. } = &mut resource else {
+                unreachable!()
+            };
+            *policy = FrontOperationPolicy::NativeFrontAlgebra;
+            resource
+        };
+        let (mut graph, ..) = parallel_prefixes(charges(), [0., 0.]);
+        graph.set_coupled_resources(&[native(charges())]).unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let root = kernel.root(true);
+        let prefix = |arc| {
+            let mut state = kernel.extend(&root, arc, true).unwrap().unwrap().0;
+            state.account_extension(&root, 0., 0.).unwrap();
+            state
+        };
+        let (rising, flat) = (prefix(0), prefix(1));
+        // Rising is t, flat is 1: rising exceeds by 1 at t=2 and pays
+        // 1 + min 1 - min 0; flat exceeds by 1 at t=0, already in its minimum.
+        let penalty = kernel.dominance_penalty(&rising, &flat, true).unwrap();
+        assert!((2. ..=2. + 1e-12).contains(&penalty), "{penalty}");
+        assert_eq!(kernel.dominance_penalty(&flat, &rising, true), Some(0.));
+        // Strict policy keeps unequal costly fronts uncompared.
+        let (graph, rising, flat) = parallel_prefixes(charges(), [0., 0.]);
+        let kernel = graph.coupled_kernel().unwrap();
+        assert_eq!(kernel.dominance_penalty(&rising, &flat, true), None);
+        assert_eq!(kernel.dominance_penalty(&flat, &rising, true), None);
+        // The routes cost t + 0 and 1 + 0 (minimum 0 and 1), plus arc costs.
+        for costs in [[0., -2.], [-2., 0.]] {
+            let (mut graph, ..) = parallel_prefixes(charges(), costs);
+            graph.set_coupled_resources(&[native(charges())]).unwrap();
+            let expected = (costs[0]).min(costs[1] + 1.);
+            for mode in [0., 1., 2.] {
+                let mut solver = crate::pricing::Solver::<2>::new(3, 0).unwrap();
+                solver.graph = graph.clone();
+                solver
+                    .set_option("BALDESuseBidirectionalSearch", mode)
+                    .unwrap();
+                let result = solver.price_phase(0, 20, false).unwrap();
+                assert_eq!(result.minimum_reduced_cost, expected);
+            }
+        }
     }
     #[cfg(feature = "clp")]
     #[test]

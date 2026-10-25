@@ -134,10 +134,6 @@ impl CoupledKernel {
                             .iter()
                             .zip(&b.fronts)
                             .any(|(a, b)| a.minimum() > b.minimum())
-                        || a.slope_fronts
-                            .iter()
-                            .zip(&b.slope_fronts)
-                            .any(|(a, b)| a.minimum > b.minimum)
                     {
                         return None;
                     }
@@ -199,18 +195,27 @@ impl CoupledKernel {
             }
         }
         // Raw slope-interval fronts: bitwise-equal labels replay identical
-        // future operations; otherwise only the zero-valued domain rule
-        // applies. Backward labels hold no front and match by suffix program.
-        if a.slope_fronts.len() != b.slope_fronts.len()
-            || a.slope_fronts
-                .iter()
-                .zip(&b.slope_fronts)
-                .zip(&self.slope_dominance)
-                .any(|((a, b), prepared)| {
-                    a != b && !(forward && prepared.dominates(a, b, self.cost_scale))
-                })
-        {
+        // future operations and compare through the scalar order above, their
+        // minima being equal. Unequal forward labels need the per-policy rule.
+        // Backward labels hold no front and match by suffix program.
+        if a.slope_fronts.len() != b.slope_fronts.len() {
             return None;
+        }
+        let mut slope_penalty = 0.;
+        for ((left, right), prepared) in a
+            .slope_fronts
+            .iter()
+            .zip(&b.slope_fronts)
+            .zip(&self.slope_dominance)
+        {
+            if left == right {
+                continue;
+            }
+            if !forward {
+                return None;
+            }
+            let gap = prepared.penalty(left, right, self.cost_scale, tracked_order)?;
+            slope_penalty = add_up(slope_penalty, gap)?;
         }
         // Paired checks are deliberately last among these necessary
         // preconditions: rejected scalar/discrete/program pairs need no walk
@@ -218,10 +223,14 @@ impl CoupledKernel {
         if !self.plugins_dominate(a, b, forward) {
             return None;
         }
-        let relation_penalty = self.relations_dominate(a, b, forward, tracked_order)?;
-        if !self.slope_relations_dominate(a, b, forward, tracked_order) {
-            return None;
-        }
+        let relation_penalty = add_up(
+            self.relations_dominate(a, b, forward, tracked_order)?,
+            slope_penalty,
+        )?;
+        let relation_penalty = add_up(
+            relation_penalty,
+            self.slope_relations_dominate(a, b, forward, tracked_order)?,
+        )?;
         if !forward {
             let a = a.suffix.as_ref()?;
             let b = b.suffix.as_ref()?;
@@ -303,27 +312,36 @@ impl CoupledKernel {
     }
 
     /// Paired slope relations: forward fronts cover and stay below, with the
-    /// same scalar-order requirement as function relations when charged.
+    /// same scalar-order requirement as function relations when charged. A
+    /// shifting cost-unbounded relation may exceed and pay. Returns the penalty.
     fn slope_relations_dominate(
         &self,
         a: &CoupledLabelState,
         b: &CoupledLabelState,
         forward: bool,
         tracked_order: bool,
-    ) -> bool {
-        a.slope_relations.len() == b.slope_relations.len()
-            && a.slope_relations
-                .iter()
-                .zip(&b.slope_relations)
-                .zip(&self.slope_paired)
-                .all(|((left, right), prepared)| {
-                    if left == right {
-                        return true;
-                    }
-                    let charged = prepared.has_costs() && self.cost_scale != 0.;
-                    (!charged || (tracked_order && self.cost_scale > 0.))
-                        && prepared.dominates(left, right, forward)
-                })
+    ) -> Option<f64> {
+        if a.slope_relations.len() != b.slope_relations.len() {
+            return None;
+        }
+        let mut penalty = 0.;
+        for ((left, right), prepared) in a
+            .slope_relations
+            .iter()
+            .zip(&b.slope_relations)
+            .zip(&self.slope_paired)
+        {
+            if left == right {
+                continue;
+            }
+            let charged = prepared.has_costs() && self.cost_scale != 0.;
+            if charged && !(tracked_order && self.cost_scale > 0.) {
+                return None;
+            }
+            let gap = prepared.penalty(left, right, forward, self.cost_scale)?;
+            penalty = add_up(penalty, gap)?;
+        }
+        Some(penalty)
     }
 
     /// Every plugin's own direction-specific dominance test.
