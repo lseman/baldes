@@ -28,6 +28,17 @@ pub enum MemoryType {
     Default = 2,
     AllVertices = 3,
 }
+impl MemoryType {
+    /// Compile-time policy for generated cuts. Explicit full-vertex memory
+    /// modes retain their meaning; manually registered rows are not converted.
+    pub(crate) fn for_build(self) -> Self {
+        if cfg!(feature = "rank-one-node-memory") && self == Self::Arc {
+            Self::Vertex
+        } else {
+            self
+        }
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CandidateMode {
     CliqueEnumeration = 0,
@@ -199,7 +210,7 @@ pub fn memory_policy(options: &Options) -> Result<MemoryPolicy> {
         _ => return Err(invalid("BALDESrankOneCutsMemoryType must be 0, 1, 2 or 3")),
     };
     Ok(MemoryPolicy {
-        memory_type,
+        memory_type: memory_type.for_build(),
         arc_memory_type: options.get("BALDESrankOneCutsArcMemoryType")? as i32,
         sp_dependent: options.get("BALDESrankOneCutsSpDependentMemory")? != 0.,
     })

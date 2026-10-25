@@ -1,6 +1,98 @@
 use super::*;
 
 #[test]
+fn build_memory_policy_and_generated_cut_pricing_agree() {
+    let node = cfg!(feature = "rank-one-node-memory");
+    let mut options = Options::default();
+    options.set("BALDESrankOneCutsMemoryType", 1.).unwrap();
+    assert_eq!(
+        memory_policy(&options).unwrap().memory_type,
+        if node {
+            MemoryType::Vertex
+        } else {
+            MemoryType::Arc
+        }
+    );
+    assert_eq!(MemoryType::Default.for_build(), MemoryType::Default);
+    assert_eq!(MemoryType::AllVertices.for_build(), MemoryType::AllVertices);
+    let mut graph = Graph::<2>::new(6, 1).unwrap();
+    graph.elementary = true;
+    for v in 0..6 {
+        graph.set_bounds(v, 0, 0., 5.).unwrap();
+    }
+    for tail in 0..6 {
+        for head in 0..6 {
+            if tail != head && tail != graph.sink && head != graph.source {
+                let id = graph.add_arc(tail, head, -1.).unwrap();
+                graph.arc_mut(id).unwrap().consumption[0] = 1.;
+            }
+        }
+    }
+    let columns: Vec<_> = [vec![1, 4, 2], vec![1, 3], vec![2, 3]]
+        .into_iter()
+        .map(|vertices| FractionalColumn {
+            vertices,
+            value: 0.5,
+            graph_id: 0,
+            enumerated: false,
+        })
+        .collect();
+    let mut registry = CutRegistry::default();
+    registry.parameters.max_rank = 3;
+    registry.parameters.memory_type = MemoryType::Arc;
+    assert_eq!(registry.separate(&graph, &[1, 2, 3], &columns).unwrap(), 1);
+    assert_eq!(
+        registry.cuts[0].memory_kind,
+        if node {
+            MemoryKind::Vertex
+        } else {
+            MemoryKind::Arc
+        }
+    );
+    if node {
+        assert!(registry.cuts[0].arc_memory_for_graph(0).is_empty());
+        assert!(registry.cuts[0].memory_for_graph(0)[4]);
+    }
+    for column in &columns {
+        assert_eq!(
+            registry
+                .coefficient(&graph, 0, &column.vertices, false)
+                .unwrap(),
+            1
+        );
+    }
+    registry.cuts[0].dual = -0.7;
+    fn oracle(g: &Graph<2>, cuts: &CutRegistry, path: &mut Vec<usize>, best: &mut f64) {
+        let value = -(path.len() as f64 + 1.)
+            - cuts.cuts[0].dual * cuts.coefficient(g, 0, path, false).unwrap() as f64;
+        *best = best.min(value);
+        for v in 1..5 {
+            if !path.contains(&v) {
+                path.push(v);
+                oracle(g, cuts, path, best);
+                path.pop();
+            }
+        }
+    }
+    let mut expected = f64::INFINITY;
+    oracle(&graph, &registry, &mut vec![], &mut expected);
+    for direction in [0., 1., 2.] {
+        let mut solver = crate::pricing::Solver::<2>::new(6, 1).unwrap();
+        solver.graph = graph.clone();
+        solver.cuts = registry.clone();
+        solver
+            .options
+            .set("BALDESuseBidirectionalSearch", direction)
+            .unwrap();
+        let output = solver.price(1000, false).unwrap();
+        assert!(
+            (output.minimum_reduced_cost - expected).abs() < 1e-8,
+            "{direction}: {output:?}"
+        );
+    }
+}
+
+#[test]
 fn dense_packing_matches_graph_support_for_walks_and_memory_policies() {
     let mut dense = RankOneCut {
         weights: vec![0, 1, -1, 4],
@@ -80,6 +172,7 @@ fn dense_packing_matches_graph_support_for_walks_and_memory_policies() {
 }
 
 #[test]
+#[cfg(not(feature = "rank-one-node-memory"))]
 fn rank_one_rounds_inherit_only_active_arc_memories() {
     for graph_dependent in [false, true] {
         for retired in [false, true] {

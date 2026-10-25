@@ -34,6 +34,25 @@ Python and JSON APIs.
 
 Python installation is covered in the [pybaldes guide](python.md).
 
+### Rank-one node memory
+
+Use `cargo build --release --features clp,rank-one-node-memory` to generate
+rank-one cuts with node memory instead of arc memory. In `make config`, select
+**Rank-one memory → Node**, or set `CONFIG_RANK_ONE_MEMORY=node` in the saved
+configuration. `CONFIG_RANK_ONE_MEMORY=arc` preserves the existing runtime policy.
+
+The feature maps arc-memory requests (`BALDESrankOneCutsMemoryType=1` or Rust
+`MemoryType::Arc`) to vertex memory during cut generation. The default-copy and
+all-vertices modes already use vertex memory and retain their meaning. Explicitly
+registered cuts retain their declared representation. Node memory retains a
+cut's remainder through remembered vertices, while arc memory can distinguish
+individual arcs entering or leaving the same vertex; the resulting limited-memory
+cut coefficients and LP bounds can therefore differ. Master coefficients and
+pricing use the selected cut representation consistently.
+
+Python builds expose the same feature, for example
+`maturin develop --features rank-one-node-memory`.
+
 ## Gurobi master backend
 
 Download and extract the latest stable Linux release into the repository's

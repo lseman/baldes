@@ -16,6 +16,7 @@ highs = ["baldes/highs"]
 gurobi = ["baldes/gurobi"]
 simd = ["baldes/simd"]
 multi-time-windows = ["baldes/multi-time-windows"]
+rank-one-node-memory = ["baldes/rank-one-node-memory"]
 
 [dependencies]
 baldes = { path = "../.." }

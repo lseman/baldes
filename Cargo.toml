@@ -43,6 +43,8 @@ ryan-foster-master = []
 # Enforce accumulated-resource branches only through master rows; pricing
 # keeps the unbranched arc windows. Without it, pricing tightens them too.
 accumulated-resource-master = []
+# Generate node memory instead of arc memory for rank-one cuts.
+rank-one-node-memory = []
 # Eight-label AVX-512F scans (Rust >= 1.89); AVX2/scalar fallback at runtime.
 simd-avx512 = ["simd"]
 # Clp restricted master and column-generation loop. Builds Clp 1.17.10 and

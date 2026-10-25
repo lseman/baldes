@@ -80,6 +80,7 @@ struct Config {
     ryan_foster_master: bool,
     /// Enforce accumulated-resource branches through master rows only.
     accumulated_resource_master: bool,
+    rank_one_node_memory: bool,
     release: bool,
     native_cpu: bool,
     simd: SimdMode,
@@ -103,6 +104,7 @@ impl Default for Config {
             multi_time_windows: false,
             ryan_foster_master: false,
             accumulated_resource_master: false,
+            rank_one_node_memory: false,
             release: true,
             native_cpu: false,
             simd: SimdMode::Off,
@@ -146,6 +148,13 @@ impl Config {
                 "CONFIG_GUROBI" => config.gurobi = boolean()?,
                 "CONFIG_CLI" => config.cli = boolean()?,
                 "CONFIG_MULTI_TIME_WINDOWS" => config.multi_time_windows = boolean()?,
+                "CONFIG_RANK_ONE_MEMORY" => {
+                    config.rank_one_node_memory = match value {
+                        "arc" => false,
+                        "node" => true,
+                        _ => return Err("CONFIG_RANK_ONE_MEMORY must be arc or node".into()),
+                    }
+                }
                 "CONFIG_ACCUMULATED_RESOURCE" => {
                     config.accumulated_resource_master = match value {
                         "pricing" => false,
@@ -259,7 +268,7 @@ impl Config {
         format!(
             "# BALDES build configuration; edit with make config.\n\
             CONFIG_PROFILE={}\nCONFIG_CLP={}\nCONFIG_HIGHS={}\nCONFIG_GUROBI={}\nCONFIG_CLI={}\nCONFIG_MULTI_TIME_WINDOWS={}\n\
-            CONFIG_RYAN_FOSTER={}\nCONFIG_ACCUMULATED_RESOURCE={}\n\
+            CONFIG_RYAN_FOSTER={}\nCONFIG_ACCUMULATED_RESOURCE={}\nCONFIG_RANK_ONE_MEMORY={}\n\
             CONFIG_SIMD={}\nCONFIG_NATIVE_CPU={}\nCONFIG_RELEASE_DEBUG={}\nCONFIG_OFFLINE={}\nCONFIG_LOCKED={}\n\
             CONFIG_JOBS={}\nCONFIG_RESOURCE_DIMENSIONS={}\nCONFIG_TARGET={}\nCONFIG_HIGHS_DIR={}\nCONFIG_GUROBI_HOME={}\n",
             if self.release { "release" } else { "dev" },
@@ -270,6 +279,7 @@ impl Config {
             yn(self.multi_time_windows),
             if self.ryan_foster_master { "master" } else { "pricing" },
             if self.accumulated_resource_master { "master" } else { "pricing" },
+            if self.rank_one_node_memory { "node" } else { "arc" },
             self.simd.name(),
             yn(self.native_cpu),
             yn(self.release_debug),
@@ -333,6 +343,7 @@ impl Config {
             (self.multi_time_windows, "multi-time-windows"),
             (self.ryan_foster_master, "ryan-foster-master"),
             (self.accumulated_resource_master, "accumulated-resource-master"),
+            (self.rank_one_node_memory, "rank-one-node-memory"),
             (self.simd == SimdMode::Avx2, "simd"),
             (self.simd == SimdMode::Avx512, "simd-avx512"),
         ]
@@ -458,6 +469,7 @@ impl Config {
             15 => self.multi_time_windows = !self.multi_time_windows,
             16 => self.ryan_foster_master = !self.ryan_foster_master,
             17 => self.accumulated_resource_master = !self.accumulated_resource_master,
+            18 => self.rank_one_node_memory = !self.rank_one_node_memory,
             12 => self.simd = self.simd.next(CpuSimd::detect(), self.target.is_empty()),
             _ => {}
         }
@@ -474,6 +486,7 @@ impl Config {
             Item::toggle(15, "BUILD", "Multi-time windows", self.multi_time_windows, "Disjoint service-start domains for scalar pricing resources."),
             Item::value(16, "BUILD", "Ryan–Foster enforcement", if self.ryan_foster_master { "Master" } else { "Pricing" }, "Fixed at compile time. Pricing keeps branch-violating columns out of labeling. Master enforces branches only through master rows; pricing ignores them, so bounds at branched nodes can be weaker."),
             Item::value(17, "BUILD", "Accumulated-resource branching", if self.accumulated_resource_master { "Master" } else { "Pricing" }, "Fixed at compile time. Pricing tightens the branched arc windows during labeling. Master enforces branches only through master rows; pricing keeps the original windows, so bounds at branched nodes can be weaker."),
+            Item::value(18, "BUILD", "Rank-one memory", if self.rank_one_node_memory { "Node" } else { "Arc / runtime" }, "Node forces generated arc-memory rank-one cuts to use node memory. Arc preserves runtime memory settings. Full vertex-memory modes and manually registered rows retain their declared representation."),
             Item::value(12, "PERFORMANCE", "SIMD acceleration", self.simd.name(), "Cycle Off / AVX2 / AVX-512, skipping modes unsupported by this CPU. Host target only. AVX-512 requires Rust 1.89+. Runtime detection keeps portable fallback."),
             Item::toggle(4, "PERFORMANCE", "Native CPU", self.native_cpu, "Optimize for this computer with target-cpu=native. Clear the target triple before enabling; use portable builds for distribution."),
             Item::toggle(5, "PERFORMANCE", "Release debug symbols", self.release_debug, "Keep debug symbols in release builds for perf and other profilers. The development profile retains Cargo's normal debug settings."),
@@ -1120,7 +1133,7 @@ mod tests {
         c.edit(11, Some("0".into())).unwrap();
         assert_eq!(c.resource_dimensions, 0);
         assert!(c.cargo("clean").unwrap().vars.is_empty());
-        assert_eq!(c.rows().len(), 18);
+        assert_eq!(c.rows().len(), 19);
     }
     #[test]
     fn ryan_foster_enforcement_round_trips_and_selects_its_feature() {
@@ -1145,6 +1158,18 @@ mod tests {
         assert!(args(&c, "build").iter().any(|a| a.contains("accumulated-resource-master")));
         assert!(Config::parse("CONFIG_ACCUMULATED_RESOURCE=labels").is_err());
         assert!(!Config::parse("CONFIG_ACCUMULATED_RESOURCE=pricing").unwrap().accumulated_resource_master);
+    }
+    #[test]
+    fn rank_one_memory_round_trips_and_selects_its_feature() {
+        let mut c = Config::default();
+        assert!(!args(&c, "build").iter().any(|a| a.contains("rank-one-node-memory")));
+        c.edit(18, None).unwrap();
+        assert!(c.rank_one_node_memory);
+        assert!(c.text().contains("CONFIG_RANK_ONE_MEMORY=node"));
+        assert_eq!(Config::parse(&c.text()).unwrap(), c);
+        assert!(args(&c, "build").iter().any(|a| a.contains("rank-one-node-memory")));
+        assert!(Config::parse("CONFIG_RANK_ONE_MEMORY=other").is_err());
+        assert!(!Config::parse("CONFIG_RANK_ONE_MEMORY=arc").unwrap().rank_one_node_memory);
     }
     #[test]
     fn clean_does_not_receive_build_flags() {

@@ -8,7 +8,9 @@ impl CutRegistry {
         customers: &[usize],
         columns: &[FractionalColumn],
     ) -> Result<usize> {
-        let p = &self.parameters;
+        let mut parameters = self.parameters.clone();
+        parameters.memory_type = parameters.memory_type.for_build();
+        let p = &parameters;
         let vertices = g.vertices.len();
         if p.max_rank < 1
             || p.max_rank > 8
