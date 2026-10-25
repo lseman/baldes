@@ -112,6 +112,57 @@ impl CoupledKernel {
         changed
     }
 
+    /// The reference's tightening schedule for one improper path. Each
+    /// relaxed resource contributes at most one window: the minimal one ending
+    /// at the path's first violation (findViolatingSubPaths). Windows no
+    /// longer than `max_length` are remembered; when none is, the shortest one
+    /// (first on ties) is, so the path is always excluded afterwards
+    /// (strengthenCurrentRelaxation). Window length counts the vertex
+    /// positions between the failing items, as the reference does.
+    pub(crate) fn strengthen_selection_first_windows(
+        &mut self,
+        arcs: &[usize],
+        max_length: i64,
+    ) -> bool {
+        let windows: Vec<(usize, FirstWindow)> = self
+            .selection_masks()
+            .enumerate()
+            .filter(|(r, _)| {
+                self.selection_memory[*r]
+                    .as_ref()
+                    .is_some_and(|m| m.relaxed)
+            })
+            .filter_map(|(r, masks)| Some((r, first_violating_window(&masks, arcs)?)))
+            .collect();
+        let fits = |window: &FirstWindow| window.length as i64 <= max_length;
+        let fallback = if windows.iter().any(|(_, window)| fits(window)) {
+            None
+        } else {
+            // min_by_key keeps the first of equal lengths.
+            windows
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, (_, window))| window.length)
+                .map(|(index, _)| index)
+        };
+        let mut changed = false;
+        for (index, (r, window)) in windows.iter().enumerate() {
+            if !fits(window) && fallback != Some(index) {
+                continue;
+            }
+            let relaxed = self.selection_memory[*r]
+                .as_mut()
+                .expect("relaxed resource");
+            for &vertex in &window.vertices {
+                changed |= !std::mem::replace(&mut relaxed.remembered[vertex], true);
+            }
+        }
+        if changed {
+            self.identity = std::sync::Arc::new(());
+        }
+        changed
+    }
+
     fn selection_masks(&self) -> impl Iterator<Item = ExactMasks<'_>> {
         let heads = &self.selection_heads;
         self.definitions.iter().filter_map(move |r| match r {
@@ -196,6 +247,51 @@ fn violating_vertices(masks: &ExactMasks<'_>, arcs: &[usize]) -> Vec<usize> {
     remembered
 }
 
+/// A minimal violating window: its vertices, both endpoints included, and its
+/// length in the reference's convention.
+struct FirstWindow {
+    vertices: Vec<usize>,
+    length: usize,
+}
+
+/// The path alternates vertex and arc masks: item 2p is vertex position p and
+/// item 2i+1 is arc i. Scan forward to the first item that empties the
+/// domain, then backward from it to the latest start that still empties it.
+/// An arc item stands at its tail position for the length, while the window
+/// remembers its head as well. Interior windows start from the universe.
+fn first_violating_window(masks: &ExactMasks<'_>, arcs: &[usize]) -> Option<FirstWindow> {
+    let mut vertices = vec![masks.source];
+    for &arc in arcs {
+        masks.allowed.get(arc)?;
+        vertices.push(*masks.heads.get(arc)?);
+    }
+    let mask = |item: usize| {
+        if item % 2 == 0 {
+            masks
+                .vertices
+                .get(vertices[item / 2])
+                .copied()
+                .unwrap_or(u64::MAX)
+        } else {
+            masks.allowed[arcs[item / 2]]
+        }
+    };
+    let mut domain = masks.initial;
+    let failure = (0..=2 * arcs.len()).find(|&item| {
+        domain &= mask(item);
+        domain == 0
+    })?;
+    let mut domain = masks.initial;
+    let start = (0..=failure).rev().find(|&item| {
+        domain &= mask(item);
+        domain == 0
+    })?;
+    Some(FirstWindow {
+        vertices: vertices[start / 2..=failure.div_ceil(2)].to_vec(),
+        length: failure / 2 - start / 2,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -218,6 +314,65 @@ mod tests {
             }])
             .unwrap();
         graph
+    }
+
+    fn remembered(kernel: &CoupledKernel, resource: usize) -> Vec<usize> {
+        let memory = kernel.selection_memory[resource].as_ref().unwrap();
+        (0..memory.remembered.len())
+            .filter(|&v| memory.remembered[v])
+            .collect()
+    }
+
+    #[test]
+    fn first_window_schedule_caps_length_and_falls_back_to_the_shortest() {
+        let mut graph = Graph::<2>::new(4, 1).unwrap();
+        for (tail, head) in [(0, 1), (1, 2), (2, 3)] {
+            graph.add_arc(tail, head, 0.).unwrap();
+        }
+        let selection = |vertices: Vec<u64>| CoupledResource::Selection {
+            initial: 3,
+            allowed: vec![3; 3],
+            vertices,
+            relaxed: true,
+        };
+        // Resource 0 first fails at vertex 2; its window {1, 2} has length 1.
+        // Resource 1 first fails at vertex 3; its window {0..3} has length 3.
+        graph
+            .set_coupled_resources(&[selection(vec![3, 1, 2, 3]), selection(vec![1, 3, 3, 2])])
+            .unwrap();
+        let route = [0, 1, 2];
+        for (cap, short, long) in [
+            (0, vec![1, 2], vec![]),
+            (1, vec![1, 2], vec![]),
+            (3, vec![1, 2], vec![0, 1, 2, 3]),
+        ] {
+            let mut kernel = graph.coupled_kernel().unwrap().clone();
+            assert!(kernel.strengthen_selection_first_windows(&route, cap));
+            assert_eq!(remembered(&kernel, 0), short, "cap {cap}");
+            assert_eq!(remembered(&kernel, 1), long, "cap {cap}");
+            // One remembered window already excludes the improper route.
+            assert!(kernel.replay(&route).unwrap().is_none());
+            assert!(!kernel.strengthen_selection_first_windows(&route, cap));
+        }
+    }
+
+    #[test]
+    fn first_window_arc_failure_has_zero_length_and_remembers_the_head() {
+        let mut graph = Graph::<2>::new(4, 1).unwrap();
+        for (tail, head) in [(0, 1), (1, 2), (2, 3)] {
+            graph.add_arc(tail, head, 0.).unwrap();
+        }
+        graph
+            .set_coupled_resources(&[CoupledResource::Selection {
+                initial: 3,
+                allowed: vec![3, 0, 3],
+                vertices: vec![],
+                relaxed: true,
+            }])
+            .unwrap();
+        let mut kernel = graph.coupled_kernel().unwrap().clone();
+        assert!(kernel.strengthen_selection_first_windows(&[0, 1, 2], 0));
+        assert_eq!(remembered(&kernel, 0), vec![1, 2]);
     }
 
     #[test]

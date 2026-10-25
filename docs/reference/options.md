@@ -4,7 +4,7 @@
 [Enumerated MIP](../solver/enumerated-mip.md)
 
 The public option names start with `BALDES`. The standard build exposes
-**40 supported pricing options**. Builds with both `clp` and `highs` expose
+**41 supported pricing options**. Builds with both `clp` and `highs` expose
 **two additional enumerated-MIP controls**. Each option below has a consumer;
 some apply only to a particular operation or a configured cut family.
 
@@ -75,6 +75,7 @@ reconfigure its existing separator.
 | `BALDESmaxNumOfColumnsInDynamicNG` | Int | `100.0` | [src/master/root/controller/relaxation.rs](../../src/master/root/controller/relaxation.rs) |
 | `BALDESmaxCycleSizeInDynamicNG` | Int | `5.0` | [src/master/root/controller/relaxation.rs](../../src/master/root/controller/relaxation.rs) |
 | `BALDESmaxNGaverNeighbourhoodSize` | Int | `0.0` | [src/master/root/controller/relaxation.rs](../../src/master/root/controller/relaxation.rs) |
+| `BALDESselectionTighteningSchedule` | Int | `1.0` | [src/pricing/relaxation.rs](../../src/pricing/relaxation.rs) |
 | `BALDESuseCapacityCuts` | Bool | `1.0` | [src/master/root/mod.rs](../../src/master/root/mod.rs); explicit option overrides a configured capacity separator and is inherited by children |
 | `BALDEScapacityCutsSeparator` | Int | `1.0` | [src/pricing/mod.rs](../../src/pricing/mod.rs); accepts the available built-in separator; external CVRPSEP (0) is rejected |
 | `BALDEScapCutsMaxNumPerRound` | Int | `100.0` | [src/master/root/mod.rs](../../src/master/root/mod.rs); explicit per-round override for configured capacity separation, including inherited nodes |

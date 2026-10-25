@@ -104,6 +104,6 @@ For named pricing controls, see the [BALDES option reference](../reference/optio
 Public option names start with `BALDES`, for example
 `--option BALDESlabelDominanceStrategy=1`. Rust exposes supported metadata in
 `OPTION_TABLE`; Python exposes `Solver.option_names()` and
-`Solver.option_support(name)`. The public list contains 40 supported controls,
+`Solver.option_support(name)`. The public list contains 41 supported controls,
 plus two enumerated-MIP controls when both `clp` and `highs` are enabled.
 Scope can depend on the operation or configured cut family.

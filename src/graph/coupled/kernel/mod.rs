@@ -218,6 +218,16 @@ impl<const D: usize> Graph<D> {
             .as_mut()
             .is_some_and(|kernel| kernel.strengthen_selection(arcs))
     }
+    /// The reference schedule: one first window per resource, length-capped.
+    pub(crate) fn strengthen_selection_first_windows(
+        &mut self,
+        arcs: &[usize],
+        max_length: i64,
+    ) -> bool {
+        self.coupled
+            .as_mut()
+            .is_some_and(|kernel| kernel.strengthen_selection_first_windows(arcs, max_length))
+    }
     pub(crate) fn selection_relaxed(&self) -> bool {
         self.coupled_kernel()
             .is_some_and(CoupledKernel::selection_relaxed)

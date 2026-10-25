@@ -206,6 +206,12 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         support: OptionSupport::Implemented("src/master/root/controller/relaxation.rs"),
     },
     OptionInfo {
+        name: "BALDESselectionTighteningSchedule",
+        kind: OptionKind::Int,
+        default: 1.0,
+        support: OptionSupport::Implemented("src/pricing/relaxation.rs"),
+    },
+    OptionInfo {
         name: "BALDESmaxNGaverNeighbourhoodSize",
         kind: OptionKind::Int,
         default: 0.0,

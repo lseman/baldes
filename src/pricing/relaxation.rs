@@ -87,8 +87,17 @@ impl<const D: usize> Solver<D> {
         Ok(true)
     }
     /// Relaxed selection (augmentNGneighbourhoods' selection step): narrow
-    /// the selection memory at all vertices of improper paths' violating windows.
-    /// Returns the number of paths the stronger relaxation now excludes.
+    /// the selection memory at the vertices of improper paths' violating
+    /// windows. Returns the number of paths the stronger relaxation now
+    /// excludes.
+    ///
+    /// `BALDESselectionTighteningSchedule` 1 follows the reference: a negative
+    /// BALDESmaxNGneighbourhoodSize disables tightening, and
+    /// BALDESmaxNGaverNeighbourhoodSize caps the window length, as both share
+    /// the reference's relaxation parameters. The reference first sorts paths
+    /// by decreasing value; windows come from the fixed masks and memory only
+    /// grows, so that order cannot change the result and is not reproduced.
+    /// Schedule 0 remembers every minimal violating window of every path.
     pub fn strengthen_selection(
         &mut self,
         paths: &[crate::graph::relaxation::FractionalPath],
@@ -96,6 +105,11 @@ impl<const D: usize> Solver<D> {
         if !self.graph.selection_relaxed() {
             return Ok(0);
         }
+        let first_windows = self.options.get("BALDESselectionTighteningSchedule")? != 0.;
+        if first_windows && self.options.get("BALDESmaxNGneighbourhoodSize")? < 0. {
+            return Ok(0);
+        }
+        let max_length = self.options.get("BALDESmaxNGaverNeighbourhoodSize")? as i64;
         self.invalidate_changed_graph();
         let mut forbidden = 0;
         for path in paths {
@@ -110,7 +124,12 @@ impl<const D: usize> Solver<D> {
                         .ok_or_else(|| invalid("route arc out of range"))
                 })
                 .collect::<Result<Vec<_>>>()?;
-            forbidden += usize::from(self.graph.strengthen_selection(&arcs));
+            forbidden += usize::from(if first_windows {
+                self.graph
+                    .strengthen_selection_first_windows(&arcs, max_length)
+            } else {
+                self.graph.strengthen_selection(&arcs)
+            });
         }
         if forbidden > 0 {
             // As for NG: labels and enumerated paths no longer hold; the
