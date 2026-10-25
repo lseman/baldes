@@ -116,6 +116,23 @@ class DocumentationBuild(unittest.TestCase):
         self.assertIn('href="../nested/index.html"', guide)
         self.assertIn('DOCS <span aria-hidden="true">/</span> Getting started', guide)
 
+    def test_python_handbook_has_dedicated_navigation_and_search(self):
+        import json
+        handbook = self.source / "pybaldes"
+        handbook.mkdir()
+        (handbook / "README.md").write_text(
+            "# PyBaldes documentation\n\n[Pricing](pricing.md#exactness)\n")
+        (handbook / "pricing.md").write_text(
+            "# Stateful pricing\n\n## Exactness\n\nConfigured pricing domain.\n")
+        self.compile()
+        page = (self.output / "pybaldes" / "index.html").read_text()
+        self.assertIn('class="nav-group-title">PyBaldes · Python</p>', page)
+        self.assertIn('href="pricing.html#exactness"', page)
+        self.assertIn('href="index.html" aria-current="page">PyBaldes documentation</a>', page)
+        entries = json.loads((self.output / "search-index.json").read_text())
+        self.assertTrue(any(e["url"] == "pybaldes/pricing.html#exactness"
+                            and "pricing domain" in e["text"] for e in entries))
+
     def test_bad_link_fails_without_changing_previous_build(self):
         self.compile()
         before = (self.output / "index.html").read_bytes()

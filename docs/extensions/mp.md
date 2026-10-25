@@ -410,6 +410,8 @@ an independently replayed integer witness when available. Their `mode` and
 
 ## Python
 
+The dedicated [PyBaldes network guide](../pybaldes/networks.md) covers Python model construction, solve options, snapshots, and synchronization. The sections here specify the shared Rust/CLI/Python model contract.
+
 Install the extension with Clp support (the Python build's default). The typed
 inputs use the same JSON schema as the CLI, allowing a single model to drive
 both interfaces:

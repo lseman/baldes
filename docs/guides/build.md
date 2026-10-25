@@ -32,7 +32,7 @@ Disjoint service-start windows are optional: use
 [multiple time windows](../extensions/multi-time-windows.md) for the Rust,
 Python and JSON APIs.
 
-Python installation is covered in the [pybaldes guide](python.md).
+Python installation is covered in the [PyBaldes installation guide](../pybaldes/installation.md).
 
 ### Rank-one node memory
 
@@ -286,8 +286,9 @@ This feature does not require `target-cpu=native` and does not change numerical
 comparison tolerances or certification policy.
 
 For eight-label AVX-512F dominance scans, use
-`cargo build --release --features clp,simd-avx512` (or pass the same features
-to maturin). This feature includes `simd` and requires Rust 1.89 or newer;
+`cargo build --release --features clp,simd-avx512`. The Python crate currently
+forwards `simd`, but does not declare `simd-avx512`. This feature includes `simd`
+and requires Rust 1.89 or newer;
 the default and AVX2-only builds retain the package's existing Rust requirement.
 Runtime dispatch prefers AVX-512F on supported x86-64 CPUs, then AVX2, then
 the portable implementation. No global CPU flags are required. The AVX-512

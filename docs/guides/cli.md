@@ -52,7 +52,8 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--no-enumeration` | no reduced-cost fixing or enumeration |
 | `--upper-bound X` | initial incumbent for fixing |
 | `--no-stabilization` | no dual-price smoothing |
-| `--master MODE` | `clp` (default), `highs` (requires HiGHS), or native `ipm`; IPM disables stabilization |
+| `--master MODE` | `clp` (default), native `ipm`, `highs`, or `gurobi`; optional backends need their build features, and IPM disables stabilization |
+| `--master-threads N` | HiGHS/Gurobi workers; default 0 uses available CPUs; Clp/IPM ignore this setting |
 | `--bound-mode MODE` | `numerical` (default) uses pricing bounds with tolerances; `certified` requires independent original-domain bound validation |
 | `--hgs-time S` | positive HGS search budget before routing solve; separate from `--time` |
 | `--hgs-columns MODE` | `best` plan (default), `all` distinct feasible routes, or `N` cheapest new routes |

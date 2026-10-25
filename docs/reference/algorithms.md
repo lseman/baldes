@@ -26,7 +26,8 @@
 
 The core solver uses only the Rust standard library. The `clp` feature links
 COIN-OR Clp through its C interface for the restricted master. The optional
-`highs` feature adds a HiGHS LP backend and integer solving.
+`highs` feature adds a HiGHS LP backend and integer solving. The `gurobi` feature
+adds a dynamically linked Gurobi LP backend; see [backend setup](../guides/build.md).
 
 ## Additional cut configuration
 

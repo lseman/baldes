@@ -1,10 +1,12 @@
 # BALDES IPM in Rust
 
-`baldes::extensions::ipm` is a native Rust port of the active solver in
-`/home/seman/dev/solvers/ipm` and its optimization loop in
-`solvers/src/ipm/ip_solver.cpp`. It is part of the main `baldes` crate, lives
-under `src/extensions/ipm`, requires Rust 1.70+, and has no external dependencies,
-C++ bindings, BLAS requirement, or unsafe code.
+[Documentation index](../README.md) · [Backend configuration](../guides/build.md)
+
+`baldes::extensions::ipm` implements an interior-point LP solver in Rust. It is
+part of the main `baldes` crate under `src/extensions/ipm`, requires Rust 1.70+,
+and has no external dependencies, C++ bindings, BLAS requirement, or unsafe code.
+Use its direct model API below, or select `master_solver="ipm"` in a
+[PyBaldes routing root solve](../pybaldes/routing.md#master-and-bound-policy).
 
 From the BALDES repository root:
 

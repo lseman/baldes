@@ -1,142 +1,26 @@
-# Python: pybaldes
+# Python: PyBaldes
 
-[Documentation index](../README.md) · [Command-line usage](cli.md)
+[Documentation index](../README.md)
 
-Commands below run from the repository root. Python 3.9+, Rust/Cargo 1.85+ and a
-C++14 compiler are required to build the default package from source.
+PyBaldes now has a dedicated [documentation section](../pybaldes/README.md),
+covering installation, tutorials, modeling, API signatures, and troubleshooting.
+The distribution and import name are both `pybaldes`.
 
-The Python distribution and import are both named `pybaldes`. It contains the
-low-level `Solver`, `Route`, and `Phase` bindings and direct Rust-backed VRPTW/CVRP
-root solving. The default build includes the Clp master, built from the same
-`vendor/` submodules as the Rust CLI:
+| Task | Guide |
+| --- | --- |
+| Install or select build features | [Installation](../pybaldes/installation.md) |
+| Run your first Python solve | [Quickstart](../pybaldes/quickstart.md) |
+| Construct CVRP/VRPTW data and configure a root solve | [Routing inputs and options](../pybaldes/routing.md) |
+| Interpret bounds, fractional routes, and exported JSON | [Results and guarantees](../pybaldes/results.md) |
+| Integrate a pricing oracle into your own master | [Stateful pricing](../pybaldes/pricing.md) |
+| Add coupled resources or explicit function encodings | [Resource modeling](../pybaldes/resources.md) |
+| Solve shared-master models and integer trees | [Network models](../pybaldes/networks.md) |
+| Look up a public class or method | [API reference](../pybaldes/api.md) |
+| Diagnose builds, errors, or objective differences | [Troubleshooting](../pybaldes/troubleshooting.md) |
 
-```bash
-git submodule update --init
-python -m pip install .
-```
+`solve_root` solves a routing LP relaxation; its `Optimal` status does not prove
+an integer VRP optimum. Shared-master models expose their own integer tree via
+`solve_networks(..., tree=True)`. Choose the interface that matches your model.
 
-```python
-import pybaldes
-
-result = pybaldes.solve_root(
-    "instances/Solomon/R101.txt",
-    problem_type="vrptw",  # or "cvrp" for CVRPLIB .vrp files
-    customers=25,
-    capacity_cuts=True,
-    rank_one_cuts=True,
-    time_limit=120,
-)
-print(result.status, result.lp, result.bound, result.cuts)
-for route in result.routes:
-    print(route.value, route.cost, route.nodes)
-```
-
-`Instance.from_file(path)` reads Solomon-format and CVRPLIB `.vrp` files. You can also build inputs
-in memory:
-
-```python
-from pybaldes import Customer, Instance
-
-instance = Instance("small", capacity=2, customers=[
-    Customer(0, 0),  # depot, zero demand
-    Customer(1, 0, demand=1),
-    Customer(0, 1, demand=1),
-])
-result = instance.solve_root(problem_type="cvrp", capacity_cuts=True)
-```
-
-CVRP ignores time windows and service times; in-memory VRPTW data requires finite
-`ready`/`due` windows, including the depot. `vehicles` is retained as input
-metadata; the current root model uses the customer count as its fleet upper
-bound, matching the Rust CLI.
-
-## Solve options and results
-
-Options include `ng`, `reference_ng`, `rounding` (`none`, `nearest`, `tenth`, `ceil`),
-`stabilize`, `reduced_cost_fixing`, `upper_bound`, `max_iterations`,
-`max_cut_rounds`, and a `pricing_options` dictionary of BALDES option values.
-Disabling reduced-cost fixing also disables enumeration. Results include positive
-LP routes, duals, iteration history, cut/fixing counts, and timers;
-`result.to_dict()` and `result.to_json()` export them. `to_dict()` retains
-infinite values; `to_json()` converts non-finite values to `null`.
-Cut counts include generated rows later retired.
-These are root LP relaxations; `Optimal` does not certify an integer VRP optimum.
-
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `master_solver` | `"clp"` | Select `"clp"`, native `"ipm"`, or `"highs"` (requires its build feature); IPM disables stabilization |
-| `bound_mode` | `"numerical"` | Use numerical pricing bounds, or `"certified"` for independent original-domain bound validation |
-| `verbose` | `False` | Print column-generation progress to stderr |
-| `log_interval` | `10` | Positive iteration interval for progress when verbose |
-| `hgs_time` | `None` | Positive HGS search budget in seconds before the root solve, separate from `time_limit` |
-| `hgs_columns` | `"best"` | Seed the best plan, `"all"` validated encountered routes, or a positive integer of cheapest new routes |
-| `hgs_seed` | `0` | Random seed for HGS seeding |
-
-`result.bound_mode` identifies the selected `result.bound` guarantee.
-`result.numerical_bound` and `result.certified_bound` are separate: unknown
-certificates remain negative infinity (`null` in JSON), even when a numerical
-estimate is finite. Normal mode skips certificate searches; exact pricing and
-route-feasibility validation remain enabled. Certified mode requests a bound
-when pricing or the incumbent gap may close. Failure never promotes the
-numerical estimate to a certificate.
-
-For example, seed a native IPM root solve with HGS and log progress:
-
-```python
-result = pybaldes.solve_root(
-    "instances/Solomon/R101.txt", customers=25,
-    master_solver="ipm", hgs_time=2, hgs_columns="all", verbose=True,
-)
-print(result.to_json())
-```
-
-Python root solves enable Kohl with `two_path_cuts=True`. This attaches time
-resource 0 for capacity-cut registration;
-ordinary capacity cuts retain the default resource -1. Both use the capacity
-family's priority 3 at root and 1 below it, complement form and persistent subset pool.
-
-## Build variants
-
-For pricing alone, build without Clp:
-
-```bash
-python -m pip install . --config-settings=build-args=--no-default-features
-```
-
-`pybaldes.has_clp` reports backend availability; root solving raises a clear error
-in a pricing-only build. The wheel uses Python's stable ABI for Python 3.9+.
-For local development, `maturin develop --release` installs the mixed package.
-
-To include HiGHS, install its shared library as described in the
-[build guide](build.md), then install with its feature:
-
-```bash
-python -m pip install . --config-settings=build-args="--features highs"
-```
-
-## Repeated low-level pricing
-
-Retain a `Solver` across column-generation iterations. `set_reduced_costs(costs)`
-updates one reduced cost per arc while preserving original costs and prepared
-bucket graphs. `update_reduced_costs(costs, duals)` also replaces original costs;
-use it when those original costs change.
-
-```python
-solver.set_reduced_costs(reduced_arc_costs)
-minimum, columns, exact = solver.price_with_status(30)
-if not columns and not exact:
-    minimum, columns, exact = solver.price_with_status(30, exact=True)
-```
-
-The default call uses staged pricing and may return improving heuristic columns.
-`exact=True` runs the unlimited-label phase once and can also return nonnegative
-columns. Only use `minimum` as a pricing bound when the returned `exact` flag is
-true. Exactness here concerns the configured pricing domain, including its NG
-relaxation; it is not an independent arithmetic certificate for the master.
-
-## Multiple pricing networks
-
-`NetworkProblem` and `solve_networks` expose a shared master with independent
-pricing graphs, root snapshots, assignment branching, additive rows and fixed
-routes. The same model JSON is accepted by `baldes multi-pricing MODEL.json`.
-See [multi-network inputs and examples](../extensions/mp.md#python).
+This page remains at its original path so existing documentation links continue
+to work. Start new Python documentation links at the dedicated section above.

@@ -282,7 +282,8 @@ def render_shell(page: Page, pages: list[Page], body: str, repository: str, base
     home = posixpath.relpath("..", page.output.parent.as_posix()) + "/"
     groups: dict[str, list[Page]] = {}
     labels = {"guides": "Getting started", "solver": "The solver", "reference": "Reference",
-              "extensions": "Extensions", "benchmarks": "Benchmarks", "internal": "Internals"}
+              "extensions": "Extensions", "benchmarks": "Benchmarks", "internal": "Internals",
+              "pybaldes": "PyBaldes · Python"}
     for guide in pages:
         section = guide.output.parts[0] if len(guide.output.parts) > 1 else "overview"
         groups.setdefault(section, []).append(guide)

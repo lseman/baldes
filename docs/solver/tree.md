@@ -148,7 +148,7 @@ A cost-only `--upper-bound` can assist root fixing, but the tree needs actual
 feasible routes before accepting an incumbent. It does not invent a solution
 from the supplied number.
 
-`Optimal` means the configured numerical gap is closed. `TimeLimit`,
+`Optimal` means the configured gap is closed under the selected bound mode. `TimeLimit`,
 `NodeLimit`, and `Incomplete` retain unfinished-node bounds. Check whether a
 finite incumbent and routes are present before treating a limited run as a
 solution. JSON encodes nonfinite numbers as `null`.
@@ -230,9 +230,11 @@ and MIP gates retain their existing behavior; fixing routes does not force an
 integer solve. The API does not choose routes to fix automatically, and currently
 has no CLI or Python entry point.
 
-The tree does not yet provide multiple pricing networks or cut callbacks
-during the integer solve. Python exposes root solving; use Rust or the CLI
-for the tree. `Infeasible` means all nodes were closed without a feasible
+This single-network routing tree does not provide multiple pricing networks or
+cut callbacks during the integer solve. Python exposes routing root solving; use
+Rust or the CLI for this tree. For a Python shared-master integer tree, use
+[PyBaldes network models](../pybaldes/networks.md#integer-search), whose supported
+model and branching families differ. `Infeasible` means all nodes were closed without a feasible
 incumbent, under the selected bound mode and solver tolerances.
 
 `Optimal` uses the configured absolute and relative gap tolerances. The reported
