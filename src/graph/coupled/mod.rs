@@ -71,6 +71,13 @@ pub struct PairedResourceArc {
     pub waiting: i32,
 }
 
+/// Default pickup/delivery capacity tolerance.
+pub const DEFAULT_LOAD_TOLERANCE: f64 = 1e-6;
+#[cfg(feature = "clp")]
+fn default_load_tolerance() -> f64 {
+    DEFAULT_LOAD_TOLERANCE
+}
+
 /// Resource inputs use the original graph's arc vector order, not arc IDs.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "clp", derive(serde::Deserialize, serde::Serialize))]
@@ -168,6 +175,10 @@ pub enum CoupledResource {
         capacity: f64,
         deliveries: Vec<f64>,
         pickups: Vec<f64>,
+        /// Loads up to `capacity + tolerance` are feasible (default 1e-6).
+        /// Use 0 for exact capacity.
+        #[cfg_attr(feature = "clp", serde(default = "default_load_tolerance"))]
+        tolerance: f64,
     },
     /// Worst-case load when at most `budget` served demands take their
     /// deviation (budgeted uncertainty). Arc quantities describe the service
@@ -431,9 +442,13 @@ impl CoupledResource {
                 capacity,
                 deliveries,
                 pickups,
+                tolerance,
             } => {
                 if !capacity.is_finite() || *capacity < 0. {
                     return Err(invalid("invalid pickup/delivery capacity"));
+                }
+                if !tolerance.is_finite() || *tolerance < 0. {
+                    return Err(invalid("invalid pickup/delivery tolerance"));
                 }
                 numbers(deliveries, n, true)?;
                 numbers(pickups, n, true)?;

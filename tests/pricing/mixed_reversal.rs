@@ -38,6 +38,7 @@ fn mixed_solver(elementary: bool, symmetric: bool, cut: bool, multiple: bool) ->
             capacity: 5.,
             deliveries: events.iter().map(|x| x.0).collect(),
             pickups: events.iter().map(|x| x.1).collect(),
+            tolerance: 0.,
         });
     }
     s.set_coupled_resources(&definitions).unwrap();

@@ -6,21 +6,47 @@ use crate::core::rounding::add_up;
 mod numeric;
 pub(super) use numeric::NumericCostOrder;
 
-pub(super) fn loads_dominate(a: &CoupledLabelState, b: &CoupledLabelState) -> bool {
+/// `tolerances` admits the same per-resource slack as the capacity checks;
+/// missing entries compare exactly.
+pub(super) fn loads_dominate(
+    a: &CoupledLabelState,
+    b: &CoupledLabelState,
+    tolerances: &[f64],
+) -> bool {
     if a.loads.len() != b.loads.len() || a.suffix.is_some() != b.suffix.is_some() {
         return false;
     }
-    match (&a.reversal_peaks, &b.reversal_peaks) {
-        (Some(a), Some(b)) if a.iter().zip(b.iter()).all(|(a, b)| a <= b) => {}
-        (None, None) => {}
-        _ => return false,
+    if a.reversal_peaks.is_some() != b.reversal_peaks.is_some() {
+        return false;
     }
     let backward = a.suffix.is_some();
-    a.loads.iter().zip(&b.loads).all(|(a, b)| {
-        // Append is monotone in (D,N,M). Prepending and a mixed join only use
-        // a suffix's D and M, so backward net load need not agree.
-        a[0] <= b[0] && a[2] <= b[2] && (backward || a[1] <= b[1])
-    })
+    let reversed = a.reversed_use || b.reversed_use;
+    a.loads
+        .iter()
+        .zip(&b.loads)
+        .enumerate()
+        .all(|(index, (la, lb))| {
+            let tolerance = tolerances.get(index).copied().unwrap_or(0.);
+            let fits = |x: f64, y: f64| x <= y + tolerance;
+            // A suffix is prepended to and joined only through its deliveries
+            // D and peak D+M; a prefix is appended to and joined only through
+            // its pickups D+N and peak D+M.
+            let peak = fits(la[0] + la[2], lb[0] + lb[2]);
+            if backward {
+                return fits(la[0], lb[0]) && peak;
+            }
+            let prefix = fits(la[0] + la[1], lb[0] + lb[1]) && peak;
+            if !reversed {
+                return prefix;
+            }
+            // A reversed prefix acts as a suffix whose peak is its reversal
+            // peak when mixed-sign states retain one, otherwise M.
+            let (ra, rb) = match (&a.reversal_peaks, &b.reversal_peaks) {
+                (Some(pa), Some(pb)) => (pa[index], pb[index]),
+                _ => (la[2], lb[2]),
+            };
+            prefix && fits(la[0], lb[0]) && fits(la[0] + ra, lb[0] + rb)
+        })
 }
 
 fn weaker_bounds(a: &Suffix, b: &Suffix) -> bool {
@@ -71,7 +97,7 @@ impl CoupledKernel {
         // traversing paired front pieces or validating retained suffix rows.
         if a.suffix.is_none() != forward
             || b.suffix.is_none() != forward
-            || !loads_dominate(a, b)
+            || !loads_dominate(a, b, &self.load_tolerances)
             || !self.budgets_dominate(&a.budgets, &b.budgets, forward)
             || a.selection
                 .iter()
@@ -634,5 +660,102 @@ mod front_continuation_tests {
         let (b, _) = kernel.extend(&root, 1, true).unwrap().unwrap();
         assert_eq!(kernel.dominance_penalty(&a, &b, true), Some(0.));
         assert_eq!(kernel.dominance_penalty(&b, &a, true), None);
+    }
+}
+
+#[cfg(test)]
+mod load_dominance_tests {
+    use super::*;
+
+    fn kernel_graph() -> Graph<2> {
+        let mut graph = Graph::new(4, 1).unwrap();
+        for (u, v) in [(0, 1), (0, 2), (1, 3), (2, 3)] {
+            graph.add_arc(u, v, 0.).unwrap();
+        }
+        graph
+            .set_coupled_resources(&[CoupledResource::SimultaneousPickupDelivery {
+                capacity: 20.,
+                deliveries: vec![5., 0., 0., 0.],
+                pickups: vec![0., 6., 0., 0.],
+                tolerance: 0.,
+            }])
+            .unwrap();
+        graph
+    }
+
+    #[test]
+    fn prefixes_compare_only_pickups_and_peak() {
+        let graph = kernel_graph();
+        let kernel = graph.coupled_kernel().unwrap();
+        let root = kernel.root(true);
+        let deliver = kernel.extend(&root, 0, true).unwrap().unwrap().0;
+        let pickup = kernel.extend(&root, 1, true).unwrap().unwrap().0;
+        // (D,N,M) = (5,-5,0) vs (0,6,6): fewer pickups and a lower peak.
+        assert!(CoupledKernel::dominates(Some(&deliver), Some(&pickup)));
+        assert!(!CoupledKernel::dominates(Some(&pickup), Some(&deliver)));
+    }
+
+    #[test]
+    fn reversed_prefixes_also_compare_their_suffix_role() {
+        let graph = kernel_graph();
+        let kernel = graph.coupled_kernel().unwrap();
+        let mut workspace = CoupledWorkspace::default();
+        let root = kernel.reversal_root(true);
+        let mut extend = |arc| {
+            kernel
+                .extend_reversal_with_workspace(&root, arc, true, &mut workspace)
+                .unwrap()
+                .unwrap()
+                .0
+        };
+        let deliver = extend(0);
+        let pickup = extend(1);
+        // As a reversed suffix the delivering prefix carries more deliveries.
+        assert!(!CoupledKernel::dominates(Some(&deliver), Some(&pickup)));
+    }
+}
+
+#[cfg(test)]
+mod load_tolerance_tests {
+    use super::*;
+
+    fn kernel_graph(tolerance: f64) -> Graph<2> {
+        let mut graph = Graph::new(3, 1).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph.add_arc(1, 2, 0.).unwrap();
+        graph
+            .set_coupled_resources(&[CoupledResource::SimultaneousPickupDelivery {
+                capacity: 1.,
+                deliveries: vec![0., 0.],
+                pickups: vec![0.6, 0.4000005],
+                tolerance,
+            }])
+            .unwrap();
+        graph
+    }
+
+    #[test]
+    fn capacity_admits_exactly_the_configured_tolerance() {
+        let graph = kernel_graph(1e-6);
+        let kernel = graph.coupled_kernel().unwrap();
+        assert!(kernel.replay_state(&[0, 1]).unwrap().is_some());
+        let graph = kernel_graph(0.);
+        let kernel = graph.coupled_kernel().unwrap();
+        assert!(kernel.replay_state(&[0, 1]).unwrap().is_none());
+    }
+
+    #[test]
+    fn dominance_uses_the_resource_tolerance() {
+        let a = [[0.5000005, 0.5000005, 0.5000005]];
+        let b = [[0.5, 0.5, 0.5]];
+        for (tolerance, expected) in [(1e-6, true), (0., false)] {
+            let graph = kernel_graph(tolerance);
+            let kernel = graph.coupled_kernel().unwrap();
+            let mut x = kernel.root(true);
+            let mut y = kernel.root(true);
+            x.loads = StateValues::from_slice(&a);
+            y.loads = StateValues::from_slice(&b);
+            assert_eq!(loads_dominate(&x, &y, &kernel.load_tolerances), expected);
+        }
     }
 }

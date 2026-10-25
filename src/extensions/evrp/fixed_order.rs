@@ -92,7 +92,7 @@ impl Problem {
             limit: options.max_work,
         };
         let solve = |ws: &mut Workspace| -> std::result::Result<ChargingSolution, ChargingStatus> {
-            if load > self.load_capacity {
+            if load > self.load_capacity + crate::graph::coupled::DEFAULT_LOAD_TOLERANCE {
                 return Err(ChargingStatus::Infeasible);
             }
             let depot = &self.locations[self.depot];

@@ -85,7 +85,8 @@ impl Generator<'_> {
                 new_load += demand;
                 new_reduced -= self.duals[next];
             }
-            if new_load > self.problem.load_capacity {
+            if new_load > self.problem.load_capacity + crate::graph::coupled::DEFAULT_LOAD_TOLERANCE
+            {
                 continue;
             }
             if !new_reduced.is_finite() {
@@ -225,7 +226,7 @@ impl Problem {
                         continue;
                     }
                     let load = labels[cursor].load + subpath.load;
-                    if load > self.load_capacity {
+                    if load > self.load_capacity + crate::graph::coupled::DEFAULT_LOAD_TOLERANCE {
                         continue;
                     }
                     if result.statistics.labels >= options.pricing.max_labels {

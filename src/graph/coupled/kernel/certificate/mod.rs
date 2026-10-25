@@ -141,6 +141,7 @@ impl CoupledKernel {
                 }
                 CoupledResource::SimultaneousPickupDelivery {
                     capacity,
+                    tolerance,
                     deliveries,
                     pickups,
                 } => {
@@ -150,7 +151,7 @@ impl CoupledKernel {
                     }
                     let capacity = Window {
                         lower: 0.,
-                        upper: *capacity,
+                        upper: capacity + tolerance,
                     };
                     if !load.within(capacity)? {
                         return Some((false, [0.; 2]));

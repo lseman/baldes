@@ -238,16 +238,20 @@ impl ResourceModel {
         self.push(CoupledResource::Selection { initial, allowed })
     }
     /// Deliver before picking up at each stop. Quantities belong to arc heads.
+    /// Loads up to `capacity + tolerance` are feasible.
+    #[pyo3(signature = (capacity, deliveries, pickups, tolerance=1e-6))]
     fn add_simultaneous_pickup_delivery(
         &mut self,
         capacity: f64,
         deliveries: Vec<f64>,
         pickups: Vec<f64>,
+        tolerance: f64,
     ) -> usize {
         self.push(CoupledResource::SimultaneousPickupDelivery {
             capacity,
             deliveries,
             pickups,
+            tolerance,
         })
     }
     /// x += increment, cost += x * weight on each arc.

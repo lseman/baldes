@@ -53,6 +53,9 @@ pub struct CoupledLabelState {
     /// Budgeted worst-case vectors, concatenated in declaration order.
     budgets: Vec<f64>,
     reversal_peaks: Option<Box<StateValues<f64, 1>>>,
+    /// Created by a consumption-join sweep: this prefix can also be joined as
+    /// a reversed suffix, so dominance must preserve that role too.
+    reversed_use: bool,
     numeric: StateValues<f64, 4>,
     suffix: Option<Box<Suffix>>,
     fronts: Vec<front::CostFront>,
@@ -74,7 +77,10 @@ pub struct CoupledKernel {
     initial: Vec<f64>,
     cost_scale: f64,
     selection_initial: Vec<u64>,
+    /// Pickup/delivery capacity plus its tolerance: the largest admitted load.
     load_capacities: Vec<f64>,
+    /// Pickup/delivery dominance tolerance, as in the capacity checks.
+    load_tolerances: Vec<f64>,
     budgeted: Vec<budgeted::PreparedBudgeted>,
     reversal_union: bool,
     cost_resource: bool,

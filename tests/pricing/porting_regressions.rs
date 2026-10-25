@@ -614,6 +614,7 @@ fn coupled_solver(symmetric: bool, cut: bool) -> Solver<2> {
             capacity: 6.,
             deliveries: vec![1.; n],
             pickups: vec![2.; n],
+            tolerance: 0.,
         },
     ])
     .unwrap();
@@ -789,6 +790,7 @@ fn g13_bounded_cycles_jumps_and_terminal_equality_match_literal_walks() {
                         capacity: 4.,
                         deliveries: vec![1.; 3],
                         pickups: vec![1.; 3],
+                        tolerance: 0.,
                     },
                 ])
                 .unwrap();

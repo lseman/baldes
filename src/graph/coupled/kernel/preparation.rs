@@ -154,7 +154,20 @@ impl CoupledKernel {
             load_capacities: definitions
                 .iter()
                 .filter_map(|r| match r {
-                    CoupledResource::SimultaneousPickupDelivery { capacity, .. } => Some(*capacity),
+                    CoupledResource::SimultaneousPickupDelivery {
+                        capacity,
+                        tolerance,
+                        ..
+                    } => Some(capacity + tolerance),
+                    _ => None,
+                })
+                .collect(),
+            load_tolerances: definitions
+                .iter()
+                .filter_map(|r| match r {
+                    CoupledResource::SimultaneousPickupDelivery { tolerance, .. } => {
+                        Some(*tolerance)
+                    }
                     _ => None,
                 })
                 .collect(),

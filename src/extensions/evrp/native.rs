@@ -81,7 +81,12 @@ impl Problem {
         }
         for v in 0..=n {
             graph.set_bounds(v, 0, 0., options.max_arcs as f64)?;
-            graph.set_bounds(v, 1, 0., self.load_capacity)?;
+            graph.set_bounds(
+                v,
+                1,
+                0.,
+                self.load_capacity + crate::graph::coupled::DEFAULT_LOAD_TOLERANCE,
+            )?;
         }
         for r in 0..2 {
             graph.initial[r] = Some(0.);
@@ -165,6 +170,7 @@ impl Problem {
                 capacity: self.load_capacity,
                 deliveries: graph.arcs.iter().map(|arc| arc.consumption[1]).collect(),
                 pickups: vec![0.; graph.arcs.len()],
+                tolerance: crate::graph::coupled::DEFAULT_LOAD_TOLERANCE,
             },
             CoupledResource::PiecewiseLinearResource {
                 initial: 0.,

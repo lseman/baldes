@@ -379,14 +379,21 @@ impl CoupledKernel {
         }
         let mut index = 0;
         for definition in self.definitions.iter() {
-            if let CoupledResource::SimultaneousPickupDelivery { capacity, .. } = definition {
+            if let CoupledResource::SimultaneousPickupDelivery {
+                capacity,
+                tolerance,
+                ..
+            } = definition
+            {
                 let own = state.loads[index].map(Range::point);
                 let other = opposite.loads[index];
                 let (f, b) = if forward { (own, other) } else { (other, own) };
                 let deliveries = f[0].add(b[0]);
                 let net_peak = f[1].add(b[2]);
                 let lower_peak = f[2].lo.max(net_peak.lo);
-                if add_down(deliveries.lo, lower_peak).is_some_and(|lower| lower > *capacity) {
+                if add_down(deliveries.lo, lower_peak)
+                    .is_some_and(|lower| lower > capacity + tolerance)
+                {
                     return false;
                 }
                 index += 1;
@@ -609,6 +616,7 @@ mod coupled_hull_tests {
                     capacity: 10.,
                     deliveries: vec![0.],
                     pickups: vec![0.],
+                    tolerance: 0.,
                 },
                 CoupledResource::CumulativeCost {
                     initial: 0.,
@@ -790,13 +798,18 @@ impl CoupledKernel {
             .any(|(&x, &y)| x & y == 0);
         let mut index = 0;
         for definition in self.definitions.iter() {
-            if let CoupledResource::SimultaneousPickupDelivery { capacity, .. } = definition {
+            if let CoupledResource::SimultaneousPickupDelivery {
+                capacity,
+                tolerance,
+                ..
+            } = definition
+            {
                 let (Some(f), Some(b)) = (f.loads.get(index), b.loads.get(index)) else {
                     return CoupledPairSummary::default();
                 };
                 let deliveries = f[0].add(b[0]);
                 let peak = f[2].lo.max(f[1].add(b[2]).lo);
-                if add_down(deliveries.lo, peak).is_some_and(|lower| lower > *capacity) {
+                if add_down(deliveries.lo, peak).is_some_and(|lower| lower > capacity + tolerance) {
                     possible = false;
                 }
                 index += 1;
@@ -838,6 +851,7 @@ mod pairing_tests {
                     capacity: 20.,
                     deliveries: vec![1.; 4],
                     pickups: vec![2.; 4],
+                    tolerance: 0.,
                 },
                 CoupledResource::CumulativeCost {
                     initial: 0.,

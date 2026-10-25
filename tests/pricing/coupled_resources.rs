@@ -632,6 +632,7 @@ fn selection_simultaneous_loads_and_signed_cumulative_dependencies_match_tiny_pa
             capacity: 4.,
             deliveries: quantities(&deliveries),
             pickups: quantities(&pickups),
+            tolerance: 0.,
         },
         CoupledResource::CumulativeCost {
             initial: 0.,
@@ -862,6 +863,7 @@ fn interval_cost_fixture(seed: usize) -> Graph<2> {
                 capacity: 3.,
                 deliveries: vec![1.; 6],
                 pickups: vec![1.; 6],
+                tolerance: 0.,
             },
             CoupledResource::IntervalCost {
                 initial: Window {

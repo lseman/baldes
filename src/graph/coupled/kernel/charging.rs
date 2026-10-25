@@ -289,6 +289,7 @@ mod tests {
                     capacity: 2.,
                     deliveries: vec![0., 2., 0.],
                     pickups: vec![0.; 3],
+                    tolerance: 0.,
                 },
             ])
             .unwrap();

@@ -20,6 +20,7 @@ impl CoupledKernel {
                 capacity,
                 deliveries,
                 pickups,
+                ..
             } => {
                 // All retained D/N/M sums and a two-prefix join are exact
                 // integers (at most 2^53). No floating reassociation is assumed.
@@ -46,6 +47,7 @@ impl CoupledKernel {
     }
     pub(crate) fn reversal_root(&self, forward: bool) -> Box<CoupledLabelState> {
         let mut root = self.root(forward);
+        root.reversed_use = true;
         if forward && self.reversal_union_required() {
             root.reversal_peaks = Some(Box::new(StateValues::filled(
                 self.load_capacities.len(),
@@ -136,6 +138,7 @@ mod tests {
                     capacity: 20.,
                     deliveries: vec![delivery; 4],
                     pickups: vec![pickup; 4],
+                    tolerance: 0.,
                 },
             ])
             .unwrap();
@@ -179,6 +182,7 @@ mod tests {
                 capacity: 5.,
                 deliveries: vec![0., 4., 4., 0.],
                 pickups: vec![4., 0., 0., 4.],
+                tolerance: 0.,
             }])
             .unwrap();
         let kernel = graph.coupled_kernel().unwrap();
@@ -222,7 +226,7 @@ mod tests {
         assert!(!loads_dominate_for_test(&opposite, &reverse_only));
     }
     fn loads_dominate_for_test(a: &CoupledLabelState, b: &CoupledLabelState) -> bool {
-        super::super::dominance::loads_dominate(a, b)
+        super::super::dominance::loads_dominate(a, b, &[])
     }
     #[test]
     fn mixed_sign_union_matches_independent_integer_walk_oracle() {
@@ -232,6 +236,7 @@ mod tests {
                 capacity: 5.,
                 deliveries: vec![0., 2., 2., 0.],
                 pickups: vec![3., 0., 0., 3.],
+                tolerance: 0.,
             }])
             .unwrap();
         let kernel = graph.coupled_kernel().unwrap();

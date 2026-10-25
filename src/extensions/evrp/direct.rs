@@ -159,7 +159,7 @@ fn generate(
                 load += demand;
                 reduced -= duals[next];
             }
-            if load > problem.load_capacity {
+            if load > problem.load_capacity + crate::graph::coupled::DEFAULT_LOAD_TOLERANCE {
                 continue;
             }
             if !load.is_finite() || !reduced.is_finite() {
@@ -342,7 +342,9 @@ impl Problem {
                         LocationKind::Customer { demand } => demand,
                         _ => 0.0,
                     };
-                    if f.load + b.load - demand > self.load_capacity {
+                    if f.load + b.load - demand
+                        > self.load_capacity + crate::graph::coupled::DEFAULT_LOAD_TOLERANCE
+                    {
                         continue;
                     }
                     if !f.visited.iter().zip(&b.visited).any(|(a, b)| *a || *b) {

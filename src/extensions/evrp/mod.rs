@@ -254,7 +254,9 @@ impl Problem {
                     }
                     seen[visit.location] = true;
                     schedule.delivered += demand;
-                    if schedule.delivered > self.load_capacity {
+                    if schedule.delivered
+                        > self.load_capacity + crate::graph::coupled::DEFAULT_LOAD_TOLERANCE
+                    {
                         return Err(invalid("EV load capacity exceeded"));
                     }
                 }

@@ -149,7 +149,7 @@ fn native_pricing_rejects_objective_scales_reserved_for_native_sentinels() {
 }
 
 #[test]
-fn native_load_dominance_preserves_the_feasible_floating_point_order() {
+fn native_load_tolerance_matches_exhaustive_replay() {
     let mut p = problem();
     p.locations = (0..6)
         .map(|i| Location {
@@ -184,11 +184,12 @@ fn native_load_dominance_preserves_the_feasible_floating_point_order() {
             cost: if (u, v) == (0, 3) { 1. } else { 0. },
         });
     }
-    // The cheaper permutation has prefix load .6000000000000001;
-    // the other has .6. Scalar epsilon dominance must not erase the latter.
+    // The cheaper permutation has prefix load .6000000000000001 and final
+    // load .8500000000000001, within the 1e-6 capacity tolerance that native
+    // pricing, dominance and replay all share.
     let duals = [0., 10., 10., 10., 10., 10.];
     let expected = exhaustive_route_best(&p, &duals, 0., 6);
-    assert_eq!(expected, Some(-49.));
+    assert_eq!(expected, Some(-50.));
     let native = p
         .price_native(
             &duals,

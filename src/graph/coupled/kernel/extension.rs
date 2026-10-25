@@ -8,6 +8,7 @@ impl CoupledKernel {
             loads: StateValues::filled(self.load_capacities.len(), [0.; 3]),
             budgets: budgeted::PreparedBudgeted::root(&self.budgeted, forward),
             reversal_peaks: None,
+            reversed_use: false,
             numeric: StateValues::from_slice(&self.initial),
             slope_fronts: self
                 .slope_roots
@@ -56,6 +57,8 @@ impl CoupledKernel {
     }
     /// Zero-compensation dominance with directional load ordering and equal
     /// numeric entry conditions. Use `dominance_penalty` for cost tradeoffs.
+    /// Loads compare exactly: there is no kernel to supply pickup/delivery
+    /// tolerances.
     pub fn dominates(a: Option<&CoupledLabelState>, b: Option<&CoupledLabelState>) -> bool {
         match (a, b) {
             (None, None) => true,
@@ -67,7 +70,7 @@ impl CoupledKernel {
                         _ => false,
                     };
                 account_safe
-                    && dominance::loads_dominate(a, b)
+                    && dominance::loads_dominate(a, b, &[])
                     // Entry kinds are unknown here; equality is order-free.
                     && a.budgets == b.budgets
                     && a.fronts == b.fronts
@@ -135,6 +138,7 @@ impl CoupledKernel {
             loads: state.loads.clone(),
             budgets: state.budgets.clone(),
             reversal_peaks: state.reversal_peaks.clone(),
+            reversed_use: state.reversed_use,
             numeric: state.numeric.clone(),
             suffix: None,
             fronts: Vec::with_capacity(state.fronts.len()),
