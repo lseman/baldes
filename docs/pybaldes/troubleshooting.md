@@ -1,6 +1,6 @@
-# PyBaldes troubleshooting and reproducibility
+# pyBaldes troubleshooting and reproducibility
 
-[PyBaldes documentation](README.md) · [Installation](installation.md)
+[pyBaldes documentation](README.md) · [Installation](installation.md)
 
 ## Installation and import
 

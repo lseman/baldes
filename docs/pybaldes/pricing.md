@@ -1,6 +1,6 @@
 # Stateful pricing with Solver
 
-[PyBaldes documentation](README.md) · [Quickstart](quickstart.md) · [Resources](resources.md)
+[pyBaldes documentation](README.md) · [Quickstart](quickstart.md) · [Resources](resources.md)
 
 `Solver` owns a directed graph and retained pricing state. Use it to obtain
 resource-feasible paths, or as an oracle inside a master that you implement.

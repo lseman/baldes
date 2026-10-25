@@ -64,10 +64,12 @@ impl NetworkNode {
             .collect::<Vec<_>>();
         Ok(Self {
             snapshot: if input.dynamic {
-                self.snapshot.with_dynamic_row(input.row.row(), &coefficients)
+                self.snapshot
+                    .with_dynamic_row(input.row.row(), &coefficients)
             } else {
                 self.snapshot.with_row(input.row.row(), &coefficients)
-            }.map_err(error)?,
+            }
+            .map_err(error)?,
         })
     }
     fn with_resource_group_branch(&self, restriction_json: &str) -> PyResult<Self> {

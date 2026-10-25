@@ -1,6 +1,6 @@
-# PyBaldes API reference
+# pyBaldes API reference
 
-[PyBaldes documentation](README.md)
+[pyBaldes documentation](README.md)
 
 The public package exports the names below. The `math` module supplies `math.inf`
 in default expressions. Import them from `pybaldes`.

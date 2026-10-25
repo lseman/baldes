@@ -2,7 +2,7 @@
 use super::*;
 use crate::master::preprocessing::Bounds;
 
-fn fractional(value: f64, tolerance: f64) -> bool {
+pub(super) fn fractional(value: f64, tolerance: f64) -> bool {
     value.is_finite()
         && value.abs() < 9_007_199_254_740_992.
         && (value - value.round()).abs() > tolerance
@@ -12,13 +12,36 @@ pub(super) fn children<const D: usize>(
     output: &Output<D>,
     tolerance: f64,
     policy: NetworkBranchingPolicy,
+    windows: &[super::time_windows::NetworkWindows],
+    variables: &[MappedBranchVariable],
+) -> Result<Option<Vec<NodeSnapshot<D>>>> {
+    let mut children = children_inner(output, tolerance, policy, windows, variables)?;
+    if let Some(children) = &mut children {
+        for child in children {
+            child.state.node_depth = output.snapshot.state.node_depth.saturating_add(1);
+        }
+    }
+    Ok(children)
+}
+
+fn children_inner<const D: usize>(
+    output: &Output<D>,
+    tolerance: f64,
+    policy: NetworkBranchingPolicy,
+    windows: &[super::time_windows::NetworkWindows],
+    variables: &[MappedBranchVariable],
 ) -> Result<Option<Vec<NodeSnapshot<D>>>> {
     if policy == NetworkBranchingPolicy::MultiplicityFirst {
         if let Some(children) = multiplicity_children(output, tolerance)? {
             return Ok(Some(children));
         }
     }
-    let mut children = resource_or_assignment_children(output, tolerance)?;
+    let mut children = if let Some(mapped) = model_mapping::children(output, variables, tolerance)?
+    {
+        Some(mapped)
+    } else {
+        resource_or_assignment_children(output, tolerance, windows)?
+    };
     if policy == NetworkBranchingPolicy::MultiplicityFirst {
         if let Some(children) = &mut children {
             children.reverse();
@@ -27,7 +50,7 @@ pub(super) fn children<const D: usize>(
     Ok(children)
 }
 
-fn multiplicity_children<const D: usize>(
+pub(super) fn multiplicity_children<const D: usize>(
     output: &Output<D>,
     tolerance: f64,
 ) -> Result<Option<Vec<NodeSnapshot<D>>>> {
@@ -72,6 +95,7 @@ fn multiplicity_children<const D: usize>(
 fn resource_or_assignment_children<const D: usize>(
     output: &Output<D>,
     tolerance: f64,
+    windows: &[super::time_windows::NetworkWindows],
 ) -> Result<Option<Vec<NodeSnapshot<D>>>> {
     let node = &output.snapshot;
     let mut resources = node.resource_group_candidates(tolerance)?;
@@ -175,6 +199,21 @@ fn resource_or_assignment_children<const D: usize>(
             ]));
         }
     }
+    // Time-window selection counts are integer activities over window copies.
+    if !windows.is_empty() {
+        let flows: HashMap<_, _> = node
+            .state
+            .oracles
+            .iter()
+            .zip(&activities)
+            .map(|(o, a)| (o.network.id, a.clone()))
+            .collect();
+        if let Some(children) =
+            super::time_windows::selection_children(node, windows, &flows, tolerance)?
+        {
+            return Ok(Some(children));
+        }
+    }
     // Integer route quantities imply integer aggregate physical-arc activity,
     // including repeated traversals. Each split covers every integer value,
     // irrespective of numerical error in the LP point used to choose it.
@@ -206,6 +245,10 @@ fn resource_or_assignment_children<const D: usize>(
                 ]));
             }
         }
+    }
+    if let Some(children) = super::time_windows::synchronized_children(output, windows, tolerance)?
+    {
+        return Ok(Some(children));
     }
     synchronization::children(output, tolerance)
 }

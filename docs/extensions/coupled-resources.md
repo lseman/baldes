@@ -371,7 +371,7 @@ charges while retaining their state transitions and feasibility constraints.
 
 ## Python
 
-For Python installation, declaration order, method signatures, and complete examples, see [PyBaldes resource modeling](../pybaldes/resources.md).
+For Python installation, declaration order, method signatures, and complete examples, see [pyBaldes resource modeling](../pybaldes/resources.md).
 
 ```python
 from pybaldes import ResourceModel, Solver

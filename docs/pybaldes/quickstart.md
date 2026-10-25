@@ -1,6 +1,6 @@
-# PyBaldes quickstart
+# pyBaldes quickstart
 
-[PyBaldes documentation](README.md) · [Installation](installation.md)
+[pyBaldes documentation](README.md) · [Installation](installation.md)
 
 ## Solve a small routing relaxation
 
@@ -109,4 +109,4 @@ print(routes[0].original_cost, routes[0].resource_consumption(load))
 This solves the configured pricing domain. It does not create customer-covering
 rows, solve a routing master, or independently certify a master lower bound.
 See [pricing](pricing.md) for repeated dual updates and [networks](networks.md)
-for a master managed by PyBaldes.
+for a master managed by pyBaldes.

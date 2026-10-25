@@ -6,7 +6,7 @@
 part of the main `baldes` crate under `src/extensions/ipm`, requires Rust 1.70+,
 and has no external dependencies, C++ bindings, BLAS requirement, or unsafe code.
 Use its direct model API below, or select `master_solver="ipm"` in a
-[PyBaldes routing root solve](../pybaldes/routing.md#master-and-bound-policy).
+[pyBaldes routing root solve](../pybaldes/routing.md#master-and-bound-policy).
 
 From the BALDES repository root:
 

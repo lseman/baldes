@@ -47,6 +47,7 @@ Options:
   --hgs-time SECONDS    Run HGS before root/tree solve for this search budget
   --hgs-columns MODE    best (default), all, or N cheapest feasible HGS routes
   --no-stabilization    Disable dual stabilization
+  --stabilization-max-tree-depth N  Activate only below depth N (default: 10000)
   --enumerated-mip      Solve complete enumerated node masters with HiGHS (--tree; highs feature)
   --deluxing            Filter enumerated MIP columns (enables --enumerated-mip; requires --tree)
   --no-enumeration      Disable reduced-cost fixing and enumeration
@@ -265,6 +266,13 @@ pub(super) fn run() -> std::result::Result<(), String> {
                 .map_err(|e| e.to_string())?
             }
             "--no-stabilization" => options.cg.stabilize = false,
+            "--stabilization-max-tree-depth" => {
+                options.cg.stabilization_max_tree_depth = args
+                    .next()
+                    .ok_or("missing stabilization maximum tree depth")?
+                    .parse()
+                    .map_err(|e: std::num::ParseIntError| e.to_string())?;
+            }
             "--dynamic-ng" => {
                 options.relaxation_improvement_priority = args
                     .next()

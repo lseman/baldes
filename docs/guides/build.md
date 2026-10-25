@@ -32,7 +32,7 @@ Disjoint service-start windows are optional: use
 [multiple time windows](../extensions/multi-time-windows.md) for the Rust,
 Python and JSON APIs.
 
-Python installation is covered in the [PyBaldes installation guide](../pybaldes/installation.md).
+Python installation is covered in the [pyBaldes installation guide](../pybaldes/installation.md).
 
 ### Rank-one node memory
 

@@ -38,7 +38,7 @@ nonempty directories. Generated HTML is not the documentation source.
 To preview locally, serve the parent directory of the generated docs output and
 open the relevant `index.html`. The normal website build uses `landing/docs/`;
 its deployment workflow is [.github/workflows/landing.yaml](../../.github/workflows/landing.yaml).
-A website build includes the dedicated PyBaldes section at `docs/pybaldes/index.html`.
+A website build includes the dedicated pyBaldes section at `docs/pybaldes/index.html`.
 
 ## Check claims against the interface
 
@@ -52,7 +52,7 @@ matching build. Use implementation and regression tests to verify behavior;
 a docstring or type stub alone may omit a feature gate or describe old behavior.
 
 When an API changes, update examples, defaults, return fields, and build gates
-together. In particular, refresh [PyBaldes API signatures](../pybaldes/api.md)
+together. In particular, refresh [pyBaldes API signatures](../pybaldes/api.md)
 after changing public wrappers or bindings. Validate all runnable examples using
 the same source/native-extension build. State any unavailable optional backend
 instead of claiming those examples ran.

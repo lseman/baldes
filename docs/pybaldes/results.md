@@ -1,6 +1,6 @@
 # Results, bounds, and exactness
 
-[PyBaldes documentation](README.md) · [Routing](routing.md) · [Networks](networks.md)
+[pyBaldes documentation](README.md) · [Routing](routing.md) · [Networks](networks.md)
 
 ## Identify the quantity before using it
 

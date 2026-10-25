@@ -12,6 +12,9 @@ pub struct BranchPriorities {
     pub ryan_foster: f64,
     pub aggregate_flow: f64,
     pub arc_flow: f64,
+    /// Time-window selection counts. Below arc flow by default, so they are
+    /// branched on last, after flows summed over each input arc's copies.
+    pub time_window_selection: f64,
 }
 impl Default for BranchPriorities {
     fn default() -> Self {
@@ -23,6 +26,7 @@ impl Default for BranchPriorities {
             ryan_foster: 2.,
             aggregate_flow: 1.5,
             arc_flow: 1.,
+            time_window_selection: 0.5,
         }
     }
 }
@@ -36,6 +40,7 @@ impl BranchPriorities {
             self.ryan_foster,
             self.aggregate_flow,
             self.arc_flow,
+            self.time_window_selection,
         ]
         .iter()
         .all(|p| p.is_finite())
@@ -54,7 +59,15 @@ impl BranchPriorities {
             PackingSetAssignment { .. } => self.packing_set_assignment,
             RyanFoster(_) => self.ryan_foster,
             AggregateFlow { .. } => self.aggregate_flow,
-            ArcFlow { .. } => self.arc_flow,
+            ArcFlow { .. }
+            | WindowFlow {
+                group: super::WindowGroup::Arc { .. },
+                ..
+            } => self.arc_flow,
+            WindowFlow {
+                group: super::WindowGroup::Selection { .. },
+                ..
+            } => self.time_window_selection,
         }
     }
 }
@@ -75,6 +88,16 @@ pub struct BranchingOptions {
     pub aggregates: Vec<super::AggregateVariable>,
     /// Branch on undirected edge flows: both arc directions between a pair.
     pub edge_flow: bool,
+    /// Branch on how often each time window of a multi-window vertex is
+    /// selected, on this disposable resource (multi-time-windows builds).
+    /// Following Li et al. (2020), the tree copies each arc into such a vertex
+    /// once per window, branches on input-arc flows summed over the copies
+    /// (arc-flow priority) and then on window selection counts (their own,
+    /// lower priority). Reported routes use the input arc IDs.
+    pub time_window_selection: Option<usize>,
+    /// Window copies of the split graph; set by the tree, not by callers.
+    #[doc(hidden)]
+    pub window_arcs: Option<crate::graph::WindowArcs>,
 }
 impl Default for BranchingOptions {
     fn default() -> Self {
@@ -88,6 +111,8 @@ impl Default for BranchingOptions {
             accumulated_resource: false,
             aggregates: vec![],
             edge_flow: false,
+            time_window_selection: None,
+            window_arcs: None,
         }
     }
 }
@@ -107,6 +132,8 @@ impl BranchingOptions {
             accumulated_resource: false,
             aggregates: vec![],
             edge_flow: false,
+            time_window_selection: None,
+            window_arcs: None,
         }
     }
 }

@@ -1,8 +1,8 @@
-# Python: PyBaldes
+# Python: pyBaldes
 
 [Documentation index](../README.md)
 
-PyBaldes now has a dedicated [documentation section](../pybaldes/README.md),
+pyBaldes now has a dedicated [documentation section](../pybaldes/README.md),
 covering installation, tutorials, modeling, API signatures, and troubleshooting.
 The distribution and import name are both `pybaldes`.
 

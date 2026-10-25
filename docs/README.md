@@ -11,14 +11,14 @@ Commands in these guides run from the repository root.
 | Run a small example and understand its output | [Your first solve](guides/first-solve.md) |
 | Find a feasible routing solution quickly | [HGS and CLI usage](guides/cli.md) |
 | Search for an integer solution with bounds | [Branch-and-price tree](solver/tree.md) |
-| Build a Python application or custom pricing loop | [PyBaldes documentation](pybaldes/README.md) |
+| Build a Python application or custom pricing loop | [pyBaldes documentation](pybaldes/README.md) |
 | Use multiple route families in one master | [Multi-pricing](extensions/mp.md) |
 | Configure backends or troubleshoot a build | [Build and installation](guides/build.md) |
 
 ## Reading paths
 
 - **CLI users:** first solve → CLI reference → solver concepts → tree/cut guides.
-- **Python users:** PyBaldes installation → quickstart → routing, pricing, or network modeling.
+- **Python users:** pyBaldes installation → quickstart → routing, pricing, or network modeling.
 - **Rust contributors:** build guide → source layout → model/solver contracts → documentation maintenance.
 
 ## Getting started
@@ -31,11 +31,11 @@ Commands in these guides run from the repository root.
 - [Solver concepts](guides/concepts.md): paths, masters, root relaxations, integer search, and proof scope.
 - [Documentation maintenance](guides/documentation.md): organization, local builds, validation, and API update checks.
 
-## PyBaldes: Python documentation
+## pyBaldes: Python documentation
 
 A separate handbook for the Python package, with its own entry point and API reference.
 
-- [PyBaldes overview](pybaldes/README.md): choose routing, custom pricing, or shared-master modeling.
+- [pyBaldes overview](pybaldes/README.md): choose routing, custom pricing, or shared-master modeling.
 - [Installation](pybaldes/installation.md): package builds, optional features, backends, and capacities.
 - [Quickstart](pybaldes/quickstart.md): complete in-memory and file-based examples.
 - [Routing inputs and options](pybaldes/routing.md): customers, instances, distances, and every root keyword.

@@ -174,6 +174,7 @@ def solve_root(
     two_path_cuts: bool = False,
     rank_one_cuts: bool = False,
     stabilize: bool = True,
+    stabilization_max_tree_depth: int = 10000,
     master_solver: str = "clp",
     master_threads: int = 0,
     bound_mode: str = "numerical",
@@ -231,7 +232,7 @@ def solve_root(
         instance.name, instance.vehicles, instance.capacity, rows, distances, problem_type,
         ng, reference_ng, rounding or instance.rounding, capacity_cuts, rank_one_cuts, stabilize,
         reduced_cost_fixing, upper_bound, time_limit, max_iterations,
-        max_cut_rounds, dict(pricing_options or {}), two_path_cuts, master_solver, hgs_time, str(hgs_columns), hgs_seed, verbose, log_interval, bound_mode, clp_scaling, clp_keep_work_areas, master_threads,
+        max_cut_rounds, dict(pricing_options or {}), two_path_cuts, master_solver, hgs_time, str(hgs_columns), hgs_seed, verbose, log_interval, bound_mode, clp_scaling, clp_keep_work_areas, master_threads, stabilization_max_tree_depth,
     )
     data["duals"] = tuple(data["duals"])
     data["routes"] = tuple(

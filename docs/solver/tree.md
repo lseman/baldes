@@ -233,7 +233,7 @@ has no CLI or Python entry point.
 This single-network routing tree does not provide multiple pricing networks or
 cut callbacks during the integer solve. Python exposes routing root solving; use
 Rust or the CLI for this tree. For a Python shared-master integer tree, use
-[PyBaldes network models](../pybaldes/networks.md#integer-search), whose supported
+[pyBaldes network models](../pybaldes/networks.md#integer-search), whose supported
 model and branching families differ. `Infeasible` means all nodes were closed without a feasible
 incumbent, under the selected bound mode and solver tolerances.
 

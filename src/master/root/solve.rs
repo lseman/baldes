@@ -60,6 +60,7 @@ pub(super) fn solve_seeded<const D: usize>(
     seed: Option<(&NodeSnapshot<D>, ClpMaster, cg::WarmStart)>,
 ) -> Result<RootOutput<D>> {
     options.cg.bound_mode = options.bound_mode;
+    options.cg.node_depth = options.node_depth;
     options.master_solver.ensure_available()?;
     options.normalize_pricing_options()?;
     if !options.bucket_steps.is_empty()

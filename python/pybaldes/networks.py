@@ -256,6 +256,18 @@ class NetworkNode:
 
 
 @dataclass(frozen=True)
+class MappedBranchEvaluation:
+    name: str
+    depth: int
+    side: int
+    stage: int
+    kind: str
+    parent: float
+    estimate: float
+    distance: float
+
+
+@dataclass(frozen=True)
 class NetworkResult:
     mode: str
     status: str
@@ -278,6 +290,9 @@ class NetworkResult:
     enumerated_mip_calls: int
     enumerated_mip_nodes: int
     enumerated_mip_failures: int
+    strong_branching_trials: int = 0
+    mapped_history_ranked: int = 0
+    mapped_branch_evaluations: Tuple[MappedBranchEvaluation, ...] = ()
     snapshot: Optional[NetworkNode] = field(default=None, repr=False, compare=False)
 
     def to_json(self, *, indent: Optional[int] = 2) -> str:
@@ -285,6 +300,7 @@ class NetworkResult:
         data["routes"] = [asdict(r) for r in self.routes]
         data["fixed_routes"] = [asdict(r) for r in self.fixed_routes]
         data["enumeration_reports"] = [asdict(r) for r in self.enumeration_reports]
+        data["mapped_branch_evaluations"] = [asdict(e) for e in self.mapped_branch_evaluations]
         return json.dumps(data, allow_nan=False, indent=indent)
 
 
@@ -293,6 +309,9 @@ def _result(text: str, native: Any) -> NetworkResult:
     data["routes"] = tuple(NetworkRoute(**r) for r in data["routes"])
     data["fixed_routes"] = tuple(NetworkRoute(**r) for r in data["fixed_routes"])
     data["enumeration_reports"] = tuple(NetworkEnumerationReport(**r) for r in data["enumeration_reports"])
+    data["mapped_branch_evaluations"] = tuple(
+        MappedBranchEvaluation(**e) for e in data.get("mapped_branch_evaluations", ())
+    )
     data["duals"] = tuple(data["duals"])
     data["oracle_calls"] = tuple(tuple(c) for c in data["oracle_calls"])
     return NetworkResult(**data, snapshot=None if native is None else NetworkNode(native))
@@ -314,7 +333,10 @@ def solve_networks(
     tree: bool = False,
     network_pricing_schedule: str = "full-sweep",
     network_unpromising_limit: int = 1,
+    network_promising_limit: int = 1000000,
     network_branching: str = "resource-first",
+    mapped_variables: Tuple[Mapping[str, Any], ...] = (),
+    mapped_strong_branching: bool = True,
     enumerate: bool = False,
     enumeration_route_limit: int = 10000,
     enumeration_work_limit: int = 10000000,
@@ -328,6 +350,7 @@ def solve_networks(
     max_iterations: int = 100000,
     node_limit: int = 10000,
     stabilize: bool = True,
+    stabilization_max_tree_depth: int = 10000,
     proximal: Optional[Mapping[str, Any]] = None,
     bound_mode: str = "numerical",
     artificial_cost: float = 2.76,
@@ -345,7 +368,7 @@ def solve_networks(
         raise TypeError("problem must be a NetworkProblem")
     if not _core.has_clp:
         raise RuntimeError("multi-network solving requires a build with Clp")
-    options = dict(synchronized_services=synchronized_services, tree=tree, network_pricing_schedule=network_pricing_schedule, network_unpromising_limit=network_unpromising_limit, proximal=proximal, network_branching=network_branching, enumerate=enumerate, enumeration_route_limit=enumeration_route_limit,
+    options = dict(synchronized_services=synchronized_services, tree=tree, network_pricing_schedule=network_pricing_schedule, network_unpromising_limit=network_unpromising_limit, network_promising_limit=network_promising_limit, stabilization_max_tree_depth=stabilization_max_tree_depth, proximal=proximal, network_branching=network_branching, mapped_variables=mapped_variables, mapped_strong_branching=mapped_strong_branching, enumerate=enumerate, enumeration_route_limit=enumeration_route_limit,
                    enumeration_work_limit=enumeration_work_limit, enumeration_stored_arc_limit=enumeration_stored_arc_limit,
                    enumeration_time_limit=enumeration_time_limit, enumerated_mip=enumerated_mip,
                    mip_time_limit=mip_time_limit, mip_node_limit=mip_node_limit,

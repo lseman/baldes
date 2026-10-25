@@ -1,0 +1,10 @@
+[
+  {
+    "name": "total-route-count",
+    "priority": 1.0,
+    "networks": [
+      {"network": 7, "per_route": 1.0},
+      {"network": 42, "per_route": 1.0}
+    ]
+  }
+]

@@ -269,3 +269,25 @@ fn fresh_preserves_queue_budget_and_resets_all_scan_state() {
     assert!(!fresh.finish_network(0, 1));
     assert!(fresh.finish_network(1, 0));
 }
+
+#[test]
+fn native_status_budgets_keep_skips_and_failures_distinct_from_solved_networks() {
+    let mut scheduler = Scheduler::new(NetworkPricingSchedule::NativePromisingFirst, 4, 1e-6);
+    scheduler.max_promising = 1;
+    scheduler.max_unpromising = 1;
+    assert_eq!(scheduler.order(2, vec![0, 1, 2, 3]), vec![0, 1, 2, 3]);
+    // A skipped visit belongs to U but never consumes the solved-network budget.
+    assert!(!scheduler.finish_native_status(0, 1, -2).unwrap());
+    assert_eq!(scheduler.unpromising_seen, 0);
+    assert!(scheduler.finish_native_status(1, 0, 0).unwrap());
+    assert_eq!(scheduler.order(1, vec![0, 1, 2, 3]), vec![2, 3, 0, 1]);
+    // Positive status, rather than column count, consumes its independent budget.
+    assert!(scheduler.finish_native_status(2, 0, 1).unwrap());
+    assert_eq!(scheduler.order(0, vec![0, 1, 2, 3]), vec![2, 3, 0, 1]);
+    scheduler.complete = true;
+    assert!(scheduler.finish_native_status(2, 0, -1).is_err());
+    assert!(!scheduler.complete);
+    let fresh = scheduler.fresh();
+    assert_eq!(fresh.max_promising, 1);
+    assert_eq!(fresh.max_unpromising, 1);
+}

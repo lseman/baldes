@@ -41,6 +41,12 @@ pub(crate) fn key(c: &BranchConstraint) -> String {
         BranchConstraint::AggregateFlow { name, arcs, .. } => {
             format!("aggregate:{name}:{arcs:?}")
         }
+        BranchConstraint::WindowFlow { group, .. } => match group {
+            super::WindowGroup::Selection { vertex, window } => {
+                format!("window:{vertex}:{window}")
+            }
+            super::WindowGroup::Arc { original } => format!("window-arc:{original}"),
+        },
         BranchConstraint::NumberOfVehicles { graph_id, .. } => format!("vehicles:{graph_id}"),
         BranchConstraint::PackingSetAssignment {
             vertex, graph_id, ..

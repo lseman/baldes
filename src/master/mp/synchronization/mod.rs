@@ -40,6 +40,13 @@ pub(super) struct Service {
     variable: i32,
 }
 
+impl Service {
+    /// Master variable of the binary served decision.
+    pub(in crate::master::mp) fn variable(&self) -> i32 {
+        self.variable
+    }
+}
+
 pub(super) fn prepare<const D: usize>(
     problem: &mut Problem<D>,
     variables: &mut Vec<MasterVariable>,

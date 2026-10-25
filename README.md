@@ -120,7 +120,7 @@ Use `problem_type="cvrp"` for capacitated routing without time windows.
 
 You can also construct an `Instance` in memory, configure cuts and master
 solvers, or use the low-level `Solver` for pricing. See the
-[PyBaldes documentation](docs/pybaldes/README.md) for examples, options, and result export.
+[pyBaldes documentation](docs/pybaldes/README.md) for examples, options, and result export.
 
 ## Documentation
 
@@ -128,7 +128,7 @@ New here? Start with [Your first solve](docs/guides/first-solve.md).
 
 - [Build and installation](docs/guides/build.md)
 - [CLI usage and options](docs/guides/cli.md)
-- [PyBaldes handbook and API reference](docs/pybaldes/README.md)
+- [pyBaldes handbook and API reference](docs/pybaldes/README.md)
 - [Branch-and-price](docs/solver/tree.md)
 - [Pricing controls](docs/reference/options.md)
 - [Algorithms and references](docs/reference/algorithms.md)

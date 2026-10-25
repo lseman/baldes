@@ -2,6 +2,7 @@
 use super::*;
 mod encoded;
 mod fronts;
+mod lattice;
 mod operators;
 mod paired;
 use crate::core::rounding::{add_down, add_up, multiply_down};

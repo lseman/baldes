@@ -5,6 +5,7 @@
 //! times a route selects each window is then an integer combination of arc
 //! traversals, so window-selection rows are arc-additive in pricing and every
 //! window choice remains reachable under any dual prices.
+#[cfg(feature = "multi-time-windows")]
 use super::*;
 
 /// One arc into a multi-window vertex, restricted to a single window. The
@@ -55,6 +56,7 @@ impl WindowArcs {
     }
 }
 
+#[cfg(feature = "multi-time-windows")]
 impl<const D: usize> Graph<D> {
     /// Copy every arc into a vertex with two or more time windows on
     /// `resource`, once per window that the arc can reach; each copy's head
@@ -160,6 +162,7 @@ impl<const D: usize> Graph<D> {
     }
 }
 
+#[cfg(feature = "multi-time-windows")]
 fn arc_window(vertex: Window, arc: Option<Window>) -> Window {
     arc.map_or(vertex, |a| Window {
         lower: vertex.lower.max(a.lower),
@@ -167,6 +170,6 @@ fn arc_window(vertex: Window, arc: Option<Window>) -> Window {
     })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "multi-time-windows"))]
 #[path = "../../tests/unit/graph/window_arcs_tests.rs"]
 mod tests;

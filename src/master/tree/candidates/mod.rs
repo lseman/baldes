@@ -1,5 +1,6 @@
 //! Fractional candidates of the native routing branch families.
 use super::*;
+use crate::master::branching::WindowGroup;
 pub(crate) mod resource_groups;
 
 #[derive(Clone, Debug)]
@@ -41,7 +42,7 @@ pub(super) fn legacy_candidates_with_history<const D: usize>(
     options: &BranchingOptions,
     history: &[BranchConstraint],
 ) -> Vec<BranchCandidate> {
-    generate(problem, result, options, history, false, true)
+    generate(problem, result, options, history, false, true, true)
 }
 pub(super) fn fresh_candidates<const D: usize>(
     problem: &RootProblem<D>,
@@ -87,6 +88,7 @@ pub(super) fn fresh_candidates_with_budget<const D: usize>(
                 history,
                 true,
                 options.priorities.arc_flow == priority,
+                options.priorities.time_window_selection == priority,
             )
         },
     )
@@ -99,6 +101,7 @@ fn generate<const D: usize>(
     history: &[BranchConstraint],
     all: bool,
     arcs: bool,
+    windows: bool,
 ) -> Vec<BranchCandidate> {
     let routes: Vec<_> = result
         .route_values()
@@ -264,11 +267,47 @@ fn generate<const D: usize>(
             return candidates;
         }
     }
+    // On a window-split graph the arc-flow family branches on input arcs, each
+    // flow summed over its copies, and window selection counts follow it.
+    let split = options.window_arcs.as_ref();
+    if let Some(split) = split.filter(|_| windows) {
+        for ((vertex, window), ids) in split.selections() {
+            let members = positions(problem, &ids);
+            let value = members.iter().map(|&(a, _)| flows.get(&a).copied().unwrap_or(0.)).sum::<f64>();
+            if fractional(value) {
+                candidates.push(window_candidate(
+                    WindowGroup::Selection { vertex, window },
+                    members,
+                    value,
+                ));
+            }
+        }
+    }
     if !arcs {
         order(&mut candidates);
         return candidates;
     }
+    let mut copied = BTreeMap::<i32, Vec<i32>>::new();
+    for copy in split.map_or(&[][..], |s| &s.arcs[..]) {
+        copied.entry(copy.original).or_default().push(copy.arc);
+    }
+    copied.retain(|_, ids| ids.len() > 1);
+    let grouped: HashSet<usize> = copied
+        .values()
+        .flatten()
+        .filter_map(|&id| problem.arc_position(id))
+        .collect();
+    for (&original, ids) in &copied {
+        let members = positions(problem, ids);
+        let value = members.iter().map(|&(a, _)| flows.get(&a).copied().unwrap_or(0.)).sum::<f64>();
+        if fractional(value) {
+            candidates.push(window_candidate(WindowGroup::Arc { original }, members, value));
+        }
+    }
     for (arc, value) in flows {
+        if grouped.contains(&arc) {
+            continue;
+        }
         if fractional(value) {
             candidates.push(BranchCandidate {
                 down: BranchConstraint::ArcFlow {
@@ -287,4 +326,31 @@ fn generate<const D: usize>(
     }
     order(&mut candidates);
     candidates
+}
+
+/// Sorted physical positions of arc IDs, with unit coefficients.
+fn positions<const D: usize>(problem: &RootProblem<D>, ids: &[i32]) -> Vec<(usize, f64)> {
+    let mut arcs: Vec<_> = ids
+        .iter()
+        .filter_map(|&id| Some((problem.arc_position(id)?, 1.)))
+        .collect();
+    arcs.sort_by_key(|&(a, _)| a);
+    arcs
+}
+
+/// Floor/ceil children on a window-copy flow. For a unit-cover customer the
+/// up child of a selection count also excludes its other windows through
+/// preprocessing, as in the right child of Li et al. (2020).
+fn window_candidate(group: WindowGroup, arcs: Vec<(usize, f64)>, value: f64) -> BranchCandidate {
+    let branch = |sense, rhs| BranchConstraint::WindowFlow {
+        group,
+        arcs: arcs.clone(),
+        sense,
+        rhs,
+    };
+    BranchCandidate {
+        down: branch(RowSense::LessEqual, value.floor()),
+        up: branch(RowSense::GreaterEqual, value.ceil()),
+        value,
+    }
 }

@@ -287,3 +287,7 @@ pub(super) fn infeasible_output<const D: usize>(
 #[cfg(test)]
 #[path = "../../../tests/unit/master/root/preprocessing/tests.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "multi-time-windows"))]
+#[path = "../../../tests/unit/master/root/preprocessing/window_tests.rs"]
+mod window_tests;

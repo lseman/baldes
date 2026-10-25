@@ -27,6 +27,7 @@ impl BranchEvaluationHistory {
                 AccumulatedResource(_) => options.accumulated_resource,
                 ArcFlow { .. } => true,
                 AggregateFlow { .. } => options.aggregate_flow(),
+                WindowFlow { .. } => options.window_arcs.is_some(),
                 NumberOfVehicles { .. } => options.number_of_vehicles,
                 PackingSetAssignment { .. } => options.packing_set_assignment,
                 RyanFoster(_) => options.ryan_foster,
@@ -125,6 +126,7 @@ impl BranchEvaluationHistory {
                 match constraint {
                     ArcFlow { rhs: r, .. }
                     | AggregateFlow { rhs: r, .. }
+                    | WindowFlow { rhs: r, .. }
                     | NumberOfVehicles { rhs: r, .. }
                     | ClusterBoundary { rhs: r, .. }
                     | ClusterPair { rhs: r, .. } => *r = rhs,

@@ -49,6 +49,8 @@ impl<const D: usize> NodeSnapshot<D> {
             master: self.master.try_clone()?,
             warm: self.warm.clone(),
             state: State {
+                mapped_subtree_size: self.state.mapped_subtree_size,
+                node_depth: self.state.node_depth,
                 scheduler: self.state.scheduler.fresh(),
                 synchronized_services: self.state.synchronized_services.clone(),
                 oracles: self
@@ -89,6 +91,11 @@ impl<const D: usize> NodeSnapshot<D> {
                 route_upper_bounds: self.state.route_upper_bounds.clone(),
             },
         })
+    }
+
+    /// Actual branch depth; resumes and row additions preserve this value.
+    pub fn node_depth(&self) -> usize {
+        self.state.node_depth
     }
 
     /// Resume this node with a new time/iteration budget and no external registry.
@@ -319,7 +326,9 @@ impl<const D: usize> NodeSnapshot<D> {
         } else {
             (RowSense::LessEqual, 0.)
         };
-        self.with_row(Row { sense, rhs }, &[coefficients])
+        let mut child = self.with_row(Row { sense, rhs }, &[coefficients])?;
+        child.state.node_depth = self.state.node_depth.saturating_add(1);
+        Ok(child)
     }
 
     /// Candidates from the current solved, original-feasible node only.

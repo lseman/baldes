@@ -203,7 +203,11 @@ pub struct SolveOptions {
     pub tree: bool,
     pub network_pricing_schedule: NetworkPricingSchedule,
     pub network_unpromising_limit: usize,
+    /// Native promising-status visit budget (default one million).
+    pub network_promising_limit: usize,
     pub network_branching: NetworkBranchingPolicy,
+    pub mapped_variables: Vec<MappedBranchVariable>,
+    pub mapped_strong_branching: bool,
     pub synchronized_services: Vec<SynchronizedService>,
     pub enumerate: bool,
     pub enumeration_route_limit: usize,
@@ -218,6 +222,7 @@ pub struct SolveOptions {
     pub max_iterations: usize,
     pub node_limit: usize,
     pub stabilize: bool,
+    pub stabilization_max_tree_depth: i64,
     pub proximal: Option<crate::master::stabilization::ProximalParameters>,
     pub bound_mode: String,
     pub artificial_cost: f64,
@@ -230,7 +235,10 @@ impl Default for SolveOptions {
             tree: false,
             network_pricing_schedule: NetworkPricingSchedule::default(),
             network_unpromising_limit: 1,
+            network_promising_limit: 1_000_000,
             network_branching: NetworkBranchingPolicy::default(),
+            mapped_variables: vec![],
+            mapped_strong_branching: true,
             synchronized_services: vec![],
             enumerate: false,
             enumeration_route_limit: 10000,
@@ -245,6 +253,7 @@ impl Default for SolveOptions {
             max_iterations: 100000,
             node_limit: 10000,
             stabilize: true,
+            stabilization_max_tree_depth: 10_000,
             proximal: None,
             bound_mode: "numerical".into(),
             artificial_cost: 2.76,
@@ -261,6 +270,7 @@ impl SolveOptions {
         let mut options = Options::default();
         options.network_pricing_schedule = self.network_pricing_schedule;
         options.network_unpromising_limit = self.network_unpromising_limit;
+        options.network_promising_limit = self.network_promising_limit;
         options.cg.proximal = self.proximal.clone();
         options.synchronized_services = self.synchronized_services.clone();
         if self.enumerated_mip && (!self.tree || !cfg!(feature = "highs")) {
@@ -291,6 +301,7 @@ impl SolveOptions {
             .map_err(|_| invalid("time_limit must be finite and nonnegative"))?;
         options.cg.max_iterations = self.max_iterations;
         options.cg.stabilize = self.stabilize;
+        options.cg.stabilization_max_tree_depth = self.stabilization_max_tree_depth;
         options.cg.bound_mode = cg::BoundMode::parse(&self.bound_mode)?;
         options.cg.artificial_cost = self.artificial_cost;
         options.cg.log_interval = self.log_interval;
@@ -312,6 +323,10 @@ impl SolveOptions {
         let node = self.node_options()?;
         Ok(AssignmentTreeOptions {
             branching: self.network_branching,
+            mapped_variables: self.mapped_variables.clone(),
+            mapped_strong_branching: self
+                .mapped_strong_branching
+                .then(crate::master::tree::StrongBranchingOptions::default),
             time_limit: node.cg.time_limit,
             node,
             node_limit: self.node_limit,
@@ -435,6 +450,9 @@ pub struct SolveResult {
     pub enumerated_mip_calls: usize,
     pub enumerated_mip_nodes: usize,
     pub enumerated_mip_failures: usize,
+    pub strong_branching_trials: usize,
+    pub mapped_history_ranked: usize,
+    pub mapped_branch_evaluations: Vec<MappedBranchEvaluation>,
 }
 fn finite(value: f64) -> Option<f64> {
     value.is_finite().then_some(value)
@@ -472,6 +490,9 @@ impl SolveResult {
             enumerated_mip_calls: 0,
             enumerated_mip_nodes: 0,
             enumerated_mip_failures: 0,
+            strong_branching_trials: 0,
+            mapped_history_ranked: 0,
+            mapped_branch_evaluations: vec![],
             seconds,
         }
     }
@@ -501,6 +522,9 @@ impl SolveResult {
             enumerated_mip_calls: output.enumerated_mip_calls,
             enumerated_mip_nodes: output.enumerated_mip_nodes,
             enumerated_mip_failures: output.enumerated_mip_failures,
+            strong_branching_trials: output.strong_branching_trials,
+            mapped_history_ranked: output.mapped_history_ranked,
+            mapped_branch_evaluations: output.mapped_branch_evaluations.clone(),
             seconds,
         }
     }
@@ -541,6 +565,9 @@ impl SolveResult {
             enumerated_mip_calls: 1,
             enumerated_mip_nodes: output.mip.nodes,
             enumerated_mip_failures: 0,
+            strong_branching_trials: 0,
+            mapped_history_ranked: 0,
+            mapped_branch_evaluations: vec![],
         }
     }
     pub fn to_json(&self) -> Result<String> {

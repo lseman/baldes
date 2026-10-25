@@ -1,8 +1,8 @@
-# PyBaldes documentation
+# pyBaldes documentation
 
 [All BALDES documentation](../README.md)
 
-PyBaldes is the Python distribution of BALDES. Import it as `pybaldes`.
+pyBaldes is the Python distribution of BALDES. Import it as `pybaldes`.
 It provides typed routing inputs/results, a stateful resource-constrained
 shortest-path pricing solver, and shared-master models with multiple pricing
 networks. Solves run in the Rust library; no CLI subprocess is required.

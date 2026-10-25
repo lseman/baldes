@@ -1,6 +1,6 @@
 # Routing inputs and options
 
-[PyBaldes documentation](README.md) · [Results](results.md)
+[pyBaldes documentation](README.md) · [Results](results.md)
 
 ## Customer and Instance
 

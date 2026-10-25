@@ -1,6 +1,6 @@
 # Coupled resources and function encodings
 
-[PyBaldes documentation](README.md) · [Pricing](pricing.md)
+[pyBaldes documentation](README.md) · [Pricing](pricing.md)
 
 Scalar coordinates cover additive consumption and vertex bounds. `ResourceModel`
 adds physical-graph resource families with selection domains, simultaneous

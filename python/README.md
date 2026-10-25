@@ -1,9 +1,9 @@
-# PyBaldes
+# pyBaldes
 
-PyBaldes is the Python package for BALDES routing root relaxations, RCSP pricing,
+pyBaldes is the Python package for BALDES routing root relaxations, RCSP pricing,
 and shared-master network models with integer search.
 
-Start with the [PyBaldes handbook](../docs/pybaldes/README.md).
+Start with the [pyBaldes handbook](../docs/pybaldes/README.md).
 
 - [Install and select build features](../docs/pybaldes/installation.md)
 - [Run the quickstart](../docs/pybaldes/quickstart.md)

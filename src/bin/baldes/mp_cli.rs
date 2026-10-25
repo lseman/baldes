@@ -9,8 +9,12 @@ Solve shared master rows with multiple pricing networks (Clp).
   --tree                 Run the assignment branch-and-price tree
   --network-pricing-schedule MODE  full-sweep (default), cyclic, sorted,
                             native-promising-first or native-unvisited-first
+  --network-promising-limit N  Native positive-status budget (default: 1000000)
+  --stabilization-max-tree-depth N  Disable stabilization at depth N (default: 10000)
   --network-unpromising-limit N  Per-batch native queue budget (default: 1)
-  --proximal FILE         Explicit proximal bands JSON (replaces smoothing)
+  --mapped-variables FILE  Registered original aggregate branch variables JSON
+  --no-mapped-strong-branching  Rank registered aggregates without trial solves
+  --proximal FILE         Proximal configuration JSON (replaces smoothing)
   --automatic-curvature   Automatic three-piece curvature stabilization
   --automatic-curvature-five-piece  Automatic five-piece curvature stabilization
   --proximal-width X      One proximal band, in dual row units
@@ -73,10 +77,24 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
                 options.proximal =
                     Some(baldes::master::stabilization::ProximalParameters::automatic_five_piece())
             }
+            "--network-promising-limit" => {
+                options.network_promising_limit =
+                    value()?.parse::<usize>().map_err(|e| e.to_string())?;
+            }
+            "--stabilization-max-tree-depth" => {
+                options.stabilization_max_tree_depth =
+                    value()?.parse::<i64>().map_err(|e| e.to_string())?;
+            }
             "--network-unpromising-limit" => {
                 options.network_unpromising_limit =
                     value()?.parse::<usize>().map_err(|e| e.to_string())?;
             }
+            "--mapped-variables" => {
+                let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;
+                options.mapped_variables = serde_json::from_str(&text)
+                    .map_err(|e| format!("mapped variables JSON: {e}"))?;
+            }
+            "--no-mapped-strong-branching" => options.mapped_strong_branching = false,
             "--proximal" => {
                 let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;
                 options.proximal =

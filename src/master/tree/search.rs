@@ -1,6 +1,44 @@
 use super::*;
 
-pub fn solve<const D: usize>(
+/// Best-bound branch-and-price. With `branching.time_window_selection`, the
+/// search runs on window copies of the arcs into multi-window vertices,
+/// branches on window selection counts and reports routes in input arc IDs.
+pub fn solve<const D: usize>(problem: RootProblem<D>, options: TreeOptions) -> Result<TreeOutput> {
+    let Some(resource) = options.branching.time_window_selection else {
+        return solve_split(problem, options);
+    };
+    #[cfg(not(feature = "multi-time-windows"))]
+    {
+        let _ = resource;
+        Err(invalid("time-window selection branching requires multi-time-windows"))
+    }
+    #[cfg(feature = "multi-time-windows")]
+    {
+        let mut options = options;
+        let vehicles = problem
+            .rows
+            .first()
+            .ok_or_else(|| invalid("tree requires set partitioning rows"))?
+            .rhs;
+        let mut graph = problem.graph.clone();
+        let split = graph.split_time_window_arcs(resource)?;
+        options.root.initial_routes = std::mem::take(&mut options.root.initial_routes)
+            .into_iter()
+            .filter_map(|mut route| {
+                route.arcs = graph.route_on_window_arcs(&split, &route.arcs)?;
+                Some(route)
+            })
+            .collect();
+        options.branching.window_arcs = Some(split.clone());
+        let mut output = solve_split(RootProblem::set_partitioning(graph, vehicles)?, options)?;
+        for route in &mut output.routes {
+            split.restore(route);
+        }
+        Ok(output)
+    }
+}
+
+fn solve_split<const D: usize>(
     problem: RootProblem<D>,
     mut options: TreeOptions,
 ) -> Result<TreeOutput> {

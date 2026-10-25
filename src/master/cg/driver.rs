@@ -86,10 +86,14 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     // A zero alpha factor disables the reference's smoothing workflow, not
     // only publication of smoothed duals.
     let mut smoothing = DualPriceSmoothing::new(options.smoothing.clone());
-    let proximal = options.proximal.as_ref().filter(|_| options.stabilize);
+    let configured_proximal = options.proximal.as_ref().filter(|_| options.stabilize);
+    let depth_active = options.stabilization_active_at_depth();
+    let proximal = configured_proximal.filter(|_| depth_active);
     let mut proximal_state = crate::master::stabilization::proximal::ProximalState::default();
-    let stabilize =
-        options.stabilize && proximal.is_none() && smoothing.parameters.alpha_factor > 0.;
+    let retain_smoothing = options.stabilize
+        && configured_proximal.is_none()
+        && smoothing.parameters.alpha_factor > 0.;
+    let stabilize = retain_smoothing && depth_active;
     let mut warm = options.warm_start.take();
     let is_resume = warm.is_some();
     let inherited_center = warm.as_ref().and_then(|warm| warm.stabilization.as_ref());
@@ -97,11 +101,15 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         smoothing.inherit_center(previous, (schedule.len() - 1) as i32);
     }
     let has_inherited_center = inherited_center.is_some();
+    if !depth_active {
+        smoothing.deactivate();
+    }
     smoothing.exclude_rows(controller.unstabilized_rows());
     setup::validate_warm_start(master, warm.as_ref())?;
-    if let (Some(parameters), Some(previous)) =
-        (proximal, warm.as_ref().and_then(|w| w.proximal.as_ref()))
-    {
+    if let (Some(parameters), Some(previous)) = (
+        configured_proximal,
+        warm.as_ref().and_then(|w| w.proximal.as_ref()),
+    ) {
         if let Some(snapshot) = previous.restore(master, controller, parameters)? {
             proximal_state.inherit_for_solve(&snapshot, schedule.len() - 1)?;
         }
@@ -243,7 +251,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             bound_mode: out.bound_mode,
             numerical_bound: out.numerical_bound,
             certified_bound: out.certified_bound,
-            stabilization: stabilize.then_some(smoothing),
+            stabilization: retain_smoothing.then_some(smoothing),
             proximal: out.warm_start.proximal.take(),
             generated_pool: pool,
             columns: loaded,
@@ -253,7 +261,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         };
         Ok(out)
     };
-    if let Some(parameters) = proximal {
+    if let Some(parameters) = configured_proximal {
         out.warm_start.proximal = ProximalWarmStart::capture(
             &proximal_state,
             master,

@@ -12,8 +12,12 @@ box-step, three-piece or five-piece dual regularization on a private LP copy.
 Its optional multi-point epigraph also stays private; ordinary master duals are
 retried before accepting a no-column result. Auxiliary objectives never become
 original bounds or incumbents. See [network proximal controls](../extensions/mp.md#proximal-pricing).
-`CurvatureState` and `CurvatureFeedback` expose recovered radius arithmetic with
-explicit measured inputs; they do not guess native row flags or schedule timing.
+Automatic three/five-piece curvature is available through
+`ProximalParameters::automatic_three_piece()` / `automatic_five_piece()` or
+JSON/Python `proximal={"curvature": {}}`. The solve loop supplies initialization,
+physical-row participation, raw-dual measurements, iteration updates, activity
+retries and compatible warm/child inheritance. See
+[automatic curvature controls](../extensions/mp.md#automatic-curvature).
 
 The implementation is
 [`DualPriceSmoothing`](../../src/master/stabilization/mod.rs), integrated by the

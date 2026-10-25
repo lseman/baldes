@@ -33,7 +33,7 @@ fn _read_instance(py: Python<'_>, path: PathBuf) -> PyResult<Py<PyDict>> {
 
 #[cfg(feature = "clp")]
 #[pyfunction]
-#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false, master_solver="clp", hgs_time=None, hgs_columns="best", hgs_seed=0, verbose=false, log_interval=10, bound_mode="numerical", clp_scaling="equilibrium", clp_keep_work_areas=true, master_threads=0))]
+#[pyo3(signature = (name, vehicles, capacity, customers, distances, problem_type, ng, reference_ng, rounding, capacity_cuts, rank_one_cuts, stabilize, enumerate, upper_bound, time_limit, max_iterations, max_cut_rounds, pricing_options, two_path_cuts=false, master_solver="clp", hgs_time=None, hgs_columns="best", hgs_seed=0, verbose=false, log_interval=10, bound_mode="numerical", clp_scaling="equilibrium", clp_keep_work_areas=true, master_threads=0, stabilization_max_tree_depth=10000))]
 #[allow(clippy::too_many_arguments)]
 fn _solve_root(
     py: Python<'_>,
@@ -66,6 +66,7 @@ fn _solve_root(
     clp_scaling: &str,
     clp_keep_work_areas: bool,
     master_threads: usize,
+    stabilization_max_tree_depth: i64,
 ) -> PyResult<Py<PyDict>> {
     use baldes::inputs::{Customer, Rounding};
     use baldes::master::root::{self, RootOptions, RootProblem};
@@ -208,6 +209,7 @@ fn _solve_root(
         })
         .transpose()?;
     options.cg.stabilize = stabilize;
+    options.cg.stabilization_max_tree_depth = stabilization_max_tree_depth;
     options.cg.max_iterations = max_iterations;
     options.cg.time_limit = std::time::Duration::try_from_secs_f64(time_limit)
         .map_err(|e| PyValueError::new_err(e.to_string()))?;

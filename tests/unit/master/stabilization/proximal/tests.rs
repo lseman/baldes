@@ -211,6 +211,8 @@ fn hard_and_soft_bands_solve_only_a_private_master() {
             last_mean: None,
             pending_iteration: false,
             artificial_values: None,
+            explicit_bands: vec![],
+            explicit_baseline: None,
         };
         let point = state
             .pricing_point(&master, &[10.], 0, &parameters, &[], Duration::from_secs(5))
@@ -254,6 +256,8 @@ fn incompatible_hard_band_and_zero_budget_fall_back_to_original_duals() {
         last_mean: None,
         pending_iteration: false,
         artificial_values: None,
+        explicit_bands: vec![],
+        explicit_baseline: None,
     };
     for remaining in [Duration::from_secs(5), Duration::ZERO] {
         assert_eq!(
@@ -330,4 +334,28 @@ fn multipoint_column_generation_keeps_beta_out_of_original_objectives_and_warm_m
         .iter()
         .flatten()
         .all(|c| [2., 10.].contains(&c.cost)));
+}
+
+#[test]
+fn explicit_center_intervals_and_baseline_survive_phase_and_schedule_changes() {
+    let parameters = ProximalParameters::three_piece(5., 1.);
+    let mut state = ProximalState::default();
+    state.begin_iteration(&[10.], &[0], 2, &parameters).unwrap();
+    assert_eq!(state.center, vec![0.]);
+    state.explicit_bands = parameters.bands.clone();
+    state.explicit_baseline = Some(5.);
+    state.observe(&[3.], 8., true);
+    state.begin_iteration(&[10.], &[0], 1, &parameters).unwrap();
+    assert_eq!(state.center, vec![3.]);
+    state.observe(&[4.], 2., true);
+    assert_eq!(state.center, vec![4.]);
+    state.restart_schedule();
+    state.begin_iteration(&[99.], &[0], 2, &parameters).unwrap();
+    assert_eq!(state.center, vec![4.]);
+    assert_eq!(state.explicit_bands[0].half_width, 5.);
+    assert_eq!(state.explicit_baseline, Some(5.));
+    state.artificial_values = Some(vec![0.]);
+    assert!(state.after_iteration(&parameters).unwrap());
+    assert_eq!(state.explicit_bands[0].half_width, 2.5);
+    assert_eq!(state.explicit_baseline, Some(5.));
 }

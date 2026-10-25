@@ -1,4 +1,4 @@
-//! Automatic stabilization checkpoints contain original model geometry only.
+//! Proximal stabilization checkpoints contain original model geometry only.
 use super::*;
 use crate::master::stabilization::proximal::{ProximalParameters, ProximalSnapshot, ProximalState};
 
@@ -41,9 +41,6 @@ impl ProximalWarmStart {
         artificials: &[usize],
         cut_artificials: &[(usize, usize)],
     ) -> Result<Option<Self>> {
-        if parameters.curvature.is_none() {
-            return Ok(None);
-        }
         let Some(snapshot) = state.snapshot() else {
             return Ok(None);
         };
@@ -104,12 +101,33 @@ impl ProximalWarmStart {
         let mut snapshot = self.snapshot.clone();
         if compatible {
             snapshot.center.resize(master.rhs().len(), 0.);
-        } else if self.child && snapshot.curvature.is_some() {
-            // Child global radius information is dimension-independent. Never
+            for plane in &mut snapshot.support_planes {
+                plane.point.resize(master.rhs().len(), 0.);
+            }
+        } else if self.child {
+            // Child global interval information is dimension-independent. Never
             // assign old coordinates to different rows or carry a bound.
             snapshot.center = vec![0.; master.rhs().len()];
+            snapshot.support_planes.clear();
         } else {
             return Ok(None);
+        }
+        if self.child && parameters.curvature.is_none() && !parameters.multi_point {
+            if let Some(baseline) = snapshot.explicit_baseline {
+                let outer = baseline * (parameters.child_half_interval_factor as f32 as f64);
+                if !outer.is_finite()
+                    || (snapshot.explicit_bands.len() > 1 && !(outer * 10.).is_finite())
+                {
+                    return Err(invalid("inherited explicit proximal intervals overflow"));
+                }
+                let count = snapshot.explicit_bands.len();
+                if let Some(band) = snapshot.explicit_bands.last_mut() {
+                    band.half_width = outer;
+                }
+                if count > 1 {
+                    snapshot.explicit_bands[0].half_width = outer * 10.;
+                }
+            }
         }
         snapshot.bound = f64::NEG_INFINITY;
         Ok(Some(snapshot))
@@ -118,6 +136,10 @@ impl ProximalWarmStart {
 
 fn same_parameters(a: &ProximalParameters, b: &ProximalParameters) -> bool {
     a.curvature == b.curvature
+        && a.child_half_interval_factor == b.child_half_interval_factor
+        && a.artificial_activity_factor == b.artificial_activity_factor
+        && a.native_row_scaling == b.native_row_scaling
+        && a.native_explicit == b.native_explicit
         && a.multi_point == b.multi_point
         && a.max_points == b.max_points
         && a.bands.len() == b.bands.len()

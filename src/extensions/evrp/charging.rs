@@ -5,6 +5,7 @@
 use crate::graph::coupled::{CoupledPlugin, PiecewiseLinearFunction, PluginState};
 use crate::graph::Window;
 use crate::{invalid, Result};
+mod certificate;
 
 fn finite(x: f64) -> Result<f64> {
     if x.is_finite() {
@@ -224,6 +225,15 @@ impl ChargingResource {
 }
 
 impl CoupledPlugin for ChargingResource {
+    fn certify(
+        &self,
+        arcs: &[usize],
+        work: &mut usize,
+        deadline: Option<std::time::Instant>,
+    ) -> Option<bool> {
+        certificate::certify(self, arcs, work, deadline)
+    }
+
     fn validate(&self, n: usize) -> Result<()> {
         let battery = &self.battery;
         let initial_energy = &self.initial_energy;

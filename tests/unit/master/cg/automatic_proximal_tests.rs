@@ -153,3 +153,79 @@ fn automatic_controller_measures_rows_updates_caps_and_keeps_warm_models_origina
     assert_eq!(resumed.lp, 2.);
     assert!(resumed.warm_start.proximal.is_some());
 }
+
+#[test]
+fn native_stabilization_depth_limit_is_strict_and_signed() {
+    let mut options = Options::default();
+    options.stabilization_max_tree_depth = 2;
+    for (depth, active) in [(0, true), (1, true), (2, false), (3, false)] {
+        options.node_depth = depth;
+        assert_eq!(options.stabilization_active_at_depth(), active);
+    }
+    options.node_depth = 0;
+    for limit in [0, -1, i64::MIN] {
+        options.stabilization_max_tree_depth = limit;
+        assert!(!options.stabilization_active_at_depth());
+    }
+    options.stabilization_max_tree_depth = i64::MAX;
+    options.node_depth = usize::MAX;
+    assert!(!options.stabilization_active_at_depth());
+    options.node_depth = 0;
+    options.stabilize = false;
+    assert!(!options.stabilization_active_at_depth());
+}
+
+#[test]
+fn explicit_children_use_native_baseline_and_same_node_resume_does_not_rescale() {
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, 1., &[]).unwrap();
+    master.add_column(10., &[(0, 1.)]).unwrap();
+    assert!(master.solve());
+    let parameters = ProximalParameters::five_piece(
+        crate::master::stabilization::ProximalBand {
+            half_width: 1.,
+            penalty: 0.5,
+        },
+        crate::master::stabilization::ProximalBand {
+            half_width: 5.,
+            penalty: 0.5,
+        },
+    );
+    let mut state = ProximalState::default();
+    state.begin_iteration(&[10.], &[0], 2, &parameters).unwrap();
+    state
+        .pricing_point(&master, &[10.], 2, &parameters, &[], Duration::from_secs(1))
+        .unwrap();
+    state.observe(&[3.], 1., true);
+    let mut checkpoint =
+        ProximalWarmStart::capture(&state, &master, &NoController, &parameters, &[], &[])
+            .unwrap()
+            .unwrap();
+    let resumed = checkpoint
+        .restore(&master, &NoController, &parameters)
+        .unwrap()
+        .unwrap();
+    assert_eq!(resumed.explicit_bands[0].half_width, 1.);
+    assert_eq!(resumed.explicit_bands[1].half_width, 5.);
+    checkpoint.child = true;
+    let child = checkpoint
+        .restore(&master, &NoController, &parameters)
+        .unwrap()
+        .unwrap();
+    assert_eq!(child.center, vec![3.]);
+    assert_eq!(child.explicit_bands[0].half_width, 500.);
+    assert_eq!(child.explicit_bands[1].half_width, 50.);
+    assert_eq!(child.explicit_baseline, Some(5.));
+    let mut child_state = ProximalState::default();
+    child_state.inherit_for_solve(&child, 2).unwrap();
+    let resume_checkpoint =
+        ProximalWarmStart::capture(&child_state, &master, &NoController, &parameters, &[], &[])
+            .unwrap()
+            .unwrap();
+    let resumed_child = resume_checkpoint
+        .restore(&master, &NoController, &parameters)
+        .unwrap()
+        .unwrap();
+    assert_eq!(resumed_child.explicit_bands[0].half_width, 500.);
+    assert_eq!(resumed_child.explicit_bands[1].half_width, 50.);
+}

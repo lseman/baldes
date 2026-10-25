@@ -1,6 +1,6 @@
-# Install PyBaldes
+# Install pyBaldes
 
-[PyBaldes documentation](README.md) · [Quickstart](quickstart.md)
+[pyBaldes documentation](README.md) · [Quickstart](quickstart.md)
 
 ## Install from a checkout
 

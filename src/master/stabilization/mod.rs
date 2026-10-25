@@ -119,6 +119,15 @@ impl DualPriceSmoothing {
         self.active = false;
         self.center_phase = phase;
     }
+    /// Disable participation without discarding the inherited accepted center.
+    /// Native setup applies this at and beyond its maximum tree depth.
+    pub(crate) fn deactivate(&mut self) {
+        self.alpha = 0.;
+        self.effective_alpha = 0.;
+        self.active = false;
+        self.directional_available = false;
+        self.misprices = 0;
+    }
     pub fn remap_rows(&mut self, map: &[Option<usize>]) {
         fn compact<T>(v: &mut Vec<T>, map: &[Option<usize>]) {
             let mut index = 0;
@@ -409,4 +418,4 @@ pub mod proximal;
 #[path = "../../../tests/unit/master/stabilization/tests.rs"]
 mod tests;
 pub use curvature::{AutomaticCurvatureParameters, CurvatureFeedback, CurvatureState};
-pub use proximal::{ProximalBand, ProximalParameters, ProximalSnapshot};
+pub use proximal::{NativeExplicitParameters, ProximalBand, ProximalParameters, ProximalSnapshot};

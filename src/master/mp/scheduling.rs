@@ -43,6 +43,8 @@ pub(super) struct Scheduler {
     /// Stop after this many normal solved networks once a new improving
     /// column has appeared in the current batch. Does not limit empty sweeps.
     pub max_unpromising: usize,
+    /// Native MaxNbPromisingSpFound; independent of accepted column counts.
+    pub max_promising: usize,
     primary: Vec<usize>,
     secondary: Vec<usize>,
     promising: Vec<usize>,
@@ -62,6 +64,7 @@ impl Scheduler {
             policy,
             tolerance,
             max_unpromising: 1,
+            max_promising: 1_000_000,
             primary: (0..networks).collect(),
             secondary: vec![],
             promising: vec![],
@@ -79,6 +82,7 @@ impl Scheduler {
     pub fn fresh(&self) -> Self {
         let mut fresh = Self::new(self.policy, self.scores.len(), self.tolerance);
         fresh.max_unpromising = self.max_unpromising;
+        fresh.max_promising = self.max_promising;
         fresh
     }
 
@@ -141,11 +145,31 @@ impl Scheduler {
     /// columns. Positive native status is a distinct, unobserved classifier;
     /// do not infer it from a negative minimum or from the number of columns.
     pub fn finish_network(&mut self, index: usize, new_improving_columns: usize) -> bool {
-        self.finish_classified(index, new_improving_columns, false)
+        // The built-in modern oracle always completes with native status zero.
+        self.finish_native_status(index, new_improving_columns, 0)
+            .expect("normal modern pricing status")
     }
 
+    #[cfg(test)]
     fn finish_classified(&mut self, index: usize, new_columns: usize, promising: bool) -> bool {
-        match self.policy {
+        self.finish_native_status(index, new_columns, i32::from(promising))
+            .unwrap()
+    }
+
+    /// Native status contract for adapters: positive is promising, zero is a
+    /// normal solve, -2 is skipped without spending the unpromising budget.
+    /// Other negative outcomes are failures and cannot establish batch coverage.
+    pub(super) fn finish_native_status(
+        &mut self,
+        index: usize,
+        new_columns: usize,
+        status: i32,
+    ) -> Result<bool> {
+        if status < 0 && status != -2 {
+            self.complete = false;
+            return Err(incomplete("native network pricing failed"));
+        }
+        Ok(match self.policy {
             NetworkPricingSchedule::FullSweep => false,
             NetworkPricingSchedule::Cyclic | NetworkPricingSchedule::Sorted => new_columns > 0,
             NetworkPricingSchedule::NativePromisingFirst
@@ -153,20 +177,18 @@ impl Scheduler {
                 self.primary.retain(|&i| i != index);
                 self.secondary.retain(|&i| i != index);
                 self.found_columns |= new_columns > 0;
-                if promising {
+                if status > 0 {
                     self.promising.push(index);
-                    // The native default promising budget is one million;
-                    // normal solved modern results never take this branch.
-                    self.promising.len() >= 1_000_000
+                    self.promising.len() >= self.max_promising
                 } else {
                     self.unpromising.push(index);
-                    if self.found_columns {
+                    if self.found_columns && status == 0 {
                         self.unpromising_seen += 1;
                     }
                     self.found_columns && self.unpromising_seen >= self.max_unpromising
                 }
             }
-        }
+        })
     }
 
     pub fn record(&mut self, index: usize, minimum: f64) {

@@ -107,11 +107,59 @@ replaces smoothing; `--no-stabilization` disables both.
 Auxiliary columns, support rows and beta variables belong to a private LP copy.
 Its objective cannot update the original bound or incumbent. An unsuccessful
 proximal pricing pass retries the original master duals before completing a
-phase. Node/phase/formulation changes reset the center. Backends that cannot
+phase. Explicit modes reset their center on phase changes; automatic curvature
+retains its accepted center and radii. Backends that cannot
 clone the master, or unfinished private solves, fall back to original duals.
-The public curvature primitives accept explicit state and measured row feedback;
-native automatic radius initialization, inherited row classifications and exact
-multi-point plane-aging trajectories are not inferred from ordinary master rows.
+
+## Automatic curvature
+
+Automatic three-piece stabilization needs no manually prepared state:
+
+```python
+result = problem.solve(proximal={"curvature": {}})
+# Five-piece automatic bands:
+result = problem.solve(proximal={"curvature": {"five_piece": True}})
+```
+
+CLI flags are `--automatic-curvature` and `--automatic-curvature-five-piece`.
+`--proximal FILE.json` accepts the same object. Automatic curvature is a separate
+mode from explicit `bands` and `multi_point`; conflicting selections are rejected.
+`--no-stabilization` disables the selected mode. Existing defaults remain smoothing.
+
+| Curvature option | Default | Meaning |
+| --- | --- | --- |
+| `five_piece` | `false` | Maintain inner and outer radii instead of one radius. |
+| `kappa` | `1` | Positive: initialize curvature from the first positive ordinary-row mean divided by Kappa. |
+| `curvature` | `1` | Configured starting curvature when Kappa is nonpositive. |
+| `advance_rate` | `1` | Radius adaptation rate, with native stored-float precision. |
+| `artificial_activity_factor` | `10` | Multiply curvature when stabilization auxiliaries remain active at a stopping pass. |
+| `initial` | `null` | Optional explicit prepared state; ordinary use needs no override. |
+
+The controller measures original master duals against the previous accepted
+center before pricing, and consumes that measurement once after the iteration.
+Retries and a later center move cannot replace the saved mean. Positive-mean
+bootstrap initializes the radii and curvature automatically. No eligible rows
+means no fabricated feedback. Active dynamic rows use the same bands but do
+not enter the ordinary-row mean; generated network multiplicity rows are excluded
+from both measurement and automatic proximal variables. Root controllers use
+actual base/branch/cut row metadata. Custom CG controllers can implement
+`curvature_rows`; row sense or append position does not define participation.
+
+`node.with_row(...)` adds an ordinary row. Rust `with_dynamic_row(...)` and
+Python `node.with_row(..., dynamic=True)` label an added dynamic row explicitly.
+An active private auxiliary above absolute activity `1e-6` can request a bounded
+no-new-column retry; these updates share the existing penalty/time/iteration
+budgets. Equal-width bands retain separate activity variables.
+
+Automatic geometry survives pricing-phase and ordinary schedule restarts.
+Compatible warm starts retain the accepted center and exact global radii/curvature
+without applying the explicit-mode child factor. New child rows start at center
+zero; incompatible coordinate geometry is discarded while a restricted child
+can retain global radius information. Resume is distinct from creating a child.
+Warm checkpoints validate configuration, physical row roles and original matrix
+prefixes; ordinary newly generated columns do not invalidate them. Auxiliary
+LP columns, support planes and objective values never enter those checkpoints
+or authorize an original bound/incumbent.
 
 Phase estimates guide stabilization. Published lower bounds additionally use
 graph-walk relaxations with downward arithmetic. If a negative cycle prevents
@@ -492,7 +540,7 @@ an independently replayed integer witness when available. Their `mode` and
 
 ## Python
 
-The dedicated [PyBaldes network guide](../pybaldes/networks.md) covers Python model construction, solve options, snapshots, and synchronization. The sections here specify the shared Rust/CLI/Python model contract.
+The dedicated [pyBaldes network guide](../pybaldes/networks.md) covers Python model construction, solve options, snapshots, and synchronization. The sections here specify the shared Rust/CLI/Python model contract.
 
 Install the extension with Clp support (the Python build's default). The typed
 inputs use the same JSON schema as the CLI, allowing a single model to drive

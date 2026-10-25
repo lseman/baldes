@@ -14,9 +14,15 @@ fn multiplicity_first_matches_the_mapped_native_first_child_and_restores_parent(
     options.cg.artificial_cost = 100.;
     let root = solve_with_master_variables(problem, vec![], options.clone()).unwrap();
     assert_eq!(root.master.lp, 1.5);
-    let branches = children(&root, 1e-6, NetworkBranchingPolicy::MultiplicityFirst)
-        .unwrap()
-        .unwrap();
+    let branches = children(
+        &root,
+        1e-6,
+        NetworkBranchingPolicy::MultiplicityFirst,
+        &[],
+        &[],
+    )
+    .unwrap()
+    .unwrap();
     assert_eq!(branches.len(), 2);
     let first = branches[0].solve(options.clone()).unwrap();
     // In the public native control, fractional network42 count .5 splits

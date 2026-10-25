@@ -20,7 +20,7 @@ distance convention, and inherited node restrictions.
 | Need | CLI | Python | Reading |
 | --- | --- | --- | --- |
 | Feasible heuristic routing plan | `hgs` | HGS seeding within root solve | [CLI](cli.md) |
-| Routing root LP | `solve` | `solve_root` | [PyBaldes routing](../pybaldes/routing.md) |
+| Routing root LP | `solve` | `solve_root` | [pyBaldes routing](../pybaldes/routing.md) |
 | Single-network integer routing tree | `solve --tree` | Not exposed by `solve_root` | [Routing tree](../solver/tree.md) |
 | Custom RCSP pricing | Through a model | `Solver` | [Pricing](../pybaldes/pricing.md) |
 | Shared-master root / integer search | `multi-pricing` / `multi-pricing --tree` | `NetworkProblem.solve(tree=...)` | [Multi-pricing](../extensions/mp.md) |

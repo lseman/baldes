@@ -147,6 +147,16 @@ name = "branch_price"
 path = "tests/master/branch_price.rs"
 
 [[test]]
+name = "time_window_selection"
+path = "tests/master/time_window_selection.rs"
+required-features = ["clp", "multi-time-windows"]
+
+[[test]]
+name = "network_time_windows"
+path = "tests/master/network_time_windows.rs"
+required-features = ["clp", "multi-time-windows"]
+
+[[test]]
 name = "column_cleanup"
 path = "tests/master/column_cleanup.rs"
 

@@ -2,6 +2,9 @@
 use super::*;
 
 pub(super) fn validate_options(options: &Options) -> Result<()> {
+    if options.network_promising_limit == 0 {
+        return Err(invalid("network_promising_limit must be positive"));
+    }
     if options.network_unpromising_limit == 0 {
         return Err(invalid("network_unpromising_limit must be positive"));
     }
@@ -145,6 +148,8 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
     }
     let master_only = oracles.is_empty();
     let mut state = State {
+        mapped_subtree_size: 1e12,
+        node_depth: 0,
         scheduler: scheduling::Scheduler::new(
             options.network_pricing_schedule,
             oracles.len(),
@@ -204,6 +209,8 @@ pub(super) fn run<const D: usize>(
         options.cg.tolerance,
     );
     state.scheduler.max_unpromising = options.network_unpromising_limit;
+    state.scheduler.max_promising = options.network_promising_limit;
+    options.cg.node_depth = state.node_depth;
     options.cg.time_limit = options
         .cg
         .time_limit

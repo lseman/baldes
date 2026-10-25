@@ -259,6 +259,11 @@ pub struct Options {
     /// private, and every unsuccessful proximal pass retries original duals.
     pub proximal: Option<super::stabilization::ProximalParameters>,
     pub stabilize: bool,
+    /// Actual tree depth, including inherited branches. Depth zero is the root.
+    pub node_depth: usize,
+    /// Native stabilization activation boundary: depth must be strictly less
+    /// than this signed limit. Zero or a negative value disables activation.
+    pub stabilization_max_tree_depth: i64,
     pub tolerance: f64,
     pub multiplicity: f64,
     pub max_iterations: usize,
@@ -295,6 +300,8 @@ impl Default for Options {
             smoothing: Parameters::default(),
             proximal: None,
             stabilize: true,
+            node_depth: 0,
+            stabilization_max_tree_depth: 10000,
             tolerance: 1e-6,
             multiplicity: 1.,
             max_iterations: 100000,
@@ -315,6 +322,14 @@ impl Default for Options {
             column_cleanup_threshold: 0.,
             column_cleanup_ratio: 0.66,
         }
+    }
+}
+
+impl Options {
+    pub fn stabilization_active_at_depth(&self) -> bool {
+        self.stabilize
+            && i64::try_from(self.node_depth)
+                .is_ok_and(|depth| depth < self.stabilization_max_tree_depth)
     }
 }
 

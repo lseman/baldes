@@ -11,6 +11,7 @@ mod options;
 mod packing_set_assignment;
 pub mod resource_intervals;
 mod ryan_foster;
+pub mod time_window_selection;
 
 use crate::master::{root::RootProblem, RowSense};
 use crate::{invalid, pricing::restrictions::RyanFosterConstraint, Result, Route};
@@ -64,6 +65,24 @@ pub enum BranchConstraint {
     },
     AccumulatedResource(crate::pricing::restrictions::AccumulatedResourceBranch),
     AccumulatedResourceGroup(AccumulatedResourceGroupBranch),
+    /// An integer flow over the window copies of a split multi-time-window
+    /// graph (`BranchingOptions::time_window_selection`). `arcs` holds sorted
+    /// physical arc positions with unit coefficients.
+    WindowFlow {
+        group: WindowGroup,
+        arcs: Vec<(usize, f64)>,
+        sense: RowSense,
+        rhs: f64,
+    },
+}
+
+/// What a `WindowFlow` branch counts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WindowGroup {
+    /// Services of `vertex` that start in its `window`-th time window.
+    Selection { vertex: usize, window: usize },
+    /// Traversals of input arc `original`, summed over its window copies.
+    Arc { original: i32 },
 }
 impl BranchConstraint {
     pub fn row(&self) -> (RowSense, f64) {
@@ -71,6 +90,7 @@ impl BranchConstraint {
             Self::ArcFlow { sense, rhs, .. }
             | Self::NumberOfVehicles { sense, rhs, .. }
             | Self::AggregateFlow { sense, rhs, .. }
+            | Self::WindowFlow { sense, rhs, .. }
             | Self::ClusterBoundary { sense, rhs, .. }
             | Self::ClusterPair { sense, rhs, .. } => (sense, rhs),
             Self::PackingSetAssignment { assigned, .. } => packing_set_assignment::row(assigned),
@@ -86,7 +106,9 @@ impl BranchConstraint {
         }
         match self {
             Self::ArcFlow { arc, .. } => arc_flow::validate(p, *arc),
-            Self::AggregateFlow { arcs, .. } => aggregate_flow::validate(p, arcs),
+            Self::AggregateFlow { arcs, .. } | Self::WindowFlow { arcs, .. } => {
+                aggregate_flow::validate(p, arcs)
+            }
             Self::NumberOfVehicles { graph_id, rhs, .. } => {
                 number_of_vehicles::validate(*graph_id, *rhs)
             }
@@ -104,7 +126,9 @@ impl BranchConstraint {
     pub(crate) fn arc_coefficient<const D: usize>(&self, p: &RootProblem<D>, arc: usize) -> f64 {
         match self {
             Self::ArcFlow { arc: target, .. } => arc_flow::coefficient(arc, *target),
-            Self::AggregateFlow { arcs, .. } => aggregate_flow::coefficient(arcs, arc),
+            Self::AggregateFlow { arcs, .. } | Self::WindowFlow { arcs, .. } => {
+                aggregate_flow::coefficient(arcs, arc)
+            }
             Self::NumberOfVehicles { graph_id, .. } => {
                 number_of_vehicles::coefficient(p, arc, *graph_id)
             }

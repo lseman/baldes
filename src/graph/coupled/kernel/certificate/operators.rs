@@ -1,8 +1,10 @@
-//! Exact operator certificates for integer-aligned raw slope geometry.
+//! Exact operator certificates for dyadic-lattice raw slope geometry.
 //!
 //! This does not reinterpret a general numerical front as source replay.
-//! Coordinates are bounded integers, so native tolerance cannot align distinct
-//! coordinates; every retained endpoint operation is an exact binary64 integer.
+//! Bounded integer lattice coordinates/values and integer slopes make endpoint
+//! operations exact in binary64. Native lattices additionally have spacing
+//! greater than its absolute tolerance; the scaled magnitude bound keeps the
+//! relative tolerance below one lattice step.
 use super::*;
 use crate::graph::coupled::descriptor::{PairedCostNormalization, PreparedSlopeFunction};
 
@@ -11,6 +13,45 @@ const LIMIT: f64 = 1_000_000.;
 fn small(x: f64) -> bool {
     x.is_finite() && x.fract() == 0. && x.abs() <= LIMIT
 }
+fn lattice(x: f64, unit: f64) -> bool {
+    small(x / unit)
+}
+
+fn coordinate_unit(
+    initial: Window,
+    bounds: Window,
+    path: &[usize],
+    increments: &[f64],
+    functions: &[PreparedSlopeFunction],
+    charged: bool,
+    native: bool,
+    work: &mut usize,
+    deadline: Option<Instant>,
+) -> Option<f64> {
+    // Power-of-two scaling is exact in this bounded normal range. A native
+    // step >=2^-13 exceeds1e-4; its relative band is <0.000445 steps.
+    let limit = if native { 13 } else { 30 };
+    let mut unit = 1.;
+    for _ in 0..=limit {
+        debit(work, 4, deadline)?;
+        let mut accepted = [initial.lower, initial.upper, bounds.lower, bounds.upper]
+            .into_iter()
+            .all(|x| lattice(x, unit));
+        for &arc in path {
+            debit(work, 2, deadline)?;
+            let function = functions.get(arc)?;
+            debit(work, function.pairs().len(), deadline)?;
+            accepted &= lattice(*increments.get(arc)?, unit)
+                && (!charged || lattice(function.pairs()[0].0, unit))
+                && function.pairs().iter().all(|p| lattice(p.1, unit));
+        }
+        if accepted {
+            return Some(unit);
+        }
+        unit *= 0.5;
+    }
+    None
+}
 fn exact(x: f64) -> bool {
     x.is_finite() && x.fract() == 0. && x.abs() <= 4_503_599_627_370_496.
 }
@@ -18,18 +59,19 @@ fn exact(x: f64) -> bool {
 fn shape(
     function: &PreparedSlopeFunction,
     charged: bool,
+    unit: f64,
     work: &mut usize,
     deadline: Option<Instant>,
 ) -> Option<(f64, f64)> {
     debit(work, function.pairs().len(), deadline)?;
-    if !function.pairs().iter().all(|p| small(p.1)) {
+    if !function.pairs().iter().all(|p| lattice(p.1, unit)) {
         return None;
     }
     if !charged {
         return Some((0., 0.));
     }
     let (mut value, mut previous) = function.pairs()[0];
-    if !small(value) {
+    if !lattice(value, unit) {
         return None;
     }
     let (mut magnitude, mut slope_magnitude) = (value.abs(), 0f64);
@@ -39,7 +81,7 @@ fn shape(
         }
         let product = slope * (end - previous);
         let next = value + product;
-        if !exact(product) || !small(next) {
+        if !exact(product / unit) || !lattice(next, unit) {
             return None;
         }
         value = next;
@@ -55,7 +97,7 @@ fn constant(
     work: &mut usize,
     deadline: Option<Instant>,
 ) -> Option<f64> {
-    shape(function, true, work, deadline)?;
+    shape(function, true, 1., work, deadline)?;
     function
         .pairs()
         .iter()
@@ -65,6 +107,17 @@ fn constant(
 }
 
 pub(super) fn native_pair(
+    definition: &CoupledResource,
+    path: &[usize],
+    scale: f64,
+    work: &mut usize,
+    deadline: Option<Instant>,
+) -> Option<(bool, [f64; 2])> {
+    constant_pair(definition, path, scale, work, deadline)
+        .or_else(|| super::lattice::native_pair(definition, path, scale, work, deadline))
+}
+
+fn constant_pair(
     definition: &CoupledResource,
     path: &[usize],
     scale: f64,
@@ -105,7 +158,7 @@ pub(super) fn native_pair(
         if arc.waiting != 0 {
             return None;
         }
-        shape(&arc.arrival, true, work, deadline)?;
+        shape(&arc.arrival, true, 1., work, deadline)?;
         if !arc.arrival.pairs().iter().skip(1).all(|p| p.0 == 1.) {
             return None;
         }
@@ -168,18 +221,25 @@ impl CoupledKernel {
                 bounds,
                 increments,
                 functions,
-                ..
+                policy,
             } = &self.definitions[index]
             else {
                 return None;
             };
-            if ![initial.lower, initial.upper, bounds.lower, bounds.upper]
-                .into_iter()
-                .all(small)
-                || !(self.cost_scale == 0. || self.cost_scale == 1.)
-            {
+            if !(self.cost_scale == 0. || self.cost_scale == 1.) {
                 return None;
             }
+            let unit = coordinate_unit(
+                *initial,
+                *bounds,
+                path,
+                increments,
+                functions,
+                self.cost_scale != 0.,
+                *policy == descriptor::FrontOperationPolicy::NativeFrontAlgebra,
+                work,
+                deadline,
+            )?;
             let (mut lo, mut hi, mut shift) = (initial.lower, initial.upper, 0.);
             let mut knots = vec![lo, hi];
             let mut shifts = Vec::with_capacity(path.len());
@@ -187,21 +247,21 @@ impl CoupledKernel {
             for &arc in path {
                 debit(work, 1, deadline)?;
                 let increment = *increments.get(arc)?;
-                if !small(increment) {
+                if !lattice(increment, unit) {
                     return None;
                 }
                 shift += increment;
-                if !small(shift) {
+                if !lattice(shift, unit) {
                     return None;
                 }
                 let function = functions.get(arc)?;
-                let (m, s) = shape(function, self.cost_scale != 0., work, deadline)?;
+                let (m, s) = shape(function, self.cost_scale != 0., unit, work, deadline)?;
                 magnitude += m;
                 slopes += s;
-                // This bounds every intermediate anchor value and summed
-                // slope. With integer coordinates <=2*LIMIT, all segment
-                // products are below2^53 and therefore exactly represented.
-                if !small(magnitude) || !small(slopes) {
+                // In lattice units every intermediate anchor and summed slope
+                // is bounded. Coordinates <=2*LIMIT units keep all segment
+                // products below2^53, including dyadic physical coordinates.
+                if !lattice(magnitude, unit) || !small(slopes) {
                     return None;
                 }
                 let (left, right) = function.domain();
@@ -235,12 +295,12 @@ impl CoupledKernel {
                         work,
                         deadline,
                     )?;
-                    if value.lo != value.hi || !small(value.lo) {
+                    if value.lo != value.hi || !lattice(value.lo, unit) {
                         return None;
                     }
                     cost = cost.add(Interval::point(value.lo))?;
                 }
-                if cost.lo != cost.hi || !small(cost.lo) {
+                if cost.lo != cost.hi || !lattice(cost.lo, unit) {
                     return None;
                 }
                 minimum = minimum.min(cost.lo);

@@ -36,11 +36,15 @@ mod preprocessing_flow;
 mod route_bounds;
 pub use preprocessing::{NetworkActivityBounds, PreprocessingOptions, PreprocessingReport};
 mod master_variables;
+mod model_mapping;
+mod model_strong;
 mod variables;
 pub use enumeration::{
     CutoffCostBound, CutoffEnumeration, EnumeratedMipOutput, EnumerationOptions, EnumerationReport,
 };
 pub use master_variables::MasterVariable;
+pub use model_mapping::{MappedBranchVariable, MappedNetworkVariable};
+pub use model_strong::{MappedBranchEvaluation, MappedEvaluationKind};
 pub use nonlinear::{RankOneCoefficients, RegisteredCutCoefficients};
 mod tree;
 pub use lifecycle::{Assignment, FixedRoute, NodeSnapshot, RowCoefficients};
@@ -102,6 +106,8 @@ pub struct Options {
     pub network_pricing_schedule: NetworkPricingSchedule,
     /// Budget for unpromising networks in native queue scheduling modes.
     pub network_unpromising_limit: usize,
+    /// Native promising-status visit budget (default one million).
+    pub network_promising_limit: usize,
     /// Optional integer-time, simultaneous service by distinct route copies.
     pub synchronized_services: Vec<SynchronizedService>,
     pub cg: cg::Options,
@@ -116,6 +122,7 @@ impl Default for Options {
         Self {
             network_pricing_schedule: NetworkPricingSchedule::default(),
             network_unpromising_limit: 1,
+            network_promising_limit: 1_000_000,
             synchronized_services: vec![],
             cg,
             pricing_options: vec![],
@@ -192,6 +199,8 @@ impl<const D: usize> Oracle<D> {
     }
 }
 struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    mapped_subtree_size: f64,
+    node_depth: usize,
     scheduler: scheduling::Scheduler,
     synchronized_services: Vec<synchronization::Service>,
     oracles: Vec<Oracle<D>>,

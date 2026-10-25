@@ -1,6 +1,6 @@
 # Shared-master network models
 
-[PyBaldes documentation](README.md) · [Results](results.md)
+[pyBaldes documentation](README.md) · [Results](results.md)
 
 Use independent pricing networks when several route families contribute to the
 same master constraints. Network IDs identify fleets or families; they need not
