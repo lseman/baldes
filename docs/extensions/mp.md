@@ -42,6 +42,77 @@ stabilization subgradient. `Output.oracle_calls` counts individual oracle calls;
 `Output.master.pricing_calls` counts batches. `Output.values` gives the current
 restricted-master quantity for every route in `Output.routes`.
 
+## Network pricing schedules
+
+`Options.network_pricing_schedule` selects `NetworkPricingSchedule` in Rust.
+The JSON/Python option is `network_pricing_schedule`; the CLI flag is
+`--network-pricing-schedule`. All three accept these choices:
+
+| Schedule | Network visitation |
+| --- | --- |
+| `full-sweep` (default) | Visit every enabled network in input order. |
+| `cyclic` | Resume after the last visited network, wrap around, and return after a network generates a previously unregistered negative-reduced-cost route. |
+| `sorted` | Visit unseen networks first, then ascending recent minimum reduced cost, breaking ties by input order. Return on the same new-route condition. |
+| `native-promising-first` | Persistent primary/secondary queues following recovered strategy 2; normal solved networks enter the secondary queue. |
+| `native-unvisited-first` | Persistent queues following recovered strategy 3; unvisited primary entries precede newly promising entries. |
+
+For example, `problem.solve(network_pricing_schedule="cyclic")` in Python, or
+`baldes multi-pricing MODEL.json --network-pricing-schedule sorted`. The option
+also applies to snapshot solves and the nodes of an assignment tree.
+
+A partial batch returns columns without an aggregate bound correction or
+subgradient. It is never exact, even when each visited oracle used an exact
+phase. A traversal that finds no new negative route visits every enabled network;
+only a complete batch can supply a fresh global pricing estimate or establish
+pricing convergence. Cached scores affect visitation order only: minima and
+coverage are recomputed at the current dual point. Disabled networks are skipped.
+The cursor and scores reset on a new solve, a formulation fork or a phase change.
+An installed complete enumerated universe continues to use its full scan.
+Early return requires reduced cost below minus the configured CG tolerance;
+insignificant negative routes do not interrupt the scan.
+
+The sorted score is an explicit BALDES heuristic. The two native queue policies
+use `network_unpromising_limit` (CLI `--network-unpromising-limit`, default 1),
+which limits normal solved visits after a new improving column appears. Empty
+sweeps still visit all networks. Queue order persists across phase changes;
+forks and new solves reset it. Normal modern native pricing returns zero even
+when it generates columns; negative reduced cost does not imply the native
+positive-status promising classification. That positive branch is recovered
+statically but has no demonstrated normal-modern public reachability.
+Native strategy 1 is deliberately excluded: its pinned public control aborts
+with invalid-pointer corruption. These schedules change work distribution;
+speedups and identical native trajectories are not promised.
+
+## Proximal pricing
+
+`cg::Options.proximal` selects explicit `ProximalParameters` in Rust. One hard
+band gives box-step stabilization, one finite-penalty band gives a three-piece
+penalty, and two bands give five pieces. In JSON/Python:
+
+```python
+result = problem.solve(
+    proximal={"bands": [{"half_width": 0.5, "penalty": 1.0}]},
+    network_pricing_schedule="native-promising-first",
+)
+```
+
+`penalty: null` means a hard band. `multi_point: true` enables the private
+support-plane epigraph and requires a finite outer penalty. Use
+`max_points` (positive, default 1) to bound retained support planes; inactive
+unprotected planes age out after more than two zero-activity solves. CLI callers can use
+`--proximal-width 0.5 --proximal-penalty 1`, omit the penalty for a hard box, or
+pass a complete bands object with `--proximal FILE.json`. Proximal pricing
+replaces smoothing; `--no-stabilization` disables both.
+
+Auxiliary columns, support rows and beta variables belong to a private LP copy.
+Its objective cannot update the original bound or incumbent. An unsuccessful
+proximal pricing pass retries the original master duals before completing a
+phase. Node/phase/formulation changes reset the center. Backends that cannot
+clone the master, or unfinished private solves, fall back to original duals.
+The public curvature primitives accept explicit state and measured row feedback;
+native automatic radius initialization, inherited row classifications and exact
+multi-point plane-aging trajectories are not inferred from ordinary master rows.
+
 Phase estimates guide stabilization. Published lower bounds additionally use
 graph-walk relaxations with downward arithmetic. If a negative cycle prevents
 a resource-free bound, nonnegative scalar consumption and bounded resource
@@ -108,13 +179,24 @@ Scalar resource capacity is a const generic, defaulting to two; see
 ## Assignment tree
 
 `solve_assignment_tree(problem, AssignmentTreeOptions)` runs a best-bound tree
-using network-aware snapshots. It tries assignment rows, declared integer master
-variables, total network multiplicities, then original physical-arc activities. It returns network-tagged
+using network-aware snapshots. It tries proved shared resource-group splits,
+assignment rows, declared integer master variables, total network multiplicities,
+original physical-arc activities, then synchronized-service splits. It returns network-tagged
 integer route quantities, an incumbent, selected bound mode, frontier bound and
 node/work-limit status. Integer witnesses replay original graph resources,
 shared rows and original multiplicities with exact sums; objectives round upward.
 Fixed routes are included in this replay. A rounded labeling resource profile
 alone never authorizes an incumbent or fixed route.
+
+`AssignmentTreeOptions::branching` selects the family and child order.
+`NetworkBranchingPolicy::ResourceFirst` preserves the order above, with lower
+children first. `MultiplicityFirst` tries fractional network route counts first
+and visits upper children first, following the observed public native controls.
+It does not change disjunctions or proof bounds, and does not promise the same
+LP basis, generated columns or total node count as another backend. Select it
+with `--network-branching multiplicity-first`, JSON solve option
+`"network_branching": "multiplicity-first"`, or Python
+`solve_networks(..., tree=True, network_branching="multiplicity-first")`.
 
 Rust callers can run `snapshot.solve_assignment_tree(options)` after installing
 shared nonlinear rows, fixing routes or restricting master variables. It forks
@@ -503,6 +585,22 @@ networks and proof preparation. Missing original-domain bounds, unsupported
 resource replay and exhausted budgets return an error; the source snapshot
 remains usable. This API currently requires a snapshot that has not already
 installed a full enumerated universe.
+
+Coupled objective costs are included in proof preparation. A bounded complete
+scalar-path superset can provide a directed route-wide resource-cost lower
+bound, which joins the cutoff's once-per-route constant. This preserves routes
+whose large scalar cost is offset by a negative resource charge. Full-universe
+column bounds likewise use certified resource-cost lower endpoints. Path and
+certificate work share the attempt's budget and deadline; unavailable replay
+or incomplete coverage leaves the proof unknown. The original integer-route
+domain is physically vertex-simple, and this fallback does not certify arbitrary
+repeated-walk objective programs. It can be too expensive for large networks.
+
+PWL paired resources and strict-domain slope pairs have independent directed
+feasibility witnesses. A cost enclosure can remain non-singleton; finite-MIP
+proof outcomes still require exact objective encoding. Native-front-algebra
+paired operations, standalone raw slope-interval fronts and plugins retain
+their explicit unsupported-proof behavior.
 
 With `highs`, call `view.solve_mip(&MipOptions::default())` on that view. Its
 `ObjectiveCutoff` outcome means no integer solution improves the effective
