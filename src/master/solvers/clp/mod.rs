@@ -59,6 +59,9 @@ extern "C" {
     fn Clp_setDualTolerance(m: *mut Model, tolerance: f64);
     fn Clp_setPrimalTolerance(m: *mut Model, tolerance: f64);
     fn Clp_getRowStatus(m: *mut Model, row: i32) -> i32;
+    fn Clp_statusExists(m: *mut Model) -> i32;
+    fn Clp_statusArray(m: *mut Model) -> *const u8;
+    fn Clp_copyinStatus(m: *mut Model, statuses: *const u8);
     fn Clp_getVectorStarts(m: *mut Model) -> *const i32;
     fn Clp_getVectorLengths(m: *mut Model) -> *const i32;
     fn Clp_getIndices(m: *mut Model) -> *const i32;
@@ -191,6 +194,8 @@ mod highs_warm_tests;
 mod ipm_state;
 mod matrix;
 mod model;
+mod transfer;
+pub(crate) use transfer::MasterTransfer;
 mod solve;
 
 #[cfg(test)]

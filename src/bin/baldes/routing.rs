@@ -30,6 +30,7 @@ Options:
   --capacity-cuts        Enable capacity cuts (alias: --capacity)
   --two-path-cuts        Enable capacity and Kohl 2-path cuts using time windows
   --tree                Run branch-and-price with a restricted-master MIP heuristic
+  --tree-threads N      Concurrent tree node evaluations (default 1)
   --nodes N             Tree node limit (default: 10000)
   --branching MODE      native (default), vehicles, ryan-foster, arc, cluster, resource, hybrid
   --branch-history      Enable branch history (default; observed native rules)
@@ -307,6 +308,16 @@ pub(super) fn run() -> std::result::Result<(), String> {
                 two_path = true;
             }
             "--tree" => tree = true,
+            "--tree-threads" => {
+                tree_options.threads = args
+                    .next()
+                    .ok_or("missing tree thread count")?
+                    .parse::<usize>()
+                    .map_err(|e| e.to_string())?;
+                if tree_options.threads == 0 {
+                    return Err("tree threads must be positive".into());
+                }
+            }
             "--branching" => {
                 use baldes::master::branching::BranchingOptions;
                 tree_options.branching = match args.next().ok_or("missing branching mode")?.as_str()
@@ -407,6 +418,9 @@ pub(super) fn run() -> std::result::Result<(), String> {
         if kind == "hgs" {
             return Err("--deluxing requires a routing solve, not hgs".into());
         }
+    }
+    if tree_options.threads > 1 && !tree {
+        return Err("--tree-threads requires --tree".into());
     }
     if tree_options.enumerated_mip.is_some() && !tree {
         return Err("--enumerated-mip requires --tree".into());

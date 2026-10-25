@@ -22,6 +22,73 @@ fn options() -> TreeOptions {
         ..Default::default()
     }
 }
+
+#[test]
+fn parallel_tree_matches_exhaustive_routes_in_both_bound_modes() {
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        for backend in [
+            baldes::master::root::MasterSolver::Clp,
+            baldes::master::root::MasterSolver::Ipm,
+        ] {
+            for threads in [1, 2, 4] {
+                let instance = triangle();
+                let problem =
+                    RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.)
+                        .unwrap();
+                let mut controls = options();
+                controls.threads = threads;
+                controls.root.bound_mode = mode;
+                controls.root.master_solver = backend;
+                controls.root.enumerate = false;
+                controls.mip_node_limit = 0;
+                let output = tree::solve(problem, controls).unwrap();
+                let optimum = exhaustive(&instance);
+                assert_eq!(output.status, TreeStatus::Optimal, "{threads}: {output:?}");
+                assert!((output.incumbent - optimum).abs() < 1e-6, "{output:?}");
+                assert!((output.bound - optimum).abs() < 1e-6, "{output:?}");
+                assert_eq!(output.open_nodes, 0);
+                assert_eq!(output.parallel_batches > 0, threads > 1, "{output:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn parallel_tree_preserves_global_node_and_time_budgets() {
+    let instance = triangle();
+    let optimum = exhaustive(&instance);
+    for limit in [0, 1, 2, 3] {
+        let problem =
+            RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
+        let mut controls = options();
+        controls.threads = 4;
+        controls.node_limit = limit;
+        controls.root.enumerate = false;
+        controls.mip_node_limit = 0;
+        let output = tree::solve(problem, controls).unwrap();
+        assert!(output.nodes <= limit, "{output:?}");
+        assert!(output.bound <= optimum + 1e-6, "{output:?}");
+        if output.status != TreeStatus::Optimal {
+            assert_eq!(output.status, TreeStatus::NodeLimit, "{output:?}");
+            assert!(output.open_nodes > 0, "{output:?}");
+        }
+    }
+    let problem =
+        RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
+    let mut controls = options();
+    controls.threads = 2;
+    controls.time_limit = Duration::ZERO;
+    let output = tree::solve(problem.clone(), controls).unwrap();
+    assert_eq!(output.status, TreeStatus::TimeLimit);
+    assert_eq!(output.nodes, 0);
+    assert_eq!(output.open_nodes, 1);
+    let mut controls = options();
+    controls.threads = 0;
+    assert!(tree::solve(problem, controls)
+        .unwrap_err()
+        .message
+        .contains("tree threads"));
+}
 #[test]
 fn integer_heuristic_incumbent_bounds_the_original_arc_sum() {
     let mut graph = baldes::Graph::<2>::new(3, 1).unwrap();
@@ -446,13 +513,18 @@ fn fork_and_carry_inherits_cuts_basis_and_protects_branch_rows() {
 
     // Verify full tree solve with cuts + strong branching + diving agrees with exact optimum.
     let exact = exhaustive(&instance);
-    let mut controls = options();
-    controls.root = root_opts;
-    controls.strong_branching = Some(StrongBranchingOptions::default());
-    controls.diving = Some(DivingOptions::default());
-    let tree_out = tree::solve(problem, controls).unwrap();
-    assert_eq!(tree_out.status, TreeStatus::Optimal, "{tree_out:?}");
-    assert!((tree_out.incumbent - exact).abs() < 1e-5, "{tree_out:?}");
+    for threads in [1, 2, 4] {
+        for strong in [false, true] {
+            let mut controls = options();
+            controls.threads = threads;
+            controls.root = root_opts.clone();
+            controls.strong_branching = strong.then(StrongBranchingOptions::default);
+            controls.diving = Some(DivingOptions::default());
+            let tree_out = tree::solve(problem.clone(), controls).unwrap();
+            assert_eq!(tree_out.status, TreeStatus::Optimal, "{tree_out:?}");
+            assert!((tree_out.incumbent - exact).abs() < 1e-5, "{tree_out:?}");
+        }
+    }
 }
 
 #[test]

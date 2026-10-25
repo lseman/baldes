@@ -166,6 +166,7 @@ fn register<const D: usize>(state: &mut State<D>, route: &Route) -> Result<i32> 
 mod cut_state;
 mod snapshot;
 mod state;
+mod transfer;
 
 mod solve;
 pub(crate) use solve::inherit_with_history;

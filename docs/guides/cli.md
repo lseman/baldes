@@ -40,6 +40,7 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--capacity` / `--capacity-cuts` | separate native rounded capacity cuts in the Clp root master |
 | `--two-path-cuts` | enable capacity cuts with Kohl's time resource attached (VRPTW only) |
 | `--tree` | run branch-and-price for integer routing |
+| `--tree-threads N` | concurrent open-node evaluations; default `1`, requires `--tree` for `N > 1` |
 | `--nodes N` | tree node limit (default 10,000) |
 | `--branching MODE` | `native` (default), `ryan-foster`, `vehicles`, or `arc` |
 | `--no-strong-branching` | use fractionality instead of phased strong branching |

@@ -19,6 +19,27 @@ cargo run --release --features clp --bin baldes -- \
 validated incumbent routes, bounds, statuses, and work counters. Use
 `--no-enumeration` to disable both reduced-cost fixing and enumeration.
 
+### Optional parallel nodes
+
+Add `--tree-threads N` to evaluate up to `N` open nodes concurrently; the
+default is `1`, using the sequential search. Rust callers set
+`TreeOptions::threads`. The root is evaluated first, so parallel work begins
+once branching supplies multiple open nodes.
+
+Workers receive independent parent matrices, cuts, pricing state and route
+identities. Clp basis statuses are copied; other LP backends rebuild their
+internal solver state. Native model pointers and `Rc` snapshots never cross
+threads. The coordinator merges a bounded batch in dispatch order, updates
+the incumbent and branching history, and runs strong branching and diving.
+New incumbents reach workers at the next batch. Parallel search may therefore
+visit more nodes or select a different optimal route set than sequential search.
+
+The node limit and deadline apply to the whole tree, including dispatched
+nodes. Every batch finishes before returning, and unfinished nodes retain
+their lower bounds. `parallel_batches` reports batches containing multiple
+nodes. Worker count is separate from pricing threads and `--master-threads`;
+choose those budgets together to avoid oversubscribing the machine.
+
 A complete Rust entry point, requiring `clp`:
 
 ```rust

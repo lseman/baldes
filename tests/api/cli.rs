@@ -7,6 +7,56 @@ fn command() -> Command {
 }
 
 #[test]
+fn routing_parallel_tree_is_optional_and_validates_worker_count() {
+    let file =
+        std::env::temp_dir().join(format!("baldes-parallel-tree-{}.txt", std::process::id()));
+    let json = file.with_extension("json");
+    std::fs::write(&file, "triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
+    let output = command()
+        .arg("vrptw")
+        .arg(&file)
+        .args([
+            "--tree",
+            "--tree-threads",
+            "2",
+            "--rounding",
+            "none",
+            "--no-strong-branching",
+            "--no-diving",
+            "--no-mip-heuristic",
+            "--no-enumeration",
+            "--json",
+        ])
+        .arg(&json)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&json).unwrap()).unwrap();
+    assert_eq!(report["status"], "Optimal", "{report}");
+    assert!(report["parallel_batches"].as_u64().unwrap() > 0, "{report}");
+    for (threads, message) in [
+        ("0", "tree threads must be positive"),
+        ("2", "--tree-threads requires --tree"),
+    ] {
+        let output = command()
+            .arg("vrptw")
+            .arg(&file)
+            .args(["--tree-threads", threads])
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains(message));
+    }
+    std::fs::remove_file(file).unwrap();
+    std::fs::remove_file(json).unwrap();
+}
+
+#[test]
 fn routing_phase_one_restores_expensive_costs_and_exposes_separate_diagnostics() {
     let file = std::env::temp_dir().join(format!("baldes-phase-one-{}.txt", std::process::id()));
     let json = file.with_extension("json");

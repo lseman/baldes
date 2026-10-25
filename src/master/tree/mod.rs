@@ -34,6 +34,8 @@ pub use strong::{StrongBranchingOptions, StrongPhase};
 
 #[derive(Clone, Debug)]
 pub struct TreeOptions {
+    /// Concurrent node evaluations. One preserves sequential best-bound search.
+    pub threads: usize,
     pub root: RootOptions,
     pub branching: BranchingOptions,
     pub node_limit: usize,
@@ -56,6 +58,7 @@ pub struct TreeOptions {
 impl Default for TreeOptions {
     fn default() -> Self {
         Self {
+            threads: 1,
             root: RootOptions::default(),
             branching: BranchingOptions::default(),
             node_limit: 10000,
@@ -89,6 +92,8 @@ pub struct TreeOutput {
     pub bound: f64,
     pub routes: Vec<Route>,
     pub nodes: usize,
+    /// Number of batches with two or more concurrently evaluated nodes.
+    pub parallel_batches: usize,
     pub open_nodes: usize,
     pub pricing_calls: usize,
     /// Fixing/inspection calls across normal nodes, strong trials and dives.
@@ -124,11 +129,11 @@ impl TreeOutput {
                 )
             })
             .collect();
-        format!("{{\"instance\":{:?},\"status\":\"{:?}\",\"incumbent\":{},\"bound\":{},\"bound_mode\":\"{}\",\"numerical_bound\":{},\"certified_bound\":{},\"nodes\":{},\"open_nodes\":{},\"pricing_calls\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"mip_nodes\":{},\"enumerated_mip_calls\":{},\"enumerated_mip_nodes\":{},\"strong_branching_trials\":{},\"diving_nodes\":{},\"branch_history_ranked\":{},\"branch_evaluations\":[{}],\"seconds\":{},\"routes\":[{}]}}\n",
+        format!("{{\"instance\":{:?},\"status\":\"{:?}\",\"incumbent\":{},\"bound\":{},\"bound_mode\":\"{}\",\"numerical_bound\":{},\"certified_bound\":{},\"nodes\":{},\"parallel_batches\":{},\"open_nodes\":{},\"pricing_calls\":{},\"fixing_calls\":{},\"enumerated_routes\":{},\"mip_nodes\":{},\"enumerated_mip_calls\":{},\"enumerated_mip_nodes\":{},\"strong_branching_trials\":{},\"diving_nodes\":{},\"branch_history_ranked\":{},\"branch_evaluations\":[{}],\"seconds\":{},\"routes\":[{}]}}\n",
             name, self.status, number(self.incumbent), number(self.bound), self.bound_mode.as_str(),
             if self.bound_mode == root::BoundMode::Numerical { number(self.bound) } else { "null".into() },
             if self.bound_mode == root::BoundMode::Certified { number(self.bound) } else { "null".into() }, self.nodes,
-            self.open_nodes, self.pricing_calls, self.fixing_calls, self.enumerated_routes, self.mip_nodes, self.enumerated_mip_calls, self.enumerated_mip_nodes, self.strong_branching_trials, self.diving_nodes, self.branch_history.ranked_candidates, self.branch_history.to_json(), self.seconds, routes.join(","))
+            self.parallel_batches, self.open_nodes, self.pricing_calls, self.fixing_calls, self.enumerated_routes, self.mip_nodes, self.enumerated_mip_calls, self.enumerated_mip_nodes, self.strong_branching_trials, self.diving_nodes, self.branch_history.ranked_candidates, self.branch_history.to_json(), self.seconds, routes.join(","))
     }
 }
 type Branch = BranchConstraint;
@@ -251,5 +256,6 @@ mod pool_tests;
 mod heuristic;
 use heuristic::integer_heuristic;
 
+mod parallel;
 mod search;
 pub use search::solve;

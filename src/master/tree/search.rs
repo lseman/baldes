@@ -4,6 +4,9 @@ pub fn solve<const D: usize>(
     problem: RootProblem<D>,
     mut options: TreeOptions,
 ) -> Result<TreeOutput> {
+    if options.threads == 0 {
+        return Err(invalid("tree threads must be positive"));
+    }
     if options.deluxing.is_some() && options.enumerated_mip.is_none() {
         return Err(invalid("DeLuxing requires enumerated MIP"));
     }
@@ -79,6 +82,17 @@ pub fn solve<const D: usize>(
             "branch history requires positive observation count",
         ));
     }
+    let workers = if options.threads > 1 {
+        Some(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(options.threads)
+                .thread_name(|i| format!("baldes-tree-{i}"))
+                .build()
+                .map_err(|e| invalid(format!("tree worker pool: {e}")))?,
+        )
+    } else {
+        None
+    };
     let deadline = started + options.time_limit;
     let mut output = TreeOutput {
         bound_mode: options.root.bound_mode,
@@ -87,6 +101,7 @@ pub fn solve<const D: usize>(
         bound: 0.,
         routes: vec![],
         nodes: 0,
+        parallel_batches: 0,
         open_nodes: 1,
         pricing_calls: 0,
         fixing_calls: 0,
@@ -154,7 +169,8 @@ pub fn solve<const D: usize>(
     // the incumbent. These leaves still contribute to the global minimum.
     let mut closed_bound = f64::INFINITY;
     let mut previous = None::<Rc<root::NodeSnapshot<D>>>;
-    while !open.is_empty() {
+    let mut ready = std::collections::VecDeque::new();
+    while !open.is_empty() || !ready.is_empty() {
         // Discard only nodes whose selected bound closes the global gap.
         open.retain(|n| {
             if closed(n.bound, output.incumbent, &options) {
@@ -167,38 +183,63 @@ pub fn solve<const D: usize>(
                 true
             }
         });
-        if open.is_empty() {
-            break;
+        if ready.is_empty() {
+            if open.is_empty() {
+                break;
+            }
+            if Instant::now() >= deadline {
+                output.status = TreeStatus::TimeLimit;
+                break;
+            }
+            if output.nodes >= options.node_limit {
+                output.status = TreeStatus::NodeLimit;
+                break;
+            }
+            let count = options
+                .threads
+                .min(open.len())
+                .min(options.node_limit - output.nodes);
+            let mut batch = Vec::with_capacity(count);
+            for _ in 0..count {
+                let index = (0..open.len())
+                    .min_by(|&a, &b| open[a].bound.total_cmp(&open[b].bound))
+                    .unwrap();
+                batch.push(open.remove(index));
+            }
+            let results = if let Some(workers) = workers.as_ref().filter(|_| batch.len() > 1) {
+                output.parallel_batches += 1;
+                parallel::evaluate_batch(
+                    workers,
+                    &problem,
+                    &batch,
+                    &options,
+                    output.incumbent,
+                    deadline,
+                )?
+            } else {
+                let node = &batch[0];
+                vec![evaluate(
+                    node.parent.as_ref(),
+                    previous.as_deref(),
+                    &problem,
+                    &node.branches,
+                    &pool,
+                    &options,
+                    output.incumbent,
+                    deadline,
+                    options.root.cg.max_iterations,
+                    0,
+                    true,
+                )]
+            };
+            ready.extend(batch.into_iter().zip(results));
         }
-        if Instant::now() >= deadline {
-            output.status = TreeStatus::TimeLimit;
-            break;
-        }
-        if output.nodes >= options.node_limit {
-            output.status = TreeStatus::NodeLimit;
-            break;
-        }
-        let index = (0..open.len())
-            .min_by(|&a, &b| open[a].bound.total_cmp(&open[b].bound))
-            .unwrap();
-        let mut node = open.remove(index);
-        let parent_ref = node.parent.as_ref();
-        let result = match evaluate(
-            parent_ref,
-            previous.as_deref(),
-            &problem,
-            &node.branches,
-            &pool,
-            &options,
-            output.incumbent,
-            deadline,
-            options.root.cg.max_iterations,
-            0,
-            true,
-        ) {
+        let (mut node, evaluation) = ready.pop_front().expect("nonempty evaluation batch");
+        let result = match evaluation {
             Ok(result) => result,
             Err(error) if budget_error(&error) => {
                 open.push(node);
+                open.extend(ready.drain(..).map(|(node, _)| node));
                 output.status = if Instant::now() >= deadline {
                     TreeStatus::TimeLimit
                 } else {
