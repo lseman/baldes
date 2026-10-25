@@ -234,8 +234,14 @@ impl ResourceModel {
         })
     }
     /// Arc vectors use original insertion order. Bits represent allowed values.
-    fn add_selection(&mut self, initial: u64, allowed: Vec<u64>) -> usize {
-        self.push(CoupledResource::Selection { initial, allowed })
+    /// ``relaxed`` starts with check-only arcs that the master tightens.
+    #[pyo3(signature = (initial, allowed, relaxed=false))]
+    fn add_selection(&mut self, initial: u64, allowed: Vec<u64>, relaxed: bool) -> usize {
+        self.push(CoupledResource::Selection {
+            initial,
+            allowed,
+            relaxed,
+        })
     }
     /// Deliver before picking up at each stop. Quantities belong to arc heads.
     /// Loads up to `capacity + tolerance` are feasible.
@@ -254,18 +260,25 @@ impl ResourceModel {
             tolerance,
         })
     }
-    /// x += increment, cost += x * weight on each arc.
+    /// x += increment, cost += x * weight on each arc. ``future_weight``
+    /// optionally bounds (lower, upper) the total weight of any completion.
+    #[pyo3(signature = (initial, increments, weights, future_weight=None))]
     fn add_cumulative_cost(
         &mut self,
         initial: f64,
         increments: Vec<f64>,
         weights: Vec<f64>,
-    ) -> usize {
-        self.push(CoupledResource::CumulativeCost {
+        future_weight: Option<(f64, f64)>,
+    ) -> PyResult<usize> {
+        let future_weight = future_weight
+            .map(|(lower, upper)| run(|| baldes::Window::new(lower, upper)))
+            .transpose()?;
+        Ok(self.push(CoupledResource::CumulativeCost {
             initial,
             increments,
             weights,
-        })
+            future_weight,
+        }))
     }
     /// Optimize one shared free initial value over all per-arc PWL charges.
     fn add_interval_cost(

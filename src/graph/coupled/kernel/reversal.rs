@@ -133,6 +133,7 @@ mod tests {
                 CoupledResource::Selection {
                     initial: 3,
                     allowed: vec![3; 4],
+                    relaxed: false,
                 },
                 CoupledResource::SimultaneousPickupDelivery {
                     capacity: 20.,
@@ -324,6 +325,7 @@ mod tests {
                     initial: 0.,
                     increments: vec![0.; 4],
                     weights: vec![0.; 4],
+                    future_weight: None,
                 }),
             }
             graph.set_coupled_resources(&definitions).unwrap();

@@ -124,22 +124,10 @@ impl CoupledKernel {
             cost_scale: 1.,
             frozen,
             paired,
-            charging: definitions
+            plugins: definitions
                 .iter()
                 .filter_map(|r| match r {
-                    CoupledResource::Charging {
-                        battery,
-                        initial_energy,
-                        initial_time,
-                        arcs,
-                        max_work,
-                    } => Some(charging::PreparedCharging::new(
-                        *battery,
-                        *initial_energy,
-                        *initial_time,
-                        arcs,
-                        *max_work,
-                    )),
+                    CoupledResource::Plugin(plugin) => Some(plugin.clone()),
                     _ => None,
                 })
                 .collect(),
@@ -148,6 +136,15 @@ impl CoupledKernel {
                 .iter()
                 .filter_map(|r| match r {
                     CoupledResource::Selection { initial, .. } => Some(*initial),
+                    _ => None,
+                })
+                .collect(),
+            selection_memory: definitions
+                .iter()
+                .filter_map(|r| match r {
+                    CoupledResource::Selection {
+                        allowed, relaxed, ..
+                    } => Some(relaxed.then(|| vec![false; allowed.len()])),
                     _ => None,
                 })
                 .collect(),

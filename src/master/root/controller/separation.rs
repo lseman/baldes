@@ -14,6 +14,35 @@ impl<const D: usize> RootController<D> {
         let mut state = self.state.borrow_mut();
         let state = &mut *state;
         let value = master.objective();
+        // A solution using an improper route of a relaxed selection never
+        // ends the node: tighten (or drop stale columns) before any stop test.
+        if self.problem.graph.selection_relaxed() {
+            let values = master.values().to_vec();
+            let tagged: Vec<(usize, usize)> = tags
+                .iter()
+                .enumerate()
+                .filter(|(_, &t)| t >= 0)
+                .map(|(i, &t)| (i, t as usize))
+                .collect();
+            if self.uses_improper_selection(state, &tagged, &values) {
+                let rank_one_in_master = state.cut.rows.iter().any(Option::is_some);
+                if !self.improve_relaxation(state, rank_one_in_master, &tagged, &values)? {
+                    // The memory already excludes them; remove the stale columns.
+                    let mut removed = vec![];
+                    for &(column, tag) in &tagged {
+                        let route = &state.routes[tag];
+                        if !state
+                            .solver
+                            .route_satisfies_relaxation(&route.nodes, &route.arcs)?
+                        {
+                            removed.push(column);
+                        }
+                    }
+                    state.cut.removed_columns = removed;
+                }
+                return Ok(1);
+            }
+        }
         // Every converged column generation, round 0 included, reports to the
         let stop = state.solver.column_generation_terminated(0, 0)?;
         if state.cut.rounds == 0 {

@@ -76,7 +76,57 @@ impl<const D: usize> Solver<D> {
             };
             bits = next;
         }
+        if self.graph.selection_relaxed() {
+            let positions = arcs
+                .iter()
+                .map(|&id| self.graph.arcs.iter().position(|a| a.id == id))
+                .collect::<Option<Vec<_>>>()
+                .ok_or_else(|| invalid("route arc out of range"))?;
+            return Ok(self.graph.coupled_path_cost(&positions)?.is_some());
+        }
         Ok(true)
+    }
+    /// Relaxed selection (augmentNGneighbourhoods' selection step): narrow
+    /// the check-only arcs along the violating windows of the improper paths.
+    /// Returns the number of paths the stronger relaxation now excludes.
+    pub fn strengthen_selection(
+        &mut self,
+        paths: &[crate::graph::relaxation::FractionalPath],
+    ) -> Result<usize> {
+        if !self.graph.selection_relaxed() {
+            return Ok(0);
+        }
+        self.invalidate_changed_graph();
+        let mut forbidden = 0;
+        for path in paths {
+            let arcs = path
+                .arcs
+                .iter()
+                .map(|&id| {
+                    self.graph
+                        .arcs
+                        .iter()
+                        .position(|a| a.id == id)
+                        .ok_or_else(|| invalid("route arc out of range"))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            forbidden += usize::from(self.graph.strengthen_selection(&arcs));
+        }
+        if forbidden > 0 {
+            // As for NG: labels and enumerated paths no longer hold; the
+            // bucket graph, fixed arcs and half-way point stay.
+            match &mut self.engine {
+                Some(engine) => {
+                    engine.half_ready = false;
+                    engine.full_ready = false;
+                    self.prepared = Some(self.topology());
+                }
+                None => self.prepared = None,
+            }
+            self.enumeration = None;
+            self.enumeration_snapshot = None;
+        }
+        Ok(forbidden)
     }
     pub fn reset_ng(&mut self) -> bool {
         let Some((vertices, arcs)) = self.ng_baseline.take() else {

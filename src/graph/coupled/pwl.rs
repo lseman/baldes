@@ -17,7 +17,7 @@ impl PiecewiseLinearFunction {
         value.validate()?;
         Ok(value)
     }
-    pub(super) fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         if self.points.len() < 2
             || self.points.iter().flatten().any(|x| !x.is_finite())
             || self.points.windows(2).any(|p| {

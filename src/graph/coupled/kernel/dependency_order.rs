@@ -241,6 +241,7 @@ mod tests {
                 initial: 0.,
                 increments: vec![0.],
                 weights: vec![0.],
+                future_weight: None,
             }];
             for parent in 0..count - 1 {
                 definitions.push(CoupledResource::Dependent {
@@ -281,6 +282,7 @@ mod tests {
                 initial: 0.,
                 increments: vec![1.; factors.len()],
                 weights: vec![0.; factors.len()],
+                future_weight: None,
             },
             CoupledResource::Dependent {
                 parent: 0,
@@ -366,6 +368,7 @@ mod tests {
                 initial: 0.,
                 increments: vec![0.],
                 weights: vec![0.],
+                future_weight: None,
             },
             CoupledResource::Dependent {
                 parent: 0,
@@ -450,6 +453,7 @@ mod tests {
                 initial: 0.,
                 increments: vec![1.],
                 weights: vec![0.],
+                future_weight: None,
             },
             CoupledResource::PiecewiseLinearDependent {
                 parent: 0,

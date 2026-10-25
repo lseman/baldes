@@ -2,7 +2,9 @@
 //!
 //! This metadata never spends a mixed-key gap. Independently ordered physical
 //! scalar bases and numeric prefix costs are still required by the caller.
+use super::super::bounds::Range;
 use super::super::*;
+use crate::core::rounding::add_up;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Slot {
@@ -17,6 +19,8 @@ enum Slot {
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::graph::coupled::kernel) struct NumericCostOrder {
     slots: Vec<Slot>,
+    // Optional user bounds on any completion's total weight, per slot.
+    future: Vec<Option<Range>>,
     nonnegative_charges: bool,
     deploy_unequal: bool,
 }
@@ -27,12 +31,14 @@ impl NumericCostOrder {
         numeric_count: usize,
     ) -> Self {
         let mut order = vec![Slot::Other; numeric_count];
+        let mut future = vec![None; numeric_count];
         let mut nonnegative_charges = true;
         for (r, definition) in definitions.iter().enumerate() {
             match definition {
                 CoupledResource::CumulativeCost {
                     increments,
                     weights,
+                    future_weight,
                     ..
                 } => {
                     let increasing = increments.iter().all(|&x| x >= 0.);
@@ -57,7 +63,12 @@ impl NumericCostOrder {
                         nonnegative_charges = false;
                         Slot::Equal
                     };
-                    order[slots[r].expect("validated numeric resource slot")] = kind;
+                    let slot = slots[r].expect("validated numeric resource slot");
+                    order[slot] = kind;
+                    future[slot] = future_weight.map(|w| Range {
+                        lo: w.lower,
+                        hi: w.upper,
+                    });
                 }
                 CoupledResource::PiecewiseLinearCost { functions, .. } => {
                     // Its argument stays equal under DependencyOrder. Ordered
@@ -88,6 +99,7 @@ impl NumericCostOrder {
         });
         Self {
             slots: order,
+            future,
             nonnegative_charges,
             deploy_unequal,
         }
@@ -136,10 +148,16 @@ impl NumericCostOrder {
         if a_cost == b_cost && a == b {
             return a.iter().all(|x| x.is_finite());
         }
-        self.slots
+        // A bounded slot may put A on the wrong side of B: along a common
+        // completion the states keep their difference, so A's extra future
+        // cost is at most max(0, (a - b) * W). The numeric prefix pays it.
+        let mut penalty = 0.;
+        let ordered = self
+            .slots
             .iter()
+            .zip(&self.future)
             .zip(a.iter().zip(b))
-            .all(|(slot, (&a, &b))| {
+            .all(|((slot, future), (&a, &b))| {
                 if !a.is_finite() || !b.is_finite() {
                     return false;
                 }
@@ -158,22 +176,45 @@ impl NumericCostOrder {
                         }
                     }
                     Slot::Equal => a == b,
-                    Slot::Positive => {
+                    Slot::Positive | Slot::Negative => {
                         if !self.nonnegative_charges {
                             return a == b;
                         }
-                        // State, product, scaling and charge are nonnegative and
-                        // ordered. If B's literal operation is finite, A's is too.
-                        0. <= a && a <= b
-                    }
-                    Slot::Negative => {
-                        if !self.nonnegative_charges {
-                            return a == b;
+                        let positive = *slot == Slot::Positive;
+                        // State, product, scaling and charge keep the cone's
+                        // sign. If B's literal operation is finite, A's is too.
+                        let in_cone = if positive {
+                            0. <= a.min(b)
+                        } else {
+                            a.max(b) <= 0.
+                        };
+                        let ordered = if positive {
+                            0. <= a && a <= b
+                        } else {
+                            b <= a && a <= 0.
+                        };
+                        if ordered {
+                            return true;
                         }
-                        b <= a && a <= 0.
+                        let Some(weight) = future else {
+                            return false;
+                        };
+                        let extra = Range::point(a)
+                            .subtract(Range::point(b))
+                            .multiply(*weight)
+                            .hi
+                            .max(0.);
+                        match add_up(penalty, extra) {
+                            Some(sum) if in_cone && sum.is_finite() => {
+                                penalty = sum;
+                                true
+                            }
+                            _ => false,
+                        }
                     }
                 }
-            })
+            });
+        ordered && (penalty == 0. || add_up(a_cost, penalty).is_some_and(|c| c <= b_cost))
     }
 }
 
@@ -185,6 +226,7 @@ mod tests {
             initial: 0.,
             increments,
             weights,
+            future_weight: None,
         }
     }
     #[test]
@@ -225,6 +267,56 @@ mod tests {
                 }
             }
         }
+    }
+    #[test]
+    fn bounded_future_weight_lets_a_larger_state_pay_for_every_short_completion() {
+        let (increments, weights) = ([1., 2.], [1., 3.]);
+        let bounded = |future_weight| {
+            NumericCostOrder::new(
+                &[CoupledResource::CumulativeCost {
+                    initial: 0.,
+                    increments: increments.to_vec(),
+                    weights: weights.to_vec(),
+                    future_weight,
+                }],
+                &[Some(0)],
+                1,
+            )
+        };
+        // At most four future arcs, each weighing at most 3.
+        let order = bounded(Some(Window::new(0., 12.).unwrap()));
+        assert!(order.preserves(&[3.], &[0.], 0., 36.));
+        assert!(!order.preserves(&[3.], &[0.], 0., 35.));
+        assert!(!bounded(None).preserves(&[3.], &[0.], 0., 36.));
+        let mut accepted = 0;
+        for a0 in 0..=3 {
+            for b0 in 0..=3 {
+                for ac in 0..=40 {
+                    for bc in ac..=40 {
+                        let (a0, b0) = (f64::from(a0), f64::from(b0));
+                        if !order.preserves(&[a0], &[b0], f64::from(ac), f64::from(bc)) {
+                            continue;
+                        }
+                        accepted += usize::from(a0 > b0);
+                        for length in 0..=4 {
+                            for word in 0..(1usize << length) {
+                                let (mut a, mut b) = (a0, b0);
+                                let (mut ca, mut cb) = (f64::from(ac), f64::from(bc));
+                                for step in 0..length {
+                                    let arc = (word >> step) & 1;
+                                    a += increments[arc];
+                                    b += increments[arc];
+                                    ca += a * weights[arc];
+                                    cb += b * weights[arc];
+                                }
+                                assert!(ca <= cb, "{a0} {b0} {ac} {bc} {word}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(accepted > 0);
     }
     #[test]
     fn signed_shared_charges_require_identical_cost_inputs_and_prefix_costs() {

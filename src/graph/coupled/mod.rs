@@ -8,6 +8,7 @@ use crate::{invalid, Result};
 pub mod descriptor;
 mod encoded;
 mod kernel;
+pub mod plugin;
 mod pwl;
 pub use descriptor::{
     EvaluationPolicy, FrontOperationPolicy, PairedCostNormalization, PreparedSlopeFunction,
@@ -16,21 +17,8 @@ pub use descriptor::{
 pub use encoded::EncodedFunction;
 pub use kernel::{CoupledKernel, CoupledLabelState, CoupledWorkspace};
 pub(crate) use kernel::{CoupledPairSummary, CoupledStateBounds};
+pub use plugin::{CoupledPlugin, PluginResource, PluginState};
 pub use pwl::PiecewiseLinearFunction;
-
-/// Travel followed by service and optional continuous charging at the head.
-/// Charging maps energy to cumulative time from empty. Customers constrain
-/// service start; a charging stop also constrains completion by closing time.
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "clp", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "clp", serde(deny_unknown_fields))]
-pub struct ChargingResourceArc {
-    pub travel_time: f64,
-    pub energy: f64,
-    pub window: Window,
-    pub service: f64,
-    pub charging: Option<PiecewiseLinearFunction>,
-}
 
 /// Diagnostics for bounded graph-wide resource-domain propagation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,18 +74,11 @@ fn default_load_tolerance() -> f64 {
     serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)
 )]
 pub enum CoupledResource {
-    /// Earliest departure time as a continuous function of remaining energy.
-    /// All partial charging choices survive. Adds no objective, cannot be a
-    /// numeric dependency parent, and does not claim directed certification.
-    /// `max_work` bounds each frontier extension, including envelope work;
-    /// exhaustion is an error, never a proof of infeasibility.
-    Charging {
-        battery: f64,
-        initial_energy: f64,
-        initial_time: f64,
-        arcs: Vec<ChargingResourceArc>,
-        max_work: usize,
-    },
+    /// A resource supplied by an extension (for example EVRP charging).
+    /// It adds no objective, cannot be a numeric dependency parent and is
+    /// never certified. Plugins are not serialized.
+    #[cfg_attr(feature = "clp", serde(skip))]
+    Plugin(PluginResource),
     /// Numeric base transition retaining its literal function encoding.
     EncodedPiecewiseLinearResource {
         initial: f64,
@@ -166,7 +147,19 @@ pub enum CoupledResource {
     /// Values still possible for a route. Each arc intersects this domain with
     /// its mask; an empty intersection is infeasible. A two-value domain is a
     /// binary selection resource. Up to 64 distinct values are supported.
-    Selection { initial: u64, allowed: Vec<u64> },
+    ///
+    /// `relaxed` starts pricing with every arc check-only: an arc rejects a
+    /// label whose domain misses its mask but does not narrow the domain.
+    /// When the master solution uses a route breaking the exact rule, the
+    /// arcs of its shortest violating window start narrowing the domain, and
+    /// the stronger relaxation removes that route. Certification, incumbents
+    /// and final routes always apply the exact rule.
+    Selection {
+        initial: u64,
+        allowed: Vec<u64>,
+        #[cfg_attr(feature = "clp", serde(default))]
+        relaxed: bool,
+    },
     /// Deliveries leave the depot loaded; each customer unloads before picking
     /// up. Arc quantities describe the service at that arc's head. Capacity is
     /// enforced at departure and after every service, including earlier stops
@@ -208,6 +201,12 @@ pub enum CoupledResource {
         initial: f64,
         increments: Vec<f64>,
         weights: Vec<f64>,
+        /// Optional bounds on the total weight of any route completion
+        /// (forward: the remaining arcs; backward: the arcs before). When
+        /// set, forward dominance may accept a label with a larger state
+        /// x, charging its numeric cost the extra (x_a - x_b) * weight.
+        #[cfg_attr(feature = "clp", serde(default))]
+        future_weight: Option<Window>,
     },
     /// Bounded affine dependency: y += offsets[i] + factors[i] * parent_after.
     /// The parent must be an earlier numeric resource.
@@ -285,53 +284,7 @@ impl CoupledResource {
     ) -> Result<()> {
         let n = g.arcs.len();
         match self {
-            Self::Charging {
-                battery,
-                initial_energy,
-                initial_time,
-                arcs,
-                ..
-            } => {
-                if !battery.is_finite()
-                    || *battery <= 0.
-                    || !initial_energy.is_finite()
-                    || *initial_energy < 0.
-                    || initial_energy > battery
-                    || !initial_time.is_finite()
-                    || *initial_time < 0.
-                    || arcs.len() != n
-                {
-                    return Err(invalid(
-                        "invalid charging resource initial state or arc count",
-                    ));
-                }
-                for arc in arcs {
-                    Window::new(arc.window.lower, arc.window.upper)?;
-                    if [
-                        arc.travel_time,
-                        arc.energy,
-                        arc.service,
-                        arc.window.lower,
-                        arc.window.upper,
-                    ]
-                    .iter()
-                    .any(|x| !x.is_finite() || *x < 0.)
-                    {
-                        return Err(invalid(
-                            "invalid charging resource travel, service or window",
-                        ));
-                    }
-                    if let Some(curve) = &arc.charging {
-                        curve.validate()?;
-                        if curve.points[0] != [0., 0.]
-                            || curve.points.last().unwrap()[0] != *battery
-                            || curve.points.windows(2).any(|w| w[0][1] >= w[1][1])
-                        {
-                            return Err(invalid("charging curve must strictly increase from zero to battery capacity"));
-                        }
-                    }
-                }
-            }
+            Self::Plugin(plugin) => plugin.0.validate(n)?,
             Self::SlopePaired {
                 initial,
                 initial_base,
@@ -431,7 +384,9 @@ impl CoupledResource {
                     function.validate()?;
                 }
             }
-            Self::Selection { initial, allowed } => {
+            Self::Selection {
+                initial, allowed, ..
+            } => {
                 if *initial == 0 || allowed.len() != n {
                     return Err(invalid(
                         "selection needs a nonempty initial domain and one mask per arc",
@@ -490,10 +445,16 @@ impl CoupledResource {
                 initial,
                 increments,
                 weights,
+                future_weight,
             } => {
                 finite(*initial)?;
                 numbers(increments, n, false)?;
                 numbers(weights, n, false)?;
+                if let Some(w) = future_weight {
+                    finite(w.lower)?;
+                    finite(w.upper)?;
+                    Window::new(w.lower, w.upper)?;
+                }
             }
             Self::PiecewiseLinearResource {
                 initial,

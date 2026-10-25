@@ -279,6 +279,40 @@ impl RelationFront {
             minimum.min(p.left[1]).min(p.right[1])
         })
     }
+    /// This forward front is defined wherever `other` is and is no higher
+    /// there. Fronts are piecewise linear, so each of `other`'s pieces is
+    /// checked at the merged breakpoints; one piece of this front must cover
+    /// each sub-interval by itself. Overlapping pieces are never combined,
+    /// which can only reject. Forward extension is monotone in the front,
+    /// so every completion of `other` stays available at no higher value.
+    pub(in crate::graph::coupled) fn covers_below(&self, other: &Self) -> bool {
+        let mut knots = Vec::new();
+        other.pieces.iter().all(|b| {
+            knots.clear();
+            knots.push(b.left[0]);
+            knots.extend(
+                self.pieces
+                    .iter()
+                    .flat_map(|a| [a.left[0], a.right[0]])
+                    .filter(|&x| b.left[0] < x && x < b.right[0]),
+            );
+            knots.push(b.right[0]);
+            knots.sort_by(f64::total_cmp);
+            knots.dedup();
+            let below = |a: &RelationPiece, x: f64| {
+                matches!((a.value(x), b.value(x)), (Ok(va), Ok(vb)) if va <= vb)
+            };
+            let covers = |lo: f64, hi: f64| {
+                self.pieces
+                    .iter()
+                    .any(|a| a.left[0] <= lo && hi <= a.right[0] && below(a, lo) && below(a, hi))
+            };
+            if knots.len() == 1 {
+                return covers(knots[0], knots[0]);
+            }
+            knots.windows(2).all(|w| covers(w[0], w[1]))
+        })
+    }
     #[cfg(test)]
     pub(super) fn value(&self, x: f64) -> Result<Option<f64>> {
         let mut best: Option<f64> = None;
@@ -1240,5 +1274,45 @@ mod metadata_tests {
         assert!(!nan.exact_cache_eligible());
         assert_ne!(nan, nan.clone());
         assert!(!front(f64::INFINITY).exact_cache_eligible());
+    }
+}
+
+#[cfg(test)]
+mod covering_tests {
+    use super::*;
+    fn front(pieces: &[([f64; 2], [f64; 2])]) -> RelationFront {
+        RelationFront::from_pieces(
+            pieces
+                .iter()
+                .map(|&(left, right)| RelationPiece {
+                    metadata: 0,
+                    left,
+                    right,
+                    waiting: false,
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn lower_wider_front_covers_and_crossing_or_narrower_fronts_do_not() {
+        let b = front(&[([1., 5.], [3., 7.])]);
+        // Lower on a wider domain, with an interior breakpoint inside b.
+        let a = front(&[([0., 4.], [2., 4.]), ([2., 4.], [4., 6.])]);
+        assert!(a.covers_below(&b));
+        assert!(!b.covers_below(&a));
+        // Equal endpoints but above b in the interior.
+        let bump = front(&[([1., 5.], [2., 8.]), ([2., 8.], [3., 7.])]);
+        assert!(!bump.covers_below(&b));
+        // Below b but missing part of its domain.
+        assert!(!front(&[([1., 0.], [2.5, 0.])]).covers_below(&b));
+        // A gap inside b's domain is not covered.
+        let gap = front(&[([0., 0.], [1.5, 0.]), ([2., 0.], [4., 0.])]);
+        assert!(!gap.covers_below(&b));
+        // Singleton pieces are compared at their point.
+        let point = front(&[([2., 6.], [2., 6.])]);
+        assert!(a.covers_below(&point));
+        assert!(!front(&[([2., 6.5], [2., 6.5])]).covers_below(&point));
+        assert!(a.covers_below(&a));
     }
 }

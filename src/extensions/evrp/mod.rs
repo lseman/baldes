@@ -5,12 +5,14 @@
 
 use crate::{invalid, Result};
 
+mod charging;
 mod direct;
 mod fixed_order;
 mod functions;
 mod master;
 mod native;
 mod subpath;
+pub use charging::{ChargingResource, ChargingResourceArc};
 pub use direct::{
     DirectOptions, EvPricingResult, EvPricingStatistics, EvPricingStatus, PricedRoute,
 };

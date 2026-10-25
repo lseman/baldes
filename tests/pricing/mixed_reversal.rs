@@ -29,6 +29,7 @@ fn mixed_solver(elementary: bool, symmetric: bool, cut: bool, multiple: bool) ->
     let mut definitions = vec![CoupledResource::Selection {
         initial: 3,
         allowed: vec![3; s.graph.arcs.len()],
+        relaxed: false,
     }];
     for second in 0..=usize::from(multiple) {
         let events: Vec<_> = (0..s.graph.arcs.len())

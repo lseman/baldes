@@ -33,7 +33,7 @@ impl CoupledKernel {
             resource_objective: 0.,
             accounting: Some(accounting::ScalarCosts::default()),
             relations: self.paired.iter().map(|p| p.root(forward)).collect(),
-            charging: self.charging.iter().map(|p| p.root(forward)).collect(),
+            plugins: self.plugins.iter().map(|p| p.0.root(forward)).collect(),
             fronts: self
                 .front_indices
                 .iter()
@@ -77,7 +77,7 @@ impl CoupledKernel {
                     && a.slope_fronts == b.slope_fronts
                     && a.slope_relations == b.slope_relations
                     && a.relations == b.relations
-                    && a.charging == b.charging
+                    && a.plugins == b.plugins
                     && a.numeric == b.numeric
                     && a.suffix == b.suffix
                     && a.selection.len() == b.selection.len()
@@ -145,16 +145,24 @@ impl CoupledKernel {
             slope_fronts: Vec::with_capacity(state.slope_fronts.len()),
             slope_relations: Vec::with_capacity(state.slope_relations.len()),
             relations: Vec::with_capacity(state.relations.len()),
-            charging: Vec::with_capacity(state.charging.len()),
+            plugins: Vec::with_capacity(state.plugins.len()),
             numeric_cost: 0.,
             resource_objective: 0.,
             accounting: None,
         };
         let prepared = &self.transitions.arcs[arc];
-        for (domain, &allowed) in next.selection.iter_mut().zip(&prepared.selection) {
-            *domain &= allowed;
-            if *domain == 0 {
+        for ((domain, &allowed), memory) in next
+            .selection
+            .iter_mut()
+            .zip(&prepared.selection)
+            .zip(&self.selection_memory)
+        {
+            let kept = *domain & allowed;
+            if kept == 0 {
                 return Ok(None);
+            }
+            if memory.as_ref().map_or(true, |remembered| remembered[arc]) {
+                *domain = kept;
             }
         }
         for (index, ((load, &step), &capacity)) in next
@@ -244,11 +252,11 @@ impl CoupledKernel {
             };
             next.relations.push(label);
         }
-        for (old, prepared) in state.charging.iter().zip(&self.charging) {
-            let Some(label) = prepared.extend(old, arc, forward)? else {
+        for (old, plugin) in state.plugins.iter().zip(&self.plugins) {
+            let Some(label) = plugin.0.extend(old, arc, forward)? else {
                 return Ok(None);
             };
-            next.charging.push(label);
+            next.plugins.push(label);
         }
         let cost = if forward {
             let mut cost = state.numeric_cost;
@@ -312,7 +320,7 @@ impl CoupledKernel {
                     || !self.relation_indices.is_empty()
                     || self.cost_resource
                     || !self.slope_paired.is_empty()
-                    || !self.charging.is_empty()
+                    || !self.plugins.is_empty()
                 {
                     old.program.prepend(arc)
                 } else {

@@ -1,0 +1,84 @@
+//! Label resources supplied by extensions.
+//!
+//! A plugin owns one resource's per-label state and its transitions over
+//! physical arc positions (the original graph's arc vector order). The kernel
+//! carries the state, calls the plugin on every extension and join, and
+//! treats a plugin like any other resource without directed certification:
+//! routes using one are replayed numerically, never certified.
+use crate::Result;
+use std::any::Any;
+use std::fmt::Debug;
+use std::sync::Arc;
+
+/// One label's plugin value. Clones share it; equality compares values.
+#[derive(Clone, Debug)]
+pub struct PluginState(Arc<dyn PluginValue>);
+impl PluginState {
+    pub fn new<T: PluginValue>(value: T) -> Self {
+        Self(Arc::new(value))
+    }
+    /// The value as its concrete type, or None for another plugin's state.
+    pub fn get<T: 'static>(&self) -> Option<&T> {
+        self.0.as_any().downcast_ref()
+    }
+}
+impl PartialEq for PluginState {
+    fn eq(&self, other: &Self) -> bool {
+        same(&self.0, &other.0) || self.0.equals(&*other.0)
+    }
+}
+
+/// Value stored in a [`PluginState`]; implemented for every comparable type.
+pub trait PluginValue: Any + Debug + Send + Sync {
+    fn as_any(&self) -> &dyn Any;
+    fn equals(&self, other: &dyn PluginValue) -> bool;
+}
+impl<T: Any + Debug + Send + Sync + PartialEq> PluginValue for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn equals(&self, other: &dyn PluginValue) -> bool {
+        other.as_any().downcast_ref::<T>() == Some(self)
+    }
+}
+
+/// A resource that an extension adds to coupled labeling. It adds no
+/// objective. Errors abort pricing; they never prove infeasibility.
+pub trait CoupledPlugin: Debug + Send + Sync {
+    /// Check per-arc data against the graph's arc count.
+    fn validate(&self, arcs: usize) -> Result<()>;
+    /// The state at the source (forward) or the sink (backward).
+    fn root(&self, forward: bool) -> PluginState;
+    /// Extend along physical arc `arc`; None when infeasible.
+    fn extend(&self, state: &PluginState, arc: usize, forward: bool)
+        -> Result<Option<PluginState>>;
+    /// Whether forward prefix `state` stays feasible along `suffix`, the
+    /// backward label's arcs in route order.
+    fn join(&self, state: &PluginState, suffix: &mut dyn Iterator<Item = usize>) -> Result<bool>;
+    /// Whether label state `a` dominates `b` in this direction: every
+    /// completion feasible for `b` is feasible for `a`. Default: equality.
+    fn dominates(&self, a: &PluginState, b: &PluginState, forward: bool) -> bool {
+        let _ = forward;
+        a == b
+    }
+}
+
+/// Shared handle to a plugin inside a resource definition. Two handles are
+/// equal when they share one plugin instance.
+#[derive(Clone, Debug)]
+pub struct PluginResource(pub Arc<dyn CoupledPlugin>);
+impl PluginResource {
+    pub fn new<P: CoupledPlugin + 'static>(plugin: P) -> Self {
+        Self(Arc::new(plugin))
+    }
+}
+impl PartialEq for PluginResource {
+    fn eq(&self, other: &Self) -> bool {
+        same(&self.0, &other.0)
+    }
+}
+
+/// Same allocation; vtable addresses are not compared.
+fn same<T: ?Sized>(a: &Arc<T>, b: &Arc<T>) -> bool {
+    std::ptr::eq(Arc::as_ptr(a) as *const (), Arc::as_ptr(b) as *const ())
+}

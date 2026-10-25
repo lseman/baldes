@@ -75,6 +75,57 @@ fn expensive_columns_are_recovered_then_optimized_at_original_costs() {
 }
 
 #[test]
+fn phase_one_recovers_ryan_foster_children_before_original_cost_optimization() {
+    use baldes::pricing::restrictions::RyanFosterConstraint;
+
+    let mut problem = singleton_problem();
+    problem.graph.add_arc(1, 2, 50.).unwrap();
+    // Rebuild arc coefficients after adding the pair route.
+    let problem = RootProblem::set_partitioning(problem.graph, 2.).unwrap();
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        for stabilized in [false, true] {
+            let mut controls = options(mode);
+            controls.cg.stabilize = stabilized;
+            let parent = root::solve(problem.clone(), controls.clone()).unwrap();
+            for together in [false, true] {
+                let rule = RyanFosterConstraint {
+                    first: 1,
+                    second: 2,
+                    together,
+                };
+                let branch = BranchConstraint::RyanFoster(rule);
+                let mut fresh = problem.clone();
+                fresh.branch(branch.clone()).unwrap();
+                for output in [
+                    root::solve(fresh, controls.clone()).unwrap(),
+                    root::inherit_branches(
+                        parent.snapshot.as_ref().unwrap(),
+                        &[branch],
+                        controls.clone(),
+                    )
+                    .unwrap(),
+                ] {
+                    let optimum = if together { 300. } else { 500. };
+                    assert_eq!(output.master.status, Status::Optimal, "{output:?}");
+                    assert!((output.master.lp - optimum).abs() < 1e-6, "{output:?}");
+                    assert!((output.master.bound - optimum).abs() < 1e-6, "{output:?}");
+                    assert!(output
+                        .master
+                        .artificials
+                        .iter()
+                        .all(|&c| output.values[c] < 1e-7));
+                    assert!(output
+                        .route_values()
+                        .iter()
+                        .all(|(route, value)| *value < 1e-7
+                            || rule.satisfied_by(route.nodes.iter().map(|&v| v as usize))));
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn recovery_uses_all_supported_lp_backends() {
     let mut backends = vec![MasterSolver::Clp, MasterSolver::Ipm];
     if cfg!(feature = "highs") {

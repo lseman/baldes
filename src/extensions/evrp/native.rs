@@ -1,6 +1,7 @@
 //! EV model adapter for the ordinary physical-graph pricing engine.
 use super::*;
-use crate::graph::coupled::{ChargingResourceArc, CoupledResource, PiecewiseLinearFunction};
+use super::{ChargingResource, ChargingResourceArc};
+use crate::graph::coupled::{CoupledResource, PiecewiseLinearFunction, PluginResource};
 use crate::{Graph, Window};
 
 #[derive(Clone, Copy, Debug)]
@@ -177,13 +178,14 @@ impl Problem {
                 bounds: Window::new(0., 1.)?,
                 functions: served,
             },
-            CoupledResource::Charging {
+            // Vehicles leave the depot fully charged.
+            CoupledResource::Plugin(PluginResource::new(ChargingResource {
                 battery: self.battery,
                 initial_energy: self.battery,
                 initial_time,
                 arcs,
                 max_work: options.max_front_work,
-            },
+            })),
         ])?;
         Ok(graph)
     }

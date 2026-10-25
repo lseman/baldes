@@ -193,10 +193,12 @@ impl CoupledKernel {
                 return None;
             }
         }
-        // Deep paired equality is deliberately last among these necessary
+        // Paired checks are deliberately last among these necessary
         // preconditions: rejected scalar/discrete/program pairs need no walk
         // through the retained function and backward-adjoint pieces.
-        if a.relations != b.relations || a.charging != b.charging {
+        if !self.plugins_dominate(a, b, forward)
+            || !self.relations_dominate(a, b, forward, tracked_order)
+        {
             return None;
         }
         if !forward {
@@ -256,6 +258,49 @@ impl CoupledKernel {
             penalty = add_up(penalty, gap.hi.max(0.))?;
         }
         Some(penalty)
+    }
+
+    /// Forward relation fronts dominate by covering and staying below; the
+    /// final minimum is then no higher for every completion. A charged
+    /// relation also needs the scalar prefix order proven by `tracked_order`,
+    /// since its own objective term is then no higher as well. Backward
+    /// labels retain only the arc program, so they must match exactly.
+    fn plugins_dominate(
+        &self,
+        a: &CoupledLabelState,
+        b: &CoupledLabelState,
+        forward: bool,
+    ) -> bool {
+        a.plugins.len() == b.plugins.len()
+            && a.plugins
+                .iter()
+                .zip(&b.plugins)
+                .zip(&self.plugins)
+                .all(|((a, b), plugin)| plugin.0.dominates(a, b, forward))
+    }
+
+    fn relations_dominate(
+        &self,
+        a: &CoupledLabelState,
+        b: &CoupledLabelState,
+        forward: bool,
+        tracked_order: bool,
+    ) -> bool {
+        a.relations.len() == b.relations.len()
+            && a.relations.iter().zip(&b.relations).zip(&self.paired).all(
+                |((left, right), prepared)| {
+                    if left == right {
+                        return true;
+                    }
+                    let (Some(left), Some(right)) = (left.forward(), right.forward()) else {
+                        return false;
+                    };
+                    let charged = prepared.has_costs() && self.cost_scale != 0.;
+                    forward
+                        && (!charged || (tracked_order && self.cost_scale > 0.))
+                        && left.covers_below(right)
+                },
+            )
     }
 }
 impl<const D: usize> Graph<D> {
@@ -439,6 +484,7 @@ mod front_continuation_tests {
                     initial: 0.,
                     increments: vec![0.; 4],
                     weights: vec![0.; 4],
+                    future_weight: None,
                 },
                 CoupledResource::PiecewiseLinearCost {
                     parent: 0,
@@ -484,6 +530,7 @@ mod front_continuation_tests {
                 initial: 0.,
                 increments: vec![1., 2., 1.],
                 weights: vec![1., 1., 3.],
+                future_weight: None,
             }])
             .unwrap();
         let kernel = graph.coupled_kernel().unwrap();
@@ -525,6 +572,7 @@ mod front_continuation_tests {
                         initial: 0.,
                         increments: vec![0.; 3],
                         weights: vec![0.; 3],
+                        future_weight: None,
                     },
                     CoupledResource::PiecewiseLinearCost {
                         parent: 0,
@@ -560,6 +608,7 @@ mod front_continuation_tests {
                     initial: 0.,
                     increments: vec![0.; 3],
                     weights: vec![0.; 3],
+                    future_weight: None,
                 },
                 CoupledResource::PiecewiseLinearCost {
                     parent: 0,
@@ -612,6 +661,7 @@ mod front_continuation_tests {
                     initial: 0.,
                     increments: vec![1., 2., 1.],
                     weights: vec![1., 1., 3.],
+                    future_weight: None,
                 },
                 CoupledResource::Dependent {
                     parent: 0,

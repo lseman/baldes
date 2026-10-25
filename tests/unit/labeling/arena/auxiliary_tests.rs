@@ -35,6 +35,7 @@ fn auxiliary_payloads_move_without_wide_promotion_and_survive_inspection() {
         .set_coupled_resources(&[CoupledResource::Selection {
             initial: 3,
             allowed: vec![3],
+            relaxed: false,
         }])
         .unwrap();
     for words in [2, 4, 8, LIMITED_WORDS] {

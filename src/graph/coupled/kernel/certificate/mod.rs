@@ -76,7 +76,7 @@ impl CoupledKernel {
         // General relation optimization uses numerical intersection/waiting
         // envelopes; a numerical replay must not masquerade as a directed
         // integer feasibility or objective certificate, even in phase I.
-        if !self.relation_indices.is_empty() || !self.charging.is_empty() {
+        if !self.relation_indices.is_empty() || !self.plugins.is_empty() {
             return None;
         }
         let mut numeric: Vec<_> = self.initial.iter().copied().map(Interval::point).collect();
@@ -90,7 +90,9 @@ impl CoupledKernel {
         };
         for r in self.definitions.iter() {
             match r {
-                CoupledResource::Selection { initial, allowed } => {
+                CoupledResource::Selection {
+                    initial, allowed, ..
+                } => {
                     let mut domain = *initial;
                     for &arc in arcs {
                         domain &= *allowed.get(arc)?;

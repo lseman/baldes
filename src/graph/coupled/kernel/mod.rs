@@ -6,7 +6,6 @@ mod bucketing;
 mod budgeted;
 #[cfg(feature = "clp")]
 mod certificate;
-mod charging;
 mod continuation;
 mod dependency_order;
 mod domains;
@@ -16,6 +15,7 @@ mod frozen;
 mod paired;
 pub(super) mod relation;
 mod reversal;
+mod selection;
 mod slope_interval;
 pub(super) mod slope_paired;
 mod storage;
@@ -62,7 +62,7 @@ pub struct CoupledLabelState {
     slope_fronts: Vec<slope_interval::SlopeLabel>,
     slope_relations: Vec<slope_interval::SlopeLabel>,
     relations: Vec<paired::PairedLabel>,
-    charging: Vec<charging::ChargingLabel>,
+    plugins: Vec<crate::graph::coupled::PluginState>,
     numeric_cost: f64,
     resource_objective: f64,
     accounting: Option<accounting::ScalarCosts>,
@@ -77,6 +77,9 @@ pub struct CoupledKernel {
     initial: Vec<f64>,
     cost_scale: f64,
     selection_initial: Vec<u64>,
+    /// Per selection resource: None applies every arc mask; Some(memory)
+    /// narrows the domain only on remembered arcs and checks the others.
+    selection_memory: Vec<Option<Vec<bool>>>,
     /// Pickup/delivery capacity plus its tolerance: the largest admitted load.
     load_capacities: Vec<f64>,
     /// Pickup/delivery dominance tolerance, as in the capacity checks.
@@ -91,7 +94,7 @@ pub struct CoupledKernel {
     slope_paired: Vec<slope_paired::PreparedSlopePaired>,
     relation_indices: Vec<usize>,
     paired: Vec<paired::PreparedPaired>,
-    charging: Vec<charging::PreparedCharging>,
+    plugins: Vec<crate::graph::coupled::PluginResource>,
     front_bucket_policy: bucketing::FrontBucketPolicy,
     frozen: frozen::PreparedFrozen,
     arc_count: usize,
@@ -120,10 +123,7 @@ fn combine_load(a: [f64; 3], b: [f64; 3]) -> Result<[f64; 3]> {
 }
 impl CoupledKernel {
     fn check_state(&self, state: &CoupledLabelState) -> Result<()> {
-        if state.charging.len() != self.charging.len()
-            || state.charging.iter().any(|label| {
-                matches!(label, charging::ChargingLabel::Forward(_)) != state.suffix.is_none()
-            })
+        if state.plugins.len() != self.plugins.len()
             || state.relations.len() != self.relation_indices.len()
             || state.fronts.len() != self.front_indices.len()
             || state.slope_fronts.len() != self.slope_indices.len()
@@ -207,6 +207,16 @@ impl<const D: usize> Graph<D> {
     }
     pub fn coupled_kernel(&self) -> Option<&CoupledKernel> {
         self.coupled.as_deref()
+    }
+    /// Narrow relaxed selection arcs along this route's violating windows.
+    pub(crate) fn strengthen_selection(&mut self, arcs: &[usize]) -> bool {
+        self.coupled
+            .as_mut()
+            .is_some_and(|kernel| kernel.strengthen_selection(arcs))
+    }
+    pub(crate) fn selection_relaxed(&self) -> bool {
+        self.coupled_kernel()
+            .is_some_and(CoupledKernel::selection_relaxed)
     }
     pub fn has_coupled_resources(&self) -> bool {
         self.coupled.is_some()

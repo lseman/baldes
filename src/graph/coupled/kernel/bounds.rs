@@ -420,7 +420,7 @@ impl CoupledKernel {
         if !self.front_indices.is_empty()
             || self.has_slope_fronts()
             || !self.relation_indices.is_empty()
-            || !self.charging.is_empty()
+            || !self.plugins.is_empty()
         {
             return f64::NEG_INFINITY;
         }
@@ -525,6 +525,7 @@ impl PreparedBounds {
                     initial,
                     increments,
                     weights: w,
+                    ..
                 } => {
                     let i = slots[r].unwrap();
                     let (min, max) = increments
@@ -611,6 +612,7 @@ mod coupled_hull_tests {
                 CoupledResource::Selection {
                     initial: 3,
                     allowed: vec![3],
+                    relaxed: false,
                 },
                 CoupledResource::SimultaneousPickupDelivery {
                     capacity: 10.,
@@ -622,6 +624,7 @@ mod coupled_hull_tests {
                     initial: 0.,
                     increments: vec![0.],
                     weights: vec![1.],
+                    future_weight: None,
                 },
             ],
         )
@@ -772,7 +775,7 @@ impl CoupledKernel {
         if !self.front_indices.is_empty()
             || self.has_slope_fronts()
             || !self.relation_indices.is_empty()
-            || !self.charging.is_empty()
+            || !self.plugins.is_empty()
         {
             return CoupledPairSummary::default();
         }
@@ -846,6 +849,7 @@ mod pairing_tests {
                 CoupledResource::Selection {
                     initial: 3,
                     allowed: vec![1, 2, 1, 2],
+                    relaxed: false,
                 },
                 CoupledResource::SimultaneousPickupDelivery {
                     capacity: 20.,
@@ -857,6 +861,7 @@ mod pairing_tests {
                     initial: 0.,
                     increments: vec![1., 2., 3., 4.],
                     weights: vec![-2., 3., -1., 2.],
+                    future_weight: None,
                 },
             ],
         )
@@ -967,6 +972,7 @@ mod merge_tests {
                 initial: 2.,
                 increments: vec![1.],
                 weights: vec![-3.],
+                future_weight: None,
             }])
             .unwrap();
         let kernel = graph.coupled_kernel().unwrap();

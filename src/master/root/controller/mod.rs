@@ -227,7 +227,7 @@ impl<const D: usize> Controller<ClpMaster> for RootController<D> {
     }
 
     fn separates(&self) -> bool {
-        !self.state.borrow().cut.separators().is_empty()
+        !self.state.borrow().cut.separators().is_empty() || self.problem.graph.selection_relaxed()
     }
 
     fn separate(&mut self, master: &mut ClpMaster, tags: &[i32]) -> Result<usize> {

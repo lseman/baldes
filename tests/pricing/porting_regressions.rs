@@ -609,6 +609,7 @@ fn coupled_solver(symmetric: bool, cut: bool) -> Solver<2> {
         CoupledResource::Selection {
             initial: 3,
             allowed,
+            relaxed: false,
         },
         CoupledResource::SimultaneousPickupDelivery {
             capacity: 6.,
@@ -785,6 +786,7 @@ fn g13_bounded_cycles_jumps_and_terminal_equality_match_literal_walks() {
                     CoupledResource::Selection {
                         initial: 3,
                         allowed: vec![3; 3],
+                        relaxed: false,
                     },
                     CoupledResource::SimultaneousPickupDelivery {
                         capacity: 4.,

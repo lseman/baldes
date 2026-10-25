@@ -76,8 +76,8 @@ impl CoupledKernel {
             }
         }
         let suffix = b.suffix.as_ref().unwrap();
-        for (front, prepared) in f.charging.iter().zip(&self.charging) {
-            if !prepared.join(front, &suffix.program)? {
+        for (front, plugin) in f.plugins.iter().zip(&self.plugins) {
+            if !plugin.0.join(front, &mut suffix.program.iter())? {
                 return Ok(None);
             }
         }
@@ -159,7 +159,7 @@ impl CoupledKernel {
         if self.front_indices.is_empty()
             && !self.has_slope_fronts()
             && self.relation_indices.is_empty()
-            && self.charging.is_empty()
+            && self.plugins.is_empty()
         {
             let mut numeric = f.numeric.clone();
             let mut cost = f.numeric_cost;
@@ -184,7 +184,7 @@ impl CoupledKernel {
             && !self.has_slope_fronts()
             && self.initial.is_empty()
             && !self.paired.is_empty()
-            && self.charging.is_empty()
+            && self.plugins.is_empty()
         {
             let mut total = 0.;
             let mut known = true;

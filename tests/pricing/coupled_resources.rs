@@ -218,6 +218,7 @@ fn nonlinear_chain() -> Graph<2> {
                 initial: 0.,
                 increments: vec![1.; 3],
                 weights: vec![2., -1., 3.],
+                future_weight: None,
             },
             CoupledResource::PiecewiseLinearDependent {
                 parent: 0,
@@ -283,6 +284,7 @@ fn graph_wide_reduction_eliminates_an_infeasible_branch_without_renumbering() {
                 initial: 0.,
                 increments: vec![0.; 4],
                 weights: vec![0.; 4],
+                future_weight: None,
             },
             CoupledResource::Dependent {
                 parent: 0,
@@ -338,6 +340,7 @@ fn domain_reduction_preserves_a_feasible_cyclic_route() {
                 initial: 0.,
                 increments: vec![0.; 3],
                 weights: vec![0.; 3],
+                future_weight: None,
             },
             CoupledResource::PiecewiseLinearDependent {
                 parent: 0,
@@ -627,6 +630,7 @@ fn selection_simultaneous_loads_and_signed_cumulative_dependencies_match_tiny_pa
         CoupledResource::Selection {
             initial: 3,
             allowed: graph.arcs.iter().map(|arc| masks[arc.head]).collect(),
+            relaxed: false,
         },
         CoupledResource::SimultaneousPickupDelivery {
             capacity: 4.,
@@ -638,6 +642,7 @@ fn selection_simultaneous_loads_and_signed_cumulative_dependencies_match_tiny_pa
             initial: 0.,
             increments: quantities(&increments),
             weights: quantities(&weights),
+            future_weight: None,
         },
         CoupledResource::Dependent {
             parent: 2,
@@ -858,6 +863,7 @@ fn interval_cost_fixture(seed: usize) -> Graph<2> {
             CoupledResource::Selection {
                 initial: 3,
                 allowed: vec![3; 6],
+                relaxed: false,
             },
             CoupledResource::SimultaneousPickupDelivery {
                 capacity: 3.,

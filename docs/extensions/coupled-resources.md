@@ -21,9 +21,9 @@ Multiple resources compose in declaration order.
 | `IntervalCost` | Choose one shared initial value in the initial interval; on every arc add its increment, enforce state/charge domains, and charge the PWL function. Minimize the full route sum over that choice. |
 | `SlopeIntervalCost` | Retain prepared slope segments through translation, restriction and addition, with an explicit front-operation policy. |
 | `SlopePaired` | Retain prepared slope relations with general arrival composition, waiting and function-valued bounds, explicit operation policy and absolute-final or final-minus-initial cost normalization. Runtime validation is deferred. |
-| `Selection` | Intersect the remaining value domain with the arc's allowed mask; reject the empty domain. Bits 0 and 1 give a binary domain; up to 64 values are supported. |
+| `Selection` | Intersect the remaining value domain with the arc's allowed mask; reject the empty domain. Bits 0 and 1 give a binary domain; up to 64 values are supported. With `relaxed`, arcs start check-only (reject a missing value without narrowing) and the routing master narrows them along the shortest violating window of each improper route in its solution; incumbents always use the exact rule. |
 | `SimultaneousPickupDelivery` | Deliver before picking up at each stop, with all route deliveries loaded at departure. Enforce capacity at departure and between all stops, admitting loads up to `capacity + tolerance` (default 1e-6, also used by load dominance; 0 is exact). |
-| `CumulativeCost` | Update `x += increment[arc]`, then add `x * weight[arc]` to the objective. |
+| `CumulativeCost` | Update `x += increment[arc]`, then add `x * weight[arc]` to the objective. Optional `future_weight` bounds the total weight of any route completion; with it, dominance accepts a label with a larger `x` that pays `(x_a - x_b) * weight` from its numeric cost. |
 | `Dependent` | Update `y += offset[arc] + factor[arc] * parent_after`; reject values outside the declared closed bounds. The parent must be an earlier numeric resource. |
 | `PiecewiseLinearDependent` | Update `y += function[arc](parent_after)` within the function's finite argument domain, then enforce the dependent state bounds. |
 | `PiecewiseLinearResource` | Replace `x` with `function[arc](x_before)`, enforcing the input domain and output window. |

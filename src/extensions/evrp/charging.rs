@@ -1,10 +1,33 @@
-//! Continuous charging fronts over exact remaining energy. This resource has
-//! no cost: earlier departure dominates at the same energy. Backward states
-//! defer to physical suffix replay at the actual forward frontier.
-use super::*;
+//! Continuous charging fronts over exact remaining energy, as a coupled
+//! labeling plugin. This resource has no cost: earlier departure dominates
+//! at the same energy. Backward states defer to physical suffix replay at
+//! the actual forward frontier.
+use crate::graph::coupled::{CoupledPlugin, PiecewiseLinearFunction, PluginState};
+use crate::graph::Window;
+use crate::{invalid, Result};
+
+fn finite(x: f64) -> Result<f64> {
+    if x.is_finite() {
+        Ok(x)
+    } else {
+        Err(invalid("nonfinite coupled resource arithmetic"))
+    }
+}
+
+/// Travel followed by service and optional continuous charging at the head.
+/// Charging maps energy to cumulative time from empty. Customers constrain
+/// service start; a charging stop also constrains completion by closing time.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ChargingResourceArc {
+    pub travel_time: f64,
+    pub energy: f64,
+    pub window: Window,
+    pub service: f64,
+    pub charging: Option<PiecewiseLinearFunction>,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) struct Piece {
+struct Piece {
     lo: f64,
     hi: f64,
     a: f64,
@@ -34,17 +57,26 @@ impl Piece {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(super) enum ChargingLabel {
+enum ChargingLabel {
     Forward(Vec<Piece>),
     Backward,
 }
 
+/// Earliest departure time as a continuous function of remaining energy.
+/// All partial charging choices survive. `max_work` bounds each frontier
+/// extension, including envelope work; exhaustion is an error, never a
+/// proof of infeasibility. Arcs use the graph's arc vector order.
 #[derive(Clone, Debug, PartialEq)]
-pub(super) struct PreparedCharging {
-    battery: f64,
-    initial: Piece,
-    arcs: std::sync::Arc<[ChargingResourceArc]>,
-    max_work: usize,
+pub struct ChargingResource {
+    /// Battery capacity.
+    pub battery: f64,
+    /// Energy at the source, at most `battery`.
+    pub initial_energy: f64,
+    /// Departure time at the source.
+    pub initial_time: f64,
+    /// One entry per physical arc.
+    pub arcs: Vec<ChargingResourceArc>,
+    pub max_work: usize,
 }
 struct Work(usize);
 impl Work {
@@ -110,65 +142,7 @@ impl Work {
         Ok(result)
     }
 }
-impl PreparedCharging {
-    pub(super) fn new(
-        battery: f64,
-        energy: f64,
-        time: f64,
-        arcs: &[ChargingResourceArc],
-        max_work: usize,
-    ) -> Self {
-        Self {
-            battery,
-            initial: Piece {
-                lo: energy,
-                hi: energy,
-                a: 0.,
-                b: time,
-            },
-            arcs: arcs.into(),
-            max_work,
-        }
-    }
-    pub(super) fn root(&self, forward: bool) -> ChargingLabel {
-        if forward {
-            ChargingLabel::Forward(vec![self.initial])
-        } else {
-            ChargingLabel::Backward
-        }
-    }
-    pub(super) fn extend(
-        &self,
-        state: &ChargingLabel,
-        arc: usize,
-        forward: bool,
-    ) -> Result<Option<ChargingLabel>> {
-        match (state, forward) {
-            (ChargingLabel::Backward, false) => Ok(Some(ChargingLabel::Backward)),
-            (ChargingLabel::Forward(front), true) => {
-                let next = self.advance(front, &self.arcs[arc])?;
-                Ok((!next.is_empty()).then_some(ChargingLabel::Forward(next)))
-            }
-            _ => Err(invalid("charging label direction mismatch")),
-        }
-    }
-    pub(super) fn join(
-        &self,
-        forward: &ChargingLabel,
-        suffix: &continuation::Continuation,
-    ) -> Result<bool> {
-        let ChargingLabel::Forward(front) = forward else {
-            return Err(invalid("charging forward join expected"));
-        };
-        let mut current = front.clone();
-        for arc in suffix.iter() {
-            current = self.advance(&current, &self.arcs[arc])?;
-            if current.is_empty() {
-                return Ok(false);
-            }
-        }
-        Ok(true)
-    }
+impl ChargingResource {
     fn advance(&self, front: &[Piece], arc: &ChargingResourceArc) -> Result<Vec<Piece>> {
         let mut work = Work(self.max_work);
         let mut candidates = Vec::new();
@@ -249,9 +223,102 @@ impl PreparedCharging {
     }
 }
 
+impl CoupledPlugin for ChargingResource {
+    fn validate(&self, n: usize) -> Result<()> {
+        let battery = &self.battery;
+        let initial_energy = &self.initial_energy;
+        let initial_time = &self.initial_time;
+        let arcs = &self.arcs;
+        if !battery.is_finite()
+            || *battery <= 0.
+            || !initial_energy.is_finite()
+            || *initial_energy < 0.
+            || initial_energy > battery
+            || !initial_time.is_finite()
+            || *initial_time < 0.
+            || arcs.len() != n
+        {
+            return Err(invalid(
+                "invalid charging resource initial state or arc count",
+            ));
+        }
+        for arc in arcs.iter() {
+            Window::new(arc.window.lower, arc.window.upper)?;
+            if [
+                arc.travel_time,
+                arc.energy,
+                arc.service,
+                arc.window.lower,
+                arc.window.upper,
+            ]
+            .iter()
+            .any(|x| !x.is_finite() || *x < 0.)
+            {
+                return Err(invalid(
+                    "invalid charging resource travel, service or window",
+                ));
+            }
+            if let Some(curve) = &arc.charging {
+                curve.validate()?;
+                if curve.points[0] != [0., 0.]
+                    || curve.points.last().unwrap()[0] != *battery
+                    || curve.points.windows(2).any(|w| w[0][1] >= w[1][1])
+                {
+                    return Err(invalid(
+                        "charging curve must strictly increase from zero to battery capacity",
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+    fn root(&self, forward: bool) -> PluginState {
+        PluginState::new(if forward {
+            ChargingLabel::Forward(vec![Piece {
+                lo: self.initial_energy,
+                hi: self.initial_energy,
+                a: 0.,
+                b: self.initial_time,
+            }])
+        } else {
+            ChargingLabel::Backward
+        })
+    }
+    fn extend(
+        &self,
+        state: &PluginState,
+        arc: usize,
+        forward: bool,
+    ) -> Result<Option<PluginState>> {
+        match (state.get::<ChargingLabel>(), forward) {
+            (Some(ChargingLabel::Backward), false) => Ok(Some(state.clone())),
+            (Some(ChargingLabel::Forward(front)), true) => {
+                let next = self.advance(front, &self.arcs[arc])?;
+                Ok((!next.is_empty()).then(|| PluginState::new(ChargingLabel::Forward(next))))
+            }
+            _ => Err(invalid("charging label direction mismatch")),
+        }
+    }
+    fn join(&self, state: &PluginState, suffix: &mut dyn Iterator<Item = usize>) -> Result<bool> {
+        let Some(ChargingLabel::Forward(front)) = state.get::<ChargingLabel>() else {
+            return Err(invalid("charging forward join expected"));
+        };
+        let mut current = front.clone();
+        for arc in suffix {
+            current = self.advance(&current, &self.arcs[arc])?;
+            if current.is_empty() {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::graph::coupled::{CoupledResource, PluginResource};
+    use crate::Graph;
 
     fn fixture(close: f64, max_work: usize) -> Graph<2> {
         let mut graph = Graph::<2>::new(4, 0).unwrap();
@@ -274,16 +341,17 @@ mod tests {
             .collect();
         graph
             .set_coupled_resources(&[
-                CoupledResource::Charging {
+                CoupledResource::Plugin(PluginResource::new(ChargingResource {
                     battery: 4.,
                     initial_energy: 4.,
                     initial_time: 0.,
                     arcs,
                     max_work,
-                },
+                })),
                 CoupledResource::Selection {
                     initial: 3,
                     allowed: vec![3, 2, 3],
+                    relaxed: false,
                 },
                 CoupledResource::SimultaneousPickupDelivery {
                     capacity: 2.,
@@ -372,9 +440,6 @@ mod tests {
             kernel.suppress_costs();
             assert_eq!(kernel.replay(&[0, 1, 2]).unwrap().is_some(), close >= 7.);
             assert!(kernel.certify(&[0, 1, 2]).is_none());
-            let json = serde_json::to_string(kernel.definitions()).unwrap();
-            let definitions: Vec<CoupledResource> = serde_json::from_str(&json).unwrap();
-            assert_eq!(definitions, kernel.definitions());
         }
     }
 }
