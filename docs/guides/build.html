@@ -51,6 +51,21 @@ HiGHS backend and generic MIP API. See below for library discovery details.</p>
 <a href="../extensions/multi-time-windows.html">multiple time windows</a> for the Rust,
 Python and JSON APIs.</p>
 <p>Python installation is covered in the <a href="python.html">pybaldes guide</a>.</p>
+<h3 id="rank-one-node-memory">Rank-one node memory</h3>
+<p>Use <code>cargo build --release --features clp,rank-one-node-memory</code> to generate
+rank-one cuts with node memory instead of arc memory. In <code>make config</code>, select
+<strong>Rank-one memory → Node</strong>, or set <code>CONFIG_RANK_ONE_MEMORY=node</code> in the saved
+configuration. <code>CONFIG_RANK_ONE_MEMORY=arc</code> preserves the existing runtime policy.</p>
+<p>The feature maps arc-memory requests (<code>BALDESrankOneCutsMemoryType=1</code> or Rust
+<code>MemoryType::Arc</code>) to vertex memory during cut generation. The default-copy and
+all-vertices modes already use vertex memory and retain their meaning. Explicitly
+registered cuts retain their declared representation. Node memory retains a
+cut's remainder through remembered vertices, while arc memory can distinguish
+individual arcs entering or leaving the same vertex; the resulting limited-memory
+cut coefficients and LP bounds can therefore differ. Master coefficients and
+pricing use the selected cut representation consistently.</p>
+<p>Python builds expose the same feature, for example
+<code>maturin develop --features rank-one-node-memory</code>.</p>
 <h2 id="gurobi-master-backend">Gurobi master backend</h2>
 <p>Download and extract the latest stable Linux release into the repository's
 ignored <code>external/</code> directory:</p>
@@ -339,6 +354,6 @@ See <a href="../reference/simd.html">SIMD dispatch</a> for dispatch behavior and
 <nav class="page-turn" aria-label="Adjacent guides"><a href="../extensions/mp.html"><small>Previous guide</small>Multi-pricing: one master, multiple pricing subproblems <span aria-hidden="true">↗</span></a><a href="source-layout.html"><small>Next guide</small>Source layout <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#direct-cargo-builds">Direct Cargo builds</a><a class="toc-level-2" href="#gurobi-master-backend">Gurobi master backend</a><a class="toc-level-2" href="#interactive-configuration">Interactive configuration</a><a class="toc-level-2" href="#build-options">Build options</a><a class="toc-level-2" href="#saved-settings-and-automation">Saved settings and automation</a><a class="toc-level-2" href="#other-make-targets">Other Make targets</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#direct-cargo-builds">Direct Cargo builds</a><a class="toc-level-3" href="#rank-one-node-memory">Rank-one node memory</a><a class="toc-level-2" href="#gurobi-master-backend">Gurobi master backend</a><a class="toc-level-2" href="#interactive-configuration">Interactive configuration</a><a class="toc-level-2" href="#build-options">Build options</a><a class="toc-level-2" href="#saved-settings-and-automation">Saved settings and automation</a><a class="toc-level-2" href="#other-make-targets">Other Make targets</a></nav></aside>
 </div>
 </body></html>

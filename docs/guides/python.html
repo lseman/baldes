@@ -152,6 +152,21 @@ For local development, <code>maturin develop --release</code> installs the mixed
 <a href="build.html">build guide</a>, then install with its feature:</p>
 <div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.<span class="w"> </span>--config-settings<span class="o">=</span>build-args<span class="o">=</span><span class="s2">"--features highs"</span>
 </code></pre></div>
+<h2 id="repeated-low-level-pricing">Repeated low-level pricing</h2>
+<p>Retain a <code>Solver</code> across column-generation iterations. <code>set_reduced_costs(costs)</code>
+updates one reduced cost per arc while preserving original costs and prepared
+bucket graphs. <code>update_reduced_costs(costs, duals)</code> also replaces original costs;
+use it when those original costs change.</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="n">solver</span><span class="o">.</span><span class="n">set_reduced_costs</span><span class="p">(</span><span class="n">reduced_arc_costs</span><span class="p">)</span>
+<span class="n">minimum</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span> <span class="n">exact</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">price_with_status</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">columns</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">exact</span><span class="p">:</span>
+    <span class="n">minimum</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span> <span class="n">exact</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">price_with_status</span><span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="n">exact</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<p>The default call uses staged pricing and may return improving heuristic columns.
+<code>exact=True</code> runs the unlimited-label phase once and can also return nonnegative
+columns. Only use <code>minimum</code> as a pricing bound when the returned <code>exact</code> flag is
+true. Exactness here concerns the configured pricing domain, including its NG
+relaxation; it is not an independent arithmetic certificate for the master.</p>
 <h2 id="multiple-pricing-networks">Multiple pricing networks</h2>
 <p><code>NetworkProblem</code> and <code>solve_networks</code> expose a shared master with independent
 pricing graphs, root snapshots, assignment branching, additive rows and fixed
@@ -161,6 +176,6 @@ See <a href="../extensions/mp.html#python">multi-network inputs and examples</a>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="../solver/tree.html"><small>Previous guide</small>Branch-and-price tree and node lifecycle <span aria-hidden="true">↗</span></a><a href="../extensions/mp.html"><small>Next guide</small>Multi-pricing: one master, multiple pricing subproblems <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#solve-options-and-results">Solve options and results</a><a class="toc-level-2" href="#build-variants">Build variants</a><a class="toc-level-2" href="#multiple-pricing-networks">Multiple pricing networks</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#solve-options-and-results">Solve options and results</a><a class="toc-level-2" href="#build-variants">Build variants</a><a class="toc-level-2" href="#repeated-low-level-pricing">Repeated low-level pricing</a><a class="toc-level-2" href="#multiple-pricing-networks">Multiple pricing networks</a></nav></aside>
 </div>
 </body></html>

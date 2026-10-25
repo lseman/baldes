@@ -61,6 +61,18 @@ and resource-branch windows continue to apply.</p>
 feature to the existing wheel build). The stateful solver exposes:</p>
 <div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="n">solver</span><span class="o">.</span><span class="n">set_vertex_time_windows</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">[(</span><span class="mf">8.0</span><span class="p">,</span> <span class="mf">12.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">16.0</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">)])</span>
 </code></pre></div>
+<p>For Python network models, use <code>PricingResource(time_windows=...)</code> with one
+entry per vertex:</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">PricingResource</span>
+
+<span class="n">time</span> <span class="o">=</span> <span class="n">PricingResource</span><span class="p">(</span>
+    <span class="n">bounds</span><span class="o">=</span><span class="p">[(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">30.0</span><span class="p">)]</span> <span class="o">*</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="n">time_windows</span><span class="o">=</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">[(</span><span class="mf">8.0</span><span class="p">,</span> <span class="mf">12.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">16.0</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">)],</span> <span class="kc">None</span><span class="p">],</span>
+<span class="p">)</span>
+</code></pre></div>
+<p><code>None</code> entries use ordinary bounds. The field survives network JSON round trips
+and is omitted when unset, allowing ordinary models on builds without the feature.
+Window validation and normalization take place in Rust when solving the model.</p>
 <p>Network JSON, built with <code>clp,multi-time-windows</code>, accepts <code>time_windows</code> on a
 resource: one entry per vertex, each either null (ordinary bounds) or a nonempty
 list of [lower, upper] pairs. For a three-vertex network:</p>
