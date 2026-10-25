@@ -214,60 +214,9 @@ impl PiecewiseLinearFunction {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn interval_images_enclose_literal_evaluation_at_knots_and_segment_interiors() {
-        for points in [
-            vec![[-2., -3.], [0., 2.], [1., -1.], [3., 4.]],
-            vec![[0., -1e16], [1., 1.], [2., 1e16]],
-        ] {
-            let function = PiecewiseLinearFunction::new(points).unwrap();
-            let domain = function.prepared_domain();
-            for i in 0..=32 {
-                for j in i..=32 {
-                    let lo = domain.lower + (domain.upper - domain.lower) * (i as f64 / 32.);
-                    let hi = domain.lower + (domain.upper - domain.lower) * (j as f64 / 32.);
-                    let image = function.range(Range { lo, hi }).unwrap();
-                    for point in &function.points {
-                        if lo <= point[0] && point[0] <= hi {
-                            assert!(image.lo <= point[1] && point[1] <= image.hi);
-                        }
-                    }
-                    for k in 0..=8 {
-                        let x = lo + (hi - lo) * (k as f64 / 8.);
-                        let y = function.value(x).unwrap().unwrap();
-                        assert!(
-                            image.lo <= y && y <= image.hi,
-                            "x={x} y={y} image={image:?}"
-                        );
-                    }
-                }
-            }
-        }
-    }
-}
+#[path = "../../../tests/unit/graph/coupled/pwl/tests.rs"]
+mod tests;
 
 #[cfg(test)]
-mod preimage_tests {
-    use super::*;
-    #[test]
-    fn preimages_retain_exact_arguments_through_flat_and_nonmonotone_segments() {
-        let function =
-            PiecewiseLinearFunction::new(vec![[-2., 3.], [0., 1.], [1., 1.], [3., -1.], [4., 2.]])
-                .unwrap();
-        let domain = Range { lo: -2., hi: 4. };
-        for index in 0..=128 {
-            let x = -2. + 6. * (index as f64 / 128.);
-            let y = function.value(x).unwrap().unwrap();
-            let inverse = function.preimage(domain, Range::point(y)).unwrap();
-            assert!(
-                inverse.lo <= x && x <= inverse.hi,
-                "x={x} y={y} inverse={inverse:?}"
-            );
-        }
-        assert!(function
-            .preimage(domain, Range { lo: 10., hi: 20. })
-            .is_none());
-    }
-}
+#[path = "../../../tests/unit/graph/coupled/pwl/preimage_tests.rs"]
+mod preimage_tests;
