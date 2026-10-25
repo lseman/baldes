@@ -345,6 +345,10 @@ pub(super) fn run() -> std::result::Result<(), String> {
                         number_of_vehicles: true,
                         ..BranchingOptions::arc_flow_only()
                     },
+                    "edge" => BranchingOptions {
+                        edge_flow: true,
+                        ..BranchingOptions::arc_flow_only()
+                    },
                     mode => return Err(format!("unknown branching mode: {mode}")),
                 };
             }

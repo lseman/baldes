@@ -18,6 +18,7 @@ unit customer coverage with equality rows.
 | `--branching cluster` | Cluster boundary/pair variables, then arc-flow fallback |
 | `--branching resource` | Accumulated-resource splits, then arc-flow fallback |
 | `--branching hybrid` | Vehicle count, resource/cluster, assignment, Ryan–Foster, arc flow |
+| `--branching edge` | Undirected edge flow, then arc-flow fallback |
 
 The default selector visits enabled families in descending model priority. Within
 an applicable family it orders candidates by closeness of the fractional part
@@ -25,7 +26,8 @@ to 0.5, with stable ties. Phased strong branching then evaluates candidates
 when enabled. These are adapter priorities, not a combined ranking across all
 families. Families in the same integer priority group can contribute together.
 Rust callers can set `BranchingOptions::priorities`; its defaults are vehicle
-count 11, resource/cluster 10, assignment 3, Ryan–Foster 2 and arc flow 1.
+count 11, resource/cluster 10, assignment 3, Ryan–Foster 2, aggregate flow 1.5
+and arc flow 1.
 These are Baldes adapter settings; reference model interfaces also register
 priorities explicitly. Every supplied priority must be finite.
 
@@ -113,6 +115,28 @@ the arc; branch duals also reach pricing through that arc.
 `BranchConstraint::ArcFlow::arc` takes the arc's **position in
 `problem.graph.arcs`**, while `Route::arcs` stores public arc IDs. Use
 `RootProblem::arc_position(id)` to convert an ID to a position.
+
+## Aggregate flow and edges
+
+`BranchConstraint::AggregateFlow` branches on a fixed integer combination of arc
+traversals, the routing counterpart of the reference's generic aggregate
+variables. Its children enforce activity at most `floor(f)` or at least
+`ceil(f)`. Route coefficients and pricing duals follow each arc's coefficient,
+exactly as for a single arc.
+
+Register model variables in `BranchingOptions::aggregates` with
+`AggregateVariable::new(name, &[(arc_id, coefficient), ...])`, using public arc
+IDs. Coefficients must be nonzero integers of magnitude at most 2^20, so the
+activity is integral in every integer solution; repeated arcs are merged.
+`BranchingOptions::edge_flow` (or `--branching edge`) adds one variable per
+undirected edge `{u, v}`, named `edge:u-v`, counting both arc directions and any
+parallel arcs. This is the edge variable of symmetric models. Both sources share
+the `aggregate_flow` priority, and the arc family remains the fallback.
+
+The routing tree has one pricing network, so the reference's cross-network
+aggregate membership has no counterpart here; the multi-network MP tree keeps
+its own dispatcher. Edge packing sets reduce to the same disjunction: an edge
+set used fractionally by the single network is branched as its aggregate flow.
 
 ## Strong branching and diving
 

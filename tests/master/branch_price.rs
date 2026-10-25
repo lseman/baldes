@@ -640,3 +640,41 @@ fn root_and_exact_incumbent_validation_support_more_than_two_resources() {
         assert!(output.bound <= 5.);
     }
 }
+
+#[test]
+fn edge_and_registered_aggregate_branching_reach_the_exhaustive_optimum() {
+    use baldes::master::branching::{AggregateVariable, BranchingOptions};
+    let problem =
+        RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
+    // A registered generic variable: the route count, as source departures.
+    let departures: Vec<_> = problem
+        .graph
+        .arcs
+        .iter()
+        .filter(|a| a.tail == problem.graph.source && a.head != problem.graph.sink)
+        .map(|a| (a.id, 1.))
+        .collect();
+    let routes = AggregateVariable::new("routes", &departures).unwrap();
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        for branching in [
+            BranchingOptions {
+                edge_flow: true,
+                ..BranchingOptions::arc_flow_only()
+            },
+            BranchingOptions {
+                aggregates: vec![routes.clone()],
+                edge_flow: true,
+                ..BranchingOptions::arc_flow_only()
+            },
+        ] {
+            let mut controls = options();
+            controls.root.cg.bound_mode = mode;
+            controls.mip_node_limit = 0;
+            controls.branching = branching;
+            let out = tree::solve(problem.clone(), controls).unwrap();
+            assert_eq!(out.status, TreeStatus::Optimal, "{out:?}");
+            assert!((out.incumbent - (4. + 2f64.sqrt())).abs() < 1e-6, "{out:?}");
+            assert!(out.bound <= out.incumbent);
+        }
+    }
+}

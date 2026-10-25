@@ -1,5 +1,6 @@
 //! Routing branch constraints. Family-specific behavior lives in sibling modules.
 mod accumulated_resource;
+mod aggregate_flow;
 mod arc_flow;
 mod cluster;
 pub mod enforcement;
@@ -13,6 +14,8 @@ mod ryan_foster;
 
 use crate::master::{root::RootProblem, RowSense};
 use crate::{invalid, pricing::restrictions::RyanFosterConstraint, Result, Route};
+pub(crate) use aggregate_flow::edges as aggregate_edges;
+pub use aggregate_flow::AggregateVariable;
 pub use cluster::ClusterBranchingOptions;
 pub use generator_identity::BranchGeneratorNames;
 pub use grouped_resource::AccumulatedResourceGroupBranch;
@@ -27,6 +30,15 @@ pub enum BranchConstraint {
     },
     NumberOfVehicles {
         graph_id: i32,
+        sense: RowSense,
+        rhs: f64,
+    },
+    /// An integer combination of physical arc traversals: a model-registered
+    /// generic variable or an undirected edge. `arcs` holds sorted physical
+    /// arc positions and integer coefficients; `name` identifies the variable.
+    AggregateFlow {
+        name: String,
+        arcs: Vec<(usize, f64)>,
         sense: RowSense,
         rhs: f64,
     },
@@ -58,6 +70,7 @@ impl BranchConstraint {
         match *self {
             Self::ArcFlow { sense, rhs, .. }
             | Self::NumberOfVehicles { sense, rhs, .. }
+            | Self::AggregateFlow { sense, rhs, .. }
             | Self::ClusterBoundary { sense, rhs, .. }
             | Self::ClusterPair { sense, rhs, .. } => (sense, rhs),
             Self::PackingSetAssignment { assigned, .. } => packing_set_assignment::row(assigned),
@@ -73,6 +86,7 @@ impl BranchConstraint {
         }
         match self {
             Self::ArcFlow { arc, .. } => arc_flow::validate(p, *arc),
+            Self::AggregateFlow { arcs, .. } => aggregate_flow::validate(p, arcs),
             Self::NumberOfVehicles { graph_id, rhs, .. } => {
                 number_of_vehicles::validate(*graph_id, *rhs)
             }
@@ -90,6 +104,7 @@ impl BranchConstraint {
     pub(crate) fn arc_coefficient<const D: usize>(&self, p: &RootProblem<D>, arc: usize) -> f64 {
         match self {
             Self::ArcFlow { arc: target, .. } => arc_flow::coefficient(arc, *target),
+            Self::AggregateFlow { arcs, .. } => aggregate_flow::coefficient(arcs, arc),
             Self::NumberOfVehicles { graph_id, .. } => {
                 number_of_vehicles::coefficient(p, arc, *graph_id)
             }

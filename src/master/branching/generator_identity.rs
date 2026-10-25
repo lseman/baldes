@@ -38,6 +38,9 @@ impl BranchGeneratorNames {
 pub(crate) fn key(c: &BranchConstraint) -> String {
     match c {
         BranchConstraint::ArcFlow { arc, .. } => format!("arc:{arc}"),
+        BranchConstraint::AggregateFlow { name, arcs, .. } => {
+            format!("aggregate:{name}:{arcs:?}")
+        }
         BranchConstraint::NumberOfVehicles { graph_id, .. } => format!("vehicles:{graph_id}"),
         BranchConstraint::PackingSetAssignment {
             vertex, graph_id, ..

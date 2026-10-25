@@ -73,6 +73,10 @@ pub(super) fn fresh_candidates_with_budget<const D: usize>(
             current.accumulated_resource &= options.priorities.accumulated_resource == priority;
             current.packing_set_assignment &= options.priorities.packing_set_assignment == priority;
             current.ryan_foster &= options.priorities.ryan_foster == priority;
+            if options.priorities.aggregate_flow != priority {
+                current.aggregates.clear();
+                current.edge_flow = false;
+            }
             if options.priorities.clusters != priority {
                 current.clusters = None;
             }
@@ -221,15 +225,48 @@ fn generate<const D: usize>(
             return candidates;
         }
     }
+    let mut flows = BTreeMap::<usize, f64>::new();
+    for (r, value) in &routes {
+        for &id in &r.arcs {
+            *flows.entry(problem.arc_position(id).unwrap()).or_default() += *value;
+        }
+    }
+    if options.aggregate_flow() {
+        let registered = options
+            .aggregates
+            .iter()
+            .filter_map(|v| Some((v.name().to_owned(), v.positions(problem)?)));
+        let edges = options
+            .edge_flow
+            .then(|| crate::master::branching::aggregate_edges(problem))
+            .unwrap_or_default();
+        for (name, members) in registered.chain(edges) {
+            let value = members
+                .iter()
+                .map(|&(arc, c)| c * flows.get(&arc).copied().unwrap_or(0.))
+                .sum::<f64>();
+            if fractional(value) {
+                let branch = |sense, rhs| BranchConstraint::AggregateFlow {
+                    name: name.clone(),
+                    arcs: members.clone(),
+                    sense,
+                    rhs,
+                };
+                candidates.push(BranchCandidate {
+                    down: branch(RowSense::LessEqual, value.floor()),
+                    up: branch(RowSense::GreaterEqual, value.ceil()),
+                    value,
+                });
+            }
+        }
+        if !all && !candidates.is_empty() && !aggregate_candidates {
+            order(&mut candidates);
+            return candidates;
+        }
+    }
     if !arcs {
         order(&mut candidates);
         return candidates;
-    }
-    let mut flows = BTreeMap::<usize, f64>::new();
-    for (r, value) in routes {
-        for &id in &r.arcs {
-            *flows.entry(problem.arc_position(id).unwrap()).or_default() += value;
-        }
     }
     for (arc, value) in flows {
         if fractional(value) {

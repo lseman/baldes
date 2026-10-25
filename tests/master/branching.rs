@@ -430,6 +430,130 @@ fn accumulated_resource_windows_cover_schedules_and_restore_pricing() {
 }
 
 #[cfg(feature = "clp")]
+#[cfg(feature = "clp")]
+#[test]
+fn aggregate_flow_candidates_count_weighted_arcs_and_children_match_fresh_masters() {
+    use baldes::master::{
+        branching::{AggregateVariable, BranchConstraint as B, BranchingOptions},
+        root::{self, RootOptions},
+        tree::candidates::candidates,
+        RowSense,
+    };
+    assert!(AggregateVariable::new("empty", &[]).is_err());
+    assert!(AggregateVariable::new("half", &[(0, 0.5)]).is_err());
+    assert!(AggregateVariable::new("cancelled", &[(0, 1.), (0, -1.)]).is_err());
+    let merged = AggregateVariable::new("merged", &[(3, 1.), (0, 2.), (3, 1.)]).unwrap();
+    assert_eq!(merged.arcs(), &[(0, 2.), (3, 2.)]);
+
+    let p = triangle_problem();
+    let mut options = RootOptions::default();
+    options.capture_state = true;
+    options.enumerate = false;
+    options.incumbent = 100.;
+    options.cg.stabilize = false;
+    options.cg.multiplicity = 3.;
+    let out = root::solve(p.clone(), options.clone()).unwrap();
+    let flow = |tail: usize, head: usize| -> f64 {
+        out.route_values()
+            .iter()
+            .map(|(r, x)| {
+                r.arcs
+                    .iter()
+                    .filter(|&&id| {
+                        let arc = &p.graph.arcs[p.arc_position(id).unwrap()];
+                        arc.tail == tail && arc.head == head
+                    })
+                    .count() as f64
+                    * x
+            })
+            .sum()
+    };
+    let edges = candidates(
+        &p,
+        &out,
+        &BranchingOptions {
+            edge_flow: true,
+            ..BranchingOptions::arc_flow_only()
+        },
+    );
+    // The full candidate list also carries the lower-priority arc fallback.
+    let edges: Vec<_> = edges
+        .into_iter()
+        .filter(|c| matches!(c.down, B::AggregateFlow { .. }))
+        .collect();
+    assert!(!edges.is_empty());
+    for candidate in &edges {
+        let B::AggregateFlow { name, arcs, .. } = &candidate.down else {
+            unreachable!()
+        };
+        let (u, v) = name
+            .strip_prefix("edge:")
+            .and_then(|e| e.split_once('-'))
+            .map(|(u, v)| (u.parse().unwrap(), v.parse().unwrap()))
+            .unwrap();
+        assert!((candidate.value - (flow(u, v) + flow(v, u))).abs() < 1e-9);
+        assert!(arcs.iter().all(|&(arc, c)| {
+            let arc = &p.graph.arcs[arc];
+            c == 1. && arc.tail.min(arc.head) == u && arc.tail.max(arc.head) == v
+        }));
+    }
+    // A registered variable with doubled weights: twice the edge's value.
+    let B::AggregateFlow { arcs, .. } = &edges[0].down else {
+        unreachable!()
+    };
+    let ids: Vec<_> = arcs
+        .iter()
+        .map(|&(a, _)| (p.graph.arcs[a].id, 2.))
+        .collect();
+    let registered = candidates(
+        &p,
+        &out,
+        &BranchingOptions {
+            aggregates: vec![AggregateVariable::new("double", &ids).unwrap()],
+            ..BranchingOptions::arc_flow_only()
+        },
+    );
+    if (2. * edges[0].value).fract().abs() > 1e-6 {
+        let double = registered
+            .iter()
+            .find(|c| matches!(&c.down, B::AggregateFlow { name, .. } if name == "double"))
+            .unwrap();
+        assert!((double.value - 2. * edges[0].value).abs() < 1e-9);
+    }
+
+    let snapshot = out.snapshot.as_ref().unwrap();
+    for candidate in edges.iter().take(2) {
+        for branch in [&candidate.down, &candidate.up] {
+            let child =
+                root::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
+            let mut cold = p.clone();
+            cold.branch(branch.clone()).unwrap();
+            let fresh = root::solve(cold, options.clone()).unwrap();
+            assert_eq!(child.master.status, fresh.master.status, "{branch:?}");
+            assert!(
+                (child.master.lp - fresh.master.lp).abs() < 1e-6,
+                "{branch:?}: child={} fresh={}",
+                child.master.lp,
+                fresh.master.lp
+            );
+            let (sense, rhs) = branch.row();
+            let activity: f64 = child
+                .route_values()
+                .iter()
+                .map(|(r, x)| branch.coefficient(&p, r) * x)
+                .sum();
+            assert!(
+                match sense {
+                    RowSense::LessEqual => activity <= rhs + 1e-6,
+                    RowSense::GreaterEqual => activity >= rhs - 1e-6,
+                    RowSense::Equal => (activity - rhs).abs() < 1e-6,
+                },
+                "{branch:?} activity={activity}"
+            );
+        }
+    }
+}
+
 #[test]
 fn aggregate_branches_match_fresh_and_inherited_masters() {
     use baldes::master::{

@@ -14,6 +14,7 @@ pub(in crate::master::tree) fn registered(options: &BranchingOptions) -> Vec<f64
         (options.clusters.is_some(), p.clusters),
         (options.packing_set_assignment, p.packing_set_assignment),
         (options.ryan_foster, p.ryan_foster),
+        (options.aggregate_flow(), p.aggregate_flow),
     ] {
         if enabled {
             values.push(value);
