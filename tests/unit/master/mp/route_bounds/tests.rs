@@ -51,6 +51,32 @@ fn options(mode: BoundMode) -> Options {
     options
 }
 #[test]
+fn coupled_objective_survives_full_domain_caps_and_directed_compensation() {
+    use crate::graph::coupled::CoupledResource;
+    let mut problem = fixture(1., 0.5, &[0., 10., 20.]);
+    problem.networks[0]
+        .graph
+        .set_coupled_resources(&[CoupledResource::CumulativeCost {
+            initial: 0.,
+            increments: vec![2., 0., 2., 0., 2., 0.],
+            weights: vec![1., 0., 1., 0., 1., 0.],
+            sink_upper: None,
+            source_upper: None,
+        }])
+        .unwrap();
+    let root = solve(problem, options(BoundMode::Certified)).unwrap();
+    assert_eq!(root.master.status, cg::Status::Optimal, "{:?}", root.master);
+    assert_eq!(root.master.lp, 7.);
+    assert!(root.snapshot.enumeration_report().complete);
+    let mut duals = vec![0.; root.snapshot.state.rhs.len()];
+    duals[root.snapshot.state.shared_offset] = 12.;
+    assert_eq!(certificate(&root.snapshot.state, &duals), Some(-5.));
+    let bound =
+        super::super::bounds::certificate(&root.snapshot.state, &root.snapshot.master, &duals)
+            .unwrap();
+    assert_eq!(bound, 7.);
+}
+#[test]
 fn positive_column_caps_have_a_tight_directed_box_certificate() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let result = solve(fixture(1., 0.5, &[0., 10., 20.]), options(mode)).unwrap();

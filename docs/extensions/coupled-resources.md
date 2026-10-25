@@ -252,11 +252,14 @@ scalar and resource cost orders also hold. Reversal reuse is disabled.
 
 This is a numerical resource contract. Arithmetic ambiguity or excessive
 front work produces an error; it is never converted to infeasibility or a
-complete-pricing claim. Directed path certification currently returns unknown
-for this family, including during phase I. Consequently proof-dependent
-enumeration/MIP transfer can decline the transfer and continue normal solving.
-No original-domain pricing certificate or raw external descriptor compatibility
-is claimed. Phase I suppresses objective charges while retaining dependent
+complete-pricing claim. Directed path certification uses an independent outward
+reachability relaxation and checked control witnesses. A proved witness gives
+feasibility and an enclosure of the optimum charge; an empty outer relaxation
+proves infeasibility. A failed witness search, uncertain boundary or exhausted
+shared budget remains unknown. Numerical optimized fronts are not proof inputs.
+A non-singleton objective enclosure can bound a column but does not establish
+exact finite-MIP objective encoding. Raw external descriptor compatibility is
+not claimed. Phase I suppresses objective charges while retaining dependent
 transitions and feasibility.
 
 Python exposes the same contract through
@@ -304,8 +307,12 @@ running-minimum waiting envelope. The name `native_front_algebra` selects
 recovered arithmetic/comparison choices where supported; it does not promise
 reproduction of the reference's underpricing on accepted nonconvex waiting
 fixtures. A computed front minimum, a source replay and a directed global pricing
-certificate remain distinct. Unproved operations return an explicit incomplete
-result; raw directed certificates and unsafe pruning remain disabled.
+certificate remain distinct. Strict-domain paired slopes can use the independent
+directed control certificate described above, preserving their ordered slope
+encoding. Exact integer-aligned standalone slope fronts and constant-dependent,
+zero-wait native-front-algebra pairs also have independent operator certificates.
+General tolerant/nonexact operator geometry remains unknown. Unproved operations
+return an explicit incomplete result.
 
 The native-front composition policy handles in-domain start snapping,
 tolerance-sized constant intervals, near-knot segment advancement, and the
@@ -587,7 +594,18 @@ length/resource bound can still exhaust those limits.
 
 Integer witnesses use outward interval replay for coupled feasibility and
 objective contributions. A straddling boundary or unsupported arithmetic remains
-unknown. Original-domain scalar relaxation collectors and additive-cost
+unknown. Encoded knot/slope numeric programs include independently enclosed
+endpoint-snap branches. Plugins can opt into `CoupledPlugin::certify`, which
+must independently prove original-domain feasibility under the caller's work
+and deadline; its default returns unknown. Ordinary numerical plugin transitions
+do not supply proof. Charging currently retains that default.
+
+For numeric and interval costs, a polynomial directed walk relaxation propagates
+state/objective enclosures over the original physical graph up to the integer
+route contract's vertex-simple hop limit. It can retain a cost certificate when
+literal path enumeration exceeds its limit. Unsupported objective operators,
+overflow or exhausted proof work still return unknown. Original-domain scalar
+relaxation collectors and additive-cost
 certificates do not silently claim support for coupled resources. General
 external dependency-type semantics and exact native dominance/bound policies
 are not claimed to match the reference binary.

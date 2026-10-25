@@ -18,6 +18,63 @@ def triangle():
     return NetworkProblem.from_file(FIXTURE)
 
 
+@pytest.mark.parametrize("schedule", ["full-sweep", "cyclic", "sorted", "native-promising-first", "native-unvisited-first"])
+def test_network_pricing_schedules_across_fresh_and_snapshot_solves(schedule):
+    root = triangle().solve(network_pricing_schedule=schedule)
+    assert root.status == "Optimal"
+    assert root.lp == pytest.approx(1.5)
+    child = root.snapshot.branch_assignment(0, 7, True)
+    assert child.solve(network_pricing_schedule=schedule).lp == pytest.approx(2.)
+    assert root.snapshot.solve(network_pricing_schedule=schedule).lp == pytest.approx(1.5)
+    assert triangle().solve(tree=True, network_pricing_schedule=schedule).incumbent == pytest.approx(2.)
+
+
+def test_unknown_network_pricing_schedule_is_rejected():
+    with pytest.raises(ValueError, match="full-sweep.*cyclic.*sorted"):
+        triangle().solve(network_pricing_schedule="unknown")
+
+
+@pytest.mark.parametrize("bands", [
+    [{"half_width": .5, "penalty": None}],
+    [{"half_width": .5, "penalty": 1.}],
+    [{"half_width": .1, "penalty": .5}, {"half_width": .5, "penalty": 1.}],
+])
+def test_explicit_proximal_bands_keep_original_network_objectives(bands):
+    proximal = {"bands": bands}
+    root = triangle().solve(proximal=proximal, network_pricing_schedule="native-promising-first")
+    assert root.lp == pytest.approx(1.5)
+    assert root.snapshot.branch_assignment(0, 7, True).solve(proximal=proximal).lp == pytest.approx(2.)
+    assert triangle().solve(tree=True, proximal=proximal).incumbent == pytest.approx(2.)
+    with pytest.raises(ValueError, match="proximal"):
+        triangle().solve(proximal={"bands": [{"half_width": -1., "penalty": None}]})
+
+
+def test_native_queue_budget_is_validated():
+    assert triangle().solve(network_pricing_schedule="native-unvisited-first", network_unpromising_limit=2).lp == pytest.approx(1.5)
+    with pytest.raises(ValueError, match="network_unpromising_limit"):
+        triangle().solve(network_unpromising_limit=0)
+
+
+def test_multipoint_proximal_support_planes_preserve_network_solutions():
+    proximal = {"bands": [{"half_width": .5, "penalty": 1.}], "multi_point": True}
+    root = triangle().solve(proximal=proximal, network_pricing_schedule="native-unvisited-first")
+    assert root.lp == pytest.approx(1.5)
+    assert root.snapshot.solve(proximal=proximal).lp == pytest.approx(1.5)
+    assert triangle().solve(tree=True, proximal=proximal).incumbent == pytest.approx(2.)
+
+
+@pytest.mark.parametrize("five_piece", [False, True])
+def test_automatic_curvature_needs_no_manually_initialized_state(five_piece):
+    proximal = {"curvature": {"five_piece": five_piece}}
+    root = triangle().solve(proximal=proximal)
+    assert root.lp == pytest.approx(1.5)
+    assert root.snapshot.solve(proximal=proximal).lp == pytest.approx(1.5)
+    assert root.snapshot.branch_assignment(0, 7, True).solve(proximal=proximal).lp == pytest.approx(2.)
+    dynamic = root.snapshot.with_row(SharedRow("le", 10.), (), dynamic=True)
+    assert dynamic.solve(proximal=proximal).lp == pytest.approx(1.5)
+    assert triangle().solve(tree=True, proximal=proximal).incumbent == pytest.approx(2.)
+
+
 def test_model_json_round_trip_and_shared_root():
     model = triangle()
     assert NetworkProblem.from_json(model.to_json()) == model
@@ -49,6 +106,24 @@ def test_assignment_tree_and_limits(bound_mode):
     assert limited.incumbent is None and limited.bound == pytest.approx(1.5)
     zero = triangle().solve(tree=True, node_limit=0)
     assert zero.bound is None and json.loads(zero.to_json())["bound"] is None
+
+
+@pytest.mark.parametrize("policy", ["resource-first", "multiplicity-first"])
+def test_explicit_network_branch_order_in_fresh_and_snapshot_trees(policy):
+    model = triangle()
+    fresh = model.solve(tree=True, network_branching=policy, stabilize=False)
+    assert fresh.status == "Optimal"
+    assert fresh.incumbent == pytest.approx(2)
+    root = model.solve(stabilize=False)
+    resumed = root.snapshot.solve(tree=True, network_branching=policy, stabilize=False)
+    assert resumed.status == "Optimal"
+    assert resumed.incumbent == pytest.approx(2)
+    assert root.snapshot.solve(stabilize=False).lp == pytest.approx(1.5)
+
+
+def test_invalid_network_branch_order_is_rejected():
+    with pytest.raises(ValueError, match="variant|branch"):
+        triangle().solve(tree=True, network_branching="unknown")
 
 
 def test_python_nodes_branch_restore_and_own_their_state():

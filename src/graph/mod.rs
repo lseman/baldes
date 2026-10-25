@@ -9,6 +9,10 @@ use crate::{invalid, Result};
 use std::collections::HashSet;
 pub mod ng;
 mod time_windows;
+#[cfg(feature = "multi-time-windows")]
+mod window_arcs;
+#[cfg(feature = "multi-time-windows")]
+pub use window_arcs::{WindowArc, WindowArcs};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ResourceKind {

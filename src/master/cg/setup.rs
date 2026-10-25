@@ -2,6 +2,9 @@
 use super::*;
 
 pub(super) fn validate_options(options: &Options) -> Result<()> {
+    if let Some(parameters) = &options.proximal {
+        parameters.validate()?;
+    }
     if !options.multiplicity.is_finite() || options.multiplicity < 0. || options.max_iterations == 0
     {
         return Err(invalid("column generation options"));

@@ -4,6 +4,8 @@
 //! multiplicity rows. Additive rows and assignment branches survive node forks.
 //! Complete all-network enumeration can feed an optional HiGHS integer copy.
 mod pricing;
+mod scheduling;
+pub use scheduling::NetworkPricingSchedule;
 mod solve;
 use super::{cg, clp::ClpMaster, root::Row, RowSense};
 use crate::{graph::Window, incomplete, invalid, pricing::Solver, Graph, Result, Route};
@@ -44,7 +46,7 @@ mod tree;
 pub use lifecycle::{Assignment, FixedRoute, NodeSnapshot, RowCoefficients};
 pub use tree::{
     solve_assignment_tree, solve_assignment_tree_with_master_variables, AssignmentTreeOptions,
-    AssignmentTreeOutput,
+    AssignmentTreeOutput, NetworkBranchingPolicy,
 };
 
 #[derive(Clone, Debug)]
@@ -97,6 +99,9 @@ impl<const D: usize> Problem<D> {
 
 #[derive(Clone, Debug)]
 pub struct Options {
+    pub network_pricing_schedule: NetworkPricingSchedule,
+    /// Budget for unpromising networks in native queue scheduling modes.
+    pub network_unpromising_limit: usize,
     /// Optional integer-time, simultaneous service by distinct route copies.
     pub synchronized_services: Vec<SynchronizedService>,
     pub cg: cg::Options,
@@ -109,6 +114,8 @@ impl Default for Options {
         let mut cg = cg::Options::default();
         cg.artificial_cost = 2.76;
         Self {
+            network_pricing_schedule: NetworkPricingSchedule::default(),
+            network_unpromising_limit: 1,
             synchronized_services: vec![],
             cg,
             pricing_options: vec![],
@@ -185,6 +192,7 @@ impl<const D: usize> Oracle<D> {
     }
 }
 struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    scheduler: scheduling::Scheduler,
     synchronized_services: Vec<synchronization::Service>,
     oracles: Vec<Oracle<D>>,
     shared_offset: usize,
@@ -195,6 +203,7 @@ struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     rhs: Vec<f64>,
     deadline: Instant,
     shared_rows: Vec<Row>,
+    curvature_rows: Vec<cg::CurvatureRow>,
     fixed_routes: Vec<FixedRoute>,
     universe: Option<Vec<usize>>,
     enumeration_report: EnumerationReport,

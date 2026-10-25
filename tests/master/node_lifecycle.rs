@@ -603,6 +603,7 @@ fn cut_cleanup_remaps_loaded_and_uninserted_pool_rows_before_resume() {
         numerical_bound: f64::NEG_INFINITY,
         certified_bound: f64::NEG_INFINITY,
         stabilization: None,
+        proximal: None,
         columns: vec![Some(known.clone())],
         generated_pool: vec![known, cached],
         artificials: vec![],

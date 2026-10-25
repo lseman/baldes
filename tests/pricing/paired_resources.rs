@@ -201,7 +201,7 @@ fn paired_limited_memory_cut_dual_refresh_keeps_original_route_costs() {
 
 #[cfg(feature = "clp")]
 #[test]
-fn paired_phase_i_restores_costs_and_unknown_certificate_declines_transfer_atomically() {
+fn paired_phase_i_restores_costs_and_certified_controls_allow_complete_transfer() {
     use baldes::master::{
         cg::{FeasibilityStatus, Status},
         mp::{self, format::Model, EnumerationOptions, Options},
@@ -255,9 +255,9 @@ fn paired_phase_i_restores_costs_and_unknown_certificate_declines_transfer_atomi
         .enumerate(&EnumerationOptions::default())
         .unwrap();
     let report = attempted.enumeration_report();
-    assert!(!report.complete, "{report:?}");
-    assert_eq!(report.transferred, 0);
-    assert!(report.failure.as_ref().unwrap().contains("unknown"));
+    assert!(report.complete, "{report:?}");
+    assert_eq!(report.routes, 2);
+    assert!(report.failure.is_none());
     assert!(!parent.snapshot.enumeration_report().complete);
     let resumed = attempted.solve(options).unwrap();
     assert_eq!(resumed.master.status, Status::Optimal);

@@ -74,6 +74,23 @@ impl<const D: usize> Controller<ClpMaster> for RootController<D> {
         self.store_checkpoint(master, output)
     }
 
+    fn curvature_rows(&self, row_count: usize) -> Vec<cg::CurvatureRow> {
+        let ordinary = self.problem.row_map.borrow();
+        let excluded = self.unstabilized_rows();
+        (0..row_count)
+            .map(|row| cg::CurvatureRow {
+                class: if excluded.contains(&row) {
+                    cg::CurvatureRowClass::Excluded
+                } else if ordinary.contains(&row) {
+                    cg::CurvatureRowClass::Ordinary
+                } else {
+                    cg::CurvatureRowClass::Dynamic
+                },
+                active: true,
+            })
+            .collect()
+    }
+
     fn unstabilized_rows(&self) -> Vec<usize> {
         let map = self.problem.row_map.borrow();
         std::iter::once(map[0])

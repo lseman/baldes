@@ -7,6 +7,14 @@ BALDES optionally smooths the dual point sent to pricing, using a stored
 center and bounded retries when smoothed pricing finds no fresh columns.
 It is enabled by default in `cg::Options`.
 
+An explicit `cg::Options.proximal` configuration replaces smoothing with
+box-step, three-piece or five-piece dual regularization on a private LP copy.
+Its optional multi-point epigraph also stays private; ordinary master duals are
+retried before accepting a no-column result. Auxiliary objectives never become
+original bounds or incumbents. See [network proximal controls](../extensions/mp.md#proximal-pricing).
+`CurvatureState` and `CurvatureFeedback` expose recovered radius arithmetic with
+explicit measured inputs; they do not guess native row flags or schedule timing.
+
 The implementation is
 [`DualPriceSmoothing`](../../src/master/stabilization/mod.rs), integrated by the
 [column-generation loop](../../src/master/cg/driver.rs). The sections below
@@ -37,7 +45,7 @@ They are separate from the named BALDES pricing options.
 
 | Parameter | Default | Behavior |
 | --- | --- | --- |
-| `alpha_factor` | `1.0` | Below 1: use that base alpha and the linear retry rule; otherwise adapt alpha dynamically |
+| `alpha_factor` | `1.0` | Below 1: fixed base and linear retries; exactly 1: angle-adaptive base and doubled retries; above 1: initial base and doubled retries |
 | `initial_alpha` | `0.5` | Initial base alpha for the dynamic mode |
 | `beta_factor` | `0.0` | Zero: use raw outward point; positive: enable the directional construction below |
 | `max_updates` | `10` | Maximum smoothed retry updates before returning to raw duals |
@@ -81,7 +89,7 @@ subgradient starts at the row RHS and subtracts multiplicity times the best
 returned acceptable column's coefficients. A near-zero or rounded-zero reduced
 cost does not suppress this contribution.
 
-On the first pricing pass in dynamic mode (`alpha_factor >= 1`):
+On the first pricing pass in angle-adaptive mode (`alpha_factor == 1`):
 
 ```text
 if no fresh negative columns or angle > 1e-12:
@@ -105,7 +113,8 @@ fixed-base mode: effective_alpha = 1 - misprices * (1 - alpha)
 ```
 
 It republishes a smoothed point only while the retry count is at most
-`max_updates` and effective alpha exceeds the tolerance. When either gate
+`max_updates` and effective alpha exceeds the absolute-plus-relative zero gate
+(`tolerance + abs(effective_alpha) * 1e-10`). When either gate
 fails, it deactivates smoothing and requests a final retry at raw duals.
 “Fixed” describes the base alpha, not an unchanging effective retry weight.
 The dynamic formula preserves the compiled reference's floating-point operation

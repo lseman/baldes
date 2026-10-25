@@ -2,6 +2,24 @@
 use super::*;
 
 impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
+    fn curvature_rows(&self, row_count: usize) -> Vec<cg::CurvatureRow> {
+        let state = self.0.borrow();
+        (0..row_count)
+            .map(|row| {
+                state
+                    .curvature_rows
+                    .get(row)
+                    .copied()
+                    .unwrap_or(cg::CurvatureRow {
+                        class: cg::CurvatureRowClass::Excluded,
+                        active: false,
+                    })
+            })
+            .collect()
+    }
+    fn pricing_complete(&self) -> bool {
+        self.0.borrow().scheduler.complete
+    }
     fn request_enumeration_checkpoint(&mut self, _master: &ClpMaster) -> Result<bool> {
         let requested = self.1 && self.0.borrow().universe.is_none();
         // A failed attempt must resume ordinary pricing, not request another
@@ -101,7 +119,11 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
 
 impl<const D: usize> State<D> {
     pub(super) fn price(&mut self, phase: usize, duals: &[f64]) -> Result<cg::Answer> {
+        self.correction = None;
+        self.gradient = None;
+        self.scheduler.complete = false;
         if self.universe.is_some() {
+            self.scheduler.complete = true;
             return enumeration::price(self, duals);
         }
         let mut columns = vec![];
@@ -109,10 +131,16 @@ impl<const D: usize> State<D> {
         let mut exact = true;
         let mut correction = 0.;
         let mut gradient = self.rhs.clone();
-        for oracle in &mut self.oracles {
-            if oracle.multiplicity_upper() == 0. {
-                continue;
-            }
+        let active = self
+            .oracles
+            .iter()
+            .enumerate()
+            .filter_map(|(index, oracle)| (oracle.multiplicity_upper() != 0.).then_some(index))
+            .collect();
+        let order = self.scheduler.order(phase, active);
+        let mut visited = 0;
+        for &index in &order {
+            let oracle = &mut self.oracles[index];
             let remaining = self.deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
                 return Err(incomplete("multiple-network pricing time limit"));
@@ -174,15 +202,13 @@ impl<const D: usize> State<D> {
                 return Err(incomplete("required network pricing witness unavailable"));
             }
             minimum = minimum.min(reduced);
-            let quantity = if reduced > 0. {
+            self.scheduler.record(index, reduced);
+            visited += 1;
+            let mut new_improving_columns = 0;
+            let quantity = if reduced >= 0. {
                 oracle.network.multiplicity.lower
             } else {
-                let upper = oracle.multiplicity_upper();
-                if reduced == 0. && !upper.is_finite() {
-                    oracle.network.multiplicity.lower
-                } else {
-                    upper
-                }
+                oracle.multiplicity_upper()
             };
             correction += quantity * reduced;
             let mut best: Option<(f64, Vec<(usize, f64)>)> = None;
@@ -226,6 +252,7 @@ impl<const D: usize> State<D> {
                 let tag = if let Some(&tag) = self.tags.get(&key) {
                     tag
                 } else {
+                    new_improving_columns += usize::from(reduced_cost < -self.scheduler.tolerance);
                     let tag = i32::try_from(self.routes.len())
                         .map_err(|_| invalid("network route tag overflow"))?;
                     self.tags.insert(key, tag);
@@ -249,11 +276,26 @@ impl<const D: usize> State<D> {
                     gradient[row] -= quantity * value;
                 }
             }
+            if self.scheduler.finish_network(index, new_improving_columns) {
+                break;
+            }
         }
+        self.scheduler.complete = visited == order.len();
+        exact &= self.scheduler.complete;
         if minimum == f64::INFINITY {
             minimum = 0.;
         }
-        // Heuristic batches also supply the phase estimate used by smoothing.
+        if !self.scheduler.complete {
+            // Unvisited minima are unknown at these duals. Cached scores are
+            // ordering hints only; do not publish a partial correction/gradient.
+            return Ok(cg::Answer {
+                columns,
+                minimum,
+                exact: false,
+                bound_minimum: None,
+            });
+        }
+        // Complete heuristic batches also supply the estimate for smoothing.
         // The CG driver publishes it as a bound only for an exact batch.
         if let Some((static_correction, static_gradient)) =
             master_variables::correction(self, duals)
@@ -283,3 +325,7 @@ impl<const D: usize> State<D> {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/master/mp/native_contribution_tests.rs"]
+mod native_contribution_tests;

@@ -72,15 +72,9 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
         })
         .transpose()
         .map_err(|e| e.to_string())?;
-        if matches!(
-            cutoff,
-            Some(super::super::bounds::NetworkCutoff::Cost { .. })
-        ) && graph
-            .coupled_kernel()
-            .is_some_and(|kernel| kernel.has_costs())
-        {
-            return Err("UnsupportedDomain: additive cutoff omits coupled costs".into());
-        }
+        // A cost plan includes a directed route-wide coupled-objective lower
+        // bound in its constant. The scalar superset can therefore prune by
+        // its arc ceiling even when original resource charges are signed.
         let limits = PathDomainLimits {
             max_paths: paths_left,
             max_work: work_left,
@@ -162,7 +156,12 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
                 resources: vec![],
                 resource_profile: vec![],
             };
-            match crate::master::root::exact_route_feasibility(&problem, &probe) {
+            match crate::master::root::exact_route_feasibility_with_budget(
+                &problem,
+                &probe,
+                &mut work_left,
+                deadline,
+            ) {
                 Some(false) => continue,
                 Some(true) => {}
                 None => return Err("Arithmetic: exact resource replay is unknown".into()),

@@ -5,9 +5,34 @@ mod branching;
 use crate::master::{tree::TreeStatus, LpMaster};
 use std::time::Duration;
 
+/// Family/child ordering only; it never changes a disjunction or a proof bound.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum NetworkBranchingPolicy {
+    /// Existing shared-resource/assignment-first policy with lower children first.
+    #[default]
+    ResourceFirst,
+    /// Network route counts first, upper children first, as in the recovered
+    /// public native controls. Other model/backend settings can change the tree.
+    MultiplicityFirst,
+}
+
+impl NetworkBranchingPolicy {
+    pub fn parse(value: &str) -> Result<Self> {
+        match value {
+            "resource-first" => Ok(Self::ResourceFirst),
+            "multiplicity-first" => Ok(Self::MultiplicityFirst),
+            _ => Err(invalid(
+                "network branching must be resource-first or multiplicity-first",
+            )),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct AssignmentTreeOptions {
     pub node: Options,
+    pub branching: NetworkBranchingPolicy,
     pub node_limit: usize,
     pub time_limit: Duration,
     pub tolerance: f64,
@@ -17,6 +42,7 @@ impl Default for AssignmentTreeOptions {
     fn default() -> Self {
         Self {
             node: Options::default(),
+            branching: NetworkBranchingPolicy::default(),
             node_limit: 10000,
             time_limit: Duration::from_secs(120),
             tolerance: 1e-6,
@@ -414,7 +440,8 @@ fn solve<const D: usize>(
                 continue;
             }
         }
-        if let Some(children) = branching::children(&output, options.tolerance)? {
+        if let Some(children) = branching::children(&output, options.tolerance, options.branching)?
+        {
             pending.extend(children);
         } else {
             unresolved = Some(bound);

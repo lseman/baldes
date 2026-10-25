@@ -188,7 +188,7 @@ impl DualPriceSmoothing {
     }
     pub fn after_pricing(&mut self, f: &Feedback) -> bool {
         self.consider_center(f);
-        if self.parameters.alpha_factor >= 1. && self.misprices == 0 {
+        if self.parameters.alpha_factor == 1. && self.misprices == 0 {
             // The reference calculates the angle only for the first pricing
             // attempt in the adaptive schedule, retaining it during retries.
             let center = if self.angle_center.len() == self.center.len() {
@@ -215,7 +215,7 @@ impl DualPriceSmoothing {
             if f.negative_columns == 0 || self.angle > 1e-12 {
                 self.alpha -= 0.1;
             } else if self.angle < -1e-12
-                && self.alpha < 0.999 - (self.alpha.abs().min(0.999) * 1e-10 + tolerance)
+                && self.alpha < 0.999 - (self.alpha.abs().max(0.999) * 1e-10 + tolerance)
             {
                 self.alpha += 0.1 * (1. - self.alpha);
             }
@@ -230,7 +230,7 @@ impl DualPriceSmoothing {
             1. - self.misprices as f64 * (1. - self.alpha)
         };
         if self.misprices <= self.parameters.max_updates
-            && self.effective_alpha > self.parameters.tolerance
+            && greater(self.effective_alpha, 0., self.parameters.tolerance)
         {
             self.publish(self.effective_alpha, false);
             return true;
@@ -402,6 +402,11 @@ fn cosine(center: &[f64], priced: &[f64], g: &[f64]) -> f64 {
     dot(&toward, g) / (norm(g) * norm(&toward))
 }
 
+pub mod curvature;
+pub mod multipoint;
+pub mod proximal;
 #[cfg(test)]
 #[path = "../../../tests/unit/master/stabilization/tests.rs"]
 mod tests;
+pub use curvature::{AutomaticCurvatureParameters, CurvatureFeedback, CurvatureState};
+pub use proximal::{ProximalBand, ProximalParameters, ProximalSnapshot};

@@ -22,6 +22,66 @@ fn solve(flags: &[&str]) -> Value {
     );
     serde_json::from_slice(&output.stdout).unwrap()
 }
+
+#[test]
+fn network_schedule_flags_keep_root_and_tree_objectives() {
+    for policy in [
+        "full-sweep",
+        "cyclic",
+        "sorted",
+        "native-promising-first",
+        "native-unvisited-first",
+    ] {
+        let root = solve(&["--network-pricing-schedule", policy]);
+        assert_eq!(root["status"], "Optimal");
+        assert_eq!(root["lp"], 1.5);
+        let tree = solve(&["--tree", "--network-pricing-schedule", policy]);
+        assert_eq!(tree["status"], "Optimal");
+        assert_eq!(tree["incumbent"], 2.);
+    }
+    assert!(!command()
+        .arg("multi-pricing")
+        .arg(fixture())
+        .args(["--network-pricing-schedule", "unknown"])
+        .output()
+        .unwrap()
+        .status
+        .success());
+}
+
+#[test]
+fn proximal_flags_use_original_objective_and_validate_configuration() {
+    for flag in ["--automatic-curvature", "--automatic-curvature-five-piece"] {
+        let root = solve(&[flag]);
+        assert_eq!(root["status"], "Optimal");
+        assert_eq!(root["lp"], 1.5);
+        let tree = solve(&[flag, "--tree"]);
+        assert_eq!(tree["incumbent"], 2.);
+    }
+    for flags in [
+        vec!["--proximal-width", "0.5"],
+        vec!["--proximal-width", "0.5", "--proximal-penalty", "1"],
+    ] {
+        let result = solve(&flags);
+        assert_eq!(result["status"], "Optimal");
+        assert_eq!(result["lp"], 1.5);
+        assert!(result["bound"].as_f64().unwrap() <= 1.5);
+    }
+    for flags in [
+        vec!["--proximal-penalty", "1"],
+        vec!["--proximal-width", "-1"],
+        vec!["--network-unpromising-limit", "0"],
+    ] {
+        assert!(!command()
+            .arg("multi-pricing")
+            .arg(fixture())
+            .args(flags)
+            .output()
+            .unwrap()
+            .status
+            .success());
+    }
+}
 #[test]
 fn root_and_assignment_tree_use_all_networks() {
     for mode in ["numerical", "certified"] {
@@ -72,6 +132,35 @@ fn budgets_keep_unknown_bounds_and_open_nodes_explicit() {
     assert_eq!(one["open_nodes"], 2);
     assert!(one["incumbent"].is_null());
     assert_eq!(solve(&["--tree", "--time", "0"])["status"], "TimeLimit");
+}
+
+#[test]
+fn explicit_network_family_order_preserves_the_integer_optimum() {
+    for policy in ["resource-first", "multiplicity-first"] {
+        let tree = solve(&[
+            "--tree",
+            "--network-branching",
+            policy,
+            "--no-stabilization",
+        ]);
+        assert_eq!(tree["status"], "Optimal");
+        assert_eq!(tree["incumbent"], 2.);
+        assert_eq!(tree["bound"], 2.);
+        assert_eq!(tree["open_nodes"], 0);
+        assert!(tree["oracle_calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|calls| calls[1].as_u64().unwrap() > 0));
+    }
+    assert!(!command()
+        .arg("networks")
+        .arg(fixture())
+        .args(["--network-branching", "unknown"])
+        .output()
+        .unwrap()
+        .status
+        .success());
 }
 #[test]
 fn writes_json_files_and_rejects_unknown_options() {

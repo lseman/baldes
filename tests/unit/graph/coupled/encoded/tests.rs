@@ -193,7 +193,7 @@ fn phase_i_keeps_literal_domains_and_round_trips_encoding() {
     let mut kernel = graph.coupled_kernel().unwrap().clone();
     kernel.suppress_costs();
     assert_eq!(kernel.replay(&[0, 1]).unwrap(), Some(0.));
-    assert!(kernel.certify(&[0, 1]).is_none());
+    assert_eq!(kernel.certify(&[0, 1]), Some((true, [0., 0.])));
     let strict = fixture(EvaluationPolicy::StrictDomain);
     let mut strict = strict.coupled_kernel().unwrap().clone();
     strict.suppress_costs();

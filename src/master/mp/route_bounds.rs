@@ -22,11 +22,20 @@ fn reduced<const D: usize>(
     oracle: &Oracle<D>,
     route: &Route,
     duals: &[f64],
+    work: &mut usize,
+    deadline: Instant,
 ) -> Option<f64> {
-    if oracle.network.graph.has_coupled_resources() {
-        return None;
-    }
     let mut value = 0.;
+    if let Some(kernel) = oracle.network.graph.coupled_kernel() {
+        let arcs: Vec<_> = route.arcs.iter().map(|id| oracle.index[id]).collect();
+        let (feasible, objective) = kernel.certify_with_budget(&arcs, work, Some(deadline))?;
+        if !feasible {
+            return None;
+        }
+        // A directed lower endpoint is enough for a box correction. Requiring
+        // an exact objective would unnecessarily discard sound interval proofs.
+        value = add_down(value, objective[0])?;
+    }
     for id in &route.arcs {
         let index = oracle.index[id];
         value = add_down(value, oracle.network.graph.arcs[index].cost)?;
@@ -53,6 +62,7 @@ fn reduced<const D: usize>(
 pub(super) fn certificate<const D: usize>(state: &State<D>, duals: &[f64]) -> Option<f64> {
     let universe = state.universe.as_ref()?;
     let mut correction = 0.;
+    let mut work = 1_000_000;
     for oracle in &state.oracles {
         let mut available = false;
         for &tag in universe {
@@ -76,7 +86,14 @@ pub(super) fn certificate<const D: usize>(state: &State<D>, duals: &[f64]) -> Op
                 continue;
             }
             available = true;
-            let value = reduced(state, oracle, &route.route, duals)?;
+            let value = reduced(
+                state,
+                oracle,
+                &route.route,
+                duals,
+                &mut work,
+                state.deadline,
+            )?;
             if value < 0. {
                 correction = add_down(correction, multiply_down(value, cap)?)?;
             }
@@ -85,7 +102,7 @@ pub(super) fn certificate<const D: usize>(state: &State<D>, duals: &[f64]) -> Op
             return None;
         }
     }
-    Some(correction)
+    (Instant::now() < state.deadline).then_some(correction)
 }
 
 #[cfg(test)]

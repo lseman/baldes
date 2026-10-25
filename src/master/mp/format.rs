@@ -201,6 +201,9 @@ impl Model {
 #[serde(default, deny_unknown_fields)]
 pub struct SolveOptions {
     pub tree: bool,
+    pub network_pricing_schedule: NetworkPricingSchedule,
+    pub network_unpromising_limit: usize,
+    pub network_branching: NetworkBranchingPolicy,
     pub synchronized_services: Vec<SynchronizedService>,
     pub enumerate: bool,
     pub enumeration_route_limit: usize,
@@ -215,6 +218,7 @@ pub struct SolveOptions {
     pub max_iterations: usize,
     pub node_limit: usize,
     pub stabilize: bool,
+    pub proximal: Option<crate::master::stabilization::ProximalParameters>,
     pub bound_mode: String,
     pub artificial_cost: f64,
     pub log_interval: Option<usize>,
@@ -224,6 +228,9 @@ impl Default for SolveOptions {
     fn default() -> Self {
         Self {
             tree: false,
+            network_pricing_schedule: NetworkPricingSchedule::default(),
+            network_unpromising_limit: 1,
+            network_branching: NetworkBranchingPolicy::default(),
             synchronized_services: vec![],
             enumerate: false,
             enumeration_route_limit: 10000,
@@ -238,6 +245,7 @@ impl Default for SolveOptions {
             max_iterations: 100000,
             node_limit: 10000,
             stabilize: true,
+            proximal: None,
             bound_mode: "numerical".into(),
             artificial_cost: 2.76,
             log_interval: None,
@@ -251,6 +259,9 @@ impl SolveOptions {
     }
     pub fn node_options(&self) -> Result<Options> {
         let mut options = Options::default();
+        options.network_pricing_schedule = self.network_pricing_schedule;
+        options.network_unpromising_limit = self.network_unpromising_limit;
+        options.cg.proximal = self.proximal.clone();
         options.synchronized_services = self.synchronized_services.clone();
         if self.enumerated_mip && (!self.tree || !cfg!(feature = "highs")) {
             return Err(invalid(
@@ -300,6 +311,7 @@ impl SolveOptions {
     pub fn tree_options(&self) -> Result<AssignmentTreeOptions> {
         let node = self.node_options()?;
         Ok(AssignmentTreeOptions {
+            branching: self.network_branching,
             time_limit: node.cg.time_limit,
             node,
             node_limit: self.node_limit,
@@ -321,6 +333,8 @@ impl SolveOptions {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AddRow {
+    #[serde(default)]
+    pub dynamic: bool,
     pub row: SharedRow,
     pub coefficients: Vec<Coefficients>,
 }

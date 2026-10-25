@@ -2,6 +2,12 @@
 use super::*;
 
 pub(super) fn validate_options(options: &Options) -> Result<()> {
+    if options.network_unpromising_limit == 0 {
+        return Err(invalid("network_unpromising_limit must be positive"));
+    }
+    if let Some(proximal) = &options.cg.proximal {
+        proximal.validate()?;
+    }
     if options.cg.warm_start.is_some() || !options.cg.known.is_empty() {
         return Err(invalid("network nodes own their column registry"));
     }
@@ -139,6 +145,11 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
     }
     let master_only = oracles.is_empty();
     let mut state = State {
+        scheduler: scheduling::Scheduler::new(
+            options.network_pricing_schedule,
+            oracles.len(),
+            options.cg.tolerance,
+        ),
         synchronized_services,
         oracles,
         shared_offset,
@@ -147,6 +158,16 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
         correction: None,
         gradient: None,
         rhs: master.rhs.clone(),
+        curvature_rows: (0..master.rhs.len())
+            .map(|row| cg::CurvatureRow {
+                class: if row < shared_offset {
+                    cg::CurvatureRowClass::Excluded
+                } else {
+                    cg::CurvatureRowClass::Ordinary
+                },
+                active: true,
+            })
+            .collect(),
         deadline,
         shared_rows,
         fixed_routes: vec![],
@@ -175,6 +196,14 @@ pub(super) fn run<const D: usize>(
     mut state: State<D>,
     mut options: Options,
 ) -> Result<Output<D>> {
+    // A resumed or modified formulation starts a fresh scan. Cached scores
+    // from another node never supply coverage or a dual-bound contribution.
+    state.scheduler = scheduling::Scheduler::new(
+        options.network_pricing_schedule,
+        state.oracles.len(),
+        options.cg.tolerance,
+    );
+    state.scheduler.max_unpromising = options.network_unpromising_limit;
     options.cg.time_limit = options
         .cg
         .time_limit

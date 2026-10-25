@@ -86,7 +86,10 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     // A zero alpha factor disables the reference's smoothing workflow, not
     // only publication of smoothed duals.
     let mut smoothing = DualPriceSmoothing::new(options.smoothing.clone());
-    let stabilize = options.stabilize && smoothing.parameters.alpha_factor > 0.;
+    let proximal = options.proximal.as_ref().filter(|_| options.stabilize);
+    let mut proximal_state = crate::master::stabilization::proximal::ProximalState::default();
+    let stabilize =
+        options.stabilize && proximal.is_none() && smoothing.parameters.alpha_factor > 0.;
     let mut warm = options.warm_start.take();
     let is_resume = warm.is_some();
     let inherited_center = warm.as_ref().and_then(|warm| warm.stabilization.as_ref());
@@ -96,6 +99,13 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     let has_inherited_center = inherited_center.is_some();
     smoothing.exclude_rows(controller.unstabilized_rows());
     setup::validate_warm_start(master, warm.as_ref())?;
+    if let (Some(parameters), Some(previous)) =
+        (proximal, warm.as_ref().and_then(|w| w.proximal.as_ref()))
+    {
+        if let Some(snapshot) = previous.restore(master, controller, parameters)? {
+            proximal_state.inherit_for_solve(&snapshot, schedule.len() - 1)?;
+        }
+    }
     let inherited_numerical = warm
         .as_ref()
         .map_or(f64::NEG_INFINITY, |w| w.numerical_bound);
@@ -184,6 +194,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             numerical_bound: f64::NEG_INFINITY,
             certified_bound: f64::NEG_INFINITY,
             stabilization: None,
+            proximal: None,
             generated_pool: vec![],
             columns: vec![],
             artificials: vec![],
@@ -233,6 +244,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             numerical_bound: out.numerical_bound,
             certified_bound: out.certified_bound,
             stabilization: stabilize.then_some(smoothing),
+            proximal: out.warm_start.proximal.take(),
             generated_pool: pool,
             columns: loaded,
             artificials: out.artificials.clone(),
@@ -241,6 +253,17 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         };
         Ok(out)
     };
+    if let Some(parameters) = proximal {
+        out.warm_start.proximal = ProximalWarmStart::capture(
+            &proximal_state,
+            master,
+            controller,
+            parameters,
+            &out.artificials,
+            &cut_artificials,
+        )?;
+    }
+    let mut proximal_retry = false;
     for _ in 0..options.max_iterations {
         if out.iterations >= options.max_iterations {
             out.status = Status::IterationLimit;
@@ -263,6 +286,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             enumeration_transferred = false;
             round_primal_bound = 1e12;
             smoothing.restart_schedule((schedule.len() - 1) as i32);
+            proximal_state.reset();
+            out.warm_start.proximal = None;
             stage = schedule.len() - 1;
             stage_bound = -1e12;
             round_penalty_updates = 0;
@@ -314,6 +339,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                         accurate_next = false;
                         enumeration_transferred = false;
                         smoothing = DualPriceSmoothing::new(options.smoothing.clone());
+                        proximal_state.reset();
+                        out.warm_start.proximal = None;
                         smoothing.exclude_rows(controller.unstabilized_rows());
                         round_lower_bound = if inherited_bound.is_finite() {
                             inherited_bound
@@ -377,7 +404,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         } else {
             pricing_estimate
         };
-        let converged = accurate
+        let converged = !proximal_retry
+            && accurate
             && !positive
             && stopping_bound.is_finite()
             && gap_smaller_than_tolerance(
@@ -485,13 +513,49 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 out.status = Status::TimeLimit;
                 return finish(out, loaded, cut_artificials, pool, smoothing);
             }
-            let mut current = if stabilize {
+            proximal_retry = false;
+            let mut current = if let Some(parameters) = proximal {
+                let row_roles = proximal::roles(controller, raw.len())?;
+                let ordinary: Vec<_> = row_roles
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(r, role)| {
+                        (role.active && role.class == CurvatureRowClass::Ordinary).then_some(r)
+                    })
+                    .collect();
+                let mut excluded = controller.unstabilized_rows();
+                if parameters.curvature.is_some() {
+                    excluded.extend(row_roles.iter().enumerate().filter_map(|(row, role)| {
+                        (!role.active || role.class == CurvatureRowClass::Excluded).then_some(row)
+                    }));
+                    excluded.sort_unstable();
+                    excluded.dedup();
+                }
+                if row_roles
+                    .iter()
+                    .any(|role| role.class != CurvatureRowClass::Excluded)
+                {
+                    proximal_state.begin_iteration(&raw, &ordinary, stage, parameters)?;
+                }
+                proximal_state.pricing_point(
+                    master,
+                    &raw,
+                    stage,
+                    parameters,
+                    &excluded,
+                    options.time_limit.saturating_sub(started.elapsed()),
+                )?
+            } else if stabilize {
                 smoothing.pricing.clone()
             } else {
                 raw.clone()
             };
             let mut pending = vec![];
             loop {
+                if started.elapsed() >= options.time_limit {
+                    out.status = Status::TimeLimit;
+                    return finish(out, loaded, cut_artificials, pool, smoothing);
+                }
                 let mut answer = price(stage, &current)?;
                 // One exact key per returned column is reused for the pool,
                 // improvement test and insertion instead of reformatting it.
@@ -506,7 +570,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 // Preserve duplicates produced within one oracle batch, as
                 // with restricted-master insertion below.
                 pool_seen.extend(created);
-                answer.exact |= schedule[stage].exact();
+                answer.exact =
+                    controller.pricing_complete() && (answer.exact || schedule[stage].exact());
                 out.pricing_calls += 1;
                 fresh = answer
                     .columns
@@ -568,6 +633,18 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 }
                 exact = answer.exact;
                 answer_phase = stage;
+                if proximal.is_some() {
+                    proximal_state.observe(&current, pass_bound, exact);
+                    pending.push(keys.into_iter().zip(answer.columns).collect::<Vec<_>>());
+                    // A proximal null step cannot finish a phase or raise
+                    // penalties. Complete ordinary pricing at the original LP
+                    // dual before consuming any no-column result.
+                    if fresh == 0 && current != raw {
+                        current = raw.clone();
+                        continue;
+                    }
+                    break;
+                }
                 if !stabilize {
                     pending.push(keys.into_iter().zip(answer.columns).collect::<Vec<_>>());
                     break;
@@ -620,6 +697,37 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             if stabilize {
                 smoothing.after_iteration();
             }
+            if let Some(parameters) = proximal {
+                proximal_state.after_iteration(parameters)?;
+                let active = proximal_state
+                    .take_artificial_values()
+                    .is_some_and(|values| values.iter().any(|v| v.abs() > 1e-6));
+                let activity_due = round_penalty_updates < options.max_penalty_updates
+                    && !(stage > 0
+                        && controller.incumbent().is_finite()
+                        && pass_bound.is_finite()
+                        && gap_smaller_than_tolerance(
+                            pass_bound,
+                            controller.incumbent(),
+                            options.gap_absolute,
+                            options.gap_relative,
+                        ));
+                if fresh == 0 && activity_due {
+                    proximal_retry = proximal_state.artificial_activity(active, parameters)?;
+                    if proximal_retry {
+                        round_penalty_updates += 1;
+                        out.penalty_updates += 1;
+                    }
+                }
+                out.warm_start.proximal = ProximalWarmStart::capture(
+                    &proximal_state,
+                    master,
+                    controller,
+                    parameters,
+                    &out.artificials,
+                    &cut_artificials,
+                )?;
+            }
             let due = round_penalty_updates < options.max_penalty_updates && positive;
             penalties = fresh == 0
                 && due
@@ -632,7 +740,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                         options.gap_absolute,
                         options.gap_relative,
                     ));
-            advanced = fresh == 0 && !exact && !penalties && stage > 0;
+            advanced = fresh == 0 && !exact && !penalties && !proximal_retry && stage > 0;
             if advanced {
                 stage -= 1;
                 stage_bound = -1e12;
@@ -691,6 +799,11 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             stabilization_gap: gap,
             master_gap_tolerance: if accurate { None } else { requested_gap },
         });
+        // A completed auxiliary-activity update is a null step of the
+        // automatic controller, not termination of the original pricing loop.
+        if proximal_retry {
+            continue;
+        }
         // A previous exact bound can close this LP without another oracle
         // call. Certified mode must validate this closing point as well.
         if converged && exact && options.bound_mode == BoundMode::Certified {
@@ -740,6 +853,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             return finish(out, loaded, cut_artificials, pool, smoothing);
         }
         if penalties {
+            proximal_state.restart_schedule();
             for &id in &out.artificials {
                 master.set_cost(id, master.costs()[id] * options.penalty_factor)?;
             }
@@ -797,6 +911,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                         accurate_next = false;
                         enumeration_transferred = false;
                         smoothing = DualPriceSmoothing::new(options.smoothing.clone());
+                        proximal_state.reset();
+                        out.warm_start.proximal = None;
                         smoothing.exclude_rows(controller.unstabilized_rows());
                         round_lower_bound = if inherited_bound.is_finite() {
                             inherited_bound
@@ -847,6 +963,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     pool_seen = next.pool_seen;
                     // eval restarts the phase walk whether or not the master changed.
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
+                    proximal_state.restart_schedule();
                     if pricing_estimate.is_finite() {
                         round_lower_bound = pricing_estimate.max(round_lower_bound);
                         // A completed CG round accepts its LP objective at the
@@ -936,6 +1053,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                                 .collect();
                         }
                         smoothing.remap_rows(&row_map);
+                        proximal_state.reset();
+                        out.warm_start.proximal = None;
                         cut_artificials = cut_artificials
                             .iter()
                             .filter_map(|&(r, c)| Some((row_map[r]?, map[c]?)))
@@ -1027,11 +1146,17 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 if coefficients_changed || rows_remapped {
                     pool_seen = pool.iter().map(Column::signature).collect();
                 }
+                if coefficients_changed || rows_remapped || !removed.is_empty() {
+                    proximal_state.reset();
+                    out.warm_start.proximal = None;
+                }
                 if added > 0 {
                     feasibility_attempted = false;
                     out.cut_rounds += 1;
                     round_penalty_updates = 0;
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
+                    proximal_state.reset();
+                    out.warm_start.proximal = None;
                     if pricing_estimate.is_finite() {
                         round_lower_bound = pricing_estimate.max(round_lower_bound);
                         // A completed CG round accepts its LP objective at the
@@ -1094,6 +1219,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     }
                     ipm_accuracy = IpmAccuracy::new();
                     smoothing.restart_schedule((schedule.len() - 1) as i32);
+                    proximal_state.reset();
+                    out.warm_start.proximal = None;
                     stage = schedule.len() - 1;
                     stage_bound = -1e12;
                     round_penalty_updates = 0;

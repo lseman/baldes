@@ -1,0 +1,486 @@
+{
+  "sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "evidence_type": "actual native routine with analyst ABI inputs; row duals zero",
+  "cases": [
+    {
+      "cost": -4.0,
+      "lower": 0.0,
+      "upper": 2.0,
+      "status": 1,
+      "native": {
+        "individual": -4.0,
+        "contribution": -8.0,
+        "quantity": 2.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -4.0,
+      "lower": 0.0,
+      "upper": 2.0,
+      "status": 2,
+      "native": {
+        "individual": -4.0,
+        "contribution": -8.0,
+        "quantity": 2.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -4.0,
+      "lower": 0.0,
+      "upper": 3.0,
+      "status": 1,
+      "native": {
+        "individual": -4.0,
+        "contribution": -12.0,
+        "quantity": 3.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -4.0,
+      "lower": 0.0,
+      "upper": 3.0,
+      "status": 2,
+      "native": {
+        "individual": -4.0,
+        "contribution": -12.0,
+        "quantity": 3.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -4.0,
+      "lower": 1.0,
+      "upper": 2.0,
+      "status": 1,
+      "native": {
+        "individual": -4.0,
+        "contribution": -8.0,
+        "quantity": 2.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -4.0,
+      "lower": 1.0,
+      "upper": 2.0,
+      "status": 2,
+      "native": {
+        "individual": -4.0,
+        "contribution": -8.0,
+        "quantity": 2.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -4.0,
+      "lower": 1.0,
+      "upper": 3.0,
+      "status": 1,
+      "native": {
+        "individual": -4.0,
+        "contribution": -12.0,
+        "quantity": 3.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -4.0,
+      "lower": 1.0,
+      "upper": 3.0,
+      "status": 2,
+      "native": {
+        "individual": -4.0,
+        "contribution": -12.0,
+        "quantity": 3.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -1.0,
+      "lower": 0.0,
+      "upper": 2.0,
+      "status": 1,
+      "native": {
+        "individual": -1.0,
+        "contribution": -2.0,
+        "quantity": 2.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -1.0,
+      "lower": 0.0,
+      "upper": 2.0,
+      "status": 2,
+      "native": {
+        "individual": -1.0,
+        "contribution": -2.0,
+        "quantity": 2.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -1.0,
+      "lower": 0.0,
+      "upper": 3.0,
+      "status": 1,
+      "native": {
+        "individual": -1.0,
+        "contribution": -3.0,
+        "quantity": 3.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -1.0,
+      "lower": 0.0,
+      "upper": 3.0,
+      "status": 2,
+      "native": {
+        "individual": -1.0,
+        "contribution": -3.0,
+        "quantity": 3.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -1.0,
+      "lower": 1.0,
+      "upper": 2.0,
+      "status": 1,
+      "native": {
+        "individual": -1.0,
+        "contribution": -2.0,
+        "quantity": 2.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -1.0,
+      "lower": 1.0,
+      "upper": 2.0,
+      "status": 2,
+      "native": {
+        "individual": -1.0,
+        "contribution": -2.0,
+        "quantity": 2.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -1.0,
+      "lower": 1.0,
+      "upper": 3.0,
+      "status": 1,
+      "native": {
+        "individual": -1.0,
+        "contribution": -3.0,
+        "quantity": 3.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": -1.0,
+      "lower": 1.0,
+      "upper": 3.0,
+      "status": 2,
+      "native": {
+        "individual": -1.0,
+        "contribution": -3.0,
+        "quantity": 3.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 0.0,
+      "lower": 0.0,
+      "upper": 2.0,
+      "status": 1,
+      "native": {
+        "individual": 0.0,
+        "contribution": 0.0,
+        "quantity": 0.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 0.0,
+      "lower": 0.0,
+      "upper": 2.0,
+      "status": 2,
+      "native": {
+        "individual": 0.0,
+        "contribution": 0.0,
+        "quantity": 0.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 0.0,
+      "lower": 0.0,
+      "upper": 3.0,
+      "status": 1,
+      "native": {
+        "individual": 0.0,
+        "contribution": 0.0,
+        "quantity": 0.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 0.0,
+      "lower": 0.0,
+      "upper": 3.0,
+      "status": 2,
+      "native": {
+        "individual": 0.0,
+        "contribution": 0.0,
+        "quantity": 0.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 0.0,
+      "lower": 1.0,
+      "upper": 2.0,
+      "status": 1,
+      "native": {
+        "individual": 0.0,
+        "contribution": 0.0,
+        "quantity": 1.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 0.0,
+      "lower": 1.0,
+      "upper": 2.0,
+      "status": 2,
+      "native": {
+        "individual": 0.0,
+        "contribution": 0.0,
+        "quantity": 1.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 0.0,
+      "lower": 1.0,
+      "upper": 3.0,
+      "status": 1,
+      "native": {
+        "individual": 0.0,
+        "contribution": 0.0,
+        "quantity": 1.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 0.0,
+      "lower": 1.0,
+      "upper": 3.0,
+      "status": 2,
+      "native": {
+        "individual": 0.0,
+        "contribution": 0.0,
+        "quantity": 1.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 1.0,
+      "lower": 0.0,
+      "upper": 2.0,
+      "status": 1,
+      "native": {
+        "individual": 1.0,
+        "contribution": 0.0,
+        "quantity": 0.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 1.0,
+      "lower": 0.0,
+      "upper": 2.0,
+      "status": 2,
+      "native": {
+        "individual": 1.0,
+        "contribution": 0.0,
+        "quantity": 0.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 1.0,
+      "lower": 0.0,
+      "upper": 3.0,
+      "status": 1,
+      "native": {
+        "individual": 1.0,
+        "contribution": 0.0,
+        "quantity": 0.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 1.0,
+      "lower": 0.0,
+      "upper": 3.0,
+      "status": 2,
+      "native": {
+        "individual": 1.0,
+        "contribution": 0.0,
+        "quantity": 0.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 1.0,
+      "lower": 1.0,
+      "upper": 2.0,
+      "status": 1,
+      "native": {
+        "individual": 1.0,
+        "contribution": 1.0,
+        "quantity": 1.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 1.0,
+      "lower": 1.0,
+      "upper": 2.0,
+      "status": 2,
+      "native": {
+        "individual": 1.0,
+        "contribution": 1.0,
+        "quantity": 1.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 1.0,
+      "lower": 1.0,
+      "upper": 3.0,
+      "status": 1,
+      "native": {
+        "individual": 1.0,
+        "contribution": 1.0,
+        "quantity": 1.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 1.0,
+      "lower": 1.0,
+      "upper": 3.0,
+      "status": 2,
+      "native": {
+        "individual": 1.0,
+        "contribution": 1.0,
+        "quantity": 1.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 4.0,
+      "lower": 0.0,
+      "upper": 2.0,
+      "status": 1,
+      "native": {
+        "individual": 4.0,
+        "contribution": 0.0,
+        "quantity": 0.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 4.0,
+      "lower": 0.0,
+      "upper": 2.0,
+      "status": 2,
+      "native": {
+        "individual": 4.0,
+        "contribution": 0.0,
+        "quantity": 0.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 4.0,
+      "lower": 0.0,
+      "upper": 3.0,
+      "status": 1,
+      "native": {
+        "individual": 4.0,
+        "contribution": 0.0,
+        "quantity": 0.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 4.0,
+      "lower": 0.0,
+      "upper": 3.0,
+      "status": 2,
+      "native": {
+        "individual": 4.0,
+        "contribution": 0.0,
+        "quantity": 0.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 4.0,
+      "lower": 1.0,
+      "upper": 2.0,
+      "status": 1,
+      "native": {
+        "individual": 4.0,
+        "contribution": 4.0,
+        "quantity": 1.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 4.0,
+      "lower": 1.0,
+      "upper": 2.0,
+      "status": 2,
+      "native": {
+        "individual": 4.0,
+        "contribution": 4.0,
+        "quantity": 1.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 4.0,
+      "lower": 1.0,
+      "upper": 3.0,
+      "status": 1,
+      "native": {
+        "individual": 4.0,
+        "contribution": 4.0,
+        "quantity": 1.0,
+        "bound_status": 3
+      }
+    },
+    {
+      "cost": 4.0,
+      "lower": 1.0,
+      "upper": 3.0,
+      "status": 2,
+      "native": {
+        "individual": 4.0,
+        "contribution": 4.0,
+        "quantity": 1.0,
+        "bound_status": 3
+      }
+    }
+  ]
+}

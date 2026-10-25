@@ -7,6 +7,56 @@ use baldes::master::{
 };
 
 #[test]
+fn an_exact_phase_cannot_promote_an_incomplete_multi_domain_batch() {
+    struct Partial;
+    impl cg::Controller<ClpMaster> for Partial {
+        fn pricing_complete(&self) -> bool {
+            false
+        }
+        fn pricing_bound(&self, _: &ClpMaster, _: &[f64]) -> baldes::Result<Option<f64>> {
+            Ok(Some(2.))
+        }
+        fn certified_pricing_bound(&self, _: &ClpMaster, _: &[f64]) -> baldes::Result<Option<f64>> {
+            panic!("partial pricing must not schedule a closing certificate")
+        }
+    }
+    let exact = [baldes::pricing::phases::Phase {
+        check_ng: true,
+        jump_arcs: true,
+        labels_per_bucket: i64::MAX,
+    }];
+    for mode in [cg::BoundMode::Numerical, cg::BoundMode::Certified] {
+        let mut master = ClpMaster::new().unwrap();
+        master.add_row(RowSense::Equal, 1., &[]).unwrap();
+        master.add_column(2., &[(0, 1.)]).unwrap();
+        let out = cg::optimize(
+            &mut master,
+            &exact,
+            |_, _| {
+                Ok(Answer {
+                    columns: vec![],
+                    minimum: 0.,
+                    exact: true,
+                    bound_minimum: None,
+                })
+            },
+            &mut Partial,
+            Options {
+                stabilize: false,
+                max_iterations: 1,
+                bound_mode: mode,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(out.status, Status::Stalled);
+        assert!(!out.history[0].exact);
+        assert_eq!(out.numerical_bound, f64::NEG_INFINITY);
+        assert_eq!(out.certified_bound, f64::NEG_INFINITY);
+    }
+}
+
+#[test]
 fn numerical_mode_skips_certification_and_certified_mode_requests_only_a_closing_pass() {
     use cg::{BoundMode, Controller};
     use std::cell::Cell;
@@ -393,6 +443,7 @@ fn an_integer_certificate_does_not_terminate_fractional_lp_pricing() {
                 numerical_bound: f64::NEG_INFINITY,
                 certified_bound: 1.,
                 stabilization: None,
+                proximal: None,
                 generated_pool: vec![],
                 columns: vec![Some(Column {
                     cost: 1.,

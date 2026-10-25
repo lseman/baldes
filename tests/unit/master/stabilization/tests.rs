@@ -1,6 +1,84 @@
 use super::*;
 
 #[test]
+fn doubled_retry_mode_keeps_its_base_alpha_instead_of_applying_angle_updates() {
+    // Native updateAfterPricingProblemSolution, mode 2 and round zero:
+    // no columns leaves base .8 unchanged, then doubles distance from one.
+    for (gradient, columns) in [(1., 0), (1., 1), (-1., 1)] {
+        let mut smoothing = DualPriceSmoothing::new(Parameters {
+            alpha_factor: 2.,
+            initial_alpha: 0.8,
+            ..Default::default()
+        });
+        smoothing.center = vec![0.];
+        smoothing.pricing = vec![1.];
+        smoothing.raw = vec![2.];
+        smoothing.active = true;
+        smoothing.after_pricing(&Feedback {
+            negative_columns: columns,
+            subgradient_available: true,
+            subgradient: vec![gradient],
+            lagrangian: f64::NEG_INFINITY,
+            phase: 0,
+        });
+        assert_eq!(smoothing.alpha, 0.8);
+        assert_eq!(
+            smoothing.effective_alpha,
+            if columns == 0 {
+                1. - 2. * (1. - 0.8)
+            } else {
+                0.8
+            }
+        );
+    }
+}
+
+#[test]
+fn retry_stop_uses_the_native_relative_and_absolute_zero_gate() {
+    let mut smoothing = DualPriceSmoothing::new(Parameters {
+        alpha_factor: 0.5,
+        ..Default::default()
+    });
+    smoothing.alpha = 0.666667;
+    smoothing.effective_alpha = smoothing.alpha;
+    smoothing.misprices = 2;
+    smoothing.active = true;
+    smoothing.center = vec![0.];
+    smoothing.raw = vec![2.];
+    smoothing.pricing = vec![1.];
+    smoothing.after_pricing(&Feedback {
+        negative_columns: 0,
+        subgradient_available: false,
+        subgradient: vec![],
+        lagrangian: f64::NEG_INFINITY,
+        phase: 0,
+    });
+    // Actual native replay at this public mutable state. The alpha lies just
+    // above the absolute epsilon, but below its relative+absolute stop gate.
+    assert_eq!(smoothing.effective_alpha, 1.0000000000287557e-6);
+    assert!(!smoothing.active);
+    assert_eq!(smoothing.pricing, smoothing.raw);
+}
+
+#[test]
+fn angle_increase_respects_the_near_one_relative_margin() {
+    let mut smoothing = DualPriceSmoothing::default();
+    smoothing.alpha = 0.9989989999001;
+    smoothing.center = vec![0.];
+    smoothing.pricing = vec![1.];
+    smoothing.after_pricing(&Feedback {
+        negative_columns: 1,
+        subgradient_available: true,
+        subgradient: vec![-1.],
+        lagrangian: f64::NEG_INFINITY,
+        phase: 0,
+    });
+    // Equality with .999 - (max(|alpha|,.999)*1e-10 + tolerance)
+    // is not below the native gate. The former min incorrectly increased it.
+    assert_eq!(smoothing.alpha, 0.9989989999001);
+}
+
+#[test]
 fn unavailable_solution_moves_to_raw_center_without_replacing_direction() {
     let mut smoothing = DualPriceSmoothing::new(Parameters {
         beta_factor: 0.5,

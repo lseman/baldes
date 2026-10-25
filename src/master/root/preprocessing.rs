@@ -262,6 +262,7 @@ pub(super) fn infeasible_output<const D: usize>(
                 numerical_bound: f64::NEG_INFINITY,
                 certified_bound: f64::NEG_INFINITY,
                 stabilization: None,
+                proximal: None,
                 generated_pool: vec![],
                 columns: vec![],
                 artificials: vec![],

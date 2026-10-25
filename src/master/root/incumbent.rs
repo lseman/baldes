@@ -100,6 +100,38 @@ pub(crate) fn exact_route_feasibility<const D: usize>(
     problem: &RootProblem<D>,
     route: &Route,
 ) -> Option<bool> {
+    exact_route_feasibility_using(problem, route, |kernel, arcs| {
+        kernel.certify(arcs).map(|result| result.0)
+    })
+}
+
+/// The same original resource check under a caller-owned proof budget.
+pub(crate) fn exact_route_feasibility_with_budget<const D: usize>(
+    problem: &RootProblem<D>,
+    route: &Route,
+    work: &mut usize,
+    deadline: std::time::Instant,
+) -> Option<bool> {
+    if std::time::Instant::now() >= deadline {
+        return None;
+    }
+    let result = exact_route_feasibility_using(problem, route, |kernel, arcs| {
+        kernel
+            .certify_with_budget(arcs, work, Some(deadline))
+            .map(|result| result.0)
+    });
+    if std::time::Instant::now() >= deadline {
+        None
+    } else {
+        result
+    }
+}
+
+fn exact_route_feasibility_using<const D: usize>(
+    problem: &RootProblem<D>,
+    route: &Route,
+    certify: impl FnOnce(&crate::graph::coupled::CoupledKernel, &[usize]) -> Option<bool>,
+) -> Option<bool> {
     use crate::graph::ResourceKind;
     use std::cmp::Ordering::{Greater, Less};
     let g = &problem.graph;
@@ -210,7 +242,7 @@ pub(crate) fn exact_route_feasibility<const D: usize>(
             .iter()
             .map(|id| problem.arc_position(*id))
             .collect::<Option<Vec<_>>>()?;
-        if !kernel.certify(&arcs)?.0 {
+        if !certify(kernel, &arcs)? {
             return Some(false);
         }
     }

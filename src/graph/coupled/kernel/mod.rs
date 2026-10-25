@@ -24,6 +24,8 @@ mod transitions;
 
 mod extension;
 mod joining;
+#[cfg(feature = "clp")]
+mod objective_lower;
 mod preparation;
 use bounds::{CostEnvelope, PreparedBounds};
 pub(crate) use bounds::{CoupledPairSummary, CoupledStateBounds};

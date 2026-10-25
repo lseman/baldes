@@ -61,6 +61,9 @@ fn options() -> Options {
     options
 }
 
+#[path = "networks/scheduling.rs"]
+mod scheduling_tests;
+
 fn optimal<const D: usize>(output: &Output<D>, expected: f64) {
     assert_eq!(output.master.status, Status::Optimal, "{:?}", output.master);
     assert!(
@@ -936,6 +939,9 @@ fn original_variable_and_multiplicity_fixtures_match_exact_cover_domains() {
 
 #[path = "networks/master_variables.rs"]
 mod master_variable_tests;
+
+#[path = "networks/coupled_objective.rs"]
+mod coupled_objective_tests;
 
 #[path = "networks/general_domains.rs"]
 mod general_domain_tests;

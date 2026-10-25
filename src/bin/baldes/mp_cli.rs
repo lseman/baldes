@@ -7,6 +7,15 @@ const HELP: &str = "Usage: baldes multi-pricing MODEL.json [OPTIONS]
 
 Solve shared master rows with multiple pricing networks (Clp).
   --tree                 Run the assignment branch-and-price tree
+  --network-pricing-schedule MODE  full-sweep (default), cyclic, sorted,
+                            native-promising-first or native-unvisited-first
+  --network-unpromising-limit N  Per-batch native queue budget (default: 1)
+  --proximal FILE         Explicit proximal bands JSON (replaces smoothing)
+  --automatic-curvature   Automatic three-piece curvature stabilization
+  --automatic-curvature-five-piece  Automatic five-piece curvature stabilization
+  --proximal-width X      One proximal band, in dual row units
+  --proximal-penalty X    Finite band penalty; omitted means hard box-step
+  --network-branching MODE  resource-first (default) or multiplicity-first
   --synchronized-services FILE  JSON array of common-start service definitions
   --resource-branches FILE  Apply a JSON array of grouped-resource restrictions
   --enumerate            Attempt bounded full-domain all-network transfer
@@ -43,6 +52,8 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
     let mut options = SolveOptions::default();
     let mut json = None;
     let mut resource_branches = None;
+    let mut proximal_width = None;
+    let mut proximal_penalty = None;
     while let Some(arg) = args.next() {
         let mut value = || {
             args.next()
@@ -54,6 +65,38 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
                 return Ok(());
             }
             "--tree" => options.tree = true,
+            "--automatic-curvature" => {
+                options.proximal =
+                    Some(baldes::master::stabilization::ProximalParameters::automatic_three_piece())
+            }
+            "--automatic-curvature-five-piece" => {
+                options.proximal =
+                    Some(baldes::master::stabilization::ProximalParameters::automatic_five_piece())
+            }
+            "--network-unpromising-limit" => {
+                options.network_unpromising_limit =
+                    value()?.parse::<usize>().map_err(|e| e.to_string())?;
+            }
+            "--proximal" => {
+                let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;
+                options.proximal =
+                    Some(serde_json::from_str(&text).map_err(|e| format!("proximal JSON: {e}"))?);
+            }
+            "--proximal-width" => {
+                proximal_width = Some(value()?.parse::<f64>().map_err(|e| e.to_string())?)
+            }
+            "--proximal-penalty" => {
+                proximal_penalty = Some(value()?.parse::<f64>().map_err(|e| e.to_string())?)
+            }
+            "--network-pricing-schedule" => {
+                options.network_pricing_schedule =
+                    mp::NetworkPricingSchedule::parse(&value()?).map_err(|e| e.to_string())?
+            }
+            "--network-branching" => {
+                options.network_branching =
+                    baldes::master::mp::NetworkBranchingPolicy::parse(&value()?)
+                        .map_err(|e| e.to_string())?
+            }
             "--resource-branches" => resource_branches = Some(value()?),
             "--enumerate" => options.enumerate = true,
             "--enumerated-mip" => options.enumerated_mip = true,
@@ -109,6 +152,20 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
             }
             _ => return Err(format!("unknown networks option: {arg}\n{HELP}")),
         }
+    }
+    if proximal_penalty.is_some() && proximal_width.is_none() {
+        return Err("--proximal-penalty requires --proximal-width".into());
+    }
+    if let Some(width) = proximal_width {
+        if options.proximal.is_some() {
+            return Err("choose --proximal or --proximal-width".into());
+        }
+        options.proximal = Some(
+            baldes::master::stabilization::ProximalParameters::three_piece(
+                width,
+                proximal_penalty.unwrap_or(f64::INFINITY),
+            ),
+        );
     }
     let node_options = options.node_options().map_err(|e| e.to_string())?;
     let text = std::fs::read_to_string(file).map_err(|e| e.to_string())?;

@@ -13,6 +13,31 @@ use crate::pricing::phases::{self, Phase};
 use crate::{invalid, Result};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
+mod proximal;
+pub use proximal::ProximalWarmStart;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CurvatureRowClass {
+    #[default]
+    Ordinary,
+    Dynamic,
+    Excluded,
+}
+
+/// Physical-row participation in automatic curvature feedback.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CurvatureRow {
+    pub class: CurvatureRowClass,
+    pub active: bool,
+}
+impl Default for CurvatureRow {
+    fn default() -> Self {
+        Self {
+            class: CurvatureRowClass::Ordinary,
+            active: true,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Column {
@@ -178,6 +203,8 @@ pub struct WarmStart {
     pub certified_bound: f64,
     /// Accepted parent center; node schedules restart independently.
     pub stabilization: Option<DualPriceSmoothing>,
+    /// Automatic curvature and accepted coordinates, never auxiliary LP state.
+    pub proximal: Option<ProximalWarmStart>,
     /// Generated columns in creation order, including those outside the
     /// restricted master and duplicates created in a single oracle batch.
     pub generated_pool: Vec<Column>,
@@ -195,11 +222,26 @@ impl WarmStart {
             numerical_bound: f64::NEG_INFINITY,
             certified_bound: f64::NEG_INFINITY,
             stabilization: None,
+            proximal: None,
             generated_pool: vec![],
             columns: vec![],
             artificials: vec![],
             cut_artificials: vec![],
             initial_rows: 0,
+        }
+    }
+    /// Mark an actual restriction boundary, distinct from a same-node resume.
+    pub fn mark_proximal_child(&mut self) {
+        if let Some(state) = &mut self.proximal {
+            state.child = true;
+        }
+    }
+    /// Invalidate an accepted model value after a restriction. Coordinates are
+    /// rechecked against the new matrix; global automatic radii are retained.
+    pub fn clear_proximal(&mut self) {
+        if let Some(state) = &mut self.proximal {
+            state.child = true;
+            state.snapshot.bound = f64::NEG_INFINITY;
         }
     }
 }
@@ -213,6 +255,9 @@ pub struct Options {
     /// artificials are added when resuming a node.
     pub warm_start: Option<WarmStart>,
     pub smoothing: Parameters,
+    /// Explicit proximal bands replace smoothing. Auxiliary columns remain
+    /// private, and every unsuccessful proximal pass retries original duals.
+    pub proximal: Option<super::stabilization::ProximalParameters>,
     pub stabilize: bool,
     pub tolerance: f64,
     pub multiplicity: f64,
@@ -248,6 +293,7 @@ impl Default for Options {
             log_interval: None,
             warm_start: None,
             smoothing: Parameters::default(),
+            proximal: None,
             stabilize: true,
             tolerance: 1e-6,
             multiplicity: 1.,

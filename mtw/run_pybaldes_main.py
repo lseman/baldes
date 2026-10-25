@@ -7,7 +7,10 @@ Uses the original instance generator and keeps the historical result files intac
 The default preserves the Python BCP master/search, including diving and dynamic
 NG growth. Rank-one cuts and bucket-arc elimination are off. --backend native
 selects the native shared-master tree without those search features.
-NG growth is capped at 15 to match native memory capacity. Bounds are numerical.
+NG growth is capped at 15 to match the default native memory capacity. Bounds are numerical.
+--arrayed RHO runs the arrayed benchmark (python-search or python-labeling only):
+arrayed requests join every NG memory, so build pybaldes with ng-memory-31 or
+ng-memory-63 for more than a few arrayed requests.
 --backend python-labeling uses the original labeler with the same feature settings.
 """
 import argparse
@@ -129,23 +132,35 @@ def validate_witness(data, result):
         raise ValueError("incumbent objective differs from independently checked routes")
 
 
-def baseline():
+def baseline(rho=0.):
     rows = {}
     for line in (HERE / 'results/v2/runs.jsonl').read_text().splitlines():
         r = json.loads(line)
-        if r['variant'] == 'full' and r.get('rho', 0.) == 0.:
+        if r['variant'] == 'full' and abs(r.get('rho', 0.) - rho) < 1e-9:
             rows[r['instance']] = r
     return rows
 
 
-def run_case(per, n, seed, limit, out, backend='python-search'):
+def instance(per, n, seed, rho=0.):
+    return dsn_instances.generate(n, seed, days=1, antennas_per_complex=per, dur=(120, 300),
+                                  arrayed=rho)
+
+
+def run_case(per, n, seed, limit, out, backend='python-search', rho=0., cuts=False,
+             dive_retries=0):
     import pybaldes
-    data = dsn_instances.generate(n, seed, days=1, antennas_per_complex=per, dur=(120, 300))
+    data = instance(per, n, seed, rho)
     name = data['name']
-    model = make_model(data)
-    text = model.to_json()
-    (out / f'{name}.model.json').write_text(text)
     dsn_instances.save(data, out / f'{name}.instance.json')
+    if rho:
+        if backend == 'native':
+            raise ValueError('the native tree supports ordinary requests only')
+        # No shared-row model: hash the instance that the Python master builds from.
+        text = (out / f'{name}.instance.json').read_text()
+    else:
+        model = make_model(data)
+        text = model.to_json()
+        (out / f'{name}.model.json').write_text(text)
     print(f'START {name}', flush=True)
     started = time.perf_counter()
     if backend == 'native':
@@ -164,7 +179,8 @@ def run_case(per, n, seed, limit, out, backend='python-search'):
         else:
             from bp_mtw_baldes import solve_bcp
         result = solve_bcp(*dsn_instances.to_jobs(data), verbose=False, time_limit=limit,
-                           parallel=False, root_cut_rounds=0, node_cut_rounds=0,
+                           parallel=False, dive_retries=dive_retries,
+                           **({} if cuts else dict(root_cut_rounds=0, node_cut_rounds=0)),
                            arc_elimination=False, ng_max=15)
         elapsed = time.perf_counter() - started
         (out / f'{name}.solution.json').write_text(json.dumps(result, indent=2, allow_nan=False))
@@ -174,8 +190,9 @@ def run_case(per, n, seed, limit, out, backend='python-search'):
                   'Optimal' if result['optimal'] else 'TimeLimit')
         nodes, open_nodes = result['nodes'], None
         calls, solver_seconds = result.get('baldes_calls'), result['time']
-    old = baseline()[name]
-    row = dict(instance=name, n=n, antennas=data['antennas'], seed=seed,
+    old = baseline(rho)[name]
+    row = dict(instance=name, n=n, antennas=data['antennas'], seed=seed, rho=rho,
+               arrayed=sum(j['antennas_required'] > 1 for j in data['jobs']),
                method=f'pybaldes-{backend}', status=status,
                incumbent=incumbent, bound=bound,
                optimal=status == 'Optimal', time=solver_seconds, wall_seconds=elapsed,
@@ -186,7 +203,9 @@ def run_case(per, n, seed, limit, out, backend='python-search'):
                baseline_optimal=old['optimal'], pybaldes_version=pybaldes.__version__,
                python=platform.python_version(), bound_mode='numerical',
                cpu_affinity=sorted(os.sched_getaffinity(0)),
-               features=dict(rank_one_cuts=False, python_bucket_arc_elimination=False,
+               ng_memory_capacity=getattr(pybaldes, 'ng_memory_capacity', 15),
+               features=dict(rank_one_cuts=cuts, python_bucket_arc_elimination=False,
+                             dive_retries=dive_retries,
                              diving=backend != 'native',
                              dynamic_ng_growth=backend != 'native', ng_size=8,
                              ng_max=15 if backend != 'native' else 8))
@@ -363,25 +382,37 @@ def main():
                         default='python-search')
     parser.add_argument('--case', nargs=3, type=int, metavar=('PER', 'N', 'SEED'))
     parser.add_argument('--workers', type=int, default=3)
+    parser.add_argument('--dive-retries', type=int, default=0,
+                        help='extra dives with earlier first fixings forbidden (bp_mtw dive_retries)')
+    parser.add_argument('--cuts', action='store_true',
+                        help='separate limited-memory rank-1 cuts (default rounds of bp_mtw)')
+    parser.add_argument('--arrayed', type=float, default=0., metavar='RHO',
+                        help='fraction of requests requiring two synchronized antennas')
     parser.add_argument('--cpus', help=argparse.SUPPRESS)
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     if args.cpus:
         os.sched_setaffinity(0, {int(c) for c in args.cpus.split(',')})
     if args.case:
-        run_case(*args.case, args.time_limit, args.out, args.backend)
+        run_case(*args.case, args.time_limit, args.out, args.backend, args.arrayed, args.cuts,
+                 args.dive_retries)
         return
     done = set()
     if (args.out / 'runs.jsonl').exists():
         previous = [json.loads(s) for s in (args.out / 'runs.jsonl').read_text().splitlines()]
         if any(r['method'] != f'pybaldes-{args.backend}' or r['time_limit'] != args.time_limit
-               for r in previous):
-            parser.error('existing output uses another backend or time limit; choose a new --out')
+               or r.get('rho', 0.) != args.arrayed
+               or r['features'].get('dive_retries', 0) != args.dive_retries
+               or r['features']['rank_one_cuts'] != args.cuts for r in previous):
+            parser.error('existing output uses another backend, time limit or arrayed '
+                         'fraction; choose a new --out')
         if args.backend == 'python-search' and any(
                 r.get('pricing_adapter') != 'cached-staged-v2' for r in previous):
             parser.error('existing output uses another pricing adapter; choose a new --out')
         done = {r['instance'] for r in previous}
-    tasks = [(p, n, s) for p, n, s in GRID if f'dsn_n{n}_c3x{p}_d1_s{s}' not in done]
+    if args.arrayed and args.backend == 'native':
+        parser.error('--arrayed requires a Python search backend')
+    tasks = [(p, n, s) for p, n, s in GRID if instance(p, n, s, args.arrayed)['name'] not in done]
     cpus = sorted(set(os.sched_getaffinity(0)) - {10, 11})
     workers = min(args.workers, len(cpus), len(tasks))
     if args.workers < 1:
@@ -393,7 +424,8 @@ def main():
             completed = subprocess.run([
                 sys.executable, str(Path(__file__).resolve()), '--case', str(per), str(n), str(seed),
                 '--time-limit', str(args.time_limit), '--out', str(args.out.resolve()),
-                '--backend', args.backend,
+                '--backend', args.backend, '--arrayed', str(args.arrayed),
+                '--dive-retries', str(args.dive_retries), *(['--cuts'] if args.cuts else []),
                 '--cpus', ','.join(map(str, block)),
             ], check=False)
             if completed.returncode:

@@ -3,12 +3,13 @@
 //! A plugin owns one resource's per-label state and its transitions over
 //! physical arc positions (the original graph's arc vector order). The kernel
 //! carries the state, calls the plugin on every extension and join, and
-//! treats a plugin like any other resource without directed certification:
-//! routes using one are replayed numerically, never certified.
+//! treats a plugin like any other resource. Directed route certification is
+//! opt-in; ordinary numerical transitions are never taken as proof.
 use crate::Result;
 use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::time::Instant;
 
 /// One label's plugin value. Clones share it; equality compares values.
 #[derive(Clone, Debug)]
@@ -60,6 +61,21 @@ pub trait CoupledPlugin: Debug + Send + Sync {
     fn dominates(&self, a: &PluginState, b: &PluginState, forward: bool) -> bool {
         let _ = forward;
         a == b
+    }
+    /// Optional original-domain proof for a complete physical-arc path.
+    ///
+    /// `Some(true)` proves that the path admits this resource; `Some(false)`
+    /// proves that it does not. `None` means unavailable, exhausted or unknown.
+    /// Implementations must establish these claims independently of tolerant
+    /// numerical labeling, debit bounded proof work through `work`, respect the
+    /// cooperative deadline, and never increase the supplied work allowance.
+    /// A plugin adds no objective, so a valid proof contributes zero cost.
+    ///
+    /// The default supplies no proof; adding numerical `extend`/`join` methods
+    /// alone never opts an existing plugin into certification.
+    fn certify(&self, arcs: &[usize], work: &mut usize, deadline: Option<Instant>) -> Option<bool> {
+        let _ = (arcs, work, deadline);
+        None
     }
 }
 

@@ -49,6 +49,7 @@ impl<const D: usize> NodeSnapshot<D> {
             master: self.master.try_clone()?,
             warm: self.warm.clone(),
             state: State {
+                scheduler: self.state.scheduler.fresh(),
                 synchronized_services: self.state.synchronized_services.clone(),
                 oracles: self
                     .state
@@ -79,6 +80,7 @@ impl<const D: usize> NodeSnapshot<D> {
                 rhs: self.state.rhs.clone(),
                 deadline: self.state.deadline,
                 shared_rows: self.state.shared_rows.clone(),
+                curvature_rows: self.state.curvature_rows.clone(),
                 fixed_routes: self.state.fixed_routes.clone(),
                 universe: self.state.universe.clone(),
                 enumeration_report: self.state.enumeration_report.clone(),
@@ -120,6 +122,21 @@ impl<const D: usize> NodeSnapshot<D> {
     /// Omitted networks have zero coefficients. The caller supplies a valid cut
     /// or branch restriction; this method does not infer cut validity.
     pub fn with_row(&self, row: Row, coefficients: &[RowCoefficients]) -> Result<Self> {
+        self.with_row_class(row, coefficients, cg::CurvatureRowClass::Ordinary)
+    }
+
+    /// Append a valid dynamic cut row, excluding it from automatic curvature
+    /// distance measurements while retaining its ordinary pricing coefficients.
+    pub fn with_dynamic_row(&self, row: Row, coefficients: &[RowCoefficients]) -> Result<Self> {
+        self.with_row_class(row, coefficients, cg::CurvatureRowClass::Dynamic)
+    }
+
+    fn with_row_class(
+        &self,
+        row: Row,
+        coefficients: &[RowCoefficients],
+        class: cg::CurvatureRowClass,
+    ) -> Result<Self> {
         if !row.rhs.is_finite() {
             return Err(invalid("network row RHS"));
         }
@@ -203,10 +220,15 @@ impl<const D: usize> NodeSnapshot<D> {
         node.master.add_row(row.sense, rhs, &column_entries)?;
         let sense = row.sense;
         node.state.shared_rows.push(row);
+        node.state.curvature_rows.push(cg::CurvatureRow {
+            class,
+            active: true,
+        });
         node.state.rhs = node.master.rhs.clone();
         // Row dimensions and objectives differ; the old smoothing center is
         // not a dual point for this child. Keep valid inherited lower bounds.
         node.warm.stabilization = None;
+        node.warm.clear_proximal();
         let penalty = node
             .warm
             .artificials
@@ -452,6 +474,7 @@ impl<const D: usize> NodeSnapshot<D> {
             quantity,
         });
         node.warm.stabilization = None;
+        node.warm.clear_proximal();
         Ok(node)
     }
 }
@@ -592,3 +615,7 @@ pub(super) fn install_seed_routes<const D: usize>(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/master/mp/curvature_lifecycle_tests.rs"]
+mod curvature_tests;

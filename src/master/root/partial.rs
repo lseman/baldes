@@ -78,7 +78,7 @@ fn residual_fork<const D: usize>(
     fixed: &[FixedRoute],
     penalty: f64,
 ) -> Result<(RootProblem<D>, ClpMaster, cg::WarmStart)> {
-    let (mut problem, mut master, warm) = parent.fork(&[], penalty)?;
+    let (mut problem, mut master, mut warm) = parent.fork(&[], penalty)?;
     let mut checked = vec![];
     for entry in fixed {
         if entry.quantity == 0 {
@@ -115,6 +115,9 @@ fn residual_fork<const D: usize>(
         return Err(invalid("fixed-route objective overflow"));
     }
     master.objective_offset = offset;
+    if !fixed.is_empty() {
+        warm.clear_proximal();
+    }
     Ok((problem, master, warm))
 }
 

@@ -104,7 +104,11 @@ pub(in crate::master::mp) fn cutoff_plan<const D: usize>(
             add(oracle.network.multiplicity.lower, -1.)?.max(0.)
         };
         let other = add(add(prefix[i], suffix[i + 1])?, multiply(minimum, rest)?)?;
-        let mut constant = 0.;
+        // The arc collector sees only scalar/dual weights. Include a proved
+        // lower bound on the complete coupled objective in its route constant,
+        // so signed resource charges cannot hide an improving original route.
+        let domain = super::super::resource_groups::residual_domain_graph(oracle).ok()?;
+        let mut constant = coupled::minimum(domain.as_ref(), work, deadline)??;
         for &(input, row) in &oracle.presence_rows {
             let dual = duals[state.shared_offset + row];
             if dual > 0. {

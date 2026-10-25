@@ -15,6 +15,7 @@ fn exact_integer_encoding<const D: usize>(
     if !super::super::bounds::exact_fixed_reduction(state, master)? {
         return Ok(false);
     }
+    let mut proof_work = 1_000_000;
     for (column, metadata) in columns.iter().enumerate() {
         if Instant::now() >= deadline {
             return Ok(false);
@@ -54,7 +55,9 @@ fn exact_integer_encoding<const D: usize>(
             };
             if let Some(kernel) = oracle.network.graph.coupled_kernel() {
                 let arcs: Vec<_> = route.route.arcs.iter().map(|id| oracle.index[id]).collect();
-                let Some((true, bounds)) = kernel.certify(&arcs) else {
+                let Some((true, bounds)) =
+                    kernel.certify_with_budget(&arcs, &mut proof_work, Some(deadline))
+                else {
                     return Ok(false);
                 };
                 if bounds[0] != bounds[1] || cost.add(bounds[0]).is_none() {
@@ -115,7 +118,7 @@ fn exact_integer_encoding<const D: usize>(
             return Ok(false);
         }
     }
-    Ok(true)
+    Ok(Instant::now() < deadline)
 }
 
 impl<const D: usize> NodeSnapshot<D> {

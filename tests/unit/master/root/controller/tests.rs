@@ -92,6 +92,19 @@ fn inactive_pool_declines_finite_domains_full_memory_markers_and_changed_geometr
         enumeration_checkpoint: None,
         certificate_search: Default::default(),
     };
+    // Base/branch identity follows the physical map, including logical rows
+    // located after inherited dynamic cut rows.
+    let rows = controller.curvature_rows(4);
+    assert_eq!(rows[0].class, cg::CurvatureRowClass::Excluded);
+    assert_eq!(rows[1].class, cg::CurvatureRowClass::Ordinary);
+    assert_eq!(rows[2].class, cg::CurvatureRowClass::Dynamic);
+    let saved_map = problem.row_map.borrow().clone();
+    *problem.row_map.borrow_mut() = vec![0, 3];
+    let remapped = controller.curvature_rows(4);
+    assert_eq!(remapped[1].class, cg::CurvatureRowClass::Dynamic);
+    assert_eq!(remapped[3].class, cg::CurvatureRowClass::Ordinary);
+    assert!(remapped.iter().all(|r| r.active));
+    *problem.row_map.borrow_mut() = saved_map;
     assert!(controller.uses_inactive_column_pool());
     // A complete empty universe excludes even the original feasible route.
     state.borrow_mut().solver.enumeration = Some(crate::enumeration::Enumeration {

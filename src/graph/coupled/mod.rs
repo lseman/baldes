@@ -76,7 +76,8 @@ fn default_load_tolerance() -> f64 {
 pub enum CoupledResource {
     /// A resource supplied by an extension (for example EVRP charging).
     /// It adds no objective, cannot be a numeric dependency parent and is
-    /// never certified. Plugins are not serialized.
+    /// certified only through its independent opt-in proof callback. Plugins
+    /// are not serialized.
     #[cfg_attr(feature = "clp", serde(skip))]
     Plugin(PluginResource),
     /// Numeric base transition retaining its literal function encoding.

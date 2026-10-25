@@ -1,4 +1,40 @@
 use super::*;
+
+#[test]
+fn network_pricing_schedule_round_trips_and_configures_root_and_tree() {
+    for (name, policy) in [
+        ("full-sweep", NetworkPricingSchedule::FullSweep),
+        ("cyclic", NetworkPricingSchedule::Cyclic),
+        ("sorted", NetworkPricingSchedule::Sorted),
+    ] {
+        let options =
+            SolveOptions::from_json(&format!(r#"{{"network_pricing_schedule":"{name}"}}"#))
+                .unwrap();
+        assert_eq!(
+            options.node_options().unwrap().network_pricing_schedule,
+            policy
+        );
+        assert_eq!(
+            options
+                .tree_options()
+                .unwrap()
+                .node
+                .network_pricing_schedule,
+            policy
+        );
+        assert_eq!(
+            serde_json::to_value(options).unwrap()["network_pricing_schedule"],
+            name
+        );
+    }
+    assert_eq!(
+        SolveOptions::from_json("{}")
+            .unwrap()
+            .network_pricing_schedule,
+        NetworkPricingSchedule::FullSweep
+    );
+    assert!(SolveOptions::from_json(r#"{"network_pricing_schedule":"unknown"}"#).is_err());
+}
 #[test]
 fn multiplicity_json_round_trips_unbounded_upper_without_clipping_finite_counts() {
     let fixture = include_str!("../../../../../examples/networks/triangle.json");

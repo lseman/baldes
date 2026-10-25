@@ -1,13 +1,19 @@
 """Reusable BALDES pricing for the MTW instance interface in bp_mtw.py.
 
 Rust uses service-start times; MTW stores full service windows and finish times.
-Rank-one cuts and Python bucket-arc elimination are not represented here.
+Limited-memory rank-1 cuts with arc memory are passed to the native solver;
+Python bucket-arc elimination is not represented here.
 """
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pybaldes import Solver
+
+try:  # pybaldes builds before the NG memory option always had 15 elements
+    from pybaldes import ng_memory_capacity as NG_CAPACITY
+except ImportError:
+    NG_CAPACITY = 15
 
 
 @dataclass(frozen=True)
@@ -32,8 +38,8 @@ class PreparedGroup:
         for vertex in range(inst.n):
             solver.set_vertex_bounds(vertex, 0, inst.t0, inst.T)
             neighbors = sorted({v for v in range(inst.n) if ng[vertex] & (1 << v)} | {vertex})
-            if len(neighbors) > 15:
-                raise ValueError('BALDES native local NG memory supports at most 15 elements')
+            if len(neighbors) > NG_CAPACITY:
+                raise ValueError(f'BALDES native local NG memory supports at most {NG_CAPACITY} elements')
             solver.set_ng_neighborhood(vertex, neighbors)
         for vertex in inst.job_ids:
             if vertex in banned:
@@ -44,6 +50,7 @@ class PreparedGroup:
                 solver.set_vertex_time_windows(vertex, 0, starts)
                 active.add(vertex)
         self.arcs = []
+        self.arc_ids = {}
         self.base_costs = []
         for tail, head in sorted(group.arcs):
             if (tail, head) in removed or tail not in active or head not in active:
@@ -53,6 +60,7 @@ class PreparedGroup:
             cost = -1. if head != inst.end else 0.
             arc = solver.new_arc(tail, head, cost)
             solver.set_arc_consumption(arc, 0, inst.s[tail] + inst.dist[tail][head])
+            self.arc_ids[tail, head] = arc
             self.arcs.append((tail, head))
             self.base_costs.append(cost)
         for siblings in getattr(inst, 'copies', {}).values():
@@ -63,15 +71,24 @@ class PreparedGroup:
         self.inst = inst
         self.last_key = None
         self.last_result = None
+        self.last_cuts = ()
 
-    def price(self, pi, mu, arc_cost, maximum, exact):
+    def price(self, pi, mu, arc_cost, maximum, exact, cuts=()):
         costs = tuple(base + (mu if head == self.inst.end else pi[head])
                       + arc_cost.get((tail, head), 0.)
                       for (tail, head), base in zip(self.arcs, self.base_costs))
-        key = (costs, maximum)
+        key = (costs, maximum, cuts)
         if self.last_key == key and (not exact or self.last_result.exact):
             return self.last_result, False
         self.solver.set_reduced_costs(list(costs))
+        if cuts != self.last_cuts:
+            # The native master convention: a packing row dual -sigma <= 0 adds
+            # sigma per unit of the limited-memory coefficient to a route.
+            self.solver.set_rank_one_cuts([
+                (list(support), den, rhs,
+                 sorted(self.arc_ids[a] for a in memory if a in self.arc_ids), -sigma)
+                for support, den, rhs, memory, sigma in cuts])
+            self.last_cuts = cuts
         minimum, routes, completed = self.solver.price_with_status(maximum, exact=exact)
         if exact and not completed:
             raise RuntimeError('BALDES did not complete exact MTW pricing')
@@ -105,7 +122,9 @@ class GroupPricer:
 
     def price(self, pi, ng, *, mu=0., maximum=30, mode=1, buckets=10,
               removed=frozenset(), banned=frozenset(), windows=None,
-              arc_cost=None, exact=True):
+              arc_cost=None, cuts=(), exact=True):
+        """cuts: tuple of (((vertex, multiplier), ...), den, rhs, frozenset of arcs, sigma)
+        with sigma >= 0, as built by rank_one_cuts."""
         if not hasattr(Solver, 'price_with_status'):
             raise RuntimeError('rebuild pybaldes with MTW and status-aware pricing support')
         if maximum <= 0:
@@ -123,10 +142,27 @@ class GroupPricer:
             if len(self.cache) > self.capacity:
                 self.cache.popitem(last=False)
         self.cache.move_to_end(key)
-        result, ran = prepared.price(pi, mu, {} if arc_cost is None else arc_cost, maximum, exact)
+        result, ran = prepared.price(pi, mu, {} if arc_cost is None else arc_cost, maximum, exact,
+                                     tuple(cuts))
         self.native_calls += ran
         self.cached_results += not ran
         return result
+
+
+def rank_one_cuts(resources):
+    """Active cuts of bp_mtw's dual dict R (sigma, den, cuts_of, keep) in GroupPricer form."""
+    sigma, den = resources.get('sigma', ()), resources.get('den', ())
+    support = [[] for _ in sigma]
+    for vertex, entries in enumerate(resources.get('cuts_of', ())):
+        for k, p in entries:
+            support[k].append((vertex, p))
+    memory = [set() for _ in sigma]
+    for arc, mask in resources.get('keep', {}).items():
+        for k in range(len(sigma)):
+            if mask >> k & 1:
+                memory[k].add(arc)
+    return tuple((tuple(support[k]), den[k], sum(p for _, p in support[k]) // den[k],
+                  frozenset(memory[k]), sigma[k]) for k in range(len(sigma)))
 
 
 def price_group(inst, group, pi, ng, **options):

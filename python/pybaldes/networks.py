@@ -222,8 +222,8 @@ class NetworkNode:
     def branch_assignment(self, shared_row: int, network: int, assigned: bool) -> NetworkNode:
         return NetworkNode(self._native.branch_assignment(shared_row, network, assigned))
 
-    def with_row(self, row: SharedRow, coefficients: Tuple[NetworkRowCoefficients, ...]) -> NetworkNode:
-        data = {"row": asdict(row), "coefficients": [asdict(c) for c in coefficients]}
+    def with_row(self, row: SharedRow, coefficients: Tuple[NetworkRowCoefficients, ...], *, dynamic: bool = False) -> NetworkNode:
+        data = {"row": asdict(row), "coefficients": [asdict(c) for c in coefficients], "dynamic": dynamic}
         return NetworkNode(self._native.with_row(json.dumps(data, allow_nan=False)))
 
     def with_resource_group_branch(
@@ -312,6 +312,9 @@ def solve_networks(
     problem: NetworkProblem,
     *,
     tree: bool = False,
+    network_pricing_schedule: str = "full-sweep",
+    network_unpromising_limit: int = 1,
+    network_branching: str = "resource-first",
     enumerate: bool = False,
     enumeration_route_limit: int = 10000,
     enumeration_work_limit: int = 10000000,
@@ -325,6 +328,7 @@ def solve_networks(
     max_iterations: int = 100000,
     node_limit: int = 10000,
     stabilize: bool = True,
+    proximal: Optional[Mapping[str, Any]] = None,
     bound_mode: str = "numerical",
     artificial_cost: float = 2.76,
     log_interval: Optional[int] = None,
@@ -341,7 +345,7 @@ def solve_networks(
         raise TypeError("problem must be a NetworkProblem")
     if not _core.has_clp:
         raise RuntimeError("multi-network solving requires a build with Clp")
-    options = dict(synchronized_services=synchronized_services, tree=tree, enumerate=enumerate, enumeration_route_limit=enumeration_route_limit,
+    options = dict(synchronized_services=synchronized_services, tree=tree, network_pricing_schedule=network_pricing_schedule, network_unpromising_limit=network_unpromising_limit, proximal=proximal, network_branching=network_branching, enumerate=enumerate, enumeration_route_limit=enumeration_route_limit,
                    enumeration_work_limit=enumeration_work_limit, enumeration_stored_arc_limit=enumeration_stored_arc_limit,
                    enumeration_time_limit=enumeration_time_limit, enumerated_mip=enumerated_mip,
                    mip_time_limit=mip_time_limit, mip_node_limit=mip_node_limit,

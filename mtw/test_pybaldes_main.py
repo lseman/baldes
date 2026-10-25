@@ -95,6 +95,6 @@ def test_original_bcp_search_with_baldes_pricing_matches_python(seed):
 
 def test_baldes_bcp_rejects_ng_growth_beyond_native_capacity():
     pytest.importorskip('gurobipy')
-    from bp_mtw_baldes import BaldesBranchPrice
-    with pytest.raises(ValueError, match='ng_max <= 15'):
-        BaldesBranchPrice(None, ng_max=16)
+    from bp_mtw_baldes import NG_CAPACITY, BaldesBranchPrice
+    with pytest.raises(ValueError, match=f'ng_max <= {NG_CAPACITY}'):
+        BaldesBranchPrice(None, ng_max=NG_CAPACITY + 1)

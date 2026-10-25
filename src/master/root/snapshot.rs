@@ -98,6 +98,9 @@ impl<const D: usize> NodeSnapshot<D> {
                 }
             }
         }
+        if !branches.is_empty() {
+            warm.mark_proximal_child();
+        }
         Ok((problem, master, warm))
     }
     pub(crate) fn restricted_value(

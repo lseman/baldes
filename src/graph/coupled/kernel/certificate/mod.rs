@@ -1,7 +1,45 @@
 //! Outward interval replay for integer witnesses, distinct from tolerant pricing.
 use super::*;
+mod encoded;
 mod fronts;
+mod operators;
+mod paired;
 use crate::core::rounding::{add_down, add_up, multiply_down};
+use std::time::Instant;
+
+const DEFAULT_CERTIFICATE_WORK: usize = 1_000_000;
+
+fn debit(work: &mut usize, amount: usize, deadline: Option<Instant>) -> Option<()> {
+    if deadline.is_some_and(|limit| Instant::now() >= limit) {
+        return None;
+    }
+    *work = work.checked_sub(amount)?;
+    Some(())
+}
+
+/// Outward image of the accepted encoded arguments, sharing the caller's proof
+/// budget. `None` is unknown or unavailable, never a global emptiness proof.
+/// Route feasibility callers must separately prove full argument acceptance.
+pub(super) fn encoded_image(
+    function: &crate::graph::coupled::EncodedFunction,
+    argument: bounds::Range,
+    work: &mut usize,
+    deadline: Option<Instant>,
+) -> Option<bounds::Range> {
+    encoded::image(function, argument, work, deadline)
+}
+
+/// Ordered source-encoding image over the strict-domain portion of `argument`.
+/// This does not certify arbitrary raw front-algebra operators.
+pub(super) fn slope_function_range(
+    function: &crate::graph::coupled::PreparedSlopeFunction,
+    argument: bounds::Range,
+    work: &mut usize,
+    deadline: Option<Instant>,
+) -> Option<bounds::Range> {
+    paired::slope_range(function, argument, work, deadline)
+}
+
 #[derive(Clone, Copy)]
 struct Interval {
     lo: f64,
@@ -58,26 +96,89 @@ impl CoupledKernel {
     /// A rigorously feasible/infeasible path and an outward objective interval.
     /// Arithmetic failure or a boundary-straddling interval remains unknown.
     pub(crate) fn certify(&self, arcs: &[usize]) -> Option<(bool, [f64; 2])> {
-        // Literal slope descriptors do not yet provide directed interval
-        // replay. Numerical execution must not become a certificate.
-        if self.has_slope_fronts() {
-            return None;
+        let mut work = DEFAULT_CERTIFICATE_WORK;
+        self.certify_with_budget(arcs, &mut work, None)
+    }
+
+    /// Share logical proof work and a cooperative deadline with a caller that
+    /// certifies several routes. Exhaustion never produces an infeasibility or
+    /// objective result. Failed attempts retain their consumed work charge.
+    pub(crate) fn certify_with_budget(
+        &self,
+        arcs: &[usize],
+        work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Option<(bool, [f64; 2])> {
+        self.debit_replay(arcs, work, deadline)?;
+        let result = self.certify_inner(arcs, work, deadline);
+        if deadline.is_some_and(|limit| Instant::now() >= limit) {
+            None
+        } else {
+            result
         }
-        if self.definitions.iter().any(|r| {
-            matches!(
-                r,
-                CoupledResource::EncodedPiecewiseLinearResource { .. }
-                    | CoupledResource::EncodedPiecewiseLinearDependent { .. }
-                    | CoupledResource::EncodedPiecewiseLinearCost { .. }
-            )
-        }) {
-            return None;
+    }
+
+    fn debit_replay(
+        &self,
+        arcs: &[usize],
+        work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Option<()> {
+        let base = arcs
+            .len()
+            .checked_add(1)?
+            .checked_mul(self.definitions.len().checked_add(1)?)?;
+        debit(work, base, deadline)?;
+        for definition in self.definitions.iter() {
+            let extra = match definition {
+                CoupledResource::BudgetedLoad { budget, .. }
+                | CoupledResource::BudgetedTime { budget, .. } => {
+                    arcs.len().checked_mul(budget.checked_add(1)?)?
+                }
+                CoupledResource::SimultaneousPickupDelivery { .. } => arcs.len(),
+                CoupledResource::PiecewiseLinearResource { functions, .. }
+                | CoupledResource::PiecewiseLinearDependent { functions, .. }
+                | CoupledResource::PiecewiseLinearCost { functions, .. } => {
+                    arcs.iter().try_fold(0usize, |n, &arc| {
+                        n.checked_add(functions.get(arc)?.points.len())
+                    })?
+                }
+                CoupledResource::IntervalCost { functions, .. } => {
+                    let points = arcs.iter().try_fold(0usize, |n, &arc| {
+                        n.checked_add(functions.get(arc)?.points.len())
+                    })?;
+                    // Every retained knot and interval can evaluate each arc
+                    // function. Sorting and translations are charged as well.
+                    let knots = points.checked_add(4)?;
+                    knots.checked_mul(points.checked_mul(2)?.checked_add(usize::BITS as usize)?)?
+                }
+                _ => 0,
+            };
+            debit(work, extra, deadline)?;
         }
-        // General relation optimization uses numerical intersection/waiting
-        // envelopes; a numerical replay must not masquerade as a directed
-        // integer feasibility or objective certificate, even in phase I.
-        if !self.relation_indices.is_empty() || !self.plugins.is_empty() {
-            return None;
+        Some(())
+    }
+
+    fn certify_inner(
+        &self,
+        arcs: &[usize],
+        work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Option<(bool, [f64; 2])> {
+        for plugin in &self.plugins {
+            debit(work, arcs.len().checked_add(1)?, deadline)?;
+            let before = *work;
+            let result = plugin.0.certify(arcs, work, deadline);
+            if *work > before {
+                *work = before;
+                return None;
+            }
+            if deadline.is_some_and(|limit| Instant::now() >= limit) {
+                return None;
+            }
+            if !result? {
+                return Some((false, [0.; 2]));
+            }
         }
         if !self.selection_proper(arcs) {
             return Some((false, [0.; 2]));
@@ -91,6 +192,22 @@ impl CoupledKernel {
             lo: front_cost[0],
             hi: front_cost[1],
         };
+        let (valid, slope_cost) = self.certify_slope_fronts(arcs, work, deadline)?;
+        if !valid {
+            return Some((false, [0.; 2]));
+        }
+        objective = objective.add(Interval {
+            lo: slope_cost[0],
+            hi: slope_cost[1],
+        })?;
+        let (valid, paired_cost) = self.certify_relations(arcs, work, deadline)?;
+        if !valid {
+            return Some((false, [0.; 2]));
+        }
+        objective = objective.add(Interval {
+            lo: paired_cost[0],
+            hi: paired_cost[1],
+        })?;
         for r in self.definitions.iter() {
             match r {
                 CoupledResource::Selection { .. } => {}
@@ -166,6 +283,85 @@ impl CoupledKernel {
         for &arc in arcs {
             for (r, definition) in self.definitions.iter().enumerate() {
                 match definition {
+                    CoupledResource::EncodedPiecewiseLinearResource {
+                        bounds, functions, ..
+                    } => {
+                        let i = self.slots[r]?;
+                        let function = functions.get(arc)?;
+                        if !numeric[i].within(function.prepared_domain())? {
+                            return Some((false, [0.; 2]));
+                        }
+                        let value = encoded::image(
+                            function,
+                            bounds::Range {
+                                lo: numeric[i].lo,
+                                hi: numeric[i].hi,
+                            },
+                            work,
+                            deadline,
+                        )?;
+                        numeric[i] = Interval {
+                            lo: value.lo,
+                            hi: value.hi,
+                        };
+                        if !numeric[i].within(*bounds)? {
+                            return Some((false, [0.; 2]));
+                        }
+                    }
+                    CoupledResource::EncodedPiecewiseLinearDependent {
+                        parent,
+                        bounds,
+                        functions,
+                        ..
+                    } => {
+                        let i = self.slots[r]?;
+                        let p = self.slots[*parent]?;
+                        let function = functions.get(arc)?;
+                        if !numeric[p].within(function.prepared_domain())? {
+                            return Some((false, [0.; 2]));
+                        }
+                        let value = encoded::image(
+                            function,
+                            bounds::Range {
+                                lo: numeric[p].lo,
+                                hi: numeric[p].hi,
+                            },
+                            work,
+                            deadline,
+                        )?;
+                        numeric[i] = numeric[i].add(Interval {
+                            lo: value.lo,
+                            hi: value.hi,
+                        })?;
+                        if !numeric[i].within(*bounds)? {
+                            return Some((false, [0.; 2]));
+                        }
+                    }
+                    CoupledResource::EncodedPiecewiseLinearCost { parent, functions } => {
+                        let p = self.slots[*parent]?;
+                        let function = functions.get(arc)?;
+                        if !numeric[p].within(function.prepared_domain())? {
+                            return Some((false, [0.; 2]));
+                        }
+                        let value = encoded::image(
+                            function,
+                            bounds::Range {
+                                lo: numeric[p].lo,
+                                hi: numeric[p].hi,
+                            },
+                            work,
+                            deadline,
+                        )?;
+                        if self.cost_scale != 0. {
+                            objective = objective.add(
+                                Interval {
+                                    lo: value.lo,
+                                    hi: value.hi,
+                                }
+                                .multiply(self.cost_scale)?,
+                            )?;
+                        }
+                    }
                     CoupledResource::PiecewiseLinearResource {
                         bounds, functions, ..
                     } => {
@@ -274,3 +470,11 @@ impl CoupledKernel {
         Some((true, [objective.lo, objective.hi]))
     }
 }
+
+#[cfg(test)]
+#[path = "../../../../../tests/unit/graph/coupled/kernel/remaining_certificate_tests.rs"]
+mod remaining_tests;
+
+#[cfg(test)]
+#[path = "../../../../../tests/unit/graph/coupled/kernel/operator_certificate_oracle_tests.rs"]
+mod operator_oracle_tests;

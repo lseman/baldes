@@ -11,6 +11,67 @@ fn fractional(value: f64, tolerance: f64) -> bool {
 pub(super) fn children<const D: usize>(
     output: &Output<D>,
     tolerance: f64,
+    policy: NetworkBranchingPolicy,
+) -> Result<Option<Vec<NodeSnapshot<D>>>> {
+    if policy == NetworkBranchingPolicy::MultiplicityFirst {
+        if let Some(children) = multiplicity_children(output, tolerance)? {
+            return Ok(Some(children));
+        }
+    }
+    let mut children = resource_or_assignment_children(output, tolerance)?;
+    if policy == NetworkBranchingPolicy::MultiplicityFirst {
+        if let Some(children) = &mut children {
+            children.reverse();
+        }
+    }
+    Ok(children)
+}
+
+fn multiplicity_children<const D: usize>(
+    output: &Output<D>,
+    tolerance: f64,
+) -> Result<Option<Vec<NodeSnapshot<D>>>> {
+    let node = &output.snapshot;
+    for oracle in &node.state.oracles {
+        let value = output
+            .routes
+            .iter()
+            .zip(&output.values)
+            .filter(|(route, _)| route.network == oracle.network.id)
+            .map(|(_, &quantity)| quantity)
+            .chain(
+                node.state
+                    .fixed_routes
+                    .iter()
+                    .filter(|fixed| fixed.route.network == oracle.network.id)
+                    .map(|fixed| fixed.quantity),
+            )
+            .sum::<f64>();
+        if value >= 0. && fractional(value, tolerance) {
+            return Ok(Some(vec![
+                node.with_multiplicity(
+                    oracle.network.id,
+                    Bounds {
+                        lower: value.ceil(),
+                        upper: f64::INFINITY,
+                    },
+                )?,
+                node.with_multiplicity(
+                    oracle.network.id,
+                    Bounds {
+                        lower: 0.,
+                        upper: value.floor(),
+                    },
+                )?,
+            ]));
+        }
+    }
+    Ok(None)
+}
+
+fn resource_or_assignment_children<const D: usize>(
+    output: &Output<D>,
+    tolerance: f64,
 ) -> Result<Option<Vec<NodeSnapshot<D>>>> {
     let node = &output.snapshot;
     let mut resources = node.resource_group_candidates(tolerance)?;
@@ -148,3 +209,7 @@ pub(super) fn children<const D: usize>(
     }
     synchronization::children(output, tolerance)
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/master/mp/network_branching_tests.rs"]
+mod tests;

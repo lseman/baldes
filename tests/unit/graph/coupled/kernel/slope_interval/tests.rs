@@ -226,13 +226,13 @@ fn raw_front_unknown_is_an_error_and_proven_empty_is_infeasible() {
 }
 #[cfg(feature = "clp")]
 #[test]
-fn raw_interval_phase_i_keeps_domains_and_declines_certification() {
+fn raw_interval_phase_i_keeps_domains_and_certifies_exact_operator_geometry() {
     let graph = negative_suffix_graph();
     let mut kernel = graph.coupled_kernel().unwrap().clone();
     kernel.suppress_costs();
     assert!(!kernel.has_costs());
     assert_eq!(kernel.replay(&[0, 1]).unwrap(), Some(0.));
-    assert!(kernel.certify(&[0, 1]).is_none());
+    assert_eq!(kernel.certify(&[0, 1]), Some((true, [0., 0.])));
     let json = serde_json::to_string(kernel.definitions()).unwrap();
     let decoded: Vec<CoupledResource> = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, kernel.definitions());

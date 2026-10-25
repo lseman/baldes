@@ -4,6 +4,7 @@
 use super::*;
 
 use crate::core::rounding::{add_down as add, multiply_down as multiply};
+mod coupled;
 mod cutoff;
 mod presence;
 mod resource;
@@ -28,9 +29,6 @@ fn arc_cost_lower_bounds<const D: usize>(
         return None;
     }
     let graph = &oracle.network.graph;
-    if graph.coupled_kernel().is_some_and(|k| k.has_costs()) {
-        return None;
-    }
     let mut weights = vec![];
     for (index, (arc, coefficients)) in graph
         .arcs
@@ -78,6 +76,9 @@ fn network_minimum<const D: usize>(
     }
     let domain = super::resource_groups::residual_domain_graph(oracle).ok()?;
     let graph = domain.as_ref();
+    let Some(coupled_cost) = coupled::minimum(graph, resource_work, deadline)? else {
+        return Some(None);
+    };
     let positions = (graph.arcs.len() != oracle.network.graph.arcs.len()).then(|| {
         graph
             .arcs
@@ -215,6 +216,7 @@ fn network_minimum<const D: usize>(
         Some(None) => return Some(None),
         None => {}
     }
+    minimum = add(minimum, coupled_cost)?;
     for &(row, coefficient) in &oracle.route_entries {
         minimum = subtract_product(minimum, duals[row], coefficient)?;
     }
