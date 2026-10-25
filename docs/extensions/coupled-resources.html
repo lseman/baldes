@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="coupled-resources.html" aria-current="page">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP and VRPTW extension</a><a href="evrp.html">EVRP implementation status</a><a href="robust.html">Robust vehicle routing</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a></div></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: PyBaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">PyBaldes documentation</a><a href="../pybaldes/installation.html">Install PyBaldes</a><a href="../pybaldes/quickstart.html">PyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/api.html">PyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">PyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="coupled-resources.html" aria-current="page">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP and VRPTW extension</a><a href="evrp.html">EVRP implementation status</a><a href="robust.html">Robust vehicle routing</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/coupled-resources.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -69,7 +69,7 @@ Multiple resources compose in declaration order.</p>
 </tr>
 <tr>
 <td><code>Selection</code></td>
-<td>Intersect the remaining value domain with arc and vertex masks; reject an empty domain. Up to 64 values are supported. Optional <code>vertices</code> gives one mask per vertex. Forward extension checks the head; backward extension checks the tail. With <code>relaxed</code>, an unremembered vertex resets the domain to <code>initial</code> after checking feasibility, forgetting earlier arc and vertex eliminations. The routing master remembers all vertices of minimal violating intervals, including both endpoints. This also applies with omitted vertex masks. Incumbents always use the exact rule.</td>
+<td>Intersect the remaining value domain with arc and vertex masks; reject an empty domain. Up to 64 values are supported. Optional <code>vertices</code> gives one mask per vertex. Forward extension checks the head; backward extension checks the tail. With <code>relaxed</code>, an unremembered vertex resets the domain to <code>initial</code> after checking feasibility, forgetting earlier arc and vertex eliminations. By default (<code>BALDESselectionTighteningSchedule</code> 1) the routing master follows the reference schedule: per resource it takes the minimal violating interval ending at an improper path's first violation, remembers those no longer than <code>BALDESmaxNGaverNeighbourhoodSize</code> (or else the path's shortest one), and skips tightening while <code>BALDESmaxNGneighbourhoodSize</code> is negative. Schedule 0 remembers all minimal violating intervals. Remembered intervals include both endpoints. This also applies with omitted vertex masks. Incumbents always use the exact rule.</td>
 </tr>
 <tr>
 <td><code>SimultaneousPickupDelivery</code></td>
@@ -190,8 +190,19 @@ choices explicit.</p>
 <p>Each forward extension translates the coordinate, restricts the allowed domain,
 adds the charge front and scans its segment endpoints for a minimum. Backward
 labels retain ordered suffix replay for the final joined objective. Unproved
-operations produce an explicit incomplete result. Unsupported dominance,
-completion bounds, fixing and certificates remain conservative. The result is a
+operations produce an explicit incomplete result. Forward dominance accepts
+bitwise-equal fronts, ordered by the independent scalar prefix costs. Under
+<code>strict_domain</code> it otherwise accepts only identically zero fronts when every
+charge is zero or costs are suppressed in phase I; such a front dominates when
+each of the other's components lies in one of its components. Unequal costly
+strict fronts never compare, because translation and addition re-round segment
+spans and can reverse a current pointwise order. Under <code>native_front_algebra</code> a
+covering front may exceed the other by delta, with values within the reference
+tolerance counted as equal, and pays <code>delta</code> plus the difference of current
+minima; this follows the reference's tolerant front comparison and is a parity
+rule rather than a binary64 proof. Backward labels compare only with identical
+suffix programs. Completion bounds, fixing and certificates
+remain conservative. The result is a
 minimum of the computed front algebra, not a promise of a global minimum over
 every sequential binary64 evaluation of the source program. Compile checks pass;
 new runtime regressions remain deferred.</p>
@@ -277,11 +288,14 @@ compensate a higher front through a cost penalty, provided the independent
 scalar and resource cost orders also hold. Reversal reuse is disabled.</p>
 <p>This is a numerical resource contract. Arithmetic ambiguity or excessive
 front work produces an error; it is never converted to infeasibility or a
-complete-pricing claim. Directed path certification currently returns unknown
-for this family, including during phase I. Consequently proof-dependent
-enumeration/MIP transfer can decline the transfer and continue normal solving.
-No original-domain pricing certificate or raw external descriptor compatibility
-is claimed. Phase I suppresses objective charges while retaining dependent
+complete-pricing claim. Directed path certification uses an independent outward
+reachability relaxation and checked control witnesses. A proved witness gives
+feasibility and an enclosure of the optimum charge; an empty outer relaxation
+proves infeasibility. A failed witness search, uncertain boundary or exhausted
+shared budget remains unknown. Numerical optimized fronts are not proof inputs.
+A non-singleton objective enclosure can bound a column but does not establish
+exact finite-MIP objective encoding. Raw external descriptor compatibility is
+not claimed. Phase I suppresses objective charges while retaining dependent
 transitions and feasibility.</p>
 <p>Python exposes the same contract through
 <code>ResourceModel.add_paired_piecewise_linear(initial_lower, initial_upper, initial, arrivals, increments, lowers, uppers, waiting, mode=&quot;feasibility&quot;)</code>. Function
@@ -302,6 +316,11 @@ minimum, including the initial value. The alternate
 zero under both conventions. Phase I suppresses this objective while keeping
 dependent transitions and bounds.</p>
 <p>Raw paired forward dominance compares covering fronts under the selected policy.
+In <code>cost_unbounded</code> mode with <code>native_front_algebra</code> and no reachable upper bound
+(every upper at or above the <code>1e12</code> marker), a front may instead exceed the other
+by delta and pay <code>scale * delta</code> plus the objective difference, following the
+reference's shifted-front comparison. This is a parity rule under the recovered
+tolerance, not a binary64 proof; <code>strict_domain</code> keeps exact coverage.
 In feasibility mode with <code>strict_domain</code>, backward labels also retain an upper
 front when the slope functions can be converted into knot functions without
 changing their stored segment slopes. Unsupported conversions, singleton
@@ -316,8 +335,12 @@ running-minimum waiting envelope. The name <code>native_front_algebra</code> sel
 recovered arithmetic/comparison choices where supported; it does not promise
 reproduction of the reference's underpricing on accepted nonconvex waiting
 fixtures. A computed front minimum, a source replay and a directed global pricing
-certificate remain distinct. Unproved operations return an explicit incomplete
-result; raw directed certificates and unsafe pruning remain disabled.</p>
+certificate remain distinct. Strict-domain paired slopes can use the independent
+directed control certificate described above, preserving their ordered slope
+encoding. Exact integer-aligned standalone slope fronts and constant-dependent,
+zero-wait native-front-algebra pairs also have independent operator certificates.
+General tolerant/nonexact operator geometry remains unknown. Unproved operations
+return an explicit incomplete result.</p>
 <p>The native-front composition policy handles in-domain start snapping,
 tolerance-sized constant intervals, near-knot segment advancement, and the
 separate near-equal-slope merge rules for outer knots and inner endpoints.
@@ -367,6 +390,7 @@ column reconstruction, retained-universe repricing, fixed-route objective
 validation and warm-start replay. Private phase I suppresses cumulative objective
 charges while retaining their state transitions and feasibility constraints.</p>
 <h2 id="python">Python</h2>
+<p>For Python installation, declaration order, method signatures, and complete examples, see <a href="../pybaldes/resources.html">PyBaldes resource modeling</a>.</p>
 <div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResourceModel</span><span class="p">,</span> <span class="n">Solver</span>
 
 <span class="n">solver</span> <span class="o">=</span> <span class="n">Solver</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
@@ -563,7 +587,17 @@ normal label, time and path limits. A cyclic graph without a justified route
 length/resource bound can still exhaust those limits.</p>
 <p>Integer witnesses use outward interval replay for coupled feasibility and
 objective contributions. A straddling boundary or unsupported arithmetic remains
-unknown. Original-domain scalar relaxation collectors and additive-cost
+unknown. Encoded knot/slope numeric programs include independently enclosed
+endpoint-snap branches. Plugins can opt into <code>CoupledPlugin::certify</code>, which
+must independently prove original-domain feasibility under the caller's work
+and deadline; its default returns unknown. Ordinary numerical plugin transitions
+do not supply proof. Charging currently retains that default.</p>
+<p>For numeric and interval costs, a polynomial directed walk relaxation propagates
+state/objective enclosures over the original physical graph up to the integer
+route contract's vertex-simple hop limit. It can retain a cost certificate when
+literal path enumeration exceeds its limit. Unsupported objective operators,
+overflow or exhausted proof work still return unknown. Original-domain scalar
+relaxation collectors and additive-cost
 certificates do not silently claim support for coupled resources. General
 external dependency-type semantics and exact native dominance/bound policies
 are not claimed to match the reference binary.</p>

@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Routing inputs and options PyBaldes documentation · Results Customer and Instance Customer(x, y, demand=0.0, ready=0.0, due=math.inf, service=0.0) is a frozenvalue object. Coordina">
+<meta name="theme-color" content="#0b0e11">
+<title>Routing inputs and options — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/pybaldes/routing.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: PyBaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="index.html">PyBaldes documentation</a><a href="installation.html">Install PyBaldes</a><a href="quickstart.html">PyBaldes quickstart</a><a href="routing.html" aria-current="page">Routing inputs and options</a><a href="results.html">Results, bounds, and exactness</a><a href="pricing.html">Stateful pricing with Solver</a><a href="resources.html">Coupled resources and function encodings</a><a href="networks.html">Shared-master network models</a><a href="api.html">PyBaldes API reference</a><a href="troubleshooting.html">PyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/pybaldes/routing.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> PyBaldes · Python</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="routing-inputs-and-options">Routing inputs and options</h1>
+<p><a href="index.html">PyBaldes documentation</a> · <a href="results.html">Results</a></p>
+<h2 id="customer-and-instance">Customer and Instance</h2>
+<p><code>Customer(x, y, demand=0.0, ready=0.0, due=math.inf, service=0.0)</code> is a frozen
+value object. Coordinates define Euclidean distances unless an explicit matrix
+is supplied. Time windows constrain service start; service duration contributes
+to the next transition. The depot must be the first customer and have zero demand.</p>
+<p><code>Instance(name, capacity, customers, vehicles=1, rounding=&quot;none&quot;, distances=None)</code>
+normalizes customers and matrix rows into tuples. Every customer must be a
+<code>Customer</code>. Native solving performs additional numeric/model validation.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Model label</td>
+</tr>
+<tr>
+<td><code>capacity</code></td>
+<td>Positive vehicle capacity</td>
+</tr>
+<tr>
+<td><code>customers</code></td>
+<td>Depot followed by customers in internal index order</td>
+</tr>
+<tr>
+<td><code>vehicles</code></td>
+<td>Input metadata; the routing root uses customer count as its fleet upper bound</td>
+</tr>
+<tr>
+<td><code>rounding</code></td>
+<td>Distance convention used when no solve override is supplied</td>
+</tr>
+<tr>
+<td><code>distances</code></td>
+<td>Optional full depot/customer matrix; supplied weights determine distances</td>
+</tr>
+</tbody>
+</table></div>
+<p>For VRPTW, supply finite <code>ready</code> and <code>due</code> values, including for the depot.
+The default infinite <code>due</code> is convenient for CVRP but is not a valid VRPTW
+window. CVRP ignores time windows and service durations.</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Customer</span><span class="p">,</span> <span class="n">Instance</span>
+
+<span class="n">instance</span> <span class="o">=</span> <span class="n">Instance</span><span class="p">(</span><span class="s2">"matrix"</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="p">[</span>
+    <span class="n">Customer</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">Customer</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">demand</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">Customer</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">demand</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+<span class="p">],</span> <span class="n">distances</span><span class="o">=</span><span class="p">[</span>
+    <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span>
+    <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span>
+    <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+<span class="p">])</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span><span class="n">problem_type</span><span class="o">=</span><span class="s2">"cvrp"</span><span class="p">)</span>
+</code></pre></div>
+<p><code>Instance.from_file(path)</code> accepts a string or path-like object and reads Solomon
+or CVRPLIB <code>.vrp</code> data. The caller still selects <code>problem_type</code> for solving;
+use <code>&quot;cvrp&quot;</code> for CVRPLIB inputs. <code>Instance.truncated(N)</code> returns a new instance
+containing the first N customers plus the depot, truncating both matrix axes.
+It requires <code>0 &lt; N &lt; len(instance.customers)</code> and preserves the original object.</p>
+<h2 id="distance-conventions">Distance conventions</h2>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Coordinate-derived distance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&quot;none&quot;</code></td>
+<td>Unrounded Euclidean distance</td>
+</tr>
+<tr>
+<td><code>&quot;nearest&quot;</code></td>
+<td>TSPLIB nearest integer (<code>nint</code>)</td>
+</tr>
+<tr>
+<td><code>&quot;tenth&quot;</code></td>
+<td>Truncate to tenths</td>
+</tr>
+<tr>
+<td><code>&quot;ceil&quot;</code></td>
+<td>Round upward to an integer</td>
+</tr>
+</tbody>
+</table></div>
+<p>Solomon files default to <code>none</code>; CVRPLIB <code>EUC_2D</code> defaults to <code>nearest</code> and
+<code>CEIL_2D</code> to <code>ceil</code>. Explicit CVRPLIB full/triangular edge-weight matrices retain
+the supplied weights. A solve's <code>rounding=None</code> uses <code>instance.rounding</code>.
+Match these conventions before comparing objective values. CVRPLIB route-length
+constraints (<code>DISTANCE</code>) are not part of this routing interface.</p>
+<h2 id="solve_root">solve_root</h2>
+<p><code>solve_root(instance, *, ...)</code> accepts an <code>Instance</code>, file path string, or path-like
+object. <code>instance.solve_root(**options)</code> delegates to the same function. All
+options below are keyword-only. The call requires a Clp-enabled build.</p>
+<h3 id="model-and-pricing">Model and pricing</h3>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Keyword</th>
+<th>Default</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>problem_type</code></td>
+<td><code>&quot;vrptw&quot;</code></td>
+<td><code>&quot;vrptw&quot;</code> or <code>&quot;cvrp&quot;</code></td>
+</tr>
+<tr>
+<td><code>customers</code></td>
+<td><code>None</code></td>
+<td>Keep the first N customers before solving</td>
+</tr>
+<tr>
+<td><code>ng</code></td>
+<td><code>8</code></td>
+<td>NG neighborhood size; constrained by compiled memory</td>
+</tr>
+<tr>
+<td><code>reference_ng</code></td>
+<td><code>False</code></td>
+<td>Use reference nearest-customer neighborhood construction</td>
+</tr>
+<tr>
+<td><code>rounding</code></td>
+<td><code>None</code></td>
+<td>Override coordinate distance convention</td>
+</tr>
+<tr>
+<td><code>pricing_options</code></td>
+<td><code>None</code></td>
+<td>Mapping of supported BALDES names to numeric values</td>
+</tr>
+<tr>
+<td><code>capacity_cuts</code></td>
+<td><code>False</code></td>
+<td>Enable rounded capacity cuts</td>
+</tr>
+<tr>
+<td><code>two_path_cuts</code></td>
+<td><code>False</code></td>
+<td>Enable capacity-family Kohl separation with time resource; VRPTW only</td>
+</tr>
+<tr>
+<td><code>rank_one_cuts</code></td>
+<td><code>False</code></td>
+<td>Enable limited-memory rank-one cuts</td>
+</tr>
+<tr>
+<td><code>stabilize</code></td>
+<td><code>True</code></td>
+<td>Dual-price smoothing; disabled by IPM</td>
+</tr>
+<tr>
+<td><code>reduced_cost_fixing</code></td>
+<td><code>True</code></td>
+<td>Reduced-cost fixing and route enumeration; disabling disables both</td>
+</tr>
+<tr>
+<td><code>upper_bound</code></td>
+<td><code>math.inf</code></td>
+<td>Supplied incumbent objective used for fixing; use a valid feasible bound</td>
+</tr>
+</tbody>
+</table></div>
+<p>NG pricing can include repeated customers. Exact pricing of this configured
+relaxation does not make every route elementary. Rank-one cut memory also
+depends on build features. Inspect supported controls with
+<code>Solver.option_names()</code> and <code>Solver.option_support(name)</code>; see the
+<a href="../reference/options.html">pricing option reference</a> for scope and values.</p>
+<h3 id="master-and-bound-policy">Master and bound policy</h3>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Keyword</th>
+<th>Default</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>master_solver</code></td>
+<td><code>&quot;clp&quot;</code></td>
+<td><code>&quot;clp&quot;</code>, <code>&quot;ipm&quot;</code>, <code>&quot;highs&quot;</code>, or <code>&quot;gurobi&quot;</code>; last two need features</td>
+</tr>
+<tr>
+<td><code>master_threads</code></td>
+<td><code>0</code></td>
+<td>HiGHS/Gurobi worker budget; 0 uses available CPUs; Clp/IPM ignore it</td>
+</tr>
+<tr>
+<td><code>bound_mode</code></td>
+<td><code>&quot;numerical&quot;</code></td>
+<td>Numerical bounds or independent <code>&quot;certified&quot;</code> validation</td>
+</tr>
+<tr>
+<td><code>clp_scaling</code></td>
+<td><code>&quot;equilibrium&quot;</code></td>
+<td><code>&quot;equilibrium&quot;</code>, <code>&quot;auto&quot;</code>, <code>&quot;geometric&quot;</code>, or <code>&quot;off&quot;</code></td>
+</tr>
+<tr>
+<td><code>clp_keep_work_areas</code></td>
+<td><code>True</code></td>
+<td>Retain native work buffers across LP solves</td>
+</tr>
+</tbody>
+</table></div>
+<p>HiGHS uses a process-shared native scheduler: keep its worker budget consistent
+within one process and configure it before the first solve. CPU affinity limits
+the available worker count. A higher budget does not guarantee faster solving.
+Selecting IPM disables stabilization. Gurobi additionally needs its runtime
+library and a valid license. All backend choices still require the Clp model store.</p>
+<h3 id="heuristic-seeding-limits-and-logging">Heuristic seeding, limits, and logging</h3>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Keyword</th>
+<th>Default</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hgs_time</code></td>
+<td><code>None</code></td>
+<td>Positive HGS time budget in seconds before column generation</td>
+</tr>
+<tr>
+<td><code>hgs_columns</code></td>
+<td><code>&quot;best&quot;</code></td>
+<td>Best plan, <code>&quot;all&quot;</code> validated encountered routes, or positive integer count of cheapest new routes</td>
+</tr>
+<tr>
+<td><code>hgs_seed</code></td>
+<td><code>0</code></td>
+<td>HGS random seed</td>
+</tr>
+<tr>
+<td><code>time_limit</code></td>
+<td><code>120.0</code></td>
+<td>Root solve budget in seconds; separate from HGS</td>
+</tr>
+<tr>
+<td><code>max_iterations</code></td>
+<td><code>10000</code></td>
+<td>Column-generation iteration limit</td>
+</tr>
+<tr>
+<td><code>max_cut_rounds</code></td>
+<td><code>None</code></td>
+<td>Optional cut-round limit</td>
+</tr>
+<tr>
+<td><code>verbose</code></td>
+<td><code>False</code></td>
+<td>Emit progress to stderr</td>
+</tr>
+<tr>
+<td><code>log_interval</code></td>
+<td><code>10</code></td>
+<td>Positive interval between progress rows</td>
+</tr>
+</tbody>
+</table></div>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">solve_root</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">solve_root</span><span class="p">(</span>
+    <span class="s2">"instances/Solomon/R101.txt"</span><span class="p">,</span> <span class="n">customers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">rounding</span><span class="o">=</span><span class="s2">"none"</span><span class="p">,</span>
+    <span class="n">master_solver</span><span class="o">=</span><span class="s2">"ipm"</span><span class="p">,</span> <span class="n">hgs_time</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">hgs_columns</span><span class="o">=</span><span class="s2">"all"</span><span class="p">,</span> <span class="n">hgs_seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
+    <span class="n">capacity_cuts</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">bound_mode</span><span class="o">=</span><span class="s2">"certified"</span><span class="p">,</span> <span class="n">time_limit</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">log_interval</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">bound</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">incumbent</span><span class="p">)</span>
+</code></pre></div>
+<p>The HGS budget is additional work, so <code>time_limit</code> alone is not an end-to-end
+wall-time cap. Failure to obtain a certificate leaves the certified bound unknown;
+it never substitutes the numerical estimate. See <a href="results.html">results</a>.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="quickstart.html"><small>Previous guide</small>PyBaldes quickstart <span aria-hidden="true">↗</span></a><a href="results.html"><small>Next guide</small>Results, bounds, and exactness <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#customer-and-instance">Customer and Instance</a><a class="toc-level-2" href="#distance-conventions">Distance conventions</a><a class="toc-level-2" href="#solve_root">solve_root</a><a class="toc-level-3" href="#model-and-pricing">Model and pricing</a><a class="toc-level-3" href="#master-and-bound-policy">Master and bound policy</a><a class="toc-level-3" href="#heuristic-seeding-limits-and-logging">Heuristic seeding, limits, and logging</a></nav></aside>
+</div>
+</body></html>

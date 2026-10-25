@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Stateful pricing with Solver PyBaldes documentation · Quickstart · Resources Solver owns a directed graph and retained pricing state. Use it to obtainresource-feasible paths, or as">
+<meta name="theme-color" content="#0b0e11">
+<title>Stateful pricing with Solver — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/pybaldes/pricing.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: PyBaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="index.html">PyBaldes documentation</a><a href="installation.html">Install PyBaldes</a><a href="quickstart.html">PyBaldes quickstart</a><a href="routing.html">Routing inputs and options</a><a href="results.html">Results, bounds, and exactness</a><a href="pricing.html" aria-current="page">Stateful pricing with Solver</a><a href="resources.html">Coupled resources and function encodings</a><a href="networks.html">Shared-master network models</a><a href="api.html">PyBaldes API reference</a><a href="troubleshooting.html">PyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/pybaldes/pricing.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> PyBaldes · Python</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="stateful-pricing-with-solver">Stateful pricing with Solver</h1>
+<p><a href="index.html">PyBaldes documentation</a> · <a href="quickstart.html">Quickstart</a> · <a href="resources.html">Resources</a></p>
+<p><code>Solver</code> owns a directed graph and retained pricing state. Use it to obtain
+resource-feasible paths, or as an oracle inside a master that you implement.
+It does not create or optimize a shared master automatically.</p>
+<h2 id="construction-order-and-ids">Construction order and IDs</h2>
+<ol>
+<li>Construct <code>Solver(n_vertices, n_resources)</code>. The active scalar count cannot
+exceed <code>pybaldes.resource_dimensions</code>.</li>
+<li>Set source/sink and add directed arcs, retaining the IDs from <code>new_arc</code>.</li>
+<li>Configure scalar kinds, initial values, vertex bounds, and arc consumption.</li>
+<li>Configure NG neighborhoods or elementarity sets.</li>
+<li>Install any coupled-resource model after the physical graph is complete.</li>
+<li>Set pricing options, optionally prepare buckets, and price.</li>
+</ol>
+<p>Vertex IDs are zero-based. Arc IDs follow insertion order. Per-arc vectors must
+use that order, including arcs not used by a returned route. <code>new_resource(name, kind)</code> configures the next pre-created scalar coordinate; it does not grow the
+constructor's resource count. The name is an interface label, not a lookup key.</p>
+<h2 id="scalar-resource-semantics">Scalar resource semantics</h2>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th><code>kind</code></th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>Disposable resource: nonnegative consumption; may wait to reach lower bounds</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>Equality resource: signed accumulation without waiting</td>
+</tr>
+</tbody>
+</table></div>
+<p>Initial values default to source lower bounds unless explicitly set. Lower and
+upper bounds are inclusive. Equality here describes propagation, not a master
+row's equality constraint. Backward equality pricing needs fixed sink windows;
+otherwise the engine selects forward search. See <a href="../reference/resources.html">scalar resources</a>.</p>
+<p>The <a href="quickstart.html#price-a-path-directly">quickstart</a> builds a complete load example.
+For a time resource, arc consumption typically includes travel plus tail service;
+vertex bounds constrain service start. The low-level API does not infer these
+quantities from coordinates.</p>
+<h2 id="ng-and-elementarity">NG and elementarity</h2>
+<p><code>set_ng_neighborhood(vertex, nodes)</code> requires distinct valid IDs and inclusion
+of the vertex itself. Actual preparation is limited by the compiled
+<code>pybaldes.ng_memory_capacity</code> (15 by default), including merged arc memory.
+The binding's preliminary size check is not a promise that 64 entries fit.
+NG relaxation permits some revisits; it is not full elementarity.</p>
+<p><code>add_elementarity_set(nodes)</code> returns a set ID;
+<code>attach_elementarity_to_node(vertex, set_id)</code> associates an existing set with
+a vertex. These are low-level elementarity controls. In declarative networks,
+<code>PricingNetwork(elementary=True)</code> requests the network's elementary domain.</p>
+<h2 id="repeated-pricing-in-column-generation">Repeated pricing in column generation</h2>
+<p>Build the graph once and update reduced costs as master duals change:</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Solver</span>
+
+<span class="n">solver</span> <span class="o">=</span> <span class="n">Solver</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">set_source</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">set_sink</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">new_arc</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">)</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">new_arc</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">build_default_resource_buckets</span><span class="p">()</span>
+
+<span class="c1"># Example reduced arc costs computed by your master integration.</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">set_reduced_costs</span><span class="p">([</span><span class="o">-</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">])</span>
+<span class="n">minimum</span><span class="p">,</span> <span class="n">routes</span><span class="p">,</span> <span class="n">exact</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">price_with_status</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">routes</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">exact</span><span class="p">:</span>
+    <span class="n">minimum</span><span class="p">,</span> <span class="n">routes</span><span class="p">,</span> <span class="n">exact</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">price_with_status</span><span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="n">exact</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">route</span> <span class="ow">in</span> <span class="n">routes</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">route</span><span class="o">.</span><span class="n">cost</span><span class="p">,</span> <span class="n">route</span><span class="o">.</span><span class="n">original_cost</span><span class="p">,</span> <span class="n">route</span><span class="o">.</span><span class="n">arcs</span><span class="p">())</span>
+</code></pre></div>
+<p><code>set_reduced_costs(costs)</code> requires one finite value per physical arc. It preserves
+original costs and prepared graph state. Derive reduced costs using your own
+row coefficients; this API cannot infer the rows in an external master.</p>
+<p><code>update_reduced_costs(costs, duals)</code> instead replaces original arc costs and
+applies vertex dual prices. Supply one cost per arc and one dual per vertex.
+Use it when original costs change or when the vertex-dual representation matches
+your master. Do not feed already reduced costs into it and subtract duals twice.</p>
+<h2 id="pricing-returns-and-exactness">Pricing returns and exactness</h2>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Call</th>
+<th>Return</th>
+<th>Contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>solve()</code></td>
+<td><code>(cost, Route)</code> or <code>None</code></td>
+<td>Single-route pricing; <code>None</code> is not a master infeasibility proof</td>
+</tr>
+<tr>
+<td><code>price(maximum)</code></td>
+<td><code>(minimum, routes)</code></td>
+<td>Staged pricing without an aggregate exactness flag</td>
+</tr>
+<tr>
+<td><code>price_with_status(maximum, exact=False)</code></td>
+<td><code>(minimum, routes, exact)</code></td>
+<td>Staged pricing; can return heuristic improving columns</td>
+</tr>
+<tr>
+<td><code>price_with_status(maximum, exact=True)</code></td>
+<td>Same triple</td>
+<td>Run unlimited-label pricing phase once; can include nonnegative columns</td>
+</tr>
+<tr>
+<td><code>enumerate(maximum)</code></td>
+<td><code>(1e12, 0, routes)</code></td>
+<td>Current compatibility wrapper around phase-0 pricing; first two values are placeholders</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>maximum</code> must be a positive integer. Only use a minimum as a pricing bound when
+the returned exactness flag establishes it for the configured domain. Unlimited
+labels do not remove time, arithmetic, memory, or model-domain restrictions.
+An NG-domain minimum is not the same as an elementary-path minimum.</p>
+<p>The low-level <code>enumerate()</code> method does not itself transfer a complete universe
+into a master or populate the retained enumeration store. Do not interpret its
+placeholder values as a bound or route count. <code>enumerated_count</code> and
+<code>get_enumerated(index)</code> inspect an existing retained universe; calling
+<code>enumerate()</code> alone does not establish one. For reported route coverage and MIP
+transfer use the <a href="networks.html#enumeration-and-integer-transfer">network workflow</a>.</p>
+<h2 id="route-and-phase">Route and Phase</h2>
+<p>A low-level <code>Route</code> owns its data and remains valid after the solver is released.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Member</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cost</code></td>
+<td>Priced route objective, including configured coupled charges</td>
+</tr>
+<tr>
+<td><code>original_cost</code></td>
+<td>Original objective before reduced-cost adjustments</td>
+</tr>
+<tr>
+<td><code>nb_nodes</code></td>
+<td>Number of entries in the node sequence</td>
+</tr>
+<tr>
+<td><code>nodes()</code> / <code>arcs()</code></td>
+<td>Copies of ordered vertex/physical-arc IDs</td>
+</tr>
+<tr>
+<td><code>resource_consumption(resource_id)</code></td>
+<td>Final scalar resource value</td>
+</tr>
+<tr>
+<td><code>is_certified</code></td>
+<td>Whether the producing pricing result was exact; not a directed arithmetic certificate</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>get_phase(index)</code> returns <code>Phase</code> with <code>check_ng</code>, <code>allow_jump_arcs</code>, and
+<code>labels_per_bucket</code>. <code>phase_count</code> reports the configured schedule size.</p>
+<h2 id="configuration-method-reference">Configuration method reference</h2>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_source(v)</code>, <code>set_sink(v)</code></td>
+<td>Select terminal vertices</td>
+</tr>
+<tr>
+<td><code>set_graph_id(id)</code></td>
+<td>Set diagnostic graph identity</td>
+</tr>
+<tr>
+<td><code>new_arc(tail, head, cost)</code></td>
+<td>Add physical arc; return its ID</td>
+</tr>
+<tr>
+<td><code>new_resource(name, kind)</code>, <code>set_resource_type(resource_id, kind)</code></td>
+<td>Configure pre-created scalar coordinates</td>
+</tr>
+<tr>
+<td><code>set_arc_consumption(arc_id, resource_id, value)</code></td>
+<td>Set one finite consumption</td>
+</tr>
+<tr>
+<td><code>set_vertex_bounds(vertex_id, resource_id, lower, upper)</code></td>
+<td>Set inclusive scalar bounds</td>
+</tr>
+<tr>
+<td><code>set_initial_resource(resource_id, value)</code></td>
+<td>Set finite source state</td>
+</tr>
+<tr>
+<td><code>set_vertex_time_windows(vertex_id, resource_id, windows)</code></td>
+<td>Optional disjoint windows; feature-gated</td>
+</tr>
+<tr>
+<td><code>set_ng_neighborhood(vertex_id, nodes)</code></td>
+<td>Replace a vertex's NG memory</td>
+</tr>
+<tr>
+<td><code>add_elementarity_set(nodes)</code>, <code>attach_elementarity_to_node(vertex_id, set_id)</code></td>
+<td>Configure elementarity membership</td>
+</tr>
+<tr>
+<td><code>set_pricing_controls(cutoff, max_labels, max_columns)</code></td>
+<td>Set cutoff and positive work/output limits</td>
+</tr>
+<tr>
+<td><code>set_option(name, value)</code>, <code>get_option(name)</code></td>
+<td>Set/read a numeric BALDES option</td>
+</tr>
+<tr>
+<td><code>option_names()</code>, <code>option_support(name)</code></td>
+<td>Static supported-name list and availability/scope explanation</td>
+</tr>
+<tr>
+<td><code>build_default_resource_buckets()</code></td>
+<td>Prepare bucket labeling using current graph/options</td>
+</tr>
+<tr>
+<td><code>set_bidirectional_mode(mode)</code></td>
+<td>0 off, 1 normal, 2 halfway</td>
+</tr>
+</tbody>
+</table></div>
+<p>Choose options before preparing buckets. If topology, elementarity, or arc order
+changes after coupled resources are installed, reinstall their definitions so
+prepared domains match the graph. Prefer rebuilding the solver for topology
+changes between iterations. Cost-only updates have a dedicated reuse interface.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="results.html"><small>Previous guide</small>Results, bounds, and exactness <span aria-hidden="true">↗</span></a><a href="resources.html"><small>Next guide</small>Coupled resources and function encodings <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#construction-order-and-ids">Construction order and IDs</a><a class="toc-level-2" href="#scalar-resource-semantics">Scalar resource semantics</a><a class="toc-level-2" href="#ng-and-elementarity">NG and elementarity</a><a class="toc-level-2" href="#repeated-pricing-in-column-generation">Repeated pricing in column generation</a><a class="toc-level-2" href="#pricing-returns-and-exactness">Pricing returns and exactness</a><a class="toc-level-2" href="#route-and-phase">Route and Phase</a><a class="toc-level-2" href="#configuration-method-reference">Configuration method reference</a></nav></aside>
+</div>
+</body></html>

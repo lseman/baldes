@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Shared-master network models PyBaldes documentation · Results Use independent pricing networks when several route families contribute to thesame master constraints. Network IDs ide">
+<meta name="theme-color" content="#0b0e11">
+<title>Shared-master network models — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/pybaldes/networks.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: PyBaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="index.html">PyBaldes documentation</a><a href="installation.html">Install PyBaldes</a><a href="quickstart.html">PyBaldes quickstart</a><a href="routing.html">Routing inputs and options</a><a href="results.html">Results, bounds, and exactness</a><a href="pricing.html">Stateful pricing with Solver</a><a href="resources.html">Coupled resources and function encodings</a><a href="networks.html" aria-current="page">Shared-master network models</a><a href="api.html">PyBaldes API reference</a><a href="troubleshooting.html">PyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/pybaldes/networks.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> PyBaldes · Python</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="shared-master-network-models">Shared-master network models</h1>
+<p><a href="index.html">PyBaldes documentation</a> · <a href="results.html">Results</a></p>
+<p>Use independent pricing networks when several route families contribute to the
+same master constraints. Network IDs identify fleets or families; they need not
+be consecutive. Arc IDs and vertex IDs are local to a network. Shared-row IDs
+are positions in <code>NetworkProblem.rows</code>, starting at zero.</p>
+<h2 id="build-a-complete-model">Build a complete model</h2>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">NetworkProblem</span><span class="p">,</span> <span class="n">PricingArc</span><span class="p">,</span> <span class="n">PricingNetwork</span><span class="p">,</span> <span class="n">PricingResource</span><span class="p">,</span> <span class="n">SharedRow</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">problem</span> <span class="o">=</span> <span class="n">NetworkProblem</span><span class="p">(</span>
+    <span class="n">rows</span><span class="o">=</span><span class="p">[</span><span class="n">SharedRow</span><span class="p">(</span><span class="s2">"eq"</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)],</span>
+    <span class="n">networks</span><span class="o">=</span><span class="p">[</span><span class="n">PricingNetwork</span><span class="p">(</span>
+        <span class="nb">id</span><span class="o">=</span><span class="mi">19</span><span class="p">,</span> <span class="n">vertices</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">multiplicity</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
+        <span class="n">arcs</span><span class="o">=</span><span class="p">[</span>
+            <span class="n">PricingArc</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="n">consumption</span><span class="o">=</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,),</span> <span class="n">entries</span><span class="o">=</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),)),</span>
+            <span class="n">PricingArc</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">consumption</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,)),</span>
+        <span class="p">],</span>
+        <span class="n">resources</span><span class="o">=</span><span class="p">[</span><span class="n">PricingResource</span><span class="p">(</span><span class="n">bounds</span><span class="o">=</span><span class="p">((</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">),)</span> <span class="o">*</span> <span class="mi">3</span><span class="p">)],</span>
+    <span class="p">)],</span>
+<span class="p">)</span>
+<span class="n">root</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">stabilize</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"Optimal"</span> <span class="ow">and</span> <span class="n">root</span><span class="o">.</span><span class="n">lp</span> <span class="o">==</span> <span class="mf">3.0</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">root</span><span class="o">.</span><span class="n">routes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">network</span><span class="p">,</span> <span class="n">root</span><span class="o">.</span><span class="n">routes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+</code></pre></div>
+<p>The only covering route costs 3, contributes one unit to shared row 0, consumes
+one load unit, and uses one copy of network 19's allowed route multiplicity.
+<code>problem.solve(**options)</code> delegates to <code>solve_networks(problem, **options)</code>.
+Both require Clp.</p>
+<h2 id="model-reference">Model reference</h2>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Fields and defaults</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SharedRow</code></td>
+<td><code>sense</code>, <code>rhs</code>; sense is <code>&quot;eq&quot;</code>, <code>&quot;le&quot;</code>, or <code>&quot;ge&quot;</code></td>
+</tr>
+<tr>
+<td><code>PricingResource</code></td>
+<td><code>kind=&quot;disposable&quot;</code>, <code>initial=None</code>, <code>bounds=None</code>, <code>time_windows=None</code></td>
+</tr>
+<tr>
+<td><code>PricingArc</code></td>
+<td><code>tail</code>, <code>head</code>, <code>cost</code>, <code>consumption=()</code>, <code>bounds=()</code>, <code>entries=()</code></td>
+</tr>
+<tr>
+<td><code>PricingNetwork</code></td>
+<td><code>id</code>, <code>vertices</code>, <code>multiplicity</code>, <code>arcs</code>, <code>resources=()</code>, <code>source=0</code>, <code>sink=None</code>, <code>route_entries=()</code>, <code>ng=None</code>, <code>coupled_resources=()</code>, <code>elementary=False</code></td>
+</tr>
+<tr>
+<td><code>NetworkProblem</code></td>
+<td><code>rows</code>, <code>networks</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Scalar <code>kind</code> accepts <code>&quot;disposable&quot;</code> or <code>&quot;equality&quot;</code>. Resource <code>bounds</code> has one
+<code>(lower, upper)</code> pair per vertex when supplied; <code>initial</code> overrides the source
+initial value. Optional windows are described in <a href="resources.html">resources</a>.
+<code>PricingArc.consumption</code> follows scalar coordinate order. Arc <code>bounds</code> entries
+are optional <code>(lower, upper)</code> pairs constraining head states. <code>entries</code> contains
+<code>(shared_row_index, coefficient)</code> pairs for that arc.</p>
+<p>For a route p in network k, an additive shared-row coefficient is the sum of its
+arc entries plus <code>route_entries</code> once per route. Multiplicity <code>(lower, upper)</code>
+bounds the sum of route variables in that network. Shared coverage rows and
+fleet multiplicity are different constraints. <code>sink=None</code> selects the last
+vertex. <code>ng</code> supplies per-vertex neighborhoods; <code>elementary=True</code> selects an
+elementary network domain. <code>coupled_resources</code> accepts tagged descriptors.</p>
+<p>The JSON schema has Rust capabilities beyond these Python dataclasses, including
+independent master variables and imported finite columns. Do not assume a raw
+Rust model with additional top-level fields can round trip through
+<code>NetworkProblem.from_json</code>. See the <a href="../extensions/mp.html">multi-pricing model guide</a>
+for those Rust/CLI interfaces.</p>
+<h2 id="model-json">Model JSON</h2>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkProblem</span>
+
+<span class="n">text</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">to_json</span><span class="p">(</span><span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">restored</span> <span class="o">=</span> <span class="n">NetworkProblem</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">restored</span> <span class="o">==</span> <span class="n">problem</span>
+<span class="n">Path</span><span class="p">(</span><span class="s2">"model.json"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span>
+<span class="n">restored</span> <span class="o">=</span> <span class="n">NetworkProblem</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"model.json"</span><span class="p">)</span>
+</code></pre></div>
+<p>The same model format is accepted by <code>baldes multi-pricing model.json</code> (alias
+<code>baldes networks</code>). JSON requires finite numeric fields; it cannot represent
+infinity. Synchronization definitions are solve options, not fields in
+<code>NetworkProblem.to_json()</code>; save them separately for reproducibility.</p>
+<h2 id="solve-controls">Solve controls</h2>
+<p>All options to <code>solve_networks</code> are keyword-only.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Keyword</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tree</code></td>
+<td><code>False</code></td>
+<td>Solve a root LP or search a shared-master integer tree</td>
+</tr>
+<tr>
+<td><code>network_pricing_schedule</code></td>
+<td><code>&quot;full-sweep&quot;</code></td>
+<td><code>full-sweep</code>, <code>cyclic</code>, <code>sorted</code>, <code>native-promising-first</code>, <code>native-unvisited-first</code></td>
+</tr>
+<tr>
+<td><code>network_unpromising_limit</code></td>
+<td><code>1</code></td>
+<td>Positive native queue batch budget</td>
+</tr>
+<tr>
+<td><code>network_branching</code></td>
+<td><code>&quot;resource-first&quot;</code></td>
+<td><code>resource-first</code> or <code>multiplicity-first</code> branching order</td>
+</tr>
+<tr>
+<td><code>stabilize</code></td>
+<td><code>True</code></td>
+<td>Dual smoothing when no explicit proximal configuration replaces it</td>
+</tr>
+<tr>
+<td><code>proximal</code></td>
+<td><code>None</code></td>
+<td>Explicit proximal bands and optional multi-point policy</td>
+</tr>
+<tr>
+<td><code>bound_mode</code></td>
+<td><code>&quot;numerical&quot;</code></td>
+<td>Numerical or certified lower bounds</td>
+</tr>
+<tr>
+<td><code>artificial_cost</code></td>
+<td><code>2.76</code></td>
+<td>Positive artificial-column configuration; not an incumbent bound</td>
+</tr>
+<tr>
+<td><code>time_limit</code></td>
+<td><code>120.0</code></td>
+<td>Solve time budget in seconds</td>
+</tr>
+<tr>
+<td><code>max_iterations</code></td>
+<td><code>100000</code></td>
+<td>Column-generation iteration limit</td>
+</tr>
+<tr>
+<td><code>node_limit</code></td>
+<td><code>10000</code></td>
+<td>Tree node limit</td>
+</tr>
+<tr>
+<td><code>log_interval</code></td>
+<td><code>None</code></td>
+<td>Optional positive progress interval</td>
+</tr>
+<tr>
+<td><code>pricing_options</code></td>
+<td><code>None</code></td>
+<td>Numeric BALDES option mapping</td>
+</tr>
+<tr>
+<td><code>synchronized_services</code></td>
+<td><code>()</code></td>
+<td>Common-start optional service definitions</td>
+</tr>
+</tbody>
+</table></div>
+<p>A schedule changes which networks are priced first; early improving columns do
+not establish that all networks have completed pricing. The solver coordinates
+the complete pricing checkpoint needed for bounds.</p>
+<p>Example proximal configuration:</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="n">root</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
+    <span class="n">network_pricing_schedule</span><span class="o">=</span><span class="s2">"native-promising-first"</span><span class="p">,</span>
+    <span class="n">proximal</span><span class="o">=</span><span class="p">{</span><span class="s2">"bands"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"half_width"</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s2">"penalty"</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">}],</span> <span class="s2">"multi_point"</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+<span class="p">)</span>
+</code></pre></div>
+<p><code>penalty=None</code> selects a hard band. Use positive validated widths/penalties;
+see <a href="../extensions/mp.html#proximal-pricing">proximal pricing</a> for the mathematical
+contract. Root and tree APIs have different option sets from routing
+<code>solve_root</code>; there is no <code>master_solver</code> keyword here.</p>
+<h2 id="resume-branch-and-add-rows">Resume, branch, and add rows</h2>
+<p>A root result owns a <code>NetworkNode</code> snapshot. Child operations return new nodes
+and preserve their parent. Handles are bound to their creating Python thread.</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkRowCoefficients</span><span class="p">,</span> <span class="n">SharedRow</span>
+
+<span class="n">root</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
+<span class="n">parent</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">snapshot</span>
+<span class="k">assert</span> <span class="n">parent</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+<span class="c1"># Add an additive row requiring at least one route across the networks.</span>
+<span class="n">coefficients</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+    <span class="n">NetworkRowCoefficients</span><span class="p">(</span><span class="n">n</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">n</span><span class="o">.</span><span class="n">arcs</span><span class="p">),</span> <span class="n">per_route</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">problem</span><span class="o">.</span><span class="n">networks</span>
+<span class="p">)</span>
+<span class="n">child</span> <span class="o">=</span> <span class="n">parent</span><span class="o">.</span><span class="n">with_row</span><span class="p">(</span><span class="n">SharedRow</span><span class="p">(</span><span class="s2">"ge"</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span> <span class="n">coefficients</span><span class="p">)</span>
+<span class="n">child_result</span> <span class="o">=</span> <span class="n">child</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">stabilize</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">parent</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span><span class="o">.</span><span class="n">lp</span> <span class="o">==</span> <span class="n">root</span><span class="o">.</span><span class="n">lp</span>
+</code></pre></div>
+<p><code>NetworkRowCoefficients(network, arcs, per_route=0.0)</code> supplies one coefficient
+per physical arc. The constant is charged once per route. These coefficients
+apply to future priced columns as well as existing columns.</p>
+<p><code>parent.fractional_assignments(tolerance=1e-6)</code> returns <code>NetworkAssignment</code>
+objects with <code>shared_row</code>, <code>network</code>, and <code>value</code>. A candidate can be branched:</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="k">for</span> <span class="n">candidate</span> <span class="ow">in</span> <span class="n">parent</span><span class="o">.</span><span class="n">fractional_assignments</span><span class="p">():</span>
+    <span class="n">assigned</span> <span class="o">=</span> <span class="n">parent</span><span class="o">.</span><span class="n">branch_assignment</span><span class="p">(</span><span class="n">candidate</span><span class="o">.</span><span class="n">shared_row</span><span class="p">,</span> <span class="n">candidate</span><span class="o">.</span><span class="n">network</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+    <span class="n">excluded</span> <span class="o">=</span> <span class="n">parent</span><span class="o">.</span><span class="n">branch_assignment</span><span class="p">(</span><span class="n">candidate</span><span class="o">.</span><span class="n">shared_row</span><span class="p">,</span> <span class="n">candidate</span><span class="o">.</span><span class="n">network</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">assigned</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">excluded</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span><span class="o">.</span><span class="n">status</span><span class="p">)</span>
+    <span class="k">break</span>
+</code></pre></div>
+<p>Use candidate IDs from the solved snapshot and supported original assignment
+rows. Arbitrary shared rows need not define assignment disjunctions.
+<code>fix_route(route_index, quantity=1)</code> fixes a route using the snapshot's route
+handle. <code>quantity</code> must be a positive Python integer at most <code>2**53</code>; booleans
+and fractional values are rejected. Use a non-None <code>route_index</code> from that
+snapshot's routes, not an index into an unrelated result.</p>
+<p><code>with_resource_group_branch(packing_row, resource, threshold, upper, members)</code>
+accepts <code>NetworkResourceGroupMember(network, arcs)</code> objects. The original packing
+row must establish at most one occurrence. The operation has resource replay
+and row compatibility preconditions, including enumeration for some resource-load
+rows. See <a href="../extensions/mp.html#grouped-accumulated-resource-branches">grouped branches</a>
+for the shared boundary convention and restrictions.</p>
+<h2 id="integer-search">Integer search</h2>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">NetworkProblem</span>
+
+<span class="c1"># Bundled example, run from the repository root.</span>
+<span class="n">triangle</span> <span class="o">=</span> <span class="n">NetworkProblem</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"examples/networks/triangle.json"</span><span class="p">)</span>
+<span class="n">root</span> <span class="o">=</span> <span class="n">triangle</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">stabilize</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">integer</span> <span class="o">=</span> <span class="n">triangle</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">tree</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">time_limit</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">node_limit</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">lp</span> <span class="o">==</span> <span class="mf">1.5</span>
+<span class="k">assert</span> <span class="n">integer</span><span class="o">.</span><span class="n">incumbent</span> <span class="o">==</span> <span class="mf">2.0</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">integer</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">integer</span><span class="o">.</span><span class="n">bound</span><span class="p">,</span> <span class="n">integer</span><span class="o">.</span><span class="n">open_nodes</span><span class="p">)</span>
+</code></pre></div>
+<p><code>root.snapshot.solve(tree=True, ...)</code> starts a tree from that node's inherited
+state. Automatic search supports its documented branching families and may
+return <code>Incomplete</code> when they do not resolve the model. A tree result has no
+resumable node snapshot. An incumbent remains distinct from a lower bound.</p>
+<h2 id="enumeration-and-integer-transfer">Enumeration and integer transfer</h2>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Keyword</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enumerate</code></td>
+<td><code>False</code></td>
+<td>Attempt full route-universe transfer at a valid pricing checkpoint</td>
+</tr>
+<tr>
+<td><code>enumeration_route_limit</code></td>
+<td><code>10000</code></td>
+<td>Candidate route budget across networks</td>
+</tr>
+<tr>
+<td><code>enumeration_work_limit</code></td>
+<td><code>10000000</code></td>
+<td>Collection/proof work budget</td>
+</tr>
+<tr>
+<td><code>enumeration_stored_arc_limit</code></td>
+<td><code>1000000</code></td>
+<td>Stored route-arc budget</td>
+</tr>
+<tr>
+<td><code>enumeration_time_limit</code></td>
+<td><code>1.0</code></td>
+<td>Per-attempt time budget in seconds</td>
+</tr>
+<tr>
+<td><code>enumerated_mip</code></td>
+<td><code>False</code></td>
+<td>Use optional HiGHS integer transfer</td>
+</tr>
+<tr>
+<td><code>mip_time_limit</code></td>
+<td><code>1.0</code></td>
+<td>Per-MIP time budget</td>
+</tr>
+<tr>
+<td><code>mip_node_limit</code></td>
+<td><code>100000</code></td>
+<td>Per-MIP node budget</td>
+</tr>
+<tr>
+<td><code>mip_objective_cutoff</code></td>
+<td><code>None</code></td>
+<td>Optional finite improvement cutoff</td>
+</tr>
+</tbody>
+</table></div>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="n">root</span> <span class="o">=</span> <span class="n">triangle</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="nb">enumerate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">report</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">enumeration_reports</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">complete</span><span class="p">,</span> <span class="n">report</span><span class="o">.</span><span class="n">routes</span><span class="p">,</span> <span class="n">report</span><span class="o">.</span><span class="n">failure</span><span class="p">,</span> <span class="n">report</span><span class="o">.</span><span class="n">coverage_cutoff</span><span class="p">)</span>
+</code></pre></div>
+<p>Full transfer commits only when every enabled network completes. Unsupported
+resources, ambiguous replay, or exhausted limits leave normal pricing available
+and do not install a partial universe. A failed attempt may be retried by a later
+solve with different limits. <code>NetworkNode.solve_enumerated_mip(time_limit=1.0, node_limit=100000, objective_cutoff=None)</code> solves an available transferred copy
+and may return <code>None</code> when unprepared. HiGHS support is required for integer solving.</p>
+<p>With <code>tree=True, enumerated_mip=True</code>, the solver can use full transfer or a
+cutoff-bounded improvement domain. Inspect each report's <code>coverage_cutoff</code>:
+<code>None</code> means full-domain coverage; a number restricts coverage to improvements
+below it. Failure to improve an arbitrary cutoff is not original-model
+infeasibility and does not supply a feasible incumbent. Independent certificates
+and numerical MIP bounds remain distinct. See the
+<a href="../extensions/mp.html#complete-enumeration-and-integer-transfer">enumeration contract</a>.</p>
+<h2 id="synchronized-optional-service">Synchronized optional service</h2>
+<p><code>SynchronizedService(id, resource, vehicles_required, reward, start, members)</code>
+defines a job served by distinct vehicle copies at a common integer service start.
+Members are <code>SynchronizedServiceMember(network, vertex)</code> values. Service is
+optional and its reward is counted once in the master, so exclude that reward
+from route arc costs and remove ordinary unit-cover rows for this job.</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">SynchronizedService</span><span class="p">,</span> <span class="n">SynchronizedServiceMember</span>
+
+<span class="n">fleets</span> <span class="o">=</span> <span class="n">NetworkProblem</span><span class="p">((),</span> <span class="nb">tuple</span><span class="p">(</span>
+    <span class="n">PricingNetwork</span><span class="p">(</span>
+        <span class="nb">id</span><span class="o">=</span><span class="n">n</span><span class="p">,</span> <span class="n">vertices</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">multiplicity</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+        <span class="n">arcs</span><span class="o">=</span><span class="p">(</span><span class="n">PricingArc</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">PricingArc</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+        <span class="n">resources</span><span class="o">=</span><span class="p">(</span><span class="n">PricingResource</span><span class="p">(</span><span class="n">initial</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">window</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">))),),</span>
+    <span class="p">)</span> <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">window</span> <span class="ow">in</span> <span class="p">((</span><span class="mi">7</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">9</span><span class="p">)),</span> <span class="p">(</span><span class="mi">42</span><span class="p">,</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">10</span><span class="p">)))</span>
+<span class="p">))</span>
+<span class="n">service</span> <span class="o">=</span> <span class="n">SynchronizedService</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="mi">17</span><span class="p">,</span> <span class="n">resource</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">vehicles_required</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">reward</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">start</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+    <span class="n">members</span><span class="o">=</span><span class="p">(</span><span class="n">SynchronizedServiceMember</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">SynchronizedServiceMember</span><span class="p">(</span><span class="mi">42</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+<span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">fleets</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">tree</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">synchronized_services</span><span class="o">=</span><span class="p">(</span><span class="n">service</span><span class="p">,))</span>
+<span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">incumbent</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span>
+<span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">resource_profile</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">5</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">routes</span><span class="p">)</span>
+</code></pre></div>
+<p>The synchronized resource must be disposable with nonnegative consumption.
+Put service duration on outgoing arcs. Start bounds are inclusive integers in
+<code>[-2**52, 2**52]</code>; the unit determines the time grid. Participating coupled
+resources and resource-load rows on that axis are rejected. Root LP columns need
+not form a synchronized schedule; the tree validates the joint integer witness.</p>
+<p>A snapshot's service definitions are immutable. Narrow a start domain with
+<code>with_synchronized_start(id, lower, upper)</code>; parents remain reusable. Complete
+MIP is deferred while common start domains are non-singleton. The
+<a href="../extensions/mp.html#synchronized-service-across-vehicles">synchronization contract</a>
+explains coverage equations and schedule validation.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="resources.html"><small>Previous guide</small>Coupled resources and function encodings <span aria-hidden="true">↗</span></a><a href="api.html"><small>Next guide</small>PyBaldes API reference <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#build-a-complete-model">Build a complete model</a><a class="toc-level-2" href="#model-reference">Model reference</a><a class="toc-level-2" href="#model-json">Model JSON</a><a class="toc-level-2" href="#solve-controls">Solve controls</a><a class="toc-level-2" href="#resume-branch-and-add-rows">Resume, branch, and add rows</a><a class="toc-level-2" href="#integer-search">Integer search</a><a class="toc-level-2" href="#enumeration-and-integer-transfer">Enumeration and integer transfer</a><a class="toc-level-2" href="#synchronized-optional-service">Synchronized optional service</a></nav></aside>
+</div>
+</body></html>
