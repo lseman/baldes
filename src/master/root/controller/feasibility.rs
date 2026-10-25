@@ -11,7 +11,7 @@ impl<const D: usize> RootController<D> {
         remaining: Duration,
         iterations: usize,
         tolerance: f64,
-        _bound_mode: BoundMode,
+        bound_mode: BoundMode,
     ) -> Result<Option<FeasibilityRecovery>> {
         if !tolerance.is_finite() || tolerance < 0. {
             return Err(invalid("phase-I tolerance"));
@@ -249,6 +249,38 @@ impl<const D: usize> RootController<D> {
                         state.solver.controls.max_columns = larger;
                         continue;
                     }
+                }
+                if result.exact
+                    && !crate::pricing::restrictions::RYAN_FOSTER_IN_PRICING
+                    && self
+                        .problem
+                        .branch_constraints
+                        .iter()
+                        .any(|(_, branch)| matches!(branch, BranchConstraint::RyanFoster(_)))
+                {
+                    if bound_mode == BoundMode::Certified {
+                        // The native no-new-column test is not a certificate
+                        // when RF row prices are omitted. Ask the independent
+                        // original-domain proof rather than using the raw
+                        // pricing minimum as its scheduling gate.
+                        report.certified_infeasible = super::super::certificate::lower_bound(
+                            &phase_problem,
+                            &state,
+                            &phase_master,
+                            &proof_cache,
+                        )
+                        .is_some_and(|bound| bound > tolerance);
+                        if !report.certified_infeasible {
+                            report.status = FeasibilityStatus::Stalled;
+                            break;
+                        }
+                    }
+                    // Native pure phase I marks infeasibility when an exact
+                    // pass supplies no new improving master column. RF duals
+                    // are absent from pricing in the master-only build, so this
+                    // numerical termination is not a directed certificate.
+                    report.status = FeasibilityStatus::Infeasible;
+                    break;
                 }
                 report.status = FeasibilityStatus::Stalled;
                 break;

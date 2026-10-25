@@ -66,10 +66,20 @@ Both children work with **a single pricing network**. The together condition
 applies to each route, rather than merely requiring both customers somewhere
 in the final solution.
 
-Binary resources enforce the rule during labeling and bidirectional joins.
+By default, binary resources enforce the rule during labeling and bidirectional joins.
 Retained enumeration is filtered by the same rule. Existing NG routes that
 repeat a pair endpoint are retired from the child master. A violation row also
 keeps inherited and newly added master columns consistent with the branch.
+
+Build with `--features clp,ryan-foster-master` to enforce Ryan–Foster only
+through master rows. Pricing then receives neither the hard binary-resource
+restriction nor the violation row's dual cost. After exact column generation
+returns no new improving master columns, numerical mode uses the completed
+restricted-master objective as the node bound. If artificials remain, pure
+phase I runs first and marks numerical infeasibility when an exact pass adds
+no improving master columns. Limits and incomplete pricing leave the node open.
+These numerical decisions are not original-domain certificates; certified mode
+still requires an independent bound or infeasibility proof.
 
 An apart constraint consumes one binary resource; a together constraint
 consumes three. The current representation holds 512 resources. Candidate

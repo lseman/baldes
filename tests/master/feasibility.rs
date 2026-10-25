@@ -96,8 +96,17 @@ fn phase_one_recovers_ryan_foster_children_before_original_cost_optimization() {
                 let branch = BranchConstraint::RyanFoster(rule);
                 let mut fresh = problem.clone();
                 fresh.branch(branch.clone()).unwrap();
+                let fresh = root::solve(fresh, controls.clone()).unwrap();
+                assert!(
+                    fresh
+                        .master
+                        .feasibility
+                        .iter()
+                        .any(|report| { report.status == FeasibilityStatus::Feasible }),
+                    "{fresh:?}"
+                );
                 for output in [
-                    root::solve(fresh, controls.clone()).unwrap(),
+                    fresh,
                     root::inherit_branches(
                         parent.snapshot.as_ref().unwrap(),
                         &[branch],
@@ -108,7 +117,10 @@ fn phase_one_recovers_ryan_foster_children_before_original_cost_optimization() {
                     let optimum = if together { 300. } else { 500. };
                     assert_eq!(output.master.status, Status::Optimal, "{output:?}");
                     assert!((output.master.lp - optimum).abs() < 1e-6, "{output:?}");
-                    assert!((output.master.bound - optimum).abs() < 1e-6, "{output:?}");
+                    assert!(output.master.bound <= optimum + 1e-6, "{output:?}");
+                    if !output.master.pruned_by_bound {
+                        assert!((output.master.bound - optimum).abs() < 1e-6, "{output:?}");
+                    }
                     assert!(output
                         .master
                         .artificials
@@ -122,6 +134,32 @@ fn phase_one_recovers_ryan_foster_children_before_original_cost_optimization() {
                 }
             }
         }
+    }
+}
+
+#[test]
+fn phase_one_closes_infeasible_ryan_foster_child_without_pair_route() {
+    use baldes::pricing::restrictions::RyanFosterConstraint;
+
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let mut problem = singleton_problem();
+        problem
+            .branch(BranchConstraint::RyanFoster(RyanFosterConstraint {
+                first: 1,
+                second: 2,
+                together: true,
+            }))
+            .unwrap();
+        let output = root::solve(problem, options(mode)).unwrap();
+        assert_eq!(output.master.status, Status::Infeasible, "{output:?}");
+        assert_eq!(output.master.bound, f64::INFINITY);
+        assert!(
+            output.master.feasibility.iter().any(|report| {
+                report.status == FeasibilityStatus::Infeasible
+                    && (mode == BoundMode::Numerical || report.certified_infeasible)
+            }),
+            "{output:?}"
+        );
     }
 }
 

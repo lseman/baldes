@@ -225,47 +225,6 @@ impl<const D: usize> RootProblem<D> {
         if duals.len() < self.rows.len() || self.arc_entries.len() != self.graph.arcs.len() {
             return Err(invalid("root master dimensions"));
         }
-        if !crate::pricing::restrictions::RYAN_FOSTER_IN_PRICING {
-            use crate::cuts::soft_conflicts::{Mode, PresenceRow, PricingInput};
-            let mut presence = vec![];
-            for &(row, ref branch) in &self.branch_constraints {
-                let BranchConstraint::RyanFoster(rule) = branch else {
-                    continue;
-                };
-                // Master-only branches retain violating paths in the pricing
-                // domain, but their row prices must still enter reduced costs.
-                // Presence (rather than visit counts) also handles NG cycles.
-                let events: Vec<Vec<usize>> = solver
-                    .graph
-                    .arcs
-                    .iter()
-                    .map(|arc| {
-                        if arc.head == rule.first {
-                            vec![0]
-                        } else if arc.head == rule.second {
-                            vec![1]
-                        } else {
-                            vec![]
-                        }
-                    })
-                    .collect();
-                let dual = duals[map[row]];
-                let terms = if rule.together {
-                    // XOR(a,b) = a + b - 2ab.
-                    vec![((0, 0), dual), ((1, 1), dual), ((0, 1), -2. * dual)]
-                } else {
-                    vec![((0, 1), dual)]
-                };
-                for (pair, dual) in terms {
-                    presence.push(PricingInput {
-                        row: PresenceRow::new(2, vec![pair], Mode::PairCount)?,
-                        arc_events: events.clone(),
-                        dual,
-                    });
-                }
-            }
-            solver.set_presence_rows(presence)?;
-        }
         for (index, arc) in solver.graph.arcs.iter_mut().enumerate() {
             let mut cost = self.graph.arcs[index].cost;
             for &(r, a) in &self.arc_entries[index] {
