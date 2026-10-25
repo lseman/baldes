@@ -199,26 +199,43 @@ fn resource_or_assignment_children<const D: usize>(
             ]));
         }
     }
-    // Time-window selection counts are integer activities over window copies.
-    if !windows.is_empty() {
-        let flows: HashMap<_, _> = node
-            .state
-            .oracles
-            .iter()
-            .zip(&activities)
-            .map(|(o, a)| (o.network.id, a.clone()))
-            .collect();
-        if let Some(children) =
-            super::time_windows::selection_children(node, windows, &flows, tolerance)?
-        {
-            return Ok(Some(children));
-        }
+    // On window-split networks, arc flows are branched on summed over each
+    // input arc's copies, then on window selection counts (Li et al., 2020).
+    let flows: HashMap<_, _> = node
+        .state
+        .oracles
+        .iter()
+        .zip(&activities)
+        .map(|(o, a)| (o.network.id, a.clone()))
+        .collect();
+    if let Some(children) = super::time_windows::arc_children(node, windows, &flows, tolerance)? {
+        return Ok(Some(children));
     }
+    let copied: HashSet<(i32, i32)> = windows
+        .iter()
+        .flat_map(|w| {
+            w.split
+                .arcs
+                .iter()
+                .filter(|a| {
+                    w.split
+                        .arcs
+                        .iter()
+                        .filter(|b| b.original == a.original)
+                        .count()
+                        > 1
+                })
+                .map(move |a| (w.network, a.arc))
+        })
+        .collect();
     // Integer route quantities imply integer aggregate physical-arc activity,
     // including repeated traversals. Each split covers every integer value,
     // irrespective of numerical error in the LP point used to choose it.
     for (i, oracle) in node.state.oracles.iter().enumerate() {
         for (a, &value) in activities[i].iter().enumerate() {
+            if copied.contains(&(oracle.network.id, oracle.network.graph.arcs[a].id)) {
+                continue;
+            }
             if value >= 0. && fractional(value, tolerance) {
                 let mut arcs = vec![0.; oracle.network.graph.arcs.len()];
                 arcs[a] = 1.;
@@ -246,8 +263,17 @@ fn resource_or_assignment_children<const D: usize>(
             }
         }
     }
-    if let Some(children) = super::time_windows::synchronized_children(output, windows, tolerance)?
+    if let Some(children) =
+        super::time_windows::selection_children(node, windows, &flows, tolerance)?
     {
+        return Ok(Some(children));
+    }
+    if let Some(children) =
+        super::time_windows::multiple_window_children(output, windows, tolerance)?
+    {
+        return Ok(Some(children));
+    }
+    if let Some(children) = super::time_windows::conflict_children(output, windows, tolerance)? {
         return Ok(Some(children));
     }
     synchronization::children(output, tolerance)

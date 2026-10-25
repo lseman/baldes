@@ -229,7 +229,11 @@ Scalar resource capacity is a const generic, defaulting to two; see
 `solve_assignment_tree(problem, AssignmentTreeOptions)` runs a best-bound tree
 using network-aware snapshots. It tries proved shared resource-group splits,
 assignment rows, declared integer master variables, total network multiplicities,
-original physical-arc activities, then synchronized-service splits. It returns network-tagged
+original physical-arc activities, then synchronized-service splits. With
+`AssignmentTreeOptions::time_window_selection`, arc activities are summed over
+window copies and time-window selection counts follow them; see
+[branching on time-window selection](multi-time-windows.md#branching-on-time-window-selection).
+It returns network-tagged
 integer route quantities, an incumbent, selected bound mode, frontier bound and
 node/work-limit status. Integer witnesses replay original graph resources,
 shared rows and original multiplicities with exact sums; objectives round upward.

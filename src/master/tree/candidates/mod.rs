@@ -271,16 +271,35 @@ fn generate<const D: usize>(
     // flow summed over its copies, and window selection counts follow it.
     let split = options.window_arcs.as_ref();
     if let Some(split) = split.filter(|_| windows) {
-        for ((vertex, window), ids) in split.selections() {
-            let members = positions(problem, &ids);
-            let value = members.iter().map(|&(a, _)| flows.get(&a).copied().unwrap_or(0.)).sum::<f64>();
-            if fractional(value) {
-                candidates.push(window_candidate(
-                    WindowGroup::Selection { vertex, window },
-                    members,
-                    value,
-                ));
+        let selections = split.selections();
+        for (&(vertex, window), ids) in &selections {
+            let members = positions(problem, ids);
+            let value = members
+                .iter()
+                .map(|&(a, _)| flows.get(&a).copied().unwrap_or(0.))
+                .sum::<f64>();
+            if !fractional(value) {
+                continue;
             }
+            let group = WindowGroup::Selection { vertex, window };
+            let mut candidate = window_candidate(group, members, value);
+            // Li et al. (2020): the up child also allows only this window. A
+            // unit-cover customer then has no visit in any other window, which
+            // is the single row below; preprocessing removes those copies.
+            if value.ceil() == 1. {
+                let others: Vec<i32> = selections
+                    .iter()
+                    .filter(|(&(v, w), _)| v == vertex && w != window)
+                    .flat_map(|(_, ids)| ids.iter().copied())
+                    .collect();
+                candidate.up = BranchConstraint::WindowFlow {
+                    group,
+                    arcs: positions(problem, &others),
+                    sense: RowSense::LessEqual,
+                    rhs: 0.,
+                };
+            }
+            candidates.push(candidate);
         }
     }
     if !arcs {
@@ -299,9 +318,16 @@ fn generate<const D: usize>(
         .collect();
     for (&original, ids) in &copied {
         let members = positions(problem, ids);
-        let value = members.iter().map(|&(a, _)| flows.get(&a).copied().unwrap_or(0.)).sum::<f64>();
+        let value = members
+            .iter()
+            .map(|&(a, _)| flows.get(&a).copied().unwrap_or(0.))
+            .sum::<f64>();
         if fractional(value) {
-            candidates.push(window_candidate(WindowGroup::Arc { original }, members, value));
+            candidates.push(window_candidate(
+                WindowGroup::Arc { original },
+                members,
+                value,
+            ));
         }
     }
     for (arc, value) in flows {
@@ -338,9 +364,7 @@ fn positions<const D: usize>(problem: &RootProblem<D>, ids: &[i32]) -> Vec<(usiz
     arcs
 }
 
-/// Floor/ceil children on a window-copy flow. For a unit-cover customer the
-/// up child of a selection count also excludes its other windows through
-/// preprocessing, as in the right child of Li et al. (2020).
+/// Floor/ceil children on a window-copy flow.
 fn window_candidate(group: WindowGroup, arcs: Vec<(usize, f64)>, value: f64) -> BranchCandidate {
     let branch = |sense, rhs| BranchConstraint::WindowFlow {
         group,

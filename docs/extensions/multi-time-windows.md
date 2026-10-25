@@ -78,6 +78,54 @@ is rejected as unknown, rather than silently ignored. Solomon and CVRPLIB file
 formats retain their existing input semantics; use the graph API or network JSON
 for disjoint windows.
 
+## Branching on time-window selection
+
+Both trees can branch on the number of times each time window of a vertex is
+selected, following Li et al. (2020, *Transportation Research Part E* 140,
+101955, Section 6.3). Enable it with the time resource:
+
+```rust
+let mut tree = baldes::master::tree::TreeOptions::default();
+tree.branching.time_window_selection = Some(0);          // routing tree
+
+let mut network = baldes::master::mp::AssignmentTreeOptions::default();
+network.time_window_selection = Some(0);                 // network tree
+```
+
+Every arc into a vertex with two or more windows on that resource is copied
+once per window (`Graph::split_time_window_arcs`); a copy's head bound is its
+window, so a route entering through it starts service in that window and waits
+for it when necessary. The selection count of window `w` of vertex `i` is the
+flow on the copies for `(i, w)`. Pricing charges branching duals per copy, so
+every window choice stays reachable under any duals; earliest-window labeling
+on the unsplit graph cannot generate a route that waits for a later window.
+Reported routes use the input arc IDs.
+
+The branching order and children follow the paper:
+
+1. Arc flows are branched on summed over each input arc's copies, as the
+   paper's flow between two customers; single copies are never branched on.
+2. A fractional count, the one closest to one half, gets `count <= floor` and
+   `count >= ceil` children. The right child also allows only window `w`: the
+   other windows of `i` are fixed to zero where every visit must use one window,
+   namely unit-cover customers (the routing tree and unit shared rows) and
+   members of synchronized services. Other multi-visit vertices keep only the
+   count row, since forcing one window there would cut off feasible solutions.
+3. With every count integral, a synchronized member that selects several
+   windows has one of them, chosen pseudo-randomly but reproducibly, forbidden
+   in the left child and forced in the right child.
+
+In the routing tree the counts form their own family below arc flow
+(`BranchPriorities::time_window_selection`, default 0.5). Forbidden windows are
+removed rather than penalized: preprocessing bounds their copies to zero, which
+removes them from pricing and fixes columns that use them.
+
+The network tree adds one extension after the paper's rules. Members of a
+synchronized service may sit in different networks with different window sets;
+when two selected windows cannot share a start within the service domain, one
+child forbids each. The service's start-domain split follows. The network tree
+supports the option only for a fresh problem, not from a snapshot.
+
 ## Implementation and validation
 
 Forward transitions choose the first admissible value at or after arrival;

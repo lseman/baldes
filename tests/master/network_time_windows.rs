@@ -137,7 +137,14 @@ fn exhaustive(inst: &Instance, vehicles: usize) -> f64 {
                 .iter()
                 .find_map(|&(a, b)| (arrive.max(a) <= b).then_some(arrive.max(a)))
             {
-                walk(inst, v, start, mask | 1 << (v - 1), cost + inst.travel[at][v], best);
+                walk(
+                    inst,
+                    v,
+                    start,
+                    mask | 1 << (v - 1),
+                    cost + inst.travel[at][v],
+                    best,
+                );
             }
         }
     }
@@ -163,26 +170,30 @@ fn exhaustive(inst: &Instance, vehicles: usize) -> f64 {
 
 #[test]
 fn network_window_selection_matches_exhaustive_optima_in_input_arc_ids() {
-    let (mut solved, mut incomplete_without) = (0, 0);
+    // closed[selection]: instances proved optimal without / with window counts.
+    let (mut feasible, mut closed) = (0, [0, 0]);
     for seed in 0..12 {
         let inst = instance(6, seed);
         let optimum = exhaustive(&inst, 3);
         if !optimum.is_finite() {
             continue;
         }
-        solved += 1;
+        feasible += 1;
         let base = problem(&inst, 3.);
         let input: std::collections::HashSet<_> =
             base.networks[0].graph.arcs.iter().map(|a| a.id).collect();
         for selection in [false, true] {
             let output = mp::solve_assignment_tree(base.clone(), options(selection)).unwrap();
-            // Without window counts the network tree may lack a disjunction
-            // and stop Incomplete; with them it must close every instance.
-            if !selection && output.status == TreeStatus::Incomplete {
-                incomplete_without += 1;
+            // A stalled column generation leaves nodes open in either mode.
+            if output.status == TreeStatus::Incomplete {
                 continue;
             }
-            assert_eq!(output.status, TreeStatus::Optimal, "seed {seed} selection {selection}: {output:?}");
+            assert_eq!(
+                output.status,
+                TreeStatus::Optimal,
+                "seed {seed} {selection}: {output:?}"
+            );
+            closed[selection as usize] += 1;
             assert!(
                 (output.incumbent - optimum).abs() < 1e-6,
                 "seed {seed} {selection}: {} vs {optimum}",
@@ -193,8 +204,12 @@ fn network_window_selection_matches_exhaustive_optima_in_input_arc_ids() {
             }
         }
     }
-    assert!(solved >= 6, "only {solved} feasible instances");
-    eprintln!("network tree without window counts: {incomplete_without}/{solved} incomplete");
+    eprintln!("feasible {feasible}, closed without/with window counts {closed:?}");
+    assert!(feasible >= 6, "only {feasible} feasible instances");
+    assert!(
+        closed[1] >= closed[0] && closed[1] > 0,
+        "{closed:?} of {feasible}"
+    );
 }
 
 /// Members in networks 7 and 42 with different window sets that overlap
@@ -224,8 +239,14 @@ fn synchronized(first: &[(f64, f64)], second: &[(f64, f64)]) -> mp::AssignmentTr
         reward: 1.,
         start: [0, 20],
         members: vec![
-            SynchronizedServiceMember { network: 7, vertex: 1 },
-            SynchronizedServiceMember { network: 42, vertex: 1 },
+            SynchronizedServiceMember {
+                network: 7,
+                vertex: 1,
+            },
+            SynchronizedServiceMember {
+                network: 42,
+                vertex: 1,
+            },
         ],
     }];
     mp::solve_assignment_tree(

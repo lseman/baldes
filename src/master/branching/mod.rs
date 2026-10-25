@@ -11,7 +11,6 @@ mod options;
 mod packing_set_assignment;
 pub mod resource_intervals;
 mod ryan_foster;
-pub mod time_window_selection;
 
 use crate::master::{root::RootProblem, RowSense};
 use crate::{invalid, pricing::restrictions::RyanFosterConstraint, Result, Route};

@@ -152,7 +152,10 @@ impl<const D: usize> Graph<D> {
                 .filter_map(|c| {
                     let a = self.arcs.iter().find(|a| a.id == c.arc)?;
                     let bounds = arc_window(self.vertices[a.head].bounds[r], a.bounds[r]);
-                    Some((self.project_resource(a.head, r, bounds, reach, true)?, c.arc))
+                    Some((
+                        self.project_resource(a.head, r, bounds, reach, true)?,
+                        c.arc,
+                    ))
                 })
                 .min_by(|a, b| a.0.total_cmp(&b.0))?;
             q = start;

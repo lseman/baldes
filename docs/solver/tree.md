@@ -84,6 +84,11 @@ remaining global budget. Its main steps are:
    a branching candidate and create children. Strong trials and diving use
    isolated evaluations.
 
+With multiple time windows, `options.branching.time_window_selection` runs the
+tree on window copies of the arcs and branches on time-window selection counts
+after arc flows; see
+[branching on time-window selection](../extensions/multi-time-windows.md#branching-on-time-window-selection).
+
 Time limits are cooperative across solver operations. A backend call can
 finish after its requested budget. Limits preserve bounds for unfinished nodes.
 

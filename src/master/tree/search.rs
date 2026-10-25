@@ -10,7 +10,9 @@ pub fn solve<const D: usize>(problem: RootProblem<D>, options: TreeOptions) -> R
     #[cfg(not(feature = "multi-time-windows"))]
     {
         let _ = resource;
-        Err(invalid("time-window selection branching requires multi-time-windows"))
+        Err(invalid(
+            "time-window selection branching requires multi-time-windows",
+        ))
     }
     #[cfg(feature = "multi-time-windows")]
     {

@@ -37,20 +37,47 @@ fn selection(problem: &RootProblem<2>, ids: &[i32], sense: RowSense, rhs: f64) -
 }
 
 #[test]
-fn selecting_a_window_of_a_covered_customer_forbids_its_other_windows() {
+fn selection_rows_alone_do_not_imply_the_other_windows_are_unused() {
+    // Cover = 1 and "window 1 selected at least once" together imply that
+    // window 0 is unused, but arc-bound propagation does not derive it; the
+    // up child therefore carries the "other windows <= 0" row explicitly.
     let (mut problem, split) = split_problem();
     let selections = split.selections();
-    let chosen = &selections[&(1, 1)];
-    let others = &selections[&(1, 0)];
     problem
-        .branch(selection(&problem, chosen, RowSense::GreaterEqual, 1.))
+        .branch(selection(
+            &problem,
+            &selections[&(1, 1)],
+            RowSense::GreaterEqual,
+            1.,
+        ))
         .unwrap();
     let (_, bounds) = problem.preprocess(&[]).unwrap();
-    for id in others {
-        assert!(bounds[problem.arc_position(*id).unwrap()].upper <= 0., "{id}");
+    assert!(selections[&(1, 0)]
+        .iter()
+        .any(|id| bounds[problem.arc_position(*id).unwrap()].upper > 0.));
+}
+
+#[test]
+fn forcing_a_window_removes_the_copies_of_the_others() {
+    let (mut problem, split) = split_problem();
+    let selections = split.selections();
+    problem
+        .branch(selection(
+            &problem,
+            &selections[&(1, 0)],
+            RowSense::LessEqual,
+            0.,
+        ))
+        .unwrap();
+    let (_, bounds) = problem.preprocess(&[]).unwrap();
+    for id in &selections[&(1, 0)] {
+        assert_eq!(bounds[problem.arc_position(*id).unwrap()].upper, 0., "{id}");
     }
-    for id in chosen {
-        assert!(bounds[problem.arc_position(*id).unwrap()].upper > 0., "{id}");
+    for id in &selections[&(1, 1)] {
+        assert!(
+            bounds[problem.arc_position(*id).unwrap()].upper > 0.,
+            "{id}"
+        );
     }
 }
 
