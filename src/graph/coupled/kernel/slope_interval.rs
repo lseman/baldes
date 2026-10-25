@@ -65,6 +65,54 @@ impl PreparedSlopeCharge {
         Ok(label.front.as_ref().expect("prepared charge front"))
     }
 }
+/// Per-resource facts behind the domain-only dominance rule. Unequal costly
+/// fronts never compare: a pointwise order is not preserved by future
+/// operations, because translation re-rounds every segment span and addition
+/// re-accumulates split segments, so an earlier gap can reverse.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct PreparedSlopeDominance {
+    strict: bool,
+    zero_charges: bool,
+}
+impl PreparedSlopeDominance {
+    pub(super) fn new(definition: &CoupledResource) -> Self {
+        let CoupledResource::SlopeIntervalCost {
+            functions, policy, ..
+        } = definition
+        else {
+            unreachable!()
+        };
+        Self {
+            strict: *policy == FrontOperationPolicy::StrictDomain,
+            zero_charges: functions.iter().all(zero_valued),
+        }
+    }
+    /// Forward a dominates b when both fronts are identically zero, every
+    /// future charge is zero (or suppressed) and each component of b lies in
+    /// one component of a. Zero values survive every operation exactly, and
+    /// literal translation, restriction and strict-domain intersection are
+    /// monotone in each coordinate, so a stays feasible wherever b does with
+    /// the same zero minimum. Tolerant native alignment can snap a and b to
+    /// different boundaries and is excluded.
+    pub(super) fn dominates(&self, a: &SlopeLabel, b: &SlopeLabel, scale: f64) -> bool {
+        let (Some(a), Some(b)) = (&a.front, &b.front) else {
+            return false;
+        };
+        self.strict
+            && (scale == 0. || self.zero_charges)
+            && a.components().iter().chain(b.components()).all(zero_valued)
+            && b.components().iter().all(|b| {
+                let (lo, hi) = b.domain();
+                a.components().iter().any(|a| {
+                    let (start, end) = a.domain();
+                    start <= lo && hi <= end
+                })
+            })
+    }
+}
+fn zero_valued(function: &PreparedSlopeFunction) -> bool {
+    function.pairs().iter().all(|pair| pair.0 == 0.)
+}
 pub(super) fn outcome<T>(value: FrontierOutcome<T>) -> Result<Option<T>> {
     match value {
         FrontierOutcome::Complete(value) => Ok(Some(value)),
@@ -397,6 +445,129 @@ mod tests {
         let mut restricted = restricted.coupled_kernel().unwrap().clone();
         restricted.suppress_costs();
         assert_eq!(restricted.replay(&[0, 1]).unwrap(), None);
+    }
+    fn parallel_prefixes(
+        functions: Vec<PreparedSlopeFunction>,
+        costs: [f64; 2],
+    ) -> (Graph<2>, Box<CoupledLabelState>, Box<CoupledLabelState>) {
+        let mut graph = Graph::<2>::new(3, 0).unwrap();
+        for (tail, head, cost) in [(0, 1, costs[0]), (0, 1, costs[1]), (1, 2, 0.)] {
+            graph.add_arc(tail, head, cost).unwrap();
+        }
+        graph
+            .set_coupled_resources(&[definition(functions)])
+            .unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let root = kernel.root(true);
+        let mut prefix = |arc: usize| {
+            let mut state = kernel.extend(&root, arc, true).unwrap().unwrap().0;
+            state
+                .account_extension(&root, costs[arc], costs[arc])
+                .unwrap();
+            state
+        };
+        let (a, b) = (prefix(0), prefix(1));
+        (graph, a, b)
+    }
+    #[test]
+    fn equal_raw_fronts_dominate_by_independent_scalar_order() {
+        let charges = vec![
+            constant(3., 0., 2.),
+            constant(3., 0., 2.),
+            constant(0., 0., 2.),
+        ];
+        let (graph, cheap, dear) = parallel_prefixes(charges, [-10., -9.]);
+        let kernel = graph.coupled_kernel().unwrap();
+        assert_eq!(cheap.slope_fronts, dear.slope_fronts);
+        assert_eq!(kernel.dominance_penalty(&cheap, &dear, true), Some(0.));
+        assert_eq!(kernel.dominance_penalty(&dear, &cheap, true), None);
+        for mode in [0., 1., 2.] {
+            let mut solver = crate::pricing::Solver::<2>::new(3, 0).unwrap();
+            solver.graph = graph.clone();
+            solver
+                .set_option("BALDESuseBidirectionalSearch", mode)
+                .unwrap();
+            let result = solver.price_phase(0, 20, false).unwrap();
+            assert_eq!(result.minimum_reduced_cost, -7.);
+            assert!(result
+                .columns
+                .iter()
+                .any(|r| r.arcs == [0, 2] && r.original_cost == -7.));
+        }
+    }
+    #[test]
+    fn zero_raw_fronts_dominate_by_domain_coverage() {
+        let charges = vec![
+            constant(0., 0., 2.),
+            constant(0., 0., 1.),
+            constant(0., 0., 2.),
+        ];
+        let (graph, wide, narrow) = parallel_prefixes(charges, [0., 0.]);
+        let kernel = graph.coupled_kernel().unwrap();
+        assert_ne!(wide.slope_fronts, narrow.slope_fronts);
+        assert_eq!(kernel.dominance_penalty(&wide, &narrow, true), Some(0.));
+        assert_eq!(kernel.dominance_penalty(&narrow, &wide, true), None);
+        // The narrow prefix is physically cheaper and must survive pricing.
+        let charges = vec![
+            constant(0., 0., 2.),
+            constant(0., 0., 1.),
+            constant(0., 0., 2.),
+        ];
+        let (graph, ..) = parallel_prefixes(charges, [0., -5.]);
+        for mode in [0., 1., 2.] {
+            let mut solver = crate::pricing::Solver::<2>::new(3, 0).unwrap();
+            solver.graph = graph.clone();
+            solver
+                .set_option("BALDESuseBidirectionalSearch", mode)
+                .unwrap();
+            let result = solver.price_phase(0, 20, false).unwrap();
+            assert_eq!(result.minimum_reduced_cost, -5.);
+            assert!(result.columns.iter().any(|r| r.arcs == [1, 2]));
+        }
+    }
+    #[test]
+    fn unequal_costly_raw_fronts_stay_conservative() {
+        // The cheaper front is pointwise lower now, but future translations
+        // and additions re-round its segment spans; no order is retained.
+        let charges = vec![
+            constant(1., 0., 2.),
+            constant(2., 0., 2.),
+            constant(0., 0., 2.),
+        ];
+        let (graph, low, high) = parallel_prefixes(charges, [0., 0.]);
+        let kernel = graph.coupled_kernel().unwrap();
+        assert_eq!(kernel.dominance_penalty(&low, &high, true), None);
+        assert_eq!(kernel.dominance_penalty(&high, &low, true), None);
+        // A future nonzero charge forbids the domain rule even for zero fronts.
+        let charges = vec![
+            constant(0., 0., 2.),
+            constant(0., 0., 1.),
+            constant(1., 0., 2.),
+        ];
+        let (graph, wide, narrow) = parallel_prefixes(charges, [0., 0.]);
+        let kernel = graph.coupled_kernel().unwrap();
+        assert_eq!(kernel.dominance_penalty(&wide, &narrow, true), None);
+    }
+    #[cfg(feature = "clp")]
+    #[test]
+    fn phase_i_raw_fronts_dominate_by_domain_coverage() {
+        let charges = vec![
+            constant(1., 0., 2.),
+            constant(2., 0., 1.),
+            constant(5., 0., 2.),
+        ];
+        let (graph, ..) = parallel_prefixes(charges, [0., 0.]);
+        let mut kernel = graph.coupled_kernel().unwrap().clone();
+        kernel.suppress_costs();
+        let root = kernel.root(true);
+        let mut prefix = |arc| {
+            let mut state = kernel.extend(&root, arc, true).unwrap().unwrap().0;
+            state.account_extension(&root, 0., 0.).unwrap();
+            state
+        };
+        let (wide, narrow) = (prefix(0), prefix(1));
+        assert_eq!(kernel.dominance_penalty(&wide, &narrow, true), Some(0.));
+        assert_eq!(kernel.dominance_penalty(&narrow, &wide, true), None);
     }
     trait Complete<T> {
         fn complete_for_test(self) -> T;

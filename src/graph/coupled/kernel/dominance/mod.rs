@@ -88,12 +88,6 @@ impl CoupledKernel {
         forward: bool,
         frozen_fronts: bool,
     ) -> Option<f64> {
-        // Raw slope-interval cost fronts have no established dominance
-        // certificate; retain every candidate. Paired slope relations compare
-        // their fronts below.
-        if !self.slope_indices.is_empty() {
-            return None;
-        }
         // Reject cheap direction/discrete/component mismatches before
         // traversing paired front pieces or validating retained suffix rows.
         if a.suffix.is_none() != forward
@@ -124,36 +118,43 @@ impl CoupledKernel {
                         &a.numeric, &b.numeric, a.numeric_cost, b.numeric_cost,
                     ))
         };
-        let tracked_order =
-            if !charged && self.front_indices.is_empty() && self.relation_indices.is_empty() {
-                false
-            } else {
-                match (a.accounting, b.accounting) {
-                    (Some(a_cost), Some(b_cost)) => {
-                        if a_cost.reduced > b_cost.reduced
-                            || a.numeric_cost > b.numeric_cost
-                            || !numeric_order()
-                            || a.fronts
-                                .iter()
-                                .zip(&b.fronts)
-                                .any(|(a, b)| a.minimum() > b.minimum())
-                        {
-                            return None;
-                        }
-                        true
+        let tracked_order = if !charged
+            && self.front_indices.is_empty()
+            && self.slope_indices.is_empty()
+            && self.relation_indices.is_empty()
+        {
+            false
+        } else {
+            match (a.accounting, b.accounting) {
+                (Some(a_cost), Some(b_cost)) => {
+                    if a_cost.reduced > b_cost.reduced
+                        || a.numeric_cost > b.numeric_cost
+                        || !numeric_order()
+                        || a.fronts
+                            .iter()
+                            .zip(&b.fronts)
+                            .any(|(a, b)| a.minimum() > b.minimum())
+                        || a.slope_fronts
+                            .iter()
+                            .zip(&b.slope_fronts)
+                            .any(|(a, b)| a.minimum > b.minimum)
+                    {
+                        return None;
                     }
-                    (None, None) => {
-                        // Public resource-only states carry no scalar history,
-                        // but their already accumulated numeric objective is
-                        // still part of the continuation component contract.
-                        if (charged && a.numeric_cost > b.numeric_cost) || !numeric_order() {
-                            return None;
-                        }
-                        false
-                    }
-                    _ => return None,
+                    true
                 }
-            };
+                (None, None) => {
+                    // Public resource-only states carry no scalar history,
+                    // but their already accumulated numeric objective is
+                    // still part of the continuation component contract.
+                    if (charged && a.numeric_cost > b.numeric_cost) || !numeric_order() {
+                        return None;
+                    }
+                    false
+                }
+                _ => return None,
+            }
+        };
         let frozen_fronts = frozen_fronts && tracked_order;
         if !forward
             && a.suffix.as_ref()?.program != b.suffix.as_ref()?.program
@@ -196,6 +197,20 @@ impl CoupledKernel {
             if !zero_charges || a.points().iter().chain(b.points()).any(|p| p[1] != 0.) {
                 return None;
             }
+        }
+        // Raw slope-interval fronts: bitwise-equal labels replay identical
+        // future operations; otherwise only the zero-valued domain rule
+        // applies. Backward labels hold no front and match by suffix program.
+        if a.slope_fronts.len() != b.slope_fronts.len()
+            || a.slope_fronts
+                .iter()
+                .zip(&b.slope_fronts)
+                .zip(&self.slope_dominance)
+                .any(|((a, b), prepared)| {
+                    a != b && !(forward && prepared.dominates(a, b, self.cost_scale))
+                })
+        {
+            return None;
         }
         // Paired checks are deliberately last among these necessary
         // preconditions: rejected scalar/discrete/program pairs need no walk

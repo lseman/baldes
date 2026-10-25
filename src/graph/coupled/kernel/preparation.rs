@@ -70,6 +70,10 @@ impl CoupledKernel {
                     .map(std::sync::Arc::<[slope_interval::PreparedSlopeCharge]>::from)
             })
             .collect::<Result<Vec<_>>>()?;
+        let slope_dominance = slope_indices
+            .iter()
+            .map(|&i| slope_interval::PreparedSlopeDominance::new(&definitions[i]))
+            .collect();
         let frozen = frozen::PreparedFrozen::new(g, definitions, &front_indices);
         let slope_paired = definitions
             .iter()
@@ -193,6 +197,7 @@ impl CoupledKernel {
             slope_indices,
             slope_roots,
             slope_charges,
+            slope_dominance,
             slope_paired,
             cost_resource: definitions.iter().any(|r| {
                 matches!(

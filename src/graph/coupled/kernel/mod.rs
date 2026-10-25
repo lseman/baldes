@@ -94,6 +94,7 @@ pub struct CoupledKernel {
     slope_indices: Vec<usize>,
     slope_roots: Vec<slope_interval::SlopeLabel>,
     slope_charges: Vec<std::sync::Arc<[slope_interval::PreparedSlopeCharge]>>,
+    slope_dominance: Vec<slope_interval::PreparedSlopeDominance>,
     slope_paired: Vec<slope_paired::PreparedSlopePaired>,
     relation_indices: Vec<usize>,
     paired: Vec<paired::PreparedPaired>,

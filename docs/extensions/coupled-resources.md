@@ -137,8 +137,15 @@ choices explicit.
 Each forward extension translates the coordinate, restricts the allowed domain,
 adds the charge front and scans its segment endpoints for a minimum. Backward
 labels retain ordered suffix replay for the final joined objective. Unproved
-operations produce an explicit incomplete result. Unsupported dominance,
-completion bounds, fixing and certificates remain conservative. The result is a
+operations produce an explicit incomplete result. Forward dominance accepts
+bitwise-equal fronts, ordered by the independent scalar prefix costs, and
+otherwise only identically zero fronts under the `strict_domain` policy when
+every charge is zero or costs are suppressed in phase I; such a front dominates
+when each of the other's components lies in one of its components. Unequal
+costly fronts never compare, because translation and addition re-round segment
+spans and can reverse a current pointwise order. Backward labels compare only
+with identical suffix programs. Completion bounds, fixing and certificates
+remain conservative. The result is a
 minimum of the computed front algebra, not a promise of a global minimum over
 every sequential binary64 evaluation of the source program. Compile checks pass;
 new runtime regressions remain deferred.
