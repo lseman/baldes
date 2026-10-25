@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/python.html">Python: pybaldes</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="mp.html" aria-current="page">Multi-pricing: one master, multiple pricing subproblems</a><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP and VRPTW extension</a><a href="evrp.html">EVRP implementation status</a><a href="robust.html">Robust vehicle routing</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a></div></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: PyBaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">PyBaldes documentation</a><a href="../pybaldes/installation.html">Install PyBaldes</a><a href="../pybaldes/quickstart.html">PyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/api.html">PyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">PyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="mp.html" aria-current="page">Multi-pricing: one master, multiple pricing subproblems</a><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="column-imports.html">Finite column imports</a><a href="pstep.html">P-step CVRP and VRPTW extension</a><a href="evrp.html">EVRP implementation status</a><a href="robust.html">Robust vehicle routing</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/mp.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -64,6 +64,88 @@ restricted master and aggregates each network's multiplicity contribution and
 stabilization subgradient. <code>Output.oracle_calls</code> counts individual oracle calls;
 <code>Output.master.pricing_calls</code> counts batches. <code>Output.values</code> gives the current
 restricted-master quantity for every route in <code>Output.routes</code>.</p>
+<h2 id="network-pricing-schedules">Network pricing schedules</h2>
+<p><code>Options.network_pricing_schedule</code> selects <code>NetworkPricingSchedule</code> in Rust.
+The JSON/Python option is <code>network_pricing_schedule</code>; the CLI flag is
+<code>--network-pricing-schedule</code>. All three accept these choices:</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Schedule</th>
+<th>Network visitation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>full-sweep</code> (default)</td>
+<td>Visit every enabled network in input order.</td>
+</tr>
+<tr>
+<td><code>cyclic</code></td>
+<td>Resume after the last visited network, wrap around, and return after a network generates a previously unregistered negative-reduced-cost route.</td>
+</tr>
+<tr>
+<td><code>sorted</code></td>
+<td>Visit unseen networks first, then ascending recent minimum reduced cost, breaking ties by input order. Return on the same new-route condition.</td>
+</tr>
+<tr>
+<td><code>native-promising-first</code></td>
+<td>Persistent primary/secondary queues following recovered strategy 2; normal solved networks enter the secondary queue.</td>
+</tr>
+<tr>
+<td><code>native-unvisited-first</code></td>
+<td>Persistent queues following recovered strategy 3; unvisited primary entries precede newly promising entries.</td>
+</tr>
+</tbody>
+</table></div>
+<p>For example, <code>problem.solve(network_pricing_schedule=&quot;cyclic&quot;)</code> in Python, or
+<code>baldes multi-pricing MODEL.json --network-pricing-schedule sorted</code>. The option
+also applies to snapshot solves and the nodes of an assignment tree.</p>
+<p>A partial batch returns columns without an aggregate bound correction or
+subgradient. It is never exact, even when each visited oracle used an exact
+phase. A traversal that finds no new negative route visits every enabled network;
+only a complete batch can supply a fresh global pricing estimate or establish
+pricing convergence. Cached scores affect visitation order only: minima and
+coverage are recomputed at the current dual point. Disabled networks are skipped.
+The cursor and scores reset on a new solve, a formulation fork or a phase change.
+An installed complete enumerated universe continues to use its full scan.
+Early return requires reduced cost below minus the configured CG tolerance;
+insignificant negative routes do not interrupt the scan.</p>
+<p>The sorted score is an explicit BALDES heuristic. The two native queue policies
+use <code>network_unpromising_limit</code> (CLI <code>--network-unpromising-limit</code>, default 1),
+which limits normal solved visits after a new improving column appears. Empty
+sweeps still visit all networks. Queue order persists across phase changes;
+forks and new solves reset it. Normal modern native pricing returns zero even
+when it generates columns; negative reduced cost does not imply the native
+positive-status promising classification. That positive branch is recovered
+statically but has no demonstrated normal-modern public reachability.
+Native strategy 1 is deliberately excluded: its pinned public control aborts
+with invalid-pointer corruption. These schedules change work distribution;
+speedups and identical native trajectories are not promised.</p>
+<h2 id="proximal-pricing">Proximal pricing</h2>
+<p><code>cg::Options.proximal</code> selects explicit <code>ProximalParameters</code> in Rust. One hard
+band gives box-step stabilization, one finite-penalty band gives a three-piece
+penalty, and two bands give five pieces. In JSON/Python:</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="n">result</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
+    <span class="n">proximal</span><span class="o">=</span><span class="p">{</span><span class="s2">"bands"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"half_width"</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s2">"penalty"</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">}]},</span>
+    <span class="n">network_pricing_schedule</span><span class="o">=</span><span class="s2">"native-promising-first"</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p><code>penalty: null</code> means a hard band. <code>multi_point: true</code> enables the private
+support-plane epigraph and requires a finite outer penalty. Use
+<code>max_points</code> (positive, default 1) to bound retained support planes; inactive
+unprotected planes age out after more than two zero-activity solves. CLI callers can use
+<code>--proximal-width 0.5 --proximal-penalty 1</code>, omit the penalty for a hard box, or
+pass a complete bands object with <code>--proximal FILE.json</code>. Proximal pricing
+replaces smoothing; <code>--no-stabilization</code> disables both.</p>
+<p>Auxiliary columns, support rows and beta variables belong to a private LP copy.
+Its objective cannot update the original bound or incumbent. An unsuccessful
+proximal pricing pass retries the original master duals before completing a
+phase. Node/phase/formulation changes reset the center. Backends that cannot
+clone the master, or unfinished private solves, fall back to original duals.
+The public curvature primitives accept explicit state and measured row feedback;
+native automatic radius initialization, inherited row classifications and exact
+multi-point plane-aging trajectories are not inferred from ordinary master rows.</p>
 <p>Phase estimates guide stabilization. Published lower bounds additionally use
 graph-walk relaxations with downward arithmetic. If a negative cycle prevents
 a resource-free bound, nonnegative scalar consumption and bounded resource
@@ -123,13 +205,23 @@ Scalar resource capacity is a const generic, defaulting to two; see
 <a href="../reference/resources.html">scalar resources</a>.</p>
 <h2 id="assignment-tree">Assignment tree</h2>
 <p><code>solve_assignment_tree(problem, AssignmentTreeOptions)</code> runs a best-bound tree
-using network-aware snapshots. It tries assignment rows, declared integer master
-variables, total network multiplicities, then original physical-arc activities. It returns network-tagged
+using network-aware snapshots. It tries proved shared resource-group splits,
+assignment rows, declared integer master variables, total network multiplicities,
+original physical-arc activities, then synchronized-service splits. It returns network-tagged
 integer route quantities, an incumbent, selected bound mode, frontier bound and
 node/work-limit status. Integer witnesses replay original graph resources,
 shared rows and original multiplicities with exact sums; objectives round upward.
 Fixed routes are included in this replay. A rounded labeling resource profile
 alone never authorizes an incumbent or fixed route.</p>
+<p><code>AssignmentTreeOptions::branching</code> selects the family and child order.
+<code>NetworkBranchingPolicy::ResourceFirst</code> preserves the order above, with lower
+children first. <code>MultiplicityFirst</code> tries fractional network route counts first
+and visits upper children first, following the observed public native controls.
+It does not change disjunctions or proof bounds, and does not promise the same
+LP basis, generated columns or total node count as another backend. Select it
+with <code>--network-branching multiplicity-first</code>, JSON solve option
+<code>&quot;network_branching&quot;: &quot;multiplicity-first&quot;</code>, or Python
+<code>solve_networks(..., tree=True, network_branching=&quot;multiplicity-first&quot;)</code>.</p>
 <p>Rust callers can run <code>snapshot.solve_assignment_tree(options)</code> after installing
 shared nonlinear rows, fixing routes or restricting master variables. It forks
 the snapshot and retains cuts, bounds, fixed contributions and complete route
@@ -386,6 +478,7 @@ quantities separately. Unknown/nonfinite bounds and absent objectives are JSON
 an independently replayed integer witness when available. Their <code>mode</code> and
 <code>bound_mode</code> fields preserve that distinction.</p>
 <h2 id="python">Python</h2>
+<p>The dedicated <a href="../pybaldes/networks.html">PyBaldes network guide</a> covers Python model construction, solve options, snapshots, and synchronization. The sections here specify the shared Rust/CLI/Python model contract.</p>
 <p>Install the extension with Clp support (the Python build's default). The typed
 inputs use the same JSON schema as the CLI, allowing a single model to drive
 both interfaces:</p>
@@ -466,6 +559,20 @@ networks and proof preparation. Missing original-domain bounds, unsupported
 resource replay and exhausted budgets return an error; the source snapshot
 remains usable. This API currently requires a snapshot that has not already
 installed a full enumerated universe.</p>
+<p>Coupled objective costs are included in proof preparation. A bounded complete
+scalar-path superset can provide a directed route-wide resource-cost lower
+bound, which joins the cutoff's once-per-route constant. This preserves routes
+whose large scalar cost is offset by a negative resource charge. Full-universe
+column bounds likewise use certified resource-cost lower endpoints. Path and
+certificate work share the attempt's budget and deadline; unavailable replay
+or incomplete coverage leaves the proof unknown. The original integer-route
+domain is physically vertex-simple, and this fallback does not certify arbitrary
+repeated-walk objective programs. It can be too expensive for large networks.</p>
+<p>PWL paired resources and strict-domain slope pairs have independent directed
+feasibility witnesses. A cost enclosure can remain non-singleton; finite-MIP
+proof outcomes still require exact objective encoding. Native-front-algebra
+paired operations, standalone raw slope-interval fronts and plugins retain
+their explicit unsupported-proof behavior.</p>
 <p>With <code>highs</code>, call <code>view.solve_mip(&amp;MipOptions::default())</code> on that view. Its
 <code>ObjectiveCutoff</code> outcome means no integer solution improves the effective
 cutoff; it does not mean the original model is infeasible. Time/node limits remain explicit. A cutoff supplied by the caller
@@ -645,9 +752,9 @@ charges one reward per request, and independently checks returned schedules:</p>
 </code></pre></div>
 <p>Both vehicles start service at time 5; the minimization objective is -1.</p>
 </article>
-<nav class="page-turn" aria-label="Adjacent guides"><a href="../guides/python.html"><small>Previous guide</small>Python: pybaldes <span aria-hidden="true">↗</span></a><a href="../guides/build.html"><small>Next guide</small>Configuring and building BALDES <span aria-hidden="true">↗</span></a></nav>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="../pybaldes/index.html"><small>Previous guide</small>PyBaldes documentation <span aria-hidden="true">↗</span></a><a href="../guides/build.html"><small>Next guide</small>Configuring and building BALDES <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#node-lifecycle">Node lifecycle</a><a class="toc-level-2" href="#assignment-tree">Assignment tree</a><a class="toc-level-2" href="#finite-column-imports">Finite column imports</a><a class="toc-level-2" href="#independent-master-variables">Independent master variables</a><a class="toc-level-2" href="#original-activities-multiplicities-and-nonlinear-rows">Original activities, multiplicities and nonlinear rows</a><a class="toc-level-2" href="#limitations">Limitations</a><a class="toc-level-2" href="#cli">CLI</a><a class="toc-level-2" href="#python">Python</a><a class="toc-level-2" href="#complete-enumeration-and-integer-transfer">Complete enumeration and integer transfer</a><a class="toc-level-2" href="#grouped-accumulated-resource-branches">Grouped accumulated-resource branches</a><a class="toc-level-2" href="#synchronized-service-across-vehicles">Synchronized service across vehicles</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#network-pricing-schedules">Network pricing schedules</a><a class="toc-level-2" href="#proximal-pricing">Proximal pricing</a><a class="toc-level-2" href="#node-lifecycle">Node lifecycle</a><a class="toc-level-2" href="#assignment-tree">Assignment tree</a><a class="toc-level-2" href="#finite-column-imports">Finite column imports</a><a class="toc-level-2" href="#independent-master-variables">Independent master variables</a><a class="toc-level-2" href="#original-activities-multiplicities-and-nonlinear-rows">Original activities, multiplicities and nonlinear rows</a><a class="toc-level-2" href="#limitations">Limitations</a><a class="toc-level-2" href="#cli">CLI</a><a class="toc-level-2" href="#python">Python</a><a class="toc-level-2" href="#complete-enumeration-and-integer-transfer">Complete enumeration and integer transfer</a><a class="toc-level-2" href="#grouped-accumulated-resource-branches">Grouped accumulated-resource branches</a><a class="toc-level-2" href="#synchronized-service-across-vehicles">Synchronized service across vehicles</a></nav></aside>
 </div>
 </body></html>

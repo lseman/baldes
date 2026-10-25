@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="first-solve.html">Your first solve</a><a href="cli.html">Command-line usage</a><a href="python.html">Python: pybaldes</a><a href="build.html" aria-current="page">Configuring and building BALDES</a><a href="source-layout.html">Source layout</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a></div></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="first-solve.html">Your first solve</a><a href="cli.html">Command-line usage</a><a href="build.html" aria-current="page">Configuring and building BALDES</a><a href="source-layout.html">Source layout</a><a href="concepts.html">Solver concepts and interface choices</a><a href="documentation.html">Maintaining the documentation</a><a href="python.html">Python: PyBaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">PyBaldes documentation</a><a href="../pybaldes/installation.html">Install PyBaldes</a><a href="../pybaldes/quickstart.html">PyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/api.html">PyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">PyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/guides/build.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -50,7 +50,7 @@ HiGHS backend and generic MIP API. See below for library discovery details.</p>
 <code>--features clp,multi-time-windows</code> for network JSON and the CLI. See
 <a href="../extensions/multi-time-windows.html">multiple time windows</a> for the Rust,
 Python and JSON APIs.</p>
-<p>Python installation is covered in the <a href="python.html">pybaldes guide</a>.</p>
+<p>Python installation is covered in the <a href="../pybaldes/installation.html">PyBaldes installation guide</a>.</p>
 <h3 id="rank-one-node-memory">Rank-one node memory</h3>
 <p>Use <code>cargo build --release --features clp,rank-one-node-memory</code> to generate
 rank-one cuts with node memory instead of arc memory. In <code>make config</code>, select
@@ -66,6 +66,19 @@ cut coefficients and LP bounds can therefore differ. Master coefficients and
 pricing use the selected cut representation consistently.</p>
 <p>Python builds expose the same feature, for example
 <code>maturin develop --features rank-one-node-memory</code>.</p>
+<h3 id="ng-memory-size">NG memory size</h3>
+<p>Each vertex remembers at most 15 ng elements by default. Build with
+<code>--features ng-memory-31</code> or <code>--features ng-memory-63</code> to raise the limit to 31
+or 63; when both are enabled, 63 applies. In <code>make config</code>, cycle
+<strong>NG memory → 15 / 31 / 63</strong>, or set <code>CONFIG_NG_MEMORY=31</code> (or <code>63</code>) in the
+saved configuration.</p>
+<p>The limit applies after arc memory is merged into each vertex. Graphs that
+exceed it fail during preparation with <code>native NG local memory exceeds N elements</code>. Wider memory stores a 32- or 64-bit ng word in every label instead of
+16 bits, so labeling uses more memory and bandwidth; keep the default unless the
+neighborhoods need it. Rust code can read the compiled limit from
+<code>baldes::graph::ng::NG_MEMORY_CAPACITY</code>, and Python from
+<code>pybaldes.ng_memory_capacity</code> (for example after
+<code>maturin develop --features ng-memory-31</code>).</p>
 <h2 id="gurobi-master-backend">Gurobi master backend</h2>
 <p>Download and extract the latest stable Linux release into the repository's
 ignored <code>external/</code> directory:</p>
@@ -342,8 +355,9 @@ accumulation for at least 16 words, independently of the resource dimension.
 This feature does not require <code>target-cpu=native</code> and does not change numerical
 comparison tolerances or certification policy.</p>
 <p>For eight-label AVX-512F dominance scans, use
-<code>cargo build --release --features clp,simd-avx512</code> (or pass the same features
-to maturin). This feature includes <code>simd</code> and requires Rust 1.89 or newer;
+<code>cargo build --release --features clp,simd-avx512</code>. The Python crate currently
+forwards <code>simd</code>, but does not declare <code>simd-avx512</code>. This feature includes <code>simd</code>
+and requires Rust 1.89 or newer;
 the default and AVX2-only builds retain the package's existing Rust requirement.
 Runtime dispatch prefers AVX-512F on supported x86-64 CPUs, then AVX2, then
 the portable implementation. No global CPU flags are required. The AVX-512
@@ -354,6 +368,6 @@ See <a href="../reference/simd.html">SIMD dispatch</a> for dispatch behavior and
 <nav class="page-turn" aria-label="Adjacent guides"><a href="../extensions/mp.html"><small>Previous guide</small>Multi-pricing: one master, multiple pricing subproblems <span aria-hidden="true">↗</span></a><a href="source-layout.html"><small>Next guide</small>Source layout <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#direct-cargo-builds">Direct Cargo builds</a><a class="toc-level-3" href="#rank-one-node-memory">Rank-one node memory</a><a class="toc-level-2" href="#gurobi-master-backend">Gurobi master backend</a><a class="toc-level-2" href="#interactive-configuration">Interactive configuration</a><a class="toc-level-2" href="#build-options">Build options</a><a class="toc-level-2" href="#saved-settings-and-automation">Saved settings and automation</a><a class="toc-level-2" href="#other-make-targets">Other Make targets</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#direct-cargo-builds">Direct Cargo builds</a><a class="toc-level-3" href="#rank-one-node-memory">Rank-one node memory</a><a class="toc-level-3" href="#ng-memory-size">NG memory size</a><a class="toc-level-2" href="#gurobi-master-backend">Gurobi master backend</a><a class="toc-level-2" href="#interactive-configuration">Interactive configuration</a><a class="toc-level-2" href="#build-options">Build options</a><a class="toc-level-2" href="#saved-settings-and-automation">Saved settings and automation</a><a class="toc-level-2" href="#other-make-targets">Other Make targets</a></nav></aside>
 </div>
 </body></html>

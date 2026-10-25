@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Coupled resources and function encodings PyBaldes documentation · Pricing Scalar coordinates cover additive consumption and vertex bounds. ResourceModeladds physical-graph resource">
+<meta name="theme-color" content="#0b0e11">
+<title>Coupled resources and function encodings — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/pybaldes/resources.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: PyBaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="index.html">PyBaldes documentation</a><a href="installation.html">Install PyBaldes</a><a href="quickstart.html">PyBaldes quickstart</a><a href="routing.html">Routing inputs and options</a><a href="results.html">Results, bounds, and exactness</a><a href="pricing.html">Stateful pricing with Solver</a><a href="resources.html" aria-current="page">Coupled resources and function encodings</a><a href="networks.html">Shared-master network models</a><a href="api.html">PyBaldes API reference</a><a href="troubleshooting.html">PyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/pybaldes/resources.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> PyBaldes · Python</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="coupled-resources-and-function-encodings">Coupled resources and function encodings</h1>
+<p><a href="index.html">PyBaldes documentation</a> · <a href="pricing.html">Pricing</a></p>
+<p>Scalar coordinates cover additive consumption and vertex bounds. <code>ResourceModel</code>
+adds physical-graph resource families with selection domains, simultaneous
+pickup/delivery, numeric dependencies, and state-dependent objective terms.
+It attaches definitions to the same solver; it does not expand your vertex IDs.</p>
+<h2 id="declare-and-install">Declare and install</h2>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResourceModel</span><span class="p">,</span> <span class="n">Solver</span>
+
+<span class="n">solver</span> <span class="o">=</span> <span class="n">Solver</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">new_arc</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mf">20.0</span><span class="p">)</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">new_arc</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="mf">20.0</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ResourceModel</span><span class="p">()</span>
+<span class="n">parent</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">add_custom_resource</span><span class="p">(</span>
+    <span class="n">increments</span><span class="o">=</span><span class="p">[</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">],</span> <span class="n">weights</span><span class="o">=</span><span class="p">[</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">],</span>
+    <span class="n">forward_bound</span><span class="o">=</span><span class="mf">7.0</span><span class="p">,</span> <span class="n">backward_bound</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">add_piecewise_linear_cost</span><span class="p">(</span>
+    <span class="n">parent</span><span class="p">,</span> <span class="n">functions</span><span class="o">=</span><span class="p">[[(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">10.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">)]]</span> <span class="o">*</span> <span class="mi">2</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="n">solver</span><span class="p">)</span>
+<span class="n">minimum</span><span class="p">,</span> <span class="n">routes</span><span class="p">,</span> <span class="n">exact</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">price_with_status</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">exact</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">exact</span> <span class="ow">and</span> <span class="n">minimum</span> <span class="o">==</span> <span class="o">-</span><span class="mf">17.0</span>
+<span class="k">assert</span> <span class="n">routes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">original_cost</span> <span class="o">==</span> <span class="o">-</span><span class="mf">17.0</span>
+</code></pre></div>
+<p>Each increment/weight/function vector has one entry per physical arc in insertion
+order. A returned resource ID refers to this declaration list. Dependent
+resources reference an earlier compatible numeric parent, not a scalar ID from
+<code>Solver.new_resource</code>. Keep IDs returned by methods instead of hard-coding them.
+Install after graph construction. Reinstall after topology/arc-order changes.
+Installation invalidates prepared labels, fixing, and enumeration state.</p>
+<p>In this example the custom state moves from 0 to 2 to 3. Its own objective charge
+is <code>2*3 + 3*4 = 18</code>; the dependent piecewise charges add <code>2 + 3 = 5</code>.
+Adding those to base arc cost -40 gives -17. Coupled charges appear in
+<code>Route.original_cost</code> as well as its priced objective.</p>
+<h2 id="resourcemodel-methods">ResourceModel methods</h2>
+<p>The <a href="api.html#resourcemodel-signatures">API reference</a> lists exact signatures.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Inputs and meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_selection</code></td>
+<td><code>initial</code>, per-arc <code>allowed</code> bitmasks, optional <code>vertices</code>, <code>relaxed=False</code>; intersect selected-value domains</td>
+</tr>
+<tr>
+<td><code>add_simultaneous_pickup_delivery</code></td>
+<td><code>capacity</code>, per-arc <code>deliveries</code>, <code>pickups</code>, <code>tolerance=1e-6</code>; enforce physical route load</td>
+</tr>
+<tr>
+<td><code>add_cumulative_cost</code></td>
+<td><code>initial</code>, per-arc <code>increments</code>, <code>weights</code>, optional <code>sink_upper</code> and <code>source_upper</code>; accumulate state-dependent cost</td>
+</tr>
+<tr>
+<td><code>add_custom_resource</code></td>
+<td>Per-arc <code>increments</code>, <code>weights</code>, optional <code>forward_bound</code>, <code>backward_bound</code>; zero-initial numeric state with directional cost bounds</td>
+</tr>
+<tr>
+<td><code>add_dependent</code></td>
+<td>Earlier <code>parent</code>, <code>initial</code>, <code>lower</code>, <code>upper</code>, per-arc <code>offsets</code> and <code>factors</code>; affine dependency</td>
+</tr>
+<tr>
+<td><code>add_piecewise_linear_resource</code></td>
+<td><code>initial</code>, <code>lower</code>, <code>upper</code>, per-arc knot <code>functions</code>; direct state transitions</td>
+</tr>
+<tr>
+<td><code>add_piecewise_linear_cost</code></td>
+<td>Earlier <code>parent</code> and per-arc knot functions; objective charges evaluated on parent state</td>
+</tr>
+<tr>
+<td><code>add_piecewise_linear_dependent</code></td>
+<td>Earlier <code>parent</code>, own initial/bounds, per-arc knot functions; dependent numeric transitions</td>
+</tr>
+<tr>
+<td><code>add_encoded_piecewise_linear_resource</code></td>
+<td>Direct transitions using <code>EncodedFunction</code> objects</td>
+</tr>
+<tr>
+<td><code>add_encoded_piecewise_linear_cost</code></td>
+<td>Parent-state charges using encoded functions</td>
+</tr>
+<tr>
+<td><code>add_encoded_piecewise_linear_dependent</code></td>
+<td>Numeric dependency using encoded functions</td>
+</tr>
+<tr>
+<td><code>add_interval_cost</code></td>
+<td>Initial interval, global bounds, per-arc increments and knot functions; preserve a shared continuous initial choice</td>
+</tr>
+<tr>
+<td><code>add_slope_interval_cost</code></td>
+<td>Interval cost with explicit slope encodings and front policy</td>
+</tr>
+<tr>
+<td><code>add_paired_piecewise_linear</code></td>
+<td>Initial interval/front, per-arc arrival/increment/lower/upper functions, integer waiting rates, and mode</td>
+</tr>
+<tr>
+<td><code>add_slope_paired</code></td>
+<td>Paired relation with encoded slope functions, front policy, and cost normalization</td>
+</tr>
+<tr>
+<td><code>install</code></td>
+<td>Validate and attach the declaration list to a <code>Solver</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Selection masks encode allowed values as bits, rather than a list of scalar
+values. Simultaneous pickup/delivery checks the combined physical load along the
+route; independent total delivery and pickup bounds do not capture that contract.
+Numeric transition equations, directional bounds, and feasibility tolerances are
+specified in the <a href="../extensions/coupled-resources.html">coupled-resource model guide</a>.</p>
+<h2 id="knot-and-slope-encodings">Knot and slope encodings</h2>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">EncodedFunction</span>
+
+<span class="n">knots</span> <span class="o">=</span> <span class="n">EncodedFunction</span><span class="o">.</span><span class="n">knots</span><span class="p">([(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">4.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">)])</span>
+<span class="n">slope</span> <span class="o">=</span> <span class="n">EncodedFunction</span><span class="o">.</span><span class="n">slope_segments</span><span class="p">([(</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">)])</span>
+<span class="n">affine</span> <span class="o">=</span> <span class="n">EncodedFunction</span><span class="o">.</span><span class="n">affine</span><span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">knots</span><span class="o">.</span><span class="n">value</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span> <span class="o">==</span> <span class="n">slope</span><span class="o">.</span><span class="n">value</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span> <span class="o">==</span> <span class="n">affine</span><span class="o">.</span><span class="n">value</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span> <span class="o">==</span> <span class="mf">8.0</span>
+<span class="k">assert</span> <span class="n">knots</span><span class="o">.</span><span class="n">value</span><span class="p">(</span><span class="mf">5.0</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span>
+<span class="n">restored</span> <span class="o">=</span> <span class="n">EncodedFunction</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">slope</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
+<span class="k">assert</span> <span class="n">restored</span><span class="o">.</span><span class="n">value</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)</span> <span class="o">==</span> <span class="mf">8.0</span>
+</code></pre></div>
+<p>Knot pairs are <code>(argument, value)</code>. Slope encoding instead begins with
+<code>(initial_value, initial_coordinate)</code>; each later pair is
+<code>(segment_slope, ending_coordinate)</code>. They are different representations with
+different evaluation order. Do not pass knot pairs to <code>slope_segments</code>.
+<code>affine(intercept, slope, lower, upper)</code> prepares an anchored slope representation.</p>
+<p><code>.encoding</code> and <code>.policy</code> identify the stored encoding and evaluation policy.
+<code>.value(argument)</code> returns <code>None</code> outside the accepted domain; invalid arithmetic
+raises <code>ValueError</code>. <code>to_dict()</code>/<code>from_dict()</code> retain explicit wire encoding.
+Use them when inserting encoded functions into network JSON descriptors.</p>
+<p>Knot functions use strict closed domains. Slope functions accept evaluation
+policy <code>&quot;strict_domain&quot;</code> (default) or <code>&quot;native_tolerance&quot;</code>. Slope interval/paired
+resources separately choose front policy <code>&quot;strict_domain&quot;</code> or
+<code>&quot;native_front_algebra&quot;</code>. Strict fronts require strict slope functions;
+native-front-algebra fronts require native-tolerance slope functions. Knot
+functions cannot be substituted where lossless slope encodings are required.</p>
+<p>Paired modes are <code>&quot;feasibility&quot;</code>, <code>&quot;cost_bounded&quot;</code>, and <code>&quot;cost_unbounded&quot;</code>.
+Slope-paired normalization defaults to <code>&quot;absolute_final_value&quot;</code>; the alternative
+is <code>&quot;final_minus_initial_minimum&quot;</code>. These choices affect objective meaning and
+arithmetic; do not change them to bypass a domain error. A successful numerical
+front operation does not automatically provide an independent bound certificate.</p>
+<h2 id="disjoint-time-windows">Disjoint time windows</h2>
+<p>Requires a build with <code>multi-time-windows</code>:</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Solver</span>
+
+<span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">Solver</span><span class="p">,</span> <span class="s2">"set_vertex_time_windows"</span><span class="p">):</span>
+    <span class="n">solver</span> <span class="o">=</span> <span class="n">Solver</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">vertex</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+        <span class="n">solver</span><span class="o">.</span><span class="n">set_vertex_bounds</span><span class="p">(</span><span class="n">vertex</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">)</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">new_arc</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.0</span><span class="p">)</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">new_arc</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">)</span>
+    <span class="n">solver</span><span class="o">.</span><span class="n">set_arc_consumption</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">)</span>
+    <span class="n">solver</span><span class="o">.</span><span class="n">set_arc_consumption</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">)</span>
+    <span class="n">solver</span><span class="o">.</span><span class="n">set_vertex_time_windows</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">[(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">8.0</span><span class="p">,</span> <span class="mf">12.0</span><span class="p">)])</span>
+    <span class="n">minimum</span><span class="p">,</span> <span class="n">routes</span><span class="p">,</span> <span class="n">exact</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">price_with_status</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">exact</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">routes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">resource_consumption</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="mf">10.0</span>
+</code></pre></div>
+<p>Arrival at 4 waits until 8; the final state is 10. Ordinary vertex bounds
+intersect the window union. Bounds <code>[3, 7]</code> at the middle vertex would make that
+visit infeasible; the gap is not filled by the windows' convex hull. Supply
+nonempty finite closed intervals on disposable resources.</p>
+<p>For declarative networks use <code>PricingResource(time_windows=...)</code>, with one
+entry per vertex; <code>None</code> uses ordinary bounds for that vertex. See
+<a href="../extensions/multi-time-windows.html">multiple time windows</a> for validation rules.</p>
+<h2 id="declarative-network-resources">Declarative network resources</h2>
+<p><code>PricingNetwork(coupled_resources=(descriptor, ...))</code> accepts JSON-style mappings
+with a <code>kind</code> tag. It is separate from <code>ResourceModel.install(solver)</code>, which
+operates on a low-level solver. Per-arc vectors and parent declaration indices
+retain the same ordering requirements. Use the descriptor schema in the
+<a href="../extensions/coupled-resources.html#python">coupled-resource guide</a>, including
+explicit bounds objects and function encodings. Routing text readers do not
+infer coupled resource definitions.</p>
+<p>Unsupported certificate operators or exhausted work can leave bounds unknown.
+Resource replay, pricing exactness, integer witness validation, and independent
+bound certificates are separate operations; inspect the corresponding result.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="pricing.html"><small>Previous guide</small>Stateful pricing with Solver <span aria-hidden="true">↗</span></a><a href="networks.html"><small>Next guide</small>Shared-master network models <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#declare-and-install">Declare and install</a><a class="toc-level-2" href="#resourcemodel-methods">ResourceModel methods</a><a class="toc-level-2" href="#knot-and-slope-encodings">Knot and slope encodings</a><a class="toc-level-2" href="#disjoint-time-windows">Disjoint time windows</a><a class="toc-level-2" href="#declarative-network-resources">Declarative network resources</a></nav></aside>
+</div>
+</body></html>

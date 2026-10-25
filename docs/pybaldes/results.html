@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Results, bounds, and exactness PyBaldes documentation · Routing · Networks Identify the quantity before using it For a minimization model, an independently justified lower bound L ">
+<meta name="theme-color" content="#0b0e11">
+<title>Results, bounds, and exactness — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/pybaldes/results.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: PyBaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="index.html">PyBaldes documentation</a><a href="installation.html">Install PyBaldes</a><a href="quickstart.html">PyBaldes quickstart</a><a href="routing.html">Routing inputs and options</a><a href="results.html" aria-current="page">Results, bounds, and exactness</a><a href="pricing.html">Stateful pricing with Solver</a><a href="resources.html">Coupled resources and function encodings</a><a href="networks.html">Shared-master network models</a><a href="api.html">PyBaldes API reference</a><a href="troubleshooting.html">PyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/pybaldes/results.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> PyBaldes · Python</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="results-bounds-and-exactness">Results, bounds, and exactness</h1>
+<p><a href="index.html">PyBaldes documentation</a> · <a href="routing.html">Routing</a> · <a href="networks.html">Networks</a></p>
+<h2 id="identify-the-quantity-before-using-it">Identify the quantity before using it</h2>
+<p>For a minimization model, an independently justified lower bound L and a valid
+integer incumbent U imply <code>L &lt;= optimum &lt;= U</code>. An LP column vector may be
+fractional. Its objective is not automatically an integer incumbent, and a
+restricted-master LP objective is not automatically a bound on all possible
+columns before pricing has justified it.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lp</code></td>
+<td>Current reported master LP objective; check status and pricing completion</td>
+</tr>
+<tr>
+<td><code>bound</code></td>
+<td>Selected lower bound under <code>bound_mode</code></td>
+</tr>
+<tr>
+<td><code>numerical_bound</code></td>
+<td>Floating-point pricing estimate under solver tolerances</td>
+</tr>
+<tr>
+<td><code>certified_bound</code></td>
+<td>Independently validated bound, when available</td>
+</tr>
+<tr>
+<td><code>incumbent</code></td>
+<td>Best reported integer objective, when one is known</td>
+</tr>
+<tr>
+<td>Low-level pricing <code>minimum</code></td>
+<td>Reduced-cost minimum; use as a pricing bound only with returned <code>exact=True</code></td>
+</tr>
+<tr>
+<td>Low-level <code>Route.is_certified</code></td>
+<td>Pricing-phase exactness marker; not an independent master certificate</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>bound_mode=&quot;numerical&quot;</code> selects the numerical bound and normally skips the
+independent certificate search. <code>bound_mode=&quot;certified&quot;</code> requests independent
+original-domain validation when pricing or the incumbent gap can close. An
+unsupported operator, exhausted work budget, or unknown arithmetic can leave
+the certificate unknown even when the numerical estimate is finite.</p>
+<p>For root results an unknown certificate is <code>-math.inf</code> in Python and <code>null</code> in
+JSON. Network result unknown quantities are <code>None</code>, serialized as <code>null</code>.
+Do not replace an unknown bound with <code>lp</code>, zero, or the incumbent.</p>
+<h2 id="status-and-solve-mode">Status and solve mode</h2>
+<p><code>solve_root</code> returns a routing root relaxation. <code>Optimal</code> means the root LP
+converged. <code>NetworkResult.mode</code> distinguishes root, tree, and enumerated-MIP
+workflows. In a tree, <code>Optimal</code> describes integer gap closure under the selected
+bound policy and tolerances. Read <code>bound_mode</code> alongside status.</p>
+<p>A time, iteration, or node limit can leave a useful incumbent without proving
+optimality. A network tree can report <code>Incomplete</code> when its available branching
+families cannot resolve the remaining fractionality. Infeasibility conclusions
+must come from the solver's relevant feasibility/proof status, not an empty
+route list. The <a href="../solver/feasibility.html">feasibility guide</a> explains phase I.</p>
+<h2 id="rootresult-reference">RootResult reference</h2>
+<p>The frozen result objects contain tuple-valued collections.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Fields</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>status</code>, <code>bound_mode</code></td>
+<td>Termination and selected bound guarantee</td>
+</tr>
+<tr>
+<td><code>lp</code>, <code>bound</code>, <code>numerical_bound</code>, <code>certified_bound</code></td>
+<td>Objective and lower-bound quantities above</td>
+</tr>
+<tr>
+<td><code>lp_before_cuts</code></td>
+<td>LP objective before cut strengthening</td>
+</tr>
+<tr>
+<td><code>incumbent</code>, <code>pruned_by_bound</code></td>
+<td>Integer upper bound and bound-pruning outcome</td>
+</tr>
+<tr>
+<td><code>cuts</code>, <code>cut_rounds</code></td>
+<td>Generated rows and separation rounds; counts include retired rows</td>
+</tr>
+<tr>
+<td><code>iterations</code>, <code>pricing_calls</code></td>
+<td>Column-generation work counters</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td>Route columns added over the run</td>
+</tr>
+<tr>
+<td><code>master_columns</code></td>
+<td>Final master size, including artificial columns</td>
+</tr>
+<tr>
+<td><code>fixing_calls</code>, <code>enumerated_routes</code></td>
+<td>Fixing/enumeration counters</td>
+</tr>
+<tr>
+<td><code>duals</code></td>
+<td>Exported master dual vector</td>
+</tr>
+<tr>
+<td><code>seconds</code>, <code>pricing_seconds</code>, <code>solver_seconds</code></td>
+<td>Reported elapsed/component timers</td>
+</tr>
+<tr>
+<td><code>simplex_iterations</code>, <code>ipm_iterations</code></td>
+<td>LP backend iteration totals</td>
+</tr>
+<tr>
+<td><code>routes</code></td>
+<td>Positive LP <code>RootRoute</code> columns</td>
+</tr>
+<tr>
+<td><code>history</code></td>
+<td><code>Iteration</code> records</td>
+</tr>
+<tr>
+<td><code>feasibility</code></td>
+<td>Auxiliary <code>FeasibilityReport</code> records</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>RootRoute(value, cost, nodes, arcs)</code> contains the column weight, original route
+cost, node sequence, and arc sequence. For N routing customers, the source is
+0 and the separate terminal depot is N+1; internal customer IDs are 1 through N.
+The node sequence may repeat under NG relaxation. RootRoute uses <code>.nodes</code> and
+<code>.arcs</code> attributes; low-level Route uses <code>.nodes()</code> and <code>.arcs()</code> methods.</p>
+<p><code>Iteration</code> fields are <code>iteration</code>, <code>lp</code>, <code>minimum_reduced_cost</code>, <code>new_columns</code>,
+<code>columns</code>, <code>exact</code>, <code>phase</code>, <code>pricing_calls</code>, <code>alpha</code>, and <code>misprices</code>.
+They expose the per-iteration objective, pricing output, phase exactness, and
+stabilization diagnostics. Do not infer a global certificate from <code>exact</code>.</p>
+<p><code>FeasibilityReport</code> fields are <code>status</code>, <code>iterations</code>, <code>pricing_calls</code>,
+<code>simplex_iterations</code>, <code>ipm_iterations</code>, <code>seconds</code>, <code>artificial_activity</code>,
+<code>lower_bound</code>, and <code>certified_infeasible</code>. Its bounds belong to the auxiliary
+phase-I objective, not the original routing objective.</p>
+<h2 id="networkresult-reference">NetworkResult reference</h2>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Fields</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mode</code>, <code>status</code>, <code>bound_mode</code></td>
+<td>Solve workflow, termination, and bound policy</td>
+</tr>
+<tr>
+<td><code>lp</code>, <code>bound</code>, <code>numerical_bound</code>, <code>certified_bound</code>, <code>incumbent</code></td>
+<td>Optional objective/bound quantities</td>
+</tr>
+<tr>
+<td><code>routes</code>, <code>fixed_routes</code></td>
+<td>Active route solution and separately retained fixed contributions</td>
+</tr>
+<tr>
+<td><code>duals</code></td>
+<td>Shared-master dual values</td>
+</tr>
+<tr>
+<td><code>iterations</code>, <code>pricing_calls</code>, <code>oracle_calls</code></td>
+<td>Total work and <code>(network ID, calls)</code> pairs</td>
+</tr>
+<tr>
+<td><code>nodes</code>, <code>open_nodes</code></td>
+<td>Tree evaluation and remaining-node counts</td>
+</tr>
+<tr>
+<td><code>seconds</code></td>
+<td>Reported elapsed time</td>
+</tr>
+<tr>
+<td><code>enumeration_reports</code></td>
+<td>Per-attempt route coverage reports</td>
+</tr>
+<tr>
+<td><code>enumerated_mip_calls</code>, <code>enumerated_mip_nodes</code>, <code>enumerated_mip_failures</code></td>
+<td>Integer transfer work</td>
+</tr>
+<tr>
+<td><code>snapshot</code></td>
+<td>Thread-bound resumable node for root results; otherwise may be <code>None</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>NetworkRoute</code> fields are <code>network</code>, <code>route_index</code>, <code>value</code>, <code>cost</code>, <code>nodes</code>,
+<code>arcs</code>, <code>resources</code>, and <code>resource_profile</code>. Network and arc IDs are local to the
+model's declared network; <code>route_index</code> is a snapshot route handle, not an arc
+or a position in the returned positive-route list. It can be absent.
+<code>resources</code> gives final scalar values; <code>resource_profile</code> records states along
+the route. Include <code>fixed_routes</code> when interpreting child-node contributions.
+Synchronization rewards can be master contributions outside the route costs.</p>
+<p><code>NetworkEnumerationReport</code> fields are <code>attempts</code>, <code>complete</code>, <code>networks</code>,
+<code>routes</code>, <code>transferred</code>, <code>failure</code>, and <code>coverage_cutoff</code>. A route limit is a
+budget, not evidence of complete enumeration. A finite <code>coverage_cutoff</code>
+restricts the covered improvement domain; consult it before interpreting a MIP
+result as a proof. See <a href="networks.html#enumeration-and-integer-transfer">network enumeration</a>.</p>
+<h2 id="serialization">Serialization</h2>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="c1"># With a RootResult named result:</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>  <span class="c1"># ordinary dataclass data; may retain infinities</span>
+<span class="n">text</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">to_json</span><span class="p">(</span><span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># strict JSON; non-finite floats become null</span>
+<span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">text</span><span class="p">),</span> <span class="nb">dict</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">bound</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Selected finite bound:"</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">bound</span><span class="p">)</span>
+</code></pre></div>
+<p><code>NetworkResult.to_json(indent=2)</code> omits the native <code>snapshot</code> and uses strict
+JSON. There is no public NetworkResult <code>to_dict()</code> method. Exported result JSON
+is a record of the result, not a resumable node checkpoint. Model JSON round trips
+through <code>NetworkProblem</code>; result JSON is a different schema.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="routing.html"><small>Previous guide</small>Routing inputs and options <span aria-hidden="true">↗</span></a><a href="pricing.html"><small>Next guide</small>Stateful pricing with Solver <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#identify-the-quantity-before-using-it">Identify the quantity before using it</a><a class="toc-level-2" href="#status-and-solve-mode">Status and solve mode</a><a class="toc-level-2" href="#rootresult-reference">RootResult reference</a><a class="toc-level-2" href="#networkresult-reference">NetworkResult reference</a><a class="toc-level-2" href="#serialization">Serialization</a></nav></aside>
+</div>
+</body></html>
