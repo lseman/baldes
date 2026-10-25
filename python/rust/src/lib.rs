@@ -386,6 +386,74 @@ impl Solver {
         }
         Ok(())
     }
+    /// Replace the registered rank-one cuts with packing cuts using arc memory.
+    ///
+    /// Each cut is ``(support, denominator, rhs, arc_memory, dual)``: ``support``
+    /// lists ``(vertex, weight)`` pairs with positive weights, ``arc_memory`` lists
+    /// arc IDs returned by ``new_arc``, and ``dual`` is the row dual of the
+    /// minimization master (nonpositive for a binding packing row). A route with
+    /// limited-memory coefficient ``alpha`` pays ``-dual * alpha``; the state
+    /// resets on arcs outside the memory. An empty list removes all cuts.
+    fn set_rank_one_cuts(
+        &mut self,
+        cuts: Vec<(Vec<(i32, i32)>, i32, i32, Vec<i32>, f64)>,
+    ) -> PyResult<()> {
+        let solver = self.solver.get_mut().unwrap();
+        let (vertices, arcs) = (solver.graph.vertices.len(), solver.graph.arcs.len());
+        let mut rows = Vec::with_capacity(cuts.len());
+        for (id, (support, denominator, rhs, arc_memory, dual)) in cuts.into_iter().enumerate() {
+            if denominator <= 0 || rhs < 0 || !dual.is_finite() {
+                return Err(PyValueError::new_err(
+                    "rank-one cuts need a positive denominator, nonnegative rhs and finite dual",
+                ));
+            }
+            let mut weights = vec![0; vertices];
+            let mut ordered = Vec::with_capacity(support.len());
+            for (vertex, weight) in support {
+                let v = index(vertex)?;
+                if v >= vertices {
+                    return Err(PyRuntimeError::new_err("vertex out of range"));
+                }
+                if weight <= 0 || weights[v] != 0 {
+                    return Err(PyValueError::new_err(
+                        "rank-one support weights must be positive and unique per vertex",
+                    ));
+                }
+                weights[v] = weight;
+                ordered.push((v, weight));
+            }
+            ordered.sort_unstable();
+            if arc_memory.iter().any(|&a| a < 0 || a as usize >= arcs) {
+                return Err(PyValueError::new_err("rank-one arc memory ID out of range"));
+            }
+            rows.push(baldes::cuts::RankOneCut {
+                weights,
+                graph_support: Default::default(),
+                graph_pricing_support: Default::default(),
+                native_kpath_support: None,
+                memory: vec![false; vertices],
+                graph_dependent_memory: false,
+                graph_memories: Default::default(),
+                memory_kind: baldes::cuts::MemoryKind::Arc,
+                arc_memory: arc_memory.into_iter().collect(),
+                graph_arc_memories: Default::default(),
+                arc_weights: Default::default(),
+                visit_once: false,
+                native_type2: false,
+                denominator,
+                dual,
+                class: baldes::cuts::CutClass::Packing,
+                rhs,
+                kind: 0,
+                id: id as i32,
+                ordered_support: Some(ordered),
+            });
+        }
+        solver.cuts.cuts = rows;
+        solver.cuts.retired.clear();
+        solver.cuts.pricing_order.clear();
+        Ok(())
+    }
     /// Set the bidirectional search mode: 0=off, 1=normal, 2=half-way.
     fn set_bidirectional_mode(&mut self, mode: i32) -> PyResult<()> {
         self.set_option("BALDESuseBidirectionalSearch", mode as f64)

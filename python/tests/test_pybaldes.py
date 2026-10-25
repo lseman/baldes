@@ -337,3 +337,39 @@ def test_direct_rust_solver_can_move_to_another_python_thread():
         cost, route = pool.submit(solver.solve).result()
     assert cost == -1
     assert route.nodes() == [0, 1]
+
+
+def rank_one_path():
+    # 0 -> 1 -> 2 -> 3 -> 4 is the only route; every customer arc costs -1.
+    solver = pybaldes.Solver(5, 1)
+    solver.set_source(0)
+    solver.set_sink(4)
+    solver.set_initial_resource(0, 0.)
+    arcs = []
+    for tail in range(4):
+        arc = solver.new_arc(tail, tail + 1, -1. if tail < 3 else 0.)
+        solver.set_arc_consumption(arc, 0, 1.)
+        arcs.append(arc)
+    for vertex in range(5):
+        solver.set_vertex_bounds(vertex, 0, 0., 10.)
+    return solver, arcs
+
+
+def test_rank_one_cut_duals_follow_arc_memory():
+    solver, arcs = rank_one_path()
+    support = [(1, 1), (2, 1), (3, 1)]
+    solver.set_rank_one_cuts([(support, 2, 1, arcs, -0.75)])
+    minimum, routes, exact = solver.price_with_status(5, exact=True)
+    assert exact
+    assert routes[0].nodes() == [0, 1, 2, 3, 4]
+    # Full memory: floor(3 / 2) = 1 unit of the dual.
+    assert minimum == pytest.approx(-3. + 0.75)
+    # Without memory the state resets on every arc, so the cut is never paid.
+    solver.set_rank_one_cuts([(support, 2, 1, [], -0.75)])
+    assert solver.price_with_status(5, exact=True)[0] == pytest.approx(-3.)
+    solver.set_rank_one_cuts([])
+    assert solver.price_with_status(5, exact=True)[0] == pytest.approx(-3.)
+    for bad in ([(support, 0, 1, arcs, -1.)], [([(1, 0)], 2, 0, arcs, -1.)],
+                [(support, 2, 1, [99], -1.)], [(support, 2, 1, arcs, math.nan)]):
+        with pytest.raises((ValueError, RuntimeError)):
+            solver.set_rank_one_cuts(bad)
