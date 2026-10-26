@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Source layout Production Rust code lives in src/. Unit tests live in tests/unit/, andpublic-interface integration suites live in subsystem directories undertests/. See the test gui">
+<meta name="description" content="Source layout Documentation index · Architecture · Test layout The source tree groups code by the work it owns. A pricing network and an arraycontaining that network use the same m">
 <meta name="theme-color" content="#0b0e11">
 <title>Source layout — BALDES docs</title>
 <link rel="canonical" href="https://laioseman.com/baldes/docs/guides/source-layout.html">
@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="first-solve.html">Your first solve</a><a href="cli.html">Command-line usage</a><a href="build.html">Configuring and building BALDES</a><a href="source-layout.html" aria-current="page">Source layout</a><a href="concepts.html">Solver concepts and interface choices</a><a href="documentation.html">Maintaining the documentation</a><a href="python.html">Python: pyBaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">pyBaldes documentation</a><a href="../pybaldes/installation.html">Install pyBaldes</a><a href="../pybaldes/quickstart.html">pyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/api.html">pyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="first-solve.html">Your first solve</a><a href="solve.html">Unified solve interface</a><a href="build.html">Configuring and building BALDES</a><a href="architecture.html">Solver architecture and ownership</a><a href="source-layout.html" aria-current="page">Source layout</a><a href="cli.html">Command-line usage</a><a href="concepts.html">Solver concepts and interface choices</a><a href="documentation.html">Maintaining the documentation</a><a href="python.html">Python: pyBaldes</a><a href="releases.html">Python wheels and releases</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">pyBaldes documentation</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/installation.html">Install pyBaldes</a><a href="../pybaldes/quickstart.html">pyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/api.html">pyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/models.html">Network models and shared masters</a><a href="../solver/column-imports.html">Finite column imports</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/robust-pd.html">Robust pickup and delivery with time windows</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/guides/source-layout.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -28,10 +28,11 @@
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="source-layout">Source layout</h1>
-<p>Production Rust code lives in <code>src/</code>. Unit tests live in <code>tests/unit/</code>, and
-public-interface integration suites live in subsystem directories under
-<code>tests/</code>. See the <a href="https://github.com/lseman/baldes/blob/main/tests/README.md">test guide</a> for registration and
-commands. Runnable demonstrations belong in <code>examples/</code>.</p>
+<p><a href="../index.html">Documentation index</a> · <a href="architecture.html">Architecture</a> · <a href="https://github.com/lseman/baldes/blob/main/tests/README.md">Test layout</a></p>
+<p>The source tree groups code by the work it owns. A pricing network and an array
+containing that network use the same master framework. See the
+<a href="architecture.html">architecture guide</a> for execution flow and adapter semantics.</p>
+<h2 id="production-ownership">Production ownership</h2>
 <div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
@@ -42,43 +43,67 @@ commands. Runnable demonstrations belong in <code>examples/</code>.</p>
 <tbody>
 <tr>
 <td><code>src/core/</code></td>
-<td>Errors, options, logging, and conservative floating-point arithmetic</td>
+<td>Errors, options, logging and conservative floating-point arithmetic</td>
 </tr>
 <tr>
 <td><code>src/graph/</code></td>
-<td>Graphs, resources, neighborhoods, and bucket construction</td>
+<td>Graphs, resources, neighborhoods and bucket geometry</td>
 </tr>
 <tr>
 <td><code>src/labeling/</code></td>
-<td>Label storage, dominance, and directional labeling engines</td>
+<td>Label storage, resource extension, joining and dominance</td>
 </tr>
 <tr>
 <td><code>src/pricing/</code></td>
-<td>Stateful pricing, restrictions, cut preparation, and retained route universes</td>
+<td>Stateful network oracle, cost preparation, restrictions and retained route universes</td>
 </tr>
 <tr>
 <td><code>src/enumeration/</code></td>
-<td>Route-domain proofs and bounded path enumeration</td>
+<td>Route-domain proofs and bounded path collection</td>
 </tr>
 <tr>
 <td><code>src/cuts/</code></td>
-<td>Cut families, registration, and shared separation machinery</td>
+<td>Cut definitions, registration, separation and coefficient replay</td>
 </tr>
 <tr>
-<td><code>src/master/</code></td>
-<td>LP interfaces, column generation, root solving, branching, and tree search</td>
+<td><code>src/master/model/</code></td>
+<td>Canonical shared rows/networks, registrations, original variables and snapshots</td>
 </tr>
 <tr>
-<td><code>src/master/mp/</code></td>
-<td>Shared masters with independently priced networks and imported columns</td>
+<td><code>src/master/routing/</code></td>
+<td>Customer/fleet registration, routing cut hooks, witnesses and certificates</td>
+</tr>
+<tr>
+<td><code>src/master/formulation/</code></td>
+<td>Shared restricted-master construction and dynamic row insertion</td>
+</tr>
+<tr>
+<td><code>src/master/cg/</code></td>
+<td>Column-generation lifecycle, artificial columns, pools, restarts and handoffs</td>
+</tr>
+<tr>
+<td><code>src/master/pricing/</code></td>
+<td>Scheduling and feedback aggregation across enabled network oracles</td>
+</tr>
+<tr>
+<td><code>src/master/preprocessing/</code></td>
+<td>Propagation, conservation rows and model/routing preprocessing adapters</td>
+</tr>
+<tr>
+<td><code>src/master/tree/</code></td>
+<td>Shared lifecycle, frontier, policies, history, strong branching and adapters</td>
+</tr>
+<tr>
+<td><code>src/master/stabilization/</code></td>
+<td>Smoothing, proximal stabilization and curvature rules</td>
 </tr>
 <tr>
 <td><code>src/master/solvers/</code></td>
-<td>Clp, HiGHS, and Gurobi adapters and shared MIP controls</td>
+<td>Clp, HiGHS, Gurobi and shared integer-copy controls</td>
 </tr>
 <tr>
 <td><code>src/extensions/</code></td>
-<td>HGS, IPM, electric-vehicle routing, p-step, robust routing, and column elimination (<code>ce</code>)</td>
+<td>HGS, IPM, EVRP, p-step, robust routing and column elimination</td>
 </tr>
 <tr>
 <td><code>src/inputs/</code></td>
@@ -86,140 +111,111 @@ commands. Runnable demonstrations belong in <code>examples/</code>.</p>
 </tr>
 <tr>
 <td><code>src/bin/baldes/</code></td>
-<td>Executable entry point and command implementations</td>
+<td><code>main.rs</code>, unified <code>cli.rs</code>, and distinct CE/p-step commands</td>
+</tr>
+<tr>
+<td><code>src/api/</code></td>
+<td>Public low-level interface helpers</td>
+</tr>
+<tr>
+<td><code>python/pybaldes/</code></td>
+<td>Python data/results and unified <code>solve.py</code> entry point</td>
+</tr>
+<tr>
+<td><code>python/rust/src/frontend/</code></td>
+<td>One <code>_solve</code> transport and private routing/network input compilers</td>
 </tr>
 </tbody>
 </table></div>
-<p>A module with production child files uses <code>name/mod.rs</code>; a leaf module uses
-<code>name.rs</code>. This keeps the parent and its implementations together. Rust module
-paths stay independent of these physical filenames. Private implementation
-modules group work by responsibility, while the parent defines shared data and
-exports the public interface.</p>
-<p><code>pricing/mod.rs</code> defines the solver state. Construction, configuration, cut
-preparation, restriction application, and lifecycle changes have separate
-implementations. <code>master/mp/mod.rs</code> defines its shared model and
-state; <code>pricing.rs</code> implements network pricing callbacks, and <code>solve.rs</code>
-implements initialization and the solve workflow.</p>
-<p>Keep test bodies and fixtures outside <code>src/</code>. Attach private unit tests with
-feature-gated <code>#[path]</code> module declarations so tests do not require widening
-production visibility. Keep implementation-specific test adapters gated with
-<code>#[cfg(test)]</code> when they must access private fields. Extension guides belong in
-<code>docs/extensions/</code>; dependency licenses remain alongside their implementation.</p>
-<h2 id="responsibility-within-large-modules">Responsibility within large modules</h2>
-<p>The top-level directories follow solver responsibilities. Keep that grouping as
-new models and algorithms arrive. In particular, multiple pricing networks
-still belong to <code>master/</code>, while a specialized routing formulation belongs to
-<code>extensions/</code>. Low-level route enumeration belongs to <code>enumeration/</code>; installing
-its routes into a restricted master belongs to <code>master/</code>.</p>
+<p><code>master::model::Problem</code> owns shared rows and a network collection.
+<code>RoutingContext</code> holds that model with routing metadata. The physical source
+owners for tree and preprocessing algorithms are <code>master/tree</code> and
+<code>master/preprocessing</code>; their model-specific files live under those owners.</p>
+<p>Private adapters can be attached to their data-owning Rust module through
+<code>#[path]</code>. That preserves field privacy while keeping a single physical source
+for the implementation. Public callers use the parent's exported interface,
+not private attachment names such as <code>tree_adapter</code> or <code>flow_adapter</code>.</p>
+<h2 id="finding-the-right-file">Finding the right file</h2>
 <div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
-<th>Module</th>
-<th>Internal ownership</th>
+<th>Change</th>
+<th>Start here</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>graph/coupled/kernel/mod.rs</code></td>
-<td>Shared kernel/state types, state inspection, graph attachment, and child declarations</td>
+<td>New model rows / quantity layout</td>
+<td><code>master/formulation/mod.rs</code></td>
 </tr>
 <tr>
-<td><code>graph/coupled/kernel/preparation.rs</code></td>
-<td>Prepare definitions, configure objectives, and validate graph compatibility</td>
+<td>LP/pricing iteration or recovery handoff</td>
+<td><code>master/cg/driver.rs</code>, <code>master/cg/feasibility.rs</code></td>
 </tr>
 <tr>
-<td><code>graph/coupled/kernel/extension.rs</code></td>
-<td>Create directional labels, extend arcs, and replay paths</td>
+<td>Initial/cut/branch artificial columns</td>
+<td><code>master/cg/rows.rs</code></td>
 </tr>
 <tr>
-<td><code>graph/coupled/kernel/joining.rs</code></td>
-<td>Join forward/backward states and compute the joined objective</td>
+<td>Network visitation / admission</td>
+<td><code>master/pricing/mod.rs</code>, <code>master/pricing/scheduling.rs</code></td>
 </tr>
 <tr>
-<td><code>master/mp/enumeration/mod.rs</code></td>
-<td>Public options/reports and snapshot enumeration entry point</td>
+<td>Raw objective pricing / cost cache</td>
+<td><code>pricing/variable_costs.rs</code></td>
 </tr>
 <tr>
-<td><code>master/mp/enumeration/collection.rs</code></td>
-<td>Collect complete or cutoff-bounded route universes under shared budgets</td>
+<td>Propagation or flow rows</td>
+<td><code>master/preprocessing/</code>, including shared <code>flow/mod.rs</code></td>
 </tr>
 <tr>
-<td><code>master/mp/enumeration/transfer.rs</code></td>
-<td>Install a collected universe atomically on a private master</td>
+<td>Node dispatch / budgets</td>
+<td><code>master/tree/driver.rs</code></td>
 </tr>
 <tr>
-<td><code>master/mp/enumeration/pricing.rs</code></td>
-<td>Price the installed finite universe</td>
+<td>Open-node priority / overflow</td>
+<td><code>master/tree/frontier.rs</code></td>
 </tr>
 <tr>
-<td><code>master/mp/enumeration/mip.rs</code></td>
-<td>Solve integer copies and check original-domain encoding</td>
+<td>Routing/model/imported tree interpretation</td>
+<td><code>master/tree/adapters/</code></td>
 </tr>
 <tr>
-<td><code>master/mp/enumeration/cutoff.rs</code></td>
-<td>Own the improvement-domain snapshot and expose its restricted guarantees</td>
+<td>CLI parsing and result output</td>
+<td><code>bin/baldes/cli.rs</code></td>
 </tr>
 <tr>
-<td><code>master/cg/setup.rs</code></td>
-<td>Validate options and warm-start metadata before execution</td>
-</tr>
-<tr>
-<td><code>master/cg/driver.rs</code></td>
-<td>Sequence master solves, pricing, stabilization, cuts, and handoffs</td>
+<td>Python scalar/array normalization</td>
+<td><code>python/pybaldes/solve.py</code></td>
 </tr>
 </tbody>
 </table></div>
-<p>Kernel submodules with their own implementations (<code>front</code>, <code>relation</code>,
-<code>dominance</code>, and <code>certificate</code>) also use <code>mod.rs</code>. Moving a file into its module
-directory does not change its Rust import path.</p>
-<h2 id="naming-and-split-decisions">Naming and split decisions</h2>
-<p>Use established solver vocabulary (<code>price</code>, <code>extend</code>, <code>join</code>, <code>dominates</code>,
-<code>separate</code>) when the enclosing type or module supplies the subject. Prefer a
-more specific verb when several subjects share the scope: <code>collect_routes</code> and
-<code>collect_routes_with_plan</code> distinguish route-universe construction from
-iterator collection. Public names such as <code>Options</code>, <code>Output</code>, and <code>Status</code>
-remain useful under a descriptive module path; import them with a module
-qualifier when several solvers appear in one file.</p>
-<p>Keep implementation state near its consumer. For example, column generation's
-<code>IpmAccuracy</code> belongs beside its loop rather than among its public data types.
-Keep private helpers private to their owning module; sibling implementations
-may share them through a restricted parent visibility. Re-export public types
-and entry points from their existing parent so callers do not learn the
-internal file layout.</p>
-<p>Split when a file contains independently explainable responsibilities. Keep
-extension and replay together because they share the same transition rules.
-Avoid extracting each short helper into its own file or creating generic
-<code>utils</code> modules. A long mathematical routine may remain cohesive; line count
-alone does not justify another interface.</p>
-<h2 id="remaining-redesign-candidates">Remaining redesign candidates</h2>
-<p>The organization review identifies these next areas for deeper work:</p>
+<p>A module with implementation children normally uses <code>name/mod.rs</code>; a leaf uses
+<code>name.rs</code>. Keep shared state near its consumers, helpers private to their owner,
+and established solver verbs such as <code>price</code>, <code>extend</code>, <code>join</code> and <code>separate</code>.
+Split independently explainable responsibilities; avoid generic <code>utils</code> files
+or moving long argument lists behind pass-through helpers.</p>
+<h2 id="tests-examples-and-documentation">Tests, examples and documentation</h2>
 <ul>
-<li><code>master/cg/driver.rs</code>: the main loop still coordinates many
-mutable values and several restart paths. A future extraction should give
-iteration state a single owner and test warm starts, feasibility recovery,
-cut remapping, and enumeration handoffs together. Moving individual branches
-behind helpers with long mutable argument lists would retain that coupling.</li>
-<li><code>graph/coupled/kernel/relation/mod.rs</code> and
-<code>graph/coupled/kernel/bounds.rs</code>: separate preparation, directional operations,
-and mathematical helpers only where they can share a small internal
-interface. Existing specialized child implementations provide starting
-points; preserve numerical evaluation order when extracting code.</li>
-<li><code>bin/baldes/routing.rs</code>: consider separating command configuration from
-execution and result rendering when adding another routing command.</li>
+<li><code>tests/unit/</code>: private unit tests, attached with feature-gated <code>#[path]</code> modules.</li>
+<li><code>tests/api</code>, <code>tests/master</code>, <code>tests/pricing</code> and other subsystem folders: public-interface integration suites, explicitly registered in <code>Cargo.toml</code>.</li>
+<li><code>python/tests/</code>: Python wrapper and native-interface checks.</li>
+<li><code>examples/</code>: runnable demonstrations; <code>instances/</code>: benchmark inputs.</li>
+<li><code>docs/</code>: maintained Markdown, built into the documentation site.</li>
+<li><code>internal/</code> and <code>working/</code>: ignored local investigations and experiments.</li>
 </ul>
-<p>The canonical namespaces are <code>baldes::master::cg</code> for column generation,
-<code>baldes::master::mp</code> for multi-pricing, and <code>baldes::extensions::ce</code> for column
-elimination. Source and mirrored unit-test
-folders use those abbreviations as well. These namespace renames require Rust
-callers to update their imports; descriptive algorithm method names remain
-unchanged. Internal file splits preserve the remaining public interfaces and
-numerical algorithms. This is a structural pass, not an exhaustive correctness
-or dead-code audit of every function. Further function renames should follow call-site evidence and domain
-meaning rather than a global naming substitution.</p>
+<p>Test bodies and fixtures stay outside <code>src/</code>. Most unit paths mirror their
+implementation owner; the <code>#[path]</code> declaration is authoritative where a private
+adapter belongs to another logical Rust module.</p>
+<p>The current separation gives one owner to master construction, network pricing
+coordination, preprocessing and tree orchestration. Model-specific data and
+proof hooks remain explicit adapters. A future refactor of the CG loop should
+preserve its restart, feasibility, cut-remapping and enumeration contracts;
+folder moves alone do not establish numerical or behavioral equivalence.</p>
 </article>
-<nav class="page-turn" aria-label="Adjacent guides"><a href="build.html"><small>Previous guide</small>Configuring and building BALDES <span aria-hidden="true">↗</span></a><a href="concepts.html"><small>Next guide</small>Solver concepts and interface choices <span aria-hidden="true">↗</span></a></nav>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="architecture.html"><small>Previous guide</small>Solver architecture and ownership <span aria-hidden="true">↗</span></a><a href="cli.html"><small>Next guide</small>Command-line usage <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#responsibility-within-large-modules">Responsibility within large modules</a><a class="toc-level-2" href="#naming-and-split-decisions">Naming and split decisions</a><a class="toc-level-2" href="#remaining-redesign-candidates">Remaining redesign candidates</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#production-ownership">Production ownership</a><a class="toc-level-2" href="#finding-the-right-file">Finding the right file</a><a class="toc-level-2" href="#tests-examples-and-documentation">Tests, examples and documentation</a></nav></aside>
 </div>
 </body></html>

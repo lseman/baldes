@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="BALDES documentation New to BALDES? Follow Your first solve to build the CLI,run a small instance, and understand the result.Commands in these guides run from the repository root. ">
+<meta name="description" content="BALDES documentation Use one solve interface for routing inputs and explicit pricing-network models.A single network is a collection of length one. Start withYour first solve, then">
 <meta name="theme-color" content="#0b0e11">
 <title>BALDES documentation — BALDES docs</title>
 <link rel="canonical" href="https://laioseman.com/baldes/docs/index.html">
@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../">Home</a><a href="index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="index.html" aria-current="page">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="guides/first-solve.html">Your first solve</a><a href="guides/cli.html">Command-line usage</a><a href="guides/build.html">Configuring and building BALDES</a><a href="guides/source-layout.html">Source layout</a><a href="guides/concepts.html">Solver concepts and interface choices</a><a href="guides/documentation.html">Maintaining the documentation</a><a href="guides/python.html">Python: pyBaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="solver/feasibility.html">Routing feasibility recovery</a><a href="solver/branching.html">Routing branching</a><a href="solver/cuts.html">Routing cuts</a><a href="solver/stabilization.html">Dual-price stabilization</a><a href="solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="pybaldes/index.html">pyBaldes documentation</a><a href="pybaldes/installation.html">Install pyBaldes</a><a href="pybaldes/quickstart.html">pyBaldes quickstart</a><a href="pybaldes/routing.html">Routing inputs and options</a><a href="pybaldes/results.html">Results, bounds, and exactness</a><a href="pybaldes/pricing.html">Stateful pricing with Solver</a><a href="pybaldes/resources.html">Coupled resources and function encodings</a><a href="pybaldes/networks.html">Shared-master network models</a><a href="pybaldes/api.html">pyBaldes API reference</a><a href="pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="extensions/coupled-resources.html">Coupled resources</a><a href="extensions/multi-time-windows.html">Multiple time windows</a><a href="extensions/column-imports.html">Finite column imports</a><a href="extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="extensions/evrp.html">EVRP implementation status</a><a href="extensions/robust.html">Robust vehicle routing</a><a href="extensions/ipm.html">BALDES IPM in Rust</a><a href="extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="reference/algorithms.html">Algorithms and references</a><a href="reference/options.html">BALDES pricing options</a><a href="reference/resources.html">Scalar resources</a><a href="reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="benchmarks/root.html">Root benchmarks</a><a href="benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="index.html" aria-current="page">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="guides/first-solve.html">Your first solve</a><a href="guides/solve.html">Unified solve interface</a><a href="guides/build.html">Configuring and building BALDES</a><a href="guides/architecture.html">Solver architecture and ownership</a><a href="guides/source-layout.html">Source layout</a><a href="guides/cli.html">Command-line usage</a><a href="guides/concepts.html">Solver concepts and interface choices</a><a href="guides/documentation.html">Maintaining the documentation</a><a href="guides/python.html">Python: pyBaldes</a><a href="guides/releases.html">Python wheels and releases</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="pybaldes/index.html">pyBaldes documentation</a><a href="pybaldes/networks.html">Shared-master network models</a><a href="pybaldes/installation.html">Install pyBaldes</a><a href="pybaldes/quickstart.html">pyBaldes quickstart</a><a href="pybaldes/routing.html">Routing inputs and options</a><a href="pybaldes/pricing.html">Stateful pricing with Solver</a><a href="pybaldes/resources.html">Coupled resources and function encodings</a><a href="pybaldes/results.html">Results, bounds, and exactness</a><a href="pybaldes/api.html">pyBaldes API reference</a><a href="pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="solver/models.html">Network models and shared masters</a><a href="solver/column-imports.html">Finite column imports</a><a href="solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="solver/feasibility.html">Routing feasibility recovery</a><a href="solver/branching.html">Routing branching</a><a href="solver/cuts.html">Routing cuts</a><a href="solver/stabilization.html">Dual-price stabilization</a><a href="solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="reference/algorithms.html">Algorithms and references</a><a href="reference/options.html">BALDES pricing options</a><a href="reference/resources.html">Scalar resources</a><a href="reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="extensions/coupled-resources.html">Coupled resources</a><a href="extensions/multi-time-windows.html">Multiple time windows</a><a href="extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="extensions/evrp.html">EVRP implementation status</a><a href="extensions/robust.html">Robust vehicle routing</a><a href="extensions/robust-pd.html">Robust pickup and delivery with time windows</a><a href="extensions/ipm.html">BALDES IPM in Rust</a><a href="extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="benchmarks/root.html">Root benchmarks</a><a href="benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/README.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -28,140 +28,113 @@
 <section id="search-results" class="search-results" aria-label="Search results" hidden></section>
 <noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
 <article class="prose"><h1 id="baldes-documentation">BALDES documentation</h1>
-<p>New to BALDES? Follow <a href="guides/first-solve.html">Your first solve</a> to build the CLI,
-run a small instance, and understand the result.
-Commands in these guides run from the repository root.</p>
+<p>Use one solve interface for routing inputs and explicit pricing-network models.
+A single network is a collection of length one. Start with
+<a href="guides/first-solve.html">Your first solve</a>, then read the
+<a href="guides/solve.html">unified solve interface</a>. Commands run from the repository root.</p>
 <h2 id="choose-your-task">Choose your task</h2>
 <div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
-<th>I want to…</th>
-<th>Start here</th>
+<th>Task</th>
+<th>Guide</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Run a small example and understand its output</td>
-<td><a href="guides/first-solve.html">Your first solve</a></td>
+<td>Build and run a small instance</td>
+<td><a href="guides/first-solve.html">First solve</a>, <a href="guides/build.html">build</a></td>
 </tr>
 <tr>
-<td>Find a feasible routing solution quickly</td>
-<td><a href="guides/cli.html">HGS and CLI usage</a></td>
+<td>Understand the shared model and engine ownership</td>
+<td><a href="guides/architecture.html">Architecture</a>, <a href="guides/source-layout.html">source layout</a></td>
 </tr>
 <tr>
-<td>Search for an integer solution with bounds</td>
-<td><a href="solver/tree.html">Branch-and-price tree</a></td>
+<td>Look up CLI input modes and flags</td>
+<td><a href="guides/solve.html">Solve interface</a>, <a href="guides/cli.html">CLI reference</a></td>
 </tr>
 <tr>
-<td>Build a Python application or custom pricing loop</td>
-<td><a href="pybaldes/index.html">pyBaldes documentation</a></td>
+<td>Build a Python application</td>
+<td><a href="pybaldes/index.html">pyBaldes handbook</a></td>
 </tr>
 <tr>
-<td>Use multiple route families in one master</td>
-<td><a href="extensions/mp.html">Multi-pricing</a></td>
+<td>Model one or many pricing networks</td>
+<td><a href="solver/models.html">Network models</a>, <a href="pybaldes/networks.html">Python modeling</a></td>
 </tr>
 <tr>
-<td>Configure backends or troubleshoot a build</td>
-<td><a href="guides/build.html">Build and installation</a></td>
+<td>Integrate external columns and pricing callbacks</td>
+<td><a href="solver/column-imports.html">Column imports</a></td>
+</tr>
+<tr>
+<td>Run integer search and interpret its bound</td>
+<td><a href="solver/tree.html">Tree lifecycle</a>, <a href="guides/concepts.html">solver concepts</a></td>
 </tr>
 </tbody>
 </table></div>
-<h2 id="reading-paths">Reading paths</h2>
+<h2 id="getting-started-and-contributing">Getting started and contributing</h2>
 <ul>
-<li><strong>CLI users:</strong> first solve → CLI reference → solver concepts → tree/cut guides.</li>
-<li><strong>Python users:</strong> pyBaldes installation → quickstart → routing, pricing, or network modeling.</li>
-<li><strong>Rust contributors:</strong> build guide → source layout → model/solver contracts → documentation maintenance.</li>
+<li><a href="guides/first-solve.html">Your first solve</a>: CLI walkthrough, outputs and setup fixes.</li>
+<li><a href="guides/solve.html">Unified solve interface</a>: routing/model inputs and scalar/array normalization.</li>
+<li><a href="guides/build.html">Build and installation</a>: dependencies, features, optional backends and Make configuration.</li>
+<li><a href="guides/cli.html">Command-line reference</a>: common and routing-specific controls, JSON model controls and output.</li>
+<li><a href="guides/concepts.html">Solver concepts</a>: paths, LP relaxations, witnesses and proof scope.</li>
+<li><a href="guides/architecture.html">Architecture</a>: canonical model, shared engines and adapter responsibilities.</li>
+<li><a href="guides/source-layout.html">Source layout</a>: implementation ownership and test locations.</li>
+<li><a href="guides/documentation.html">Documentation maintenance</a>: source checks, API synchronization and site validation.</li>
 </ul>
-<h2 id="getting-started">Getting started</h2>
+<h2 id="python-handbook">Python handbook</h2>
 <ul>
-<li>
-<p><a href="guides/first-solve.html">Your first solve</a>: a complete CLI walkthrough, result interpretation, and common setup fixes.</p>
-</li>
-<li>
-<p><a href="guides/build.html">Build and installation</a>: dependencies, optional backends, and Make configuration.</p>
-</li>
-<li>
-<p><a href="guides/source-layout.html">Source layout</a>: production modules, CLI commands, and test organization.</p>
-</li>
-<li>
-<p><a href="guides/cli.html">Command-line usage</a>: routing solves, HGS, flags, and output.</p>
-</li>
-<li>
-<p><a href="guides/concepts.html">Solver concepts</a>: paths, masters, root relaxations, integer search, and proof scope.</p>
-</li>
-<li>
-<p><a href="guides/documentation.html">Documentation maintenance</a>: organization, local builds, validation, and API update checks.</p>
-</li>
+<li><a href="pybaldes/index.html">Overview</a> and <a href="pybaldes/installation.html">installation</a>.</li>
+<li><a href="pybaldes/quickstart.html">Quickstart</a>: routing, pricing and model examples.</li>
+<li><a href="pybaldes/routing.html">Routing inputs and options</a>: instances, inference, distances and root keywords.</li>
+<li><a href="pybaldes/networks.html">Network models</a>: scalar/array models, shared rows, integer trees, snapshots and synchronization.</li>
+<li><a href="pybaldes/pricing.html">Stateful pricing</a>: graph setup, dual updates and low-level <code>Solver</code> methods.</li>
+<li><a href="pybaldes/resources.html">Coupled resources</a>: resource definitions, piecewise functions and windows.</li>
+<li><a href="pybaldes/results.html">Results and guarantees</a>: statuses, bounds, witnesses, counters and serialization.</li>
+<li><a href="pybaldes/api.html">API reference</a>: exported names, declared fields and callable signatures.</li>
+<li><a href="pybaldes/troubleshooting.html">Troubleshooting</a>: build errors, concurrency and reproducibility.</li>
+<li><a href="guides/python.html">Python entry page</a>: a short guide to the handbook.</li>
 </ul>
-<h2 id="pybaldes-python-documentation">pyBaldes: Python documentation</h2>
-<p>A separate handbook for the Python package, with its own entry point and API reference.</p>
+<h2 id="shared-solver-and-model-contracts">Shared solver and model contracts</h2>
 <ul>
-<li><a href="pybaldes/index.html">pyBaldes overview</a>: choose routing, custom pricing, or shared-master modeling.</li>
-<li><a href="pybaldes/installation.html">Installation</a>: package builds, optional features, backends, and capacities.</li>
-<li><a href="pybaldes/quickstart.html">Quickstart</a>: complete in-memory and file-based examples.</li>
-<li><a href="pybaldes/routing.html">Routing inputs and options</a>: customers, instances, distances, and every root keyword.</li>
-<li><a href="pybaldes/results.html">Results and guarantees</a>: fields, bounds, status, exactness, and serialization.</li>
-<li><a href="pybaldes/pricing.html">Stateful pricing</a>: graph construction, dual updates, and Solver methods.</li>
-<li><a href="pybaldes/resources.html">Coupled resources</a>: resource models, piecewise functions, and windows.</li>
-<li><a href="pybaldes/networks.html">Network models</a>: shared rows, solve controls, integer trees, snapshots, and synchronization.</li>
-<li><a href="pybaldes/api.html">API reference</a>: exported types, constructors, and callable signatures.</li>
-<li><a href="pybaldes/troubleshooting.html">Troubleshooting</a>: errors, concurrency, and reproducibility.</li>
-</ul>
-<h2 id="solver">Solver</h2>
-<ul>
-<li><a href="solver/tree.html">Tree and node lifecycle</a>: integer routing, inherited state, bounds, and limits.</li>
-<li><a href="solver/feasibility.html">Routing feasibility recovery</a>: zero-objective phase I, objective restoration, proof scope and limits.</li>
-<li><a href="solver/branching.html">Branching</a>: branching families and selection.</li>
-<li><a href="solver/cuts.html">Cuts</a>: cut configuration and coefficient consistency.</li>
-<li><a href="solver/stabilization.html">Dual-price stabilization</a>: smoothing, center updates, and retries.</li>
-<li><a href="solver/enumerated-mip.html">Enumerated MIP</a>: optional HiGHS integer solving and proof coverage.</li>
-<li><a href="solver/deluxing.html">Deluxing</a>: complete-universe column filtering before integer solving.</li>
+<li><a href="solver/models.html">Network models and shared masters</a>: rows, multiplicities, scheduling, branches and original variables.</li>
+<li><a href="solver/column-imports.html">Column imports</a>: finite domains, external pricing, certificates and imported-source trees.</li>
+<li><a href="solver/tree.html">Tree lifecycle</a>: shared orchestration and routing registration details.</li>
+<li><a href="solver/feasibility.html">Feasibility recovery</a>: phase I, cut-coefficient transitions and proof scope.</li>
+<li><a href="solver/branching.html">Branching</a>: branch families, selection and history.</li>
+<li><a href="solver/cuts.html">Cuts</a>: separation, configuration and coefficient consistency.</li>
+<li><a href="solver/stabilization.html">Stabilization</a>: smoothing, proximal rules and automatic curvature.</li>
+<li><a href="solver/enumerated-mip.html">Enumerated MIP</a> and <a href="solver/deluxing.html">deluxing</a>: optional integer copies and coverage requirements.</li>
 </ul>
 <h2 id="reference">Reference</h2>
 <ul>
-<li><a href="reference/algorithms.html">Algorithms and references</a>: solver components and research references.</li>
-<li><a href="reference/options.html">BALDES options</a>: supported controls, defaults, types, and scope.</li>
-<li><a href="reference/resources.html">Scalar resources</a>: resource dimensions and bucket indexing.</li>
-<li><a href="reference/simd.html">SIMD dispatch</a>: optional kernels and runtime portability.</li>
+<li><a href="reference/algorithms.html">Algorithms and references</a>.</li>
+<li><a href="reference/options.html">BALDES options</a>.</li>
+<li><a href="reference/resources.html">Scalar resources</a>.</li>
+<li><a href="reference/simd.html">SIMD dispatch</a>.</li>
 </ul>
-<h2 id="extensions-and-modeling">Extensions and modeling</h2>
+<h2 id="specialized-models-and-algorithms">Specialized models and algorithms</h2>
 <ul>
-<li>
-<p><a href="extensions/coupled-resources.html">Coupled resources</a>: simultaneous pickup/delivery, selected values, cumulative costs and affine dependencies in the physical-graph labeling engine.</p>
-</li>
-<li>
-<p><a href="extensions/multi-time-windows.html">Multiple time windows</a>: disjoint service-start domains for scalar pricing resources.</p>
-</li>
-<li>
-<p><a href="extensions/mp.html">Multi-pricing</a>: shared masters, multiple route families, and assignment branching.</p>
-</li>
-<li>
-<p><a href="extensions/column-imports.html">Finite column imports</a>: original-vector patterns and multiplicity constraints.</p>
-</li>
-<li>
-<p><a href="extensions/pstep.html">P-step CVRP</a>: compact p-step LP relaxation.</p>
-</li>
-<li>
-<p><a href="extensions/evrp.html">Electric-vehicle routing</a>: charging models, schedule replay, and current limitations.</p>
-</li>
-<li>
-<p><a href="extensions/robust.html">Robust vehicle routing</a>: budgeted demand and travel-time uncertainty in bucket graph labeling, plus an independent validation reference.</p>
-</li>
-<li>
-<p><a href="extensions/ipm.html">Interior-point solver</a>: native LP backend, interfaces, and implementation details.</p>
-</li>
-<li>
-<p><a href="extensions/ce.html">Column elimination (CE)</a>: decision-diagram route relaxation and refinement.</p>
-</li>
+<li><a href="extensions/coupled-resources.html">Coupled resources</a>.</li>
+<li><a href="extensions/multi-time-windows.html">Multiple time windows</a>.</li>
+<li><a href="extensions/pstep.html">P-step CVRP</a>.</li>
+<li><a href="extensions/evrp.html">Electric-vehicle routing</a>.</li>
+<li><a href="extensions/robust.html">Robust vehicle routing</a>.</li>
+<li><a href="extensions/robust-pd.html">Robust pickup and delivery</a>.</li>
+<li><a href="extensions/ipm.html">Interior-point solver</a>.</li>
+<li><a href="extensions/ce.html">Column elimination</a>.</li>
 </ul>
-<h2 id="benchmarks">Benchmarks</h2>
+<h2 id="recorded-benchmarks">Recorded benchmarks</h2>
 <ul>
-<li><a href="benchmarks/root.html">Root benchmarks</a>: published root relaxation timings and measurement setup.</li>
-<li><a href="benchmarks/rank-one-three-row.html">Three-row rank-one cuts</a>: measured separation configurations.</li>
-<li><a href="benchmarks/rank-one-local-search.html">Rank-one local search</a>: separator search measurements.</li>
-<li><a href="benchmarks/ipm-factorization.html">IPM factorization</a>: factorization benchmark setup and results.</li>
+<li><a href="benchmarks/root.html">Root relaxations</a>.</li>
+<li><a href="benchmarks/rank-one-three-row.html">Three-row rank-one cuts</a>.</li>
+<li><a href="benchmarks/rank-one-local-search.html">Rank-one local search</a>.</li>
+<li><a href="benchmarks/ipm-factorization.html">IPM factorization</a>.</li>
 </ul>
-<h2 id="capabilities-and-interfaces">Capabilities and interfaces</h2>
+<p>These pages record measurements under stated source/build settings. They do not
+establish current performance without a matched rerun. Root-chart reproduction
+requires explicit <code>--rounding none</code>.</p>
+<h2 id="interface-capabilities">Interface capabilities</h2>
 <div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
 <thead>
 <tr>
@@ -169,107 +142,69 @@ Commands in these guides run from the repository root.</p>
 <th>Rust</th>
 <th>CLI</th>
 <th>Python</th>
-<th>Backend</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>RCSP pricing and enumeration</td>
-<td>Yes</td>
-<td>Through routing solves</td>
-<td>Low-level <code>Solver</code></td>
-<td>Core Rust</td>
-</tr>
-<tr>
 <td>Routing root relaxation</td>
-<td>Yes</td>
-<td>Default <code>vrptw</code> / <code>cvrp</code> mode</td>
-<td><code>pybaldes.solve_root</code></td>
-<td>Clp model store; Clp/IPM/optional HiGHS/Gurobi solves</td>
+<td><code>master::routing::solve</code> / <code>Instance::solve</code></td>
+<td><code>solve INSTANCE</code></td>
+<td><code>solve(instance)</code> / <code>instance.solve()</code></td>
 </tr>
 <tr>
-<td>Branch-and-price tree</td>
-<td>Yes</td>
-<td><code>--tree</code></td>
-<td>Not exposed</td>
-<td>Clp model store; Clp/IPM/optional HiGHS/Gurobi solves</td>
+<td>Explicit network root, including one network</td>
+<td><code>master::model::solve</code></td>
+<td><code>solve MODEL.json</code></td>
+<td><code>solve(network)</code>, <code>solve([network])</code>, <code>solve(problem)</code></td>
 </tr>
 <tr>
-<td>Shared-master root and integer tree</td>
-<td>Yes</td>
-<td><code>multi-pricing</code></td>
-<td><code>solve_networks</code></td>
-<td>Clp; HiGHS for optional enumerated MIP</td>
+<td>Routing integer tree</td>
+<td><code>master::tree::solve</code> with <code>TreeOptions</code></td>
+<td><code>solve INSTANCE --tree</code></td>
+<td>Routing tree not exposed</td>
+</tr>
+<tr>
+<td>Explicit model integer tree</td>
+<td><code>master::tree::solve</code> with <code>ModelTreeOptions</code></td>
+<td><code>solve MODEL.json --tree</code></td>
+<td><code>solve(problem, tree=True)</code></td>
+</tr>
+<tr>
+<td>Low-level RCSP pricing</td>
+<td><code>pricing::Solver</code></td>
+<td>Used within solves</td>
+<td><code>Solver</code></td>
+</tr>
+<tr>
+<td>Original master variables without pricing</td>
+<td><code>master::model::solve_master</code></td>
+<td>Rust-only static-variable registration</td>
+<td>Rust-only static-variable registration</td>
 </tr>
 <tr>
 <td>Complete enumerated node MIP</td>
-<td>Yes, opt-in</td>
-<td><code>--tree --enumerated-mip</code></td>
-<td>Not exposed</td>
-<td>Clp + HiGHS</td>
-</tr>
-<tr>
-<td>Generic mixed-integer master solve</td>
-<td><code>highs::solve_integer</code></td>
-<td>Not exposed directly</td>
-<td>Not exposed</td>
-<td>HiGHS</td>
+<td>Model/routing snapshot interfaces</td>
+<td><code>--enumerated-mip</code> with supported registration</td>
+<td>Network snapshot / model options</td>
 </tr>
 </tbody>
 </table></div>
-<p>The <code>vrptw</code> and <code>cvrp</code> routing tree uses one pricing network. For models with
-multiple route families, use the <a href="extensions/mp.html">multi-pricing interface</a>,
-including its CLI and Python APIs and assignment tree. Its supported branching
-families and solve limitations differ from the single-network routing tree.</p>
-<p>Root <code>Optimal</code> means the LP relaxation converged. Tree <code>Optimal</code> means the
-integer routing gap closed within the configured tolerances. A feasible
-restricted-column solution supplies an incumbent; its objective alone does
-not prove a lower bound for the full routing problem.</p>
-<h2 id="rust-module-organization">Rust module organization</h2>
-<p>Core modules implement graphs, labeling, pricing, cuts, enumeration and the
-master. <code>master::mp</code> coordinates one master with multiple pricing
-subproblems and belongs to the core master framework. Rust callers can also use
-<code>master::mp::solve_master</code> for original master variables with no
-pricing subproblems.</p>
-<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
-<thead>
-<tr>
-<th>Module</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>extensions::hgs</code></td>
-<td>Hybrid Genetic Search and primal heuristics</td>
-</tr>
-<tr>
-<td><code>extensions::ipm</code></td>
-<td>Native interior-point LP backend</td>
-</tr>
-<tr>
-<td><code>extensions::evrp</code></td>
-<td>Electric-vehicle routing models and charging schedules</td>
-</tr>
-<tr>
-<td><code>extensions::pstep</code></td>
-<td>P-step CVRP LP with parallel bucket pricing and reference enumeration</td>
-</tr>
-<tr>
-<td><code>master::mp</code></td>
-<td>Shared rows, per-subproblem multiplicities and node lifecycle</td>
-</tr>
-</tbody>
-</table></div>
-<p><code>extensions</code> groups algorithms and specialized models in the same crate; it
-does not imply runtime plugins or new build features. Existing <code>baldes::hgs</code>,
-<code>baldes::ipm</code>, <code>baldes::evrp</code> and <code>master::networks</code> paths remain compatibility
-re-exports. New Rust code should use the module paths above. CLI JSON fields
-and Python names such as <code>NetworkProblem</code> and <code>solve_networks</code> stay compatible.</p>
+<p>Shared-master registrations require <code>clp</code>; optional HiGHS/Gurobi backend and
+integer-copy features are documented beside their interfaces. Different
+registrations can install different cut, branch and witness hooks while sharing
+construction, CG, pricing coordination and tree dispatch.</p>
+<p>Root <code>Optimal</code> means the configured LP relaxation converged. Tree <code>Optimal</code>
+closes the configured integer-domain gap within its tolerances and proof policy.
+A restricted-column incumbent alone is not a lower-bound proof. Read
+<a href="guides/concepts.html">concepts</a> and <a href="pybaldes/results.html">results</a> before comparing
+bounds across models or interfaces.</p>
+<ul>
+<li><a href="guides/releases.html">Python wheels and releases</a>: supported platforms, tagged builds and release assets.</li>
+</ul>
 </article>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="guides/first-solve.html"><small>Next guide</small>Your first solve <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#choose-your-task">Choose your task</a><a class="toc-level-2" href="#reading-paths">Reading paths</a><a class="toc-level-2" href="#getting-started">Getting started</a><a class="toc-level-2" href="#pybaldes-python-documentation">pyBaldes: Python documentation</a><a class="toc-level-2" href="#solver">Solver</a><a class="toc-level-2" href="#reference">Reference</a><a class="toc-level-2" href="#extensions-and-modeling">Extensions and modeling</a><a class="toc-level-2" href="#benchmarks">Benchmarks</a><a class="toc-level-2" href="#capabilities-and-interfaces">Capabilities and interfaces</a><a class="toc-level-2" href="#rust-module-organization">Rust module organization</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#choose-your-task">Choose your task</a><a class="toc-level-2" href="#getting-started-and-contributing">Getting started and contributing</a><a class="toc-level-2" href="#python-handbook">Python handbook</a><a class="toc-level-2" href="#shared-solver-and-model-contracts">Shared solver and model contracts</a><a class="toc-level-2" href="#reference">Reference</a><a class="toc-level-2" href="#specialized-models-and-algorithms">Specialized models and algorithms</a><a class="toc-level-2" href="#recorded-benchmarks">Recorded benchmarks</a><a class="toc-level-2" href="#interface-capabilities">Interface capabilities</a></nav></aside>
 </div>
 </body></html>

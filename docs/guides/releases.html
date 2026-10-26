@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Python wheels and releases The Python distributions workflow builds pybaldes wheels for Linux x86-64and ARM64 (manylinux2014), and macOS Intel and Apple Silicon. Wheels use theCPyt">
+<meta name="theme-color" content="#0b0e11">
+<title>Python wheels and releases — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/guides/releases.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="first-solve.html">Your first solve</a><a href="solve.html">Unified solve interface</a><a href="build.html">Configuring and building BALDES</a><a href="architecture.html">Solver architecture and ownership</a><a href="source-layout.html">Source layout</a><a href="cli.html">Command-line usage</a><a href="concepts.html">Solver concepts and interface choices</a><a href="documentation.html">Maintaining the documentation</a><a href="python.html">Python: pyBaldes</a><a href="releases.html" aria-current="page">Python wheels and releases</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">pyBaldes documentation</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/installation.html">Install pyBaldes</a><a href="../pybaldes/quickstart.html">pyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/api.html">pyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/models.html">Network models and shared masters</a><a href="../solver/column-imports.html">Finite column imports</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/robust-pd.html">Robust pickup and delivery with time windows</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/guides/releases.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Getting started</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="python-wheels-and-releases">Python wheels and releases</h1>
+<p>The <code>Python distributions</code> workflow builds <code>pybaldes</code> wheels for Linux x86-64
+and ARM64 (manylinux2014), and macOS Intel and Apple Silicon. Wheels use the
+CPython stable ABI, starting at Python 3.9. Each wheel is installed and tested
+outside the checkout on Python 3.9 and 3.14 before it can be released.</p>
+<p>The standard wheel includes bundled Clp, multi-time-window resources and the
+default master branching policies. It uses portable CPU settings. HiGHS,
+Gurobi and CUDA require separate source builds; Windows wheels are not currently
+built because the bundled native backend configuration targets Unix systems.</p>
+<h2 id="create-a-release">Create a release</h2>
+<ol>
+<li>
+<p>Set the same version in the root <code>Cargo.toml</code> and
+<code>python/rust/Cargo.toml</code>, then refresh <code>Cargo.lock</code> with <code>cargo check -p pybaldes</code>.
+Python package metadata derives its version from the bindings crate.</p>
+</li>
+<li>
+<p>Commit the release changes and push the commit.</p>
+</li>
+<li>
+<p>Create and push a matching version tag, for example:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">python<span class="w"> </span>.github/scripts/check_release.py<span class="w"> </span>--tag<span class="w"> </span>v2.0.2
+git<span class="w"> </span>tag<span class="w"> </span>-a<span class="w"> </span>v2.0.2<span class="w"> </span>-m<span class="w"> </span><span class="s1">'BALDES 2.0.2'</span>
+git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v2.0.2
+</code></pre></div>
+</li>
+</ol>
+<p>A pushed <code>v*</code> tag triggers validation, builds all four wheels and a source
+archive, publishes them to PyPI, and creates a GitHub release with generated notes and
+<code>SHA256SUMS</code> after PyPI publication succeeds.
+A failed build or installed-wheel test prevents release publication. The source
+archive includes the vendored Clp/CoinUtils files, and wheel builds start from
+that archive to check source completeness.</p>
+<p>Tags must match the Cargo version exactly. Prerelease versions use Cargo syntax,
+for example <code>2.1.0-rc.1</code> and tag <code>v2.1.0-rc.1</code>; maturin normalizes Python package
+metadata. Prereleases are marked as such and do not replace the latest release.
+Existing releases are not overwritten automatically.</p>
+<p>Pull requests affecting packaging or solver sources also run the distribution
+builds. A manual workflow run builds and tests artifacts without publishing.
+The isolated PyPI job uses the repository secret <code>PYPI_API_TOKEN</code> with token
+authentication. It receives tested artifacts and does not execute repository
+build scripts. Existing PyPI files are skipped to allow retries after a partial
+upload. Token authentication does not enable trusted-publishing attestations.
+Only the GitHub release job has repository write permission; it uses the standard
+GitHub token.</p>
+<h2 id="install-or-build">Install or build</h2>
+<p>Install from PyPI in a virtual environment:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
+.venv/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>pybaldes
+</code></pre></div>
+<p>For a local source build, initialize native dependencies first:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>--recursive
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'maturin[patchelf]&gt;=1.9.4,&lt;2'</span>
+maturin<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--locked<span class="w"> </span>--sdist<span class="w"> </span>--out<span class="w"> </span>dist
+</code></pre></div>
+<p>Local Linux builds use the host's system ABI. Official Linux wheels use the
+manylinux build container and its portability checks. See
+<a href="python.html">Python bindings</a> for editable builds and optional backends.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="../benchmarks/ipm-factorization.html"><small>Previous guide</small>IPM factorization: cached assembly and lower-triangle updates <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#create-a-release">Create a release</a><a class="toc-level-2" href="#install-or-build">Install or build</a></nav></aside>
+</div>
+</body></html>

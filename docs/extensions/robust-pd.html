@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Robust pickup and delivery with time windows baldes::extensions::robust_pd models the one-to-one RPDPTW inAbreu, Battarra, Costa and Munari, The robust pickup and delivery problemw">
+<meta name="theme-color" content="#0b0e11">
+<title>Robust pickup and delivery with time windows — BALDES docs</title>
+<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/robust-pd.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/solve.html">Unified solve interface</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/architecture.html">Solver architecture and ownership</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: pyBaldes</a><a href="../guides/releases.html">Python wheels and releases</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">pyBaldes documentation</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/installation.html">Install pyBaldes</a><a href="../pybaldes/quickstart.html">pyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/api.html">pyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/models.html">Network models and shared masters</a><a href="../solver/column-imports.html">Finite column imports</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="pstep.html">P-step CVRP and VRPTW extension</a><a href="evrp.html">EVRP implementation status</a><a href="robust.html">Robust vehicle routing</a><a href="robust-pd.html" aria-current="page">Robust pickup and delivery with time windows</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/robust-pd.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Extensions</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="robust-pickup-and-delivery-with-time-windows">Robust pickup and delivery with time windows</h1>
+<p><code>baldes::extensions::robust_pd</code> models the one-to-one RPDPTW in
+Abreu, Battarra, Costa and Munari, <em>The robust pickup and delivery problem
+with time windows</em>, EJOR 335 (2026), 812–828
+(<a href="https://doi.org/10.1016/j.ejor.2026.03.031">paper</a>).</p>
+<p>The 60 original benchmark files in <code>instances/RobustPDPTW/</code> contain
+5–75 requests, in classes AA, BB, CC and DD. Their pinned source and hashes
+are recorded in <a href="https://github.com/lseman/baldes/blob/main/scripts/data/robust_pd_manifest.json"><code>scripts/data/robust_pd_manifest.json</code></a>.
+Instance files follow the repository's existing policy for local downloaded data.
+Download or verify them with:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">python3<span class="w"> </span>scripts/download_robust_pd.py<span class="w"> </span>--download
+</code></pre></div>
+<p>Run native branch-and-price with Clp:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh"><span class="c1"># FILE Γq Γt σq σt SECONDS</span>
+cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,multi-time-windows<span class="w"> </span>--example<span class="w"> </span>robust_pdptw<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>instances/RobustPDPTW/AA05.txt<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">0</span>.1<span class="w"> </span><span class="m">0</span>.1<span class="w"> </span><span class="m">60</span>
+
+<span class="c1"># Deterministic baseline, retaining the paper's nominal-demand adjustment.</span>
+cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,multi-time-windows<span class="w"> </span>--example<span class="w"> </span>robust_pdptw<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>instances/RobustPDPTW/AA05.txt<span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="m">60</span>
+</code></pre></div>
+<p>The example prints termination status, numerical lower bound, incumbent,
+routes, worst load, and worst return time. It independently replays every
+incumbent route and verifies request coverage and total objective.
+An incomplete or time-limited result is not an optimality claim.</p>
+<p>The maintained interface is the Rust model and runnable example above. Local
+Python/Gurobi formulation experiments may live under ignored <code>working/</code>; they
+are not part of a fresh checkout or the public Python solve interface.</p>
+<h2 id="model">Model</h2>
+<p>Each request i has pickup i and delivery i+n on the same route, in that
+order. Vehicles start at depot 0 and finish at the distinct depot 2n+1.
+Every request is served exactly once. The fleet is homogeneous and has
+up to n vehicles; departures cost 10,000 by default, as in paper §6.1.</p>
+<p>At each route position, let O be the set of requests currently on board.
+Robust capacity is checked using Proposition 1 (paper p. 815):</p>
+<div class="code-block"><div class="code-heading"><span>text</span></div><pre><code class="language-text">load(O) = sum(q[i] for i in O)
+        + sum(the Γq largest demand deviations among requests in O)
+</code></pre></div>
+<p>A delivery removes its entire request, including its uncertainty. Already
+delivered requests do not consume load or demand-uncertainty budget at a
+later position. This preserves the common demand realization of each
+pickup/delivery pair.</p>
+<p>Travel-time robustness uses the existing <code>BudgetedTime</code> resource and the
+paper's equation (6). For each γ from zero through Γt, it retains the
+worst service start, including waiting and the preceding node's service.
+Every customer window and the return-depot window must hold. Waiting can
+absorb delays, so summing the largest travel deviations alone is insufficient.</p>
+<p>The physical graph has one vertex per original node. A coupled plugin
+tracks visited and open requests, enforces elementarity, precedence and
+pairing, and checks capacity in both directions. Joins replay the suffix
+against the forward state. Conservative equality dominance compares
+both sets. The shared master has one set-partitioning row per request;
+the pickup contributes its coefficient exactly once.</p>
+<h2 id="input-conventions">Input conventions</h2>
+<p><code>Instance::read</code> validates consecutive node ids, signed demand pairs,
+finite data, time windows, and zero depot demand/service.
+<code>Problem::new(instance, Parameters)</code> preserves original file data and
+derives effective demands and deviations separately.</p>
+<p>Defaults apply the §6.1 adjustment before generating demand deviations:
+for original request demand q and <code>a=ceil(0.3*q)</code>, if <code>q+a &gt; Q</code>, replace
+the nominal demand by <code>Q-a</code>. This adjustment also applies in deterministic
+runs so comparisons share the same nominal demands. Set
+<code>Parameters::adjust_demands=false</code> to use the raw demands.
+Deviations are <code>ceil(σq*q)</code> and <code>ceil(σt*t)</code>. Budgets are nonnegative integers.</p>
+<p>The coordinate-only files do not explicitly supply a travel matrix. The
+default uses <strong>Euclidean distance rounded to the nearest 0.01</strong> for nominal
+cost and travel time. This convention matches the upstream workbook's
+nominal objectives for all four five-request instances; the PDF itself
+does not specify a coordinate rounding rule. <code>Parameters::distance_rounding</code>
+can select <code>DistanceRounding::FullPrecision</code>. The example accepts a final
+<code>none</code> argument for that convention (default: <code>hundredth</code>).</p>
+<h2 id="validation-and-boundaries">Validation and boundaries</h2>
+<p>Regression tests compare replay against exhaustive demand and arc-delay
+scenarios, compare every forward/backward join split, compare native
+pricing against exhaustive routes, and compare the integer master against
+an independently enumerated set partition on two requests. All 60 files
+are parsed by an opt-in test after downloading:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--lib<span class="w"> </span>extensions::robust_pd
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--lib<span class="w"> </span>all_downloaded_instances_parse<span class="w"> </span>--<span class="w"> </span>--ignored
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--features<span class="w"> </span>clp,multi-time-windows<span class="w"> </span>--lib<span class="w"> </span>extensions::robust_pd
+</code></pre></div>
+<p>All 76 five-request configurations listed in the upstream workbook were
+also solved to optimality and matched an independent exhaustive route and
+set-partitioning reference. Of those, 73 match the published objectives.
+Three differ under the paper's stated ceiling rule for travel deviations:
+<code>AA05_5_30_5_30</code>, <code>BB05_0_0_1_10</code>, and <code>BB05_1_10_1_10</code>.
+Those differences disappear in the reference when replacing ceiling by
+unrounded or nearest-rounded travel deviations. The implementation retains
+the paper's ceiling rule. Details are in the internal evidence directory.</p>
+<p>This is native robust pricing with a general branch-and-price master.
+It does not implement the paper's compact MIP, RRCI/RIPEI separators,
+or its complete experimental benchmark campaign. Exact request histories
+can produce exponentially many labels; large-instance scalability is
+not established. The pairing/load plugin supplies an independent bounded-work certificate
+using outward-rounded load sums. The example uses the master's numerical
+bound mode; no large-instance bound-certification campaign has been run.
+The initial twelve-case ten-request smoke test returned five Optimal and seven
+Incomplete results. A subsequent shared-master fix closes stalled nodes when
+their selected lower bound rules out improving an existing validated incumbent.
+It does not treat finite artificial penalties as an infeasibility proof.
+Repeating all 24 five-/ten-request settings three times now returns Optimal in
+all 72 runs, with unchanged objectives and independently replayed incumbents.
+The 21 formerly incomplete ten-request repetitions all close. Evidence and
+remaining work are tracked in
+local ignored <code>internal/robust-pd/</code>; these are investigation artifacts, not shipped documentation.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="robust.html"><small>Previous guide</small>Robust vehicle routing <span aria-hidden="true">↗</span></a><a href="ipm.html"><small>Next guide</small>BALDES IPM in Rust <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#model">Model</a><a class="toc-level-2" href="#input-conventions">Input conventions</a><a class="toc-level-2" href="#validation-and-boundaries">Validation and boundaries</a></nav></aside>
+</div>
+</body></html>

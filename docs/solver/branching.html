@@ -20,7 +20,7 @@
 <nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
 <div class="docs-layout">
 <aside class="docs-sidebar">
-<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: pyBaldes</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="feasibility.html">Routing feasibility recovery</a><a href="branching.html" aria-current="page">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="stabilization.html">Dual-price stabilization</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">pyBaldes documentation</a><a href="../pybaldes/installation.html">Install pyBaldes</a><a href="../pybaldes/quickstart.html">pyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/api.html">pyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/mp.html">Multi-pricing: one master, multiple pricing subproblems</a><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/column-imports.html">Finite column imports</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/solve.html">Unified solve interface</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/architecture.html">Solver architecture and ownership</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: pyBaldes</a><a href="../guides/releases.html">Python wheels and releases</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">pyBaldes documentation</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/installation.html">Install pyBaldes</a><a href="../pybaldes/quickstart.html">pyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/api.html">pyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="models.html">Network models and shared masters</a><a href="column-imports.html">Finite column imports</a><a href="tree.html">Branch-and-price tree and node lifecycle</a><a href="feasibility.html">Routing feasibility recovery</a><a href="branching.html" aria-current="page">Routing branching</a><a href="cuts.html">Routing cuts</a><a href="stabilization.html">Dual-price stabilization</a><a href="enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/robust-pd.html">Robust pickup and delivery with time windows</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a></div></nav></details>
 <a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/solver/branching.md">View Markdown source ↗</a>
 </aside>
 <main id="content" class="doc-main" tabindex="-1">
@@ -43,7 +43,7 @@ unit customer coverage with equality rows.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>--branching native</code> (default)</td>
+<td><code>--branching default</code> (default)</td>
 <td>Vehicle count, packing-set assignment, Ryan–Foster, arc flow</td>
 </tr>
 <tr>
@@ -87,7 +87,7 @@ and arc flow 1.
 These are Baldes adapter settings; reference model interfaces also register
 priorities explicitly. Every supplied priority must be finite.</p>
 <div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>vrptw<span class="w"> </span>instances/Solomon/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span>--tree<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>solve<span class="w"> </span>instances/Solomon/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span>--tree<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--branching<span class="w"> </span>ryan-foster<span class="w"> </span>--time<span class="w"> </span><span class="m">60</span>
 </code></pre></div>
 <p>Rust configures the family flags through <code>TreeOptions::branching</code>, whose type
@@ -163,7 +163,7 @@ most <code>floor(f)</code> or at least <code>ceil(f)</code>. Route coefficients 
 the arc; branch duals also reach pricing through that arc.</p>
 <p><code>BranchConstraint::ArcFlow::arc</code> takes the arc's <strong>position in
 <code>problem.graph.arcs</code></strong>, while <code>Route::arcs</code> stores public arc IDs. Use
-<code>RootProblem::arc_position(id)</code> to convert an ID to a position.</p>
+<code>RoutingContext::arc_position(id)</code> to convert an ID to a position.</p>
 <h2 id="aggregate-flow-and-edges">Aggregate flow and edges</h2>
 <p><code>BranchConstraint::AggregateFlow</code> branches on a fixed integer combination of arc
 traversals, the routing counterpart of the reference's generic aggregate
@@ -179,7 +179,7 @@ undirected edge <code>{u, v}</code>, named <code>edge:u-v</code>, counting both 
 parallel arcs. This is the edge variable of symmetric models. Both sources share
 the <code>aggregate_flow</code> priority, and the arc family remains the fallback.</p>
 <p>The routing tree has one pricing network, so the reference's cross-network
-aggregate membership has no counterpart here; the multi-network MP tree keeps
+aggregate membership has no counterpart here; the explicit-network tree keeps
 its own dispatcher. Edge packing sets reduce to the same disjunction: an edge
 set used fractionally by the single network is branched as its aggregate flow.</p>
 <h2 id="strong-branching-and-diving">Strong branching and diving</h2>
@@ -282,10 +282,10 @@ methods, and the add/clear methods on <code>Solver</code>. To request a split ne
 <code>threshold = t + 1e-6</code>; <code>boundary()</code> reports the actual floating-point split.
 Older builds used the supplied threshold directly. Existing callers that need
 to preserve their split must account for the offset when upgrading.</p>
-<p><code>--branching hybrid</code> enables both new families alongside the native families.
+<p><code>--branching hybrid</code> enables both new families alongside the standard families.
 Vehicle count keeps its first default priority. Resource/cluster candidates
 share the next priority; assignment, Ryan–Foster and arc flow remain fallbacks.
-<code>native</code> remains the default, with both new families disabled.</p>
+<code>default</code> remains the default, with both new families disabled.</p>
 <h2 id="branch-evaluation-history">Branch evaluation history</h2>
 <p>Tree search enables branch evaluation history by default, using the recovered
 native ranking rules. No extra flag is required. <code>--no-branch-history</code> disables
@@ -341,7 +341,7 @@ retain canonical labels. Automatic name mapping across native model interfaces
 remains unverified, so
 identical native candidate selection is not guaranteed. No speed improvement
 is claimed.</p>
-<p>Rust defaults select <code>BranchHistoryPolicy::ObservedNative</code> in
+<p>Rust defaults select <code>BranchHistoryPolicy::Default</code> in
 <code>BranchHistoryOptions</code>. Per-network route-count branches remain fresh candidates;
 this policy excludes them from stored-history ranking and generator replay.
 Their trial measurements remain available in diagnostics. The earlier <code>Reliable</code> policy remains available through
@@ -352,7 +352,7 @@ the default observed-native policy. Set <code>TreeOptions::branch_history</code>
 to disable history. The public <code>score_with_gap</code> method accepts the current
 incumbent-minus-parent gap.</p>
 <div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>vrptw<span class="w"> </span>instances/Solomon/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span>--tree<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>solve<span class="w"> </span>instances/Solomon/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span>--tree<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--branching<span class="w"> </span>hybrid<span class="w"> </span>--time<span class="w"> </span><span class="m">60</span><span class="w"> </span>--json<span class="w"> </span>/tmp/tree.json
 </code></pre></div>
 </article>

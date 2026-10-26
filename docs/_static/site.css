@@ -1378,6 +1378,13 @@ img,svg {
 .example-features li::before { content: '+'; color: #86ddeb; position: absolute; left: 0 }
 .landing-dark .example-grid .terminal { border-radius: 12px }
 .landing-dark .example-grid pre { border: 0; border-radius: 0; padding: 28px; font-size: 12px }
+.cite-section .example-grid { margin-top: 0; grid-template-columns: .55fr 1.45fr; gap: 56px }
+@media (max-width: 640px) { .cite-section .example-grid { grid-template-columns: 1fr } }
+.cite-section .example-copy h2 { font-size: clamp(28px, 3vw, 38px); line-height: 1.15; letter-spacing: -.05em; margin: 18px 0 }
+.cite-section .example-copy .text-link { color: #86ddeb }
+.landing-dark .cite-section .copy-button { opacity: 1; min-height: 30px }
+.landing-dark .cite-section pre:has(.copy-button) { padding-top: 46px }
+.landing-dark .cite-section pre code { white-space: pre }
 .file-dot { width: 7px; height: 7px; border-radius: 50%; background: #bba0ff }
 .terminal-language { margin-left: auto; color: #86ddeb }
 .more-start { margin-top: 32px; padding: 20px 24px; border: 1px solid var(--line); border-radius: 10px }
@@ -1495,8 +1502,31 @@ img,svg {
   filter:drop-shadow(0 0 4px #22d3ee55)
 }
 
-.landing-dark #route-vehicles circle {
+.landing-dark #route-vehicles .customer-ping,
+.landing-dark .route-truck {
   filter:drop-shadow(0 0 7px #22d3eecc)
+}
+
+.route-truck {
+  stroke-dasharray:none;
+  stroke-width:1.6;
+  stroke-linejoin:round;
+  pointer-events:none
+}
+
+.route-truck .truck-cargo,
+.route-truck .truck-cab {
+  fill:var(--surface)
+}
+
+.route-truck .truck-window {
+  fill:none;
+  stroke-width:1
+}
+
+.route-truck .truck-wheel {
+  fill:var(--ink);
+  stroke-width:1.2
 }
 
 @media (max-width:1000px) {
@@ -1587,7 +1617,7 @@ img,svg {
   -webkit-font-smoothing:antialiased
 }
 
-.landing-dark :is(.guide-card h3, .route-card-header h2, .example-copy h3, .install-card h3, .setup-strip h3, .more-start h3) {
+.landing-dark :is(.guide-card h3, .route-card-header h2, .example-copy :is(h2, h3), .install-card h3, .setup-strip h3, .more-start h3) {
   font-family:var(--sans);
   font-weight:600;
   letter-spacing:-.02em

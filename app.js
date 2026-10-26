@@ -43,16 +43,46 @@
       vehicles.setAttribute('aria-hidden', 'true');
       document.querySelector('#route-map').append(vehicles);
       paths.forEach((path, route) => {
-        if (motion.matches) return;
         const length = path.getTotalLength();
         const duration = length * 3;
-        const vehicle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        vehicle.setAttribute('r', '7');
-        vehicle.setAttribute('class', `route-${route}`);
-        vehicle.setAttribute('fill', 'var(--surface)');
-        vehicle.setAttribute('stroke-width', '3');
-        vehicle.style.opacity = '0';
+        // A small box truck drawn facing +x, centred on its position.
+        const vehicle = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        vehicle.setAttribute('class', `route-truck route-${route}`);
+        vehicle.innerHTML = '<g class="truck-body">'
+          + '<rect class="truck-cargo" x="-13" y="-7" width="17" height="14" rx="2"/>'
+          + '<path class="truck-cab" d="M5 -6h4.5l4.5 4.5v7.5h-9Z"/>'
+          + '<path class="truck-window" d="M7 -4h2l2.5 2.5h-4.5Z"/>'
+          + '<circle class="truck-wheel" cx="-8" cy="7.5" r="2.6"/>'
+          + '<circle class="truck-wheel" cx="9" cy="7.5" r="2.6"/></g>';
         vehicles.append(vehicle);
+        const place = at => {
+          const point = path.getPointAtLength(at);
+          // Head toward a point just ahead; mirror rather than drive upside down.
+          const ahead = path.getPointAtLength(Math.min(at + 4, length));
+          const behind = path.getPointAtLength(Math.max(at - 4, 0));
+          const angle = Math.atan2(ahead.y - behind.y, ahead.x - behind.x) * 180 / Math.PI;
+          const flip = Math.abs(angle) > 90 ? ' scale(1.35 -1.35)' : ' scale(1.35)';
+          vehicle.setAttribute('transform', `translate(${point.x} ${point.y}) rotate(${angle})${flip}`);
+        };
+        // With reduced motion the routes stay drawn and only the trucks loop.
+        if (motion.matches) {
+          const lap = length * 7;
+          const offset = performance.now() - route * lap / paths.length;
+          let frame;
+          const loop = now => {
+            place(length * (((now - offset) / lap) % 1));
+            frame = requestAnimationFrame(loop);
+          };
+          frame = requestAnimationFrame(loop);
+          const park = () => {
+            cancelAnimationFrame(frame);
+            place(length / 2);
+          };
+          place(0);
+          animations.push({ cancel:park, finish:park });
+          return;
+        }
+        vehicle.style.opacity = '0';
         const startsAt = performance.now() + delay;
         let frame;
         const move = now => {
@@ -62,10 +92,10 @@
             return;
           }
           if (progress >= 0) {
-            const point = path.getPointAtLength(length * progress);
-            vehicle.setAttribute('cx', point.x);
-            vehicle.setAttribute('cy', point.y);
-            vehicle.style.opacity = '1';
+            place(length * progress);
+            // Pull out of and back into the depot.
+            const edge = Math.min(progress, 1 - progress) * duration;
+            vehicle.style.opacity = String(Math.min(1, edge / 220));
           }
           frame = requestAnimationFrame(move);
         };
@@ -127,7 +157,7 @@
     });
     const syncVisibility = () => {
       clearTimeout(timer);
-      if (visible && !document.hidden && playing) update();
+      if (visible && !document.hidden && (playing || motion.matches)) update();
       else animations.forEach(animation => animation.finish());
     };
     if ('IntersectionObserver' in window) {
