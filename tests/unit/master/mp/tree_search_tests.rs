@@ -7,6 +7,14 @@ use super::{
 fn native_strategy2_uses_guarded_integer_rounded_numerical_bound() {
     let almost_above_integer = 1.000_000_5;
     assert_eq!(
+        NativeIntegerBoundRounding::default(),
+        NativeIntegerBoundRounding::Unrounded
+    );
+    assert_eq!(
+        native_strategy2_bound_values(1.5, 10.0, NativeIntegerBoundRounding::Unrounded),
+        1.5
+    );
+    assert_eq!(
         native_strategy2_bound_values(
             almost_above_integer,
             10.0,

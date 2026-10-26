@@ -26,7 +26,7 @@ Solve shared master rows with multiple pricing networks (Clp).
   --proximal-penalty X    Finite band penalty; omitted means hard box-step
   --network-branching MODE  multiplicity-first (default), resource-first or native-phased
   --network-tree-search MODE  native-default (default), best-bound or native-strategy-2
-  --network-strategy2-rounding MODE  guarded-tolerance (default) or exact-ceil
+  --network-strategy2-rounding MODE  unrounded (default), guarded-tolerance or exact-ceil
   --network-open-node-limit N  Native primary frontier size (default: 1000)
   --synchronized-services FILE  JSON array of common-start service definitions
   --resource-branches FILE  Apply a JSON array of grouped-resource restrictions
@@ -151,15 +151,15 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
             }
             "--network-strategy2-rounding" => {
                 options.network_strategy2_bound_rounding = match value()?.as_str() {
+                    "unrounded" => baldes::master::mp::NativeIntegerBoundRounding::Unrounded,
                     "guarded-tolerance" => {
                         baldes::master::mp::NativeIntegerBoundRounding::GuardedTolerance
                     }
                     "exact-ceil" => baldes::master::mp::NativeIntegerBoundRounding::ExactCeil,
-                    _ => {
-                        return Err(
-                            "strategy-2 rounding must be guarded-tolerance or exact-ceil".into(),
-                        )
-                    }
+                    _ => return Err(
+                        "strategy-2 rounding must be unrounded, guarded-tolerance or exact-ceil"
+                            .into(),
+                    ),
                 }
             }
             "--network-open-node-limit" => {

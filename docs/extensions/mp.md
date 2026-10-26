@@ -269,14 +269,14 @@ that pairwise rule and the native vector-heap operations, including overflow
 priority. Since tolerance-based pairwise ties are not transitive, this policy
 uses a custom heap rather than Rust's ordering-based `BinaryHeap`.
 `network_tree_search="native-strategy-2"` selects native strategy 2. It orders
-queued children by the integer-rounded numerical LP dual bound, then the native
+queued children by the numerical LP dual bound, then the native
 child primal-bound sentinels, depth, parent branch-and-price rank and creation
 order. The child primal sentinels are equal before evaluation, so depth and
-parent rank decide ties. The default `network_strategy2_rounding="guarded-tolerance"`
-matches the pinned native default (`integerValuedBound < 1`); set it to
-`"exact-ceil"` to model the native `integerValuedBound >= 1` path at boundaries
-within the guarded tolerance. CLI uses
-`--network-strategy2-rounding guarded-tolerance|exact-ceil`; JSON uses
+parent rank decide ties. The default `network_strategy2_rounding="unrounded"`
+matches the native continuous-objective bound contract with nonpositive
+`integerValuedBound`. Integer-objective models can select `"guarded-tolerance"`
+for tolerant integer rounding, or `"exact-ceil"` for forced integer rounding.
+CLI uses `--network-strategy2-rounding unrounded|guarded-tolerance|exact-ceil`; JSON uses
 `"network_strategy2_bound_rounding"`. These are ranking keys only and do not
 alter proof bounds.
 

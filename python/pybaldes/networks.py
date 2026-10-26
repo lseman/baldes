@@ -347,7 +347,7 @@ def solve_networks(
     network_promising_limit: int = 1000000,
     network_branching: str = "multiplicity-first",
     network_tree_search: str = "native-default",
-    network_strategy2_rounding: str = "guarded-tolerance",
+    network_strategy2_rounding: str = "unrounded",
     network_open_node_limit: int = 1000,
     network_branch_priorities: Optional[Mapping[str, float]] = None,
     mapped_variables: Tuple[Mapping[str, Any], ...] = (),

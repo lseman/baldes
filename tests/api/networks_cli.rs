@@ -463,6 +463,8 @@ fn native_depth_first_search_separates_processed_and_evaluated_nodes() {
     let all_overflow = run("native-default", Some("0"), None);
     let best_bound = run("best-bound", None, None);
     let strategy2 = run("native-strategy-2", None, None);
+    let strategy2_unrounded = run("native-strategy-2", None, Some("unrounded"));
+    let strategy2_guarded = run("native-strategy-2", None, Some("guarded-tolerance"));
     let strategy2_exact_ceil = run("native-strategy-2", None, Some("exact-ceil"));
     assert_eq!(native["status"], "Optimal");
     assert_eq!(best_bound["status"], "Optimal");
@@ -488,6 +490,9 @@ fn native_depth_first_search_separates_processed_and_evaluated_nodes() {
     assert_eq!(strategy2["incumbent"], 2.);
     assert_eq!(strategy2["tree_processed_nodes"], 5);
     assert_eq!(strategy2["nodes"], 5);
+    assert_eq!(strategy2_unrounded["tree_processed_nodes"], 5);
+    assert_eq!(strategy2_guarded["tree_processed_nodes"], 7);
+    assert_eq!(strategy2_guarded["nodes"], 6);
     let model: Value =
         serde_json::from_slice(&std::fs::read(&model).expect("read native comparison fixture"))
             .unwrap();

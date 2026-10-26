@@ -69,10 +69,12 @@ impl NetworkTreeSearchPolicy {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum NativeIntegerBoundRounding {
-    /// Native `integerValuedBound < 1`: subtract its guarded tolerance, then ceil.
+    /// Native nonpositive control with a continuous-objective bound tag.
     #[default]
+    Unrounded,
+    /// Native nonpositive control with an integer-objective bound tag.
     GuardedTolerance,
-    /// Native `integerValuedBound >= 1`: ceil the numerical bound directly.
+    /// Native positive rounding control: ceil the numerical bound directly.
     ExactCeil,
 }
 
@@ -222,7 +224,8 @@ fn native_bound_less(left: f64, right: f64) -> bool {
     left < right - epsilon
 }
 
-/// Strategy 2 uses the native node's integer-rounded secondary dual bound.
+/// Strategy 2 uses the native node's secondary dual bound, whose rounding
+/// depends on the declared objective contract.
 /// BALDES keeps the underlying numerical LP bound separately from its
 /// controller-certified bound, so the native queue key is derived from the
 /// numerical channel and never from certification metadata.
@@ -250,6 +253,7 @@ fn native_strategy2_bound_values(
         return bound;
     }
     match rounding {
+        NativeIntegerBoundRounding::Unrounded => bound,
         NativeIntegerBoundRounding::GuardedTolerance => {
             let epsilon = 1e-6 + 1e-10 * bound.abs();
             (bound - epsilon).ceil()
