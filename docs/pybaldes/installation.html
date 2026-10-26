@@ -103,6 +103,14 @@ Low-level <code>Solver</code> pricing and <code>ResourceModel</code> do not requ
 <td><code>ng-memory-31</code> / <code>ng-memory-63</code></td>
 <td>Increase compiled NG memory from the default 15; 63 takes precedence</td>
 </tr>
+<tr>
+<td><code>ryan-foster-master</code> (default)</td>
+<td>Enforce Ryan–Foster branches through master rows, matching modern MetaSolver</td>
+</tr>
+<tr>
+<td><code>accumulated-resource-master</code> (default)</td>
+<td>Enforce accumulated-resource branches through master rows, matching modern MetaSolver</td>
+</tr>
 </tbody>
 </table></div>
 <p>The Python feature list is defined by <a href="https://github.com/lseman/baldes/blob/main/python/rust/Cargo.toml">python/rust/Cargo.toml</a>.
@@ -113,6 +121,9 @@ Gurobi environment variables, and backend requirements.</p>
 <p>For a pricing-only extension:</p>
 <div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.<span class="w"> </span>--config-settings<span class="o">=</span>build-args<span class="o">=</span>--no-default-features
 </code></pre></div>
+<p>This also selects pricing-enforced Ryan–Foster and accumulated-resource
+branches. Add <code>--features clp</code> if the extension should retain LP/network solving
+while using those pricing-enforced policies.</p>
 <p>For HiGHS or Gurobi, first configure the native installation as described in the
 build guide, then build with the corresponding feature:</p>
 <div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-bash">python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.<span class="w"> </span>--config-settings<span class="o">=</span>build-args<span class="o">=</span><span class="s2">"--features highs"</span>

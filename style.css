@@ -241,7 +241,12 @@ img,svg {
 .hero-copy > :nth-child(5) { animation-delay:.32s }
 
 .hero .route-card {
-  animation:hero-reveal .9s .18s ease-out both
+  animation:hero-card-reveal .9s .18s ease-out both
+}
+
+@keyframes hero-card-reveal {
+  from { opacity:0; translate:0 18px }
+  to { opacity:1; translate:0 0 }
 }
 
 .hero #route-lines {
@@ -1405,4 +1410,281 @@ img,svg {
 }
 .landing-dark .start-section .copy-button { opacity: 1; min-height: 30px }
 
-.landing-dark .hero .route-card { transform: none }
+
+/* Living hero figure: a tilted card that follows the pointer, floats gently
+   and pulses at the depot. app.js sets --tilt-x/--tilt-y/--glare-*. */
+.route-stage {
+  perspective:1400px;
+  perspective-origin:20% 40%;
+  animation:route-float 7s ease-in-out 1.2s infinite
+}
+
+.hero .route-stage .route-card {
+  --tilt-x:6deg;
+  --tilt-y:-14deg;
+  --glare-x:30%;
+  --glare-y:20%;
+  --glare:.0;
+  transform:rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) rotateZ(1deg);
+  transform-style:preserve-3d;
+  transition:transform .7s cubic-bezier(.2,.7,.2,1), box-shadow .7s;
+  box-shadow:-30px 38px 80px #0007, -8px 10px 24px #0003, inset 0 1px #ffffff08;
+  will-change:transform
+}
+
+.hero .route-stage .route-card.is-tracking {
+  transition:transform .12s ease-out, box-shadow .3s
+}
+
+.hero .route-stage .route-card::after {
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  border-radius:inherit;
+  background:radial-gradient(circle at var(--glare-x) var(--glare-y), #ffffff1f, transparent 45%);
+  opacity:var(--glare);
+  transition:opacity .5s;
+  mix-blend-mode:screen
+}
+
+.hero .route-stage .route-card::before {
+  content:"";
+  position:absolute;
+  inset:-1px;
+  pointer-events:none;
+  border-radius:inherit;
+  padding:1px;
+  background:linear-gradient(135deg, #22d3ee55, transparent 35%, transparent 65%, #8b5cf655);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  opacity:.8
+}
+
+@keyframes route-float {
+  0%,100% { translate:0 0 }
+  50% { translate:0 -9px }
+}
+
+.depot-pulse {
+  fill:none;
+  stroke:var(--green);
+  stroke-width:2;
+  transform-box:fill-box;
+  transform-origin:center;
+  animation:depot-pulse 3.2s ease-out infinite
+}
+
+.depot-pulse-late {
+  animation-delay:1.6s
+}
+
+@keyframes depot-pulse {
+  from { transform:scale(1); opacity:.55 }
+  to { transform:scale(2.6); opacity:0 }
+}
+
+.customer-ping {
+  fill:none;
+  stroke-width:2;
+  pointer-events:none
+}
+
+.landing-dark #route-lines polyline {
+  filter:drop-shadow(0 0 4px #22d3ee55)
+}
+
+.landing-dark #route-vehicles circle {
+  filter:drop-shadow(0 0 7px #22d3eecc)
+}
+
+@media (max-width:1000px) {
+  .route-stage { perspective-origin:50% 50% }
+  .hero .route-stage .route-card { --tilt-x:4deg; --tilt-y:-8deg }
+}
+
+@media (max-width:760px) {
+  .hero .route-stage .route-card {
+    transform:none;
+    box-shadow:0 18px 50px #0005
+  }
+  .route-stage { animation:none }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-stage, .depot-pulse { animation:none }
+  .depot-pulse { opacity:0 }
+  .hero .route-stage .route-card { transition:none }
+}
+
+@media (forced-colors: active) {
+  .hero .route-stage .route-card::before, .hero .route-stage .route-card::after { display:none }
+}
+
+
+/* Alternating sections: color band, plain, color band, plain. Hero and
+   footer stay plain; 01 and 03 are bands. One brand accent throughout. */
+.landing-dark main { overflow-x:clip }
+
+.landing-dark { --band:#0f1e28; --band-card:#142733; --band-edge:#21404f }
+
+.landing-dark :is(.start-section, .guides-section) {
+  position:relative;
+  isolation:isolate
+}
+
+.landing-dark .start-section {
+  background:var(--band);
+  border-block:1px solid var(--band-edge)
+}
+
+.landing-dark .guides-section::before {
+  content:"";
+  position:absolute;
+  inset:0 calc(50% - 50vw);
+  z-index:-1;
+  pointer-events:none;
+  background:var(--band);
+  border-block:1px solid var(--band-edge)
+}
+
+.landing-dark :is(.start-section, .guides-section) :is(.guide-card, .install-card, .setup-strip) {
+  background:var(--band-card);
+  border-color:var(--band-edge)
+}
+
+.landing-dark .start-section pre {
+  background:#0a151d
+}
+
+.landing-dark main .section-heading .eyebrow,
+.landing-dark .example-copy .eyebrow {
+  color:var(--accent-3)
+}
+
+.landing-dark :is(.guide-card, .engine-card) {
+  transition:border-color .25s, box-shadow .25s, translate .25s
+}
+
+.landing-dark :is(.guide-card, .engine-card):hover {
+  border-color:var(--accent-3);
+  box-shadow:0 18px 50px #22d3ee1a;
+  translate:0 -3px
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-dark :is(.guide-card, .engine-card):hover { translate:none }
+}
+
+/* One type system on the landing page: Inter for text and headings,
+   JetBrains Mono for labels and code. The serif headings become Inter. */
+.landing-dark {
+  --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:"JetBrains Mono","SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+  --serif:var(--sans);
+  font-feature-settings:"cv11","ss01";
+  -webkit-font-smoothing:antialiased
+}
+
+.landing-dark :is(.guide-card h3, .route-card-header h2, .example-copy h3, .install-card h3, .setup-strip h3, .more-start h3) {
+  font-family:var(--sans);
+  font-weight:600;
+  letter-spacing:-.02em
+}
+
+.landing-dark .route-card-header h2 { font-size:19px }
+
+.landing-dark .start-section .guide-grid {
+  margin-bottom:36px
+}
+
+/* Stage illustrations in the three workflow cards (HGS routes, column
+   generation with cuts, branch-and-price), joined by arrow connectors.
+   Each loops a short animation; reduced motion shows the final state. */
+.landing-dark .start-section .guide-card { overflow:visible; position:relative }
+
+.stage-art {
+  display:block;
+  width:100%;
+  height:auto;
+  margin:-4px 0 22px;
+  padding:14px 12px;
+  border-radius:10px;
+  background:#0b1720;
+  border:1px solid #1d3542
+}
+
+.stage-art .tiny { font:10px var(--mono); fill:var(--muted); text-anchor:middle }
+.stage-art .tiny.end { text-anchor:end }
+.stage-art .best-text { fill:var(--accent-3) }
+.stage-art .box { fill:#122633; stroke:#2c5363 }
+.stage-art .box-text { font:600 13px var(--sans); fill:var(--ink); text-anchor:middle }
+
+.stage-hgs polyline { fill:none; stroke-width:2.4; stroke-linejoin:round; stroke-dasharray:1; animation:stage-draw 6s ease-in-out infinite }
+.stage-hgs .r0 { stroke:#22d3ee }
+.stage-hgs .r1 { stroke:#a78bfa; animation-delay:.5s }
+.stage-hgs .r2 { stroke:#94a3b8; animation-delay:1s }
+.stage-hgs .stops circle { fill:#0b1720; stroke:#5fc9da; stroke-width:1.4 }
+.stage-hgs .hub { fill:var(--accent-3); stroke:#0b1720; stroke-width:4 }
+
+.stage-cg .flow { fill:none; stroke:var(--accent-3); stroke-width:1.6; stroke-dasharray:4 4; animation:stage-flow 1s linear infinite }
+.stage-cg .flow.back { stroke:#a78bfa; animation-direction:reverse }
+.stage-cg .axis { stroke:#2b3d48 }
+.stage-cg .cut { stroke:#a78bfa; stroke-dasharray:2 4; opacity:.6 }
+.stage-cg .bound { fill:none; stroke:var(--accent-3); stroke-width:2.2; stroke-dasharray:1; animation:stage-draw 6s ease-in-out infinite }
+.stage-cg .cut-dot { fill:#a78bfa; animation:stage-pop 6s ease-out infinite }
+.stage-cg .d2 { animation-delay:.6s }
+.stage-cg .d3 { animation-delay:1.2s }
+
+.stage-tree .edge { fill:none; stroke:#3a5462; stroke-width:1.5 }
+.stage-tree .node { fill:#11202a; stroke:var(--accent-3); stroke-width:1.6 }
+.stage-tree .node.dim { stroke:#4b6573 }
+.stage-tree .node.pruned { stroke:#64748b }
+.stage-tree .x { stroke:#94a3b8; stroke-width:1.6 }
+.stage-tree .node.best { fill:var(--accent-3); stroke:#c7f6ff }
+.stage-tree :is(.n0, .n1, .n2, .n3, .n4) { animation:stage-pop 6s ease-out infinite }
+.stage-tree .n1 { animation-delay:.4s }
+.stage-tree .n2 { animation-delay:.8s }
+.stage-tree .n3 { animation-delay:1.2s }
+.stage-tree .n4 { animation-delay:1.6s }
+.stage-tree .best { filter:drop-shadow(0 0 6px #22d3eeaa) }
+
+/* Arrow connectors in the gaps between consecutive cards. */
+.landing-dark .start-section .guide-card + .guide-card::before {
+  content:"→";
+  position:absolute;
+  left:-22px;
+  top:92px;
+  z-index:1;
+  display:grid;
+  place-items:center;
+  width:26px;
+  height:26px;
+  border-radius:50%;
+  font:13px var(--sans);
+  color:#071116;
+  background:var(--accent-3);
+  box-shadow:0 0 0 4px var(--band, #0f1e28)
+}
+
+@keyframes stage-draw {
+  0% { stroke-dashoffset:1 }
+  35%, 100% { stroke-dashoffset:0 }
+}
+
+@keyframes stage-pop {
+  0% { opacity:0 }
+  12%, 100% { opacity:1 }
+}
+
+@keyframes stage-flow { to { stroke-dashoffset:-16 } }
+
+@media (max-width:760px) {
+  .landing-dark .start-section .guide-card + .guide-card::before { display:none }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-art :is(polyline, .flow, .cut-dot, .n0, .n1, .n2, .n3, .n4) { animation:none }
+}
+

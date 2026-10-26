@@ -276,24 +276,57 @@ metadata internally. Pass pricing options through <code>Options.pricing_options<
 Scalar resource capacity is a const generic, defaulting to two; see
 <a href="../reference/resources.html">scalar resources</a>.</p>
 <h2 id="assignment-tree">Assignment tree</h2>
-<p><code>solve_assignment_tree(problem, AssignmentTreeOptions)</code> runs a best-bound tree
-using network-aware snapshots. It tries proved shared resource-group splits,
+<p><code>solve_assignment_tree(problem, AssignmentTreeOptions)</code> uses network-aware
+snapshots. It tries proved shared resource-group splits,
 assignment rows, declared integer master variables, total network multiplicities,
-original physical-arc activities, then synchronized-service splits. It returns network-tagged
+original physical-arc activities, then synchronized-service splits. With
+<code>AssignmentTreeOptions::time_window_selection</code>, arc activities are summed over
+window copies and time-window selection counts follow them; see
+<a href="multi-time-windows.html#branching-on-time-window-selection">branching on time-window selection</a>.
+It returns network-tagged
 integer route quantities, an incumbent, selected bound mode, frontier bound and
 node/work-limit status. Integer witnesses replay original graph resources,
 shared rows and original multiplicities with exact sums; objectives round upward.
 Fixed routes are included in this replay. A rounded labeling resource profile
 alone never authorizes an incumbent or fixed route.</p>
 <p><code>AssignmentTreeOptions::branching</code> selects the family and child order.
-<code>NetworkBranchingPolicy::ResourceFirst</code> preserves the order above, with lower
-children first. <code>MultiplicityFirst</code> tries fractional network route counts first
-and visits upper children first, following the observed public native controls.
+<code>NetworkBranchingPolicy::MultiplicityFirst</code> is the default: it tries fractional
+network route counts first and visits upper children first, following the
+observed public native controls. <code>ResourceFirst</code> preserves the resource and
+assignment order above, with lower children first.
 It does not change disjunctions or proof bounds, and does not promise the same
 LP basis, generated columns or total node count as another backend. Select it
 with <code>--network-branching multiplicity-first</code>, JSON solve option
 <code>&quot;network_branching&quot;: &quot;multiplicity-first&quot;</code>, or Python
 <code>solve_networks(..., tree=True, network_branching=&quot;multiplicity-first&quot;)</code>.</p>
+<p>Tree selection is independent of branch-family selection.
+<code>NetworkTreeSearchPolicy::NativeDefault</code> (default) processes the deepest open
+node first, then the lowest inherited bound, then creation order. It uses the
+native 1,000-node primary frontier and its overflow queue. Select the
+bound-first queue with <code>NetworkTreeSearchPolicy::BestBound</code>, CLI
+<code>--network-tree-search best-bound</code>, JSON <code>&quot;network_tree_search&quot;: &quot;best-bound&quot;</code>,
+or Python <code>network_tree_search=&quot;best-bound&quot;</code>. Results retain <code>nodes</code> as the
+number of solved LP nodes and report <code>tree_processed_nodes</code> separately, including
+selected nodes closed by their inherited bound before an LP solve. Native mode
+uses this processed count for its tree node budget.
+<code>network_open_node_limit</code> controls the primary frontier capacity (native
+default 1000); overflow nodes use the native secondary priority queue. The CLI
+equivalent is <code>--network-open-node-limit N</code>. Native bound comparisons treat
+values as tied within <code>1e-6 + 1e-10 * max(abs(a), abs(b))</code>; BALDES reproduces
+that pairwise rule and the native vector-heap operations, including overflow
+priority. Since tolerance-based pairwise ties are not transitive, this policy
+uses a custom heap rather than Rust's ordering-based <code>BinaryHeap</code>.
+<code>network_tree_search=&quot;native-strategy-2&quot;</code> selects native strategy 2. It orders
+queued children by the integer-rounded numerical LP dual bound, then the native
+child primal-bound sentinels, depth, parent branch-and-price rank and creation
+order. The child primal sentinels are equal before evaluation, so depth and
+parent rank decide ties. The default <code>network_strategy2_rounding=&quot;guarded-tolerance&quot;</code>
+matches the pinned native default (<code>integerValuedBound &lt; 1</code>); set it to
+<code>&quot;exact-ceil&quot;</code> to model the native <code>integerValuedBound &gt;= 1</code> path at boundaries
+within the guarded tolerance. CLI uses
+<code>--network-strategy2-rounding guarded-tolerance|exact-ceil</code>; JSON uses
+<code>&quot;network_strategy2_bound_rounding&quot;</code>. These are ranking keys only and do not
+alter proof bounds.</p>
 <p>Rust callers can run <code>snapshot.solve_assignment_tree(options)</code> after installing
 shared nonlinear rows, fixing routes or restricting master variables. It forks
 the snapshot and retains cuts, bounds, fixed contributions and complete route
@@ -604,8 +637,9 @@ scalar equality resources. Equality paths are collected through a disposable
 superset, then checked against the original equality transitions; paths feasible
 only by waiting are excluded. Equality resources with a non-fixed sink
 window use forward pricing even if another direction was requested; backward
-pricing requires a fixed terminal resource value. Graphs containing direct source/sink routes
-decline transfer because empty-route integer semantics are not yet defined. Collection uses a downward resource relaxation
+pricing requires a fixed terminal resource value. Direct source-to-sink arcs are
+included as one-arc routes in complete transfer and use the same original row
+and objective accounting as other paths. Collection uses a downward resource relaxation
 that cannot discard an exact-feasible path, then independently replays original
 resources. Negative-consumption equality domains remain unavailable through
 this collector. Unsupported resources, ambiguous canonical replay, global work/path/
@@ -796,8 +830,10 @@ service duration in outgoing arc consumption. Disjoint service-start windows
 work with <code>multi-time-windows</code>. Start domains contain integers between
 <code>-2**52</code> and <code>2**52</code>, inclusive; choose time units to obtain the desired grid.
 Ordinary pricing-grid limits also apply to resource values.
-Coupled resources in participating networks and resource-load rows on the
-synchronized axis are rejected.</p>
+The synchronized coordinate must be a graph scalar resource. Separate coupled
+resource domains may coexist on participating routes. Resource-load rows on
+the synchronized axis are replayed when a start-domain branch changes route
+profiles; fixed-route contributions update the residual row RHS as well.</p>
 <p>Root solves are LP relaxations and may contain unsynchronized columns. The
 native tree propagates common earliest starts across all selected routes and
 checks the complete joint schedule using exact resource replay. When that
@@ -823,10 +859,100 @@ charges one reward per request, and independently checks returned schedules:</p>
 <span class="w">  </span>--tree<span class="w"> </span>--json<span class="w"> </span>-
 </code></pre></div>
 <p>Both vehicles start service at time 5; the minimization objective is -1.</p>
+<h3 id="native-policy-controls-and-registered-original-variables">Native policy controls and registered original variables</h3>
+<p><code>stabilization_max_tree_depth</code> uses the recovered signed native boundary:
+activation requires actual branch depth strictly below the limit (default
+10000). A zero or negative limit disables smoothing/proximal participation from
+the root. Resumes and ordinary row additions preserve depth. The corresponding
+CLI flag is <code>--stabilization-max-tree-depth</code>.</p>
+<p><code>network_promising_limit</code> exposes the independent native positive-status budget
+(default 1000000), alongside <code>network_unpromising_limit</code> (default 1). A normal
+modern oracle still has status zero, even when it produces columns. Negative
+reduced cost does not imply a promising status.</p>
+<p>Register original integer aggregate variables explicitly when their meaning
+spans networks, route constants or static integer master variables:</p>
+<div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="n">result</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
+    <span class="n">tree</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">mapped_variables</span><span class="o">=</span><span class="p">({</span>
+        <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"total-route-count"</span><span class="p">,</span>
+        <span class="s2">"priority"</span><span class="p">:</span> <span class="mf">1.</span><span class="p">,</span>
+        <span class="s2">"networks"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span><span class="s2">"network"</span><span class="p">:</span> <span class="mi">7</span><span class="p">,</span> <span class="s2">"per_route"</span><span class="p">:</span> <span class="mf">1.</span><span class="p">},</span>
+            <span class="p">{</span><span class="s2">"network"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span> <span class="s2">"per_route"</span><span class="p">:</span> <span class="mf">1.</span><span class="p">},</span>
+        <span class="p">],</span>
+    <span class="p">},),</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Each network contribution also accepts sparse <code>arcs: [[arc_id, coefficient], ...]</code>;
+<code>masters: [[variable_id, coefficient], ...]</code> adds static integer variables.
+Coefficients must be bounded integers. Names identify generators; they do not
+infer membership. <code>MappedBranchVariable::from_shared_row</code> derives selected
+network/master contributions of a known original packing or linking row.
+Branches install floor/ceiling bounds through the shared-row lifecycle, including
+fixed routes and future columns.</p>
+<p>Registered candidates support phased restricted-LP, heuristic-pricing and exact
+pricing trials, using the routing strong-branching controls. Trial objectives
+and history rank candidates; they do not become inherited proof bounds. Set
+<code>mapped_strong_branching=False</code> to select by priority/fractionality alone.
+Results expose <code>strong_branching_trials</code>, <code>mapped_history_ranked</code> and
+<code>mapped_branch_evaluations</code>. The CLI accepts <code>--mapped-variables FILE</code> and
+<code>--no-mapped-strong-branching</code>; see
+<a href="https://github.com/lseman/baldes/blob/main/examples/networks/mapped_variables.json"><code>mapped_variables.json</code></a>.</p>
+<p>Recovered explicit proximal defaults are available through
+<code>proximal={&quot;native_explicit&quot;: {}}</code> (three-piece), or
+<code>{&quot;native_explicit&quot;: {&quot;five_piece&quot;: True}}</code>. These derive initial widths from
+the first positive ordinary-row mean when Kappa is positive, retain native
+stored-float controls, and use the original row RHS for private artificial
+scaling. Existing <code>bands</code> configurations remain explicit overrides. Rust
+constructors are <code>native_three_piece()</code>, <code>native_five_piece()</code> and
+<code>native_multipoint()</code>. CLI equivalents are <code>--native-proximal-three-piece</code>,
+<code>--native-proximal-five-piece</code> and <code>--native-proximal-multipoint</code>.</p>
+<p><code>network_branching=&quot;native-phased&quot;</code> admits original resource-group, assignment,
+integer master-variable, route-count, arc and time-window proposals into the same
+phased evaluator as registered aggregates. Family priorities can be supplied in
+<code>network_branch_priorities</code>; defaults are the routing adapter preset, rather
+than a claim that all native models register the same priorities. Route-count
+generators do not enter retained native-style ranking history. Rust callers can
+also select completed-subtree estimates through <code>StrongBranchingOptions</code>.
+Trials use independent children, while actual children are recreated from the
+original parent; trial objectives never become their inherited proof bounds.</p>
+<p><code>native_box_step()</code> / <code>--native-proximal-box-step</code> follows native functiontype1,
+including its finite stored-float cap1.01; the existing <code>box_step(width)</code> remains
+a mathematical hard-band override. Public native interval names differ from the
+logical band ordering: <code>inner_half_width</code> controls the last active pair (default10)
+and <code>outer_half_width</code> the first pair (default100). Native multipoint defaults to
+two zero-width bands with stored-float caps0.9. These details are retained in the native policy evidence.</p>
+<p>Networks can declare <code>route_domain={&quot;kind&quot;: &quot;bounded_walks&quot;, &quot;max_arcs&quot;: 4}</code>
+to allow repeated interior vertices within a finite arc limit. The default is
+<code>{&quot;kind&quot;: &quot;physical_simple&quot;}</code>. The limit belongs to the model: pricing,
+certified bounds, enumeration, fixed routes and resumed children preserve it.
+Negative cycles may improve a bounded route, so its certified lower bound uses
+the declared arc limit. A runtime pricing limit cannot silently narrow this
+domain. Direct source-to-sink arcs are valid one-arc routes when <code>max_arcs &gt;= 1</code>;
+source/sink revisits are unsupported in this mode. Explicit vertex elementarity
+groups can keep customers unique while allowing station revisits; their count
+must fit the compiled NG memory capacity. <code>Graph::add_arc_elementarity_set</code>
+adds hard groups of physical arcs, limiting a route to one arc from each group.
+Pricing, canonical enumeration and original-route validation enforce the same
+groups for bounded walks. The single-network root master supports uncutted
+bounded walks. Root cut families and dynamic NG strengthening are supported
+when the bounded-walk graph is acyclic or every interior vertex has a hard
+elementarity group, either of which guarantees physically simple routes;
+otherwise they are rejected for bounded walks.
+Synchronized services additionally require their member vertex to belong to a
+declared hard vertex elementarity group, so revisiting a service cannot count
+one vehicle as two participants.</p>
+<p><code>native_front_program_domain=True</code> is a separate, explicit model choice for
+native coupled-resource fronts. It defines feasibility using the computed
+floating-point front program. Its independent machine checker reproduces the
+program's rounding operations; it does not prove equivalence to exact-real
+source constraints. Leave the option false for the default source-domain
+contract. Ambiguous source boundaries and nonfinite machine operations remain
+uncertified. See the retained proof-scope counterexamples.</p>
 </article>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="../pybaldes/index.html"><small>Previous guide</small>pyBaldes documentation <span aria-hidden="true">↗</span></a><a href="../guides/build.html"><small>Next guide</small>Configuring and building BALDES <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#network-pricing-schedules">Network pricing schedules</a><a class="toc-level-2" href="#proximal-pricing">Proximal pricing</a><a class="toc-level-2" href="#automatic-curvature">Automatic curvature</a><a class="toc-level-2" href="#node-lifecycle">Node lifecycle</a><a class="toc-level-2" href="#assignment-tree">Assignment tree</a><a class="toc-level-2" href="#finite-column-imports">Finite column imports</a><a class="toc-level-2" href="#independent-master-variables">Independent master variables</a><a class="toc-level-2" href="#original-activities-multiplicities-and-nonlinear-rows">Original activities, multiplicities and nonlinear rows</a><a class="toc-level-2" href="#limitations">Limitations</a><a class="toc-level-2" href="#cli">CLI</a><a class="toc-level-2" href="#python">Python</a><a class="toc-level-2" href="#complete-enumeration-and-integer-transfer">Complete enumeration and integer transfer</a><a class="toc-level-2" href="#grouped-accumulated-resource-branches">Grouped accumulated-resource branches</a><a class="toc-level-2" href="#synchronized-service-across-vehicles">Synchronized service across vehicles</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#network-pricing-schedules">Network pricing schedules</a><a class="toc-level-2" href="#proximal-pricing">Proximal pricing</a><a class="toc-level-2" href="#automatic-curvature">Automatic curvature</a><a class="toc-level-2" href="#node-lifecycle">Node lifecycle</a><a class="toc-level-2" href="#assignment-tree">Assignment tree</a><a class="toc-level-2" href="#finite-column-imports">Finite column imports</a><a class="toc-level-2" href="#independent-master-variables">Independent master variables</a><a class="toc-level-2" href="#original-activities-multiplicities-and-nonlinear-rows">Original activities, multiplicities and nonlinear rows</a><a class="toc-level-2" href="#limitations">Limitations</a><a class="toc-level-2" href="#cli">CLI</a><a class="toc-level-2" href="#python">Python</a><a class="toc-level-2" href="#complete-enumeration-and-integer-transfer">Complete enumeration and integer transfer</a><a class="toc-level-2" href="#grouped-accumulated-resource-branches">Grouped accumulated-resource branches</a><a class="toc-level-2" href="#synchronized-service-across-vehicles">Synchronized service across vehicles</a><a class="toc-level-3" href="#native-policy-controls-and-registered-original-variables">Native policy controls and registered original variables</a></nav></aside>
 </div>
 </body></html>

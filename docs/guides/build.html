@@ -45,6 +45,11 @@ To also enable the optional HiGHS backend and integer solver, install its
 shared library and use <code>cargo build --release --features clp,highs</code>.
 The CLI and routing tree require <code>clp</code>; <code>highs</code> alone provides the library's
 HiGHS backend and generic MIP API. See below for library discovery details.</p>
+<p>Default builds use the modern MetaSolver-compatible master-only enforcement
+for Ryan–Foster and accumulated-resource branch rows. To use the older
+pricing-enforced policies, disable default features and select the desired
+backend explicitly, for example <code>cargo build --release --no-default-features --features clp</code>. Certified mode still requires independent original-domain
+proofs and does not treat numerical master-only closure as certification.</p>
 <p>Disjoint service-start windows are optional: use
 <code>cargo build --release --features multi-time-windows</code> for the library, or
 <code>--features clp,multi-time-windows</code> for network JSON and the CLI. See
