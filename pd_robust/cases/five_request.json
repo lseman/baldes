@@ -1,0 +1,534 @@
+[
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 0,
+    "gamma_t": 0,
+    "sigma_q": 0.0,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 0,
+    "gamma_t": 1,
+    "sigma_q": 0.0,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 0,
+    "gamma_t": 1,
+    "sigma_q": 0.0,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 0,
+    "gamma_t": 1,
+    "sigma_q": 0.0,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 0,
+    "gamma_t": 5,
+    "sigma_q": 0.0,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 0,
+    "gamma_t": 5,
+    "sigma_q": 0.0,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 0,
+    "gamma_t": 5,
+    "sigma_q": 0.0,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 1,
+    "gamma_t": 0,
+    "sigma_q": 0.1,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 1,
+    "gamma_t": 0,
+    "sigma_q": 0.2,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 1,
+    "gamma_t": 0,
+    "sigma_q": 0.3,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 1,
+    "gamma_t": 1,
+    "sigma_q": 0.1,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 1,
+    "gamma_t": 1,
+    "sigma_q": 0.2,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 1,
+    "gamma_t": 1,
+    "sigma_q": 0.3,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 5,
+    "gamma_t": 0,
+    "sigma_q": 0.1,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 5,
+    "gamma_t": 0,
+    "sigma_q": 0.2,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 5,
+    "gamma_t": 0,
+    "sigma_q": 0.3,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 5,
+    "gamma_t": 5,
+    "sigma_q": 0.1,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 5,
+    "gamma_t": 5,
+    "sigma_q": 0.2,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/AA05.txt",
+    "gamma_q": 5,
+    "gamma_t": 5,
+    "sigma_q": 0.3,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 0,
+    "gamma_t": 0,
+    "sigma_q": 0.0,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 0,
+    "gamma_t": 1,
+    "sigma_q": 0.0,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 0,
+    "gamma_t": 1,
+    "sigma_q": 0.0,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 0,
+    "gamma_t": 1,
+    "sigma_q": 0.0,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 0,
+    "gamma_t": 5,
+    "sigma_q": 0.0,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 0,
+    "gamma_t": 5,
+    "sigma_q": 0.0,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 0,
+    "gamma_t": 5,
+    "sigma_q": 0.0,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 1,
+    "gamma_t": 0,
+    "sigma_q": 0.1,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 1,
+    "gamma_t": 0,
+    "sigma_q": 0.2,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 1,
+    "gamma_t": 0,
+    "sigma_q": 0.3,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 1,
+    "gamma_t": 1,
+    "sigma_q": 0.1,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 1,
+    "gamma_t": 1,
+    "sigma_q": 0.2,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 1,
+    "gamma_t": 1,
+    "sigma_q": 0.3,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 5,
+    "gamma_t": 0,
+    "sigma_q": 0.1,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 5,
+    "gamma_t": 0,
+    "sigma_q": 0.2,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 5,
+    "gamma_t": 0,
+    "sigma_q": 0.3,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 5,
+    "gamma_t": 5,
+    "sigma_q": 0.1,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 5,
+    "gamma_t": 5,
+    "sigma_q": 0.2,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/BB05.txt",
+    "gamma_q": 5,
+    "gamma_t": 5,
+    "sigma_q": 0.3,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 0,
+    "gamma_t": 0,
+    "sigma_q": 0.0,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 0,
+    "gamma_t": 1,
+    "sigma_q": 0.0,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 0,
+    "gamma_t": 1,
+    "sigma_q": 0.0,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 0,
+    "gamma_t": 1,
+    "sigma_q": 0.0,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 0,
+    "gamma_t": 5,
+    "sigma_q": 0.0,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 0,
+    "gamma_t": 5,
+    "sigma_q": 0.0,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 0,
+    "gamma_t": 5,
+    "sigma_q": 0.0,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 1,
+    "gamma_t": 0,
+    "sigma_q": 0.1,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 1,
+    "gamma_t": 0,
+    "sigma_q": 0.2,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 1,
+    "gamma_t": 0,
+    "sigma_q": 0.3,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 1,
+    "gamma_t": 1,
+    "sigma_q": 0.1,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 1,
+    "gamma_t": 1,
+    "sigma_q": 0.2,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 1,
+    "gamma_t": 1,
+    "sigma_q": 0.3,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 5,
+    "gamma_t": 0,
+    "sigma_q": 0.1,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 5,
+    "gamma_t": 0,
+    "sigma_q": 0.2,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 5,
+    "gamma_t": 0,
+    "sigma_q": 0.3,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 5,
+    "gamma_t": 5,
+    "sigma_q": 0.1,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 5,
+    "gamma_t": 5,
+    "sigma_q": 0.2,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/CC05.txt",
+    "gamma_q": 5,
+    "gamma_t": 5,
+    "sigma_q": 0.3,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 0,
+    "gamma_t": 0,
+    "sigma_q": 0.0,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 0,
+    "gamma_t": 1,
+    "sigma_q": 0.0,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 0,
+    "gamma_t": 1,
+    "sigma_q": 0.0,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 0,
+    "gamma_t": 1,
+    "sigma_q": 0.0,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 0,
+    "gamma_t": 5,
+    "sigma_q": 0.0,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 0,
+    "gamma_t": 5,
+    "sigma_q": 0.0,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 0,
+    "gamma_t": 5,
+    "sigma_q": 0.0,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 1,
+    "gamma_t": 0,
+    "sigma_q": 0.1,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 1,
+    "gamma_t": 0,
+    "sigma_q": 0.2,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 1,
+    "gamma_t": 0,
+    "sigma_q": 0.3,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 1,
+    "gamma_t": 1,
+    "sigma_q": 0.1,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 1,
+    "gamma_t": 1,
+    "sigma_q": 0.2,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 1,
+    "gamma_t": 1,
+    "sigma_q": 0.3,
+    "sigma_t": 0.3
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 5,
+    "gamma_t": 0,
+    "sigma_q": 0.1,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 5,
+    "gamma_t": 0,
+    "sigma_q": 0.2,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 5,
+    "gamma_t": 0,
+    "sigma_q": 0.3,
+    "sigma_t": 0.0
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 5,
+    "gamma_t": 5,
+    "sigma_q": 0.1,
+    "sigma_t": 0.1
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 5,
+    "gamma_t": 5,
+    "sigma_q": 0.2,
+    "sigma_t": 0.2
+  },
+  {
+    "instance": "instances/RobustPDPTW/DD05.txt",
+    "gamma_q": 5,
+    "gamma_t": 5,
+    "sigma_q": 0.3,
+    "sigma_t": 0.3
+  }
+]

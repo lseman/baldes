@@ -12,3 +12,5 @@ pub mod hgs;
 pub mod ipm;
 pub mod pstep;
 pub mod robust;
+/// One-to-one robust pickup and delivery with time windows.
+pub mod robust_pd;
