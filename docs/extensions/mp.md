@@ -979,8 +979,7 @@ including its finite stored-float cap1.01; the existing `box_step(width)` remain
 a mathematical hard-band override. Public native interval names differ from the
 logical band ordering: `inner_half_width` controls the last active pair (default10)
 and `outer_half_width` the first pair (default100). Native multipoint defaults to
-two zero-width bands with stored-float caps0.9. These details are retained in the
-[native policy evidence](../../internal/audits/native-parity-goal-20261025/policy.md).
+two zero-width bands with stored-float caps0.9. These details are retained in the native policy evidence.
 
 Networks can declare `route_domain={"kind": "bounded_walks", "max_arcs": 4}`
 to allow repeated interior vertices within a finite arc limit. The default is
@@ -1009,5 +1008,4 @@ floating-point front program. Its independent machine checker reproduces the
 program's rounding operations; it does not prove equivalence to exact-real
 source constraints. Leave the option false for the default source-domain
 contract. Ambiguous source boundaries and nonfinite machine operations remain
-uncertified. See the retained
-[proof-scope counterexamples](../../internal/audits/native-parity-goal-20261025/native-front-proof-boundary.md).
+uncertified. See the retained proof-scope counterexamples.
