@@ -13,8 +13,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="style.css?v=stages-1">
-  <script src="app.js?v=routing-tilt-1" defer></script>
+  <link rel="stylesheet" href="style.css?v=cite-1">
+  <script src="app.js?v=truck-4" defer></script>
   <title>BALDES — Go beyond the shortest path</title>
 </head>
 <body class="landing-dark">
@@ -30,7 +30,7 @@
         <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> OPEN SOURCE / ROUTING OPTIMIZATION</p>
         <h1 id="hero-title">Hard routing.<br><em>Open possibilities.</em></h1>
         <p class="hero-description">Solve vehicle routing problems with capacity constraints and time windows. Use Python for root relaxations, the CLI for feasible routes and integer search, or Rust to build your own solver.</p>
-        <div class="hero-actions"><a class="button button-dark" href="#quickstart">Start building <span aria-hidden="true">↗</span></a><a class="text-link" href="docs/guides/first-solve.html">Your first solve <span aria-hidden="true">↓</span></a></div>
+        <div class="hero-actions"><a class="button button-dark" href="#quickstart">Start building <span aria-hidden="true">↓</span></a><a class="text-link" href="docs/guides/first-solve.html">Your first solve <span aria-hidden="true">↗</span></a></div>
         <div class="hero-footnote"><span>Rust performance</span><span>Python interface</span><span>MIT licensed</span></div>
       </div>
       <div class="route-stage">
@@ -83,7 +83,7 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
           </article>
         </div>
         <div class="example-grid">
-          <div class="example-copy"><p class="eyebrow">STEP 03 / PUT IT TO WORK</p><h3>A small model.<br>A real starting point.</h3><p>Define a depot, add customers, and solve a capacitated routing root relaxation. No instance file required.</p><ul class="example-features"><li>Model directly with Python objects</li><li>Inspect bounds, duals, and route columns</li><li>Export results as a dictionary or JSON</li></ul><p class="install-note">Python returns an LP relaxation; routes may have fractional values. Use the CLI or Rust for integer tree search.</p><a class="text-link" href="docs/guides/python.html">Explore the Python API <span aria-hidden="true">↗</span></a></div>
+          <div class="example-copy"><p class="eyebrow">STEP 03 / PUT IT TO WORK</p><h3>A small model.<br>A real starting point.</h3><p>Define a depot, add customers, and solve a capacitated routing root relaxation. No instance file required.</p><ul class="example-features"><li>Model directly with Python objects</li><li>Inspect bounds, duals, and route columns</li><li>Export results as a dictionary or JSON</li></ul><p class="install-note">This routing example returns an LP relaxation; routes may be fractional. Use the CLI or Rust for a routing tree, or Python network models for integer model search.</p><a class="text-link" href="docs/guides/python.html">Explore the Python API <span aria-hidden="true">↗</span></a></div>
           <div class="terminal"><div class="terminal-bar"><span class="file-dot" aria-hidden="true"></span><span>first_route.py</span><span class="terminal-language">PYTHON</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Customer</span><span class="p">,</span> <span class="n">Instance</span>
 
 <span class="c1"># Depot first, then customers with unit demand.</span>
@@ -93,7 +93,7 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
     <span class="n">Customer</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">demand</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
 <span class="p">])</span>
 
-<span class="n">result</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
     <span class="n">problem_type</span><span class="o">=</span><span class="s2">&quot;cvrp&quot;</span><span class="p">,</span>
     <span class="n">capacity_cuts</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
@@ -117,7 +117,21 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
     <section class="section-wrap section-space guides-section" aria-labelledby="guides-title"><div class="section-heading heading-row"><div><p class="eyebrow">03 / OPEN THE NOTEBOOK</p><h2 id="guides-title">Understand what<br>the solver is doing.</h2></div><a class="text-link" href="docs/">All documentation <span aria-hidden="true">↗</span></a></div>
       <div class="guide-grid"><a class="guide-card" href="docs/solver/branching.html"><span class="eyebrow">MODELING</span><h3>A branch is a decision.</h3><p>Ryan–Foster, vehicle counts, arc flow, and what network assignment really requires.</p><span class="guide-arrow" aria-hidden="true">↗</span></a><a class="guide-card" href="docs/solver/stabilization.html"><span class="eyebrow">ALGORITHMS</span><h3>Keep duals moving.</h3><p>Follow smoothing weights, center updates, and the retry back to raw master duals.</p><span class="guide-arrow" aria-hidden="true">↗</span></a><a class="guide-card" href="docs/reference/options.html"><span class="eyebrow">REFERENCE</span><h3>Know your controls.</h3><p>Supported BALDES options, their defaults, and where each control applies.</p><span class="guide-arrow" aria-hidden="true">↗</span></a></div>
     </section>
+    <section id="cite" class="section-wrap section-space cite-section" aria-labelledby="cite-title">
+      <div class="example-grid">
+        <div class="example-copy"><p class="eyebrow">04 / CITE BALDES</p><h2 id="cite-title">Using BALDES<br>in your research?</h2><p>If BALDES supports your academic work, please cite it. Copy the BibTeX entry into your bibliography.</p><a class="text-link" href="https://github.com/lseman/baldes#citation">Citation on GitHub <span aria-hidden="true">↗</span></a></div>
+        <div class="terminal"><div class="terminal-bar"><span class="file-dot" aria-hidden="true"></span><span>baldes.bib</span><span class="terminal-language">BIBTEX</span></div><pre><code class="language-bibtex">@Misc{BucketGraphLabeling,
+  author       = {Laio Oriel Seman and Pedro Munari and Teobaldo Bulh\~oes and Eduardo Camponogara},
+  title        = {BALDES: a modern Rust Bucket Graph Labeling Algorithm for Vehicle Routing},
+  howpublished = {\url{https://github.com/lseman/baldes}},
+  year         = {2024},
+  note         = {GitHub repository},
+  urldate      = {2024-09-17},
+  month        = sep
+}</code></pre></div>
+      </div>
+    </section>
   </main>
-  <footer class="site-footer section-wrap"><div><a class="brand" href="./"><img src="mark.svg" width="26" height="34" alt="">BALDES</a><p>Routing algorithms, out in the open.</p></div><nav aria-label="Footer"><a href="docs/">Documentation</a><a href="https://github.com/lseman/baldes">Source code ↗</a><a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></nav><p class="footer-note">Built in Rust. Made for people who ask how.</p></footer>
+  <footer class="site-footer section-wrap"><div><a class="brand" href="./"><img src="mark.svg" width="26" height="34" alt="">BALDES</a><p>Routing algorithms, out in the open.</p></div><nav aria-label="Footer"><a href="docs/">Documentation</a><a href="#cite">Cite BALDES</a><a href="https://github.com/lseman/baldes">Source code ↗</a><a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></nav><p class="footer-note">Built in Rust. Made for people who ask how.</p></footer>
 </body>
 </html>
