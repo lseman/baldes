@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn correction_step_bound_matches_materialized_directions() {
+fn weighted_correction_step_bounds_match_materialized_directions() {
     let q = Point {
         x: vec![0.5, 2., 3.],
         y: vec![0., -1.],
@@ -36,11 +36,12 @@ fn correction_step_bound_matches_materialized_directions() {
             tau: 0.125,
             kappa: -2.,
         };
-        let mut combined = direction.clone();
-        combined.add_direction(&correction);
-        assert_eq!(
-            q.alpha_with_correction(&direction, &correction).to_bits(),
-            q.alpha(&combined).to_bits()
-        );
+        let weights = [0.0625, 0.5, 1.];
+        let alphas = q.alphas_with_weighted_correction(&direction, &correction, &weights);
+        for (alpha, weight) in alphas.into_iter().zip(weights) {
+            let mut combined = direction.clone();
+            combined.add_scaled_direction(&correction, weight);
+            assert_eq!(alpha.to_bits(), q.alpha(&combined).to_bits());
+        }
     }
 }

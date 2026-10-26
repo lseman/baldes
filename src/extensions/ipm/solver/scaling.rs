@@ -14,6 +14,8 @@ pub(super) fn scale(f: &mut StandardForm, passes: usize) -> Result<(Vec<f64>, Ve
         }
         for v in rn.iter_mut().chain(&mut cn) {
             *v = if *v > 0. { 1. / v.sqrt() } else { 1. };
+            // Powers of two make scaling and its recovery exact.
+            *v = v.log2().round().exp2();
         }
         for (j, &cj) in cn.iter().enumerate() {
             for p in f.a.ptr[j]..f.a.ptr[j + 1] {

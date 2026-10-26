@@ -130,10 +130,23 @@ impl Point {
         Ok(())
     }
 
-    /// Evaluate a corrected direction without copying all five vectors.
-    /// Addition order matches materializing `direction + correction` first.
-    fn alpha_with_correction(&self, direction: &Self, correction: &Self) -> f64 {
-        let mut alpha = 1.0_f64;
+    /// Step lengths for several correction weights in one pass over the iterate.
+    /// Each matches `alpha` on the materialized `direction + weight * correction`.
+    fn alphas_with_weighted_correction<const K: usize>(
+        &self,
+        direction: &Self,
+        correction: &Self,
+        weights: &[f64; K],
+    ) -> [f64; K] {
+        let mut alpha = [1.0_f64; K];
+        let mut visit = |value: f64, delta: f64, change: f64| {
+            for (alpha, &weight) in alpha.iter_mut().zip(weights) {
+                let delta = delta + weight * change;
+                if delta < 0. {
+                    *alpha = alpha.min(-value / delta);
+                }
+            }
+        };
         for (values, direction, correction) in [
             (&self.x, &direction.x, &correction.x),
             (&self.s, &direction.s, &correction.s),
@@ -141,24 +154,15 @@ impl Point {
             (&self.w, &direction.w, &correction.w),
         ] {
             for ((&value, &delta), &change) in values.iter().zip(direction).zip(correction) {
-                let delta = delta + change;
-                if delta < 0. {
-                    alpha = alpha.min(-value / delta);
-                }
+                visit(value, delta, change);
             }
         }
-        for (value, delta) in [
-            (self.tau, direction.tau + correction.tau),
-            (self.kappa, direction.kappa + correction.kappa),
-        ] {
-            if delta < 0. {
-                alpha = alpha.min(-value / delta);
-            }
-        }
+        visit(self.tau, direction.tau, correction.tau);
+        visit(self.kappa, direction.kappa, correction.kappa);
         alpha
     }
 
-    fn add_direction(&mut self, correction: &Self) {
+    fn add_scaled_direction(&mut self, correction: &Self, weight: f64) {
         for (values, correction) in [
             (&mut self.x, &correction.x),
             (&mut self.y, &correction.y),
@@ -167,11 +171,11 @@ impl Point {
             (&mut self.w, &correction.w),
         ] {
             for (value, &change) in values.iter_mut().zip(correction) {
-                *value += change;
+                *value += weight * change;
             }
         }
-        self.tau += correction.tau;
-        self.kappa += correction.kappa;
+        self.tau += weight * correction.tau;
+        self.kappa += weight * correction.kappa;
     }
 }
 
@@ -241,10 +245,13 @@ fn solve_prepared(
     let mut q = initial
         .or_else(|| initialization::least_squares(f, ls, solve_workspace))
         .unwrap_or_else(|| initialization::unit(f));
-    let mut rp = vec![1.0_f64; n];
-    let mut rd = vec![1.0_f64; m];
-    let mut rg = 1.0_f64;
+    // Start at the regularization floor, like HiPO's small static values.
+    // Large initial values perturb early directions and cost iterations;
+    // numerical failures still raise regularization for the retried step.
     let floor = f64::EPSILON.sqrt();
+    let mut rp = vec![floor; n];
+    let mut rd = vec![floor; m];
+    let mut rg = floor;
     let tol = options.tolerance;
     let mut status = Status::IterationLimit;
     let mut iterations = 0;
@@ -430,7 +437,8 @@ fn solve_prepared(
                     if alpha >= 0.9995 {
                         break;
                     }
-                    let trial = (2. * alpha).min(1.);
+                    // Target products at the full step, as HiPO's correctors do.
+                    let trial = 1.;
                     let low = 0.1 * mu * gamma;
                     let high = mu * gamma / 0.1;
                     tx.clear();
@@ -471,9 +479,18 @@ fn solve_prepared(
                     });
                     let correction =
                         newton.solve(zero, &tx, &tv, t0, solve_workspace, newton_scratch)?;
-                    let improved = q.alpha_with_correction(&direction, &correction);
+                    // Weight the correction by the best of nine points in
+                    // [alpha², 1], following HiPO's bestWeight search.
+                    let low = alpha * alpha;
+                    let weights: [f64; 9] =
+                        std::array::from_fn(|k| low + (1. - low) * k as f64 / 8.);
+                    let (improved, weight) = q
+                        .alphas_with_weighted_correction(&direction, &correction, &weights)
+                        .into_iter()
+                        .zip(weights)
+                        .fold((0., 1.), |best, c| if c.0 > best.0 { c } else { best });
                     if improved > alpha {
-                        direction.add_direction(&correction);
+                        direction.add_scaled_direction(&correction, weight);
                         alpha = improved;
                     } else {
                         break;

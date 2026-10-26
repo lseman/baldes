@@ -170,11 +170,17 @@ Deliberate differences from C++:
 - Complementarity includes the upper-bound slack/multiplier product. Success
   checks primal feasibility as well as dual feasibility and gap.
 - Centrality corrections are added to the current Newton direction instead
-  of overwriting it. The homogeneous Schur denominator uses its equivalent
+  of overwriting it. Each correction targets products at the full step and is
+  weighted by the best of nine points in `[alpha², 1]`, following HiGHS HiPO.
+  The homogeneous Schur denominator uses its equivalent
   positive quadratic form to avoid subtractive cancellation.
+- Primal and dual regularization start at `sqrt(eps)` rather than 1, closer
+  to HiPO's small static values. A failed Newton step retries with ten times
+  the regularization, as before.
 - A singular 2x2 pivot returns a numerical error instead of replacing only
   its determinant, which would be inconsistent with the stored D block.
 - Ruiz equilibration is implemented and enabled by default (five passes).
+  Each pass rounds its factors to powers of two, so scaling is exact.
   The C++ header declares scaling routines, but its optimization loop does
   not invoke them. Set `scaling_iterations: 0` to disable scaling.
 - The internal objective is normalized after equilibration. Dual recovery and
