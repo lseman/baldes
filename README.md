@@ -141,7 +141,7 @@ If you use BALDES in academic work, please cite:
 ```bibtex
 @Misc{BucketGraphLabeling,
   author       = {Laio Oriel Seman and Pedro Munari and Teobaldo Bulh\~oes and Eduardo Camponogara},
-  title        = {BALDES: a modern C++ Bucket Graph Labeling Algorithm for Vehicle Routing},
+  title        = {BALDES: a modern Rust Bucket Graph Labeling Algorithm for Vehicle Routing},
   howpublished = {\url{https://github.com/lseman/baldes}},
   year         = {2024},
   note         = {GitHub repository},
