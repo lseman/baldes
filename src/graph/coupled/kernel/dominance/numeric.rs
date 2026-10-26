@@ -84,20 +84,24 @@ impl NumericCostOrder {
                         .all(|f| f.points.iter().all(|p| p[1] >= 0.));
                 }
                 CoupledResource::EncodedPiecewiseLinearCost { .. } => {
+                    // Parent equality is certified independently. Encoded
+                    // values may be signed, so retain equal-prefix-cost only.
                     nonnegative_charges = false;
                 }
                 _ => {}
             }
         }
-        // Measured activation policy: the per-operation proof is deployed on
-        // independent additive numeric resources. Rich dependency programs
-        // keep the baseline identity path rather than paying for extra proof
-        // checks that did not improve their measured labeling workload.
+        // The order is also safe with a piecewise cost: DependencyOrder
+        // requires its parent scalar to remain equal, so its future charges
+        // are identical in both labels. Other rich dependency programs retain
+        // the baseline identity path until their composition is established.
         let deploy_unequal = definitions.iter().all(|definition| {
             matches!(
                 definition,
                 CoupledResource::CumulativeCost { .. }
                     | CoupledResource::CustomResource { .. }
+                    | CoupledResource::PiecewiseLinearCost { .. }
+                    | CoupledResource::EncodedPiecewiseLinearCost { .. }
                     | CoupledResource::Selection { .. }
                     | CoupledResource::SimultaneousPickupDelivery { .. }
                     | CoupledResource::BudgetedLoad { .. }

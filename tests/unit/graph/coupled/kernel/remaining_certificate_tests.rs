@@ -101,13 +101,23 @@ fn raw_interval_operator_certificate_preserves_one_shared_initial_value() {
         };
         increments[0] = 0.25;
         graph.set_coupled_resources(&[definition.clone()]).unwrap();
-        assert_eq!(graph.coupled_kernel().unwrap().certify(&[0, 1]), Some((true, [6., 6.])));
+        assert_eq!(
+            graph.coupled_kernel().unwrap().certify(&[0, 1]),
+            Some((true, [6., 6.]))
+        );
         let CoupledResource::SlopeIntervalCost { increments, .. } = &mut definition else {
             unreachable!()
         };
         increments[0] = 0.1;
         graph.set_coupled_resources(&[definition]).unwrap();
-        assert_eq!(graph.coupled_kernel().unwrap().certify(&[0, 1]), None);
+        let expected = if policy == descriptor::FrontOperationPolicy::NativeFrontAlgebra {
+            // Independent software-IEEE program: general native certificates
+            // cover the declared machine front, including decimal shifts.
+            Some((true, [6., 6.]))
+        } else {
+            None
+        };
+        assert_eq!(graph.coupled_kernel().unwrap().certify(&[0, 1]), expected);
     }
 }
 

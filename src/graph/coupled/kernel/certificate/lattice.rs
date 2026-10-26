@@ -27,14 +27,9 @@ fn domain(f: &PreparedSlopeFunction, work: &mut usize, deadline: Option<Instant>
     f.pairs().iter().all(|p| integer(p.1)).then_some(())
 }
 
-fn constant(
-    f: &PreparedSlopeFunction,
-    work: &mut usize,
-    deadline: Option<Instant>,
-) -> Option<f64> {
+fn constant(f: &PreparedSlopeFunction, work: &mut usize, deadline: Option<Instant>) -> Option<f64> {
     domain(f, work, deadline)?;
-    (integer(f.pairs()[0].0) && f.pairs()[1..].iter().all(|p| p.0 == 0.))
-        .then_some(f.pairs()[0].0)
+    (integer(f.pairs()[0].0) && f.pairs()[1..].iter().all(|p| p.0 == 0.)).then_some(f.pairs()[0].0)
 }
 
 fn count(lo: f64, hi: f64, work: &mut usize, deadline: Option<Instant>) -> Option<usize> {
@@ -155,7 +150,12 @@ pub(super) fn native_pair(
             }
             let dependent = (prefix + increment + waiting * (head - delta)).max(lower);
             if dependent <= upper {
-                if gap || !integer(dependent) {
+                if gap
+                    || !integer(dependent)
+                    || next
+                        .last()
+                        .is_some_and(|old: &f64| (dependent - old).abs() > 1.)
+                {
                     // Disconnected domains need a separate waiting proof.
                     return None;
                 }

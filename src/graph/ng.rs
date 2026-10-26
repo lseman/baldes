@@ -52,6 +52,14 @@ impl PreparedNg {
     pub fn new<const D: usize>(g: &Graph<D>) -> Result<Self> {
         g.validate()?;
         let n = g.vertices.len();
+        if g.max_route_arcs().is_some() && !g.hard_walk_groups() {
+            return Ok(Self {
+                vertex_bits: vec![0; n],
+                local_elements: vec![vec![]; n],
+                forward: vec![Transition::default(); g.arcs.len()],
+                backward: vec![Transition::default(); g.arcs.len()],
+            });
+        }
         let e = g.element_count;
         let checked = |values: &[usize]| -> Result<BTreeSet<usize>> {
             if values.iter().any(|&id| id >= e) {
@@ -63,7 +71,7 @@ impl PreparedNg {
         for v in &g.vertices {
             let mut m = checked(&v.memory)?;
             m.extend(checked(&v.elements)?);
-            if g.elementary {
+            if g.elementary || g.hard_walk_groups() {
                 m.extend(0..e);
             }
             member.push(m);

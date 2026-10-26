@@ -17,6 +17,20 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
             })
             .collect()
     }
+    fn recover_feasibility(
+        &mut self,
+        master: &ClpMaster,
+        warm: &cg::WarmStart,
+        remaining: std::time::Duration,
+        iterations: usize,
+        tolerance: f64,
+        bound_mode: cg::BoundMode,
+    ) -> Result<Option<cg::FeasibilityRecovery>> {
+        super::feasibility::recover(
+            &self.0, master, warm, remaining, iterations, tolerance, bound_mode,
+        )
+        .map(Some)
+    }
     fn pricing_complete(&self) -> bool {
         self.0.borrow().scheduler.complete
     }

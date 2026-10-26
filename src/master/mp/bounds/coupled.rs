@@ -18,14 +18,14 @@ pub(super) fn minimum<const D: usize>(
     if *work == 0 || Instant::now() >= deadline {
         return None;
     }
-    // The integer route contract is physically vertex-simple. The directed
-    // relaxation includes all walks up to n-1 arcs, so exponentially many
-    // simple routes can share polynomially many abstract states.
+    // Cover n-1 arcs for physical-simple routes or the explicit finite walk
+    // bound. An unproved n-1 truncation could omit cheaper repeated walks,
+    // particularly when resource objectives have negative costs.
     let allowance = (*work / 4).min(250_000);
     let mut remaining = allowance;
     let relaxed_minimum = kernel.objective_walk_lower_bound(
         graph,
-        graph.vertices.len().saturating_sub(1),
+        graph.original_max_arcs(),
         &mut remaining,
         deadline,
     );

@@ -1,7 +1,7 @@
 //! Exact operator certificates for dyadic-lattice raw slope geometry.
 //!
 //! This does not reinterpret a general numerical front as source replay.
-//! Bounded integer lattice coordinates/values and integer slopes make endpoint
+//! Bounded integer lattice coordinates/values and lattice slopes make endpoint
 //! operations exact in binary64. Native lattices additionally have spacing
 //! greater than its absolute tolerance; the scaled magnitude bound keeps the
 //! relative tolerance below one lattice step.
@@ -23,13 +23,13 @@ fn coordinate_unit(
     path: &[usize],
     increments: &[f64],
     functions: &[PreparedSlopeFunction],
-    charged: bool,
     native: bool,
     work: &mut usize,
     deadline: Option<Instant>,
 ) -> Option<f64> {
     // Power-of-two scaling is exact in this bounded normal range. A native
-    // step >=2^-13 exceeds1e-4; its relative band is <0.000445 steps.
+    // step >=2^-13 exceeds1e-4; even translated endpoint comparisons have
+    // relative bands below0.001 steps.
     let limit = if native { 13 } else { 30 };
     let mut unit = 1.;
     for _ in 0..=limit {
@@ -42,8 +42,37 @@ fn coordinate_unit(
             let function = functions.get(arc)?;
             debit(work, function.pairs().len(), deadline)?;
             accepted &= lattice(*increments.get(arc)?, unit)
-                && (!charged || lattice(function.pairs()[0].0, unit))
                 && function.pairs().iter().all(|p| lattice(p.1, unit));
+        }
+        if accepted {
+            return Some(unit);
+        }
+        unit *= 0.5;
+    }
+    None
+}
+
+fn value_unit(
+    path: &[usize],
+    functions: &[PreparedSlopeFunction],
+    coordinate_unit: f64,
+    charged: bool,
+    work: &mut usize,
+    deadline: Option<Instant>,
+) -> Option<f64> {
+    if !charged {
+        return Some(coordinate_unit);
+    }
+    let mut unit = 1.;
+    for _ in 0..=60 {
+        let mut accepted = true;
+        for &arc in path {
+            let function = functions.get(arc)?;
+            debit(work, function.pairs().len(), deadline)?;
+            accepted &= lattice(function.pairs()[0].0, unit)
+                && function.pairs()[1..]
+                    .iter()
+                    .all(|p| lattice(p.0, unit / coordinate_unit));
         }
         if accepted {
             return Some(unit);
@@ -59,29 +88,34 @@ fn exact(x: f64) -> bool {
 fn shape(
     function: &PreparedSlopeFunction,
     charged: bool,
-    unit: f64,
+    coordinate_unit: f64,
+    value_unit: f64,
     work: &mut usize,
     deadline: Option<Instant>,
 ) -> Option<(f64, f64)> {
     debit(work, function.pairs().len(), deadline)?;
-    if !function.pairs().iter().all(|p| lattice(p.1, unit)) {
+    if !function
+        .pairs()
+        .iter()
+        .all(|p| lattice(p.1, coordinate_unit))
+    {
         return None;
     }
     if !charged {
         return Some((0., 0.));
     }
     let (mut value, mut previous) = function.pairs()[0];
-    if !lattice(value, unit) {
+    if !lattice(value, value_unit) {
         return None;
     }
     let (mut magnitude, mut slope_magnitude) = (value.abs(), 0f64);
     for &(slope, end) in &function.pairs()[1..] {
-        if !small(slope) {
+        if !lattice(slope, value_unit / coordinate_unit) {
             return None;
         }
         let product = slope * (end - previous);
         let next = value + product;
-        if !exact(product / unit) || !lattice(next, unit) {
+        if !exact(product / value_unit) || !lattice(next, value_unit) {
             return None;
         }
         value = next;
@@ -97,7 +131,7 @@ fn constant(
     work: &mut usize,
     deadline: Option<Instant>,
 ) -> Option<f64> {
-    shape(function, true, 1., work, deadline)?;
+    shape(function, true, 1., 1., work, deadline)?;
     function
         .pairs()
         .iter()
@@ -158,7 +192,7 @@ fn constant_pair(
         if arc.waiting != 0 {
             return None;
         }
-        shape(&arc.arrival, true, 1., work, deadline)?;
+        shape(&arc.arrival, true, 1., 1., work, deadline)?;
         if !arc.arrival.pairs().iter().skip(1).all(|p| p.0 == 1.) {
             return None;
         }
@@ -226,6 +260,38 @@ impl CoupledKernel {
             else {
                 return None;
             };
+            if *policy == descriptor::FrontOperationPolicy::NativeFrontAlgebra {
+                // The native program also merges near-equal summed slopes.
+                // Coordinate-lattice spacing alone does not prove source
+                // equivalence after that merge. Check the declared machine
+                // program independently instead of reusing its optimized min.
+                if !self.native_front_program_domain {
+                    match super::machine::source_feasibility(
+                        *initial, *bounds, increments, functions, path, work, deadline,
+                    )? {
+                        false => return Some((false, [0.; 2])),
+                        true => {}
+                    }
+                }
+                let (feasible, cost) = super::machine::raw(
+                    *initial,
+                    *bounds,
+                    increments,
+                    functions,
+                    path,
+                    self.cost_scale,
+                    work,
+                    deadline,
+                )?;
+                if !feasible {
+                    return self.native_front_program_domain.then_some((false, [0.; 2]));
+                }
+                total = total.add(Interval {
+                    lo: cost[0],
+                    hi: cost[1],
+                })?;
+                continue;
+            }
             if !(self.cost_scale == 0. || self.cost_scale == 1.) {
                 return None;
             }
@@ -235,11 +301,12 @@ impl CoupledKernel {
                 path,
                 increments,
                 functions,
-                self.cost_scale != 0.,
                 *policy == descriptor::FrontOperationPolicy::NativeFrontAlgebra,
                 work,
                 deadline,
             )?;
+            let value_unit =
+                value_unit(path, functions, unit, self.cost_scale != 0., work, deadline)?;
             let (mut lo, mut hi, mut shift) = (initial.lower, initial.upper, 0.);
             let mut knots = vec![lo, hi];
             let mut shifts = Vec::with_capacity(path.len());
@@ -255,13 +322,20 @@ impl CoupledKernel {
                     return None;
                 }
                 let function = functions.get(arc)?;
-                let (m, s) = shape(function, self.cost_scale != 0., unit, work, deadline)?;
+                let (m, s) = shape(
+                    function,
+                    self.cost_scale != 0.,
+                    unit,
+                    value_unit,
+                    work,
+                    deadline,
+                )?;
                 magnitude += m;
                 slopes += s;
                 // In lattice units every intermediate anchor and summed slope
                 // is bounded. Coordinates <=2*LIMIT units keep all segment
                 // products below2^53, including dyadic physical coordinates.
-                if !lattice(magnitude, unit) || !small(slopes) {
+                if !lattice(magnitude, value_unit) || !lattice(slopes, value_unit / unit) {
                     return None;
                 }
                 let (left, right) = function.domain();
@@ -295,12 +369,12 @@ impl CoupledKernel {
                         work,
                         deadline,
                     )?;
-                    if value.lo != value.hi || !lattice(value.lo, unit) {
+                    if value.lo != value.hi || !lattice(value.lo, value_unit) {
                         return None;
                     }
                     cost = cost.add(Interval::point(value.lo))?;
                 }
-                if cost.lo != cost.hi || !lattice(cost.lo, unit) {
+                if cost.lo != cost.hi || !lattice(cost.lo, value_unit) {
                     return None;
                 }
                 minimum = minimum.min(cost.lo);

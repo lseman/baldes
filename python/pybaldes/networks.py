@@ -57,6 +57,12 @@ class PricingArc:
 
 @dataclass(frozen=True)
 class PricingNetwork:
+    """One route family with an explicit original resource domain.
+
+    native_front_program_domain=True selects the computed native front program
+    for NativeFrontAlgebra resources; the default retains source feasibility.
+    """
+
     id: int
     vertices: int
     multiplicity: Tuple[float, float]
@@ -68,12 +74,15 @@ class PricingNetwork:
     ng: Optional[Tuple[Tuple[int, ...], ...]] = None
     coupled_resources: Tuple[Mapping[str, Any], ...] = ()
     elementary: bool = False
+    native_front_program_domain: bool = False
+    route_domain: Mapping[str, Any] = field(default_factory=lambda: {"kind": "physical_simple"})
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "multiplicity", tuple(self.multiplicity))
         object.__setattr__(self, "arcs", tuple(self.arcs))
         object.__setattr__(self, "resources", tuple(self.resources))
         object.__setattr__(self, "coupled_resources", tuple(dict(r) for r in self.coupled_resources))
+        object.__setattr__(self, "route_domain", dict(self.route_domain))
         object.__setattr__(self, "route_entries", tuple(tuple(e) for e in self.route_entries))
         if self.ng is not None:
             object.__setattr__(self, "ng", tuple(tuple(n) for n in self.ng))
@@ -290,6 +299,7 @@ class NetworkResult:
     enumerated_mip_calls: int
     enumerated_mip_nodes: int
     enumerated_mip_failures: int
+    tree_processed_nodes: int = 0
     strong_branching_trials: int = 0
     mapped_history_ranked: int = 0
     mapped_branch_evaluations: Tuple[MappedBranchEvaluation, ...] = ()
@@ -306,6 +316,7 @@ class NetworkResult:
 
 def _result(text: str, native: Any) -> NetworkResult:
     data = json.loads(text)
+    data.setdefault("tree_processed_nodes", 0)
     data["routes"] = tuple(NetworkRoute(**r) for r in data["routes"])
     data["fixed_routes"] = tuple(NetworkRoute(**r) for r in data["fixed_routes"])
     data["enumeration_reports"] = tuple(NetworkEnumerationReport(**r) for r in data["enumeration_reports"])
@@ -334,7 +345,11 @@ def solve_networks(
     network_pricing_schedule: str = "full-sweep",
     network_unpromising_limit: int = 1,
     network_promising_limit: int = 1000000,
-    network_branching: str = "resource-first",
+    network_branching: str = "multiplicity-first",
+    network_tree_search: str = "native-default",
+    network_strategy2_rounding: str = "guarded-tolerance",
+    network_open_node_limit: int = 1000,
+    network_branch_priorities: Optional[Mapping[str, float]] = None,
     mapped_variables: Tuple[Mapping[str, Any], ...] = (),
     mapped_strong_branching: bool = True,
     enumerate: bool = False,
@@ -368,7 +383,7 @@ def solve_networks(
         raise TypeError("problem must be a NetworkProblem")
     if not _core.has_clp:
         raise RuntimeError("multi-network solving requires a build with Clp")
-    options = dict(synchronized_services=synchronized_services, tree=tree, network_pricing_schedule=network_pricing_schedule, network_unpromising_limit=network_unpromising_limit, network_promising_limit=network_promising_limit, stabilization_max_tree_depth=stabilization_max_tree_depth, proximal=proximal, network_branching=network_branching, mapped_variables=mapped_variables, mapped_strong_branching=mapped_strong_branching, enumerate=enumerate, enumeration_route_limit=enumeration_route_limit,
+    options = dict(synchronized_services=synchronized_services, tree=tree, network_pricing_schedule=network_pricing_schedule, network_unpromising_limit=network_unpromising_limit, network_promising_limit=network_promising_limit, stabilization_max_tree_depth=stabilization_max_tree_depth, proximal=proximal, network_branching=network_branching, network_tree_search=network_tree_search, network_strategy2_bound_rounding=network_strategy2_rounding, network_open_node_limit=network_open_node_limit, network_branch_priorities=dict(network_branch_priorities or {}), mapped_variables=mapped_variables, mapped_strong_branching=mapped_strong_branching, enumerate=enumerate, enumeration_route_limit=enumeration_route_limit,
                    enumeration_work_limit=enumeration_work_limit, enumeration_stored_arc_limit=enumeration_stored_arc_limit,
                    enumeration_time_limit=enumeration_time_limit, enumerated_mip=enumerated_mip,
                    mip_time_limit=mip_time_limit, mip_node_limit=mip_node_limit,

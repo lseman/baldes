@@ -104,8 +104,8 @@ impl Default for Config {
             gurobi: false,
             cli: false,
             multi_time_windows: false,
-            ryan_foster_master: false,
-            accumulated_resource_master: false,
+            ryan_foster_master: true,
+            accumulated_resource_master: true,
             rank_one_node_memory: false,
             ng_memory: 15,
             release: true,
@@ -354,7 +354,10 @@ impl Config {
             (self.gurobi, "gurobi"),
             (self.multi_time_windows, "multi-time-windows"),
             (self.ryan_foster_master, "ryan-foster-master"),
-            (self.accumulated_resource_master, "accumulated-resource-master"),
+            (
+                self.accumulated_resource_master,
+                "accumulated-resource-master",
+            ),
             (self.rank_one_node_memory, "rank-one-node-memory"),
             (self.ng_memory == 31, "ng-memory-31"),
             (self.ng_memory == 63, "ng-memory-63"),
@@ -1160,38 +1163,62 @@ mod tests {
     #[test]
     fn ryan_foster_enforcement_round_trips_and_selects_its_feature() {
         let mut c = Config::default();
-        assert!(!args(&c, "build").iter().any(|a| a.contains("ryan-foster-master")));
+        assert!(args(&c, "build")
+            .iter()
+            .any(|a| a.contains("ryan-foster-master")));
         c.edit(16, None).unwrap();
-        assert!(c.ryan_foster_master);
-        assert!(c.text().contains("CONFIG_RYAN_FOSTER=master"));
+        assert!(!c.ryan_foster_master);
+        assert!(c.text().contains("CONFIG_RYAN_FOSTER=pricing"));
         assert_eq!(Config::parse(&c.text()).unwrap(), c);
-        assert!(args(&c, "build").iter().any(|a| a.contains("ryan-foster-master")));
+        assert!(!args(&c, "build")
+            .iter()
+            .any(|a| a.contains("ryan-foster-master")));
         assert!(Config::parse("CONFIG_RYAN_FOSTER=labels").is_err());
-        assert!(!Config::parse("CONFIG_RYAN_FOSTER=pricing").unwrap().ryan_foster_master);
+        assert!(
+            !Config::parse("CONFIG_RYAN_FOSTER=pricing")
+                .unwrap()
+                .ryan_foster_master
+        );
     }
     #[test]
     fn accumulated_resource_enforcement_round_trips_and_selects_its_feature() {
         let mut c = Config::default();
-        assert!(!args(&c, "build").iter().any(|a| a.contains("accumulated-resource-master")));
+        assert!(args(&c, "build")
+            .iter()
+            .any(|a| a.contains("accumulated-resource-master")));
         c.edit(17, None).unwrap();
-        assert!(c.accumulated_resource_master);
-        assert!(c.text().contains("CONFIG_ACCUMULATED_RESOURCE=master"));
+        assert!(!c.accumulated_resource_master);
+        assert!(c.text().contains("CONFIG_ACCUMULATED_RESOURCE=pricing"));
         assert_eq!(Config::parse(&c.text()).unwrap(), c);
-        assert!(args(&c, "build").iter().any(|a| a.contains("accumulated-resource-master")));
+        assert!(!args(&c, "build")
+            .iter()
+            .any(|a| a.contains("accumulated-resource-master")));
         assert!(Config::parse("CONFIG_ACCUMULATED_RESOURCE=labels").is_err());
-        assert!(!Config::parse("CONFIG_ACCUMULATED_RESOURCE=pricing").unwrap().accumulated_resource_master);
+        assert!(
+            !Config::parse("CONFIG_ACCUMULATED_RESOURCE=pricing")
+                .unwrap()
+                .accumulated_resource_master
+        );
     }
     #[test]
     fn rank_one_memory_round_trips_and_selects_its_feature() {
         let mut c = Config::default();
-        assert!(!args(&c, "build").iter().any(|a| a.contains("rank-one-node-memory")));
+        assert!(!args(&c, "build")
+            .iter()
+            .any(|a| a.contains("rank-one-node-memory")));
         c.edit(18, None).unwrap();
         assert!(c.rank_one_node_memory);
         assert!(c.text().contains("CONFIG_RANK_ONE_MEMORY=node"));
         assert_eq!(Config::parse(&c.text()).unwrap(), c);
-        assert!(args(&c, "build").iter().any(|a| a.contains("rank-one-node-memory")));
+        assert!(args(&c, "build")
+            .iter()
+            .any(|a| a.contains("rank-one-node-memory")));
         assert!(Config::parse("CONFIG_RANK_ONE_MEMORY=other").is_err());
-        assert!(!Config::parse("CONFIG_RANK_ONE_MEMORY=arc").unwrap().rank_one_node_memory);
+        assert!(
+            !Config::parse("CONFIG_RANK_ONE_MEMORY=arc")
+                .unwrap()
+                .rank_one_node_memory
+        );
     }
     #[test]
     fn ng_memory_round_trips_and_selects_its_feature() {

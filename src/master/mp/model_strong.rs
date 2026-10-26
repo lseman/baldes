@@ -3,14 +3,15 @@
 use super::*;
 use crate::master::{tree::strong, LpMaster};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MappedEvaluationKind {
     RestrictedMaster,
     HeuristicPricing,
     ExactPricing,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct MappedBranchEvaluation {
     pub name: String,
     pub depth: usize,
@@ -34,11 +35,16 @@ pub(super) struct History {
     pub evaluations: Vec<MappedBranchEvaluation>,
     pub trials: usize,
     pub ranked: usize,
+    pub pricing_calls: usize,
+    pub iterations: usize,
+    pub oracle_calls: BTreeMap<i32, usize>,
+    pub completed_estimate: Option<f64>,
+    resources: BTreeMap<String, ResourceGroupCandidate>,
     costs: BTreeMap<String, BTreeMap<usize, [RunningCost; 2]>>,
 }
 
 impl History {
-    fn record(&mut self, evaluation: MappedBranchEvaluation) {
+    fn record_with_key(&mut self, key: &str, evaluation: MappedBranchEvaluation) {
         let cost = (evaluation.estimate - evaluation.parent) / evaluation.distance;
         if evaluation.parent.is_finite()
             && evaluation.estimate.is_finite()
@@ -48,7 +54,7 @@ impl History {
         {
             let stat = &mut self
                 .costs
-                .entry(evaluation.name.clone())
+                .entry(key.to_owned())
                 .or_default()
                 .entry(evaluation.stage)
                 .or_default()[evaluation.side];
@@ -72,19 +78,141 @@ impl History {
     }
 }
 
-struct Candidate<'a> {
-    variable: &'a MappedBranchVariable,
-    value: f64,
+/// Lightweight original-domain restriction; full masters are forked only after
+/// native priority/quota admission, never for the entire physical-arc registry.
+pub(super) enum Restriction {
+    Mapped(MappedBranchVariable),
+    Resource(ResourceGroupCandidate),
+    Assignment { shared_row: usize, network: i32 },
+    Master { id: i32 },
+    Multiplicity { network: i32 },
+    Activity { network: i32, arcs: Vec<(i32, f64)> },
+}
+
+pub(super) struct Proposal {
+    pub name: String,
+    pub history_key: String,
+    pub priority: f64,
+    pub value: f64,
+    pub restriction: Restriction,
+    pub history_eligible: bool,
+    pub fresh: bool,
+}
+impl Proposal {
+    fn children<const D: usize>(&self, node: &NodeSnapshot<D>) -> Result<Vec<NodeSnapshot<D>>> {
+        use crate::master::preprocessing::Bounds;
+        let bounds = [
+            Bounds {
+                lower: f64::NEG_INFINITY,
+                upper: self.value.floor(),
+            },
+            Bounds {
+                lower: self.value.ceil(),
+                upper: f64::INFINITY,
+            },
+        ];
+        match &self.restriction {
+            Restriction::Mapped(variable) => bounds
+                .into_iter()
+                .map(|b| variable.apply(node, b))
+                .collect(),
+            Restriction::Resource(candidate) => [false, true]
+                .into_iter()
+                .map(|up| candidate.apply(node, up))
+                .collect(),
+            Restriction::Assignment {
+                shared_row,
+                network,
+            } => [false, true]
+                .into_iter()
+                .map(|up| node.branch_assignment(*shared_row, *network, up))
+                .collect(),
+            Restriction::Master { id } => bounds
+                .into_iter()
+                .map(|b| node.with_master_variable_bounds(*id, b))
+                .collect(),
+            Restriction::Multiplicity { network } => bounds
+                .into_iter()
+                .map(|mut b| {
+                    b.lower = b.lower.max(0.);
+                    node.with_multiplicity(*network, b)
+                })
+                .collect(),
+            Restriction::Activity { network, arcs } => {
+                let oracle = node
+                    .state
+                    .oracles
+                    .iter()
+                    .find(|o| o.network.id == *network)
+                    .ok_or_else(|| invalid("unknown proposal activity network"))?;
+                let mut coefficients = vec![0.; oracle.network.graph.arcs.len()];
+                for &(id, coefficient) in arcs {
+                    let &position = oracle
+                        .index
+                        .get(&id)
+                        .ok_or_else(|| invalid("unknown proposal activity arc"))?;
+                    coefficients[position] = coefficient;
+                }
+                let coefficients = [RowCoefficients {
+                    network: *network,
+                    arcs: coefficients,
+                    per_route: 0.,
+                }];
+                bounds
+                    .into_iter()
+                    .map(|mut b| {
+                        b.lower = b.lower.max(0.);
+                        node.with_activity_bounds(b, &coefficients)
+                    })
+                    .collect()
+            }
+        }
+    }
+    fn unsupported_resource(&self) -> bool {
+        matches!(self.restriction, Restriction::Resource(_))
+    }
+}
+
+struct Candidate<const D: usize> {
+    proposal: Proposal,
+    children: Option<Vec<NodeSnapshot<D>>>,
+    usable: bool,
     score: f64,
     stages: [usize; 2],
     order: usize,
     subtree_size: f64,
 }
 
-pub(super) fn validate(options: &crate::master::tree::StrongBranchingOptions) -> Result<()> {
-    if options.use_history_subtree_size {
-        return Err(invalid("mapped strong branching uses the native parent subtree estimate; completed-subtree history is unavailable"));
+pub(super) fn mapped_proposals<const D: usize>(
+    output: &Output<D>,
+    variables: &[MappedBranchVariable],
+    tolerance: f64,
+) -> Result<Vec<Proposal>> {
+    let mut proposals = vec![];
+    for variable in variables {
+        let Some(value) = variable.value(output) else {
+            continue;
+        };
+        if !value.is_finite()
+            || value.abs() >= 9_007_199_254_740_992.
+            || (value - value.round()).abs() <= tolerance
+        {
+            continue;
+        }
+        proposals.push(Proposal {
+            name: variable.name.clone(),
+            history_key: format!("mapped:{}", variable.name),
+            priority: variable.priority,
+            value,
+            restriction: Restriction::Mapped(variable.clone()),
+            history_eligible: true,
+            fresh: true,
+        });
     }
+    Ok(proposals)
+}
+
+pub(super) fn validate(options: &crate::master::tree::StrongBranchingOptions) -> Result<()> {
     if options.phases.is_empty()
         || options.phases.iter().any(|phase| {
             !phase.subtree_ratio.is_finite()
@@ -106,70 +234,150 @@ pub(super) fn choose<const D: usize>(
     incumbent: f64,
     deadline: Instant,
 ) -> Result<Option<Vec<NodeSnapshot<D>>>> {
-    let Some(config) = &options.mapped_strong_branching else {
-        return model_mapping::children(output, &options.mapped_variables, options.tolerance);
-    };
-    let mut candidates: Vec<_> = options
-        .mapped_variables
+    let proposals = mapped_proposals(output, &options.mapped_variables, options.tolerance)?;
+    choose_proposals(output, options, history, incumbent, deadline, proposals)
+}
+
+pub(super) fn choose_proposals<const D: usize>(
+    output: &Output<D>,
+    options: &AssignmentTreeOptions,
+    history: &mut History,
+    incumbent: f64,
+    deadline: Instant,
+    mut proposals: Vec<Proposal>,
+) -> Result<Option<Vec<NodeSnapshot<D>>>> {
+    if options.branching == NetworkBranchingPolicy::NativePhased
+        && output.snapshot.state.node_depth > 0
+    {
+        let present: HashSet<_> = proposals.iter().map(|p| p.history_key.clone()).collect();
+        for (key, template) in &history.resources {
+            if present.contains(key) {
+                continue;
+            }
+            if let Some(proposal) = super::tree::proposals::refresh_resource(
+                output,
+                template,
+                options.branch_priorities.resource,
+                options.tolerance,
+            ) {
+                proposals.push(proposal);
+            }
+        }
+    }
+    if proposals
         .iter()
-        .filter_map(|variable| {
-            let value = variable.value(output)?;
-            (value.is_finite()
-                && value.abs() < 9_007_199_254_740_992.
-                && (value - value.round()).abs() > options.tolerance)
-                .then_some((variable, value))
-        })
-        .collect();
-    candidates.sort_by(|(a, x), (b, y)| {
+        .any(|p| !p.priority.is_finite() || !p.value.is_finite())
+    {
+        return Err(invalid("invalid network branch proposal"));
+    }
+    proposals.sort_by(|a, b| {
         b.priority
             .total_cmp(&a.priority)
             .then_with(|| {
-                ((x - x.floor()) - 0.5)
+                ((a.value - a.value.floor()) - 0.5)
                     .abs()
-                    .total_cmp(&((y - y.floor()) - 0.5).abs())
+                    .total_cmp(&((b.value - b.value.floor()) - 0.5).abs())
             })
             .then_with(|| a.name.cmp(&b.name))
     });
+    let Some(config) = &options.mapped_strong_branching else {
+        for proposal in proposals {
+            match proposal.children(&output.snapshot) {
+                Ok(children) => return Ok(Some(children)),
+                Err(_) if proposal.unsupported_resource() => continue,
+                Err(error) => return Err(error),
+            }
+        }
+        return Ok(None);
+    };
     let parent = output.master.bound;
     let cutoff = incumbent.min(1e12);
     let gap = cutoff - parent;
-    let limit = config.phases.first().map_or(0, |p| p.candidates);
-    // Native history is attached to generator identities and refreshed values,
-    // not the old fractional split. Reserve at most half the admission slots.
+    let inherited_size = history
+        .completed_estimate
+        .unwrap_or(output.snapshot.state.mapped_subtree_size);
+    let mut budget = strong::CandidateBudget::new(
+        config.phases.first().map_or(0, |p| p.candidates),
+        config.phases.first().map_or(0., |p| p.subtree_ratio),
+        strong::SubtreeEstimate {
+            size: inherited_size,
+            priority: output.snapshot.state.mapped_subtree_priority,
+        },
+    );
+    if history.completed_estimate.is_some() {
+        budget.use_history();
+    }
+    let mut priorities: Vec<_> = options
+        .mapped_variables
+        .iter()
+        .map(|v| v.priority)
+        .collect();
+    if options.branching == NetworkBranchingPolicy::NativePhased {
+        let p = &options.branch_priorities;
+        priorities.extend([
+            p.multiplicity,
+            p.resource,
+            p.assignment,
+            p.master_variable,
+            p.arc,
+            p.window,
+        ]);
+    }
+    priorities.sort_by(|a, b| b.total_cmp(a));
+    priorities.dedup_by(|a, b| *a == *b);
+    let (fresh, priority_cutoff) = crate::master::tree::history::fresh_batches_with_budget(
+        budget.quota,
+        &priorities,
+        Some(&mut budget),
+        |priority| {
+            proposals
+                .iter()
+                .enumerate()
+                .filter_map(|(i, p)| (p.fresh && p.priority == priority).then_some(i))
+                .collect()
+        },
+    );
+    let limit = budget.quota;
+    // Native history admission uses the actual fresh-loop cutoff, including
+    // empty registered priority families, and reserves at most half the quota.
+    let mut ranked = vec![];
     if output.snapshot.state.node_depth > 0 && gap > 0. {
-        let mut ranked: Vec<_> = candidates
+        ranked = proposals
             .iter()
             .enumerate()
-            .filter_map(|(i, (v, x))| {
+            .filter_map(|(i, p)| {
+                if !p.history_eligible
+                    || priority_cutoff
+                        - (1e-6 + p.priority.abs().max(priority_cutoff.abs()) * 1e-10)
+                        > p.priority
+                {
+                    return None;
+                }
                 history
-                    .prediction(&v.name, *x, gap)
-                    .map(|(stage, score)| (i, stage, score, &v.name))
+                    .prediction(&p.history_key, p.value, gap)
+                    .map(|(stage, score)| (i, stage, score, p.name.clone()))
             })
             .collect();
         ranked.sort_by(|a, b| {
             b.1.cmp(&a.1)
                 .then_with(|| b.2.total_cmp(&a.2))
-                .then_with(|| a.3.cmp(b.3))
+                .then_with(|| a.3.cmp(&b.3))
         });
         ranked.truncate(limit / 2);
-        let selected: HashSet<_> = ranked.iter().map(|r| r.0).collect();
-        let mut next: Vec<_> = ranked.iter().map(|r| candidates[r.0]).collect();
-        next.extend(
-            candidates
-                .into_iter()
-                .enumerate()
-                .filter(|(i, _)| !selected.contains(i))
-                .map(|(_, c)| c),
-        );
-        history.ranked += ranked.len();
-        candidates = next;
     }
-    let mut candidates: Vec<_> = candidates
+    history.ranked += ranked.len();
+    let mut slots: Vec<_> = proposals.into_iter().map(Some).collect();
+    let mut next: Vec<_> = ranked.iter().filter_map(|r| slots[r.0].take()).collect();
+    next.extend(fresh.into_iter().filter_map(|i| slots[i].take()));
+    proposals = next;
+    proposals.truncate(limit);
+    let mut candidates: Vec<_> = proposals
         .into_iter()
         .enumerate()
-        .map(|(order, (variable, value))| Candidate {
-            variable,
-            value,
+        .map(|(order, proposal)| Candidate {
+            proposal,
+            children: None,
+            usable: true,
             score: 0.,
             stages: [0; 2],
             order,
@@ -181,7 +389,6 @@ pub(super) fn choose<const D: usize>(
             .checked_add(config.time_limit)
             .unwrap_or(deadline),
     );
-    let inherited_size = output.snapshot.state.mapped_subtree_size;
     let mut best_size: f64 = 1e12;
     let mut best_score = -1e12;
     for (phase_index, phase) in config.phases.iter().enumerate() {
@@ -200,36 +407,30 @@ pub(super) fn choose<const D: usize>(
         }
         let mut evaluated = 0;
         for candidate in &mut candidates {
-            if phase.subtree_ratio > 0.
-                && exceeds(
-                    evaluated as f64,
-                    phase.subtree_ratio * inherited_size.min(best_size),
-                )
-            {
+            if !budget.permits(evaluated, phase.subtree_ratio, best_size) {
                 break;
             }
             if Instant::now() >= end {
                 break;
             }
+            if candidate.children.is_none() {
+                match candidate.proposal.children(&output.snapshot) {
+                    Ok(children) => candidate.children = Some(children),
+                    Err(_) if candidate.proposal.unsupported_resource() => {
+                        candidate.usable = false;
+                        candidate.score = f64::NEG_INFINITY;
+                        continue;
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
             evaluated += 1;
             let mut estimates = [parent; 2];
-            for (side, bounds) in [
-                crate::master::preprocessing::Bounds {
-                    lower: f64::NEG_INFINITY,
-                    upper: candidate.value.floor(),
-                },
-                crate::master::preprocessing::Bounds {
-                    lower: candidate.value.ceil(),
-                    upper: f64::INFINITY,
-                },
-            ]
-            .into_iter()
-            .enumerate()
-            {
+            for side in 0..2 {
                 if Instant::now() >= end {
                     break;
                 }
-                let mut child = candidate.variable.apply(&output.snapshot, bounds)?;
+                let mut child = candidate.children.as_ref().unwrap()[side].fork()?;
                 child.state.node_depth = output.snapshot.state.node_depth.saturating_add(1);
                 candidate.stages[side] += 1;
                 history.trials += 1;
@@ -271,6 +472,15 @@ pub(super) fn choose<const D: usize>(
                         .min(end);
                     match child.solve(node) {
                         Ok(result) => {
+                            history.pricing_calls += result.master.pricing_calls;
+                            history.iterations += result.master.iterations;
+                            for &(id, calls) in &result.oracle_calls {
+                                *history.oracle_calls.entry(id).or_default() += calls;
+                            }
+                            // As in the recovered routing policy, an incomplete
+                            // original LP value can rank a trial; it is never a
+                            // child bound, and incomplete exact trials are not
+                            // recorded as exact history.
                             estimates[side] = result.master.lp.min(1e12);
                             let artificial_zero = result.master.artificials.iter().all(|&c| {
                                 result
@@ -304,18 +514,27 @@ pub(super) fn choose<const D: usize>(
                         Err(error) => return Err(error),
                     }
                 };
-                if let Some(kind) = observation {
-                    let fraction = candidate.value - candidate.value.floor();
-                    history.record(MappedBranchEvaluation {
-                        name: candidate.variable.name.clone(),
-                        depth: output.snapshot.state.node_depth,
-                        side,
-                        stage: candidate.stages[side],
-                        kind,
-                        parent,
-                        estimate: estimates[side],
-                        distance: if side == 0 { fraction } else { 1. - fraction },
-                    });
+                if let Some(kind) = observation.filter(|_| candidate.proposal.history_eligible) {
+                    let fraction = candidate.proposal.value - candidate.proposal.value.floor();
+                    if let Restriction::Resource(template) = &candidate.proposal.restriction {
+                        history
+                            .resources
+                            .entry(candidate.proposal.history_key.clone())
+                            .or_insert_with(|| template.clone());
+                    }
+                    history.record_with_key(
+                        &candidate.proposal.history_key,
+                        MappedBranchEvaluation {
+                            name: candidate.proposal.name.clone(),
+                            depth: output.snapshot.state.node_depth,
+                            side,
+                            stage: candidate.stages[side],
+                            kind,
+                            parent,
+                            estimate: estimates[side],
+                            distance: if side == 0 { fraction } else { 1. - fraction },
+                        },
+                    );
                 }
             }
             candidate.score = if phase.tree_depth_score {
@@ -335,24 +554,29 @@ pub(super) fn choose<const D: usize>(
                 best_size = candidate.subtree_size;
             }
         }
+        candidates.retain(|c| c.usable);
         if evaluated > 0 {
             candidates.truncate(evaluated);
         }
         candidates.sort_by(|a, b| b.score.total_cmp(&a.score).then(a.order.cmp(&b.order)));
     }
-    let Some(candidate) = candidates.first() else {
-        return Ok(None);
-    };
-    // Recreate unpriced children of the original checkpoint. Trial estimates
-    // and artificial objectives never enter their inherited lower bounds.
-    let mut children =
-        model_mapping::children(output, &[candidate.variable.clone()], options.tolerance)?;
-    if let Some(children) = &mut children {
-        for child in children {
+    for candidate in candidates.into_iter().filter(|c| c.usable) {
+        let mut children = if let Some(children) = candidate.children {
+            children
+        } else {
+            match candidate.proposal.children(&output.snapshot) {
+                Ok(children) => children,
+                Err(_) if candidate.proposal.unsupported_resource() => continue,
+                Err(error) => return Err(error),
+            }
+        };
+        for child in &mut children {
             child.state.mapped_subtree_size = candidate.subtree_size;
+            child.state.mapped_subtree_priority = priority_cutoff;
         }
+        return Ok(Some(children));
     }
-    Ok(children)
+    Ok(None)
 }
 
 fn exceeds(a: f64, b: f64) -> bool {

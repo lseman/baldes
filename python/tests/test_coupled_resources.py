@@ -136,3 +136,27 @@ def test_paired_relation_rejects_mismatched_vectors_and_unknown_modes():
         model.add_paired_piecewise_linear(**(common | {"waiting": [0]}))
     with pytest.raises(RuntimeError, match="unknown paired resource mode"):
         model.add_paired_piecewise_linear(**common, mode="unknown")
+
+
+def test_computed_front_domain_is_an_explicit_installation_choice():
+    import pytest
+    from pybaldes import EncodedFunction
+    solver = Solver(3, 0)
+    solver.new_arc(0, 1, -10.)
+    solver.new_arc(1, 2, -10.)
+    model = ResourceModel()
+    point = 0.30000000000000004
+    model.add_slope_interval_cost(
+        .1, .1, 0., 1., [.2, 0.],
+        [EncodedFunction.slope_segments([(3., point)], "native_tolerance"),
+         EncodedFunction.slope_segments([(0., point)], "native_tolerance")],
+        policy="native_front_algebra",
+    )
+    model.install(solver, native_front_program_domain=True)
+    minimum, routes = solver.price(10)
+    assert minimum == pytest.approx(-17.)
+    assert routes[0].original_cost == pytest.approx(-17.)
+    # Invalid opt-in must leave the live, already installed model intact.
+    with pytest.raises(RuntimeError, match="native raw resources"):
+        ResourceModel().install(solver, native_front_program_domain=True)
+    assert solver.price(10)[0] == pytest.approx(-17.)

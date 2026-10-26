@@ -392,7 +392,7 @@ NetworkResult(
 ## Network function and methods
 
 ```python
-solve_networks(problem: NetworkProblem, *, tree: bool=False, network_pricing_schedule: str='full-sweep', network_unpromising_limit: int=1, network_branching: str='resource-first', enumerate: bool=False, enumeration_route_limit: int=10000, enumeration_work_limit: int=10000000, enumeration_stored_arc_limit: int=1000000, enumeration_time_limit: float=1.0, enumerated_mip: bool=False, mip_time_limit: float=1.0, mip_node_limit: int=100000, mip_objective_cutoff: Optional[float]=None, time_limit: float=120.0, max_iterations: int=100000, node_limit: int=10000, stabilize: bool=True, proximal: Optional[Mapping[str, Any]]=None, bound_mode: str='numerical', artificial_cost: float=2.76, log_interval: Optional[int]=None, pricing_options: Optional[Mapping[str, float]]=None, synchronized_services: Tuple[SynchronizedService, ...]=()) -> NetworkResult
+solve_networks(problem: NetworkProblem, *, tree: bool=False, network_pricing_schedule: str='full-sweep', network_unpromising_limit: int=1, network_branching: str='multiplicity-first', enumerate: bool=False, enumeration_route_limit: int=10000, enumeration_work_limit: int=10000000, enumeration_stored_arc_limit: int=1000000, enumeration_time_limit: float=1.0, enumerated_mip: bool=False, mip_time_limit: float=1.0, mip_node_limit: int=100000, mip_objective_cutoff: Optional[float]=None, time_limit: float=120.0, max_iterations: int=100000, node_limit: int=10000, stabilize: bool=True, proximal: Optional[Mapping[str, Any]]=None, bound_mode: str='numerical', artificial_cost: float=2.76, log_interval: Optional[int]=None, pricing_options: Optional[Mapping[str, float]]=None, synchronized_services: Tuple[SynchronizedService, ...]=()) -> NetworkResult
 ```
 
 ```python

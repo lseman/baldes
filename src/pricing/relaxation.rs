@@ -7,7 +7,14 @@ impl<const D: usize> Solver<D> {
         controls: &crate::graph::relaxation::Controls,
     ) -> Result<crate::graph::relaxation::Counts> {
         // Updating NG tables may mark the graph as prepared below. Discard a
-        // grid built before unrelated resource/topology edits first.
+        // grid built before unrelated resource/topology edits first. In a
+        // bounded-walk model, NG may only add exclusions when hard vertex
+        // groups already make every feasible route physically simple.
+        if self.graph.max_route_arcs().is_some() && !self.graph.bounded_walks_are_vertex_simple() {
+            return Err(invalid(
+                "NG strengthening is not a bounded-walk model restriction",
+            ));
+        }
         self.invalidate_changed_graph();
         let baseline = (
             self.graph
@@ -42,6 +49,13 @@ impl<const D: usize> Solver<D> {
     /// Whether a route (vertices and arc ids in path order) is feasible for
     /// the current NG relaxation.
     pub fn route_satisfies_relaxation(&self, vertices: &[i32], arcs: &[i32]) -> Result<bool> {
+        if self
+            .graph
+            .max_route_arcs()
+            .is_some_and(|limit| arcs.len() > limit)
+        {
+            return Ok(false);
+        }
         if vertices.len() != arcs.len() + 1 {
             return Err(invalid("route node/arc dimensions"));
         }

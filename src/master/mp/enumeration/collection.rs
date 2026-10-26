@@ -40,16 +40,6 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
         let domain = super::super::resource_groups::residual_domain_graph(oracle)
             .map_err(|e| e.to_string())?;
         let graph = domain.as_ref();
-        // The current integer witness contract requires an interior visit.
-        // A direct source/sink route may be meaningful in a generic model;
-        // decline rather than silently exclude it from a completeness claim.
-        if graph
-            .arcs
-            .iter()
-            .any(|a| a.tail == graph.source && a.head == graph.sink)
-        {
-            return Err("UnsupportedDomain: direct source/sink route domain".into());
-        }
         // Disposable transitions relax scalar equality transitions: clamping a
         // too-small load adds paths, never removes an equality-feasible path.
         // Collect that superset, then replay every path on the original graph.

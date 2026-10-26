@@ -77,6 +77,13 @@ pub struct PricingNetwork {
     pub resources: Vec<Resource>,
     #[serde(default)]
     pub coupled_resources: Vec<crate::graph::coupled::CoupledResource>,
+    /// Explicitly use the native computed-front program as the feasibility
+    /// domain for NativeFrontAlgebra resources; defaults to source controls.
+    #[serde(default)]
+    pub native_front_program_domain: bool,
+    /// Integer-route domain; bounded walks require an explicit finite arc cap.
+    #[serde(default)]
+    pub route_domain: crate::graph::RouteDomain,
     #[serde(default)]
     pub elementary: bool,
     pub arcs: Vec<Arc>,
@@ -173,7 +180,11 @@ impl Model {
                 arc_entries.push(input.entries);
             }
             graph.elementary = input.elementary;
+            graph.set_route_domain(input.route_domain)?;
             graph.set_coupled_resources(&input.coupled_resources)?;
+            if input.native_front_program_domain {
+                graph.set_native_front_program_domain(true)?;
+            }
             graph.validate()?;
             networks.push(Network {
                 id: input.id,
@@ -206,6 +217,11 @@ pub struct SolveOptions {
     /// Native promising-status visit budget (default one million).
     pub network_promising_limit: usize,
     pub network_branching: NetworkBranchingPolicy,
+    pub network_tree_search: NetworkTreeSearchPolicy,
+    pub network_strategy2_bound_rounding: NativeIntegerBoundRounding,
+    /// Primary native frontier capacity before nodes use the overflow heap.
+    pub network_open_node_limit: usize,
+    pub network_branch_priorities: NetworkBranchPriorities,
     pub mapped_variables: Vec<MappedBranchVariable>,
     pub mapped_strong_branching: bool,
     pub synchronized_services: Vec<SynchronizedService>,
@@ -237,6 +253,10 @@ impl Default for SolveOptions {
             network_unpromising_limit: 1,
             network_promising_limit: 1_000_000,
             network_branching: NetworkBranchingPolicy::default(),
+            network_tree_search: NetworkTreeSearchPolicy::default(),
+            network_strategy2_bound_rounding: NativeIntegerBoundRounding::default(),
+            network_open_node_limit: 1000,
+            network_branch_priorities: NetworkBranchPriorities::default(),
             mapped_variables: vec![],
             mapped_strong_branching: true,
             synchronized_services: vec![],
@@ -323,6 +343,10 @@ impl SolveOptions {
         let node = self.node_options()?;
         Ok(AssignmentTreeOptions {
             branching: self.network_branching,
+            tree_search: self.network_tree_search,
+            strategy2_bound_rounding: self.network_strategy2_bound_rounding,
+            native_open_node_limit: self.network_open_node_limit,
+            branch_priorities: self.network_branch_priorities.clone(),
             mapped_variables: self.mapped_variables.clone(),
             mapped_strong_branching: self
                 .mapped_strong_branching
@@ -444,6 +468,7 @@ pub struct SolveResult {
     pub pricing_calls: usize,
     pub oracle_calls: Vec<(i32, usize)>,
     pub nodes: usize,
+    pub tree_processed_nodes: usize,
     pub open_nodes: usize,
     pub seconds: f64,
     pub enumeration_reports: Vec<EnumerationReport>,
@@ -485,6 +510,7 @@ impl SolveResult {
             pricing_calls: output.master.pricing_calls,
             oracle_calls: output.oracle_calls.clone(),
             nodes: 0,
+            tree_processed_nodes: 0,
             open_nodes: 0,
             enumeration_reports: vec![output.snapshot.enumeration_report().clone()],
             enumerated_mip_calls: 0,
@@ -517,6 +543,7 @@ impl SolveResult {
             pricing_calls: output.pricing_calls,
             oracle_calls: output.oracle_calls.clone(),
             nodes: output.nodes,
+            tree_processed_nodes: output.processed_nodes,
             open_nodes: output.open_nodes,
             enumeration_reports: output.enumeration_reports.clone(),
             enumerated_mip_calls: output.enumerated_mip_calls,
@@ -559,6 +586,7 @@ impl SolveResult {
             pricing_calls: 0,
             oracle_calls: vec![],
             nodes: output.mip.nodes,
+            tree_processed_nodes: 0,
             open_nodes: usize::from(!proof),
             seconds,
             enumeration_reports: vec![report.clone()],

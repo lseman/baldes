@@ -533,12 +533,36 @@ impl PreparedBounds {
     ) -> Self {
         // Full elementarity only bounds physical visits when every nonterminal
         // owns an element. Group-free vertices may otherwise repeat forever.
-        let hops = (g.elementary
+        let needs_hop_bounds = definitions.iter().any(|definition| {
+            matches!(
+                definition,
+                CoupledResource::CumulativeCost { .. } | CoupledResource::CustomResource { .. }
+            )
+        });
+        let simple_hops = g.vertices.len().saturating_sub(1);
+        let elementary_hops = (needs_hop_bounds
+            && g.elementary
             && g.vertices
                 .iter()
                 .enumerate()
                 .all(|(v, x)| v == g.source || v == g.sink || !x.elements.is_empty()))
-        .then_some(g.vertices.len().saturating_sub(1) as f64);
+        .then_some(simple_hops);
+        let mut hops = [g.max_route_arcs(), elementary_hops]
+            .into_iter()
+            .flatten()
+            .reduce(usize::min);
+        // Only scan the physical topology when cumulative resources need a
+        // finite hop proof and the existing bound could be improved by a DAG.
+        if needs_hop_bounds && hops.map_or(true, |bound| bound > simple_hops) && g.is_acyclic() {
+            hops = Some(simple_hops);
+        }
+        // Use a floating count only when it is exact. Larger route caps retain
+        // conservative unbounded domains instead of underestimating a visit
+        // count after an integer-to-f64 conversion.
+        let hop_count = hops.and_then(|count| {
+            let value = count as f64;
+            ((value as u128) == count as u128).then_some(value)
+        });
         let mut numeric: Vec<_> = initial.iter().copied().map(Range::point).collect();
         let mut weights = vec![Range::point(0.); initial.len()];
         let mut exact_costs = true;
@@ -564,16 +588,32 @@ impl PreparedBounds {
                         .fold((0f64, 0f64), |(min, max), &x| (min.min(x), max.max(x)));
                     let integral =
                         initial.fract() == 0. && increments.iter().all(|x| x.fract() == 0.);
-                    let domain = hops.map(|h| {
-                        Range::point(initial)
-                            .add(Range { lo: min, hi: max }.multiply(Range::point(h)))
+                    let domain = hop_count.map(|count| {
+                        let exact_sum = Range::point(initial)
+                            .add(Range { lo: min, hi: max }.multiply(Range::point(count)));
+                        let absolute =
+                            Range::point(min.abs().max(max.abs())).multiply(Range::point(count));
+                        let relative = Range::point(count).multiply(Range::point(f64::EPSILON));
+                        if relative.hi >= 0.5 || !absolute.finite() {
+                            return Range::unknown();
+                        }
+                        // Enclose the h rounded state additions as well as the
+                        // exact interval sum. The gamma bound is deliberately
+                        // symmetric; it is a pruning domain, not an objective.
+                        let error = absolute
+                            .multiply(relative.multiply(Range::point(2.)))
+                            .add(Range::point(count).multiply(Range::point(f64::from_bits(1))));
+                        exact_sum.add(Range {
+                            lo: -error.hi,
+                            hi: error.hi,
+                        })
                     });
+                    let finite_domain = domain.filter(|range| range.finite());
                     let exact = integral
-                        && domain.is_some_and(|d| {
-                            d.finite() && d.lo.abs().max(d.hi.abs()) <= 4_503_599_627_370_496.
-                        });
-                    numeric[i] = if exact {
-                        domain.unwrap()
+                        && finite_domain
+                            .is_some_and(|d| d.lo.abs().max(d.hi.abs()) <= 4_503_599_627_370_496.);
+                    numeric[i] = if let Some(domain) = finite_domain {
+                        domain
                     } else {
                         Range {
                             lo: if min >= 0. {
@@ -597,7 +637,7 @@ impl PreparedBounds {
                     let (min, max) = w
                         .iter()
                         .fold((0f64, 0f64), |(min, max), &x| (min.min(x), max.max(x)));
-                    weights[i] = hops.map_or(
+                    weights[i] = hop_count.map_or(
                         Range {
                             lo: if min == 0. { 0. } else { f64::NEG_INFINITY },
                             hi: if max == 0. { 0. } else { f64::INFINITY },
@@ -606,7 +646,7 @@ impl PreparedBounds {
                     );
                     let exact = exact && w.iter().all(|x| x.fract() == 0.);
                     exact_costs &= exact;
-                    if let (true, Some(h)) = (exact, hops) {
+                    if let (true, Some(h)) = (exact, hop_count) {
                         let abs = numeric[i].lo.abs().max(numeric[i].hi.abs());
                         total_cost = total_cost.add(
                             Range::point(abs)

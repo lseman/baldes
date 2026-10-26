@@ -79,3 +79,34 @@ fn model_json_preserves_f64_costs_at_representable_boundaries() {
         assert_eq!(parsed.networks[0].arcs[0].cost.to_bits(), bits);
     }
 }
+
+#[test]
+fn network_json_keeps_computed_front_domain_an_explicit_model_choice() {
+    let text = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/coupled/native_machine_network.json"
+    ));
+    let problem = Model::from_json(text).unwrap().problem::<2>().unwrap();
+    assert!(problem.networks[0].graph.native_front_program_domain());
+    assert_eq!(
+        problem.networks[0]
+            .graph
+            .coupled_kernel()
+            .unwrap()
+            .certify(&[0, 1]),
+        Some((true, [3., 3.]))
+    );
+    let mut input: serde_json::Value = serde_json::from_str(text).unwrap();
+    input["networks"][0]["native_front_program_domain"] = false.into();
+    let source = Model::from_json(&input.to_string())
+        .unwrap()
+        .problem::<2>()
+        .unwrap();
+    assert!(!source.networks[0].graph.native_front_program_domain());
+    assert!(source.networks[0]
+        .graph
+        .coupled_kernel()
+        .unwrap()
+        .certify(&[0, 1])
+        .is_none());
+}

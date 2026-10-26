@@ -148,7 +148,10 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
     }
     let master_only = oracles.is_empty();
     let mut state = State {
+        phase_one_infeasible: false,
         mapped_subtree_size: 1e12,
+        mapped_subtree_priority: 1e12,
+        mapped_lineage: 0,
         node_depth: 0,
         scheduler: scheduling::Scheduler::new(
             options.network_pricing_schedule,
@@ -201,6 +204,26 @@ pub(super) fn run<const D: usize>(
     mut state: State<D>,
     mut options: Options,
 ) -> Result<Output<D>> {
+    // A finished directed infeasibility report publishes +infinity, whereas
+    // the generic CG warm-start contract only accepts finite/-infinity bounds.
+    // An owned proven-infeasible snapshot may safely discard its cached bounds
+    // before re-solving; do not normalize arbitrary caller metadata this way.
+    if state.phase_one_infeasible {
+        if let Some(warm) = &mut options.cg.warm_start {
+            if warm.numerical_bound == f64::INFINITY {
+                warm.numerical_bound = f64::NEG_INFINITY;
+            }
+            if warm.certified_bound == f64::INFINITY {
+                warm.certified_bound = f64::NEG_INFINITY;
+            }
+            if warm.bound == f64::INFINITY {
+                warm.bound = match warm.bound_mode {
+                    cg::BoundMode::Numerical => warm.numerical_bound,
+                    cg::BoundMode::Certified => warm.certified_bound,
+                };
+            }
+        }
+    }
     // A resumed or modified formulation starts a fresh scan. Cached scores
     // from another node never supply coverage or a dual-bound contribution.
     state.scheduler = scheduling::Scheduler::new(
@@ -378,7 +401,9 @@ pub(super) fn run<const D: usize>(
         previous = Some(current);
     };
     // A finite artificial penalty cannot prove original-model infeasibility.
-    if result.status == cg::Status::Infeasible {
+    if result.status == cg::Status::Infeasible
+        && !result.feasibility.iter().any(|r| r.certified_infeasible)
+    {
         result.status = cg::Status::Stalled;
         result.lp = master.objective;
     }
@@ -387,6 +412,9 @@ pub(super) fn run<const D: usize>(
             || !cg::gap_smaller_than_tolerance(result.bound, result.lp, gap.0, gap.1))
     {
         result.status = cg::Status::Stalled;
+    }
+    if result.feasibility.iter().any(|r| r.certified_infeasible) {
+        state.borrow_mut().phase_one_infeasible = true;
     }
     drop(controller);
     let state = Rc::try_unwrap(state)

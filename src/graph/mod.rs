@@ -12,6 +12,21 @@ mod time_windows;
 mod window_arcs;
 pub use window_arcs::{WindowArc, WindowArcs};
 
+/// Original route-domain contract, separate from pricing NG relaxations.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "clp", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "clp",
+    serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)
+)]
+pub enum RouteDomain {
+    #[default]
+    PhysicalSimple,
+    BoundedWalks {
+        max_arcs: usize,
+    },
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ResourceKind {
     Disposable,
@@ -67,6 +82,7 @@ pub struct Graph<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub sink: usize,
     pub element_count: usize,
     pub elementary: bool,
+    route_domain: RouteDomain,
     pub initial: ScalarValues<Option<f64>, D>,
     pub graph_id: i32,
     pub main_resource: Option<usize>,
@@ -87,6 +103,7 @@ impl<const D: usize> Graph<D> {
             sink,
             element_count,
             elementary,
+            route_domain,
             initial,
             graph_id,
             main_resource,
@@ -99,6 +116,7 @@ impl<const D: usize> Graph<D> {
             && *sink == other.sink
             && *element_count == other.element_count
             && *elementary == other.elementary
+            && *route_domain == other.route_domain
             && *initial == other.initial
             && *graph_id == other.graph_id
             && *main_resource == other.main_resource
@@ -174,6 +192,7 @@ impl<const D: usize> Graph<D> {
             sink: vertices - 1,
             element_count: vertices,
             elementary: false,
+            route_domain: RouteDomain::PhysicalSimple,
             initial: ScalarValues::filled(resources, None),
             graph_id: -1,
             main_resource: None,
@@ -182,6 +201,86 @@ impl<const D: usize> Graph<D> {
             #[cfg(feature = "multi-time-windows")]
             time_windows: Default::default(),
         })
+    }
+    pub fn route_domain(&self) -> RouteDomain {
+        self.route_domain
+    }
+    pub fn set_route_domain(&mut self, domain: RouteDomain) -> Result<()> {
+        let old = self.route_domain;
+        self.route_domain = domain;
+        if let Err(error) = self.validate() {
+            self.route_domain = old;
+            return Err(error);
+        }
+        Ok(())
+    }
+    pub fn max_route_arcs(&self) -> Option<usize> {
+        match self.route_domain {
+            RouteDomain::PhysicalSimple => None,
+            RouteDomain::BoundedWalks { max_arcs } => Some(max_arcs),
+        }
+    }
+    pub(crate) fn hard_walk_groups(&self) -> bool {
+        self.max_route_arcs().is_some() && self.grouped
+    }
+    /// Whether every bounded-walk route is physically vertex-simple because
+    /// hard groups forbid repeats or the physical graph is acyclic.
+    pub(crate) fn bounded_walks_are_vertex_simple(&self) -> bool {
+        self.max_route_arcs().is_some()
+            && ((self.grouped
+                && self.vertices.iter().enumerate().all(|(vertex, data)| {
+                    vertex == self.source || vertex == self.sink || !data.elements.is_empty()
+                }))
+                || self.is_acyclic())
+    }
+    pub(crate) fn is_acyclic(&self) -> bool {
+        let mut outgoing = vec![Vec::new(); self.vertices.len()];
+        let mut indegree = vec![0usize; self.vertices.len()];
+        for arc in &self.arcs {
+            if arc.tail >= self.vertices.len() || arc.head >= self.vertices.len() {
+                return false;
+            }
+            outgoing[arc.tail].push(arc.head);
+            indegree[arc.head] += 1;
+        }
+        let mut queue: Vec<_> = (0..self.vertices.len())
+            .filter(|&vertex| indegree[vertex] == 0)
+            .collect();
+        let mut processed = 0;
+        while processed < queue.len() {
+            let vertex = queue[processed];
+            processed += 1;
+            for &head in &outgoing[vertex] {
+                indegree[head] -= 1;
+                if indegree[head] == 0 {
+                    queue.push(head);
+                }
+            }
+        }
+        processed == self.vertices.len()
+    }
+    pub(crate) fn has_explicit_elementarity_groups(&self) -> bool {
+        self.grouped
+    }
+    pub(crate) fn original_max_arcs(&self) -> usize {
+        self.max_route_arcs()
+            .unwrap_or_else(|| self.vertices.len().saturating_sub(1))
+    }
+    pub(crate) fn walk_memory_relaxation(&self) -> Option<Self> {
+        if self.max_route_arcs().is_none() || self.grouped || self.element_count == 0 {
+            return None;
+        }
+        let mut graph = self.clone();
+        graph.element_count = 0;
+        for v in &mut graph.vertices {
+            v.elements.clear();
+            v.memory.clear();
+        }
+        for a in &mut graph.arcs {
+            a.elements.clear();
+            a.memory.clear();
+        }
+        Some(graph)
     }
     /// Append a scalar resource and initialize existing vertices and arcs.
     pub fn add_resource(&mut self, kind: ResourceKind) -> Result<usize> {
@@ -289,6 +388,41 @@ impl<const D: usize> Graph<D> {
         }
         Ok(id)
     }
+    /// Add a hard group of physical arcs: a valid route may traverse at most
+    /// one arc carrying this elementarity ID. Arc IDs are deduplicated.
+    pub fn add_arc_elementarity_set(&mut self, members: &[i32]) -> Result<usize> {
+        let mut members = members.to_vec();
+        members.sort_unstable();
+        members.dedup();
+        if members
+            .iter()
+            .any(|id| !self.arcs.iter().any(|arc| arc.id == *id))
+        {
+            return Err(invalid("arc elementarity member out of range"));
+        }
+        if !self.grouped {
+            for vertex in &mut self.vertices {
+                vertex.elements.clear();
+                vertex.memory.clear();
+            }
+            self.element_count = 0;
+            self.grouped = true;
+        }
+        if self.element_count >= 1024 {
+            return Err(invalid("elementarity set capacity"));
+        }
+        let id = self.element_count;
+        self.element_count += 1;
+        for arc_id in members {
+            self.arcs
+                .iter_mut()
+                .find(|arc| arc.id == arc_id)
+                .expect("arc group members were validated")
+                .elements
+                .push(id);
+        }
+        Ok(id)
+    }
     /// Replaces costs transactionally. Costs are indexed in physical input order.
     pub fn update_reduced_costs(
         &mut self,
@@ -327,6 +461,27 @@ impl<const D: usize> Graph<D> {
         Ok(())
     }
     pub(crate) fn validate(&self) -> Result<()> {
+        if let RouteDomain::BoundedWalks { max_arcs } = self.route_domain {
+            if max_arcs == 0
+                || (self.elementary && !self.grouped)
+                || (self.grouped && self.element_count > ng::NG_MEMORY_CAPACITY)
+                || (!self.grouped
+                    && self
+                        .vertices
+                        .iter()
+                        .enumerate()
+                        .any(|(i, v)| !v.elements.is_empty() && v.elements.as_slice() != [i]))
+                || self.arcs.iter().any(|a| {
+                    !a.elements.is_empty()
+                        && (!self.grouped
+                            || a.elements
+                                .iter()
+                                .any(|&element| element >= self.element_count))
+                })
+            {
+                return Err(invalid("bounded walks require a positive arc limit, explicit supported elementarity groups, and no implicit full elementarity"));
+            }
+        }
         let n = self.vertices.len();
         if n == 0
             || n > 1024
@@ -341,6 +496,25 @@ impl<const D: usize> Graph<D> {
             || self.element_count > 1024
         {
             return Err(invalid("invalid graph dimensions or distinct terminals"));
+        }
+        if self.vertices.iter().any(|vertex| {
+            vertex
+                .elements
+                .iter()
+                .chain(&vertex.memory)
+                .any(|&element| element >= self.element_count)
+        }) || self.arcs.iter().any(|arc| {
+            arc.elements
+                .iter()
+                .chain(&arc.memory)
+                .any(|&element| element >= self.element_count)
+        }) {
+            return Err(invalid("graph elementarity or NG element out of range"));
+        }
+        if !self.grouped && self.arcs.iter().any(|arc| !arc.elements.is_empty()) {
+            return Err(invalid(
+                "arc elementarity events require explicit elementarity groups",
+            ));
         }
         self.validate_time_windows()?;
         if let Some(kernel) = &self.coupled {

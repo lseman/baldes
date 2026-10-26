@@ -94,19 +94,6 @@ pub(super) fn check_load_rows<const D: usize>(
         .iter()
         .find(|o| o.network.id == network)
         .ok_or_else(|| invalid("unknown resource group network"))?;
-    if oracle
-        .synchronized_windows
-        .iter()
-        .any(|&(_, r, _)| r == resource)
-        || state.synchronized_services.iter().any(|s| {
-            s.definition.resource == resource
-                && s.definition.members.iter().any(|m| m.network == network)
-        })
-    {
-        return Err(invalid(
-            "resource-load rows cannot use a synchronized service axis",
-        ));
-    }
     if state.universe.is_none()
         && oracle.network.graph.resources.get(resource)
             == Some(&crate::graph::ResourceKind::Disposable)
@@ -226,7 +213,7 @@ impl<const D: usize> NodeSnapshot<D> {
             oracle.resource_groups.push((shared, group));
         }
         node = super::nonlinear::refresh_row(node, shared)?;
-        if profiles::refresh(&mut node, &seen)? {
+        if profiles::refresh(&mut node, &self.state, &seen)? {
             // An original-feasible fixed path can become exactly impossible
             // under a new window even if its rounded profile passes the rule.
             node = node.with_row(

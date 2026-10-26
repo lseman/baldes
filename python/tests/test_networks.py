@@ -108,7 +108,7 @@ def test_assignment_tree_and_limits(bound_mode):
     assert zero.bound is None and json.loads(zero.to_json())["bound"] is None
 
 
-@pytest.mark.parametrize("policy", ["resource-first", "multiplicity-first"])
+@pytest.mark.parametrize("policy", ["resource-first", "multiplicity-first", "native-phased"])
 def test_explicit_network_branch_order_in_fresh_and_snapshot_trees(policy):
     model = triangle()
     fresh = model.solve(tree=True, network_branching=policy, stabilize=False)
@@ -382,3 +382,100 @@ def test_grouped_resource_children_and_restricted_trees(waiting, complete):
     with pytest.raises(ValueError, match="duplicate"):
         parent.snapshot.with_resource_group_branch(0, 0, 1.5, True, members + members[:1])
     assert parent.snapshot.solve().lp == pytest.approx(2.)
+
+
+@pytest.mark.parametrize("strong", [False, True])
+def test_registered_cross_network_aggregate_branching_preserves_original_tree(strong):
+    mappings = ({
+        "name": "total-route-count", "priority": 1.,
+        "networks": [{"network": 7, "per_route": 1.},
+                     {"network": 42, "per_route": 1.}],
+    },)
+    result = triangle().solve(tree=True, mapped_variables=mappings,
+                              mapped_strong_branching=strong)
+    assert result.status == "Optimal"
+    assert result.incumbent == pytest.approx(2.)
+    assert (result.strong_branching_trials > 0) == strong
+    payload = json.loads(result.to_json())
+    assert payload["strong_branching_trials"] == result.strong_branching_trials
+    assert all(e.name == "total-route-count" for e in result.mapped_branch_evaluations)
+
+
+def test_native_tree_selection_and_processed_node_accounting():
+    native = triangle().solve(tree=True, network_branching="multiplicity-first",
+                              network_tree_search="native-default")
+    best_bound = triangle().solve(tree=True, network_branching="multiplicity-first",
+                                  network_tree_search="best-bound")
+    strategy2 = triangle().solve(tree=True, network_branching="multiplicity-first",
+                                 network_tree_search="native-strategy-2")
+    strategy2_exact = triangle().solve(tree=True, network_branching="multiplicity-first",
+                                       network_tree_search="native-strategy-2",
+                                       network_strategy2_rounding="exact-ceil")
+    assert native.status == best_bound.status == strategy2.status == strategy2_exact.status == "Optimal"
+    assert native.incumbent == pytest.approx(2.)
+    assert best_bound.incumbent == pytest.approx(2.)
+    assert strategy2.incumbent == pytest.approx(2.)
+    assert strategy2_exact.incumbent == pytest.approx(2.)
+    assert native.tree_processed_nodes >= native.nodes
+    assert best_bound.tree_processed_nodes >= best_bound.nodes
+    assert json.loads(native.to_json())["tree_processed_nodes"] == native.tree_processed_nodes
+    assert json.loads(strategy2.to_json())["tree_processed_nodes"] == strategy2.tree_processed_nodes
+    overflow = triangle().solve(tree=True, network_branching="multiplicity-first",
+                                network_tree_search="native-default", network_open_node_limit=1)
+    assert overflow.status == "Optimal"
+    assert overflow.incumbent == pytest.approx(2.)
+    all_overflow = triangle().solve(tree=True, network_branching="multiplicity-first",
+                                    network_tree_search="native-default", network_open_node_limit=0)
+    assert all_overflow.status == "Optimal"
+    assert all_overflow.incumbent == pytest.approx(2.)
+
+
+@pytest.mark.parametrize("depth", [-1, 0, 1])
+def test_signed_stabilization_depth_and_promising_budget_are_public(depth):
+    root = triangle().solve(stabilization_max_tree_depth=depth,
+                            proximal={"curvature": {}}, network_promising_limit=2)
+    assert root.lp == pytest.approx(1.5)
+    with pytest.raises(ValueError, match="network_promising_limit"):
+        triangle().solve(network_promising_limit=0)
+
+
+@pytest.mark.parametrize("proximal", [
+    {"native_explicit": {"box_step": True}},
+    {"native_explicit": {}},
+    {"native_explicit": {"five_piece": True}},
+    {"bands": [{"half_width": 0., "penalty": 0.8999999761581421},
+               {"half_width": 0., "penalty": 0.8999999761581421}],
+     "multi_point": True, "native_row_scaling": True},
+])
+def test_native_explicit_defaults_preserve_root_resume_child_and_tree(proximal):
+    root = triangle().solve(proximal=proximal)
+    assert root.lp == pytest.approx(1.5)
+    assert root.snapshot.solve(proximal=proximal).lp == pytest.approx(1.5)
+    assert root.snapshot.branch_assignment(0, 7, True).solve(proximal=proximal).lp == pytest.approx(2.)
+    assert triangle().solve(tree=True, proximal=proximal).incumbent == pytest.approx(2.)
+
+
+def test_explicit_front_program_model_round_trip_and_certified_original_objective():
+    model_file = Path(__file__).resolve().parents[2] / "tests/fixtures/coupled/native_machine_network.json"
+    model = NetworkProblem.from_json(model_file.read_text())
+    assert model.networks[0].native_front_program_domain is True
+    assert NetworkProblem.from_json(model.to_json()) == model
+    root = model.solve(stabilize=False, bound_mode="certified")
+    assert root.lp == pytest.approx(1003.)
+    result = model.solve(tree=True, stabilize=False, bound_mode="certified")
+    assert result.status == "Optimal"
+    assert result.incumbent == pytest.approx(1003.)
+    assert result.bound == pytest.approx(1003.)
+
+
+def test_bounded_walk_model_round_trip_and_certified_negative_cycle():
+    model_file = Path(__file__).resolve().parents[2] / "tests/fixtures/coupled/bounded_walk_network.json"
+    model = NetworkProblem.from_json(model_file.read_text())
+    assert model.networks[0].route_domain == {"kind": "bounded_walks", "max_arcs": 4}
+    assert NetworkProblem.from_json(model.to_json()) == model
+    root = model.solve(stabilize=False, bound_mode="certified")
+    assert root.lp == pytest.approx(-3.)
+    result = model.solve(tree=True, stabilize=False, bound_mode="certified")
+    assert result.status == "Optimal"
+    assert result.incumbent == pytest.approx(-3.)
+    assert result.bound == pytest.approx(-3.)

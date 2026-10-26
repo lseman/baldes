@@ -20,7 +20,18 @@ impl<const D: usize> Enumeration<D> {
         cuts: Option<CutTables>,
         completion: F,
     ) -> Result<Self> {
+        let effective = controls.for_graph(g)?;
+        let controls = &effective;
+        if let Some(walk) = g.walk_memory_relaxation() {
+            return Self::run_with_symmetry(&walk, grid, controls, reverse, cuts, completion);
+        }
+
         let consumption = !reverse.is_empty();
+        if consumption && g.max_route_arcs().is_some() {
+            return Err(invalid(
+                "bounded walks require ordinary directional enumeration",
+            ));
+        }
         let union_reversal = consumption
             && g.coupled_kernel()
                 .is_some_and(|k| k.reversal_union_required());
@@ -176,6 +187,11 @@ impl<const D: usize> Enumeration<D> {
                 for arc in &grid.direction(direction).buckets[v][bucket].arcs {
                     let from = &storage.arena[from_id];
                     let physical = &g.arcs[arc.physical];
+                    if g.max_route_arcs().is_some()
+                        && (physical.head == g.source || physical.tail == g.sink)
+                    {
+                        continue;
+                    }
                     let mut next = from.clone_without_coupled();
                     next.parent = Some(from.id);
                     next.arc = Some(arc.physical);
@@ -556,15 +572,13 @@ impl<const D: usize> Enumeration<D> {
                             pruning.joined(cost);
                             continue;
                         }
-                        if controls
-                            .max_route_arcs
-                            .is_some_and(|limit| f.hops + b.hops > limit)
-                            || f.visited.iter().zip(&b.visited).zip(&depot_mask).any(
-                                |((x, y), depot)| {
-                                    x & y & if consumption { !depot } else { u64::MAX } != 0
-                                },
-                            )
-                        {
+                        if controls.max_route_arcs.is_some_and(|limit| {
+                            f.hops.checked_add(b.hops).is_none_or(|hops| hops > limit)
+                        }) || f.visited.iter().zip(&b.visited).zip(&depot_mask).any(
+                            |((x, y), depot)| {
+                                x & y & if consumption { !depot } else { u64::MAX } != 0
+                            },
+                        ) {
                             continue;
                         }
                         if !g.resources.iter().enumerate().all(|(r, kind)| match kind {

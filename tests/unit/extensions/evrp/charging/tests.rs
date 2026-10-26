@@ -136,6 +136,15 @@ fn charging_proofs_check_partial_targets_and_fail_closed_on_exhaustion() {
     let expired = std::time::Instant::now()
         .checked_sub(std::time::Duration::from_secs(1))
         .unwrap();
-    assert_eq!(kernel.certify_with_budget(&[0, 1, 2], &mut 10000, Some(expired)), None);
-    assert_eq!(fixture(10., 0).coupled_kernel().unwrap().certify(&[0, 1, 2]), None);
+    assert_eq!(
+        kernel.certify_with_budget(&[0, 1, 2], &mut 10000, Some(expired)),
+        None
+    );
+    assert_eq!(
+        fixture(10., 0)
+            .coupled_kernel()
+            .unwrap()
+            .certify(&[0, 1, 2]),
+        None
+    );
 }

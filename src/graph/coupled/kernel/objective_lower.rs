@@ -73,7 +73,7 @@ impl CoupledKernel {
         }
         // Numerical slope-front operators need their own directed semantics.
         // Do not reuse their computed minima as original-domain bounds.
-        if !self.slope_indices.is_empty()
+        if self.has_machine_cost_contracts()
             || self.paired.iter().any(|p| p.has_costs())
             || self.slope_paired.iter().any(|p| p.has_costs())
         {

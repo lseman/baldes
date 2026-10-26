@@ -309,10 +309,45 @@ reproduction of the reference's underpricing on accepted nonconvex waiting
 fixtures. A computed front minimum, a source replay and a directed global pricing
 certificate remain distinct. Strict-domain paired slopes can use the independent
 directed control certificate described above, preserving their ordered slope
-encoding. Exact integer-aligned standalone slope fronts and constant-dependent,
-zero-wait native-front-algebra pairs also have independent operator certificates.
-General tolerant/nonexact operator geometry remains unknown. Unproved operations
-return an explicit incomplete result.
+encoding. Exact dyadic standalone slope fronts also have independent operator
+certificates under the strict policy.
+
+Native raw interval certificates independently interpret the declared machine
+front program from the original descriptors. Software binary64 arithmetic
+checks translation, reanchoring, native coordinate alignment and summed-slope
+merges, topology and the full endpoint scan. Native addition retains the first
+near-equal summed slope and extends its endpoint; the strict policy retains
+separate pieces. Production optimized minima are never proof inputs.
+
+Default raw interval feasibility additionally requires an independent shared
+source-control witness, replayed with outward arithmetic inside the hard and
+source domains. Failure to find that witness is unknown. A computed empty
+front alone cannot prove default source infeasibility; only an independent
+empty source-domain relaxation can do so. Native paired defaults retain their
+independent source-domain certificates where supported.
+
+Rust callers can explicitly select a different original model with
+`graph.set_native_front_program_domain(true)?`. For native raw interval and
+paired resources, this defines feasibility by the checked ordered IEEE front
+program. It is a **model-domain change**, not a proof hint or an assertion of
+source-control/exact-real equivalence. Strict and other resource families keep
+their stated semantics. The default is false. Graph clones, node forks and
+cost suppression preserve the choice; replacing resource descriptors resets
+it. The graph and kernel getters expose it.
+
+`kernel.certify_front_program(arcs, &mut work, deadline)` checks that alternate
+model and returns a `FrontProgramCertificate` without changing a default
+graph's domain. Its result cannot replace the default source-feasibility
+guard. `has_machine_front_contracts()` identifies native raw resources;
+`has_machine_cost_contracts()` identifies objectives for which a source-control
+abstract bound is insufficient. Per-route certificates and complete finite
+collectors remain available independently.
+
+A checked component machine value is not a minimum of sequential source-control
+replay or of an exact-real control problem. Other resource and arc contributions
+still require outward aggregate bounds, and exact finite-MIP cost encoding
+retains its separate guard. Unproved operations, arithmetic overflow,
+unsupported topology and exhausted proof budgets remain unknown.
 
 The native-front composition policy handles in-domain start snapping,
 tolerance-sized constant intervals, near-knot segment advancement, and the
@@ -598,7 +633,9 @@ unknown. Encoded knot/slope numeric programs include independently enclosed
 endpoint-snap branches. Plugins can opt into `CoupledPlugin::certify`, which
 must independently prove original-domain feasibility under the caller's work
 and deadline; its default returns unknown. Ordinary numerical plugin transitions
-do not supply proof. Charging currently retains that default.
+do not supply proof. Charging supplies independently checked explicit targets
+and relaxed necessary-condition propagation; failure to find a target remains
+unknown rather than infeasible.
 
 For numeric and interval costs, a polynomial directed walk relaxation propagates
 state/objective enclosures over the original physical graph up to the integer

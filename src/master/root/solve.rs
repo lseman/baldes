@@ -59,6 +59,28 @@ pub(super) fn solve_seeded<const D: usize>(
     mut options: RootOptions,
     seed: Option<(&NodeSnapshot<D>, ClpMaster, cg::WarmStart)>,
 ) -> Result<RootOutput<D>> {
+    let configured_root_separator = options.cuts.enabled
+        || options.capacity_cuts.is_some()
+        || options.kpath_cuts.is_some()
+        || options.native_kpath_cuts.is_some()
+        || options.knapsack_cuts.is_some();
+    if problem.graph.max_route_arcs().is_some()
+        && !problem.graph.bounded_walks_are_vertex_simple()
+        && options.relaxation_improvement_priority > 0.
+    {
+        return Err(invalid(
+            "dynamic NG strengthening is unsupported for bounded-walk root solves",
+        ));
+    }
+    if configured_root_separator
+        && !problem.graph.bounded_walks_are_vertex_simple()
+        && problem.graph.max_route_arcs().is_some()
+    {
+        return Err(invalid(
+            "bounded-walk root separators require hard elementarity groups on every interior vertex",
+        ));
+    }
+
     options.cg.bound_mode = options.bound_mode;
     options.cg.node_depth = options.node_depth;
     options.master_solver.ensure_available()?;

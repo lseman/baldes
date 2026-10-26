@@ -30,18 +30,18 @@ path = "src/lib.rs"
 crate-type = ["rlib"]
 
 [features]
-default = []
+default = ["ryan-foster-master", "accumulated-resource-master"]
 # Exact small-p enumeration on NVIDIA CUDA (requires nvcc).
 cuda = ["dep:cc"]
 # Runtime-dispatched AVX2 dominance scans and rank-one bitsets; portable fallback.
 simd = []
 # Disjoint service-start windows on disposable scalar resources.
 multi-time-windows = []
-# Enforce Ryan–Foster branches only through master rows; pricing ignores
-# them. Without it, pricing also enforces them with binary resources.
+# Native MetaSolver-compatible Ryan–Foster enforcement through master rows;
+# pricing-enforced binary resources are selected with --no-default-features.
 ryan-foster-master = []
-# Enforce accumulated-resource branches only through master rows; pricing
-# keeps the unbranched arc windows. Without it, pricing tightens them too.
+# Native MetaSolver-compatible accumulated-resource enforcement through master
+# rows; pricing-window enforcement is selected with --no-default-features.
 accumulated-resource-master = []
 # Generate node memory instead of arc memory for rank-one cuts.
 rank-one-node-memory = []

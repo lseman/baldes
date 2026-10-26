@@ -8,6 +8,23 @@ fn cumulative(increments: Vec<f64>, weights: Vec<f64>) -> CoupledResource {
         source_upper: None,
     }
 }
+
+#[test]
+fn piecewise_cost_can_compose_with_unequal_additive_numeric_states() {
+    let piecewise = CoupledResource::PiecewiseLinearCost {
+        parent: 0,
+        functions: vec![crate::graph::coupled::PiecewiseLinearFunction::new(vec![
+            [0., 0.],
+            [10., 2.],
+        ])
+        .unwrap()],
+    };
+    let definitions = [cumulative(vec![1.], vec![1.]), piecewise];
+    let order = NumericCostOrder::new(&definitions, &[Some(0), None], 1);
+    assert!(order.deploys_unequal());
+    assert!(order.preserves(&[1.], &[2.], 0., 2.));
+}
+
 #[test]
 fn accepted_positive_and_negative_cones_preserve_literal_costs_over_all_small_words() {
     for sign in [-1., 1.] {

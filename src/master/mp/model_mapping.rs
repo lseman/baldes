@@ -35,6 +35,25 @@ fn integer_coefficient(value: f64) -> bool {
     value.is_finite() && value.fract() == 0. && value.abs() <= 1_048_576.
 }
 
+fn exact_coefficient(values: impl Iterator<Item = f64>) -> Result<f64> {
+    let mut sum = crate::master::root::ExactSum::default();
+    for value in values {
+        sum.add(value)
+            .ok_or_else(|| invalid("mapped coefficient sum overflow"))?;
+    }
+    let value = sum
+        .upper()
+        .ok_or_else(|| invalid("mapped coefficient sum overflow"))?;
+    sum.add(-value)
+        .ok_or_else(|| invalid("mapped coefficient sum overflow"))?;
+    if sum.sign() != 0. {
+        return Err(invalid(
+            "mapped row coefficient must be exactly representable",
+        ));
+    }
+    Ok(value)
+}
+
 impl MappedBranchVariable {
     /// Map selected network and static-master contributions of an existing
     /// original shared row. In particular, an edge/vertex packing row can be
@@ -51,6 +70,16 @@ impl MappedBranchVariable {
         if shared_row >= node.state.shared_rows.len() {
             return Err(invalid("unknown mapped shared row"));
         }
+        if node.state.oracles.iter().any(|o| {
+            o.nonlinear_rows.iter().any(|&(_, row)| row == shared_row)
+                || o.knapsack_rows.iter().any(|&(_, row)| row == shared_row)
+                || o.presence_rows.iter().any(|&(_, row)| row == shared_row)
+                || o.resource_groups.iter().any(|&(row, _)| row == shared_row)
+        }) {
+            return Err(invalid(
+                "mapped shared row must have additive original coefficients",
+            ));
+        }
         let mut networks = vec![];
         for &network in network_ids {
             let oracle = node
@@ -59,28 +88,32 @@ impl MappedBranchVariable {
                 .iter()
                 .find(|o| o.network.id == network)
                 .ok_or_else(|| invalid("unknown mapped row network"))?;
-            let per_route = oracle
-                .network
-                .route_entries
-                .iter()
-                .filter(|(r, _)| *r == shared_row)
-                .map(|(_, a)| a)
-                .sum();
-            let arcs = oracle
+            let per_route = exact_coefficient(
+                oracle
+                    .network
+                    .route_entries
+                    .iter()
+                    .filter(|(r, _)| *r == shared_row)
+                    .map(|(_, a)| *a),
+            )?;
+            let mut arcs = vec![];
+            for (arc, entries) in oracle
                 .network
                 .graph
                 .arcs
                 .iter()
                 .zip(oracle.network.arc_entries.iter())
-                .filter_map(|(arc, entries)| {
-                    let value: f64 = entries
+            {
+                let value = exact_coefficient(
+                    entries
                         .iter()
                         .filter(|(r, _)| *r == shared_row)
-                        .map(|(_, a)| a)
-                        .sum();
-                    (value != 0.).then_some((arc.id, value))
-                })
-                .collect();
+                        .map(|(_, a)| *a),
+                )?;
+                if value != 0. {
+                    arcs.push((arc.id, value));
+                }
+            }
             networks.push(MappedNetworkVariable {
                 network,
                 arcs,
@@ -95,12 +128,13 @@ impl MappedBranchVariable {
                 .iter()
                 .find(|v| v.id == id)
                 .ok_or_else(|| invalid("unknown mapped row master variable"))?;
-            let value = variable
-                .entries
-                .iter()
-                .filter(|(r, _)| *r == shared_row)
-                .map(|(_, a)| a)
-                .sum();
+            let value = exact_coefficient(
+                variable
+                    .entries
+                    .iter()
+                    .filter(|(r, _)| *r == shared_row)
+                    .map(|(_, a)| *a),
+            )?;
             masters.push((id, value));
         }
         let mapping = Self {
@@ -114,6 +148,7 @@ impl MappedBranchVariable {
                 (
                     o.network.id,
                     o.network.graph.arcs.iter().map(|a| a.id).collect(),
+                    o.network.graph.original_max_arcs(),
                 )
             }),
             &node.state.master_variables,
@@ -122,7 +157,7 @@ impl MappedBranchVariable {
     }
     pub(super) fn validate<const D: usize>(
         &self,
-        networks: impl Iterator<Item = (i32, Vec<i32>)>,
+        networks: impl Iterator<Item = (i32, Vec<i32>, usize)>,
         masters: &[MasterVariable],
     ) -> Result<()> {
         if self.name.is_empty() || !self.priority.is_finite() {
@@ -130,11 +165,13 @@ impl MappedBranchVariable {
                 "mapped branch variable requires a name and finite priority",
             ));
         }
-        let networks: HashMap<_, _> = networks.collect();
+        let networks: HashMap<_, _> = networks
+            .map(|(id, arcs, hops)| (id, (arcs, hops)))
+            .collect();
         let mut seen = HashSet::new();
         let mut nonzero = false;
         for contribution in &self.networks {
-            let arcs = networks
+            let (arcs, hops) = networks
                 .get(&contribution.network)
                 .ok_or_else(|| invalid("unknown mapped branch network"))?;
             if !seen.insert(contribution.network) || !integer_coefficient(contribution.per_route) {
@@ -158,6 +195,18 @@ impl MappedBranchVariable {
                         "mapped route coefficients exceed exact integer range",
                     ));
                 }
+            }
+            let max_arc = contribution
+                .arcs
+                .iter()
+                .map(|(_, a)| a.abs())
+                .fold(0_f64, f64::max);
+            if contribution.per_route.abs() as u128 + (max_arc as u128) * (*hops as u128)
+                > 9_007_199_254_740_992u128
+            {
+                return Err(invalid(
+                    "mapped walk coefficient exceeds exact integer range at its declared arc limit",
+                ));
             }
         }
         let mut seen = HashSet::new();
@@ -221,6 +270,7 @@ impl MappedBranchVariable {
                 (
                     o.network.id,
                     o.network.graph.arcs.iter().map(|a| a.id).collect(),
+                    o.network.graph.original_max_arcs(),
                 )
             }),
             &node.state.master_variables,
@@ -292,7 +342,7 @@ impl MappedBranchVariable {
 
 pub(super) fn validate<const D: usize>(
     variables: &[MappedBranchVariable],
-    networks: impl Iterator<Item = (i32, Vec<i32>)> + Clone,
+    networks: impl Iterator<Item = (i32, Vec<i32>, usize)> + Clone,
     masters: &[MasterVariable],
 ) -> Result<()> {
     let mut names = HashSet::new();

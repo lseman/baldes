@@ -92,7 +92,7 @@ All options to `solve_networks` are keyword-only.
 | `tree` | `False` | Solve a root LP or search a shared-master integer tree |
 | `network_pricing_schedule` | `"full-sweep"` | `full-sweep`, `cyclic`, `sorted`, `native-promising-first`, `native-unvisited-first` |
 | `network_unpromising_limit` | `1` | Positive native queue batch budget |
-| `network_branching` | `"resource-first"` | `resource-first` or `multiplicity-first` branching order |
+| `network_branching` | `"multiplicity-first"` | `multiplicity-first`, `resource-first` or `native-phased` branching policy |
 | `stabilize` | `True` | Dual smoothing when no explicit proximal configuration replaces it |
 | `proximal` | `None` | Explicit proximal bands and optional multi-point policy |
 | `bound_mode` | `"numerical"` | Numerical or certified lower bounds |
@@ -256,9 +256,13 @@ assert all(r.resource_profile[1][0] == 5 for r in result.routes)
 
 The synchronized resource must be disposable with nonnegative consumption.
 Put service duration on outgoing arcs. Start bounds are inclusive integers in
-`[-2**52, 2**52]`; the unit determines the time grid. Participating coupled
-resources and resource-load rows on that axis are rejected. Root LP columns need
-not form a synchronized schedule; the tree validates the joint integer witness.
+`[-2**52, 2**52]`; the unit determines the time grid. The synchronized axis is
+a graph scalar resource; separate coupled resources may coexist. Resource-load
+rows on the same axis are refreshed when synchronized start domains change.
+The single-network root master accepts bounded walks without cuts; root cut
+families require a hard vertex elementarity group on every interior vertex.
+Root LP columns need not form a synchronized schedule; the tree validates the
+joint integer witness.
 
 A snapshot's service definitions are immutable. Narrow a start domain with
 `with_synchronized_start(id, lower, upper)`; parents remain reusable. Complete

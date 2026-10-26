@@ -43,53 +43,61 @@ impl<const D: usize> std::fmt::Debug for NodeSnapshot<D> {
     }
 }
 
+impl<const D: usize> State<D> {
+    pub(super) fn fork_state(&self) -> Self {
+        State {
+            phase_one_infeasible: self.phase_one_infeasible,
+            mapped_subtree_size: self.mapped_subtree_size,
+            mapped_subtree_priority: self.mapped_subtree_priority,
+            mapped_lineage: self.mapped_lineage,
+            node_depth: self.node_depth,
+            scheduler: self.scheduler.fresh(),
+            synchronized_services: self.synchronized_services.clone(),
+            oracles: self
+                .oracles
+                .iter()
+                .map(|o| Oracle {
+                    network: o.network.clone(),
+                    total_multiplicity: o.total_multiplicity,
+                    solver: o.solver.fork_for_node(),
+                    index: o.index.clone(),
+                    costs: vec![],
+                    route_entries: o.route_entries.clone(),
+                    calls: 0,
+                    nonlinear_rows: o.nonlinear_rows.clone(),
+                    knapsack_rows: o.knapsack_rows.clone(),
+                    presence_rows: o.presence_rows.clone(),
+                    resource_groups: o.resource_groups.clone(),
+                    synchronized_windows: o.synchronized_windows.clone(),
+                    proved_zero_arcs: o.proved_zero_arcs.clone(),
+                    proved_multiplicity_upper: o.proved_multiplicity_upper,
+                })
+                .collect(),
+            shared_offset: self.shared_offset,
+            routes: self.routes.clone(),
+            tags: self.tags.clone(),
+            correction: None,
+            gradient: None,
+            rhs: self.rhs.clone(),
+            deadline: self.deadline,
+            shared_rows: self.shared_rows.clone(),
+            curvature_rows: self.curvature_rows.clone(),
+            fixed_routes: self.fixed_routes.clone(),
+            universe: self.universe.clone(),
+            enumeration_report: self.enumeration_report.clone(),
+            preprocessing: self.preprocessing.clone(),
+            master_variables: self.master_variables.clone(),
+            route_upper_bounds: self.route_upper_bounds.clone(),
+        }
+    }
+}
+
 impl<const D: usize> NodeSnapshot<D> {
     pub(crate) fn fork(&self) -> Result<Self> {
         Ok(Self {
             master: self.master.try_clone()?,
             warm: self.warm.clone(),
-            state: State {
-                mapped_subtree_size: self.state.mapped_subtree_size,
-                node_depth: self.state.node_depth,
-                scheduler: self.state.scheduler.fresh(),
-                synchronized_services: self.state.synchronized_services.clone(),
-                oracles: self
-                    .state
-                    .oracles
-                    .iter()
-                    .map(|o| Oracle {
-                        network: o.network.clone(),
-                        total_multiplicity: o.total_multiplicity,
-                        solver: o.solver.fork_for_node(),
-                        index: o.index.clone(),
-                        costs: vec![],
-                        route_entries: o.route_entries.clone(),
-                        calls: 0,
-                        nonlinear_rows: o.nonlinear_rows.clone(),
-                        knapsack_rows: o.knapsack_rows.clone(),
-                        presence_rows: o.presence_rows.clone(),
-                        resource_groups: o.resource_groups.clone(),
-                        synchronized_windows: o.synchronized_windows.clone(),
-                        proved_zero_arcs: o.proved_zero_arcs.clone(),
-                        proved_multiplicity_upper: o.proved_multiplicity_upper,
-                    })
-                    .collect(),
-                shared_offset: self.state.shared_offset,
-                routes: self.state.routes.clone(),
-                tags: self.state.tags.clone(),
-                correction: None,
-                gradient: None,
-                rhs: self.state.rhs.clone(),
-                deadline: self.state.deadline,
-                shared_rows: self.state.shared_rows.clone(),
-                curvature_rows: self.state.curvature_rows.clone(),
-                fixed_routes: self.state.fixed_routes.clone(),
-                universe: self.state.universe.clone(),
-                enumeration_report: self.state.enumeration_report.clone(),
-                preprocessing: self.state.preprocessing.clone(),
-                master_variables: self.state.master_variables.clone(),
-                route_upper_bounds: self.state.route_upper_bounds.clone(),
-            },
+            state: self.state.fork_state(),
         })
     }
 

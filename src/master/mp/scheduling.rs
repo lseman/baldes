@@ -150,12 +150,6 @@ impl Scheduler {
             .expect("normal modern pricing status")
     }
 
-    #[cfg(test)]
-    fn finish_classified(&mut self, index: usize, new_columns: usize, promising: bool) -> bool {
-        self.finish_native_status(index, new_columns, i32::from(promising))
-            .unwrap()
-    }
-
     /// Native status contract for adapters: positive is promising, zero is a
     /// normal solve, -2 is skipped without spending the unpromising budget.
     /// Other negative outcomes are failures and cannot establish batch coverage.

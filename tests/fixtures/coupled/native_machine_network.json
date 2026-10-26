@@ -1,0 +1,74 @@
+{
+  "rows": [
+    {
+      "sense": "eq",
+      "rhs": 1
+    }
+  ],
+  "networks": [
+    {
+      "id": 7,
+      "vertices": 3,
+      "multiplicity": [
+        0,
+        1
+      ],
+      "arcs": [
+        {
+          "tail": 0,
+          "head": 1,
+          "cost": 1000,
+          "entries": [
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "tail": 1,
+          "head": 2,
+          "cost": 0
+        }
+      ],
+      "elementary": true,
+      "native_front_program_domain": true,
+      "coupled_resources": [
+        {
+          "kind": "slope_interval_cost",
+          "initial": {
+            "lower": 0.1,
+            "upper": 0.1
+          },
+          "bounds": {
+            "lower": 0,
+            "upper": 1
+          },
+          "increments": [
+            0.2,
+            0
+          ],
+          "functions": [
+            {
+              "pairs": [
+                [
+                  3,
+                  0.30000000000000004
+                ]
+              ]
+            },
+            {
+              "pairs": [
+                [
+                  0,
+                  0.30000000000000004
+                ]
+              ]
+            }
+          ],
+          "policy": "native_front_algebra"
+        }
+      ]
+    }
+  ]
+}

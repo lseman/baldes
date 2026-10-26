@@ -3,6 +3,7 @@ use super::*;
 
 pub(in crate::master::mp) fn refresh<const D: usize>(
     node: &mut NodeSnapshot<D>,
+    previous: &State<D>,
     touched: &HashSet<i32>,
 ) -> Result<bool> {
     let mut domains = HashMap::new();
@@ -22,6 +23,61 @@ pub(in crate::master::mp) fn refresh<const D: usize>(
             crate::master::root::exact_route_feasibility(domain, &fixed.route.route) == Some(false)
         })
     });
+    if !fixed_impossible {
+        let mut rhs = node.state.rhs.clone();
+        for fixed in &mut node.state.fixed_routes {
+            let Some(domain) = domains.get(&fixed.route.network) else {
+                continue;
+            };
+            if crate::master::root::exact_route_feasibility(domain, &fixed.route.route)
+                != Some(true)
+            {
+                return Err(incomplete("fixed route schedule refresh is unsupported"));
+            }
+            let old_oracle = previous
+                .oracles
+                .iter()
+                .find(|o| o.network.id == fixed.route.network)
+                .ok_or_else(|| invalid("fixed route network disappeared during refresh"))?;
+            let new_oracle = node
+                .state
+                .oracles
+                .iter()
+                .find(|o| o.network.id == fixed.route.network)
+                .ok_or_else(|| invalid("fixed route network disappeared during refresh"))?;
+            let old_entries =
+                super::super::entries(old_oracle, &fixed.route.route, previous.shared_offset)?;
+            let canonical = domain
+                .elementary_route(&fixed.route.route.arcs)
+                .ok_or_else(|| incomplete("fixed route canonical schedule reconstruction"))?;
+            fixed.route.route.resources = canonical.resources;
+            fixed.route.route.resource_profile = canonical.resource_profile;
+            let new_entries =
+                super::super::entries(new_oracle, &fixed.route.route, node.state.shared_offset)?;
+            let old: BTreeMap<_, _> = old_entries.into_iter().collect();
+            let new: BTreeMap<_, _> = new_entries.into_iter().collect();
+            for row in old
+                .keys()
+                .chain(new.keys())
+                .copied()
+                .collect::<HashSet<_>>()
+            {
+                let before = old.get(&row).copied().unwrap_or(0.);
+                let after = new.get(&row).copied().unwrap_or(0.);
+                let value = rhs
+                    .get_mut(row)
+                    .ok_or_else(|| invalid("fixed route row refresh index"))?;
+                *value -= fixed.quantity * (after - before);
+            }
+        }
+        if rhs.iter().any(|value| !value.is_finite()) {
+            return Err(invalid("fixed route row refresh overflow"));
+        }
+        if rhs != node.state.rhs {
+            node.master.set_rhs(&rhs)?;
+            node.state.rhs = rhs;
+        }
+    }
     for (tag, route) in node.state.routes.iter_mut().enumerate() {
         let Some(domain) = domains.get(&route.network) else {
             continue;

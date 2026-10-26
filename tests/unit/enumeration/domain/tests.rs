@@ -296,6 +296,7 @@ fn deadline_after_a_materialized_path_discards_the_partial_collection() {
             deadline: Some(started + Duration::from_secs(1)),
             ..limits()
         },
+        false,
         |graph, arc, quantities| {
             extensions.set(extensions.get() + 1);
             extend_resource_lower_bounds(graph, arc, quantities)

@@ -12,14 +12,22 @@ Solve shared master rows with multiple pricing networks (Clp).
   --network-promising-limit N  Native positive-status budget (default: 1000000)
   --stabilization-max-tree-depth N  Disable stabilization at depth N (default: 10000)
   --network-unpromising-limit N  Per-batch native queue budget (default: 1)
+  --network-branch-priorities FILE  Family priorities for native-phased JSON
   --mapped-variables FILE  Registered original aggregate branch variables JSON
   --no-mapped-strong-branching  Rank registered aggregates without trial solves
   --proximal FILE         Proximal configuration JSON (replaces smoothing)
+  --native-proximal-box-step  Native finite-cap box-step initialization/schedule
+  --native-proximal-three-piece  Native explicit three-piece initialization/schedule
+  --native-proximal-five-piece  Native explicit five-piece initialization/schedule
+  --native-proximal-multipoint  Native explicit multi-point initialization/schedule
   --automatic-curvature   Automatic three-piece curvature stabilization
   --automatic-curvature-five-piece  Automatic five-piece curvature stabilization
   --proximal-width X      One proximal band, in dual row units
   --proximal-penalty X    Finite band penalty; omitted means hard box-step
-  --network-branching MODE  resource-first (default) or multiplicity-first
+  --network-branching MODE  multiplicity-first (default), resource-first or native-phased
+  --network-tree-search MODE  native-default (default), best-bound or native-strategy-2
+  --network-strategy2-rounding MODE  guarded-tolerance (default) or exact-ceil
+  --network-open-node-limit N  Native primary frontier size (default: 1000)
   --synchronized-services FILE  JSON array of common-start service definitions
   --resource-branches FILE  Apply a JSON array of grouped-resource restrictions
   --enumerate            Attempt bounded full-domain all-network transfer
@@ -69,6 +77,22 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
                 return Ok(());
             }
             "--tree" => options.tree = true,
+            "--native-proximal-box-step" => {
+                options.proximal =
+                    Some(baldes::master::stabilization::ProximalParameters::native_box_step());
+            }
+            "--native-proximal-three-piece" => {
+                options.proximal =
+                    Some(baldes::master::stabilization::ProximalParameters::native_three_piece());
+            }
+            "--native-proximal-five-piece" => {
+                options.proximal =
+                    Some(baldes::master::stabilization::ProximalParameters::native_five_piece());
+            }
+            "--native-proximal-multipoint" => {
+                options.proximal =
+                    Some(baldes::master::stabilization::ProximalParameters::native_multipoint());
+            }
             "--automatic-curvature" => {
                 options.proximal =
                     Some(baldes::master::stabilization::ProximalParameters::automatic_three_piece())
@@ -88,6 +112,11 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
             "--network-unpromising-limit" => {
                 options.network_unpromising_limit =
                     value()?.parse::<usize>().map_err(|e| e.to_string())?;
+            }
+            "--network-branch-priorities" => {
+                let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;
+                options.network_branch_priorities = serde_json::from_str(&text)
+                    .map_err(|e| format!("network branch priorities JSON: {e}"))?;
             }
             "--mapped-variables" => {
                 let text = std::fs::read_to_string(value()?).map_err(|e| e.to_string())?;
@@ -114,6 +143,28 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
                 options.network_branching =
                     baldes::master::mp::NetworkBranchingPolicy::parse(&value()?)
                         .map_err(|e| e.to_string())?
+            }
+            "--network-tree-search" => {
+                options.network_tree_search =
+                    baldes::master::mp::NetworkTreeSearchPolicy::parse(&value()?)
+                        .map_err(|e| e.to_string())?
+            }
+            "--network-strategy2-rounding" => {
+                options.network_strategy2_bound_rounding = match value()?.as_str() {
+                    "guarded-tolerance" => {
+                        baldes::master::mp::NativeIntegerBoundRounding::GuardedTolerance
+                    }
+                    "exact-ceil" => baldes::master::mp::NativeIntegerBoundRounding::ExactCeil,
+                    _ => {
+                        return Err(
+                            "strategy-2 rounding must be guarded-tolerance or exact-ceil".into(),
+                        )
+                    }
+                }
+            }
+            "--network-open-node-limit" => {
+                options.network_open_node_limit =
+                    value()?.parse::<usize>().map_err(|e| e.to_string())?;
             }
             "--resource-branches" => resource_branches = Some(value()?),
             "--enumerate" => options.enumerate = true,
@@ -236,7 +287,7 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
             std::fs::write(path, data).map_err(|e| e.to_string())?;
         }
         println!(
-            "mode={} status={} lp={} incumbent={} bound={} bound_mode={} nodes={} open_nodes={}",
+            "mode={} status={} lp={} incumbent={} bound={} bound_mode={} nodes={} tree_processed_nodes={} open_nodes={}",
             result.mode,
             result.status,
             result.lp.map_or("unknown".into(), |v| v.to_string()),
@@ -244,6 +295,7 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
             result.bound.map_or("unknown".into(), |v| v.to_string()),
             result.bound_mode,
             result.nodes,
+            result.tree_processed_nodes,
             result.open_nodes
         );
     }

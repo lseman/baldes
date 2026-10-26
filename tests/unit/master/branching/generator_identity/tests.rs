@@ -40,3 +40,19 @@ fn labels_follow_both_sides_and_exact_resource_identities() {
     names.remove(&ca);
     assert_eq!(names.get(&cb), Some("same_display"));
 }
+
+#[test]
+fn registered_aggregate_flow_uses_its_original_name_for_history_ties() {
+    let constraint = BranchConstraint::AggregateFlow {
+        name: "x_1_20_1_OspV".into(),
+        arcs: vec![(3, 1.), (9, -1.)],
+        sense: RowSense::LessEqual,
+        rhs: 0.,
+    };
+    let names = BranchGeneratorNames::default();
+    assert_eq!(names.label(&constraint), "x_1_20_1_OspV");
+
+    let mut names = BranchGeneratorNames::default();
+    names.insert(&constraint, "explicit_override");
+    assert_eq!(names.label(&constraint), "explicit_override");
+}

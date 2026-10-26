@@ -20,8 +20,10 @@ pub struct SynchronizedServiceMember {
 /// Adds a binary served variable, a single reward, and the equality
 /// `sum(visits) = vehicles_required * served`. Existing route costs and shared
 /// rows are retained; do not also charge this reward on each incoming arc.
-/// Time is a disposable scalar axis with nonnegative consumption. Coupled
-/// resources and resource-load rows on this axis are deliberately unsupported.
+/// Time is an independent disposable scalar axis with nonnegative
+/// consumption. Separate coupled-resource domains may coexist on the routes.
+/// Resource-load rows on this axis are replayed after start-domain changes,
+/// including fixed-route RHS updates.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SynchronizedService {
@@ -90,6 +92,17 @@ pub(super) fn prepare<const D: usize>(
                 .find(|n| n.id == member.network)
                 .ok_or_else(|| invalid("unknown synchronized service network"))?;
             let graph = &mut network.graph;
+            // Coverage counts distinct route copies. A repeated service visit
+            // in one bounded walk must not impersonate another vehicle.
+            if graph.max_route_arcs().is_some()
+                && (!graph.hard_walk_groups()
+                    || graph
+                        .vertices
+                        .get(member.vertex)
+                        .is_none_or(|v| v.elements.is_empty()))
+            {
+                return Err(invalid("a bounded-walk synchronized service member requires a declared vertex elementarity group"));
+            }
             let r = definition.resource;
             if !networks.insert(member.network)
                 || !occurrences.insert((member.network, member.vertex))
@@ -98,9 +111,8 @@ pub(super) fn prepare<const D: usize>(
                 || member.vertex == graph.sink
                 || graph.resources.get(r) != Some(&ResourceKind::Disposable)
                 || graph.arcs.iter().any(|a| a.consumption[r] < 0.)
-                || graph.coupled_kernel().is_some()
             {
-                return Err(invalid("synchronized service needs unique nonterminal vertices and independent nonnegative disposable time"));
+                return Err(invalid("synchronized service needs unique nonterminal vertices and a nonnegative disposable scalar time axis"));
             }
             let old = graph.vertices[member.vertex].bounds[r];
             let lo = old.lower.max(definition.start[0] as f64);
@@ -206,13 +218,6 @@ impl<const D: usize> NodeSnapshot<D> {
                 .find(|o| o.network.id == member.network)
                 .unwrap();
             let r = definition.resource;
-            if oracle.knapsack_rows.iter().any(|&(k, _)| {
-                oracle.solver.cuts.knapsack_cuts[k].graph_resources[&member.network].0 == r
-            }) {
-                return Err(invalid(
-                    "resource-load rows cannot use a synchronized service axis",
-                ));
-            }
             let window = Window {
                 lower: domain[0] as f64,
                 upper: domain[1] as f64,
@@ -259,7 +264,7 @@ impl<const D: usize> NodeSnapshot<D> {
                 &coefficients.into_values().collect::<Vec<_>>(),
             )?;
         }
-        if resource_groups::profiles::refresh(&mut node, &touched)? {
+        if resource_groups::profiles::refresh(&mut node, &self.state, &touched)? {
             node = node.with_row(
                 Row {
                     sense: RowSense::LessEqual,

@@ -17,13 +17,13 @@ fn checkpoint() -> (ClpMaster, ProximalState, ProximalParameters) {
 fn automatic_checkpoint_validates_original_geometry_without_private_variables() {
     let (mut master, state, parameters) = checkpoint();
     let checkpoint =
-        ProximalWarmStart::capture(&state, &master, &NoController, &parameters, &[], &[])
+        ProximalWarmStart::capture(&state, &master, &NoController, &parameters, &[], &[], 0)
             .unwrap()
             .unwrap();
     assert_eq!(checkpoint.snapshot.curvature.unwrap().curvature, 10.);
     master.add_column(2., &[(0, 1.)]).unwrap();
     let restored = checkpoint
-        .restore(&master, &NoController, &parameters)
+        .restore(&master, &NoController, &parameters, 0)
         .unwrap()
         .unwrap();
     assert_eq!(restored.center, vec![3.]);
@@ -32,13 +32,13 @@ fn automatic_checkpoint_validates_original_geometry_without_private_variables() 
     // existing coefficient or original cost does not.
     master.set_coefficient(0, 0, 2.).unwrap();
     assert!(checkpoint
-        .restore(&master, &NoController, &parameters)
+        .restore(&master, &NoController, &parameters, 0)
         .unwrap()
         .is_none());
     master.set_coefficient(0, 0, 1.).unwrap();
     master.set_cost(0, 11.).unwrap();
     assert!(checkpoint
-        .restore(&master, &NoController, &parameters)
+        .restore(&master, &NoController, &parameters, 0)
         .unwrap()
         .is_none());
 }
@@ -47,7 +47,8 @@ fn automatic_checkpoint_validates_original_geometry_without_private_variables() 
 fn child_and_resume_keep_global_curvature_without_repeated_scaling() {
     let (mut master, state, parameters) = checkpoint();
     let checkpoint =
-        ProximalWarmStart::capture(&state, &master, &NoController, &parameters, &[], &[]).unwrap();
+        ProximalWarmStart::capture(&state, &master, &NoController, &parameters, &[], &[], 0)
+            .unwrap();
     let mut warm = WarmStart::empty(BoundMode::Numerical);
     warm.proximal = checkpoint;
     warm.mark_proximal_child();
@@ -56,20 +57,21 @@ fn child_and_resume_keep_global_curvature_without_repeated_scaling() {
         .proximal
         .as_ref()
         .unwrap()
-        .restore(&master, &NoController, &parameters)
+        .restore(&master, &NoController, &parameters, 0)
         .unwrap()
         .unwrap();
     assert_eq!(restored.center, vec![3., 0.]);
     assert_eq!(restored.curvature.unwrap().curvature, 10.);
     let mut child = ProximalState::default();
     child.inherit_for_solve(&restored, 2).unwrap();
-    let resumed = ProximalWarmStart::capture(&child, &master, &NoController, &parameters, &[], &[])
-        .unwrap()
-        .unwrap();
+    let resumed =
+        ProximalWarmStart::capture(&child, &master, &NoController, &parameters, &[], &[], 0)
+            .unwrap()
+            .unwrap();
     assert!(!resumed.child);
     assert_eq!(
         resumed
-            .restore(&master, &NoController, &parameters)
+            .restore(&master, &NoController, &parameters, 0)
             .unwrap()
             .unwrap()
             .curvature,
@@ -198,34 +200,139 @@ fn explicit_children_use_native_baseline_and_same_node_resume_does_not_rescale()
         .unwrap();
     state.observe(&[3.], 1., true);
     let mut checkpoint =
-        ProximalWarmStart::capture(&state, &master, &NoController, &parameters, &[], &[])
+        ProximalWarmStart::capture(&state, &master, &NoController, &parameters, &[], &[], 0)
             .unwrap()
             .unwrap();
     let resumed = checkpoint
-        .restore(&master, &NoController, &parameters)
+        .restore(&master, &NoController, &parameters, 0)
         .unwrap()
         .unwrap();
     assert_eq!(resumed.explicit_bands[0].half_width, 1.);
     assert_eq!(resumed.explicit_bands[1].half_width, 5.);
     checkpoint.child = true;
-    let child = checkpoint
-        .restore(&master, &NoController, &parameters)
+    // A same-node dynamic cut uses the geometry-child permission, but does
+    // not create a tree-depth transition or expand intervals.
+    master.add_row(RowSense::LessEqual, 100., &[]).unwrap();
+    let cut = checkpoint
+        .restore(&master, &NoController, &parameters, 0)
         .unwrap()
         .unwrap();
-    assert_eq!(child.center, vec![3.]);
+    assert_eq!(cut.explicit_bands[0].half_width, 1.);
+    assert_eq!(cut.explicit_bands[1].half_width, 5.);
+    let child = checkpoint
+        .restore(&master, &NoController, &parameters, 1)
+        .unwrap()
+        .unwrap();
+    assert_eq!(child.center, vec![3., 0.]);
     assert_eq!(child.explicit_bands[0].half_width, 500.);
     assert_eq!(child.explicit_bands[1].half_width, 50.);
     assert_eq!(child.explicit_baseline, Some(5.));
     let mut child_state = ProximalState::default();
     child_state.inherit_for_solve(&child, 2).unwrap();
-    let resume_checkpoint =
-        ProximalWarmStart::capture(&child_state, &master, &NoController, &parameters, &[], &[])
-            .unwrap()
-            .unwrap();
+    let resume_checkpoint = ProximalWarmStart::capture(
+        &child_state,
+        &master,
+        &NoController,
+        &parameters,
+        &[],
+        &[],
+        1,
+    )
+    .unwrap()
+    .unwrap();
     let resumed_child = resume_checkpoint
-        .restore(&master, &NoController, &parameters)
+        .restore(&master, &NoController, &parameters, 1)
         .unwrap()
         .unwrap();
     assert_eq!(resumed_child.explicit_bands[0].half_width, 500.);
     assert_eq!(resumed_child.explicit_bands[1].half_width, 50.);
+}
+
+#[test]
+fn multipoint_resume_extends_samples_for_new_rows_and_discards_incompatible_coordinates() {
+    let (mut master, mut state, _) = checkpoint();
+    let parameters = ProximalParameters::native_multipoint();
+    let mut snapshot = state.snapshot().unwrap();
+    snapshot.curvature = None;
+    snapshot.configuration = None;
+    snapshot.max_points = 2;
+    snapshot.next_point_id = 1;
+    snapshot.support_planes = vec![crate::master::stabilization::multipoint::SupportPlane {
+        point: vec![3.],
+        dual_activity: 2.,
+        zero_age: 1,
+        protected_center: true,
+        creation_id: 0,
+    }];
+    state.inherit_for_solve(&snapshot, 2).unwrap();
+    let mut checkpoint =
+        ProximalWarmStart::capture(&state, &master, &NoController, &parameters, &[], &[], 0)
+            .unwrap()
+            .unwrap();
+    checkpoint.child = true;
+    master.add_row(RowSense::LessEqual, 2., &[]).unwrap();
+    let child = checkpoint
+        .restore(&master, &NoController, &parameters, 0)
+        .unwrap()
+        .unwrap();
+    assert_eq!(child.support_planes[0].point, vec![3., 0.]);
+    assert_eq!(child.support_planes[0].dual_activity, 2.);
+    assert_eq!(child.bound, f64::NEG_INFINITY);
+    master.set_cost(0, 11.).unwrap();
+    let incompatible = checkpoint
+        .restore(&master, &NoController, &parameters, 0)
+        .unwrap()
+        .unwrap();
+    assert!(incompatible.support_planes.is_empty());
+    assert_eq!(incompatible.center, vec![0., 0.]);
+}
+
+#[test]
+fn all_inactive_native_candidates_do_not_manufacture_zero_mean_feedback() {
+    struct Inactive;
+    impl Controller<ClpMaster> for Inactive {
+        fn curvature_rows(&self, count: usize) -> Vec<CurvatureRow> {
+            vec![
+                CurvatureRow {
+                    class: CurvatureRowClass::Ordinary,
+                    active: false
+                };
+                count
+            ]
+        }
+    }
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, 1., &[]).unwrap();
+    master.add_column(10., &[(0, 1.)]).unwrap();
+    let output = super::super::optimize(
+        &mut master,
+        &[Phase {
+            check_ng: true,
+            jump_arcs: true,
+            labels_per_bucket: i64::MAX,
+        }],
+        |_, _| {
+            Ok(Answer {
+                columns: vec![],
+                minimum: 0.,
+                exact: true,
+                bound_minimum: None,
+            })
+        },
+        &mut Inactive,
+        Options {
+            proximal: Some(ProximalParameters::automatic_three_piece()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let state = output
+        .warm_start
+        .proximal
+        .unwrap()
+        .snapshot
+        .curvature
+        .unwrap();
+    assert_eq!(state.curvature, 1e12);
+    assert_eq!(state.outer_radius, 1e12);
 }

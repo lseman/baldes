@@ -333,8 +333,11 @@ mod mip {
         let fallback = mp::solve_assignment_tree(problem(), configured).unwrap();
         assert_eq!(fallback.status, TreeStatus::Optimal);
         assert_eq!(fallback.incumbent, 2.);
-        assert_eq!(fallback.nodes, 3);
-        assert_eq!(fallback.enumerated_mip_calls, 0);
+        // Direct source/sink routes now participate in full route coverage,
+        // changing the partial-universe fallback tree and allowing complete
+        // child universes to use the enumerated MIP path.
+        assert_eq!(fallback.nodes, 6);
+        assert_eq!(fallback.enumerated_mip_calls, 2);
     }
 }
 
@@ -386,7 +389,7 @@ fn global_limit_and_equality_relaxation_are_explicit() {
 
 #[cfg(feature = "highs")]
 #[test]
-fn enumeration_mip_closes_unproved_original_activity_children() {
+fn phase_one_and_enumerated_mip_close_original_activity_children() {
     use baldes::master::{solvers::mip::MipOptions, tree::TreeStatus};
     let mut model = problem();
     // Merge every path into one pricing graph while retaining distinct path IDs.
@@ -407,8 +410,12 @@ fn enumeration_mip_closes_unproved_original_activity_children() {
     let mut configured = mp::AssignmentTreeOptions::default();
     configured.node = options();
     let plain = mp::solve_assignment_tree(model.clone(), configured.clone()).unwrap();
-    assert_eq!(plain.status, TreeStatus::Incomplete);
-    assert!(plain.open_nodes > 0);
+    // General all-network phase I now proves the combined-row infeasible
+    // children that previously required a complete finite MIP fallback.
+    assert_eq!(plain.status, TreeStatus::Optimal);
+    assert_eq!(plain.incumbent, 2.);
+    assert_eq!(plain.bound, 2.);
+    assert_eq!(plain.open_nodes, 0);
     configured.enumerated_mip = Some(MipOptions::default());
     let solved = mp::solve_assignment_tree(model, configured).unwrap();
     assert_eq!(solved.status, TreeStatus::Optimal);
@@ -417,7 +424,7 @@ fn enumeration_mip_closes_unproved_original_activity_children() {
 }
 
 #[test]
-fn direct_source_sink_routes_are_not_silently_omitted_from_coverage() {
+fn direct_source_sink_routes_are_included_in_complete_coverage() {
     let mut graph = baldes::Graph::<2>::new(2, 0).unwrap();
     graph.add_arc(0, 1, 1.).unwrap();
     let model = mp::Problem {
@@ -439,13 +446,8 @@ fn direct_source_sink_routes_are_not_silently_omitted_from_coverage() {
         .snapshot
         .enumerate(&EnumerationOptions::default())
         .unwrap();
-    assert!(!prepared.enumeration_report().complete);
-    assert!(prepared
-        .enumeration_report()
-        .failure
-        .as_ref()
-        .unwrap()
-        .contains("direct source/sink"));
+    assert!(prepared.enumeration_report().complete);
+    assert_eq!(prepared.enumeration_report().routes, 1);
     assert_eq!(prepared.solve(options()).unwrap().master.lp, 1.);
 }
 

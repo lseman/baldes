@@ -24,3 +24,20 @@ impl Default for Controls {
         }
     }
 }
+
+impl Controls {
+    pub(crate) fn for_graph<const D: usize>(&self, graph: &crate::Graph<D>) -> crate::Result<Self> {
+        let mut controls = self.clone();
+        if let Some(limit) = graph.max_route_arcs() {
+            if controls.max_route_arcs.is_some_and(|old| old < limit) {
+                return Err(crate::invalid(
+                    "an enumeration arc cap cannot narrow the declared bounded-walk domain",
+                ));
+            }
+            controls.max_route_arcs =
+                Some(controls.max_route_arcs.map_or(limit, |old| old.min(limit)));
+            controls.preserve_arc_paths = true;
+        }
+        Ok(controls)
+    }
+}

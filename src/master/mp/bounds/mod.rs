@@ -151,7 +151,7 @@ fn network_minimum<const D: usize>(
             cyclic = true;
         }
     }
-    let mut minimum = match if cyclic {
+    let mut minimum = match if cyclic || graph.max_route_arcs().is_some() {
         resource::minimum(graph, &weights, resource_work, deadline)?
     } else {
         distances[graph.sink]

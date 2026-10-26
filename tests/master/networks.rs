@@ -346,7 +346,9 @@ fn assignment_tree_matches_exhaustive_integer_covers() {
     assert_eq!(tree.incumbent, expected);
     assert_eq!(tree.bound, expected);
     assert_eq!(tree.open_nodes, 0);
-    assert_eq!(tree.nodes, 3);
+    // The explicitly supported direct source/sink column participates in the
+    // modern route universe and changes this fixture's tree trajectory.
+    assert_eq!(tree.nodes, 6);
     assert!(tree.routes.iter().all(|r| r.quantity.fract() == 0.));
 
     opts.node_limit = 1;
@@ -363,12 +365,13 @@ fn assignment_tree_matches_exhaustive_integer_covers() {
 }
 
 #[test]
-fn tree_keeps_unproved_infeasibility_open_and_closes_exact_original_contradictions() {
+fn phase_one_closes_infeasible_multiplicity_children_and_original_empty_rows() {
     use baldes::master::tree::TreeStatus;
     let mut problem = triangle();
     // Put every pair in one network: row assignments are integral, although
-    // route quantities are fractional. Multiplicity branching is valid, but
-    // these empty child LPs lack a whole-domain infeasibility proof.
+    // route quantities are fractional. Every route covers two rows, so integer
+    // quantities cannot cover exactly three rows. General phase I now proves
+    // the combined-row contradictions in both multiplicity children.
     problem.networks = vec![network(
         7,
         &[(1., &[0, 1]), (1., &[1, 2]), (1., &[0, 2])],
@@ -377,9 +380,8 @@ fn tree_keeps_unproved_infeasibility_open_and_closes_exact_original_contradictio
     let mut opts = mp::AssignmentTreeOptions::default();
     opts.node = options();
     let result = mp::solve_assignment_tree(problem, opts.clone()).unwrap();
-    assert_eq!(result.status, TreeStatus::Incomplete);
-    assert_eq!(result.open_nodes, 2);
-    assert!((result.bound - 1.5).abs() < 1e-8);
+    assert_eq!(result.status, TreeStatus::Infeasible);
+    assert_eq!(result.open_nodes, 0);
     assert!(!result.incumbent.is_finite());
 
     let impossible = Problem {

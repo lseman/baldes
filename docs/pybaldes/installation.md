@@ -65,6 +65,8 @@ python -m pip install . --config-settings=build-args="--features multi-time-wind
 | `multi-time-windows` | Expose disjoint service-start windows |
 | `rank-one-node-memory` | Select node memory for generated rank-one cuts |
 | `ng-memory-31` / `ng-memory-63` | Increase compiled NG memory from the default 15; 63 takes precedence |
+| `ryan-foster-master` (default) | Enforce Ryan–Foster branches through master rows, matching modern MetaSolver |
+| `accumulated-resource-master` (default) | Enforce accumulated-resource branches through master rows, matching modern MetaSolver |
 
 The Python feature list is defined by [python/rust/Cargo.toml](../../python/rust/Cargo.toml).
 Do not assume every root-crate Cargo feature is forwarded by the Python crate.
@@ -77,6 +79,10 @@ For a pricing-only extension:
 ```bash
 python -m pip install . --config-settings=build-args=--no-default-features
 ```
+
+This also selects pricing-enforced Ryan–Foster and accumulated-resource
+branches. Add `--features clp` if the extension should retain LP/network solving
+while using those pricing-enforced policies.
 
 For HiGHS or Gurobi, first configure the native installation as described in the
 build guide, then build with the corresponding feature:

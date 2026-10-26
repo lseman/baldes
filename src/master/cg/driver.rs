@@ -110,7 +110,9 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
         configured_proximal,
         warm.as_ref().and_then(|w| w.proximal.as_ref()),
     ) {
-        if let Some(snapshot) = previous.restore(master, controller, parameters)? {
+        if let Some(snapshot) =
+            previous.restore(master, controller, parameters, options.node_depth)?
+        {
             proximal_state.inherit_for_solve(&snapshot, schedule.len() - 1)?;
         }
     }
@@ -269,6 +271,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             parameters,
             &out.artificials,
             &cut_artificials,
+            options.node_depth,
         )?;
     }
     let mut proximal_retry = false;
@@ -532,7 +535,10 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     })
                     .collect();
                 let mut excluded = controller.unstabilized_rows();
-                if parameters.curvature.is_some() {
+                if parameters.curvature.is_some()
+                    || parameters.native_explicit.is_some()
+                    || parameters.native_row_scaling
+                {
                     excluded.extend(row_roles.iter().enumerate().filter_map(|(row, role)| {
                         (!role.active || role.class == CurvatureRowClass::Excluded).then_some(row)
                     }));
@@ -541,7 +547,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 }
                 if row_roles
                     .iter()
-                    .any(|role| role.class != CurvatureRowClass::Excluded)
+                    .any(|role| role.active && role.class != CurvatureRowClass::Excluded)
                 {
                     proximal_state.begin_iteration(&raw, &ordinary, stage, parameters)?;
                 }
@@ -734,6 +740,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     parameters,
                     &out.artificials,
                     &cut_artificials,
+                    options.node_depth,
                 )?;
             }
             let due = round_penalty_updates < options.max_penalty_updates && positive;

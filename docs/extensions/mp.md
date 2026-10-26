@@ -226,8 +226,8 @@ Scalar resource capacity is a const generic, defaulting to two; see
 
 ## Assignment tree
 
-`solve_assignment_tree(problem, AssignmentTreeOptions)` runs a best-bound tree
-using network-aware snapshots. It tries proved shared resource-group splits,
+`solve_assignment_tree(problem, AssignmentTreeOptions)` uses network-aware
+snapshots. It tries proved shared resource-group splits,
 assignment rows, declared integer master variables, total network multiplicities,
 original physical-arc activities, then synchronized-service splits. With
 `AssignmentTreeOptions::time_window_selection`, arc activities are summed over
@@ -241,14 +241,44 @@ Fixed routes are included in this replay. A rounded labeling resource profile
 alone never authorizes an incumbent or fixed route.
 
 `AssignmentTreeOptions::branching` selects the family and child order.
-`NetworkBranchingPolicy::ResourceFirst` preserves the order above, with lower
-children first. `MultiplicityFirst` tries fractional network route counts first
-and visits upper children first, following the observed public native controls.
+`NetworkBranchingPolicy::MultiplicityFirst` is the default: it tries fractional
+network route counts first and visits upper children first, following the
+observed public native controls. `ResourceFirst` preserves the resource and
+assignment order above, with lower children first.
 It does not change disjunctions or proof bounds, and does not promise the same
 LP basis, generated columns or total node count as another backend. Select it
 with `--network-branching multiplicity-first`, JSON solve option
 `"network_branching": "multiplicity-first"`, or Python
 `solve_networks(..., tree=True, network_branching="multiplicity-first")`.
+
+Tree selection is independent of branch-family selection.
+`NetworkTreeSearchPolicy::NativeDefault` (default) processes the deepest open
+node first, then the lowest inherited bound, then creation order. It uses the
+native 1,000-node primary frontier and its overflow queue. Select the
+bound-first queue with `NetworkTreeSearchPolicy::BestBound`, CLI
+`--network-tree-search best-bound`, JSON `"network_tree_search": "best-bound"`,
+or Python `network_tree_search="best-bound"`. Results retain `nodes` as the
+number of solved LP nodes and report `tree_processed_nodes` separately, including
+selected nodes closed by their inherited bound before an LP solve. Native mode
+uses this processed count for its tree node budget.
+`network_open_node_limit` controls the primary frontier capacity (native
+default 1000); overflow nodes use the native secondary priority queue. The CLI
+equivalent is `--network-open-node-limit N`. Native bound comparisons treat
+values as tied within `1e-6 + 1e-10 * max(abs(a), abs(b))`; BALDES reproduces
+that pairwise rule and the native vector-heap operations, including overflow
+priority. Since tolerance-based pairwise ties are not transitive, this policy
+uses a custom heap rather than Rust's ordering-based `BinaryHeap`.
+`network_tree_search="native-strategy-2"` selects native strategy 2. It orders
+queued children by the integer-rounded numerical LP dual bound, then the native
+child primal-bound sentinels, depth, parent branch-and-price rank and creation
+order. The child primal sentinels are equal before evaluation, so depth and
+parent rank decide ties. The default `network_strategy2_rounding="guarded-tolerance"`
+matches the pinned native default (`integerValuedBound < 1`); set it to
+`"exact-ceil"` to model the native `integerValuedBound >= 1` path at boundaries
+within the guarded tolerance. CLI uses
+`--network-strategy2-rounding guarded-tolerance|exact-ceil`; JSON uses
+`"network_strategy2_bound_rounding"`. These are ranking keys only and do not
+alter proof bounds.
 
 Rust callers can run `snapshot.solve_assignment_tree(options)` after installing
 shared nonlinear rows, fixing routes or restricting master variables. It forks
@@ -607,8 +637,9 @@ scalar equality resources. Equality paths are collected through a disposable
 superset, then checked against the original equality transitions; paths feasible
 only by waiting are excluded. Equality resources with a non-fixed sink
 window use forward pricing even if another direction was requested; backward
-pricing requires a fixed terminal resource value. Graphs containing direct source/sink routes
-decline transfer because empty-route integer semantics are not yet defined. Collection uses a downward resource relaxation
+pricing requires a fixed terminal resource value. Direct source-to-sink arcs are
+included as one-arc routes in complete transfer and use the same original row
+and objective accounting as other paths. Collection uses a downward resource relaxation
 that cannot discard an exact-feasible path, then independently replays original
 resources. Negative-consumption equality domains remain unavailable through
 this collector. Unsupported resources, ambiguous canonical replay, global work/path/
@@ -837,8 +868,10 @@ service duration in outgoing arc consumption. Disjoint service-start windows
 work with `multi-time-windows`. Start domains contain integers between
 `-2**52` and `2**52`, inclusive; choose time units to obtain the desired grid.
 Ordinary pricing-grid limits also apply to resource values.
-Coupled resources in participating networks and resource-load rows on the
-synchronized axis are rejected.
+The synchronized coordinate must be a graph scalar resource. Separate coupled
+resource domains may coexist on participating routes. Resource-load rows on
+the synchronized axis are replayed when a start-domain branch changes route
+profiles; fixed-route contributions update the residual row RHS as well.
 
 Root solves are LP relaxations and may contain unsynchronized columns. The
 native tree propagates common earliest starts across all selected routes and
@@ -873,3 +906,108 @@ cargo run --release --features clp -- networks \
 ```
 
 Both vehicles start service at time 5; the minimization objective is -1.
+
+### Native policy controls and registered original variables
+
+`stabilization_max_tree_depth` uses the recovered signed native boundary:
+activation requires actual branch depth strictly below the limit (default
+10000). A zero or negative limit disables smoothing/proximal participation from
+the root. Resumes and ordinary row additions preserve depth. The corresponding
+CLI flag is `--stabilization-max-tree-depth`.
+
+`network_promising_limit` exposes the independent native positive-status budget
+(default 1000000), alongside `network_unpromising_limit` (default 1). A normal
+modern oracle still has status zero, even when it produces columns. Negative
+reduced cost does not imply a promising status.
+
+Register original integer aggregate variables explicitly when their meaning
+spans networks, route constants or static integer master variables:
+
+```python
+result = problem.solve(
+    tree=True,
+    mapped_variables=({
+        "name": "total-route-count",
+        "priority": 1.,
+        "networks": [
+            {"network": 7, "per_route": 1.},
+            {"network": 42, "per_route": 1.},
+        ],
+    },),
+)
+```
+
+Each network contribution also accepts sparse `arcs: [[arc_id, coefficient], ...]`;
+`masters: [[variable_id, coefficient], ...]` adds static integer variables.
+Coefficients must be bounded integers. Names identify generators; they do not
+infer membership. `MappedBranchVariable::from_shared_row` derives selected
+network/master contributions of a known original packing or linking row.
+Branches install floor/ceiling bounds through the shared-row lifecycle, including
+fixed routes and future columns.
+
+Registered candidates support phased restricted-LP, heuristic-pricing and exact
+pricing trials, using the routing strong-branching controls. Trial objectives
+and history rank candidates; they do not become inherited proof bounds. Set
+`mapped_strong_branching=False` to select by priority/fractionality alone.
+Results expose `strong_branching_trials`, `mapped_history_ranked` and
+`mapped_branch_evaluations`. The CLI accepts `--mapped-variables FILE` and
+`--no-mapped-strong-branching`; see
+[`mapped_variables.json`](../../examples/networks/mapped_variables.json).
+
+Recovered explicit proximal defaults are available through
+`proximal={"native_explicit": {}}` (three-piece), or
+`{"native_explicit": {"five_piece": True}}`. These derive initial widths from
+the first positive ordinary-row mean when Kappa is positive, retain native
+stored-float controls, and use the original row RHS for private artificial
+scaling. Existing `bands` configurations remain explicit overrides. Rust
+constructors are `native_three_piece()`, `native_five_piece()` and
+`native_multipoint()`. CLI equivalents are `--native-proximal-three-piece`,
+`--native-proximal-five-piece` and `--native-proximal-multipoint`.
+
+`network_branching="native-phased"` admits original resource-group, assignment,
+integer master-variable, route-count, arc and time-window proposals into the same
+phased evaluator as registered aggregates. Family priorities can be supplied in
+`network_branch_priorities`; defaults are the routing adapter preset, rather
+than a claim that all native models register the same priorities. Route-count
+generators do not enter retained native-style ranking history. Rust callers can
+also select completed-subtree estimates through `StrongBranchingOptions`.
+Trials use independent children, while actual children are recreated from the
+original parent; trial objectives never become their inherited proof bounds.
+
+`native_box_step()` / `--native-proximal-box-step` follows native functiontype1,
+including its finite stored-float cap1.01; the existing `box_step(width)` remains
+a mathematical hard-band override. Public native interval names differ from the
+logical band ordering: `inner_half_width` controls the last active pair (default10)
+and `outer_half_width` the first pair (default100). Native multipoint defaults to
+two zero-width bands with stored-float caps0.9. These details are retained in the
+[native policy evidence](../../internal/audits/native-parity-goal-20261025/policy.md).
+
+Networks can declare `route_domain={"kind": "bounded_walks", "max_arcs": 4}`
+to allow repeated interior vertices within a finite arc limit. The default is
+`{"kind": "physical_simple"}`. The limit belongs to the model: pricing,
+certified bounds, enumeration, fixed routes and resumed children preserve it.
+Negative cycles may improve a bounded route, so its certified lower bound uses
+the declared arc limit. A runtime pricing limit cannot silently narrow this
+domain. Direct source-to-sink arcs are valid one-arc routes when `max_arcs >= 1`;
+source/sink revisits are unsupported in this mode. Explicit vertex elementarity
+groups can keep customers unique while allowing station revisits; their count
+must fit the compiled NG memory capacity. `Graph::add_arc_elementarity_set`
+adds hard groups of physical arcs, limiting a route to one arc from each group.
+Pricing, canonical enumeration and original-route validation enforce the same
+groups for bounded walks. The single-network root master supports uncutted
+bounded walks. Root cut families and dynamic NG strengthening are supported
+when the bounded-walk graph is acyclic or every interior vertex has a hard
+elementarity group, either of which guarantees physically simple routes;
+otherwise they are rejected for bounded walks.
+Synchronized services additionally require their member vertex to belong to a
+declared hard vertex elementarity group, so revisiting a service cannot count
+one vehicle as two participants.
+
+`native_front_program_domain=True` is a separate, explicit model choice for
+native coupled-resource fronts. It defines feasibility using the computed
+floating-point front program. Its independent machine checker reproduces the
+program's rounding operations; it does not prove equivalence to exact-real
+source constraints. Leave the option false for the default source-domain
+contract. Ambiguous source boundaries and nonfinite machine operations remain
+uncertified. See the retained
+[proof-scope counterexamples](../../internal/audits/native-parity-goal-20261025/native-front-proof-boundary.md).

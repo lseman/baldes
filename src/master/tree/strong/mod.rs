@@ -2,9 +2,9 @@
 use super::*;
 use crate::master::{clp::ClpMaster, LpMaster};
 mod budget;
-pub(super) use budget::{CandidateBudget, SubtreeEstimate};
+pub(in crate::master) use budget::{CandidateBudget, SubtreeEstimate};
 mod subtree_history;
-pub(super) use subtree_history::SubtreeHistory;
+pub(in crate::master) use subtree_history::SubtreeHistory;
 
 #[derive(Clone, Debug)]
 pub struct StrongPhase {

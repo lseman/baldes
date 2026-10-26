@@ -15,6 +15,8 @@ pub use descriptor::{
     SlopeRelationArc,
 };
 pub use encoded::EncodedFunction;
+#[cfg(feature = "clp")]
+pub use kernel::FrontProgramCertificate;
 pub use kernel::{CoupledKernel, CoupledLabelState, CoupledWorkspace};
 pub(crate) use kernel::{CoupledPairSummary, CoupledStateBounds};
 pub use plugin::{CoupledPlugin, PluginResource, PluginState};

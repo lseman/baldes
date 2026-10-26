@@ -287,7 +287,7 @@ fn numeric_only_piecewise_costs_preserve_independent_scalar_components() {
 fn cumulative_source_bound_prices_backward_weight_differences() {
     let prepare = |source_upper| {
         let mut graph = Graph::<2>::new(3, 0).unwrap();
-        for (tail, head) in [(0, 1), (1, 2), (1, 2)] {
+        for (tail, head) in [(0, 1), (1, 2), (1, 2), (2, 1)] {
             graph.add_arc(tail, head, 0.).unwrap();
         }
         graph
@@ -295,8 +295,8 @@ fn cumulative_source_bound_prices_backward_weight_differences() {
                 initial: 0.,
                 // Zero suffix increments isolate the entry-state correction from
                 // the independent accumulated-cost ordering precondition.
-                increments: vec![1., 0., 0.],
-                weights: vec![0., 1., 3.],
+                increments: vec![1., 0., 0., 0.],
+                weights: vec![0., 1., 3., 0.],
                 sink_upper: None,
                 source_upper,
             }])
@@ -502,6 +502,46 @@ fn complex_numeric_programs_keep_baseline_identity_activation_policy() {
     assert!(!kernel.numeric_cost_order.deploys_unequal());
     assert_eq!(kernel.dominance_penalty(&a, &b, true), None);
     assert_eq!(kernel.dominance_penalty(&a, &a, true), Some(0.));
+}
+
+#[test]
+fn encoded_cost_with_equal_parent_allows_unrelated_uncharged_ordering() {
+    let mut graph = Graph::<2>::new(3, 0).unwrap();
+    for (tail, head) in [(0, 1), (0, 1), (1, 2)] {
+        graph.add_arc(tail, head, 0.).unwrap();
+    }
+    let signed_charge = crate::graph::coupled::EncodedFunction::from(
+        PiecewiseLinearFunction::new(vec![[0., -2.], [10., -1.]]).unwrap(),
+    );
+    graph
+        .set_coupled_resources(&[
+            CoupledResource::CumulativeCost {
+                initial: 0.,
+                increments: vec![0.; 3],
+                weights: vec![0.; 3],
+                sink_upper: None,
+                source_upper: None,
+            },
+            CoupledResource::EncodedPiecewiseLinearCost {
+                parent: 0,
+                functions: vec![signed_charge; 3],
+            },
+            CoupledResource::CustomResource {
+                increments: vec![0., 1., 0.],
+                weights: vec![0.; 3],
+                forward_bound: None,
+                backward_bound: None,
+            },
+        ])
+        .unwrap();
+
+    let kernel = graph.coupled_kernel().unwrap();
+    let root = kernel.root(true);
+    let (lower, _) = kernel.extend(&root, 0, true).unwrap().unwrap();
+    let (higher, _) = kernel.extend(&root, 1, true).unwrap().unwrap();
+    assert_eq!(lower.numeric_cost, higher.numeric_cost);
+    assert_eq!(kernel.dominance_penalty(&lower, &higher, true), Some(0.));
+    assert_eq!(kernel.dominance_penalty(&higher, &lower, true), None);
 }
 
 #[test]

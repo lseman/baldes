@@ -2,6 +2,8 @@ use super::*;
 
 impl<const D: usize> LabelingEngine<D> {
     pub fn solve(&mut self, g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
+        let effective = controls.for_graph(g)?;
+        let controls = &effective;
         self.cuts.presence.validate_engine(g.arcs.len())?;
         self.resource_error.store(false, Ordering::Relaxed);
         self.coupled_completion = std::array::from_fn(|_| Default::default());
@@ -158,7 +160,10 @@ impl<const D: usize> LabelingEngine<D> {
                                 if let Some(cost) = self.ctx().join_cost(g, v, label, other) {
                                     if cost < cutoff
                                         && controls.max_route_arcs.is_none_or(|limit| {
-                                            label.hops() + other.hops() <= limit
+                                            label
+                                                .hops()
+                                                .checked_add(other.hops())
+                                                .is_some_and(|hops| hops <= limit)
                                         })
                                     {
                                         pool.insert(v, cost, 0., (Some(f), Some(b)));

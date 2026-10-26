@@ -78,6 +78,8 @@ pub struct CoupledKernel {
     slots: Vec<Option<usize>>,
     initial: Vec<f64>,
     cost_scale: f64,
+    /// Explicit MODEL domain choice, never inferred from a numerical policy.
+    native_front_program_domain: bool,
     selection_initial: Vec<u64>,
     /// Directional vertex masks and forgetting memory; None for exact arc-only
     /// resources, which need only the transition's arc intersection.
@@ -108,6 +110,15 @@ pub struct CoupledKernel {
     numeric_cost_order: dominance::NumericCostOrder,
     transitions: PreparedTransitions,
     route_domains: domains::RouteDomains,
+}
+/// Certificate for the explicitly named alternate native machine-front model.
+/// It is not a source-control feasibility witness for a default graph. The
+/// objective interval also includes outward aggregation with other resources.
+#[cfg(feature = "clp")]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FrontProgramCertificate {
+    pub feasible: bool,
+    pub objective: [f64; 2],
 }
 /// Reusable per-thread resource-extension scratch. Retained labels own all
 /// their state and never borrow temporary workspace storage.
@@ -213,6 +224,41 @@ impl<const D: usize> Graph<D> {
     }
     pub fn coupled_kernel(&self) -> Option<&CoupledKernel> {
         self.coupled.as_deref()
+    }
+    /// Select a different original resource domain for native raw fronts.
+    ///
+    /// With `true`, native raw interval and paired feasibility is defined by
+    /// their checked ordered IEEE front program. This is a MODEL choice, not
+    /// a proof-strength hint: it need not equal source-control or exact-real
+    /// feasibility. The default is `false`; strict and other families do not
+    /// change. Clones, branches and cost suppression preserve the choice.
+    /// Replacing resource descriptors resets it to the default.
+    pub fn set_native_front_program_domain(&mut self, enabled: bool) -> Result<()> {
+        let Some(kernel) = self.coupled.as_mut() else {
+            return if enabled {
+                Err(invalid(
+                    "native front program domain requires native raw resources",
+                ))
+            } else {
+                Ok(())
+            };
+        };
+        if enabled && !kernel.has_machine_front_contracts() {
+            return Err(invalid(
+                "native front program domain requires native raw resources",
+            ));
+        }
+        if kernel.native_front_program_domain != enabled {
+            kernel.native_front_program_domain = enabled;
+            kernel.identity = std::sync::Arc::new(());
+        }
+        Ok(())
+    }
+    /// Whether native raw feasibility explicitly uses the machine-front model.
+    pub fn native_front_program_domain(&self) -> bool {
+        self.coupled
+            .as_ref()
+            .is_some_and(|kernel| kernel.native_front_program_domain)
     }
     /// Retain selection eliminations at every vertex of violating windows.
     pub(crate) fn strengthen_selection(&mut self, arcs: &[usize]) -> bool {

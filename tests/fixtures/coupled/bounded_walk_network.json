@@ -1,0 +1,16 @@
+{
+  "rows": [{"sense": "eq", "rhs": 1}],
+  "networks": [{
+    "id": 7,
+    "vertices": 4,
+    "multiplicity": [0, 1],
+    "route_entries": [[0, 1]],
+    "route_domain": {"kind": "bounded_walks", "max_arcs": 4},
+    "arcs": [
+      {"tail": 0, "head": 1, "cost": 0},
+      {"tail": 1, "head": 2, "cost": -3},
+      {"tail": 2, "head": 1, "cost": 0},
+      {"tail": 1, "head": 3, "cost": 0}
+    ]
+  }]
+}

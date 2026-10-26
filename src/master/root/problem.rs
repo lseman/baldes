@@ -260,9 +260,16 @@ impl<const D: usize> RootProblem<D> {
 impl<const D: usize> RootProblem<D> {
     pub(crate) fn elementary_route(&self, ids: &[i32]) -> Option<Route> {
         let g = &self.graph;
+        if ids.len() > g.original_max_arcs() {
+            return None;
+        }
         let mut at = g.source;
         let mut nodes = vec![at as i32];
         let mut visited = HashSet::new();
+        let mut groups = HashSet::new();
+        if g.has_explicit_elementarity_groups() {
+            groups.extend(g.vertices[g.source].elements.iter().copied());
+        }
         let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
         for (r, value) in q.iter_mut().enumerate().take(g.resources.len()) {
             *value = g.root_resource(r, true)?;
@@ -277,16 +284,26 @@ impl<const D: usize> RootProblem<D> {
             if arc.tail != at || at == g.sink {
                 return None;
             }
+            if g.has_explicit_elementarity_groups() {
+                let mut transition_elements = HashSet::new();
+                for &element in arc.elements.iter().chain(&g.vertices[arc.head].elements) {
+                    if transition_elements.insert(element) && !groups.insert(element) {
+                        return None;
+                    }
+                }
+            }
             q = extend_resources(g, arc, &q, true)?;
             at = arc.head;
-            if at == g.source || (at != g.sink && !visited.insert(at)) {
+            if at == g.source
+                || (at != g.sink && !visited.insert(at) && g.max_route_arcs().is_none())
+            {
                 return None;
             }
             cost += arc.cost;
             nodes.push(at as i32);
             resource_profile.push(q[..g.resources.len()].to_vec());
         }
-        if at != g.sink || visited.is_empty() {
+        if at != g.sink {
             return None;
         }
         let positions: Vec<_> = ids

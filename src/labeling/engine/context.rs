@@ -382,6 +382,9 @@ impl<'a, const D: usize> Context<'a, D> {
         workspace: &mut crate::graph::coupled::CoupledWorkspace,
     ) -> Option<(StoredLabel<D>, crate::graph::ResourceValues<D>)> {
         let physical = &g.arcs[arc.physical];
+        if g.max_route_arcs().is_some() && (physical.head == g.source || physical.tail == g.sink) {
+            return None;
+        }
         if self
             .forbidden_arcs
             .get(arc.physical)

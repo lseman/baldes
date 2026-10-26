@@ -172,3 +172,26 @@ fn registered_variable_tree_preserves_original_integer_optimum_and_json_mapping(
     assert_eq!(result.status, crate::master::tree::TreeStatus::Optimal);
     assert_eq!(result.incumbent, 2.);
 }
+
+#[test]
+fn shared_row_mapping_keeps_network_identity_and_declines_rounded_integer_sums() {
+    let output = solve_with_master_variables(triangle(), vec![], options()).unwrap();
+    let mapping = MappedBranchVariable::from_shared_row(
+        "packing-edge-assignment",
+        3.,
+        &output.snapshot,
+        0,
+        &[42],
+        &[],
+    )
+    .unwrap();
+    assert_eq!(mapping.networks.len(), 1);
+    assert_eq!(mapping.networks[0].network, 42);
+    assert!((mapping.value(&output).unwrap() - 0.5).abs() < 1e-8);
+    assert_eq!(exact_coefficient([0.5, 0.5].into_iter()).unwrap(), 1.);
+    assert!(exact_coefficient([0.1, 0.9].into_iter()).is_err());
+    assert!(
+        MappedBranchVariable::from_shared_row("bad", 1., &output.snapshot, 0, &[42, 42], &[])
+            .is_err()
+    );
+}

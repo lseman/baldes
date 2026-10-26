@@ -10,7 +10,7 @@ struct Entry {
 #[cfg(test)]
 #[path = "../../../../tests/unit/master/tree/strong/subtree_history/tests.rs"]
 mod tests;
-pub(in crate::master::tree) struct SubtreeHistory {
+pub(in crate::master) struct SubtreeHistory {
     entries: Vec<Entry>,
     means: Vec<(usize, f64)>,
 }

@@ -190,7 +190,10 @@ fn strict_slope_pairs_and_exact_native_subset_keep_ordered_encoding() {
         };
         arcs[0].waiting = 1;
         graph.set_coupled_resources(&[definition]).unwrap();
-        assert_eq!(graph.coupled_kernel().unwrap().certify(&[0]), Some((true, [expected, expected])));
+        assert_eq!(
+            graph.coupled_kernel().unwrap().certify(&[0]),
+            Some((true, [expected, expected]))
+        );
     }
 }
 

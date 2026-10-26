@@ -359,3 +359,199 @@ fn explicit_center_intervals_and_baseline_survive_phase_and_schedule_changes() {
     assert_eq!(state.explicit_bands[0].half_width, 2.5);
     assert_eq!(state.explicit_baseline, Some(5.));
 }
+
+#[test]
+fn native_explicit_defaults_bootstrap_from_latched_mean_and_reduce_artificial_caps() {
+    for five in [false, true] {
+        let parameters = if five {
+            ProximalParameters::native_five_piece()
+        } else {
+            ProximalParameters::native_three_piece()
+        };
+        let mut state = ProximalState::default();
+        state
+            .begin_iteration(&[120.], &[0], 2, &parameters)
+            .unwrap();
+        state.explicit_bands = parameters.native_explicit.as_ref().unwrap().initial_bands();
+        state.explicit_baseline = Some(1e12);
+        assert!(state
+            .explicit_bands
+            .iter()
+            .all(|band| band.half_width == 1e12));
+        // Serious-step center changes cannot replace the pre-pricing mean.
+        state.observe(&[119.], 1., true);
+        state.begin_iteration(&[1.], &[0], 2, &parameters).unwrap();
+        assert!(state.after_iteration(&parameters).unwrap());
+        let expected_outer = if five { 12. } else { 120. };
+        assert_eq!(
+            state.explicit_bands.last().unwrap().half_width,
+            expected_outer
+        );
+        assert_eq!(state.explicit_baseline, Some(expected_outer));
+        if five {
+            assert_eq!(state.explicit_bands[0].half_width, 120.);
+        }
+        assert!(state.artificial_activity(true, &parameters).unwrap());
+        for band in &state.explicit_bands {
+            assert_eq!(band.penalty, (0.9_f32 as f64) / 10.);
+        }
+    }
+    let parameters = ProximalParameters::native_explicit(NativeExplicitParameters {
+        kappa: 0.,
+        ..Default::default()
+    });
+    let bands = parameters.native_explicit.as_ref().unwrap().initial_bands();
+    assert_eq!(bands[0].half_width, 10.);
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn native_rhs_scaled_cap_changes_private_query_without_changing_original_master() {
+    use crate::master::{clp::ClpMaster, RowSense};
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, 2., &[]).unwrap();
+    master.add_column(10., &[(0, 1.)]).unwrap();
+    assert!(master.solve());
+    let unscaled = ProximalParameters::three_piece(1., 1.5);
+    let mut scaled = unscaled.clone();
+    scaled.native_row_scaling = true;
+    let mut points = vec![];
+    for parameters in [&unscaled, &scaled] {
+        let mut state = ProximalState::default();
+        state.begin_iteration(&[10.], &[0], 0, parameters).unwrap();
+        points.push(
+            state
+                .pricing_point(&master, &[10.], 0, parameters, &[], Duration::from_secs(1))
+                .unwrap()[0],
+        );
+    }
+    assert!((points[0] - 10.).abs() < 1e-7);
+    assert!((points[1] - 1.).abs() < 1e-7);
+    assert_eq!(master.costs(), &[10.]);
+    assert_eq!(master.rhs(), &[2.]);
+    assert!((master.objective() - 20.).abs() < 1e-7);
+}
+
+#[test]
+fn multipoint_checkpoint_retains_samples_activity_age_and_creation_order() {
+    let mut state = ProximalState::default();
+    let parameters = ProximalParameters::native_multipoint();
+    state.begin_iteration(&[7.], &[0], 0, &parameters).unwrap();
+    state.max_points = 3;
+    state.register_point(&[2.], false);
+    state.register_point(&[4.], true);
+    state.samples[0].dual_activity = 3.;
+    state.samples[0].zero_age = 1;
+    let snapshot = state.snapshot().unwrap();
+    let mut resumed = ProximalState::default();
+    resumed.inherit_for_solve(&snapshot, 2).unwrap();
+    assert_eq!(resumed.samples.len(), 2);
+    assert_eq!(resumed.samples[0].point, vec![2.]);
+    assert_eq!(resumed.samples[0].dual_activity, 3.);
+    assert_eq!(resumed.samples[0].zero_age, 1);
+    assert_eq!(resumed.samples[1].creation_id, 1);
+    assert!(resumed.samples[1].protected_center);
+    assert_eq!(resumed.next_point_id, 2);
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn native_multipoint_keeps_unscaled_sample_coefficients_on_rhs_scaled_artificials() {
+    use crate::master::{clp::ClpMaster, RowSense};
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, 2., &[]).unwrap();
+    master.add_column(10., &[(0, 1.)]).unwrap();
+    assert!(master.solve());
+    for (native_scaling, expected) in [(false, 3.), (true, 1.5)] {
+        let mut parameters = ProximalParameters::native_multipoint();
+        parameters.native_row_scaling = native_scaling;
+        parameters.bands.last_mut().unwrap().penalty = 2.;
+        let mut state = ProximalState::default();
+        state.begin_iteration(&[10.], &[0], 0, &parameters).unwrap();
+        state.observe(&[3.], 1., true);
+        let point = state
+            .pricing_point(&master, &[10.], 0, &parameters, &[], Duration::from_secs(1))
+            .unwrap();
+        assert!((point[0] - expected).abs() < 1e-7, "{point:?}");
+        assert!((master.objective() - 20.).abs() < 1e-7);
+    }
+}
+
+#[test]
+fn native_box_step_normalizes_angles_and_uses_function_one_bootstrap() {
+    let parameters = ProximalParameters::native_box_step();
+    let native = parameters.native_explicit.as_ref().unwrap();
+    assert!(native.box_step);
+    let mut state = ProximalState::default();
+    state
+        .begin_iteration(&[120.], &[0], 0, &parameters)
+        .unwrap();
+    state.explicit_bands = native.initial_bands();
+    assert_eq!(state.explicit_bands.len(), 1);
+    assert_eq!(state.explicit_bands[0].half_width, 1e12);
+    assert_eq!(state.explicit_bands[0].penalty, 1.01_f32 as f64);
+    state.after_iteration(&parameters).unwrap();
+    assert_eq!(state.explicit_bands[0].half_width, 12.);
+    assert_eq!(state.explicit_baseline, Some(12.));
+}
+
+#[test]
+fn native_nonpositive_kappa_respects_public_interval_names_and_normalization() {
+    for kappa in [0., -1.] {
+        let parameters = ProximalParameters::native_explicit(NativeExplicitParameters {
+            five_piece: true,
+            kappa,
+            outer_half_width: 100.,
+            inner_half_width: 10.,
+            outer_penalty: 0.75,
+            inner_penalty: 0.5,
+            ..Default::default()
+        });
+        let native = parameters.native_explicit.as_ref().unwrap();
+        let mut state = ProximalState::default();
+        state
+            .begin_iteration(&[120.], &[0], 0, &parameters)
+            .unwrap();
+        state.explicit_bands = native.initial_bands();
+        state.explicit_baseline = Some(10.);
+        assert_eq!(state.explicit_bands[0].half_width, 100.);
+        assert_eq!(state.explicit_bands[0].penalty, 0.75);
+        assert_eq!(state.explicit_bands[1].half_width, 10.);
+        assert_eq!(state.explicit_bands[1].penalty, 0.5);
+        // Configured finite widths do not bootstrap, even with a positive mean.
+        assert!(!state.after_iteration(&parameters).unwrap());
+        assert_eq!(state.explicit_bands[1].half_width, 10.);
+    }
+    // Native postTreatment clamps public InnerHalfInterval to OuterHalfInterval.
+    let native = NativeExplicitParameters {
+        kappa: 0.,
+        outer_half_width: 100.,
+        inner_half_width: 1e12,
+        ..Default::default()
+    };
+    assert_eq!(native.initial_bands()[0].half_width, 100.);
+    assert!(
+        ProximalParameters::native_explicit(NativeExplicitParameters {
+            box_step: true,
+            five_piece: true,
+            ..Default::default()
+        })
+        .validate()
+        .is_err()
+    );
+}
+
+#[test]
+fn native_multipoint_defaults_retain_both_artificial_pairs_and_only_relax_last_cap() {
+    let parameters = ProximalParameters::native_multipoint();
+    assert_eq!(parameters.bands.len(), 2);
+    assert!(parameters
+        .bands
+        .iter()
+        .all(|band| band.half_width == 0. && band.penalty == 0.9_f32 as f64));
+    let mut state = ProximalState::default();
+    state.explicit_bands = parameters.bands.clone();
+    assert!(state.artificial_activity(true, &parameters).unwrap());
+    assert_eq!(state.explicit_bands[0].penalty, 0.9_f32 as f64);
+    assert_eq!(state.explicit_bands[1].penalty, (0.9_f32 as f64) / 10.);
+}

@@ -10,7 +10,7 @@ name = "_core"
 crate-type = ["cdylib"]
 
 [features]
-default = ["clp"]
+default = ["clp", "ryan-foster-master", "accumulated-resource-master"]
 clp = ["baldes/clp"]
 highs = ["baldes/highs"]
 gurobi = ["baldes/gurobi"]
@@ -19,7 +19,9 @@ multi-time-windows = ["baldes/multi-time-windows"]
 rank-one-node-memory = ["baldes/rank-one-node-memory"]
 ng-memory-31 = ["baldes/ng-memory-31"]
 ng-memory-63 = ["baldes/ng-memory-63"]
+ryan-foster-master = ["baldes/ryan-foster-master"]
+accumulated-resource-master = ["baldes/accumulated-resource-master"]
 
 [dependencies]
-baldes = { path = "../.." }
+baldes = { path = "../..", default-features = false }
 pyo3 = { version = "0.30.1", features = ["extension-module", "abi3-py39"] }

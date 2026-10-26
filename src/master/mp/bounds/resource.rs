@@ -13,7 +13,9 @@ pub(super) fn hop_limit<const D: usize>(graph: &Graph<D>, work: usize) -> Option
     if per_pass == 0 {
         return None;
     }
-    let mut best = None;
+    let mut best = graph
+        .max_route_arcs()
+        .filter(|&hops| hops <= work / per_pass);
     let mut joint_axes = [false; D];
     let mut joint_positive = Some(0usize);
     let mut axis_count = 0;

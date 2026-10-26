@@ -14,17 +14,37 @@ pub struct AggregateVariable {
 }
 impl AggregateVariable {
     pub fn new(name: impl Into<String>, arcs: &[(i32, f64)]) -> Result<Self> {
-        let mut merged = BTreeMap::<i32, f64>::new();
-        for &(arc, coefficient) in arcs {
-            *merged.entry(arc).or_default() += coefficient;
+        let name = name.into();
+        if name.is_empty() {
+            return Err(invalid("aggregate branching variable needs a model name"));
         }
-        merged.retain(|_, coefficient| *coefficient != 0.);
-        let arcs: Vec<_> = merged.into_iter().collect();
+        let mut merged = BTreeMap::<i32, crate::master::root::ExactSum>::new();
+        for &(arc, coefficient) in arcs {
+            merged
+                .entry(arc)
+                .or_default()
+                .add(coefficient)
+                .ok_or_else(|| invalid("aggregate coefficient sum overflow"))?;
+        }
+        let mut coefficients = Vec::with_capacity(merged.len());
+        for (arc, mut sum) in merged {
+            let coefficient = sum
+                .upper()
+                .ok_or_else(|| invalid("aggregate coefficient sum overflow"))?;
+            sum.add(-coefficient)
+                .ok_or_else(|| invalid("aggregate coefficient sum overflow"))?;
+            if sum.sign() != 0. {
+                return Err(invalid(
+                    "aggregate coefficient sum must be exactly representable",
+                ));
+            }
+            if coefficient != 0. {
+                coefficients.push((arc, coefficient));
+            }
+        }
+        let arcs = coefficients;
         validate_coefficients(&arcs)?;
-        Ok(Self {
-            name: name.into(),
-            arcs,
-        })
+        Ok(Self { name, arcs })
     }
     pub fn name(&self) -> &str {
         &self.name

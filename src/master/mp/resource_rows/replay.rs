@@ -2,7 +2,26 @@
 use super::*;
 
 pub(super) fn load<const D: usize>(oracle: &Oracle<D>, route: &Route, r: usize) -> Result<f64> {
-    let g = &oracle.network.graph;
+    // Resource-group branches add waiting for their own disjunction; they must
+    // not redefine this original load-row coefficient. Synchronized-start
+    // branches do change the required schedule, so replay the immutable graph
+    // with only those explicit original-domain windows applied.
+    let mut graph;
+    let g = if oracle.synchronized_windows.is_empty() {
+        oracle.network.graph.as_ref()
+    } else {
+        graph = oracle.network.graph.as_ref().clone();
+        for &(vertex, resource, window) in &oracle.synchronized_windows {
+            let bounds = graph
+                .vertices
+                .get_mut(vertex)
+                .and_then(|v| v.bounds.get_mut(resource))
+                .ok_or_else(|| invalid("resource-row synchronized window coordinate"))?;
+            bounds.lower = bounds.lower.max(window.lower);
+            bounds.upper = bounds.upper.min(window.upper);
+        }
+        &graph
+    };
     let mut q = g
         .root_resource(r, true)
         .ok_or_else(|| invalid("resource-row initial state outside source windows"))?;

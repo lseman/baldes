@@ -1,7 +1,11 @@
 use super::*;
 use baldes::cuts::knapsack::{KnapsackKind, RouteLoadKnapsackCut};
+use baldes::graph::coupled::CoupledResource;
 use baldes::master::preprocessing::Bounds;
-use mp::{EnumerationOptions, MasterVariable, ResourceKnapsackCoefficients};
+use mp::{
+    EnumerationOptions, MasterVariable, ResourceKnapsackCoefficients, SynchronizedService,
+    SynchronizedServiceMember,
+};
 
 fn problem() -> Problem<2> {
     let mut networks = vec![
@@ -91,6 +95,79 @@ fn shared_resource_steps_price_fix_enumerate_and_restore() {
         4.
     );
     optimal(&root.snapshot.solve(options()).unwrap(), 2.);
+}
+
+#[test]
+fn synchronized_start_refreshes_fixed_route_load_rows_on_the_same_axis() {
+    let service = SynchronizedService {
+        id: 23,
+        resource: 0,
+        vehicles_required: 2,
+        reward: 0.,
+        start: [0, 10],
+        members: vec![
+            SynchronizedServiceMember {
+                network: 7,
+                vertex: 1,
+            },
+            SynchronizedServiceMember {
+                network: 42,
+                vertex: 1,
+            },
+        ],
+    };
+    let mut model = problem();
+    for network in &mut model.networks {
+        let arcs = network.graph.arcs.len();
+        network
+            .graph
+            .set_coupled_resources(&[CoupledResource::Selection {
+                initial: 1,
+                allowed: vec![1; arcs],
+                vertices: vec![],
+                relaxed: false,
+            }])
+            .unwrap();
+    }
+    let mut controls = options();
+    controls.synchronized_services = vec![service];
+    let root = mp::solve(model, controls).unwrap();
+    assert_eq!(root.master.status, Status::Optimal);
+    let route = root
+        .routes
+        .iter()
+        .position(|route| route.network == 7 && route.route.arcs == [0, 1])
+        .unwrap();
+    let load_row = Row {
+        sense: RowSense::LessEqual,
+        rhs: 0.,
+    };
+    let load = ResourceKnapsackCoefficients {
+        network: 7,
+        resource: 0,
+        scale: 1.,
+        cut: RouteLoadKnapsackCut {
+            kind: KnapsackKind::Steps,
+            numerator: 1,
+            denominator: 1,
+            rhs: 0,
+            lhs: 0.,
+            violation: 0.,
+            thresholds: vec![3],
+            coefficients: std::collections::BTreeMap::from([(3, 1)]),
+        },
+    };
+    let fixed = root
+        .snapshot
+        .with_resource_knapsack_row(load_row, &[load])
+        .unwrap()
+        .fix_route(route, 1.)
+        .unwrap();
+    let later_start = fixed.with_synchronized_start(23, 4, 4).unwrap();
+    assert_eq!(
+        later_start.solve(options()).unwrap().master.status,
+        Status::Infeasible
+    );
 }
 #[test]
 fn resource_steps_propagate_with_unbounded_static_variables() {

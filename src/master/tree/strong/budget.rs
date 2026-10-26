@@ -1,7 +1,7 @@
 //! Heuristic branching work budgets. None of these estimates are proof bounds.
 
 #[derive(Clone, Copy, Debug)]
-pub(in crate::master::tree) struct SubtreeEstimate {
+pub(in crate::master) struct SubtreeEstimate {
     pub size: f64,
     pub priority: f64,
 }
@@ -13,11 +13,11 @@ impl Default for SubtreeEstimate {
         }
     }
 }
-pub(in crate::master::tree) fn exceeds(a: f64, b: f64) -> bool {
+pub(in crate::master) fn exceeds(a: f64, b: f64) -> bool {
     a - (1e-6 + a.abs().max(b.abs()) * 1e-10) > b
 }
 
-pub(in crate::master::tree) struct CandidateBudget {
+pub(in crate::master) struct CandidateBudget {
     maximum: usize,
     pub quota: usize,
     pub estimate: SubtreeEstimate,

@@ -43,6 +43,21 @@ impl Default for Controls {
         }
     }
 }
+impl Controls {
+    pub(crate) fn for_graph<const D: usize>(&self, graph: &Graph<D>) -> Result<Self> {
+        let mut controls = self.clone();
+        if let Some(limit) = graph.max_route_arcs() {
+            if controls.max_route_arcs.is_some_and(|old| old < limit) {
+                return Err(invalid(
+                    "a pricing arc cap cannot narrow the declared bounded-walk domain",
+                ));
+            }
+            controls.max_route_arcs =
+                Some(controls.max_route_arcs.map_or(limit, |old| old.min(limit)));
+        }
+        Ok(controls)
+    }
+}
 #[derive(Clone, Debug, PartialEq)]
 pub struct Route {
     pub nodes: Vec<i32>,
@@ -265,6 +280,8 @@ fn reconstruct<const D: usize>(g: &Graph<D>, labels: &[Label<D>], terminal: &Lab
 /// Complete a label-correcting search or return an error. Budget/time exhaustion
 /// never returns a partial pool with an exactness certificate.
 pub fn reference_price<const D: usize>(g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
+    let effective = controls.for_graph(g)?;
+    let controls = &effective;
     g.validate()?;
     if controls.max_labels == 0 || controls.max_columns == 0 || !controls.zero_threshold.is_finite()
     {

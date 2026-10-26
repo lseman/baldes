@@ -44,7 +44,7 @@ pub(in crate::master::tree) fn fresh_batches<T>(
 ) -> (Vec<T>, f64) {
     fresh_batches_with_budget(quota, buckets, None, generate)
 }
-pub(in crate::master::tree) fn fresh_batches_with_budget<T>(
+pub(in crate::master) fn fresh_batches_with_budget<T>(
     mut quota: usize,
     buckets: &[f64],
     mut budget: Option<&mut super::super::strong::CandidateBudget>,

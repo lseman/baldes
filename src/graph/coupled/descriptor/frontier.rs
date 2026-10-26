@@ -697,7 +697,18 @@ fn add_component(
             ));
         }
         work.pair()?;
-        pairs.push((arithmetic(sa + sb, "front slope addition")?, end));
+        let slope = arithmetic(sa + sb, "front slope addition")?;
+        if policy == FrontOperationPolicy::NativeFrontAlgebra
+            && pairs.len() > 1
+            && near(slope, pairs[pairs.len() - 1].0, policy)?
+        {
+            // Native addition keeps the FIRST near-equal summed slope and
+            // extends its endpoint. Replacing it by the later slope changes
+            // ordered endpoint accumulation, including its last-bit minimum.
+            pairs.last_mut().unwrap().1 = end;
+        } else {
+            pairs.push((slope, end));
+        }
         previous = end;
         if aligned {
             tolerant |= xa != xb;

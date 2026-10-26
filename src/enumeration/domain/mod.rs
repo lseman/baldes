@@ -1,4 +1,4 @@
-//! Complete physical-simple paths under deterministic forward scalar resources.
+//! Complete physical-simple paths or explicitly bounded walks under scalar resources.
 //! No reduced-cost cutoff, bucket fixing, NG, cut or branch restriction is used.
 use crate::graph::Graph;
 use crate::labeling::extend_resources;
@@ -109,6 +109,7 @@ impl<'g, const D: usize> CompleteResourceRelaxation<'g, D> {
         let data = collect_paths(
             graph,
             limits,
+            false,
             extend_resource_lower_bounds,
             |arcs, lower_resources| RelaxedResourcePath {
                 arcs,
@@ -151,8 +152,9 @@ fn extend_resource_lower_bounds<const D: usize>(
     Ok(Some(q))
 }
 
-/// Every vertex-simple source/sink path accepted by canonical forward resource
-/// extension, including a direct source/sink arc. One earliest profile is kept.
+/// Every route-domain and elementarity-valid source/sink path accepted by
+/// canonical forward resource extension, including a direct source/sink arc.
+/// One earliest profile is kept.
 /// This is not a proof that all feasible resource schedules or original routing
 /// columns are represented. Such equivalence must be established by the caller.
 /// The graph borrow prevents stale membership after graph mutation.
@@ -204,6 +206,7 @@ struct Frame<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     vertex: usize,
     next_arc: usize,
     resources: crate::graph::ResourceValues<D>,
+    elementarity_len: usize,
 }
 fn reserve<T>(values: &mut Vec<T>, additional: usize) -> Result<(), PathDomainFailure> {
     values
@@ -213,6 +216,7 @@ fn reserve<T>(values: &mut Vec<T>, additional: usize) -> Result<(), PathDomainFa
 fn collect_paths<'g, P, const D: usize>(
     graph: &'g Graph<D>,
     limits: PathDomainLimits,
+    respect_elementarity: bool,
     extend: impl FnMut(
         &Graph<D>,
         &crate::graph::Arc<D>,
@@ -225,12 +229,20 @@ fn collect_paths<'g, P, const D: usize>(
     if graph.has_coupled_resources() {
         return Err(PathDomainFailure::UnsupportedResources);
     }
-    collect_paths_with_clock(graph, limits, extend, make_path, Instant::now)
+    collect_paths_with_clock(
+        graph,
+        limits,
+        respect_elementarity,
+        extend,
+        make_path,
+        Instant::now,
+    )
 }
 
 fn collect_paths_with_clock<'g, P, const D: usize>(
     graph: &'g Graph<D>,
     limits: PathDomainLimits,
+    respect_elementarity: bool,
     extend: impl FnMut(
         &Graph<D>,
         &crate::graph::Arc<D>,
@@ -239,12 +251,21 @@ fn collect_paths_with_clock<'g, P, const D: usize>(
     make_path: impl FnMut(Vec<usize>, Vec<crate::graph::ResourceValues<D>>) -> P,
     clock: impl FnMut() -> Instant,
 ) -> Result<CollectedPaths<'g, P, D>, PathDomainFailure> {
-    collect_paths_with_clock_and_cost(graph, limits, extend, make_path, clock, None)
+    collect_paths_with_clock_and_cost(
+        graph,
+        limits,
+        respect_elementarity,
+        extend,
+        make_path,
+        clock,
+        None,
+    )
 }
 
 fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
     graph: &'g Graph<D>,
     limits: PathDomainLimits,
+    respect_elementarity: bool,
     mut extend: impl FnMut(
         &Graph<D>,
         &crate::graph::Arc<D>,
@@ -318,6 +339,27 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
     let mut visited = vec![];
     reserve(&mut visited, n)?;
     visited.resize(n, false);
+    let enforce_groups = respect_elementarity && graph.has_explicit_elementarity_groups();
+    let mut used_elements = vec![];
+    let mut element_path = vec![];
+    if enforce_groups {
+        budget.spend(graph.element_count)?;
+        reserve(&mut used_elements, graph.element_count)?;
+        used_elements.resize(graph.element_count, false);
+        reserve(&mut element_path, graph.element_count)?;
+    }
+    let source_elements = if enforce_groups {
+        graph.vertices[graph.source].elements.as_slice()
+    } else {
+        &[]
+    };
+    for &element in source_elements {
+        if element >= used_elements.len() || used_elements[element] {
+            return Err(PathDomainFailure::InvalidGraph);
+        }
+        used_elements[element] = true;
+        element_path.push(element);
+    }
     let mut stack = vec![];
     reserve(&mut stack, n)?;
     let mut prefix = vec![];
@@ -327,12 +369,18 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
         vertex: graph.source,
         next_arc: 0,
         resources: initial,
+        elementarity_len: element_path.len(),
     });
     while !stack.is_empty() {
         budget.spend(1)?;
         let frame = stack.last_mut().unwrap();
-        if frame.next_arc == outgoing[frame.vertex].len() {
+        if frame.next_arc == outgoing[frame.vertex].len()
+            || prefix.len() >= graph.original_max_arcs()
+        {
             let frame = stack.pop().unwrap();
+            while element_path.len() > frame.elementarity_len {
+                used_elements[element_path.pop().unwrap()] = false;
+            }
             visited[frame.vertex] = false;
             if !stack.is_empty() {
                 prefix.pop();
@@ -342,7 +390,7 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
         let physical = outgoing[frame.vertex][frame.next_arc];
         frame.next_arc += 1;
         let arc = &graph.arcs[physical];
-        if visited[arc.head] {
+        if arc.head == graph.source || (graph.max_route_arcs().is_none() && visited[arc.head]) {
             continue;
         }
         if let Some(pruning) = &cost_pruning {
@@ -353,6 +401,41 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
         let Some(resources) = extend(graph, arc, frame.resources)? else {
             continue;
         };
+        let elementarity_len = element_path.len();
+        if enforce_groups {
+            budget.spend(
+                arc.elements
+                    .len()
+                    .checked_add(graph.vertices[arc.head].elements.len())
+                    .ok_or(PathDomainFailure::WorkLimit)?,
+            )?;
+            let mut conflict = false;
+            for &element in arc
+                .elements
+                .iter()
+                .chain(&graph.vertices[arc.head].elements)
+            {
+                if element >= used_elements.len() {
+                    conflict = true;
+                    break;
+                }
+                if element_path[elementarity_len..].contains(&element) {
+                    continue;
+                }
+                if used_elements[element] {
+                    conflict = true;
+                    break;
+                }
+                used_elements[element] = true;
+                element_path.push(element);
+            }
+            if conflict {
+                while element_path.len() > elementarity_len {
+                    used_elements[element_path.pop().unwrap()] = false;
+                }
+                continue;
+            }
+        }
         if arc.head == graph.sink {
             if result.paths.len() == limits.max_paths {
                 return Err(PathDomainFailure::PathLimit);
@@ -385,13 +468,23 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
             }
             result.paths.push(make_path(arcs, profile));
             result.stored_arcs = stored;
+            while element_path.len() > elementarity_len {
+                used_elements[element_path.pop().unwrap()] = false;
+            }
         } else {
             visited[arc.head] = true;
+            if prefix.len() == prefix.capacity() {
+                reserve(&mut prefix, 1)?;
+            }
+            if stack.len() == stack.capacity() {
+                reserve(&mut stack, 1)?;
+            }
             prefix.push(physical);
             stack.push(Frame {
                 vertex: arc.head,
                 next_arc: 0,
                 resources,
+                elementarity_len,
             });
         }
     }
@@ -410,6 +503,7 @@ impl<'g, const D: usize> CompleteCanonicalPaths<'g, D> {
         let data = collect_paths(
             graph,
             limits,
+            true,
             |g, arc, q| Ok(extend_resources(g, arc, &q, true)),
             |arcs, resources| CanonicalPath { arcs, resources },
         )?;

@@ -42,3 +42,15 @@ fn multiplicity_first_matches_the_mapped_native_first_child_and_restores_parent(
     assert!((quantity - 1.).abs() < 1e-8);
     assert_eq!(root.snapshot.solve(options).unwrap().master.lp, 1.5);
 }
+
+#[test]
+fn default_network_branching_uses_the_recovered_native_count_first_policy() {
+    assert_eq!(
+        format::SolveOptions::default().network_branching,
+        NetworkBranchingPolicy::MultiplicityFirst
+    );
+    assert_eq!(
+        NetworkBranchingPolicy::parse("resource-first").unwrap(),
+        NetworkBranchingPolicy::ResourceFirst
+    );
+}

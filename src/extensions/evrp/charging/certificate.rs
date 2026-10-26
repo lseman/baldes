@@ -27,10 +27,16 @@ impl Range {
         })
     }
     fn subtract(self, b: Self) -> Option<Self> {
-        self.add(Self { lo: -b.hi, hi: -b.lo })
+        self.add(Self {
+            lo: -b.hi,
+            hi: -b.lo,
+        })
     }
     fn max(self, lower: f64) -> Self {
-        Self { lo: self.lo.max(lower), hi: self.hi.max(lower) }
+        Self {
+            lo: self.lo.max(lower),
+            hi: self.hi.max(lower),
+        }
     }
     fn multiply_nonnegative(self, b: Self) -> Option<Self> {
         Some(Self {
@@ -44,7 +50,11 @@ fn next_down(x: f64) -> f64 {
     if x == 0. {
         -f64::from_bits(1)
     } else {
-        f64::from_bits(if x > 0. { x.to_bits() - 1 } else { x.to_bits() + 1 })
+        f64::from_bits(if x > 0. {
+            x.to_bits() - 1
+        } else {
+            x.to_bits() + 1
+        })
     }
 }
 
@@ -104,7 +114,10 @@ pub(super) fn certify(
     deadline: Option<Instant>,
 ) -> Option<bool> {
     let allowance = (*shared_work).min(resource.max_work);
-    let mut work = Work { remaining: allowance, deadline };
+    let mut work = Work {
+        remaining: allowance,
+        deadline,
+    };
     let result = run(resource, arcs, &mut work);
     *shared_work = shared_work.checked_sub(allowance - work.remaining)?;
     if deadline.is_some_and(|limit| Instant::now() >= limit) {
@@ -118,7 +131,10 @@ fn run(resource: &ChargingResource, arcs: &[usize], work: &mut Work) -> Option<b
     work.take(1)?;
     let mut outer_energy = Range::point(resource.initial_energy);
     let mut outer_time = Range::point(resource.initial_time);
-    let mut states = vec![State { energy: outer_energy, time: outer_time }];
+    let mut states = vec![State {
+        energy: outer_energy,
+        time: outer_time,
+    }];
     for (position, &index) in arcs.iter().enumerate() {
         work.take(1)?;
         let arc = resource.arcs.get(index)?;
@@ -127,7 +143,9 @@ fn run(resource: &ChargingResource, arcs: &[usize], work: &mut Work) -> Option<b
             return Some(false);
         }
         outer_energy.lo = outer_energy.lo.max(0.);
-        outer_time = outer_time.add(Range::point(arc.travel_time))?.max(arc.window.lower);
+        outer_time = outer_time
+            .add(Range::point(arc.travel_time))?
+            .max(arc.window.lower);
         if outer_time.lo > arc.window.upper {
             return Some(false);
         }
@@ -168,7 +186,10 @@ fn run(resource: &ChargingResource, arcs: &[usize], work: &mut Work) -> Option<b
         for state in states {
             work.take(1)?;
             let energy = state.energy.subtract(Range::point(arc.energy))?;
-            let time = state.time.add(Range::point(arc.travel_time))?.max(arc.window.lower);
+            let time = state
+                .time
+                .add(Range::point(arc.travel_time))?
+                .max(arc.window.lower);
             if energy.lo < 0. || time.hi > arc.window.upper {
                 continue;
             }
@@ -191,7 +212,14 @@ fn run(resource: &ChargingResource, arcs: &[usize], work: &mut Work) -> Option<b
                     let duration = value(curve, target, work)?.subtract(initial)?.max(0.);
                     let completion = time.add(duration)?;
                     if completion.hi <= arc.window.upper {
-                        insert(&mut next, State { energy: Range::point(target), time: completion }, work)?;
+                        insert(
+                            &mut next,
+                            State {
+                                energy: Range::point(target),
+                                time: completion,
+                            },
+                            work,
+                        )?;
                     }
                 }
             } else {
@@ -205,9 +233,10 @@ fn run(resource: &ChargingResource, arcs: &[usize], work: &mut Work) -> Option<b
 
 fn insert(states: &mut Vec<State>, candidate: State, work: &mut Work) -> Option<()> {
     work.take(states.len().checked_add(1)?)?;
-    if let Some(old) = states.iter_mut().find(|old| {
-        old.energy.lo == candidate.energy.lo && old.energy.hi == candidate.energy.hi
-    }) {
+    if let Some(old) = states
+        .iter_mut()
+        .find(|old| old.energy.lo == candidate.energy.lo && old.energy.hi == candidate.energy.hi)
+    {
         if candidate.time.hi < old.time.hi {
             *old = candidate;
         }

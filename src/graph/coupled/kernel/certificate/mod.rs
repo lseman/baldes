@@ -3,8 +3,10 @@ use super::*;
 mod encoded;
 mod fronts;
 mod lattice;
+mod machine;
 mod operators;
 mod paired;
+mod paired_machine;
 use crate::core::rounding::{add_down, add_up, multiply_down};
 use std::time::Instant;
 
@@ -94,6 +96,31 @@ impl Interval {
     }
 }
 impl CoupledKernel {
+    /// Independently check the alternate native machine-front model without
+    /// changing this kernel's original-domain choice. This result cannot be
+    /// substituted for a default graph's source-control feasibility proof.
+    /// Use the explicit graph model setter to select that different domain.
+    /// This checks resource operations; callers still validate physical path
+    /// continuity, terminals and original master-row activities separately.
+    pub fn certify_front_program(
+        &self,
+        arcs: &[usize],
+        work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Option<super::FrontProgramCertificate> {
+        if !self.has_machine_front_contracts() || arcs.iter().any(|&arc| arc >= self.arc_count) {
+            return None;
+        }
+        debit(work, 1, deadline)?;
+        let mut alternate = self.clone();
+        alternate.native_front_program_domain = true;
+        let (feasible, objective) = alternate.certify_with_budget(arcs, work, deadline)?;
+        Some(super::FrontProgramCertificate {
+            feasible,
+            objective,
+        })
+    }
+
     /// A rigorously feasible/infeasible path and an outward objective interval.
     /// Arithmetic failure or a boundary-straddling interval remains unknown.
     pub(crate) fn certify(&self, arcs: &[usize]) -> Option<(bool, [f64; 2])> {

@@ -35,6 +35,8 @@ mod penalty_json {
 #[cfg_attr(feature = "clp", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "clp", serde(default, deny_unknown_fields))]
 pub struct NativeExplicitParameters {
+    /// Native functiontype1 normalization: InnerAngle float1.01, OuterAngle0.
+    pub box_step: bool,
     pub five_piece: bool,
     pub kappa: f64,
     pub outer_half_width: f64,
@@ -45,6 +47,7 @@ pub struct NativeExplicitParameters {
 impl Default for NativeExplicitParameters {
     fn default() -> Self {
         Self {
+            box_step: false,
             five_piece: false,
             kappa: 1.,
             outer_half_width: 100.,
@@ -56,6 +59,9 @@ impl Default for NativeExplicitParameters {
 }
 impl NativeExplicitParameters {
     fn validate(&self) -> Result<()> {
+        if self.box_step && self.five_piece {
+            return Err(invalid("native box-step and five-piece modes conflict"));
+        }
         if !((self.kappa as f32).is_finite())
             || [
                 self.outer_half_width,
@@ -81,13 +87,19 @@ impl NativeExplicitParameters {
         let mut bands = vec![];
         if self.five_piece {
             bands.push(ProximalBand {
-                half_width: initial(self.inner_half_width),
-                penalty: self.inner_penalty as f32 as f64,
+                half_width: initial(self.outer_half_width),
+                penalty: self.outer_penalty as f32 as f64,
             });
         }
         bands.push(ProximalBand {
-            half_width: initial(self.outer_half_width),
-            penalty: self.outer_penalty as f32 as f64,
+            half_width: initial(
+                (self.inner_half_width as f32).min(self.outer_half_width as f32) as f64,
+            ),
+            penalty: if self.box_step {
+                1.01_f32 as f64
+            } else {
+                self.inner_penalty as f32 as f64
+            },
         });
         bands
     }
@@ -126,7 +138,13 @@ pub struct ProximalParameters {
     )]
     pub max_points: usize,
     /// Native explicit-rule child interval factor, widened from stored float.
-    #[cfg_attr(feature = "clp", serde(default = "default_child_factor"))]
+    #[cfg_attr(
+        feature = "clp",
+        serde(
+            default = "default_child_factor",
+            skip_serializing_if = "is_default_child_factor"
+        )
+    )]
     pub child_half_interval_factor: f64,
     /// Optional recovered native rule-1 initialization and interval schedule.
     #[cfg_attr(
@@ -134,15 +152,29 @@ pub struct ProximalParameters {
         serde(default, skip_serializing_if = "Option::is_none")
     )]
     pub native_explicit: Option<NativeExplicitParameters>,
-    /// Use original row RHS for artificial coefficients/costs, as native does.
-    #[cfg_attr(feature = "clp", serde(default))]
+    /// Use original row RHS for configured-band artificial geometry. Native
+    /// explicit and automatic workflows always use the recovered RHS scaling.
+    #[cfg_attr(
+        feature = "clp",
+        serde(default, skip_serializing_if = "std::ops::Not::not")
+    )]
     pub native_row_scaling: bool,
-    #[cfg_attr(feature = "clp", serde(default = "default_child_factor"))]
+    #[cfg_attr(
+        feature = "clp",
+        serde(
+            default = "default_child_factor",
+            skip_serializing_if = "is_default_child_factor"
+        )
+    )]
     pub artificial_activity_factor: f64,
 }
 
 fn default_child_factor() -> f64 {
     10.
+}
+#[cfg(feature = "clp")]
+fn is_default_child_factor(value: &f64) -> bool {
+    *value == default_child_factor()
 }
 
 fn default_max_points() -> usize {
@@ -154,6 +186,14 @@ fn is_default_max_points(value: &usize) -> bool {
 }
 
 impl ProximalParameters {
+    /// Recovered native functiontype1; unlike `box_step`, its normalized cap
+    /// is finite float1.01 and its default intervals bootstrap from Kappa.
+    pub fn native_box_step() -> Self {
+        Self::native_explicit(NativeExplicitParameters {
+            box_step: true,
+            ..Default::default()
+        })
+    }
     pub fn native_three_piece() -> Self {
         Self::native_explicit(NativeExplicitParameters::default())
     }
@@ -171,7 +211,11 @@ impl ProximalParameters {
         parameters
     }
     pub fn native_multipoint() -> Self {
-        let mut parameters = Self::three_piece(0., 0.9_f32 as f64);
+        let band = ProximalBand {
+            half_width: 0.,
+            penalty: 0.9_f32 as f64,
+        };
+        let mut parameters = Self::five_piece(band, band);
         parameters.multi_point = true;
         parameters.native_row_scaling = true;
         parameters
@@ -195,7 +239,7 @@ impl ProximalParameters {
             max_points: default_max_points(),
             child_half_interval_factor: default_child_factor(),
             native_explicit: None,
-            native_row_scaling: false,
+            native_row_scaling: true,
             artificial_activity_factor: 10.,
         }
     }
@@ -298,7 +342,8 @@ impl ProximalParameters {
 }
 
 /// Accepted dual center, explicit intervals and automatic curvature inherited
-/// by a compatible child. Auxiliary columns and support planes are not retained.
+/// by a compatible child. Multipoint samples retain pure dual coordinates;
+/// auxiliary LP columns and rows are never retained.
 #[derive(Clone, Debug)]
 pub struct ProximalSnapshot {
     pub center: Vec<f64>,
@@ -409,12 +454,14 @@ impl ProximalState {
         self.configuration.clone_from(&snapshot.configuration);
         self.explicit_bands.clone_from(&snapshot.explicit_bands);
         self.explicit_baseline = snapshot.explicit_baseline;
-        if snapshot.support_planes.iter().any(|plane| {
-            plane.point.len() != snapshot.center.len()
-                || plane.point.iter().any(|x| !x.is_finite())
-                || !plane.dual_activity.is_finite()
-                || plane.creation_id >= snapshot.next_point_id
-        }) {
+        if (!snapshot.support_planes.is_empty() && snapshot.max_points == 0)
+            || snapshot.support_planes.iter().any(|plane| {
+                plane.point.len() != snapshot.center.len()
+                    || plane.point.iter().any(|x| !x.is_finite())
+                    || !plane.dual_activity.is_finite()
+                    || plane.creation_id >= snapshot.next_point_id
+            })
+        {
             return Err(invalid("invalid inherited multipoint support planes"));
         }
         self.samples.clone_from(&snapshot.support_planes);
@@ -483,7 +530,7 @@ impl ProximalState {
                             && mean > mean.abs() * 1e-10 + 1e-6
                         {
                             let scale = (native.kappa as f32 as f64) * mean;
-                            let outer_width = if native.five_piece {
+                            let outer_width = if native.five_piece || native.box_step {
                                 scale * 0.1
                             } else {
                                 scale
@@ -568,12 +615,20 @@ impl ProximalState {
         if active && parameters.curvature.is_none() {
             let factor = parameters.artificial_activity_factor as f32 as f64;
             let count = self.explicit_bands.len();
-            for (index, band) in self.explicit_bands.iter_mut().enumerate() {
-                if !parameters.multi_point || index + 1 == count {
-                    band.penalty /= factor;
+            let mut next = self.explicit_bands.clone();
+            let mut changed = false;
+            for (index, band) in next.iter_mut().enumerate() {
+                if (!parameters.multi_point || index + 1 == count) && band.penalty.is_finite() {
+                    let penalty = band.penalty / factor;
+                    if !penalty.is_finite() {
+                        return Err(invalid("proximal artificial-cap update overflow"));
+                    }
+                    changed |= penalty != band.penalty;
+                    band.penalty = penalty;
                 }
             }
-            return Ok(count > 0);
+            self.explicit_bands = next;
+            return Ok(changed);
         }
         let Some(configuration) = parameters.curvature.as_ref().filter(|_| active) else {
             return Ok(false);
@@ -646,6 +701,7 @@ impl ProximalState {
             automatic = bands;
             automatic.multi_point = parameters.multi_point;
             automatic.max_points = parameters.max_points;
+            automatic.native_row_scaling = true;
             &automatic
         } else {
             self.curvature = None;
@@ -687,13 +743,14 @@ impl ProximalState {
                 .rhs()
                 .get(row)
                 .ok_or_else(|| invalid("proximal row RHS missing"))?;
-            let coefficient_scale = if parameters.native_row_scaling && rhs.abs() > 1e-6 {
+            let native_scaling =
+                parameters.native_row_scaling || parameters.native_explicit.is_some();
+            let coefficient_scale = if native_scaling && rhs.abs() > 1e-6 {
                 rhs
             } else {
                 1.
             };
-            let cost_scale = if parameters.native_row_scaling && rhs.abs() > rhs.abs() * 1e-6 + 1e-6
-            {
+            let cost_scale = if native_scaling && rhs.abs() > rhs.abs() * 1e-6 + 1e-6 {
                 rhs
             } else {
                 1.

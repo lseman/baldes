@@ -439,11 +439,17 @@ fn aggregate_flow_candidates_count_weighted_arcs_and_children_match_fresh_master
         tree::candidates::candidates,
         RowSense,
     };
+    assert!(AggregateVariable::new("", &[(0, 1.)]).is_err());
     assert!(AggregateVariable::new("empty", &[]).is_err());
     assert!(AggregateVariable::new("half", &[(0, 0.5)]).is_err());
     assert!(AggregateVariable::new("cancelled", &[(0, 1.), (0, -1.)]).is_err());
     let merged = AggregateVariable::new("merged", &[(3, 1.), (0, 2.), (3, 1.)]).unwrap();
     assert_eq!(merged.arcs(), &[(0, 2.), (3, 2.)]);
+    // Exact accumulation preserves the integer expression even when ordinary
+    // left-to-right f64 addition drops the middle unit.
+    let cancellation_safe =
+        AggregateVariable::new("cancellation_safe", &[(8, 1e16), (8, 1.), (8, -1e16)]).unwrap();
+    assert_eq!(cancellation_safe.arcs(), &[(8, 1.)]);
 
     let p = triangle_problem();
     let mut options = RootOptions::default();
@@ -554,6 +560,7 @@ fn aggregate_flow_candidates_count_weighted_arcs_and_children_match_fresh_master
     }
 }
 
+#[cfg(feature = "clp")]
 #[test]
 fn aggregate_branches_match_fresh_and_inherited_masters() {
     use baldes::master::{

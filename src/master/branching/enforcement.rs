@@ -1,14 +1,13 @@
 //! Where routing branches are enforced: in pricing, or only by master rows.
 //!
-//! Fixed per build. By default pricing also enforces Ryan–Foster branches
-//! (binary resources) and accumulated-resource branches (tightened arc
-//! windows). With the `ryan-foster-master` or `accumulated-resource-master`
-//! feature, that family is enforced only by its master row: pricing neither
-//! sees the branch nor prices its dual, violating columns reach the master,
-//! where the row keeps them at zero, and node closure follows the
-//! reference's master-only policy below. That policy is numerical, not a
-//! directed certificate, so those builds give up the optimality guarantee at
-//! such nodes.
+//! Fixed per build. The Cargo default matches the modern reference: Ryan–Foster
+//! and accumulated-resource branches are enforced through master rows, while
+//! pricing ignores those branches and their row duals. Violating columns reach
+//! the master, where the row keeps them at zero; numerical node closure follows
+//! the reference policy below. Certified mode still requires independent
+//! original-domain proof. `--no-default-features` restores pricing-side
+//! enforcement for both families unless their individual master features are
+//! selected.
 use super::BranchConstraint;
 use crate::master::{
     cg::{self, BoundMode, FeasibilityStatus},

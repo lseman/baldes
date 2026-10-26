@@ -101,14 +101,14 @@ fn custom_forward_and_backward_dominance_bounds_are_independent() {
         );
     }
     let mut graph = Graph::<2>::new(3, 0).unwrap();
-    for (tail, head) in [(0, 1), (1, 2), (1, 2)] {
+    for (tail, head) in [(0, 1), (1, 2), (1, 2), (2, 1)] {
         graph.add_arc(tail, head, 0.).unwrap();
     }
     for (forward_bound, backward_bound) in [(None, None), (Some(4.), None), (None, Some(5.))] {
         graph
             .set_coupled_resources(&[CoupledResource::CustomResource {
-                increments: vec![1., 0., 0.],
-                weights: vec![0., 1., 3.],
+                increments: vec![1., 0., 0., 0.],
+                weights: vec![0., 1., 3., 0.],
                 forward_bound,
                 backward_bound,
             }])
@@ -124,6 +124,59 @@ fn custom_forward_and_backward_dominance_bounds_are_independent() {
             assert_eq!(penalty, None);
         }
     }
+}
+
+#[test]
+fn bounded_walk_domain_certifies_fractional_backward_entry_states() {
+    let mut graph = Graph::<2>::new(3, 0).unwrap();
+    for (tail, head) in [(0, 1), (1, 2), (1, 2)] {
+        graph.add_arc(tail, head, 0.).unwrap();
+    }
+    graph
+        .set_route_domain(crate::graph::RouteDomain::BoundedWalks { max_arcs: 2 })
+        .unwrap();
+    graph
+        .set_coupled_resources(&[CoupledResource::CustomResource {
+            increments: vec![0.25, 0., 0.],
+            weights: vec![0., 1., 3.],
+            forward_bound: None,
+            backward_bound: None,
+        }])
+        .unwrap();
+
+    let kernel = graph.coupled_kernel().unwrap();
+    let root = kernel.root(false);
+    let light = kernel.extend(&root, 1, false).unwrap().unwrap().0;
+    let heavy = kernel.extend(&root, 2, false).unwrap().unwrap().0;
+
+    let penalty = kernel.dominance_penalty(&heavy, &light, false).unwrap();
+    assert!(penalty >= 0.5);
+    assert!(penalty <= 1. + 1e-9);
+}
+
+#[test]
+fn acyclic_physical_domain_bounds_fractional_backward_entry_states() {
+    let mut graph = Graph::<2>::new(3, 0).unwrap();
+    for (tail, head) in [(0, 1), (1, 2), (1, 2)] {
+        graph.add_arc(tail, head, 0.).unwrap();
+    }
+    graph
+        .set_coupled_resources(&[CoupledResource::CustomResource {
+            increments: vec![0.25, 0., 0.],
+            weights: vec![0., 1., 3.],
+            forward_bound: None,
+            backward_bound: None,
+        }])
+        .unwrap();
+
+    let kernel = graph.coupled_kernel().unwrap();
+    let root = kernel.root(false);
+    let light = kernel.extend(&root, 1, false).unwrap().unwrap().0;
+    let heavy = kernel.extend(&root, 2, false).unwrap().unwrap().0;
+
+    let penalty = kernel.dominance_penalty(&heavy, &light, false).unwrap();
+    assert!(penalty >= 0.5);
+    assert!(penalty <= 1. + 1e-9);
 }
 
 #[test]

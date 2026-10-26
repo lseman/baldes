@@ -26,6 +26,13 @@ shared library and use `cargo build --release --features clp,highs`.
 The CLI and routing tree require `clp`; `highs` alone provides the library's
 HiGHS backend and generic MIP API. See below for library discovery details.
 
+Default builds use the modern MetaSolver-compatible master-only enforcement
+for Ryan–Foster and accumulated-resource branch rows. To use the older
+pricing-enforced policies, disable default features and select the desired
+backend explicitly, for example `cargo build --release --no-default-features
+--features clp`. Certified mode still requires independent original-domain
+proofs and does not treat numerical master-only closure as certification.
+
 Disjoint service-start windows are optional: use
 `cargo build --release --features multi-time-windows` for the library, or
 `--features clp,multi-time-windows` for network JSON and the CLI. See

@@ -51,7 +51,14 @@ fn network_schedule_flags_keep_root_and_tree_objectives() {
 
 #[test]
 fn proximal_flags_use_original_objective_and_validate_configuration() {
-    for flag in ["--automatic-curvature", "--automatic-curvature-five-piece"] {
+    for flag in [
+        "--automatic-curvature",
+        "--automatic-curvature-five-piece",
+        "--native-proximal-box-step",
+        "--native-proximal-three-piece",
+        "--native-proximal-five-piece",
+        "--native-proximal-multipoint",
+    ] {
         let root = solve(&[flag]);
         assert_eq!(root["status"], "Optimal");
         assert_eq!(root["lp"], 1.5);
@@ -369,4 +376,201 @@ fn resource_group_files_restrict_both_pricing_networks_and_tree_descendants() {
             }
         }
     }
+}
+
+#[test]
+fn native_depth_budgets_and_registered_aggregate_branches_preserve_objectives() {
+    let root = solve(&[
+        "--automatic-curvature",
+        "--stabilization-max-tree-depth",
+        "0",
+        "--network-promising-limit",
+        "2",
+    ]);
+    assert_eq!(root["lp"], 1.5);
+    let mappings =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/networks/mapped_variables.json");
+    for strong in [true, false] {
+        let mut flags = vec!["--tree", "--mapped-variables", mappings.to_str().unwrap()];
+        if !strong {
+            flags.push("--no-mapped-strong-branching");
+        }
+        let tree = solve(&flags);
+        assert_eq!(tree["status"], "Optimal");
+        assert_eq!(tree["incumbent"], 2.);
+        assert_eq!(
+            tree["strong_branching_trials"].as_u64().unwrap() > 0,
+            strong
+        );
+    }
+    assert!(!command()
+        .arg("multi-pricing")
+        .arg(fixture())
+        .args(["--network-promising-limit", "0"])
+        .output()
+        .unwrap()
+        .status
+        .success());
+}
+
+#[test]
+fn native_phased_registry_evaluates_original_fallback_candidates() {
+    let tree = solve(&["--tree", "--network-branching", "native-phased"]);
+    assert_eq!(tree["status"], "Optimal");
+    assert_eq!(tree["incumbent"], 2.);
+    assert!(tree["strong_branching_trials"].as_u64().unwrap() > 0);
+}
+
+#[test]
+fn native_depth_first_search_separates_processed_and_evaluated_nodes() {
+    let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/multi_network_native_tree.json");
+    let run = |selection: &str, open_limit: Option<&str>, rounding: Option<&str>| {
+        let output = command()
+            .arg("multi-pricing")
+            .arg(&model)
+            .args([
+                "--tree",
+                "--network-branching",
+                "multiplicity-first",
+                "--network-tree-search",
+                selection,
+                "--native-proximal-five-piece",
+                "--json",
+                "-",
+            ])
+            .args(
+                rounding
+                    .into_iter()
+                    .flat_map(|mode| ["--network-strategy2-rounding", mode]),
+            )
+            .args(
+                open_limit
+                    .into_iter()
+                    .flat_map(|limit| ["--network-open-node-limit", limit]),
+            )
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice::<Value>(&output.stdout).unwrap()
+    };
+    let native = run("native-default", None, None);
+    let overflow = run("native-default", Some("1"), None);
+    let all_overflow = run("native-default", Some("0"), None);
+    let best_bound = run("best-bound", None, None);
+    let strategy2 = run("native-strategy-2", None, None);
+    let strategy2_exact_ceil = run("native-strategy-2", None, Some("exact-ceil"));
+    assert_eq!(native["status"], "Optimal");
+    assert_eq!(best_bound["status"], "Optimal");
+    assert_eq!(native["incumbent"], 2.);
+    assert_eq!(best_bound["incumbent"], 2.);
+    assert_eq!(strategy2_exact_ceil["status"], "Optimal");
+    assert_eq!(strategy2_exact_ceil["incumbent"], 2.);
+    assert_eq!(overflow["status"], "Optimal");
+    assert_eq!(overflow["incumbent"], 2.);
+    assert!(
+        overflow["tree_processed_nodes"].as_u64().unwrap() >= overflow["nodes"].as_u64().unwrap()
+    );
+    assert_eq!(all_overflow["status"], "Optimal");
+    assert_eq!(all_overflow["incumbent"], 2.);
+    assert_eq!(native["tree_processed_nodes"], 7);
+    assert!(native["tree_processed_nodes"].as_u64().unwrap() > native["nodes"].as_u64().unwrap());
+    assert_eq!(best_bound["nodes"], 5);
+    assert!(
+        best_bound["tree_processed_nodes"].as_u64().unwrap()
+            >= best_bound["nodes"].as_u64().unwrap()
+    );
+    assert_eq!(strategy2["status"], "Optimal");
+    assert_eq!(strategy2["incumbent"], 2.);
+    assert_eq!(strategy2["tree_processed_nodes"], 5);
+    assert_eq!(strategy2["nodes"], 5);
+    let model: Value =
+        serde_json::from_slice(&std::fs::read(&model).expect("read native comparison fixture"))
+            .unwrap();
+    for result in [&native, &best_bound, &strategy2] {
+        let mut coverage = vec![0.; 3];
+        let mut objective = 0.;
+        for route in result["routes"].as_array().unwrap() {
+            let network = model["networks"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|network| network["id"] == route["network"])
+                .unwrap();
+            let quantity = route["value"].as_f64().unwrap();
+            objective += quantity * route["cost"].as_f64().unwrap();
+            for arc_id in route["arcs"].as_array().unwrap() {
+                if let Some(entries) =
+                    network["arcs"][arc_id.as_u64().unwrap() as usize]["entries"].as_array()
+                {
+                    for entry in entries {
+                        let row = entry[0].as_u64().unwrap() as usize;
+                        coverage[row] += quantity * entry[1].as_f64().unwrap();
+                    }
+                }
+            }
+        }
+        assert_eq!(objective, 2.);
+        assert_eq!(coverage, vec![1., 1., 1.]);
+    }
+}
+
+#[test]
+fn explicitly_declared_front_program_domain_survives_original_cost_recovery() {
+    let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/coupled/native_machine_network.json");
+    let output = command()
+        .arg("multi-pricing")
+        .arg(model)
+        .args([
+            "--tree",
+            "--bound-mode",
+            "certified",
+            "--no-stabilization",
+            "--json",
+            "-",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["status"], "Optimal");
+    assert_eq!(result["incumbent"], 1003.);
+    assert_eq!(result["bound"], 1003.);
+}
+
+#[test]
+fn bounded_walk_json_preserves_repeated_visits_and_negative_cycle_cost() {
+    let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/coupled/bounded_walk_network.json");
+    let output = command()
+        .arg("multi-pricing")
+        .arg(model)
+        .args([
+            "--tree",
+            "--bound-mode",
+            "certified",
+            "--no-stabilization",
+            "--json",
+            "-",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["status"], "Optimal");
+    assert_eq!(result["incumbent"], -3.);
+    assert_eq!(result["bound"], -3.);
 }

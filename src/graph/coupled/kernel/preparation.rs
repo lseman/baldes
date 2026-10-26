@@ -130,6 +130,7 @@ impl CoupledKernel {
             slots,
             initial,
             cost_scale: 1.,
+            native_front_program_domain: false,
             frozen,
             paired,
             plugins: definitions
@@ -296,6 +297,47 @@ impl CoupledKernel {
     }
     pub fn has_costs(&self) -> bool {
         self.cost_scale != 0. && self.cost_resource
+    }
+    /// Whether a raw resource selects the native machine-front contract.
+    ///
+    /// Native raw costs use their ordered binary64 front contract, including
+    /// alignment and slope merges. Default feasibility still requires an
+    /// independent original source-domain proof. Only the explicit graph
+    /// machine-domain model choice also defines feasibility by that program.
+    /// Neither scope asserts an exact-real control optimum. Values combine with
+    /// other resource charges using outward aggregate bounds; this flag does
+    /// not make a rounded global objective an exact MIP coefficient.
+    pub fn has_machine_front_contracts(&self) -> bool {
+        self.definitions.iter().any(|definition| {
+            matches!(
+                definition,
+                CoupledResource::SlopeIntervalCost {
+                    policy: FrontOperationPolicy::NativeFrontAlgebra,
+                    ..
+                } | CoupledResource::SlopePaired {
+                    policy: FrontOperationPolicy::NativeFrontAlgebra,
+                    ..
+                }
+            )
+        })
+    }
+    /// The explicit model choice used for native raw resource feasibility.
+    pub fn native_front_program_domain(&self) -> bool {
+        self.native_front_program_domain
+    }
+    /// Whether any objective is defined by a computed raw machine front.
+    /// Source-control abstract objective bounds cannot be substituted for these
+    /// costs, even when default raw feasibility has a separate source witness.
+    pub fn has_machine_cost_contracts(&self) -> bool {
+        self.definitions.iter().any(|definition| match definition {
+            CoupledResource::SlopeIntervalCost { .. } => true,
+            CoupledResource::SlopePaired {
+                policy: FrontOperationPolicy::NativeFrontAlgebra,
+                mode,
+                ..
+            } => self.native_front_program_domain && *mode != PairedResourceMode::Feasibility,
+            _ => false,
+        })
     }
     #[cfg(feature = "clp")]
     pub(crate) fn suppress_costs(&mut self) {

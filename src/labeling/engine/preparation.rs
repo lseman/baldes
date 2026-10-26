@@ -59,6 +59,7 @@ impl<const D: usize> LabelingEngine<D> {
         )?;
         let reverse = crate::graph::symmetry::reverse_arcs(g).unwrap_or_default();
         let consumption_joins = controls.bidirectional
+            && g.max_route_arcs().is_none()
             && g.coupled_kernel()
                 .is_none_or(|k| !g.resources.is_empty() && k.reversal_eligible(&reverse))
             && controls.use_symmetric_execution

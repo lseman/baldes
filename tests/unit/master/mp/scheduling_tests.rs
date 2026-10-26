@@ -1,5 +1,12 @@
 use super::*;
 
+impl Scheduler {
+    fn finish_classified(&mut self, index: usize, new_columns: usize, promising: bool) -> bool {
+        self.finish_native_status(index, new_columns, i32::from(promising))
+            .unwrap()
+    }
+}
+
 #[test]
 fn cyclic_wraps_skips_disabled_slots_and_resets_at_phase_changes() {
     let mut scheduler = Scheduler::new(NetworkPricingSchedule::Cyclic, 4, 1e-6);

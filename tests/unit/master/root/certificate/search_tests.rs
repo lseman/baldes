@@ -69,3 +69,75 @@ fn expired_deadline_does_not_poison_a_later_certificate_attempt() {
         .is_some());
     assert_eq!(cache.attempts.get(), 2);
 }
+
+#[test]
+fn native_machine_underpricing_never_uses_a_source_control_root_lower_bound() {
+    use crate::graph::coupled::{
+        CoupledResource, FrontOperationPolicy, PairedCostNormalization, PairedResourceMode,
+        PreparedSlopeFunction, SlopeRelationArc,
+    };
+    use crate::graph::Window;
+    let f = |pairs: Vec<(f64, f64)>| PreparedSlopeFunction::from_prepared_pairs(pairs).unwrap();
+    let mut graph = crate::Graph::<2>::new(3, 0).unwrap();
+    graph.add_arc(0, 1, 0.).unwrap();
+    graph.add_arc(1, 2, 0.).unwrap();
+    let arc = SlopeRelationArc {
+        arrival: f(vec![(0., 0.), (1., 2.)]),
+        increment: f(vec![(0., 0.), (0., 2.)]),
+        lower: f(vec![(-10., 0.), (0., 2.)]),
+        upper: f(vec![(10., 0.), (0., 2.)]),
+        waiting: 0,
+    };
+    graph
+        .set_coupled_resources(&[CoupledResource::SlopePaired {
+            initial: f(vec![(1., 0.), (-0.00005, 1.), (-0.00001, 2.)]),
+            initial_base: Window::new(0., 2.).unwrap(),
+            arcs: vec![arc.clone(), arc],
+            mode: PairedResourceMode::CostUnbounded,
+            normalization: PairedCostNormalization::AbsoluteFinalValue,
+            policy: FrontOperationPolicy::NativeFrontAlgebra,
+        }])
+        .unwrap();
+    graph.set_native_front_program_domain(true).unwrap();
+    let machine_cost = graph
+        .coupled_kernel()
+        .unwrap()
+        .replay(&[0, 1])
+        .unwrap()
+        .unwrap();
+    // Exact source controls with identity arrival/no increment have minimum
+    // 1-0.00006. Native near-slope merging can price strictly below that value.
+    assert!(machine_cost < 1. - 0.00006);
+    let problem = RootProblem::set_partitioning(graph, 1.).unwrap();
+    assert!(ConservativeCoverRelaxation::collect(&problem, PathDomainLimits::default()).is_err());
+    let mut options = RootOptions::default();
+    options.capture_state = true;
+    options.enumerate = false;
+    options.cg.stabilize = false;
+    let output = super::super::solve(problem, options).unwrap();
+    let snapshot = output.snapshot.unwrap();
+    assert!(snapshot.problem.graph.native_front_program_domain());
+    let state = State {
+        solver: snapshot.pricing.fork_for_node(),
+        routes: snapshot.routes.clone(),
+        route_tags: Default::default(),
+        incumbent: f64::INFINITY,
+        enumerate: false,
+        rounded: false,
+        previous_fixing_gap: 1e12,
+        deadline: None,
+        pricing_seconds: 0.,
+        cut: snapshot.cut.clone(),
+        fixing_calls: 0,
+        enumerated_routes: 0,
+    };
+    assert_eq!(
+        lower_bound(
+            &snapshot.problem,
+            &state,
+            &snapshot.master,
+            &SearchCache::default()
+        ),
+        None
+    );
+}

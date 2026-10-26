@@ -224,13 +224,23 @@ impl ResourceModel {
     }
     /// Install resource kernels on this solver's physical graph in place.
     /// Existing options remain; labels, fixing and enumeration are invalidated.
-    fn install(&self, solver: &mut Solver) -> PyResult<()> {
+    /// native_front_program_domain selects a computed native-program model;
+    /// the default keeps source-control feasibility.
+    #[pyo3(signature = (solver, *, native_front_program_domain=false))]
+    fn install(&self, solver: &mut Solver, native_front_program_domain: bool) -> PyResult<()> {
         run(|| {
-            solver
-                .solver
-                .get_mut()
-                .unwrap()
-                .set_coupled_resources(&self.resources)
+            let solver = solver.solver.get_mut().unwrap();
+            if native_front_program_domain {
+                // Validate the modelling choice before replacing live resources.
+                let mut checked = solver.graph.clone();
+                checked.set_coupled_resources(&self.resources)?;
+                checked.set_native_front_program_domain(true)?;
+            }
+            solver.set_coupled_resources(&self.resources)?;
+            if native_front_program_domain {
+                solver.graph.set_native_front_program_domain(true)?;
+            }
+            Ok(())
         })
     }
     /// Arc vectors use original insertion order. Bits represent allowed values.

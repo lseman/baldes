@@ -3,6 +3,7 @@
 //! Arc entries refer to shared rows. Each network also receives its own
 //! multiplicity rows. Additive rows and assignment branches survive node forks.
 //! Complete all-network enumeration can feed an optional HiGHS integer copy.
+mod feasibility;
 mod pricing;
 mod scheduling;
 pub use scheduling::NetworkPricingSchedule;
@@ -50,7 +51,8 @@ mod tree;
 pub use lifecycle::{Assignment, FixedRoute, NodeSnapshot, RowCoefficients};
 pub use tree::{
     solve_assignment_tree, solve_assignment_tree_with_master_variables, AssignmentTreeOptions,
-    AssignmentTreeOutput, NetworkBranchingPolicy,
+    AssignmentTreeOutput, NativeIntegerBoundRounding, NetworkBranchPriorities,
+    NetworkBranchingPolicy, NetworkTreeSearchPolicy,
 };
 
 #[derive(Clone, Debug)]
@@ -199,7 +201,11 @@ impl<const D: usize> Oracle<D> {
     }
 }
 struct State<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
+    /// Directed original-domain phase-I proof for this model or a restriction.
+    phase_one_infeasible: bool,
     mapped_subtree_size: f64,
+    mapped_subtree_priority: f64,
+    mapped_lineage: usize,
     node_depth: usize,
     scheduler: scheduling::Scheduler,
     synchronized_services: Vec<synchronization::Service>,
@@ -268,3 +274,7 @@ mod sharing_tests;
 
 use solve::{run, solve_with_fixed_routes, solve_with_seed_routes, validate_options};
 pub use solve::{solve, solve_master, solve_with_master_variables};
+
+#[cfg(test)]
+#[path = "../../../tests/unit/master/mp/bounded_walk_tests.rs"]
+mod bounded_walk_tests;

@@ -3,7 +3,7 @@ use super::candidates::BranchCandidate;
 use super::*;
 mod admission;
 mod generators;
-pub(in crate::master::tree) use admission::fresh_batches_with_budget;
+pub(in crate::master) use admission::fresh_batches_with_budget;
 pub(in crate::master::tree) use admission::registered as registered_priorities;
 mod resource_generators;
 

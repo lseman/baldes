@@ -68,14 +68,9 @@ Both children work with **a single pricing network**. The together condition
 applies to each route, rather than merely requiring both customers somewhere
 in the final solution.
 
-By default, binary resources enforce the rule during labeling and bidirectional joins.
-Retained enumeration is filtered by the same rule. Existing NG routes that
-repeat a pair endpoint are retired from the child master. A violation row also
-keeps inherited and newly added master columns consistent with the branch.
-
-Build with `--features clp,ryan-foster-master` (or `CONFIG_RYAN_FOSTER=master`
-in `make config`) to enforce Ryan–Foster only
-through master rows. Pricing then receives neither the hard binary-resource
+By default, Ryan–Foster is enforced through its master violation row, matching
+the recovered modern MetaSolver restore path. Pricing receives neither the
+hard binary-resource
 restriction nor the violation row's dual cost. After exact column generation
 returns no new improving master columns, numerical mode uses the completed
 restricted-master objective as the node bound. If artificials remain, pure
@@ -83,6 +78,12 @@ phase I runs first and marks numerical infeasibility when an exact pass adds
 no improving master columns. Limits and incomplete pricing leave the node open.
 These numerical decisions are not original-domain certificates; certified mode
 still requires an independent bound or infeasibility proof.
+
+To select the stronger pricing-enforced policy, build with
+`--no-default-features` (and add backend features such as `clp` as needed).
+In that mode binary resources enforce the rule during labeling and bidirectional
+joins; retained enumeration is filtered by the same rule, and existing NG
+routes that repeat a pair endpoint are retired from the child master.
 
 An apart constraint consumes one binary resource; a together constraint
 consumes three. The current representation holds 512 resources. Candidate
@@ -207,9 +208,8 @@ The row coefficient is zero when every selected occurrence satisfies the split,
 and one otherwise, including when a relaxed route repeats a selected arc or
 packing group. It is a route violation indicator, rather than a violation count.
 
-Build with `--features clp,accumulated-resource-master` (or
-`CONFIG_ACCUMULATED_RESOURCE=master` in `make config`) to enforce these
-branches only through their master rows. Pricing then keeps the original arc
+By default these branches are enforced only through their master rows,
+matching the recovered native restore behavior. Pricing keeps the original arc
 windows, and nodes close with the same numerical master-only policy as
 master-row Ryan–Foster branching above. With disposable resources this can also
 change which schedules pricing generates: tightening a lower window can add
@@ -218,6 +218,8 @@ original earliest schedule and may reject it through the violation row. The two
 build modes therefore need not produce the same child LP objective.
 An empty resource-window intersection also remains a resource violation row in
 master-only mode; it does not introduce an arc-flow dual into pricing.
+To enable pricing-window enforcement instead, build with
+`--no-default-features` (and add backend features such as `clp` as needed).
 Resource-domain changes discard inherited labels/enumeration before repricing;
 parent and sibling graphs remain independent. Original resource limits remain
 in effect. The existing requirement for backward equality resources to have a

@@ -27,6 +27,7 @@ impl BranchGeneratorNames {
         self.get(constraint)
             .map(str::to_owned)
             .unwrap_or_else(|| match constraint {
+                BranchConstraint::AggregateFlow { name, .. } => name.clone(),
                 BranchConstraint::AccumulatedResourceGroup(group) => group.generator_name(),
                 _ => key(constraint),
             })

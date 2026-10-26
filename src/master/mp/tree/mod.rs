@@ -2,20 +2,26 @@
 //! Unsupported fractional domains remain open rather than claiming optimality.
 use super::*;
 mod branching;
+pub(super) mod proposals;
 mod time_windows;
 use crate::master::{tree::TreeStatus, LpMaster};
 use std::time::Duration;
+
+const NATIVE_OPEN_NODE_LIMIT: usize = 1000;
 
 /// Family/child ordering only; it never changes a disjunction or a proof bound.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum NetworkBranchingPolicy {
-    /// Existing shared-resource/assignment-first policy with lower children first.
+    /// Prefer fractional route counts, then use shared-resource/assignment fallback;
+    /// commit count children upward first, matching the recovered native control.
     #[default]
-    ResourceFirst,
-    /// Network route counts first, upper children first, as in the recovered
-    /// public native controls. Other model/backend settings can change the tree.
     MultiplicityFirst,
+    /// Existing shared-resource/assignment-first policy with lower children first.
+    ResourceFirst,
+    /// Evaluate registered original generators and fallback families together
+    /// through the recovered phased scoring/history mechanisms.
+    NativePhased,
 }
 
 impl NetworkBranchingPolicy {
@@ -23,9 +29,93 @@ impl NetworkBranchingPolicy {
         match value {
             "resource-first" => Ok(Self::ResourceFirst),
             "multiplicity-first" => Ok(Self::MultiplicityFirst),
+            "native-phased" => Ok(Self::NativePhased),
             _ => Err(invalid(
-                "network branching must be resource-first or multiplicity-first",
+                "network branching must be resource-first, multiplicity-first or native-phased",
             )),
+        }
+    }
+}
+
+/// Assignment-tree frontier order, independent of which branch family is used.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum NetworkTreeSearchPolicy {
+    /// Native strategy 1: depth, then bound, then stable creation order.
+    #[default]
+    NativeDefault,
+    /// Process the open node with the lowest inherited bound first.
+    BestBound,
+    /// Native strategy 2: inherited integer-rounded numerical dual bound,
+    /// queued-child primal sentinels, depth, parent branch-and-price order.
+    #[serde(rename = "native-strategy-2")]
+    NativeStrategy2,
+}
+
+impl NetworkTreeSearchPolicy {
+    pub fn parse(value: &str) -> Result<Self> {
+        match value {
+            "native-default" => Ok(Self::NativeDefault),
+            "best-bound" => Ok(Self::BestBound),
+            "native-strategy-2" => Ok(Self::NativeStrategy2),
+            _ => Err(invalid(
+                "network tree search must be native-default, best-bound or native-strategy-2",
+            )),
+        }
+    }
+}
+
+/// Integer conversion used for native strategy-2 dual-bound ranking.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum NativeIntegerBoundRounding {
+    /// Native `integerValuedBound < 1`: subtract its guarded tolerance, then ceil.
+    #[default]
+    GuardedTolerance,
+    /// Native `integerValuedBound >= 1`: ceil the numerical bound directly.
+    ExactCeil,
+}
+
+/// Explicit model-family registration priorities. Defaults reuse the routing
+/// adapter preset; native models can register other priorities.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct NetworkBranchPriorities {
+    pub multiplicity: f64,
+    pub resource: f64,
+    pub assignment: f64,
+    pub master_variable: f64,
+    pub arc: f64,
+    pub window: f64,
+}
+impl Default for NetworkBranchPriorities {
+    fn default() -> Self {
+        Self {
+            multiplicity: 11.,
+            resource: 10.,
+            assignment: 3.,
+            master_variable: 1.5,
+            arc: 1.,
+            window: 1.5,
+        }
+    }
+}
+impl NetworkBranchPriorities {
+    fn validate(&self) -> Result<()> {
+        if [
+            self.multiplicity,
+            self.resource,
+            self.assignment,
+            self.master_variable,
+            self.arc,
+            self.window,
+        ]
+        .iter()
+        .all(|v| v.is_finite())
+        {
+            Ok(())
+        } else {
+            Err(invalid("finite network branch family priorities required"))
         }
     }
 }
@@ -34,6 +124,12 @@ impl NetworkBranchingPolicy {
 pub struct AssignmentTreeOptions {
     pub node: Options,
     pub branching: NetworkBranchingPolicy,
+    pub tree_search: NetworkTreeSearchPolicy,
+    /// Rounding mode for strategy-2's integer-valued dual-bound queue key.
+    pub strategy2_bound_rounding: NativeIntegerBoundRounding,
+    /// Number of nodes held in the native primary frontier before overflow.
+    pub native_open_node_limit: usize,
+    pub branch_priorities: NetworkBranchPriorities,
     /// Explicit original integer variables spanning networks and static masters.
     pub mapped_variables: Vec<MappedBranchVariable>,
     /// Phased trials rank explicit mapped generators; trial values never prune.
@@ -53,6 +149,10 @@ impl Default for AssignmentTreeOptions {
         Self {
             node: Options::default(),
             branching: NetworkBranchingPolicy::default(),
+            tree_search: NetworkTreeSearchPolicy::default(),
+            strategy2_bound_rounding: NativeIntegerBoundRounding::default(),
+            native_open_node_limit: NATIVE_OPEN_NODE_LIMIT,
+            branch_priorities: NetworkBranchPriorities::default(),
             mapped_variables: vec![],
             mapped_strong_branching: Some(crate::master::tree::StrongBranchingOptions::default()),
             node_limit: 10000,
@@ -74,6 +174,8 @@ pub struct AssignmentTreeOutput {
     pub routes: Vec<FixedRoute>,
     pub master_values: Vec<(i32, f64)>,
     pub nodes: usize,
+    /// Nodes selected from the frontier, including nodes closed by bound before an LP solve.
+    pub processed_nodes: usize,
     pub strong_branching_trials: usize,
     pub mapped_history_ranked: usize,
     pub mapped_branch_evaluations: Vec<MappedBranchEvaluation>,
@@ -85,6 +187,383 @@ pub struct AssignmentTreeOutput {
     pub enumerated_mip_nodes: usize,
     pub enumerated_mip_failures: usize,
     pub enumeration_reports: Vec<EnumerationReport>,
+}
+
+struct QueuedNode<const D: usize> {
+    node: NodeSnapshot<D>,
+    serial: u64,
+    branch_order: i32,
+    parent_branch_order: i32,
+    strategy2_dual_bound: f64,
+}
+
+#[derive(Clone, Copy)]
+enum HeapOrder {
+    NativePrimary,
+    NativeSecondary,
+    NativeStrategy2,
+    BestBound,
+}
+
+fn native_queue_bound(value: f64) -> f64 {
+    if value == f64::NEG_INFINITY {
+        -1e12
+    } else if value == f64::INFINITY {
+        1e12
+    } else {
+        value
+    }
+}
+
+fn native_bound_less(left: f64, right: f64) -> bool {
+    let left = native_queue_bound(left);
+    let right = native_queue_bound(right);
+    let epsilon = 1e-6 + 1e-10 * left.abs().max(right.abs());
+    left < right - epsilon
+}
+
+/// Strategy 2 uses the native node's integer-rounded secondary dual bound.
+/// BALDES keeps the underlying numerical LP bound separately from its
+/// controller-certified bound, so the native queue key is derived from the
+/// numerical channel and never from certification metadata.
+fn native_strategy2_bound<const D: usize>(
+    node: &NodeSnapshot<D>,
+    rounding: NativeIntegerBoundRounding,
+) -> f64 {
+    native_strategy2_bound_values(node.warm.numerical_bound, node.warm.bound, rounding)
+}
+
+fn native_strategy2_bound_values(
+    numerical_bound: f64,
+    selected_bound: f64,
+    rounding: NativeIntegerBoundRounding,
+) -> f64 {
+    let bound = if numerical_bound.is_finite() {
+        numerical_bound
+    } else {
+        selected_bound
+    };
+    if !bound.is_finite() {
+        return native_queue_bound(bound);
+    }
+    if bound.abs() >= 4_503_599_627_370_496. {
+        return bound;
+    }
+    match rounding {
+        NativeIntegerBoundRounding::GuardedTolerance => {
+            let epsilon = 1e-6 + 1e-10 * bound.abs();
+            (bound - epsilon).ceil()
+        }
+        NativeIntegerBoundRounding::ExactCeil => bound.ceil(),
+    }
+}
+
+#[derive(Clone, Copy)]
+struct NativeStrategy2Key {
+    dual_bound: f64,
+    depth: usize,
+    parent_branch_order: i32,
+    serial: u64,
+}
+
+/// Native operator< reports lower queue priority first.
+fn native_strategy2_less(left: NativeStrategy2Key, right: NativeStrategy2Key) -> bool {
+    if native_bound_less(left.dual_bound, right.dual_bound) {
+        return false;
+    }
+    if native_bound_less(right.dual_bound, left.dual_bound) {
+        return true;
+    }
+    if left.depth != right.depth {
+        return left.depth < right.depth;
+    }
+    if left.parent_branch_order != right.parent_branch_order {
+        return left.parent_branch_order > right.parent_branch_order;
+    }
+    left.serial >= right.serial
+}
+
+struct NativeHeap<const D: usize> {
+    nodes: Vec<QueuedNode<D>>,
+    order: HeapOrder,
+}
+
+impl<const D: usize> NativeHeap<D> {
+    fn new(order: HeapOrder) -> Self {
+        Self {
+            nodes: Vec::new(),
+            order,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
+    /// Returns true when `left` has lower queue priority than `right`, exactly
+    /// following the native pairwise bound predicate and short-circuit order.
+    fn less(&self, left: &QueuedNode<D>, right: &QueuedNode<D>) -> bool {
+        let left_depth = left.node.state.node_depth;
+        let right_depth = right.node.state.node_depth;
+        if matches!(self.order, HeapOrder::NativeStrategy2) {
+            // A native child initializes both primal-bound tie fields to the
+            // objective-sense sentinel and they stay equal until evaluation.
+            return native_strategy2_less(
+                NativeStrategy2Key {
+                    dual_bound: left.strategy2_dual_bound,
+                    depth: left_depth,
+                    parent_branch_order: left.parent_branch_order,
+                    serial: left.serial,
+                },
+                NativeStrategy2Key {
+                    dual_bound: right.strategy2_dual_bound,
+                    depth: right_depth,
+                    parent_branch_order: right.parent_branch_order,
+                    serial: right.serial,
+                },
+            );
+        }
+        if !matches!(self.order, HeapOrder::BestBound) && left_depth != right_depth {
+            return left_depth < right_depth;
+        }
+        let left_bound = left.node.warm.bound;
+        let right_bound = right.node.warm.bound;
+        if native_bound_less(left_bound, right_bound) {
+            return false;
+        }
+        if native_bound_less(right_bound, left_bound) {
+            return true;
+        }
+        if matches!(self.order, HeapOrder::BestBound) && left_depth != right_depth {
+            return left_depth < right_depth;
+        }
+        match self.order {
+            HeapOrder::NativeSecondary => left.serial > right.serial,
+            HeapOrder::NativePrimary | HeapOrder::NativeStrategy2 | HeapOrder::BestBound => {
+                left.serial >= right.serial
+            }
+        }
+    }
+
+    fn push(&mut self, node: QueuedNode<D>) {
+        self.nodes.push(node);
+        let mut hole = self.nodes.len() - 1;
+        while hole > 0 {
+            let parent = (hole - 1) / 2;
+            if !self.less(&self.nodes[parent], &self.nodes[hole]) {
+                break;
+            }
+            self.nodes.swap(parent, hole);
+            hole = parent;
+        }
+    }
+
+    fn pop(&mut self) -> Option<QueuedNode<D>> {
+        if self.nodes.is_empty() {
+            return None;
+        }
+        let result = self.nodes.swap_remove(0);
+        let len = self.nodes.len();
+        if len == 0 {
+            return Some(result);
+        }
+        let mut hole = 0;
+        while 2 * hole + 2 < len {
+            let right = 2 * hole + 2;
+            let left = right - 1;
+            let child = if self.less(&self.nodes[right], &self.nodes[left]) {
+                left
+            } else {
+                right
+            };
+            self.nodes.swap(hole, child);
+            hole = child;
+        }
+        if 2 * hole + 1 < len {
+            let child = 2 * hole + 1;
+            self.nodes.swap(hole, child);
+            hole = child;
+        }
+        while hole > 0 {
+            let parent = (hole - 1) / 2;
+            if !self.less(&self.nodes[parent], &self.nodes[hole]) {
+                break;
+            }
+            self.nodes.swap(parent, hole);
+            hole = parent;
+        }
+        Some(result)
+    }
+}
+
+enum TreeFrontier<const D: usize> {
+    BestBound {
+        nodes: NativeHeap<D>,
+        overflow: NativeHeap<D>,
+        next_serial: u64,
+        next_branch_order: i32,
+        open_node_limit: usize,
+        strategy2_bound_rounding: NativeIntegerBoundRounding,
+    },
+    Native {
+        primary: NativeHeap<D>,
+        overflow: NativeHeap<D>,
+        next_serial: u64,
+        next_branch_order: i32,
+        open_node_limit: usize,
+        strategy2_bound_rounding: NativeIntegerBoundRounding,
+    },
+}
+
+impl<const D: usize> TreeFrontier<D> {
+    fn new(
+        policy: NetworkTreeSearchPolicy,
+        open_node_limit: usize,
+        strategy2_bound_rounding: NativeIntegerBoundRounding,
+    ) -> Self {
+        match policy {
+            NetworkTreeSearchPolicy::BestBound => Self::BestBound {
+                nodes: NativeHeap::new(HeapOrder::BestBound),
+                overflow: NativeHeap::new(HeapOrder::NativeSecondary),
+                next_serial: 0,
+                next_branch_order: 1,
+                open_node_limit,
+                strategy2_bound_rounding,
+            },
+            NetworkTreeSearchPolicy::NativeStrategy2 => Self::Native {
+                primary: NativeHeap::new(HeapOrder::NativeStrategy2),
+                overflow: NativeHeap::new(HeapOrder::NativeSecondary),
+                next_serial: 0,
+                next_branch_order: 1,
+                open_node_limit,
+                strategy2_bound_rounding,
+            },
+            NetworkTreeSearchPolicy::NativeDefault => Self::Native {
+                primary: NativeHeap::new(HeapOrder::NativePrimary),
+                overflow: NativeHeap::new(HeapOrder::NativeSecondary),
+                next_serial: 0,
+                next_branch_order: 1,
+                open_node_limit,
+                strategy2_bound_rounding,
+            },
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::BestBound {
+                nodes, overflow, ..
+            } => nodes.is_empty() && overflow.is_empty(),
+            Self::Native {
+                primary, overflow, ..
+            } => primary.is_empty() && overflow.is_empty(),
+        }
+    }
+
+    fn push(&mut self, node: NodeSnapshot<D>, parent_branch_order: i32) -> Result<()> {
+        let strategy2_bound_rounding = match self {
+            Self::BestBound {
+                strategy2_bound_rounding,
+                ..
+            }
+            | Self::Native {
+                strategy2_bound_rounding,
+                ..
+            } => *strategy2_bound_rounding,
+        };
+        let strategy2_dual_bound = native_strategy2_bound(&node, strategy2_bound_rounding);
+        match self {
+            Self::BestBound {
+                nodes,
+                overflow,
+                next_serial,
+                next_branch_order,
+                open_node_limit,
+                ..
+            } => {
+                let branch_order = *next_branch_order;
+                *next_branch_order = next_branch_order
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("native branch-and-price order overflow"))?;
+                let queued = QueuedNode {
+                    node,
+                    serial: *next_serial,
+                    branch_order,
+                    parent_branch_order,
+                    strategy2_dual_bound,
+                };
+                *next_serial = next_serial
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("network tree creation serial overflow"))?;
+                if nodes.nodes.len() < *open_node_limit {
+                    nodes.push(queued);
+                } else {
+                    overflow.push(queued);
+                }
+            }
+            Self::Native {
+                primary,
+                overflow,
+                next_serial,
+                next_branch_order,
+                open_node_limit,
+                ..
+            } => {
+                let branch_order = *next_branch_order;
+                *next_branch_order = next_branch_order
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("native branch-and-price order overflow"))?;
+                let queued = QueuedNode {
+                    node,
+                    serial: *next_serial,
+                    branch_order,
+                    parent_branch_order,
+                    strategy2_dual_bound,
+                };
+                *next_serial = next_serial
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("native tree creation serial overflow"))?;
+                if primary.nodes.len() < *open_node_limit {
+                    primary.push(queued);
+                } else {
+                    overflow.push(queued);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn pop(&mut self) -> Option<QueuedNode<D>> {
+        match self {
+            Self::BestBound {
+                nodes, overflow, ..
+            } => overflow.pop().or_else(|| nodes.pop()),
+            Self::Native {
+                primary, overflow, ..
+            } => overflow.pop().or_else(|| primary.pop()),
+        }
+    }
+
+    fn into_nodes(self) -> Vec<NodeSnapshot<D>> {
+        match self {
+            Self::BestBound {
+                nodes, overflow, ..
+            } => nodes
+                .nodes
+                .into_iter()
+                .chain(overflow.nodes)
+                .map(|queued| queued.node)
+                .collect(),
+            Self::Native {
+                primary, overflow, ..
+            } => primary
+                .nodes
+                .into_iter()
+                .chain(overflow.nodes)
+                .map(|queued| queued.node)
+                .collect(),
+        }
+    }
 }
 
 impl<const D: usize> NodeSnapshot<D> {
@@ -276,6 +755,7 @@ fn solve_split<const D: usize>(
     windows: &[time_windows::NetworkWindows],
 ) -> Result<AssignmentTreeOutput> {
     validate_options(&options.node)?;
+    options.branch_priorities.validate()?;
     if let Some(strong) = &options.mapped_strong_branching {
         model_strong::validate(strong)?;
     }
@@ -290,10 +770,13 @@ fn solve_split<const D: usize>(
     match &start {
         Start::Fresh(problem, variables) => model_mapping::validate::<D>(
             &options.mapped_variables,
-            problem
-                .networks
-                .iter()
-                .map(|n| (n.id, n.graph.arcs.iter().map(|a| a.id).collect())),
+            problem.networks.iter().map(|n| {
+                (
+                    n.id,
+                    n.graph.arcs.iter().map(|a| a.id).collect(),
+                    n.graph.original_max_arcs(),
+                )
+            }),
             variables,
         )?,
         Start::Snapshot(node) => model_mapping::validate::<D>(
@@ -302,6 +785,7 @@ fn solve_split<const D: usize>(
                 (
                     o.network.id,
                     o.network.graph.arcs.iter().map(|a| a.id).collect(),
+                    o.network.graph.original_max_arcs(),
                 )
             }),
             &node.state.master_variables,
@@ -345,6 +829,7 @@ fn solve_split<const D: usize>(
         routes: vec![],
         master_values: vec![],
         nodes: 0,
+        processed_nodes: 0,
         strong_branching_trials: 0,
         mapped_history_ranked: 0,
         mapped_branch_evaluations: vec![],
@@ -375,21 +860,41 @@ fn solve_split<const D: usize>(
         Start::Fresh(problem, variables) => {
             solve_with_master_variables(problem, variables, configured)?
         }
-        Start::Snapshot(node) => node.solve(configured)?,
+        Start::Snapshot(mut node) => {
+            node.state.mapped_lineage = 0;
+            node.solve(configured)?
+        }
     };
+    let base_depth = root.snapshot.state.node_depth;
+    let mut subtree_history = options
+        .mapped_strong_branching
+        .as_ref()
+        .filter(|s| s.use_history_subtree_size)
+        .map(|_| crate::master::tree::strong::SubtreeHistory::new());
     let mut current = Some(root);
-    let mut pending: Vec<NodeSnapshot<D>> = vec![];
+    let mut pending = TreeFrontier::new(
+        options.tree_search,
+        options.native_open_node_limit,
+        options.strategy2_bound_rounding,
+    );
+    let mut current_branch_order = -1;
     let mut unresolved = None;
     let mut mapped_history = model_strong::History::default();
     loop {
         let output = if let Some(output) = current.take() {
+            result.processed_nodes += 1;
             output
         } else {
             if pending.is_empty() {
                 result.status = TreeStatus::Optimal;
                 break;
             }
-            if result.nodes >= options.node_limit {
+            let limited_nodes = match options.tree_search {
+                NetworkTreeSearchPolicy::BestBound => result.nodes,
+                NetworkTreeSearchPolicy::NativeDefault
+                | NetworkTreeSearchPolicy::NativeStrategy2 => result.processed_nodes,
+            };
+            if limited_nodes >= options.node_limit {
                 result.status = TreeStatus::NodeLimit;
                 break;
             }
@@ -398,14 +903,16 @@ fn solve_split<const D: usize>(
                 result.status = TreeStatus::TimeLimit;
                 break;
             }
-            let best = (0..pending.len())
-                .min_by(|&a, &b| pending[a].warm.bound.total_cmp(&pending[b].warm.bound))
-                .unwrap();
-            let node = pending.swap_remove(best);
-            if node.warm.bound >= result.incumbent - options.tolerance {
+            let queued = pending.pop().expect("nonempty frontier was checked");
+            current_branch_order = queued.branch_order;
+            result.processed_nodes += 1;
+            if queued.node.warm.bound >= result.incumbent - options.tolerance {
+                if let Some(history) = &mut subtree_history {
+                    history.close(queued.node.state.mapped_lineage);
+                }
                 continue;
             }
-            node.solve(node_options(remaining))?
+            queued.node.solve(node_options(remaining))?
         };
         result.nodes += 1;
         result.iterations += output.master.iterations;
@@ -423,6 +930,10 @@ fn solve_split<const D: usize>(
             .enumeration_reports
             .push(output.snapshot.enumeration_report().clone());
         let bound = output.master.bound;
+        let lineage = output.snapshot.state.mapped_lineage;
+        mapped_history.completed_estimate = subtree_history
+            .as_ref()
+            .and_then(|h| h.mean(output.snapshot.state.node_depth.saturating_sub(base_depth)));
         // The whole original-flow relaxation proves LP infeasibility without
         // integer rounding. Complete-master integer deductions retain their
         // explicitly requested integer-domain policy.
@@ -430,6 +941,9 @@ fn solve_split<const D: usize>(
         if preprocessing.propagation.infeasible
             && (!preprocessing.complete_domain || options.node.preprocessing.integer_domains)
         {
+            if let Some(history) = &mut subtree_history {
+                history.close(lineage);
+            }
             continue;
         }
         if let Some(configured) = &options.enumerated_mip {
@@ -486,6 +1000,9 @@ fn solve_split<const D: usize>(
                         // becomes a directed-arithmetic publication certificate.
                         if options.node.cg.bound_mode == cg::BoundMode::Numerical {
                             if mip.mip.status == MipStatus::Infeasible {
+                                if let Some(history) = &mut subtree_history {
+                                    history.close(lineage);
+                                }
                                 continue;
                             }
                             if matches!(
@@ -494,6 +1011,9 @@ fn solve_split<const D: usize>(
                             ) && result.incumbent.is_finite()
                                 && mip.mip.bound >= result.incumbent - options.tolerance
                             {
+                                if let Some(history) = &mut subtree_history {
+                                    history.close(lineage);
+                                }
                                 continue;
                             }
                         }
@@ -505,6 +1025,18 @@ fn solve_split<const D: usize>(
                 }
             }
         }
+        if output.master.status == cg::Status::Infeasible
+            && output
+                .master
+                .feasibility
+                .iter()
+                .any(|r| r.certified_infeasible)
+        {
+            if let Some(history) = &mut subtree_history {
+                history.close(lineage);
+            }
+            continue;
+        }
         if output.master.status != cg::Status::Optimal {
             result.status = if output.master.status == cg::Status::TimeLimit {
                 TreeStatus::TimeLimit
@@ -515,6 +1047,9 @@ fn solve_split<const D: usize>(
             break;
         }
         if bound >= result.incumbent - options.tolerance {
+            if let Some(history) = &mut subtree_history {
+                history.close(lineage);
+            }
             continue;
         }
         if let Some((objective, routes, master_values)) =
@@ -526,6 +1061,9 @@ fn solve_split<const D: usize>(
                 result.master_values = master_values;
             }
             if bound >= result.incumbent - options.tolerance {
+                if let Some(history) = &mut subtree_history {
+                    history.close(lineage);
+                }
                 continue;
             }
         }
@@ -534,27 +1072,72 @@ fn solve_split<const D: usize>(
         } else {
             None
         };
-        let children = if count_children.is_some() {
+        let children = if options.branching == NetworkBranchingPolicy::NativePhased {
+            let proposals = proposals::collect(&output, &options, windows)?;
+            if let Some(mut children) = model_strong::choose_proposals(
+                &output,
+                &options,
+                &mut mapped_history,
+                result.incumbent,
+                deadline,
+                proposals,
+            )? {
+                children.reverse();
+                Some(children)
+            } else {
+                branching::children(
+                    &output,
+                    options.tolerance,
+                    NetworkBranchingPolicy::ResourceFirst,
+                    windows,
+                    &[],
+                )?
+            }
+        } else if count_children.is_some() {
             count_children
-        } else if let Some(children) = model_strong::choose(
+        } else if let Some(mut children) = model_strong::choose(
             &output,
             &options,
             &mut mapped_history,
             result.incumbent,
             deadline,
         )? {
+            if options.branching == NetworkBranchingPolicy::MultiplicityFirst {
+                children.reverse();
+            }
             Some(children)
         } else {
             branching::children(&output, options.tolerance, options.branching, windows, &[])?
         };
         if let Some(mut children) = children {
-            for child in &mut children {
-                child.state.node_depth = output.snapshot.state.node_depth.saturating_add(1);
+            if children.len() != 2 {
+                return Err(invalid("network branch proposal must have two children"));
             }
-            pending.extend(children);
+            let lineages = subtree_history
+                .as_mut()
+                .map(|h| h.split(lineage))
+                .unwrap_or([0; 2]);
+            for (side, child) in children.iter_mut().enumerate() {
+                child.state.node_depth = output.snapshot.state.node_depth.saturating_add(1);
+                child.state.mapped_lineage = lineages[side];
+            }
+            for child in children {
+                pending.push(child, current_branch_order)?;
+            }
         } else {
             unresolved = Some(bound);
             break;
+        }
+    }
+    result.pricing_calls += mapped_history.pricing_calls;
+    result.iterations += mapped_history.iterations;
+    for (id, calls) in mapped_history.oracle_calls {
+        if let Some((_, total)) = result
+            .oracle_calls
+            .iter_mut()
+            .find(|(network, _)| *network == id)
+        {
+            *total += calls;
         }
     }
     result.strong_branching_trials = mapped_history.trials;
@@ -562,7 +1145,16 @@ fn solve_split<const D: usize>(
     result.mapped_branch_evaluations = mapped_history.evaluations;
     // A frontier node already covered by the incumbent's bound is closed even
     // if its LP was not re-solved. Unknown bounds remain negative infinity.
-    pending.retain(|node| node.warm.bound < result.incumbent - options.tolerance);
+    let mut pending = pending.into_nodes();
+    pending.retain(|node| {
+        let keep = node.warm.bound < result.incumbent - options.tolerance;
+        if !keep {
+            if let Some(history) = &mut subtree_history {
+                history.close(node.state.mapped_lineage);
+            }
+        }
+        keep
+    });
     result.open_nodes = pending.len() + usize::from(unresolved.is_some());
     result.bound = pending
         .iter()
@@ -578,3 +1170,7 @@ fn solve_split<const D: usize>(
     }
     Ok(result)
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/master/mp/tree_search_tests.rs"]
+mod tree_search_tests;

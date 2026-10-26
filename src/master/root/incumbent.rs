@@ -140,7 +140,7 @@ fn exact_route_feasibility_using<const D: usize>(
     }
     if g.source == g.sink
         || g.sink >= g.vertices.len()
-        || route.arcs.len() >= g.vertices.len()
+        || route.arcs.len() > g.original_max_arcs()
         || route.nodes.len() != route.arcs.len().checked_add(1)?
         || route.nodes.first().copied() != Some(i32::try_from(g.source).ok()?)
     {
@@ -166,6 +166,10 @@ fn exact_route_feasibility_using<const D: usize>(
     }
     let mut at = g.source;
     let mut visited = HashSet::new();
+    let mut groups = HashSet::new();
+    if g.has_explicit_elementarity_groups() {
+        groups.extend(g.vertices[g.source].elements.iter().copied());
+    }
     for (position, &id) in route.arcs.iter().enumerate() {
         let Some(index) = problem.arc_position(id) else {
             return Some(false);
@@ -179,8 +183,16 @@ fn exact_route_feasibility_using<const D: usize>(
         {
             return Some(false);
         }
+        if g.has_explicit_elementarity_groups() {
+            let mut transition_elements = HashSet::new();
+            for &element in arc.elements.iter().chain(&g.vertices[arc.head].elements) {
+                if transition_elements.insert(element) && !groups.insert(element) {
+                    return Some(false);
+                }
+            }
+        }
         let head = g.vertices.get(arc.head)?;
-        if arc.head != g.sink && !visited.insert(arc.head) {
+        if arc.head != g.sink && !visited.insert(arc.head) && g.max_route_arcs().is_none() {
             return Some(false);
         }
         for (r, value) in resources.iter_mut().enumerate().take(g.resources.len()) {
@@ -246,7 +258,7 @@ fn exact_route_feasibility_using<const D: usize>(
             return Some(false);
         }
     }
-    Some(at == g.sink && !visited.is_empty())
+    Some(at == g.sink)
 }
 
 pub(super) fn validated_upper<const D: usize>(

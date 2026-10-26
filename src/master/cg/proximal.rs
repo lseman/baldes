@@ -5,6 +5,8 @@ use crate::master::stabilization::proximal::{ProximalParameters, ProximalSnapsho
 #[derive(Clone, Debug)]
 pub struct ProximalWarmStart {
     pub snapshot: ProximalSnapshot,
+    /// Actual branch depth at capture; geometry-only row changes are separate.
+    node_depth: usize,
     parameters: ProximalParameters,
     senses: Vec<RowSense>,
     rhs: Vec<f64>,
@@ -40,6 +42,7 @@ impl ProximalWarmStart {
         parameters: &ProximalParameters,
         artificials: &[usize],
         cut_artificials: &[(usize, usize)],
+        node_depth: usize,
     ) -> Result<Option<Self>> {
         let Some(snapshot) = state.snapshot() else {
             return Ok(None);
@@ -53,6 +56,7 @@ impl ProximalWarmStart {
         }
         Ok(Some(Self {
             snapshot,
+            node_depth,
             parameters: parameters.clone(),
             senses: master.senses().to_vec(),
             rhs: master.rhs().to_vec(),
@@ -69,6 +73,7 @@ impl ProximalWarmStart {
         master: &M,
         controller: &C,
         parameters: &ProximalParameters,
+        node_depth: usize,
     ) -> Result<Option<ProximalSnapshot>> {
         if !same_parameters(&self.parameters, parameters) {
             return Ok(None);
@@ -112,7 +117,8 @@ impl ProximalWarmStart {
         } else {
             return Ok(None);
         }
-        if self.child && parameters.curvature.is_none() && !parameters.multi_point {
+        if node_depth > self.node_depth && parameters.curvature.is_none() && !parameters.multi_point
+        {
             if let Some(baseline) = snapshot.explicit_baseline {
                 let outer = baseline * (parameters.child_half_interval_factor as f32 as f64);
                 if !outer.is_finite()

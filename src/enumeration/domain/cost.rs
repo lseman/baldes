@@ -35,6 +35,7 @@ impl<'g, const D: usize> CostBoundedResourceRelaxation<'g, D> {
         let data = collect_paths_with_clock_and_cost(
             graph,
             limits,
+            false,
             extend_resource_lower_bounds,
             |arcs, lower_resources| RelaxedResourcePath {
                 arcs,
@@ -95,10 +96,11 @@ impl<'a> CostPruning<'a> {
         reserve(&mut suffix, n)?;
         suffix.resize(n, None);
         suffix[graph.sink] = Some(0.);
-        // Synchronous at-most-k walk relaxation. Every simple suffix has at
-        // most n-1 arcs. Negative cycles only loosen this finite lower bound;
+        // Synchronous at-most-k walk relaxation: n-1 for physical-simple
+        // routes, or the declared finite walk bound. Negative cycles only
+        // loosen this finite lower bound;
         // no nonnegative-cost or acyclic-graph assumption is needed.
-        for _ in 1..n {
+        for _ in 0..graph.original_max_arcs() {
             budget.spend(n)?;
             let mut next = vec![];
             reserve(&mut next, n)?;

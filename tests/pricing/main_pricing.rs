@@ -264,8 +264,7 @@ fn arc_elements_are_checked_and_remembered() {
             (1, 3, 1., 0.),
         ],
     );
-    g.elementary = true;
-    g.arcs[0].elements.push(2);
+    g.add_arc_elementarity_set(&[0, 1]).unwrap();
     assert_eq!(
         price(&g, &Controls::default()).unwrap().columns[0].nodes,
         [0, 1, 3]

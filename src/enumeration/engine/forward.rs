@@ -10,6 +10,11 @@ impl<const D: usize> Enumeration<D> {
         cuts: Option<CutTables>,
     ) -> Result<Self> {
         g.validate()?;
+        let effective = controls.for_graph(g)?;
+        let controls = &effective;
+        if let Some(walk) = g.walk_memory_relaxation() {
+            return Self::run(&walk, grid, controls, cuts);
+        }
         if controls.label_limit == 0 || controls.path_limit == 0 || !controls.cutoff.is_finite() {
             return Err(invalid("invalid enumeration controls"));
         }
@@ -85,6 +90,11 @@ impl<const D: usize> Enumeration<D> {
             for arc in &grid.forward.buckets[v][bucket].arcs {
                 let from = &labels.arena[from_id];
                 let physical = &g.arcs[arc.physical];
+                if g.max_route_arcs().is_some()
+                    && (physical.head == g.source || physical.tail == g.sink)
+                {
+                    continue;
+                }
                 let mut next = from.clone_without_coupled();
                 next.parent = Some(from.id);
                 next.arc = Some(arc.physical);
