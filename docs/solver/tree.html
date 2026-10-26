@@ -97,6 +97,10 @@ HiGHS over a complete enumerated universe.</li>
 a branching candidate and create children. Strong trials and diving use
 isolated evaluations.</li>
 </ol>
+<p>With multiple time windows, <code>options.branching.time_window_selection</code> runs the
+tree on window copies of the arcs and branches on time-window selection counts
+after arc flows; see
+<a href="../extensions/multi-time-windows.html#branching-on-time-window-selection">branching on time-window selection</a>.</p>
 <p>Time limits are cooperative across solver operations. A backend call can
 finish after its requested budget. Limits preserve bounds for unfinished nodes.</p>
 <p><code>options.root.bound_mode</code> selects <code>BoundMode::Numerical</code> by default, or

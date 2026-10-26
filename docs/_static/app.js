@@ -87,6 +87,17 @@
           animations.push(nodes[route * size + index].animate([
             { opacity:.3 }, { opacity:1 }
           ], { duration:250, delay:delay + distance * 3, fill:'backwards' }));
+          // A ring spreads from the customer as the vehicle arrives.
+          const ping = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          ping.setAttribute('cx', point[0]);
+          ping.setAttribute('cy', point[1]);
+          ping.setAttribute('r', '13');
+          ping.setAttribute('class', `customer-ping route-${route}`);
+          ping.style.opacity = '0';
+          vehicles.append(ping);
+          animations.push(ping.animate([
+            { r:13, opacity:.75 }, { r:30, opacity:0 }
+          ], { duration:700, delay:delay + distance * 3, easing:'ease-out' }));
         });
         delay += duration + 180;
       });
@@ -136,6 +147,37 @@
     });
     syncDemo();
     update();
+  }
+  // Tilted hero card: follow the pointer on fine-pointer screens, rest otherwise.
+  const card = document.querySelector('.hero .route-card');
+  const stage = document.querySelector('.route-stage');
+  if (card && stage) {
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const fine = window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 761px)');
+    let frame;
+    const rest = () => {
+      cancelAnimationFrame(frame);
+      card.classList.remove('is-tracking');
+      ['--tilt-x', '--tilt-y', '--glare-x', '--glare-y'].forEach(name => card.style.removeProperty(name));
+      card.style.setProperty('--glare', '0');
+    };
+    stage.addEventListener('pointermove', event => {
+      if (still.matches || !fine.matches || event.pointerType !== 'mouse') return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const box = card.getBoundingClientRect();
+        const x = Math.min(Math.max((event.clientX - box.left) / box.width, 0), 1);
+        const y = Math.min(Math.max((event.clientY - box.top) / box.height, 0), 1);
+        card.classList.add('is-tracking');
+        card.style.setProperty('--tilt-y', `${((x - .5) * 18 - 8).toFixed(2)}deg`);
+        card.style.setProperty('--tilt-x', `${((.5 - y) * 12 + 4).toFixed(2)}deg`);
+        card.style.setProperty('--glare-x', `${(x * 100).toFixed(1)}%`);
+        card.style.setProperty('--glare-y', `${(y * 100).toFixed(1)}%`);
+        card.style.setProperty('--glare', '1');
+      });
+    });
+    stage.addEventListener('pointerleave', rest);
+    still.addEventListener('change', rest);
   }
   const status = document.createElement('p');
   status.className = 'sr-only';

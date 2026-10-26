@@ -87,6 +87,47 @@ in this example is effectively [16, 18]. Without the build feature the JSON fiel
 is rejected as unknown, rather than silently ignored. Solomon and CVRPLIB file
 formats retain their existing input semantics; use the graph API or network JSON
 for disjoint windows.</p>
+<h2 id="branching-on-time-window-selection">Branching on time-window selection</h2>
+<p>Both trees can branch on the number of times each time window of a vertex is
+selected, following Li et al. (2020, <em>Transportation Research Part E</em> 140,
+101955, Section 6.3). Enable it with the time resource:</p>
+<div class="code-block"><div class="code-heading"><span>Rust</span></div><pre><code class="language-rust"><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">tree</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">tree</span><span class="p">::</span><span class="n">TreeOptions</span><span class="p">::</span><span class="n">default</span><span class="p">();</span>
+<span class="n">tree</span><span class="p">.</span><span class="n">branching</span><span class="p">.</span><span class="n">time_window_selection</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">          </span><span class="c1">// routing tree</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">network</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">baldes</span><span class="p">::</span><span class="n">master</span><span class="p">::</span><span class="n">mp</span><span class="p">::</span><span class="n">AssignmentTreeOptions</span><span class="p">::</span><span class="n">default</span><span class="p">();</span>
+<span class="n">network</span><span class="p">.</span><span class="n">time_window_selection</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">                 </span><span class="c1">// network tree</span>
+</code></pre></div>
+<p>Every arc into a vertex with two or more windows on that resource is copied
+once per window (<code>Graph::split_time_window_arcs</code>); a copy's head bound is its
+window, so a route entering through it starts service in that window and waits
+for it when necessary. The selection count of window <code>w</code> of vertex <code>i</code> is the
+flow on the copies for <code>(i, w)</code>. Pricing charges branching duals per copy, so
+every window choice stays reachable under any duals; earliest-window labeling
+on the unsplit graph cannot generate a route that waits for a later window.
+Reported routes use the input arc IDs.</p>
+<p>The branching order and children follow the paper:</p>
+<ol>
+<li>Arc flows are branched on summed over each input arc's copies, as the
+paper's flow between two customers; single copies are never branched on.</li>
+<li>A fractional count, the one closest to one half, gets <code>count &lt;= floor</code> and
+<code>count &gt;= ceil</code> children. The right child also allows only window <code>w</code>: the
+other windows of <code>i</code> are fixed to zero where every visit must use one window,
+namely unit-cover customers (the routing tree and unit shared rows) and
+members of synchronized services. Other multi-visit vertices keep only the
+count row, since forcing one window there would cut off feasible solutions.</li>
+<li>With every count integral, a synchronized member that selects several
+windows has one of them, chosen pseudo-randomly but reproducibly, forbidden
+in the left child and forced in the right child.</li>
+</ol>
+<p>In the routing tree the counts form their own family below arc flow
+(<code>BranchPriorities::time_window_selection</code>, default 0.5). Forbidden windows are
+removed rather than penalized: preprocessing bounds their copies to zero, which
+removes them from pricing and fixes columns that use them.</p>
+<p>The network tree adds one extension after the paper's rules. Members of a
+synchronized service may sit in different networks with different window sets;
+when two selected windows cannot share a start within the service domain, one
+child forbids each. The service's start-domain split follows. The network tree
+supports the option only for a fresh problem, not from a snapshot.</p>
 <h2 id="implementation-and-validation">Implementation and validation</h2>
 <p>Forward transitions choose the first admissible value at or after arrival;
 backward transitions search from the last interval and clip at the head before
@@ -126,6 +167,6 @@ with repository warnings.</p>
 <nav class="page-turn" aria-label="Adjacent guides"><a href="coupled-resources.html"><small>Previous guide</small>Coupled resources <span aria-hidden="true">↗</span></a><a href="column-imports.html"><small>Next guide</small>Finite column imports <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#python-and-network-json">Python and network JSON</a><a class="toc-level-2" href="#implementation-and-validation">Implementation and validation</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#python-and-network-json">Python and network JSON</a><a class="toc-level-2" href="#branching-on-time-window-selection">Branching on time-window selection</a><a class="toc-level-2" href="#implementation-and-validation">Implementation and validation</a></nav></aside>
 </div>
 </body></html>

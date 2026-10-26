@@ -147,8 +147,8 @@ infinity. Synchronization definitions are solve options, not fields in
 </tr>
 <tr>
 <td><code>network_branching</code></td>
-<td><code>&quot;resource-first&quot;</code></td>
-<td><code>resource-first</code> or <code>multiplicity-first</code> branching order</td>
+<td><code>&quot;multiplicity-first&quot;</code></td>
+<td><code>multiplicity-first</code>, <code>resource-first</code> or <code>native-phased</code> branching policy</td>
 </tr>
 <tr>
 <td><code>stabilize</code></td>
@@ -369,9 +369,13 @@ from route arc costs and remove ordinary unit-cover rows for this job.</p>
 </code></pre></div>
 <p>The synchronized resource must be disposable with nonnegative consumption.
 Put service duration on outgoing arcs. Start bounds are inclusive integers in
-<code>[-2**52, 2**52]</code>; the unit determines the time grid. Participating coupled
-resources and resource-load rows on that axis are rejected. Root LP columns need
-not form a synchronized schedule; the tree validates the joint integer witness.</p>
+<code>[-2**52, 2**52]</code>; the unit determines the time grid. The synchronized axis is
+a graph scalar resource; separate coupled resources may coexist. Resource-load
+rows on the same axis are refreshed when synchronized start domains change.
+The single-network root master accepts bounded walks without cuts; root cut
+families require a hard vertex elementarity group on every interior vertex.
+Root LP columns need not form a synchronized schedule; the tree validates the
+joint integer witness.</p>
 <p>A snapshot's service definitions are immutable. Narrow a start domain with
 <code>with_synchronized_start(id, lower, upper)</code>; parents remain reusable. Complete
 MIP is deferred while common start domains are non-singleton. The
