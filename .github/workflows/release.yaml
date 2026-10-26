@@ -1,0 +1,174 @@
+name: Python distributions
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - '.github/workflows/release.yaml'
+      - '.github/scripts/check_release.py'
+      - 'tests/release/**'
+      - 'pyproject.toml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'build.rs'
+      - 'src/**'
+      - 'python/**'
+      - 'vendor/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-distributions-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  # Distributed wheels must not require the build host's CPU instruction set.
+  RUSTFLAGS: ''
+
+jobs:
+  version:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate versions and tag
+        env:
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          python -m unittest discover -s tests/release -p 'test_*.py'
+          if [ -n "$RELEASE_TAG" ]; then
+            python .github/scripts/check_release.py --tag "$RELEASE_TAG"
+          else
+            python .github/scripts/check_release.py
+          fi
+
+  wheels:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            manylinux: '2014'
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            manylinux: '2014'
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            manylinux: auto
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            manylinux: auto
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Build portable stable-ABI wheel from source distribution
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --locked --strip --sdist --out dist -i python3.9
+      - name: Test installed wheel on oldest supported Python
+        run: |
+          python -m pip install pytest dist/*.whl
+          cd "$RUNNER_TEMP"
+          python -m pytest --import-mode=importlib "$GITHUB_WORKSPACE/python/tests"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Test installed wheel on current Python
+        run: |
+          python -m pip install pytest dist/*.whl
+          cd "$RUNNER_TEMP"
+          python -m pytest --import-mode=importlib "$GITHUB_WORKSPACE/python/tests"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.target }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  sdist:
+    needs: version
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  pypi:
+    name: Publish Python distributions to PyPI
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [wheels, sdist]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Verify publishing credential
+        env:
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -z "$PYPI_API_TOKEN" ]; then
+            echo 'Missing repository secret PYPI_API_TOKEN' >&2
+            exit 1
+          fi
+      - name: Publish wheels and source distribution
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: dist/
+          attestations: false
+          skip-existing: true
+
+  release:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [pypi]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create checksums and publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          cd dist
+          sha256sum *.whl *.tar.gz > SHA256SUMS
+          release_flags=()
+          if [[ "$RELEASE_TAG" =~ -(alpha|beta|rc)\.[0-9]+$ ]]; then
+            release_flags+=(--prerelease --latest=false)
+          fi
+          gh release create "$RELEASE_TAG" ./*.whl ./*.tar.gz SHA256SUMS \
+            --verify-tag --generate-notes "${release_flags[@]}"

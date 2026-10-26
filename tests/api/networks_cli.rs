@@ -963,24 +963,32 @@ fn original_variables_compile_once_and_report_root_and_tree_activities() {
 }
 
 #[test]
-fn original_variable_boxes_preserve_original_cost_space_under_cancellation() {
+fn original_variables_preserve_original_cost_space_with_implicit_or_explicit_boxes() {
     let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
-    let output = command()
-        .arg("solve")
-        .arg(fixtures.join("multi_network_original_cancellation.json"))
-        .arg("--original-variable-boxes")
-        .arg(fixtures.join("multi_network_original_cancellation_boxes.json"))
-        .args(["--no-stabilization", "--json", "-"])
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(result["lp"], 0.);
-    assert_eq!(result["oracle_calls"], json!([[7, 3]]));
+    for mode in ["numerical", "certified"] {
+        for explicit in [false, true] {
+            let mut cli = command();
+            cli.arg("solve")
+                .arg(fixtures.join("multi_network_original_cancellation.json"));
+            if explicit {
+                cli.arg("--original-variable-boxes")
+                    .arg(fixtures.join("multi_network_original_cancellation_boxes.json"));
+            }
+            let output = cli
+                .args(["--no-stabilization", "--bound-mode", mode, "--json", "-"])
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(result["lp"], 0.);
+            assert_eq!(result["bound"], 0.);
+            assert_eq!(result["oracle_calls"], json!([[7, 3]]));
+        }
+    }
 }
 
 #[test]

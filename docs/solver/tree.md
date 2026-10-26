@@ -3,7 +3,13 @@
 [Documentation index](../README.md) · [Branching](branching.md) ·
 [Enumerated MIP](enumerated-mip.md)
 
-The Rust tree solves a routing set-partitioning master with one pricing graph.
+The shared tree driver accepts routing registrations, explicit network models
+and imported-column adapters. Frontier selection, budgets and dispatch have one
+implementation; model hooks interpret nodes and supply branching decisions.
+This guide describes the routing registration. See [network models](models.md#assignment-tree)
+and [architecture](../guides/architecture.md) for the other input contracts.
+
+The routing registration solves a set-partitioning master with one pricing graph.
 It requires nonnegative arc costs and unique public arc IDs. The base rows are
 a fleet upper bound and one equality per customer; the tree validates this
 structure before searching.
@@ -12,7 +18,7 @@ structure before searching.
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  vrptw instances/Solomon/R101.txt --customers 10 --tree --time 60
+  solve instances/Solomon/R101.txt --customers 10 --tree --time 60
 ```
 
 `--nodes N` sets the tree node budget (default 10,000). `--json FILE` writes
@@ -44,7 +50,7 @@ A complete Rust entry point, requiring `clp`:
 
 ```rust
 use baldes::{
-    master::{root::RoutingContext, tree::{self, TreeOptions}},
+    master::{routing::{self, RoutingContext}, tree::{self, TreeOptions}},
     inputs::{Instance, Rounding},
 };
 use std::time::Duration;
@@ -121,8 +127,8 @@ for only part of the enumerated master would change the model.
 
 Set `RootOptions::capture_state = true` to retain a solved `NodeSnapshot` in
 `RootOutput::snapshot`. The tree arranges snapshot capture for its own nodes.
-Manual callers use `root::inherit_branches(parent, additional_branches, options)`
-for typed constraints, or `root::inherit` for arc-flow tuples. Supply only the
+Manual callers use `routing::inherit_branches(parent, additional_branches, options)`
+for typed constraints, or `routing::inherit` for arc-flow tuples. Supply only the
 **additional** branches; the parent already contains its ancestor rows.
 To retain the child's snapshot for another generation, enable capture on that
 solve too.
@@ -200,7 +206,7 @@ in a captured node:
 ```rust,ignore
 use baldes::master::routing::{self, FixedRoute};
 
-let child = root::inherit_fixed_routes(
+let child = routing::inherit_fixed_routes(
     parent_snapshot,
     &[FixedRoute { arcs: route_arc_ids, quantity: 1 }],
     options,

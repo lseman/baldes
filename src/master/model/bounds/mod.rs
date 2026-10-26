@@ -173,6 +173,18 @@ fn network_minimum<const D: usize>(
         Some(value) => value,
         None => return Some(None),
     };
+    // A cheap shortest walk can violate scalar windows. Refine small acyclic
+    // domains independently of numerical labeling, retaining the walk bound
+    // if complete resource-aware coverage is unavailable.
+    let allowance = (*resource_work / 4).min(100_000);
+    let mut remaining = allowance;
+    let resource_minimum = resource::dag_minimum(graph, &weights, &mut remaining, deadline);
+    *resource_work -= allowance - remaining;
+    match resource_minimum {
+        Some(Some(value)) => minimum = minimum.max(value),
+        Some(None) => return Some(None),
+        None => {}
+    }
     if !oracle.resource_groups.is_empty() {
         match resource_groups::minimum(graph, &weights, resource_work, deadline) {
             Some(Some(value)) => minimum = minimum.max(value),

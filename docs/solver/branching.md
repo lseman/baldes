@@ -33,7 +33,7 @@ priorities explicitly. Every supplied priority must be finite.
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  vrptw instances/Solomon/R101.txt --customers 10 --tree \
+  solve instances/Solomon/R101.txt --customers 10 --tree \
   --branching ryan-foster --time 60
 ```
 
@@ -135,7 +135,7 @@ parallel arcs. This is the edge variable of symmetric models. Both sources share
 the `aggregate_flow` priority, and the arc family remains the fallback.
 
 The routing tree has one pricing network, so the reference's cross-network
-aggregate membership has no counterpart here; the multi-network MP tree keeps
+aggregate membership has no counterpart here; the explicit-network tree keeps
 its own dispatcher. Edge packing sets reduce to the same disjunction: an edge
 set used fractionally by the single network is branched as its aggregate flow.
 
@@ -254,10 +254,10 @@ methods, and the add/clear methods on `Solver`. To request a split near resource
 Older builds used the supplied threshold directly. Existing callers that need
 to preserve their split must account for the offset when upgrading.
 
-`--branching hybrid` enables both new families alongside the native families.
+`--branching hybrid` enables both new families alongside the standard families.
 Vehicle count keeps its first default priority. Resource/cluster candidates
 share the next priority; assignment, Ryan–Foster and arc flow remain fallbacks.
-`native` remains the default, with both new families disabled.
+`default` remains the default, with both new families disabled.
 
 ## Branch evaluation history
 
@@ -334,6 +334,6 @@ incumbent-minus-parent gap.
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  vrptw instances/Solomon/R101.txt --customers 10 --tree \
+  solve instances/Solomon/R101.txt --customers 10 --tree \
   --branching hybrid --time 60 --json /tmp/tree.json
 ```

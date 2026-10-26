@@ -172,3 +172,74 @@ fn resource_identity_proves_a_cyclic_group_envelope() {
     assert_eq!(boxes[&7].variables[0].bounds.upper, 2.);
     assert_eq!(boxes[&7].caps[1], 2.);
 }
+
+#[test]
+fn registered_cancellation_keeps_implicit_original_coordinates_on_resume() {
+    for mode in [cg::BoundMode::Numerical, cg::BoundMode::Certified] {
+        let mut model = model();
+        model.pricing_variables[0].cost = 1.;
+        model.pricing_variables[0].integer = false;
+        let mut other = model.pricing_variables[0].clone();
+        other.id = 1;
+        other.cost = -1.;
+        model.pricing_variables.push(other);
+        let (problem, registry) = model.compile::<2>().unwrap();
+        let mut configured = options();
+        configured.cg.bound_mode = mode;
+        registry.configure_pricing(&mut configured);
+        let result = solve(problem, configured).unwrap();
+        assert_eq!(result.master.lp, 0.);
+        assert_eq!(result.master.bound, 0.);
+        assert_eq!(result.oracle_calls, vec![(7, 3)]);
+        let groups = &result.snapshot.state.grouped_variable_boxes[&7];
+        assert_eq!(groups.variables.len(), 2);
+        assert!(groups
+            .variables
+            .iter()
+            .all(|v| v.bounds.lower == 0. && v.bounds.upper == f64::INFINITY));
+        let resumed = result.snapshot.solve(options()).unwrap();
+        assert_eq!(resumed.master.lp, 0.);
+        assert_eq!(
+            resumed.snapshot.state.grouped_variable_boxes[&7]
+                .variables
+                .len(),
+            2
+        );
+    }
+}
+
+#[test]
+fn implicit_original_orthant_never_restricts_negative_graph_activity() {
+    let mut model = model();
+    model.pricing_variables[0].cost = 1.;
+    model.pricing_variables[0].integer = false;
+    model.pricing_variables[0].arcs = vec![(0, -1.), (2, -1.)];
+    let (problem, registry) = model.compile::<2>().unwrap();
+    let mut configured = options();
+    registry.configure_pricing(&mut configured);
+    let result = solve(problem, configured).unwrap();
+    assert_eq!(result.master.lp, -1.);
+    assert!(!result
+        .snapshot
+        .state
+        .grouped_variable_boxes
+        .contains_key(&7));
+    assert_eq!(registry.activity(7, 0, &result).unwrap().lower, -1.);
+}
+
+#[test]
+fn implicit_original_orthant_proves_signed_complete_path_cancellation() {
+    let mut model = model();
+    model.pricing_variables[0].cost = -1.;
+    model.pricing_variables[0].integer = false;
+    model.pricing_variables[0].arcs = vec![(0, -1.), (1, 1.), (2, -1.), (3, 1.)];
+    let (problem, registry) = model.compile::<2>().unwrap();
+    let mut configured = options();
+    registry.configure_pricing(&mut configured);
+    let result = solve(problem, configured).unwrap();
+    assert_eq!(result.master.lp, 0.);
+    let groups = &result.snapshot.state.grouped_variable_boxes[&7];
+    assert_eq!(groups.variables.len(), 1);
+    assert_eq!(groups.variables[0].bounds.lower, 0.);
+    assert_eq!(groups.variables[0].bounds.upper, f64::INFINITY);
+}

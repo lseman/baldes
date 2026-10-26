@@ -16,7 +16,13 @@ BALDES is a Rust toolkit for vehicle routing, with bucket-graph pricing,
 branch-cut-and-price, and a Hybrid Genetic Search (HGS) heuristic. Use it from
 the command line, Python through **pybaldes**, or the Rust library.
 
-It reads Solomon VRPTW and CVRPLIB CVRP instances. See the
+Routing files and explicit network models use the same master framework and
+`solve` interface. A single pricing network is a collection of length one; model
+registrations provide their own cuts and branching hooks to the shared engines.
+See the [architecture](docs/guides/architecture.md) and
+[solve guide](docs/guides/solve.md).
+
+BALDES reads Solomon VRPTW and CVRPLIB CVRP instances. See the
 [documentation](docs/README.md) for solver configuration and advanced usage.
 
 ## Performance
@@ -116,7 +122,7 @@ for route in result.routes:
 ```
 
 Route values can be fractional because this API solves the root relaxation.
-Use `problem_type="cvrp"` for capacitated routing without time windows.
+Routing constraints are inferred from the instance; `problem_type="cvrp"` explicitly selects capacity-only routing.
 
 You can also construct an `Instance` in memory, configure cuts and master
 solvers, or use the low-level `Solver` for pricing. See the
@@ -127,6 +133,9 @@ solvers, or use the low-level `Solver` for pricing. See the
 New here? Start with [Your first solve](docs/guides/first-solve.md).
 
 - [Build and installation](docs/guides/build.md)
+- [Unified solve interface](docs/guides/solve.md)
+- [Architecture and ownership](docs/guides/architecture.md)
+- [Network modeling](docs/solver/models.md)
 - [CLI usage and options](docs/guides/cli.md)
 - [pyBaldes handbook and API reference](docs/pybaldes/README.md)
 - [Branch-and-price](docs/solver/tree.md)

@@ -35,6 +35,14 @@ URLs, copies referenced images, and produces a search index. It renders before
 replacing an existing generated output. It refuses to replace non-generated
 nonempty directories. Generated HTML is not the documentation source.
 
+When source comments or Rust interfaces change, validate the generated Rust API
+links too (the backend dependencies for these features must be installed):
+
+```sh
+RUSTDOCFLAGS="-D rustdoc::broken_intra_doc_links" \
+  cargo doc -p baldes --no-deps --features clp,highs,multi-time-windows
+```
+
 To preview locally, serve the parent directory of the generated docs output and
 open the relevant `index.html`. The normal website build uses `landing/docs/`;
 its deployment workflow is [.github/workflows/landing.yaml](../../.github/workflows/landing.yaml).
@@ -43,13 +51,19 @@ A website build includes the dedicated pyBaldes section at `docs/pybaldes/index.
 ## Check claims against the interface
 
 For Python, inspect [exports](../../python/pybaldes/__init__.py),
-[routing wrappers](../../python/pybaldes/routing.py),
-[network wrappers](../../python/pybaldes/networks.py), and native bindings under
+[unified solve](../../python/pybaldes/solve.py),
+[routing data](../../python/pybaldes/routing.py),
+[network data/snapshots](../../python/pybaldes/networks.py), and native bindings under
 [python/rust/src](../../python/rust/src). Public Python features come from
 [python/rust/Cargo.toml](../../python/rust/Cargo.toml), not every root-crate feature.
 For CLI claims, inspect the command's parser/help and execute `--help` from the
 matching build. Use implementation and regression tests to verify behavior;
 a docstring or type stub alone may omit a feature gate or describe old behavior.
+
+The [architecture](architecture.md) owns the engine/adapter explanation;
+[source layout](source-layout.md) owns filesystem responsibilities;
+[solve](solve.md) owns common input normalization. The CLI and Python references
+add their registration-specific controls without introducing separate algorithms.
 
 When an API changes, update examples, defaults, return fields, and build gates
 together. In particular, refresh [pyBaldes API signatures](../pybaldes/api.md)
@@ -64,7 +78,7 @@ instead of claiming those examples ran.
 - State distance conventions, units, ID spaces, and per-arc vector ordering.
 - Show feature requirements next to optional APIs.
 - Avoid claiming complete enumeration from a truncated pool.
-- Preserve existing public documentation paths or leave a linking entry page.
+- Keep one canonical page for each contract and update all links when moving a page; do not retain obsolete split-interface guides.
 - Link every guide from a discoverable index and verify heading fragments.
 - Record machine, limits, features, repetitions, and rounding for performance claims.
 

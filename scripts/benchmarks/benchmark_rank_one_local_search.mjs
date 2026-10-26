@@ -26,7 +26,7 @@ fs.writeFileSync(path.join(out, 'metadata.json'), JSON.stringify({
 const median = values => [...values].sort((a,b) => a-b)[Math.floor(values.length/2)];
 const summaries = [];
 for (const instance of ['R103', 'R201']) {
-  const args = ['vrptw', `instances/Solomon/${instance}.txt`, '--customers', '100', '--rank1',
+  const args = ['solve', `instances/Solomon/${instance}.txt`, '--customers', '100', '--rank1',
     '--master', 'clp', '--reference-ng', '--ng', '8', '--rounding', 'none', '--no-enumeration',
     '--bound-mode', 'numerical', '--time', '120'];
   const samples = [[], []];

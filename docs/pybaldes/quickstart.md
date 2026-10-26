@@ -56,13 +56,13 @@ result = pybaldes.solve(
 print(result.status, result.numerical_bound, result.certified_bound)
 ```
 
-For a CVRPLIB file, explicitly select the capacity-only model:
+CVRPLIB input automatically selects capacity-only routing; an explicit override is optional:
 
 ```python
 from pybaldes import Instance
 
 instance = Instance.from_file("instances/cvrplib/A-n32-k5.vrp")
-result = instance.solve(problem_type="cvrp", time_limit=30)
+result = instance.solve(time_limit=30)
 ```
 
 Python defaults to the instance's distance convention. CLI routing defaults to

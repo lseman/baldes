@@ -135,7 +135,7 @@ CLI overrides are repeatable:
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  vrptw instances/Solomon/R101.txt --customers 10 \
+  solve instances/Solomon/R101.txt --customers 10 \
   --option BALDESlabelDominanceStrategy=1 --time 60
 ```
 
@@ -152,7 +152,7 @@ Run HGS for a separate, positive search budget before solving the root or tree:
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  cvrp instances/cvrplib/E-n22-k4.vrp --hgs-time 10 --hgs-columns all --tree
+  solve instances/cvrplib/E-n22-k4.vrp --hgs-time 10 --hgs-columns all --tree
 ```
 
 `--hgs-columns best` (default) inserts routes from the best feasible HGS solution.
@@ -240,7 +240,7 @@ feature (for example, `maturin develop --release --features highs`).
 In Rust, set `RootOptions::master_solver` to `MasterSolver::Highs` or
 `MasterSolver::Ipm`. For HGS seeding,
 call `instance.seed_hgs(&problem, rounding, &mut options, &HgsWarmStart { ... })`
-before passing those options to `root::solve` or `TreeOptions::root`. The types
+before passing those options to `routing::solve` or `TreeOptions::root`. The types
 `HgsWarmStart` and `HgsColumns::{Best, All, Top(n)}` are exported by `baldes::inputs`.
 The returned summary reports inserted/rejected columns and any validated
 incumbent. Existing initial columns are retained and duplicates are skipped.

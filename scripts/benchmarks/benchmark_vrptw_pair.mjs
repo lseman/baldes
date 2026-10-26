@@ -69,7 +69,7 @@ for (const name of cases) {
     for (const variant of i % 2 ? ['after', 'before'] : ['before', 'after']) {
       const stem = path.join(out, `${label}-${name}-${variant}-${i}`);
       const log = run('taskset', ['-c', affinity, binaries[variant].path,
-        'vrptw', input, ...args, '--json', `${stem}.json`]);
+        'solve', input, ...args, '--json', `${stem}.json`]);
       fs.writeFileSync(`${stem}.log`, log);
       const j = JSON.parse(fs.readFileSync(`${stem}.json`));
       const semantic = Object.fromEntries(Object.entries(j).filter(([key]) =>

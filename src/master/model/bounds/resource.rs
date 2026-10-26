@@ -85,6 +85,68 @@ pub(super) fn infeasible<const D: usize>(
     Some(lower[graph.sink].is_none())
 }
 
+/// Resource-aware lower bound over a complete DAG path relaxation. Keep each
+/// path's cost and scalar lower states together: coordinate minima from other
+/// paths cannot justify the cost of this one. Directed transitions and waiting
+/// on equality axes deliberately overapproximate the original feasible paths.
+/// Exhaustion returns unknown, never the minimum of a partially visited domain.
+pub(super) fn dag_minimum<const D: usize>(
+    graph: &Graph<D>,
+    weights: &[f64],
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<Option<f64>> {
+    if graph.has_coupled_resources()
+        || graph.resources.is_empty()
+        || weights.len() != graph.arcs.len()
+        || weights.iter().any(|c| !c.is_finite())
+    {
+        return None;
+    }
+    *work = work.checked_sub(graph.vertices.len().checked_add(graph.arcs.len())?)?;
+    if Instant::now() >= deadline || !graph.is_acyclic() {
+        return None;
+    }
+    let mut outgoing = vec![Vec::new(); graph.vertices.len()];
+    for (p, arc) in graph.arcs.iter().enumerate() {
+        outgoing[arc.tail].push(p);
+    }
+    let mut initial = [0.; D];
+    for (r, value) in initial.iter_mut().enumerate().take(graph.resources.len()) {
+        *value = graph.initial[r].unwrap_or(graph.vertices[graph.source].bounds[r].lower);
+    }
+    let mut stack = vec![(graph.source, initial, 0.)];
+    let mut minimum: Option<f64> = None;
+    while let Some((vertex, prefix, cost)) = stack.pop() {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        if vertex == graph.sink {
+            minimum = Some(minimum.map_or(cost, |old| old.min(cost)));
+            continue;
+        }
+        for &p in &outgoing[vertex] {
+            *work = work.checked_sub(graph.resources.len().checked_add(2)?)?;
+            let arc = &graph.arcs[p];
+            let mut next = prefix;
+            let mut allowed = true;
+            for r in 0..graph.resources.len() {
+                let bounds = graph.vertices[arc.head].bounds[r];
+                next[r] = add_down(prefix[r], arc.consumption[r])?.max(bounds.lower);
+                if next[r] > bounds.upper {
+                    allowed = false;
+                    break;
+                }
+            }
+            if allowed {
+                stack.push((arc.head, next, add_down(cost, weights[p])?));
+            }
+        }
+    }
+    Some(minimum)
+}
+
 /// A nonnegative scalar bounds its positive-consumption arc occurrences. The
 /// sum of such per-axis counts also bounds arcs positive on any selected axis.
 /// If arcs zero on all selected axes form a DAG, each zero block has at most

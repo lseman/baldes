@@ -46,9 +46,9 @@ pricing callback.
 
 ```rust
 use baldes::master::{
-    mp::{self, imported, MasterVariable, Options, Problem},
+    model::{self, imported, MasterVariable, Options, Problem},
     preprocessing::Bounds,
-    root::Row,
+    formulation::Row,
     RowSense,
 };
 
@@ -115,7 +115,7 @@ restrictions are replayed by this extension operation.
 Use `node.with_row(row, routing_coefficients, original_coefficients)` to add a
 shared restriction. Original coefficients are `(original_variable_id, value)`
 pairs; generated imported-column IDs are rejected. Routing coefficients use
-`mp::RowCoefficients`, with physical arc order and an optional
+`model::RowCoefficients`, with physical arc order and an optional
 once-per-route term. Omitted coordinates and routing families contribute zero.
 Coefficients must be finite and coalesced. The caller supplies a valid cut or
 branch restriction. Original-coordinate links apply the row to new imported
@@ -124,7 +124,7 @@ contribution, whether the row was added before or after fixing.
 
 `node.with_presence_row(row, presence_coefficients, original_coefficients)`
 couples nonlinear routing-event presence to original coordinates. It uses
-`mp::PresenceCoefficients`, with event lists aligned to physical
+`model::PresenceCoefficients`, with event lists aligned to physical
 arcs, and supports both pair-count and any-pair semantics. The original
 presence descriptor survives extension. Fixed routes contribute their exact
 presence coefficient before preprocessing the rebuilt model; imported vectors

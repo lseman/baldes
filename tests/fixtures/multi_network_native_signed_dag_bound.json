@@ -1,0 +1,130 @@
+{
+  "rows": [],
+  "networks": [
+    {
+      "id": 7,
+      "vertices": 5,
+      "multiplicity": [
+        0,
+        1
+      ],
+      "resources": [
+        {
+          "kind": "disposable",
+          "bounds": [
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              4
+            ]
+          ]
+        },
+        {
+          "kind": "disposable",
+          "bounds": [
+            [
+              3,
+              10
+            ],
+            [
+              3,
+              8
+            ],
+            [
+              2,
+              6
+            ],
+            [
+              4,
+              8
+            ],
+            [
+              3,
+              7
+            ]
+          ]
+        }
+      ],
+      "arcs": [
+        {
+          "tail": 0,
+          "head": 1,
+          "cost": -3.5,
+          "consumption": [
+            1.0,
+            2
+          ]
+        },
+        {
+          "tail": 0,
+          "head": 2,
+          "cost": 2.0,
+          "consumption": [
+            1.0,
+            2
+          ]
+        },
+        {
+          "tail": 1,
+          "head": 2,
+          "cost": -3.0,
+          "consumption": [
+            1.0,
+            3
+          ]
+        },
+        {
+          "tail": 1,
+          "head": 3,
+          "cost": -1.5,
+          "consumption": [
+            1.0,
+            1
+          ]
+        },
+        {
+          "tail": 2,
+          "head": 3,
+          "cost": 0.5,
+          "consumption": [
+            1.0,
+            4
+          ]
+        },
+        {
+          "tail": 2,
+          "head": 4,
+          "cost": -1.5,
+          "consumption": [
+            1.0,
+            4
+          ]
+        },
+        {
+          "tail": 3,
+          "head": 4,
+          "cost": -1.5,
+          "consumption": [
+            1.0,
+            0
+          ]
+        }
+      ]
+    }
+  ]
+}

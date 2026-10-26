@@ -780,12 +780,16 @@ def test_original_variable_boxes_survive_root_resume_and_tree(mode):
         model.solve(original_variable_boxes=({"network": 7, "id": 100, "upper": 1.},))
 
 
-def test_original_variable_box_retains_native_cost_space_under_cancellation():
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+def test_original_variables_retain_cost_space_with_implicit_or_explicit_boxes(mode):
     model = NetworkProblem.from_file(Path(__file__).resolve().parents[2] /
                                      "tests/fixtures/multi_network_original_cancellation.json")
     boxes = tuple({"network": 7, "id": i, "upper": 1.} for i in [0, 1])
-    assert model.solve(stabilize=False).oracle_calls == ((7, 0),)
-    result = model.solve(stabilize=False, original_variable_boxes=boxes)
+    implicit = model.solve(stabilize=False, bound_mode=mode)
+    assert implicit.lp == implicit.bound == 0.
+    assert implicit.oracle_calls == ((7, 3),)
+    assert implicit.snapshot.solve(stabilize=False, bound_mode=mode).lp == 0.
+    result = model.solve(stabilize=False, bound_mode=mode, original_variable_boxes=boxes)
     assert result.lp == 0.
     assert result.oracle_calls == ((7, 3),)
 

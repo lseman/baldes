@@ -238,8 +238,17 @@ pub(super) fn run<const D: usize>(
             )
         }),
     )?;
-    state.grouped_variable_boxes = grouped_boxes::prepare(
+    // Explicit stabilization bypasses variable-bound admission. Its caller's
+    // envelopes still require validation, but implicit proof work is unused.
+    state.box_pricing_admission = !options.cg.stabilize && options.cg.proximal.is_none();
+    let implicit = if state.box_pricing_admission {
+        state.original_variable_costs.as_slice()
+    } else {
+        &[]
+    };
+    state.grouped_variable_boxes = grouped_boxes::prepare_registered(
         &options.grouped_variable_boxes,
+        implicit,
         state.shared_rows.len(),
         state.oracles.iter().map(|o| {
             (
@@ -254,9 +263,6 @@ pub(super) fn run<const D: usize>(
     state.pricing_gap = (options.cg.gap_absolute, options.cg.gap_relative);
     state.integer_primal_termination = options.integer_primal_termination;
     state.witness_tolerance = options.cg.tolerance;
-    // Native function-type zero admits a separable variable-bound test before
-    // invoking the pricing solver. Explicit stabilization bypasses this test.
-    state.box_pricing_admission = !options.cg.stabilize && options.cg.proximal.is_none();
     // A resumed or modified formulation starts a fresh scan. Cached scores
     // from another node never supply coverage or a dual-bound contribution.
     state.scheduler = Scheduler::new(

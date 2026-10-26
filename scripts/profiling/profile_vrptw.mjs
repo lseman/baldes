@@ -61,7 +61,7 @@ write(`${label}-metadata.json`, {
 });
 const summary = [];
 for (const {name, input} of inputs) {
-  const args = ['vrptw', input, '--customers', String(customers),
+  const args = ['solve', input, '--customers', String(customers),
     '--master', 'clp', '--clp-scaling', clpScaling, '--reference-ng', '--ng', '8', '--rounding', 'none',
     '--rank1', '--capacity-cuts', '--no-enumeration', '--bound-mode', 'numerical', '--time', String(seconds)];
   const rows = [];

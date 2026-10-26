@@ -3,10 +3,9 @@
 `baldes::extensions::robust_pd` models the one-to-one RPDPTW in
 Abreu, Battarra, Costa and Munari, *The robust pickup and delivery problem
 with time windows*, EJOR 335 (2026), 812–828
-([paper](https://doi.org/10.1016/j.ejor.2026.03.031),
-[local PDF](../../papers/robust_pd.pdf)).
+([paper](https://doi.org/10.1016/j.ejor.2026.03.031)).
 
-The [60 original benchmark files](../../instances/RobustPDPTW/) contain
+The 60 original benchmark files in `instances/RobustPDPTW/` contain
 5–75 requests, in classes AA, BB, CC and DD. Their pinned source and hashes
 are recorded in [`scripts/data/robust_pd_manifest.json`](../../scripts/data/robust_pd_manifest.json).
 Instance files follow the repository's existing policy for local downloaded data.
@@ -33,11 +32,9 @@ routes, worst load, and worst return time. It independently replays every
 incumbent route and verifies request coverage and total objective.
 An incomplete or time-limited result is not an optimality claim.
 
-For Python/Gurobi compact formulations, the paper's RRCI/RIPEI separators,
-and a reproducible timing comparison with this native implementation, see
-[`pd_robust`](../../pd_robust/README.md). That comparison also includes a
-counterexample to the compact load equations as printed and an exact
-on-board compact baseline.
+The maintained interface is the Rust model and runnable example above. Local
+Python/Gurobi formulation experiments may live under ignored `working/`; they
+are not part of a fresh checkout or the public Python solve interface.
 
 ## Model
 
@@ -132,4 +129,4 @@ Repeating all 24 five-/ten-request settings three times now returns Optimal in
 all 72 runs, with unchanged objectives and independently replayed incumbents.
 The 21 formerly incomplete ten-request repetitions all close. Evidence and
 remaining work are tracked in
-[`internal/robust-pd`](../../internal/robust-pd/).
+local ignored `internal/robust-pd/`; these are investigation artifacts, not shipped documentation.

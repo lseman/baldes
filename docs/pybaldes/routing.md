@@ -40,8 +40,8 @@ result = instance.solve(problem_type="cvrp")
 ```
 
 `Instance.from_file(path)` accepts a string or path-like object and reads Solomon
-or CVRPLIB `.vrp` data. The caller still selects `problem_type` for solving;
-use `"cvrp"` for CVRPLIB inputs. `Instance.truncated(N)` returns a new instance
+or CVRPLIB `.vrp` data. Constraint type is inferred when solving;
+use `problem_type` only to override it. `Instance.truncated(N)` returns a new instance
 containing the first N customers plus the depot, truncating both matrix axes.
 It requires `0 < N < len(instance.customers)` and preserves the original object.
 
@@ -70,7 +70,7 @@ options below are keyword-only. The call requires a Clp-enabled build.
 
 | Keyword | Default | Behavior |
 | --- | --- | --- |
-| `problem_type` | `"vrptw"` | `"vrptw"` or `"cvrp"` |
+| `problem_type` | `None` | Infer from finite due times; `"vrptw"` or `"cvrp"` explicitly overrides it |
 | `customers` | `None` | Keep the first N customers before solving |
 | `ng` | `8` | NG neighborhood size; constrained by compiled memory |
 | `reference_ng` | `False` | Use reference nearest-customer neighborhood construction |
@@ -80,6 +80,7 @@ options below are keyword-only. The call requires a Clp-enabled build.
 | `two_path_cuts` | `False` | Enable capacity-family Kohl separation with time resource; VRPTW only |
 | `rank_one_cuts` | `False` | Enable limited-memory rank-one cuts |
 | `stabilize` | `True` | Dual-price smoothing; disabled by IPM |
+| `stabilization_max_tree_depth` | `10000` | Shared stabilization depth gate; routing Python calls solve the root |
 | `reduced_cost_fixing` | `True` | Reduced-cost fixing and route enumeration; disabling disables both |
 | `upper_bound` | `math.inf` | Supplied incumbent objective used for fixing; use a valid feasible bound |
 
@@ -113,7 +114,7 @@ library and a valid license. All backend choices still require the Clp model sto
 | `hgs_columns` | `"best"` | Best plan, `"all"` validated encountered routes, or positive integer count of cheapest new routes |
 | `hgs_seed` | `0` | HGS random seed |
 | `time_limit` | `120.0` | Root solve budget in seconds; separate from HGS |
-| `max_iterations` | `10000` | Column-generation iteration limit |
+| `max_iterations` | `100000` | Column-generation iteration limit |
 | `max_cut_rounds` | `None` | Optional cut-round limit |
 | `verbose` | `False` | Emit progress to stderr |
 | `log_interval` | `10` | Positive interval between progress rows |

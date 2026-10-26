@@ -83,7 +83,7 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
           </article>
         </div>
         <div class="example-grid">
-          <div class="example-copy"><p class="eyebrow">STEP 03 / PUT IT TO WORK</p><h3>A small model.<br>A real starting point.</h3><p>Define a depot, add customers, and solve a capacitated routing root relaxation. No instance file required.</p><ul class="example-features"><li>Model directly with Python objects</li><li>Inspect bounds, duals, and route columns</li><li>Export results as a dictionary or JSON</li></ul><p class="install-note">Python returns an LP relaxation; routes may have fractional values. Use the CLI or Rust for integer tree search.</p><a class="text-link" href="docs/guides/python.html">Explore the Python API <span aria-hidden="true">↗</span></a></div>
+          <div class="example-copy"><p class="eyebrow">STEP 03 / PUT IT TO WORK</p><h3>A small model.<br>A real starting point.</h3><p>Define a depot, add customers, and solve a capacitated routing root relaxation. No instance file required.</p><ul class="example-features"><li>Model directly with Python objects</li><li>Inspect bounds, duals, and route columns</li><li>Export results as a dictionary or JSON</li></ul><p class="install-note">This routing example returns an LP relaxation; routes may be fractional. Use the CLI or Rust for a routing tree, or Python network models for integer model search.</p><a class="text-link" href="docs/guides/python.html">Explore the Python API <span aria-hidden="true">↗</span></a></div>
           <div class="terminal"><div class="terminal-bar"><span class="file-dot" aria-hidden="true"></span><span>first_route.py</span><span class="terminal-language">PYTHON</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Customer</span><span class="p">,</span> <span class="n">Instance</span>
 
 <span class="c1"># Depot first, then customers with unit demand.</span>
@@ -93,7 +93,7 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
     <span class="n">Customer</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">demand</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
 <span class="p">])</span>
 
-<span class="n">result</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">solve_root</span><span class="p">(</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
     <span class="n">problem_type</span><span class="o">=</span><span class="s2">&quot;cvrp&quot;</span><span class="p">,</span>
     <span class="n">capacity_cuts</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>

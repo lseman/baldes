@@ -1648,3 +1648,22 @@ fn signed_original_boxes_keep_negative_activity_with_optional_networks_and_prepr
         }
     }
 }
+
+#[test]
+fn certified_signed_resource_dag_closes_the_feasible_path_gap() {
+    let input = model::format::Model::from_json(include_str!(
+        "../fixtures/multi_network_native_signed_dag_bound.json"
+    ))
+    .unwrap();
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let (problem, _) = input.clone().compile::<2>().unwrap();
+        let mut opts = Options::default();
+        opts.cg.stabilize = false;
+        opts.cg.bound_mode = mode;
+        let output = model::solve(problem, opts).unwrap();
+        assert_eq!(output.master.status, Status::Optimal);
+        assert_eq!(output.master.lp, -6.5);
+        assert_eq!(output.master.bound, -6.5);
+        assert_eq!(output.routes[0].route.nodes, vec![0, 1, 3, 4]);
+    }
+}

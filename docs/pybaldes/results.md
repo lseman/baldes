@@ -32,8 +32,9 @@ Do not replace an unknown bound with `lp`, zero, or the incumbent.
 
 ## Status and solve mode
 
-`solve` returns a routing root relaxation. `Optimal` means the root LP
-converged. `NetworkResult.mode` distinguishes root, tree, and enumerated-MIP
+For routing input, `solve` returns a root relaxation and `Optimal` means the
+configured root LP converged. For network input, `tree=True` requests integer
+search through the same public function. `NetworkResult.mode` distinguishes root, tree, and enumerated-MIP
 workflows. In a tree, `Optimal` describes integer gap closure under the selected
 bound policy and tolerances. Read `bound_mode` alongside status.
 
@@ -128,3 +129,23 @@ if math.isfinite(result.bound):
 JSON. There is no public NetworkResult `to_dict()` method. Exported result JSON
 is a record of the result, not a resumable node checkpoint. Model JSON round trips
 through `NetworkProblem`; result JSON is a different schema.
+
+## Pricing work and retained original witnesses
+
+`RootResult.pricing_calls` counts coordinator requests and `RootResult.oracle_calls`
+counts entries into its network oracle. `NetworkResult.oracle_calls` reports
+per-network counts; `pricing_calls` counts coordinator batches. A partial network
+batch is not globally exact. Exact pricing describes the configured pricing
+domain, which can remain an NG relaxation.
+
+`NetworkResult.tree_processed_nodes`, `strong_branching_trials`,
+`mapped_history_ranked` and `mapped_branch_evaluations` describe selection/trial
+work. These are distinct from the number of fully priced nodes. Original-variable
+reports appear in `original_variables`.
+
+A valid original-model witness found during pricing can survive even when the
+current relaxed solution is fractional or unsynchronized. For example, optional
+service models may retain a feasible empty solution of objective 0 while their
+relaxed bound is negative. That does not earn reward for an unserved job or close
+the remaining tree. Inspect routes, original variables, status, bound and open
+nodes together.

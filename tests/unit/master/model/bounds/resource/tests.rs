@@ -200,3 +200,63 @@ fn coordinate_minima_remain_a_relaxation_and_cycles_stay_unknown() {
         None
     );
 }
+
+#[test]
+fn dag_bound_keeps_resource_states_and_path_costs_together() {
+    let input = crate::master::model::format::Model::from_json(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/multi_network_native_signed_dag_bound.json"
+    )))
+    .unwrap();
+    let (problem, _) = input.compile::<2>().unwrap();
+    let graph = &problem.networks[0].graph;
+    let weights: Vec<_> = graph.arcs.iter().map(|a| a.cost).collect();
+    let deadline = Instant::now() + Duration::from_secs(1);
+    // The geometric -8 path reaches an intermediate state above its upper
+    // bound. The cheapest resource-feasible path is 0->1->3->4 at -6.5.
+    assert_eq!(
+        dag_minimum(graph, &weights, &mut 10_000, deadline),
+        Some(Some(-6.5))
+    );
+    assert!(dag_minimum(graph, &weights, &mut 0, deadline).is_none());
+    assert!(dag_minimum(graph, &weights, &mut 10_000, Instant::now()).is_none());
+    // Even after some paths reach the sink, exhausting the complete traversal
+    // must never publish a minimum from a partially explored domain.
+    let mut completed = false;
+    for budget in 0..200 {
+        if let Some(value) = dag_minimum(graph, &weights, &mut { budget }, deadline) {
+            assert_eq!(value, Some(-6.5));
+            completed = true;
+        }
+    }
+    assert!(completed);
+    let mut cyclic = graph.clone();
+    cyclic.add_arc(1, 1, -1.).unwrap();
+    assert!(dag_minimum(&cyclic, &vec![0.; cyclic.arcs.len()], &mut 10_000, deadline).is_none());
+}
+
+#[test]
+fn dag_bound_relaxes_equality_waiting_instead_of_rejecting_a_lower_enclosure() {
+    let mut graph = Graph::<2>::new(3, 2).unwrap();
+    graph.resources[1] = crate::graph::ResourceKind::Equality;
+    for v in 0..3 {
+        graph.set_bounds(v, 0, 0., 3.).unwrap();
+    }
+    graph.set_bounds(0, 1, 0., 0.).unwrap();
+    graph.set_bounds(1, 1, 0.3, 1.).unwrap();
+    graph.set_bounds(2, 1, 0., 0.).unwrap();
+    for (u, v, amount) in [(0, 1, 0.1 + 0.2), (1, 2, -(0.1 + 0.2))] {
+        let arc = graph.add_arc(u, v, -1.).unwrap();
+        graph.arc_mut(arc).unwrap().consumption[0] = 1.;
+        graph.arc_mut(arc).unwrap().consumption[1] = amount;
+    }
+    let bound = dag_minimum(
+        &graph,
+        &[-1., -1.],
+        &mut 1000,
+        Instant::now() + Duration::from_secs(1),
+    )
+    .unwrap()
+    .unwrap();
+    assert!(bound <= -2.);
+}

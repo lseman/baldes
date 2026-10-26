@@ -11,13 +11,13 @@ An explicit `cg::Options.proximal` configuration replaces smoothing with
 box-step, three-piece or five-piece dual regularization on a private LP copy.
 Its optional multi-point epigraph also stays private; ordinary master duals are
 retried before accepting a no-column result. Auxiliary objectives never become
-original bounds or incumbents. See [network proximal controls](../extensions/mp.md#proximal-pricing).
+original bounds or incumbents. See [network proximal controls](../solver/models.md#proximal-pricing).
 Automatic three/five-piece curvature is available through
 `ProximalParameters::automatic_three_piece()` / `automatic_five_piece()` or
 JSON/Python `proximal={"curvature": {}}`. The solve loop supplies initialization,
 physical-row participation, raw-dual measurements, iteration updates, activity
 retries and compatible warm/child inheritance. See
-[automatic curvature controls](../extensions/mp.md#automatic-curvature).
+[automatic curvature controls](../solver/models.md#automatic-curvature).
 
 The implementation is
 [`DualPriceSmoothing`](../../src/master/stabilization/mod.rs), integrated by the
@@ -190,7 +190,7 @@ Set `options.cg.stabilize = false` to disable it in Rust. The CLI exposes:
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  vrptw instances/Solomon/R101.txt --customers 10 --no-stabilization
+  solve instances/Solomon/R101.txt --customers 10 --no-stabilization
 ```
 
 Python exposes the enable/disable switch through the public root API:

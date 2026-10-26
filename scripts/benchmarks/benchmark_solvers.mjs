@@ -14,14 +14,14 @@ const variants=process.argv.slice(2).map(x=>{const i=x.indexOf('=');return [x.sl
 if(variants.length<2) throw Error('Pass label=/absolute/binary for at least two variants');
 const selected=process.env.BALDES_PROFILE_CASES?.split(',');
 const definitions=[
- ['C202','vrptw','instances/C202.txt',[]],
- ['R201-rank1','vrptw','instances/R201.txt',['--rank1']],
- ['R103-rank1','vrptw','instances/R103.txt',['--rank1']],
+ ['C202','vrptw','instances/Solomon/C202.txt',[]],
+ ['R201-rank1','vrptw','instances/Solomon/R201.txt',['--rank1']],
+ ['R103-rank1','vrptw','instances/Solomon/R103.txt',['--rank1']],
  ['A-n32-k5','cvrp','instances/cvrplib/A-n32-k5.vrp',[]],
  ['A-n32-k5-capacity','cvrp','instances/cvrplib/A-n32-k5.vrp',['--capacity-cuts']],
  ['E-n22-k4-cuts','cvrp','instances/cvrplib/E-n22-k4.vrp',['--capacity-cuts','--rank1']],
 ];
-const cases=definitions.filter(([name])=>!selected||selected.includes(name)).map(([name,type,input,extra])=>({name,args:[type,input,'--master','clp','--reference-ng','--ng','8','--no-enumeration','--bound-mode','numerical','--time','45',...extra,...(type==='vrptw'?['--customers','100','--rounding','none']:[])]}));
+const cases=definitions.filter(([name])=>!selected||selected.includes(name)).map(([name,type,input,extra])=>({name,args:['solve',input,'--master','clp','--reference-ng','--ng','8','--no-enumeration','--bound-mode','numerical','--time','45',...extra,...(type==='vrptw'?['--customers','100','--rounding','none']:['--ignore-time-windows'])]}));
 if(!cases.length||selected?.some(name=>!definitions.some(([n])=>n===name))) throw Error('Unknown or empty case selection');
 const env={...process.env,OMP_NUM_THREADS:'1',OPENBLAS_NUM_THREADS:'1',MKL_NUM_THREADS:'1'};
 const variantOptions=JSON.parse(process.env.BALDES_PROFILE_OPTIONS||'{}');

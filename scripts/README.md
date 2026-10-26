@@ -50,6 +50,10 @@ header for additional settings. P-step scripts use `PSTEP_*` settings:
 `PSTEP_OUT` selects the validation runner's output directory; the backend
 comparison accepts its output directory as the second positional argument.
 Column-elimination runners use `CE_BENCH_*` and `CE_LP_*`, respectively.
+Routing benchmark/profiling runners invoke `solve`; capacity-only workloads
+explicitly add `--ignore-time-windows`. They do not require removed command
+aliases. Network JSON uses the same `solve` command.
+
 For the published root benchmark configuration, see
 [the benchmark guide](../docs/benchmarks/root.md); explicitly use
 `--rounding none` when reproducing those results.

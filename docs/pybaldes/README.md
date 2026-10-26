@@ -7,6 +7,12 @@ It provides typed routing inputs/results, a stateful resource-constrained
 shortest-path pricing solver, and shared-master models with multiple pricing
 networks. Solves run in the Rust library; no CLI subprocess is required.
 
+
+`pybaldes.solve` is the common entry point for routing instances, paths, scalar
+pricing networks, arrays and complete models. `Instance.solve` and
+`NetworkProblem.solve` delegate to it. See the [solve interface](../guides/solve.md)
+and [architecture](../guides/architecture.md) for normalization and shared ownership.
+
 ## Choose an interface
 
 | Your task | Interface | Result |
@@ -19,8 +25,8 @@ networks. Solves run in the Rust library; no CLI subprocess is required.
 
 The routing convenience API exposes root solving. It does not expose the CLI's
 single-network routing tree or a standalone HGS function. `hgs_time` seeds a
-routing root solve with heuristic routes. Network tree search has its own model
-and branching rules; it is not an `Instance.solve(tree=True)` option.
+routing root solve with heuristic routes. Network input registers its own coefficients and branching hooks with the shared
+engines; `Instance.solve(tree=True)` is not an exposed routing operation.
 
 ## Start here
 

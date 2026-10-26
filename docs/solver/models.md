@@ -1,4 +1,4 @@
-# Multi-pricing: one master, multiple pricing subproblems
+# Network models and shared masters
 
 [Documentation index](../README.md)
 
@@ -9,11 +9,13 @@ nonnegative multiplicity bounds. Rust models may use a finite lower bound and
 positive-infinite upper bound. Local arc IDs may overlap across
 networks: route identities include the network ID and resource schedule.
 
-The coordinator is called **multi-pricing** because one master coordinates
-multiple pricing subproblems. A **network** is an individual subproblem's graph
-and route family. Subproblems may share a vehicle type or represent different
-types, depots or resources; heterogeneity is optional. This is independent of
-using several CPU cores for a single pricing problem.
+A **network** is one pricing subproblem: a graph, route family and multiplicity
+bounds. One network and an array containing that network use the same coordinator.
+Several networks can represent different types, depots or resources, or several
+copies of the same family. Network count is independent of the number of CPU
+workers used within an oracle. See the [architecture](../guides/architecture.md)
+for the shared construction, pricing and tree lifecycle, and the
+[solve interface](../guides/solve.md) for scalar/array normalization.
 
 `Problem.rows` defines the shared constraints. `Network.arc_entries` contains
 one list of `(shared_row, coefficient)` pairs per physical arc, in graph order.
@@ -162,7 +164,12 @@ LP columns, support planes and objective values never enter those checkpoints
 or authorize an original bound/incumbent.
 
 Phase estimates guide stabilization. Published lower bounds additionally use
-graph-walk relaxations with downward arithmetic. If a negative cycle prevents
+graph-walk relaxations with downward arithmetic. Small acyclic scalar-resource
+graphs receive an additional work-limited path bound that keeps each path's cost
+and resource lower states together. It supports signed secondary consumption
+and waiting without using numerical labeling as a certificate. Equality waiting
+is relaxed, and an unfinished traversal retains the existing walk bound rather
+than publishing the minimum of a partial path set. If a negative cycle prevents
 a resource-free bound, nonnegative scalar consumption and bounded resource
 windows can justify a finite walk-length limit. The proof can combine dimensions
 with different units: it sums their individual positive-arc occurrence limits.
@@ -226,13 +233,13 @@ Scalar resource capacity is a const generic, defaulting to two; see
 
 ## Assignment tree
 
-`solve(problem, ModelTreeOptions)` uses network-aware
+`master::tree::solve(problem, ModelTreeOptions { .. })` uses network-aware
 snapshots. It tries proved shared resource-group splits,
 assignment rows, declared integer master variables, total network multiplicities,
 original physical-arc activities, then synchronized-service splits. With
 `ModelTreeOptions::time_window_selection`, arc activities are summed over
 window copies and time-window selection counts follow them; see
-[branching on time-window selection](multi-time-windows.md#branching-on-time-window-selection).
+[branching on time-window selection](../extensions/multi-time-windows.md#branching-on-time-window-selection).
 It returns network-tagged
 integer route quantities, an incumbent, selected bound mode, frontier bound and
 node/work-limit status. Integer witnesses replay original graph resources,
@@ -314,7 +321,7 @@ but a new original-domain bound stays unknown.
 ## Finite column imports
 
 Rust callers can combine routing networks with explicitly declared finite
-original-vector column domains using `mp::imported::solve`. See
+original-vector column domains using `model::imported::solve`. See
 [finite column imports](column-imports.md) for coordinate links, column fixing,
 multiplicity bounds, identity mapping and complete-domain MIP.
 
@@ -332,7 +339,7 @@ For a model with no pricing subproblems, Rust callers can use
 returns the same snapshot API. Signed, one-sided, free and integer variables
 retain their usual contracts. The empty pricing family is complete immediately:
 `snapshot.solve_enumerated_mip(options)` needs no preceding enumeration, and
-`snapshot.solve(options)` branches integer master variables.
+`snapshot.solve_tree(tree_options)` branches integer master variables through the common tree entry point.
 No dummy network is required. A `Problem::<D>` with an empty `networks` list is
 also accepted by `solve_with_master_variables`, for any compile-time `D`.
 An empty model has objective zero; original-row contradictions are available to
@@ -345,7 +352,7 @@ these variables to additive network activities;
 `with_rank_one_master_row(row, floor_coefficients, master_coefficients)` couples
 them to nonlinear floor rows. Existing parent restrictions remain in force.
 All operations preserve independent sibling snapshots. The corresponding tree
-entry point is `solve_with_master_variables`.
+entry point is `master::tree::solve((problem, variables), tree_options)`.
 
 Signed variables retain their original coefficients and costs. Their bounds
 participate in joint propagation, and bounds tightened by original constraints
@@ -528,20 +535,27 @@ from network activity bounds. Disabling propagation later does not widen a
 snapshot that already contains deductions; reuse an earlier ancestor for its
 original continuous relaxation.
 
-## Limitations
+## Scope and model-specific behavior
 
-The supported lifecycle supports additive rows and explicit full-memory floor
-rows through Rust. Automatic nonlinear cut separation,
-reduced-cost-pruned enumeration with proved coverage,
-other branching families and broader resource-aware
-certificates remain open. Rust and Python expose the supported
-shared-master node lifecycle. The existing single-network routing entry
-points retain their current behavior.
+The canonical master accepts zero or more pricing networks. Static master
+variables, additive rows, registered nonlinear coefficients, original-variable
+branches, snapshots and supported synchronization restrictions use that model.
+Registered cut kernels do not imply automatic separation of arbitrary nonlinear
+cuts. Routing registrations additionally provide their routing-specific cut,
+branch and witness hooks to the shared engines.
+
+Enumeration is complete only when its report establishes coverage of the stated
+domain. Cutoff-bounded transfer covers improvements below its cutoff; a truncated
+pool does not prove a global integer bound. A tree can return `Incomplete` when
+its configured generators cannot split a remaining nonintegral decision or its
+proof contract is unsupported. Read the relevant sections below and inspect the
+returned reports rather than inferring guarantees from network count.
 
 ## CLI
 
-The `multi-pricing` command accepts an explicit JSON model, rather than a Solomon
-instance. It uses Clp and supports both shared roots and the assignment tree:
+The same `solve` command accepts a pricing model with a `.json` extension.
+It uses the shared master construction and pricing coordinator, with Clp for
+this registration, and supports root solves and integer trees:
 
 ```sh
 cargo build --offline --features clp --bin baldes
@@ -554,7 +568,7 @@ target/debug/baldes solve examples/networks/triangle.json --tree --json -
 The example has shared LP optimum `1.5` and integer optimum `2`. `--time`,
 `--iterations`, `--nodes`, `--bound-mode`, `--no-stabilization`,
 `--artificial-cost`, `--option NAME=VALUE`, and `--log-interval` control solves.
-Run `baldes solve --help` for details. The previous `networks` command remains an alias. Unsupported routing flags are errors.
+Run `baldes solve --help` for details. Routing-specific flags do not apply to explicit JSON network models.
 A successful command means the run completed and produced a result: inspect
 `status` and `open_nodes` for `NodeLimit`, `TimeLimit` or `Incomplete` outcomes.
 
@@ -836,7 +850,7 @@ For the CLI, pass a JSON array of these restrictions with
 The model is restricted before the requested root or tree solve.
 
 ```sh
-cargo run --release --features clp --bin baldes -- multi-pricing \
+cargo run --release --features clp --bin baldes -- solve \
   examples/networks/resource_groups.json \
   --resource-branches examples/networks/resource_group_upper.json \
   --tree --bound-mode certified --json -
@@ -871,7 +885,7 @@ enforce `visits_in_network <= min(fleet_size, vehicles_required) * served`.
 This is optional service: an unserved job has no visits. Keep its reward out of
 incoming arc costs and remove ordinary unit-cover rows for that job; the solver
 retains all caller-supplied costs and constraints. Physical fleet limits remain
-in force. Rust callers set `mp::Options.synchronized_services`; JSON solve options
+in force. Rust callers set `model::Options.synchronized_services`; JSON solve options
 accept the same array of definitions. The CLI accepts
 `--synchronized-services services.json` alongside `--tree`.
 
@@ -901,18 +915,15 @@ An LP snapshot can be restricted explicitly with
 definitions are immutable. Complete-domain MIP is deferred while any common
 start domain is non-singleton, since its route-only matrix is then a relaxation.
 
-The DSN adapter `mtw/synchronized_baldes.py` builds grouped antenna networks,
-charges one reward per request, and independently checks returned schedules:
-
-```python
-from synchronized_baldes import solve_synchronized
-result = solve_synchronized(data, time_limit=300)
-```
+The synchronization example uses optional service variables, multiple network
+members and common-start restrictions. Local DSN experiments can live under
+ignored `working/`; they are not distributed interfaces. Use the public Rust,
+JSON and Python registration contracts in this section for reproducible models.
 
 A runnable two-fleet example is included:
 
 ```sh
-cargo run --release --features clp -- networks \
+cargo run --release --features clp -- solve \
   examples/networks/synchronization.json \
   --synchronized-services examples/networks/synchronization-services.json \
   --tree --json -
@@ -994,13 +1005,13 @@ constructors are `explicit_three_piece()`, `explicit_five_piece()` and
 `explicit_multipoint()`. CLI equivalents are `--proximal-explicit-three-piece`,
 `--proximal-explicit-five-piece` and `--proximal-explicit-multipoint`.
 
-Unstabilized MP pricing admits near-zero arc costs using the recovered native
+Unstabilized network pricing admits near-zero arc costs using the recovered native
 `1e-6` sign precision only when a finite walk bound proves no improving path.
 Negative bound corrections are retained. An unavailable pricing subgradient
 remains unavailable, and a weak aggregate estimate falls back to real pricing.
 Cyclic NG relaxations without a hard walk cap keep their pricing calls.
 
-MP trees retain original-model integer witnesses during restricted-master solves.
+Model trees retain original-model integer witnesses during restricted-master solves.
 When a valid numerical or certified bound closes the witness's incumbent gap,
 the node can finish before another pricing pass; this is integer-domain pruning,
 not an LP-pricing convergence claim. Retained witnesses survive later master
@@ -1107,7 +1118,7 @@ contract. Ambiguous source boundaries and nonfinite machine operations remain
 uncertified. See the retained proof-scope counterexamples.
 
 Packing-assignment branching can be registered with `packing` in solve
-options, or `--packing FILE` in the multi-pricing CLI. For example:
+options, or `--packing FILE` for JSON model input to `baldes solve`. For example:
 
 ```json
 {"priority": 1000, "networks": [
@@ -1156,8 +1167,8 @@ connectivity and shortest return cycles, so a cyclic graph can still prove unit
 caps on bridges and tighter repeat caps within its walk limit. Bounds requiring
 unproved resource-specific deductions are rejected. Supplied
 loose bounds retain their value; graph-derived caps do not silently replace
-native inputs. Without registration, the existing orthant/near-zero policy
-continues. Negative corrections are retained, without an invented
+native inputs. Models without registered original variables retain the physical-arc
+orthant/near-zero policy. Negative corrections are retained, without an invented
 subgradient. A bound-only skip must close the complete current master gap or
 accompany a fresh improving column; otherwise full pricing resumes. Aggregate
 master activity bounds are not per-route variable bounds. Grouped resource rows
@@ -1182,19 +1193,20 @@ paths and supplies the required pricing certificates.
 
 ### Shared pricing coordination
 
-The routing root frontend and the multi-network frontend use one pricing
-coordinator. Routing supplies a one-network collection; network models supply
+Routing and explicit network input registrations use one pricing coordinator. Routing supplies a one-network collection; network models supply
 all enabled networks. Scheduling, deadlines, admission, complete-batch checks,
 quantity corrections and subgradients use the same implementation. Model
 adapters retain cut/NG updates, route-to-row coefficients and original-domain
 certificate callbacks. Retained route domains also enter this coordinator;
 explicit finite masters keep their individual column caps.
 
-Routing pricing now uses independent raw-cost pricing, as network pricing does,
-rather than treating correction of one rounded route as a global raw optimum.
+Live pricing uses the raw objective for both routing and explicit network
+registrations. Correcting only a returned rounded route cannot prove a global
+minimum over routes that rounded dominance may have discarded.
 The routing result's `oracle_calls` counts actual oracle entries, including
 phase-I entries and excluding bound-only skips. It is separate from CG
-`pricing_calls`; cached and raw sweeps form one oracle entry. This metric is
+`pricing_calls`. One live functor entry performs one raw-objective search;
+it does not first run and discard a cached-objective search. This metric is
 available in Rust, CLI JSON and Python results.
 
 ### Original pricing-variable compilation (Rust)
@@ -1248,6 +1260,13 @@ pricing walk. They do not impose a new graph restriction. The verifier uses
 weighted DAG walk ranges, bounded cyclic walks, or matching scalar-resource
 bounds; it rejects unsupported or unaffordable proofs. Omitted upper bounds are
 unbounded. The declared endpoints remain unchanged after verification.
+
+Registered original variables also use independent default `[0, +infinity]`
+admission envelopes when graph analysis proves their activities nonnegative.
+This applies without an explicit `original_variable_boxes` option. Explicit
+envelopes take precedence. A signed mapping whose nonnegativity cannot be
+proved keeps its graph domain and falls back to physical residual bounds or
+actual pricing; registration never clips a negative activity to zero.
 
 Admission evaluates the original variables independently, even when their costs
 cancel on shared physical arcs. It adds an outward residual bound for base arc

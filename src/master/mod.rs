@@ -1,4 +1,4 @@
-//! Restricted-master and dual-price smoothing ports. Cuts are outside this scope.
+//! Shared master construction, column generation, pricing, preprocessing and tree search.
 pub use lp_master::{LpMaster, LpSolveOutcome};
 pub mod solvers;
 #[cfg(feature = "clp")]

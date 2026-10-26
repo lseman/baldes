@@ -38,6 +38,42 @@ For shared constraints, use `solve(pricings, rows=rows)` or construct a
 Routing data automatically selects capacity-only or time-window constraints;
 `problem_type` can explicitly override that inference.
 
+## Rust model and tree entry points
+
+Use `master::model` for the canonical network collection and `master::tree`
+for integer search. This example needs the `clp` feature:
+
+```rust
+use baldes::{Graph, graph::Window, master::{model::{self, Network, Problem}, tree}};
+
+fn main() -> baldes::Result<()> {
+    let mut graph = Graph::<2>::new(3, 1)?;
+    for vertex in 0..3 {
+        graph.set_bounds(vertex, 0, 0., 10.)?;
+    }
+    graph.add_arc(0, 1, -2.)?;
+    graph.add_arc(1, 2, 0.)?;
+    let problem = Problem {
+        rows: vec![],
+        networks: vec![Network {
+            id: 7, graph, multiplicity: Window::new(0., 1.)?,
+            arc_entries: vec![vec![], vec![]], route_entries: vec![],
+        }],
+    };
+    let root = model::solve(problem.clone(), model::Options::default())?;
+    assert_eq!(root.master.lp, -2.);
+    let integer = tree::solve(problem, tree::ModelTreeOptions::default())?;
+    assert_eq!(integer.incumbent, -2.);
+    Ok(())
+}
+```
+
+`Problem::routing(graph, vehicles)` produces a `RoutingContext` with routing
+registration metadata. `master::routing::solve` runs its root relaxation;
+`tree::solve(context, TreeOptions::default())` uses the same tree driver.
+See [network models](../solver/models.md), [routing tree](../solver/tree.md)
+and [architecture](architecture.md) for the registration-specific contracts.
+
 This is a breaking modernization. The old routing/network command aliases,
 separate Python solve functions, native solve exports, and Rust `master::root`
 and `master::mp` paths are removed. Use `master::routing`, `master::model`,

@@ -102,5 +102,5 @@ convention and customer count first. BALDES root benchmarks use
 
 - [Python API](python.md): construct customers in memory and inspect typed root results.
 - [CLI reference](cli.md): cuts, logging, distance modes, and backend selection.
-- [Multi-pricing](../extensions/mp.md): coordinate multiple route families in one master.
+- [Network models](../solver/models.md): coordinate one or more route families in the shared master.
 - [Options reference](../reference/options.md): supported pricing controls and their scope.

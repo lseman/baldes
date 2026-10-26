@@ -23,12 +23,13 @@ distance convention, and inherited node restrictions.
 | Routing root LP | `solve` | `solve` | [pyBaldes routing](../pybaldes/routing.md) |
 | Single-network integer routing tree | `solve --tree` | Not exposed by `solve` | [Routing tree](../solver/tree.md) |
 | Custom RCSP pricing | Through a model | `Solver` | [Pricing](../pybaldes/pricing.md) |
-| Shared-master root / integer search | `multi-pricing` / `multi-pricing --tree` | `NetworkProblem.solve(tree=...)` | [Multi-pricing](../extensions/mp.md) |
+| Shared-master root / integer search | `solve MODEL.json` / `solve MODEL.json --tree` | `NetworkProblem.solve(tree=...)` | [Network models](../solver/models.md) |
 
-A network model can represent several route families. Its branching capabilities
-and integer-domain contract differ from the specialized routing tree. A shared
-master is part of the core framework, while specialized routing formulations
-are organized under extensions. See [source layout](source-layout.md).
+One canonical model contains shared rows and zero or more pricing networks.
+A network can represent one route family; routing input registers customer/fleet
+semantics around that same model. Construction, pricing coordination and tree
+orchestration are shared. Registrations supply their own cut, branching and proof
+hooks. See [architecture](architecture.md) and [source layout](source-layout.md).
 
 ## Three meanings to keep separate
 
@@ -57,7 +58,7 @@ customer when the memory permits it. Complete supported enumeration can transfer
 an elementary route universe into a master. A bounded collection attempt is not
 complete just because it returned routes. Inspect enumeration coverage before
 using a finite-pool MIP as a proof. See [enumerated MIP](../solver/enumerated-mip.md)
-and [network transfer](../extensions/mp.md#complete-enumeration-and-integer-transfer).
+and [network transfer](../solver/models.md#complete-enumeration-and-integer-transfer).
 
 ## Reproduce an objective
 

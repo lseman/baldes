@@ -1,11 +1,11 @@
 [build-system]
-requires = ["maturin>=1.0,<2.0"]
+requires = ["maturin>=1.9.4,<2.0"]
 build-backend = "maturin"
 
 [project]
 name = "pybaldes"
-version = "0.1.0"
-description = "Rust-backed RCSP pricing and VRPTW/CVRP root solving with capacity and rank-one cuts"
+dynamic = ["version"]
+description = "Rust-backed resource-constrained pricing and vehicle routing with branch-cut-and-price"
 requires-python = ">=3.9"
 readme = "README.md"
 license = "MIT"
@@ -19,6 +19,14 @@ classifiers = [
 manifest-path = "python/rust/Cargo.toml"
 python-source = "python"
 module-name = "pybaldes._core"
+features = ["multi-time-windows"]
+include = [
+    { path = "vendor/Clp/Clp/src/**/*", format = "sdist" },
+    { path = "vendor/CoinUtils/CoinUtils/src/**/*", format = "sdist" },
+    { path = "vendor/coin/**/*", format = "sdist" },
+    { path = "vendor/Clp/LICENSE", format = "sdist" },
+    { path = "vendor/CoinUtils/LICENSE", format = "sdist" },
+]
 
 [project.optional-dependencies]
 test = ["pytest>=7"]

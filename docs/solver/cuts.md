@@ -25,7 +25,7 @@ solve automatically.
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  vrptw instances/Solomon/R101.txt --customers 25 --capacity-cuts --rank1 --time 60
+  solve instances/Solomon/R101.txt --customers 25 --capacity-cuts --rank1 --time 60
 ```
 
 An experimental rank-one selection budget can limit how many active cuts touch
@@ -133,7 +133,7 @@ the existing rounded pricing convention.
 
 ```sh
 cargo run --release --features clp --bin baldes -- \
-  cvrp instances/cvrplib/E-n22-k4.vrp --fenchel-cuts --time 30
+  solve instances/cvrplib/E-n22-k4.vrp --fenchel-cuts --time 30
 ```
 
 The CVRP/VRPTW switch builds an integer load row from total customer demand,

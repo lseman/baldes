@@ -11,7 +11,7 @@
 //!
 //! Production pricing uses [`Problem::pricing_graph`] with the standard
 //! `crate::master::routing::solve` adapter (Clp feature), or CLI `--robust`.
-//! The independent forward labeler in [`reference`] is for validation only.
+//! The independent forward labeler in [`reference`](mod@reference) is for validation only.
 
 use crate::{invalid, Result};
 

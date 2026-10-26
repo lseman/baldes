@@ -194,7 +194,7 @@ Options:
   --tree                Run branch-and-price with a restricted-master MIP heuristic
   --tree-threads N      Concurrent tree node evaluations (default 1)
   --nodes N             Tree node limit (default: 10000)
-  --branching MODE      default, vehicles, ryan-foster, arc, cluster, resource, hybrid
+  --branching MODE      default, vehicles, ryan-foster, arc, cluster, resource, hybrid, edge
   --branch-history      Enable branch history (default; observed native rules)
   --no-branch-history   Disable history-based candidate ranking and recording
   --no-strong-branching  Skip strong trials; history may still rank candidates

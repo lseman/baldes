@@ -203,7 +203,7 @@ pub enum CoupledResource {
         deviations: Vec<f64>,
         windows: Vec<Window>,
     },
-    /// On arc i, x += increments[i], then cost += x * weights[i]. The cost
+    /// On arc i, `x += increments[i]`, then `cost += x * weights[i]`. The cost
     /// correction is added to both original and reduced arc costs. Signed,
     /// finite data are supported; no monotone dominance is assumed.
     CumulativeCost {
@@ -222,7 +222,7 @@ pub enum CoupledResource {
         source_upper: Option<f64>,
     },
     /// Zero-initialized cumulative resource with independent dominance constants.
-    /// On arc i, x += increments[i], then cost += x * weights[i]. There are
+    /// On arc i, `x += increments[i]`, then `cost += x * weights[i]`. There are
     /// no vertex transitions or hard resource bounds. Signed finite data are
     /// supported. This fixed numeric resource is separate from `Plugin`.
     CustomResource {
@@ -237,7 +237,7 @@ pub enum CoupledResource {
         #[cfg_attr(feature = "clp", serde(default))]
         backward_bound: Option<f64>,
     },
-    /// Bounded affine dependency: y += offsets[i] + factors[i] * parent_after.
+    /// Bounded affine dependency: `y += offsets[i] + factors[i] * parent_after`.
     /// The parent must be an earlier numeric resource.
     /// Bounds are checked without waiting after every arc, including the sink.
     /// This is an explicit affine contract, not a claim that all external
@@ -258,7 +258,7 @@ pub enum CoupledResource {
         bounds: Window,
         functions: Vec<PiecewiseLinearFunction>,
     },
-    /// Direct bounded base-state transition x = function[arc](x_before).
+    /// Direct bounded base-state transition `x = function[arc](x_before)`.
     /// This can encode state-dependent consumption, waiting and reset maps
     /// explicitly. Function-domain and output-window violations are infeasible.
     PiecewiseLinearResource {
@@ -266,7 +266,7 @@ pub enum CoupledResource {
         bounds: Window,
         functions: Vec<PiecewiseLinearFunction>,
     },
-    /// Add function[arc](parent_after) to both original and reduced objectives.
+    /// Add `function[arc](parent_after)` to both original and reduced objectives.
     /// The earlier numeric parent's state is unchanged by this descriptor.
     /// Function argument domains remain constraints even in phase I.
     PiecewiseLinearCost {

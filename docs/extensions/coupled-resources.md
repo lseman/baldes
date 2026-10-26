@@ -483,7 +483,7 @@ actual forward state. Front work is bounded per extension and exhaustion returns
 an error. Charging adds no cost, is not a numeric dependency parent, uses
 conservative equality dominance, and disables reversal reuse. Directed path
 certification declines this family, including in phase I. See the
-[EVRP adapter](evrp.md#native-physical-graph-backend) for end-to-end pricing and
+[EVRP adapter](evrp.md#physical-graph-backend) for end-to-end pricing and
 schedule reconstruction.
 
 Selection labels carry the remaining domains. Simultaneous load labels carry

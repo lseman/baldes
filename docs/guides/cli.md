@@ -10,21 +10,28 @@ Commands below run from the repository root after building with `--features clp`
 ./target/release/baldes hgs instances/Solomon/R101.txt --population-size 50 --nb-iter 5000
 ```
 
-Use `solve` for routing: Solomon inputs enforce time windows and service
-times, while CVRPLIB inputs use capacity constraints. The input format is
-detected from the content. Use `solve INSTANCE --ignore-time-windows` to
-solve a Solomon instance as CVRP. The legacy `vrptw` and `cvrp` commands
-remain available; `cvrp` always ignores time windows and service times.
-The `hgs` command runs the Hybrid Genetic Search heuristic.
-CVRPLIB instances have no time windows, so they are solved as `cvrp`. All routing
-commands default to distances truncated to tenths (`--rounding tenth`). Use
-`--rounding none` for unrounded Euclidean distances, `--rounding nearest` for
-TSPLIB `nint`, or `--rounding ceil` for `CEIL_2D`. Explicit `EDGE_WEIGHT_SECTION`
-matrices (full or triangular) retain their supplied weights. As for
-Solomon files, the root fleet bound is the customer count. Route-length limits (`DISTANCE`) and service times are not supported. Run
-`./target/release/baldes --help` for usage.
+Use `solve INPUT` for both routing instances and pricing models. A `.json`
+path contains a [network model](../solver/models.md); Solomon and CVRPLIB paths
+are parsed as routing inputs. JSON accepts a scalar network, an array, or an
+enclosing model with shared rows. The [solve guide](solve.md) describes input
+normalization and common controls.
 
-## Options
+Routing constraints are inferred from the instance. Use `--ignore-time-windows`
+to solve Solomon data as capacity-only CVRP. `hgs`, `ce` and `pstep` are distinct
+algorithm commands. Run `baldes --help` for the complete installed interface.
+
+Routing coordinate distances default to truncated tenths (`--rounding tenth`).
+Use `none` for unrounded Euclidean distances, `nearest` for TSPLIB `nint`, or
+`ceil` for `CEIL_2D`. Explicit full/triangular distance matrices retain their
+supplied weights. The routing root's fleet bound is the customer count; its
+tree uses the instance fleet size. CVRPLIB `DISTANCE` limits are unsupported.
+
+```sh
+baldes solve examples/networks/triangle.json --json -
+baldes solve examples/networks/triangle.json --tree --nodes 100 --json -
+```
+
+## Routing options
 
 | Option | Meaning |
 | --- | --- |
@@ -37,12 +44,12 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--cuts` | enable rank-one, capacity, k-path, knapsack (rounding/1K), and Fenchel cuts; also 2-path for models with time windows. Requires the integer-demand Fenchel configuration to be valid. |
 | `--rank1` | separate limited-memory rank-one cuts |
 | `--clp-scaling MODE` | equilibrium (default), auto, geometric, or off |
-| `--capacity` / `--capacity-cuts` | separate native rounded capacity cuts in the Clp root master |
+| `--capacity` / `--capacity-cuts` | separate rounded capacity cuts in the routing master |
 | `--two-path-cuts` | enable capacity cuts with Kohl's time resource attached (VRPTW only) |
-| `--tree` | run branch-and-price for integer routing |
+| `--tree` | run integer branch-and-price for the input registration |
 | `--tree-threads N` | concurrent open-node evaluations; default `1`, requires `--tree` for `N > 1` |
 | `--nodes N` | tree node limit (default 10,000) |
-| `--branching MODE` | `native` (default), `ryan-foster`, `vehicles`, or `arc` |
+| `--branching MODE` | `default` (default), `vehicles`, `ryan-foster`, `arc`, `cluster`, `resource`, `hybrid`, or `edge` |
 | `--no-strong-branching` | use fractionality instead of phased strong branching |
 | `--no-diving` | disable strong diving |
 | `--no-mip-heuristic` | disable restricted-master integer search |
@@ -52,7 +59,7 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--no-enumeration` | no reduced-cost fixing or enumeration |
 | `--upper-bound X` | initial incumbent for fixing |
 | `--no-stabilization` | no dual-price smoothing |
-| `--master MODE` | `clp` (default), native `ipm`, `highs`, or `gurobi`; optional backends need their build features, and IPM disables stabilization |
+| `--master MODE` | `clp` (default), `ipm`, `highs`, or `gurobi`; optional backends need their build features, and IPM disables stabilization |
 | `--master-threads N` | HiGHS/Gurobi workers; default 0 uses available CPUs; Clp/IPM ignore this setting |
 | `--bound-mode MODE` | `numerical` (default) uses pricing bounds with tolerances; `certified` requires independent original-domain bound validation |
 | `--hgs-time S` | positive HGS search budget before routing solve; separate from `--time` |
@@ -62,8 +69,8 @@ Solomon files, the root fleet bound is the customer count. Route-length limits (
 | `--verbose`, `-v`, `--log` | solver progress table on stderr, every 10 CG iterations |
 | `--log-interval N` | enable progress every N CG iterations; N must be positive |
 | `--iterations N` | master iteration limit |
-| `--time S` | routing solve or standalone HGS time limit in seconds |
-| `--json FILE` | write root LP/history or HGS solution results |
+| `--time S` | solve or standalone HGS time limit in seconds |
+| `--json FILE` | write structured results; `-` emits JSON alone on stdout |
 | `--population-size N` | HGS minimum population size (default: 25) |
 | `--nb-iter N` | HGS iterations without improvement before stopping/restarting |
 | `--seed N` | HGS random seed (default: 0) |
@@ -108,3 +115,13 @@ Public option names start with `BALDES`, for example
 `Solver.option_support(name)`. The public list contains 41 supported controls,
 plus two enumerated-MIP controls when both `clp` and `highs` are enabled.
 Scope can depend on the operation or configured cut family.
+
+## Network-model controls
+
+Common time, iteration and node limits, logging, bound mode, stabilization and
+JSON output use the same parser as routing. Explicit network models also expose
+`--network-pricing-schedule`, network branching/search controls, original-variable
+registrations, proximal stabilization, synchronization and enumeration options.
+See the [model CLI reference](../solver/models.md#cli) and `baldes solve --help`.
+Routing cut/branch flags apply to routing input; network registration does not
+implicitly acquire routing-specific metadata by containing one network.

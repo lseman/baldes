@@ -118,6 +118,55 @@ fn walk_range<const D: usize>(
     Some(range[graph.sink])
 }
 
+/// Preserve original coordinates even when the caller supplies no finite box.
+/// The reference's default orthant is usable only after proving that the graph
+/// activity is nonnegative; signed mappings must not silently acquire bounds.
+pub(super) fn prepare_registered<'a, const D: usize>(
+    definitions: &[GroupedVariableBound],
+    originals: &[OriginalVariableCosts],
+    rows: usize,
+    graphs: impl Iterator<Item = (i32, &'a Graph<D>, &'a [bool])>,
+) -> Result<HashMap<i32, PreparedBox>> {
+    let graphs: Vec<_> = graphs.collect();
+    let mut boxes = prepare(definitions, rows, graphs.iter().copied())?;
+    let explicit: HashSet<_> = definitions
+        .iter()
+        .map(|b| (b.variable.network, b.variable.id))
+        .collect();
+    for model in originals {
+        for variable in &model.variables {
+            if explicit.contains(&(variable.network, variable.id)) {
+                continue;
+            }
+            let implicit = GroupedVariableBound {
+                variable: variable.clone(),
+                lower: 0.,
+                upper: None,
+            };
+            // An unavailable proof declines this optimization, not the model.
+            // Explicit user envelopes above retain their validation errors.
+            let Ok(prepared) = prepare(&[implicit], rows, graphs.iter().copied()) else {
+                continue;
+            };
+            for (network, incoming) in prepared {
+                match boxes.entry(network) {
+                    std::collections::hash_map::Entry::Vacant(entry) => {
+                        entry.insert(incoming);
+                    }
+                    std::collections::hash_map::Entry::Occupied(mut entry) => {
+                        let current = entry.get_mut();
+                        for (cap, other) in current.caps.iter_mut().zip(incoming.caps) {
+                            *cap = cap.min(other);
+                        }
+                        current.variables.extend(incoming.variables);
+                    }
+                }
+            }
+        }
+    }
+    Ok(boxes)
+}
+
 pub(super) fn prepare<'a, const D: usize>(
     definitions: &[GroupedVariableBound],
     rows: usize,

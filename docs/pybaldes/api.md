@@ -110,15 +110,30 @@ RootResult(
     history: Tuple[Iteration, ...],
     simplex_iterations: int = 0,
     ipm_iterations: int = 0,
-    feasibility: Tuple[FeasibilityReport, ...] = ()
+    feasibility: Tuple[FeasibilityReport, ...] = (),
+    oracle_calls: int = 0
 )
 ```
 
-## Routing function and methods
+## Unified solve and routing methods
 
 ```python
-solve(instance: Union[Instance, str, PathLike], *, problem_type: str='vrptw', customers: Optional[int]=None, ng: int=8, reference_ng: bool=False, rounding: Optional[str]=None, capacity_cuts: bool=False, two_path_cuts: bool=False, rank_one_cuts: bool=False, stabilize: bool=True, master_solver: str='clp', master_threads: int=0, bound_mode: str='numerical', clp_scaling: str='equilibrium', clp_keep_work_areas: bool=True, verbose: bool=False, log_interval: int=10, hgs_time: Optional[float]=None, hgs_columns: Union[str, int]='best', hgs_seed: int=0, reduced_cost_fixing: bool=True, upper_bound: float=math.inf, time_limit: float=120.0, max_iterations: int=10000, max_cut_rounds: Optional[int]=None, pricing_options: Optional[Mapping[str, float]]=None) -> RootResult
+solve(problem, *, rows=(), time_limit=120.0, max_iterations=100000,
+      stabilize=True, stabilization_max_tree_depth=10000,
+      bound_mode="numerical", pricing_options=None, **options
+) -> Union[RootResult, NetworkResult]
 ```
+
+`problem` accepts an `Instance`, a path, a `PricingNetwork`, an array of
+`PricingNetwork` objects, or a `NetworkProblem`. A `.json` path reads a network
+model; other paths read routing input. `rows=` supplies shared rows when passing
+a scalar network or array; a complete `NetworkProblem` already owns its rows.
+One network and a one-element array normalize to the same model and defaults.
+
+Model-specific keywords are documented in [routing options](routing.md#solve)
+and [network options](networks.md#solve-controls). Routing input returns a
+`RootResult`; network input returns a `NetworkResult`. Routing constraint type
+is inferred by default; `problem_type="vrptw"` or `"cvrp"` overrides it.
 
 ```python
 # Instance
@@ -285,7 +300,9 @@ PricingNetwork(
     route_entries: Tuple[Tuple[int, float], ...] = (),
     ng: Optional[Tuple[Tuple[int, ...], ...]] = None,
     coupled_resources: Tuple[Mapping[str, Any], ...] = (),
-    elementary: bool = False
+    elementary: bool = False,
+    front_program_domain: bool = False,
+    route_domain: Mapping[str, Any] = field(default_factory=lambda: {'kind': 'physical_simple'})
 )
 ```
 
@@ -310,7 +327,8 @@ SynchronizedService(
 ```python
 NetworkProblem(
     rows: Tuple[SharedRow, ...],
-    networks: Tuple[PricingNetwork, ...]
+    networks: Union[PricingNetwork, Tuple[PricingNetwork, ...]],
+    pricing_variables: Tuple[Mapping[str, Any], ...] = ()
 )
 ```
 
@@ -385,15 +403,27 @@ NetworkResult(
     enumerated_mip_calls: int,
     enumerated_mip_nodes: int,
     enumerated_mip_failures: int,
+    tree_processed_nodes: int = 0,
+    strong_branching_trials: int = 0,
+    mapped_history_ranked: int = 0,
+    mapped_branch_evaluations: Tuple[MappedBranchEvaluation, ...] = (),
+    original_variables: Tuple[Mapping[str, Any], ...] = (),
     snapshot: Optional[NetworkNode] = field(default=None, repr=False, compare=False)
 )
 ```
 
-## Network function and methods
+`mapped_branch_evaluations` contains read-only records with `name`, `depth`,
+`side`, `stage`, `kind`, `parent`, `estimate` and `distance`. Their record class is
+an implementation type; inspect the returned records rather than importing it
+from the package root.
 
-```python
-solve(problem: NetworkProblem, *, tree: bool=False, network_pricing_schedule: str='full-sweep', network_unpromising_limit: int=1, network_branching: str='multiplicity-first', enumerate: bool=False, enumeration_route_limit: int=10000, enumeration_work_limit: int=10000000, enumeration_stored_arc_limit: int=1000000, enumeration_time_limit: float=1.0, enumerated_mip: bool=False, mip_time_limit: float=1.0, mip_node_limit: int=100000, mip_objective_cutoff: Optional[float]=None, time_limit: float=120.0, max_iterations: int=100000, node_limit: int=10000, stabilize: bool=True, proximal: Optional[Mapping[str, Any]]=None, bound_mode: str='numerical', artificial_cost: float=2.76, log_interval: Optional[int]=None, pricing_options: Optional[Mapping[str, float]]=None, synchronized_services: Tuple[SynchronizedService, ...]=()) -> NetworkResult
-```
+## Network model and snapshot methods
+
+Fresh network inputs use the same `solve` operation above. Its `**options`
+include `tree`, network scheduling/branching, enumeration, mapped variables,
+proximal stabilization and synchronization controls; see the complete
+[network option tables](networks.md#solve-controls). `NetworkNode.solve` resumes
+its retained model and accepts the corresponding snapshot options.
 
 ```python
 # NetworkProblem
@@ -428,6 +458,8 @@ to_json(self, *, indent: Optional[int]=2) -> str
 - [Native type declarations](../../python/pybaldes/_core.pyi)
 - [Pricing bindings](../../python/rust/src/lib.rs)
 - [Resource bindings](../../python/rust/src/coupled.rs)
+- [Unified solve wrapper](../../python/pybaldes/solve.py)
+- [Native input dispatch](../../python/rust/src/frontend/mod.rs)
 - [Routing bindings](../../python/rust/src/frontend/routing.rs)
 - [Network bindings](../../python/rust/src/frontend/networks.rs)
 

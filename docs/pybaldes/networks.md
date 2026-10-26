@@ -7,6 +7,28 @@ same master constraints. Network IDs identify fleets or families; they need not
 be consecutive. Arc IDs and vertex IDs are local to a network. Shared-row IDs
 are positions in `NetworkProblem.rows`, starting at zero.
 
+## One network or a collection
+
+Use the same `solve` function for scalar and array inputs:
+
+```python
+from pybaldes import PricingArc, PricingNetwork, solve
+
+network = PricingNetwork(
+    id=7, vertices=3, multiplicity=(0, 1),
+    arcs=(PricingArc(0, 1, -2), PricingArc(1, 2, 0)),
+)
+a = solve(network, stabilize=False)
+b = solve([network], stabilize=False)
+assert a.lp == b.lp == -2
+assert a.oracle_calls == b.oracle_calls
+```
+
+Pass `rows=rows` with a scalar/array, or use `NetworkProblem(rows, networks)`.
+The latter accepts a scalar network or an array and always stores a tuple.
+`pricing_variables` optionally registers original pricing-variable mappings;
+see the [model compilation contract](../solver/models.md#original-pricing-variable-compilation-rust).
+
 ## Build a complete model
 
 ```python
@@ -42,8 +64,8 @@ Both require Clp.
 | `SharedRow` | `sense`, `rhs`; sense is `"eq"`, `"le"`, or `"ge"` |
 | `PricingResource` | `kind="disposable"`, `initial=None`, `bounds=None`, `time_windows=None` |
 | `PricingArc` | `tail`, `head`, `cost`, `consumption=()`, `bounds=()`, `entries=()` |
-| `PricingNetwork` | `id`, `vertices`, `multiplicity`, `arcs`, `resources=()`, `source=0`, `sink=None`, `route_entries=()`, `ng=None`, `coupled_resources=()`, `elementary=False` |
-| `NetworkProblem` | `rows`, `networks` |
+| `PricingNetwork` | `id`, `vertices`, `multiplicity`, `arcs`, `resources=()`, `source=0`, `sink=None`, `route_entries=()`, `ng=None`, `coupled_resources=()`, `elementary=False`, `route_domain=None`, `front_program_domain=False` |
+| `NetworkProblem` | `rows`, scalar/array `networks`, optional `pricing_variables` |
 
 Scalar `kind` accepts `"disposable"` or `"equality"`. Resource `bounds` has one
 `(lower, upper)` pair per vertex when supplied; `initial` overrides the source
@@ -59,11 +81,12 @@ fleet multiplicity are different constraints. `sink=None` selects the last
 vertex. `ng` supplies per-vertex neighborhoods; `elementary=True` selects an
 elementary network domain. `coupled_resources` accepts tagged descriptors.
 
-The JSON schema has Rust capabilities beyond these Python dataclasses, including
-independent master variables and imported finite columns. Do not assume a raw
-Rust model with additional top-level fields can round trip through
-`NetworkProblem.from_json`. See the [multi-pricing model guide](../extensions/mp.md)
-for those Rust/CLI interfaces.
+The Rust interface additionally supports independent master variables and
+imported-column domains. Those registrations are not fields in the CLI/Python
+network JSON schema. `pricing_variables` registers original pricing-variable
+identities; it does not add arbitrary static master variables. See the
+[shared model guide](../solver/models.md) and [column imports](../solver/column-imports.md)
+for the Rust-only contracts.
 
 ## Model JSON
 
@@ -78,9 +101,9 @@ Path("model.json").write_text(text, encoding="utf-8")
 restored = NetworkProblem.from_file("model.json")
 ```
 
-The same model format is accepted by `baldes solve model.json` (alias
-`baldes solve`). JSON requires finite numeric fields; it cannot represent
-infinity. Synchronization definitions are solve options, not fields in
+The same model format is accepted by `baldes solve model.json`. JSON rejects
+non-finite numeric literals; an unlimited multiplicity upper bound uses `null`
+as described in the shared model contract. Synchronization definitions are solve options, not fields in
 `NetworkProblem.to_json()`; save them separately for reproducibility.
 
 ## Solve controls
@@ -91,7 +114,7 @@ All options to `solve` are keyword-only.
 | --- | --- | --- |
 | `tree` | `False` | Solve a root LP or search a shared-master integer tree |
 | `network_pricing_schedule` | `"full-sweep"` | `full-sweep`, `cyclic`, `sorted`, `promising-first`, `unvisited-first` |
-| `network_unpromising_limit` | `1` | Positive native queue batch budget |
+| `network_unpromising_limit` | `1` | Positive queue batch budget |
 | `network_branching` | `"multiplicity-first"` | `multiplicity-first`, `resource-first` or `phased` branching policy |
 | `stabilize` | `True` | Dual smoothing when no explicit proximal configuration replaces it |
 | `proximal` | `None` | Explicit proximal bands and optional multi-point policy |
@@ -118,9 +141,32 @@ root = problem.solve(
 ```
 
 `penalty=None` selects a hard band. Use positive validated widths/penalties;
-see [proximal pricing](../extensions/mp.md#proximal-pricing) for the mathematical
+see [proximal pricing](../solver/models.md#proximal-pricing) for the mathematical
 contract. Root and tree APIs have different option sets from routing
 `solve`; there is no `master_solver` keyword here.
+
+### Additional tree and stabilization controls
+
+| Keyword | Default | Behavior |
+| --- | --- | --- |
+| `network_promising_limit` | `1000000` | Promising-network queue budget |
+| `stabilization_max_tree_depth` | `10000` | Disable stabilization at this depth |
+| `network_tree_search` | `"default"` | `default`, `best-bound`, `bound-priority`, `depth-bound-priority` |
+| `network_strategy2_rounding` | `"unrounded"` | Queue-key rounding: `unrounded`, `guarded-tolerance`, `exact-ceil` |
+| `network_open_node_limit` | `1000` | Primary frontier capacity before overflow |
+| `network_scoring_gap_tolerance` | `1e-6` | Absolute branch-score gap tolerance |
+| `network_search_inactive_columns` | `False` | Reprice retained inactive columns before another oracle call |
+| `network_share_inactive_columns` | `False` | Reprice columns shared by tree nodes/trials |
+| `network_branch_priorities` | `None` | Named branch-family priority mapping |
+| `network_branch_directions` | `None` | Named generator directions for phased branching |
+| `mapped_variables` | `()` | Registered original aggregate branch variables |
+| `packing` | `None` | Packing-assignment registration |
+| `variable_boxes` / `original_variable_boxes` | `()` | Verified variable envelopes |
+| `mapped_strong_branching` | `True` | Evaluate admitted mapped branch proposals in trials |
+
+These controls configure the shared lifecycle's model registration. Network
+count does not select another engine. Routing-specific Python keywords belong
+to [routing input](routing.md); a scalar `PricingNetwork` uses these model controls.
 
 ## Resume, branch, and add rows
 
@@ -169,7 +215,7 @@ snapshot's routes, not an index into an unrelated result.
 accepts `NetworkResourceGroupMember(network, arcs)` objects. The original packing
 row must establish at most one occurrence. The operation has resource replay
 and row compatibility preconditions, including enumeration for some resource-load
-rows. See [grouped branches](../extensions/mp.md#grouped-accumulated-resource-branches)
+rows. See [grouped branches](../solver/models.md#grouped-accumulated-resource-branches)
 for the shared boundary convention and restrictions.
 
 ## Integer search
@@ -224,7 +270,7 @@ cutoff-bounded improvement domain. Inspect each report's `coverage_cutoff`:
 below it. Failure to improve an arbitrary cutoff is not original-model
 infeasibility and does not supply a feasible incumbent. Independent certificates
 and numerical MIP bounds remain distinct. See the
-[enumeration contract](../extensions/mp.md#complete-enumeration-and-integer-transfer).
+[enumeration contract](../solver/models.md#complete-enumeration-and-integer-transfer).
 
 ## Synchronized optional service
 
@@ -259,15 +305,16 @@ Put service duration on outgoing arcs. Start bounds are inclusive integers in
 `[-2**52, 2**52]`; the unit determines the time grid. The synchronized axis is
 a graph scalar resource; separate coupled resources may coexist. Resource-load
 rows on the same axis are refreshed when synchronized start domains change.
-The single-network root master accepts bounded walks without cuts; root cut
+The routing registration accepts bounded walks without cuts; its automatic cut
 families require a hard vertex elementarity group on every interior vertex.
+That restriction belongs to routing cut hooks and is independent of network count.
 Root LP columns need not form a synchronized schedule; the tree validates the
 joint integer witness.
 
 A snapshot's service definitions are immutable. Narrow a start domain with
 `with_synchronized_start(id, lower, upper)`; parents remain reusable. Complete
 MIP is deferred while common start domains are non-singleton. The
-[synchronization contract](../extensions/mp.md#synchronized-service-across-vehicles)
+[synchronization contract](../solver/models.md#synchronized-service-across-vehicles)
 explains coverage equations and schedule validation.
 
 
@@ -283,4 +330,4 @@ Each identity must occur in `problem.pricing_variables`. The bound must already
 follow from the pricing graph; an unproved envelope raises an error. These
 bounds guide pricing admission without adding a route restriction. Original
 variable costs remain separate during this calculation even if they cancel on
-shared physical arcs. See the [compilation contract](../extensions/mp.md#original-pricing-variable-compilation-rust).
+shared physical arcs. See the [compilation contract](../solver/models.md#original-pricing-variable-compilation-rust).

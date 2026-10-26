@@ -10,9 +10,9 @@ const out = path.resolve(process.env.BALDES_PROFILE_OUT || 'results/routing-prof
 fs.mkdirSync(out, {recursive:true});
 if(fs.existsSync(out+label+'-metadata.json')) throw Error('Output exists; choose a fresh label or output directory');
 const cases = [
- ['C202','vrptw','instances/C202.txt',[]],
- ['R201-rank1','vrptw','instances/R201.txt',['--rank1']],
- ['R103-rank1','vrptw','instances/R103.txt',['--rank1']],
+ ['C202','vrptw','instances/Solomon/C202.txt',[]],
+ ['R201-rank1','vrptw','instances/Solomon/R201.txt',['--rank1']],
+ ['R103-rank1','vrptw','instances/Solomon/R103.txt',['--rank1']],
  ['A-n32-k5','cvrp','instances/cvrplib/A-n32-k5.vrp',[]],
  ['A-n32-k5-capacity','cvrp','instances/cvrplib/A-n32-k5.vrp',['--capacity-cuts']],
  ['E-n22-k4-cuts','cvrp','instances/cvrplib/E-n22-k4.vrp',['--capacity-cuts','--rank1']],
@@ -25,7 +25,7 @@ const metadata={binary,label,sha256:crypto.createHash('sha256').update(fs.readFi
 fs.writeFileSync(out+label+'-metadata.json',JSON.stringify(metadata,null,2));
 const summary=[];
 for(const [name,type,input,extra] of cases.filter(c => !selected || selected.includes(c[0]))){
- const args=[type,input,'--master','clp','--reference-ng','--ng','8','--no-enumeration','--bound-mode','numerical','--time','45',...extra,...(type==='vrptw'?['--customers','100','--rounding','none']:[])];
+ const args=['solve',input,'--master','clp','--reference-ng','--ng','8','--no-enumeration','--bound-mode','numerical','--time','45',...extra,...(type==='vrptw'?['--customers','100','--rounding','none']:['--ignore-time-windows'])];
  const rows=[];
  let expected;
  for(let i=0;i<4;i++){

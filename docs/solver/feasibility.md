@@ -27,6 +27,19 @@ The objective offset, incumbent and original route costs remain unchanged.
 Stabilization and objective convergence bookkeeping restart before ordinary
 pricing resumes.
 
+## Enumerated and ordinary cut coefficients
+
+Recovery first checks the inherited restricted matrix, including full-memory
+coefficients used by an enumerated route universe. If that matrix is already
+feasible without more pricing, its complete universe is retained.
+
+When recovery needs ordinary labeling, loaded routes may switch to limited-memory
+cut coefficients. The auxiliary LP is re-solved after that change before its
+activity or duals are used. A successful recovery then invalidates the original
+enumeration so the shared CG loop refreshes the resumed master and generated pool
+to the same coefficients. A feasible point from one coefficient contract is never
+used to justify an unchanged matrix under another contract.
+
 ## Outcomes and proof scope
 
 `Output::feasibility` records auxiliary rounds separately from original-objective
