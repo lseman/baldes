@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from pybaldes import Customer, Instance, solve_root
+from pybaldes import Customer, Instance, solve
 
 
 @pytest.mark.parametrize("distance", [1.0, 1e13])
@@ -12,7 +12,7 @@ def test_root_feasibility_diagnostics_survive_typed_results_and_json(distance):
         [Customer(0, 0, due=1e15), Customer(distance, 0, 1, due=1e15)],
         vehicles=1,
     )
-    result = solve_root(
+    result = solve(
         instance, problem_type="cvrp", rounding="none", stabilize=False,
         reduced_cost_fixing=False,
     )

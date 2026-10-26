@@ -266,7 +266,7 @@ fn nonzero_initial_resource_is_transformed_for_symmetric_labeling() {
 #[test]
 fn rank_one_memory_policy_separates_shared_and_graph_dependent_memories() {
     use baldes::cuts::separation::{
-        prepare_incidence, ArcData, ColumnInfo, GraphData, NativeCut, Separation, VertexData,
+        prepare_incidence, ArcData, ColumnInfo, GraphData, SeparatedCut, Separation, VertexData,
     };
     use std::collections::BTreeSet;
     let graph = |id| GraphData {
@@ -336,7 +336,7 @@ fn rank_one_memory_policy_separates_shared_and_graph_dependent_memories() {
                     &[&g0, &g1],
                     vec![(0, i0), (1, prepare_incidence(&g1).unwrap())]
                 ));
-                let mut cut = NativeCut {
+                let mut cut = SeparatedCut {
                     kind: 0,
                     num_rows: 2,
                     denominator: 2,

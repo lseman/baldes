@@ -1,0 +1,97 @@
+{
+  "rows": [],
+  "networks": [
+    {
+      "id": 7,
+      "vertices": 4,
+      "multiplicity": [
+        0,
+        1
+      ],
+      "route_domain": {
+        "kind": "bounded_walks",
+        "max_arcs": 6
+      },
+      "resources": [
+        {
+          "bounds": [
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ]
+          ]
+        },
+        {
+          "bounds": [
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ],
+            [
+              0,
+              6
+            ]
+          ]
+        }
+      ],
+      "arcs": [
+        {
+          "tail": 0,
+          "head": 1,
+          "cost": 0,
+          "consumption": [
+            1,
+            1
+          ]
+        },
+        {
+          "tail": 1,
+          "head": 2,
+          "cost": -1,
+          "consumption": [
+            1,
+            1
+          ]
+        },
+        {
+          "tail": 2,
+          "head": 1,
+          "cost": 0,
+          "consumption": [
+            1,
+            1
+          ]
+        },
+        {
+          "tail": 1,
+          "head": 3,
+          "cost": 0,
+          "consumption": [
+            1,
+            1
+          ]
+        }
+      ]
+    }
+  ]
+}

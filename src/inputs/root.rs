@@ -4,7 +4,7 @@ impl Instance {
     /// Global integer-load packing row obtained by summing customer-cover
     /// equalities. Demands are gcd-scaled; the pricing load is coordinate 1.
     /// Fenchel-only separation is opt in; no rounding/1K cuts are enabled here.
-    pub fn fenchel_cut_config(&self) -> Result<crate::master::root::KnapsackCutConfig> {
+    pub fn fenchel_cut_config(&self) -> Result<crate::master::routing::KnapsackCutConfig> {
         use crate::cuts::knapsack::{FenchelParameters, KnapsackRow};
         let mut divisor = 0_i64;
         let mut demands = Vec::new();
@@ -32,7 +32,7 @@ impl Instance {
         if total > limits.max_capacity as i64 {
             return Err(invalid("Fenchel normalized total demand exceeds the default capacity limit; use explicit Rust resource rows and limits"));
         }
-        let mut config = crate::master::root::KnapsackCutConfig::new(vec![KnapsackRow::new(
+        let mut config = crate::master::routing::KnapsackCutConfig::new(vec![KnapsackRow::new(
             0,
             1,
             1.0 / divisor as f64,
@@ -49,9 +49,9 @@ impl Instance {
         &self,
         rounding: Rounding,
         two_path: bool,
-    ) -> crate::master::root::CapacityCutConfig {
+    ) -> crate::master::routing::CapacityCutConfig {
         use crate::cuts::capacity::TimeWindows;
-        let config = crate::master::root::CapacityCutConfig::new(
+        let config = crate::master::routing::CapacityCutConfig::new(
             self.customers.iter().map(|c| c.demand).collect(),
             self.capacity,
         );
@@ -72,18 +72,18 @@ impl Instance {
         })
     }
     #[cfg(feature = "clp")]
-    pub fn solve_root(
+    pub fn solve(
         &self,
         ng_size: usize,
         rounding: Rounding,
-        mut options: crate::master::root::RootOptions,
-    ) -> Result<crate::master::root::RootOutput> {
+        mut options: crate::master::routing::RootOptions,
+    ) -> Result<crate::master::routing::RootOutput> {
         let graph = self.graph(ng_size, rounding)?;
         options.cg.multiplicity = (self.customers.len() - 1) as f64;
-        let problem = crate::master::root::RootProblem::set_partitioning(
+        let problem = crate::master::routing::RoutingContext::set_partitioning(
             graph,
             (self.customers.len() - 1) as f64,
         )?;
-        crate::master::root::solve(problem, options)
+        crate::master::routing::solve(problem, options)
     }
 }

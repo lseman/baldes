@@ -344,8 +344,8 @@ impl Problem {
 
     /// Set partitioning with one equality per request and up to n vehicles.
     #[cfg(feature = "clp")]
-    pub fn master_problem(&self) -> Result<crate::master::mp::Problem> {
-        use crate::master::{mp, root::Row, RowSense};
+    pub fn master_problem(&self) -> Result<crate::master::model::Problem> {
+        use crate::master::{model, routing::Row, RowSense};
         let n = self.instance.requests;
         let graph = self.pricing_graph(&vec![0.; n], 0.)?;
         let arc_entries = graph
@@ -359,14 +359,14 @@ impl Problem {
                 }
             })
             .collect();
-        Ok(mp::Problem {
+        Ok(model::Problem {
             rows: (0..n)
                 .map(|_| Row {
                     sense: RowSense::Equal,
                     rhs: 1.,
                 })
                 .collect(),
-            networks: vec![mp::Network {
+            networks: vec![model::Network {
                 id: 0,
                 graph,
                 multiplicity: crate::Window::new(0., n as f64)?,

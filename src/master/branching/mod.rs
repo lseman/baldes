@@ -12,7 +12,7 @@ mod packing_set_assignment;
 pub mod resource_intervals;
 mod ryan_foster;
 
-use crate::master::{root::RootProblem, RowSense};
+use crate::master::{routing::RoutingContext, RowSense};
 use crate::{invalid, pricing::restrictions::RyanFosterConstraint, Result, Route};
 pub(crate) use aggregate_flow::edges as aggregate_edges;
 pub use aggregate_flow::AggregateVariable;
@@ -99,7 +99,7 @@ impl BranchConstraint {
             | Self::AccumulatedResourceGroup(_) => (RowSense::LessEqual, 0.),
         }
     }
-    pub fn validate<const D: usize>(&self, p: &RootProblem<D>) -> Result<()> {
+    pub fn validate<const D: usize>(&self, p: &RoutingContext<D>) -> Result<()> {
         if !self.row().1.is_finite() {
             return Err(invalid("finite branch RHS required"));
         }
@@ -122,7 +122,7 @@ impl BranchConstraint {
         }
     }
     /// Per-arc contribution, so new columns and pricing receive identical rows.
-    pub(crate) fn arc_coefficient<const D: usize>(&self, p: &RootProblem<D>, arc: usize) -> f64 {
+    pub(crate) fn arc_coefficient<const D: usize>(&self, p: &RoutingContext<D>, arc: usize) -> f64 {
         match self {
             Self::ArcFlow { arc: target, .. } => arc_flow::coefficient(arc, *target),
             Self::AggregateFlow { arcs, .. } | Self::WindowFlow { arcs, .. } => {
@@ -136,23 +136,23 @@ impl BranchConstraint {
             } => packing_set_assignment::coefficient(p, arc, *vertex, *graph_id),
             Self::RyanFoster(_) | Self::AccumulatedResource(_) => 0.,
             Self::AccumulatedResourceGroup(c) if enforcement::ACCUMULATED_RESOURCE_IN_PRICING => {
-                c.additive(p.graph.arcs[arc].id)
+                c.additive(p.model.networks[0].graph.arcs[arc].id)
             }
             Self::AccumulatedResourceGroup(_) => 0.,
             Self::ClusterBoundary { vertices, .. } => cluster::boundary_coefficient(
                 vertices,
-                p.graph.arcs[arc].tail,
-                p.graph.arcs[arc].head,
+                p.model.networks[0].graph.arcs[arc].tail,
+                p.model.networks[0].graph.arcs[arc].head,
             ),
             Self::ClusterPair { first, second, .. } => cluster::pair_coefficient(
                 first,
                 second,
-                p.graph.arcs[arc].tail,
-                p.graph.arcs[arc].head,
+                p.model.networks[0].graph.arcs[arc].tail,
+                p.model.networks[0].graph.arcs[arc].head,
             ),
         }
     }
-    pub fn coefficient<const D: usize>(&self, p: &RootProblem<D>, route: &Route) -> f64 {
+    pub fn coefficient<const D: usize>(&self, p: &RoutingContext<D>, route: &Route) -> f64 {
         match self {
             Self::RyanFoster(c) => ryan_foster::coefficient(*c, route),
             Self::AccumulatedResource(c) => accumulated_resource::coefficient(*c, route),

@@ -364,15 +364,15 @@ fn explicit_center_intervals_and_baseline_survive_phase_and_schedule_changes() {
 fn native_explicit_defaults_bootstrap_from_latched_mean_and_reduce_artificial_caps() {
     for five in [false, true] {
         let parameters = if five {
-            ProximalParameters::native_five_piece()
+            ProximalParameters::explicit_five_piece()
         } else {
-            ProximalParameters::native_three_piece()
+            ProximalParameters::explicit_three_piece()
         };
         let mut state = ProximalState::default();
         state
             .begin_iteration(&[120.], &[0], 2, &parameters)
             .unwrap();
-        state.explicit_bands = parameters.native_explicit.as_ref().unwrap().initial_bands();
+        state.explicit_bands = parameters.explicit.as_ref().unwrap().initial_bands();
         state.explicit_baseline = Some(1e12);
         assert!(state
             .explicit_bands
@@ -396,11 +396,11 @@ fn native_explicit_defaults_bootstrap_from_latched_mean_and_reduce_artificial_ca
             assert_eq!(band.penalty, (0.9_f32 as f64) / 10.);
         }
     }
-    let parameters = ProximalParameters::native_explicit(NativeExplicitParameters {
+    let parameters = ProximalParameters::explicit(ExplicitParameters {
         kappa: 0.,
         ..Default::default()
     });
-    let bands = parameters.native_explicit.as_ref().unwrap().initial_bands();
+    let bands = parameters.explicit.as_ref().unwrap().initial_bands();
     assert_eq!(bands[0].half_width, 10.);
 }
 
@@ -414,7 +414,7 @@ fn native_rhs_scaled_cap_changes_private_query_without_changing_original_master(
     assert!(master.solve());
     let unscaled = ProximalParameters::three_piece(1., 1.5);
     let mut scaled = unscaled.clone();
-    scaled.native_row_scaling = true;
+    scaled.rhs_row_scaling = true;
     let mut points = vec![];
     for parameters in [&unscaled, &scaled] {
         let mut state = ProximalState::default();
@@ -435,7 +435,7 @@ fn native_rhs_scaled_cap_changes_private_query_without_changing_original_master(
 #[test]
 fn multipoint_checkpoint_retains_samples_activity_age_and_creation_order() {
     let mut state = ProximalState::default();
-    let parameters = ProximalParameters::native_multipoint();
+    let parameters = ProximalParameters::explicit_multipoint();
     state.begin_iteration(&[7.], &[0], 0, &parameters).unwrap();
     state.max_points = 3;
     state.register_point(&[2.], false);
@@ -462,9 +462,9 @@ fn native_multipoint_keeps_unscaled_sample_coefficients_on_rhs_scaled_artificial
     master.add_row(RowSense::Equal, 2., &[]).unwrap();
     master.add_column(10., &[(0, 1.)]).unwrap();
     assert!(master.solve());
-    for (native_scaling, expected) in [(false, 3.), (true, 1.5)] {
-        let mut parameters = ProximalParameters::native_multipoint();
-        parameters.native_row_scaling = native_scaling;
+    for (rhs_scaling, expected) in [(false, 3.), (true, 1.5)] {
+        let mut parameters = ProximalParameters::explicit_multipoint();
+        parameters.rhs_row_scaling = rhs_scaling;
         parameters.bands.last_mut().unwrap().penalty = 2.;
         let mut state = ProximalState::default();
         state.begin_iteration(&[10.], &[0], 0, &parameters).unwrap();
@@ -479,8 +479,8 @@ fn native_multipoint_keeps_unscaled_sample_coefficients_on_rhs_scaled_artificial
 
 #[test]
 fn native_box_step_normalizes_angles_and_uses_function_one_bootstrap() {
-    let parameters = ProximalParameters::native_box_step();
-    let native = parameters.native_explicit.as_ref().unwrap();
+    let parameters = ProximalParameters::finite_box_step();
+    let native = parameters.explicit.as_ref().unwrap();
     assert!(native.box_step);
     let mut state = ProximalState::default();
     state
@@ -498,7 +498,7 @@ fn native_box_step_normalizes_angles_and_uses_function_one_bootstrap() {
 #[test]
 fn native_nonpositive_kappa_respects_public_interval_names_and_normalization() {
     for kappa in [0., -1.] {
-        let parameters = ProximalParameters::native_explicit(NativeExplicitParameters {
+        let parameters = ProximalParameters::explicit(ExplicitParameters {
             five_piece: true,
             kappa,
             outer_half_width: 100.,
@@ -507,7 +507,7 @@ fn native_nonpositive_kappa_respects_public_interval_names_and_normalization() {
             inner_penalty: 0.5,
             ..Default::default()
         });
-        let native = parameters.native_explicit.as_ref().unwrap();
+        let native = parameters.explicit.as_ref().unwrap();
         let mut state = ProximalState::default();
         state
             .begin_iteration(&[120.], &[0], 0, &parameters)
@@ -523,27 +523,25 @@ fn native_nonpositive_kappa_respects_public_interval_names_and_normalization() {
         assert_eq!(state.explicit_bands[1].half_width, 10.);
     }
     // Native postTreatment clamps public InnerHalfInterval to OuterHalfInterval.
-    let native = NativeExplicitParameters {
+    let native = ExplicitParameters {
         kappa: 0.,
         outer_half_width: 100.,
         inner_half_width: 1e12,
         ..Default::default()
     };
     assert_eq!(native.initial_bands()[0].half_width, 100.);
-    assert!(
-        ProximalParameters::native_explicit(NativeExplicitParameters {
-            box_step: true,
-            five_piece: true,
-            ..Default::default()
-        })
-        .validate()
-        .is_err()
-    );
+    assert!(ProximalParameters::explicit(ExplicitParameters {
+        box_step: true,
+        five_piece: true,
+        ..Default::default()
+    })
+    .validate()
+    .is_err());
 }
 
 #[test]
 fn native_multipoint_defaults_retain_both_artificial_pairs_and_only_relax_last_cap() {
-    let parameters = ProximalParameters::native_multipoint();
+    let parameters = ProximalParameters::explicit_multipoint();
     assert_eq!(parameters.bands.len(), 2);
     assert!(parameters
         .bands

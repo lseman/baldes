@@ -1,0 +1,23 @@
+[
+  {
+    "network": 7,
+    "variables": [
+      {
+        "arc": 0,
+        "upper": 1
+      },
+      {
+        "arc": 1,
+        "upper": 2
+      },
+      {
+        "arc": 2,
+        "upper": 2
+      },
+      {
+        "arc": 3,
+        "upper": 1
+      }
+    ]
+  }
+]

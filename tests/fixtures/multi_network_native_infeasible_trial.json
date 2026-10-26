@@ -1,0 +1,392 @@
+{
+  "rows": [
+    {
+      "sense": "eq",
+      "rhs": 1.0
+    },
+    {
+      "sense": "eq",
+      "rhs": 1.0
+    },
+    {
+      "sense": "eq",
+      "rhs": 1.0
+    }
+  ],
+  "networks": [
+    {
+      "id": 7,
+      "vertices": 7,
+      "multiplicity": [
+        0,
+        1
+      ],
+      "resources": [
+        {
+          "bounds": [
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ]
+          ]
+        },
+        {
+          "bounds": [
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ]
+          ]
+        }
+      ],
+      "elementary": true,
+      "arcs": [
+        {
+          "tail": 0,
+          "head": 1,
+          "cost": 1.0,
+          "consumption": [
+            1.0,
+            1.0
+          ],
+          "entries": [
+            [
+              0,
+              1.0
+            ],
+            [
+              1,
+              1.0
+            ]
+          ]
+        },
+        {
+          "tail": 1,
+          "head": 6,
+          "cost": 0.0,
+          "consumption": [
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "tail": 0,
+          "head": 2,
+          "cost": 1.0,
+          "consumption": [
+            1.0,
+            1.0
+          ],
+          "entries": [
+            [
+              1,
+              1.0
+            ],
+            [
+              2,
+              1.0
+            ]
+          ]
+        },
+        {
+          "tail": 2,
+          "head": 6,
+          "cost": 0.0,
+          "consumption": [
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "tail": 0,
+          "head": 3,
+          "cost": 1.0,
+          "consumption": [
+            1.0,
+            1.0
+          ],
+          "entries": [
+            [
+              0,
+              1.0
+            ]
+          ]
+        },
+        {
+          "tail": 3,
+          "head": 6,
+          "cost": 0.0,
+          "consumption": [
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "tail": 0,
+          "head": 4,
+          "cost": 1.0,
+          "consumption": [
+            1.0,
+            1.0
+          ],
+          "entries": [
+            [
+              1,
+              1.0
+            ]
+          ]
+        },
+        {
+          "tail": 4,
+          "head": 6,
+          "cost": 0.0,
+          "consumption": [
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "tail": 0,
+          "head": 5,
+          "cost": 1.0,
+          "consumption": [
+            1.0,
+            1.0
+          ],
+          "entries": [
+            [
+              2,
+              1.0
+            ]
+          ]
+        },
+        {
+          "tail": 5,
+          "head": 6,
+          "cost": 0.0,
+          "consumption": [
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "vertices": 6,
+      "multiplicity": [
+        0,
+        3
+      ],
+      "resources": [
+        {
+          "bounds": [
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ]
+          ]
+        },
+        {
+          "bounds": [
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ]
+          ]
+        }
+      ],
+      "elementary": true,
+      "arcs": [
+        {
+          "tail": 0,
+          "head": 1,
+          "cost": 1.0,
+          "consumption": [
+            1.0,
+            1.0
+          ],
+          "entries": [
+            [
+              0,
+              1.0
+            ],
+            [
+              2,
+              1.0
+            ]
+          ]
+        },
+        {
+          "tail": 1,
+          "head": 5,
+          "cost": 0.0,
+          "consumption": [
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "tail": 0,
+          "head": 2,
+          "cost": 1.0,
+          "consumption": [
+            1.0,
+            1.0
+          ],
+          "entries": [
+            [
+              0,
+              1.0
+            ]
+          ]
+        },
+        {
+          "tail": 2,
+          "head": 5,
+          "cost": 0.0,
+          "consumption": [
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "tail": 0,
+          "head": 3,
+          "cost": 1.0,
+          "consumption": [
+            1.0,
+            1.0
+          ],
+          "entries": [
+            [
+              1,
+              1.0
+            ]
+          ]
+        },
+        {
+          "tail": 3,
+          "head": 5,
+          "cost": 0.0,
+          "consumption": [
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "tail": 0,
+          "head": 4,
+          "cost": 1.0,
+          "consumption": [
+            1.0,
+            1.0
+          ],
+          "entries": [
+            [
+              2,
+              1.0
+            ]
+          ]
+        },
+        {
+          "tail": 4,
+          "head": 5,
+          "cost": 0.0,
+          "consumption": [
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    }
+  ]
+}

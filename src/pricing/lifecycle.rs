@@ -2,13 +2,28 @@
 use super::*;
 
 impl<const D: usize> Solver<D> {
+    /// Geometry of the objective used by the most recent functor search.
+    pub(crate) fn pricing_engine(&self) -> Option<&LabelingEngine<D>> {
+        self.raw_pricing
+            .as_ref()
+            .and_then(|raw| raw.solver.engine.as_ref())
+            .or(self.engine.as_ref())
+    }
     /// columnGenerationTerminated as Alg4EvalByLagrangianDuality
     /// calls it after each converged column generation: the statistics form,
     /// then the end-of-round form that applies a pending bucket-step decrease.
     /// Returns the stop-cut-generation flag of the statistics form.
     pub fn column_generation_terminated(&mut self, flag3: i32, flag5: i32) -> Result<bool> {
         let enumerated = self.enumeration.is_some();
-        let grid = self.engine.as_ref().map(|e| &e.grid);
+        // Borrow the geometry and round state independently.
+        let grid = if self.raw_pricing.is_some() {
+            self.raw_pricing
+                .as_ref()
+                .and_then(|raw| raw.solver.engine.as_ref())
+                .map(|e| &e.grid)
+        } else {
+            self.engine.as_ref().map(|e| &e.grid)
+        };
         let (stop, _) = self
             .round
             .action(&self.options, grid, enumerated, false, flag3, flag5)?;
@@ -16,7 +31,12 @@ impl<const D: usize> Solver<D> {
             self.round
                 .action(&self.options, grid, enumerated, true, flag3, flag5)?;
         if decrease {
-            if let Some(engine) = self.engine.as_mut() {
+            let engine = if let Some(raw) = &mut self.raw_pricing {
+                raw.solver.engine.as_mut()
+            } else {
+                self.engine.as_mut()
+            };
+            if let Some(engine) = engine {
                 // "cannot decrease bucket steps" is reported and ignored.
                 let _ = engine.grid.decrease_steps(&self.graph);
                 for (axis, &slot) in engine.grid.resource_slots.iter().enumerate() {

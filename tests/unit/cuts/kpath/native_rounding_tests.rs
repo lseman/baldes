@@ -62,7 +62,7 @@ fn native_decimal_cuts_preserve_feasible_matchings_and_separate_real_overload() 
     let (graph, paths) = cycle_graph();
     for packing in [false, true] {
         for demand in [0.1, 0.100_000_1] {
-            let mut separator = NativeKPathSeparator::new(packing);
+            let mut separator = GeneralKPathSeparator::new(packing);
             separator
                 .prepare(std::slice::from_ref(&graph), &[demand; 16], 0.2, -1)
                 .unwrap();
@@ -99,7 +99,7 @@ fn native_decimal_cuts_preserve_feasible_matchings_and_separate_real_overload() 
 #[test]
 fn native_separation_transfers_pulse_storage_and_restores_it_on_rejected_input() {
     let (graph, paths) = cycle_graph();
-    let mut separator = NativeKPathSeparator::new(true);
+    let mut separator = GeneralKPathSeparator::new(true);
     separator.prepare(&[graph], &[0.1; 16], 0.2, -1).unwrap();
     let pulse = &mut separator.preparation.pulse;
     assert!(pulse.set_ready_time(vec![0.; 18]));

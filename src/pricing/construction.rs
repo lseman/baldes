@@ -35,6 +35,7 @@ impl<const D: usize> Solver<D> {
             accumulated_original_bounds: vec![],
             ng_baseline: None,
             variable_costs: vec![],
+            raw_arc_costs: None,
             arc_cost_scratch: vec![],
             raw_pricing: None,
             enumeration_snapshot: None,
@@ -105,6 +106,11 @@ impl<const D: usize> Solver<D> {
                 self.variable_costs.clone()
             } else {
                 vec![]
+            },
+            raw_arc_costs: if keep_cost_state {
+                self.raw_arc_costs.clone()
+            } else {
+                None
             },
             arc_cost_scratch: vec![],
             raw_pricing: None,

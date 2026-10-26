@@ -1,6 +1,6 @@
 use super::*;
 use baldes::master::preprocessing::Bounds;
-use mp::{EnumerationOptions, MasterVariable};
+use model::{EnumerationOptions, MasterVariable};
 
 fn variable(cost: f64, bounds: Bounds, entries: Vec<(usize, f64)>) -> MasterVariable {
     MasterVariable {
@@ -59,7 +59,7 @@ fn one_sided_and_free_master_domains_do_not_create_artificial_caps() {
         ] {
             let mut configured = options();
             configured.cg.bound_mode = mode;
-            let output = mp::solve_with_master_variables(
+            let output = model::solve_with_master_variables(
                 triangle(),
                 vec![variable(cost, bounds, vec![])],
                 configured,
@@ -84,7 +84,7 @@ fn input_unbounded_variables_can_be_bounded_by_shared_rows_or_later_fixing() {
             if enumerate {
                 configured.enumeration = Some(EnumerationOptions::default());
             }
-            let root = mp::solve_with_master_variables(
+            let root = model::solve_with_master_variables(
                 triangle(),
                 vec![variable(
                     0.25,
@@ -144,7 +144,7 @@ fn truly_unbounded_master_directions_do_not_stop_at_the_default_column_upper() {
     ] {
         let mut configured = options();
         configured.cg.bound_mode = BoundMode::Certified;
-        let output = mp::solve_with_master_variables(
+        let output = model::solve_with_master_variables(
             triangle(),
             vec![variable(cost, bounds, vec![])],
             configured,
@@ -192,14 +192,14 @@ fn infinite_wrong_signs_and_nan_are_rejected_without_forbidding_valid_free_domai
             upper: 1.,
         },
     ] {
-        assert!(mp::solve_with_master_variables(
+        assert!(model::solve_with_master_variables(
             triangle(),
             vec![variable(0., bounds, vec![])],
             options()
         )
         .is_err());
     }
-    let root = mp::solve_with_master_variables(
+    let root = model::solve_with_master_variables(
         triangle(),
         vec![variable(
             0.,
@@ -233,7 +233,7 @@ fn feasible_values_above_the_backend_default_cap_remain_available() {
     let large = 2_000_000_000_000.;
     let mut configured = options();
     configured.cg.bound_mode = BoundMode::Certified;
-    let root = mp::solve_with_master_variables(
+    let root = model::solve_with_master_variables(
         triangle(),
         vec![variable(
             0.,
@@ -290,7 +290,7 @@ fn proof_only_projection_handles_non_dyadic_duals_without_a_finite_sentinel() {
         if enumerate {
             configured.enumeration = Some(EnumerationOptions::default());
         }
-        let root = mp::solve_with_master_variables(
+        let root = model::solve_with_master_variables(
             triangle(),
             vec![variable(
                 0.3,

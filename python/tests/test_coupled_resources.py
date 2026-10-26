@@ -148,15 +148,15 @@ def test_computed_front_domain_is_an_explicit_installation_choice():
     point = 0.30000000000000004
     model.add_slope_interval_cost(
         .1, .1, 0., 1., [.2, 0.],
-        [EncodedFunction.slope_segments([(3., point)], "native_tolerance"),
-         EncodedFunction.slope_segments([(0., point)], "native_tolerance")],
-        policy="native_front_algebra",
+        [EncodedFunction.slope_segments([(3., point)], "endpoint_tolerance"),
+         EncodedFunction.slope_segments([(0., point)], "endpoint_tolerance")],
+        policy="front_algebra",
     )
-    model.install(solver, native_front_program_domain=True)
+    model.install(solver, front_program_domain=True)
     minimum, routes = solver.price(10)
     assert minimum == pytest.approx(-17.)
     assert routes[0].original_cost == pytest.approx(-17.)
     # Invalid opt-in must leave the live, already installed model intact.
     with pytest.raises(RuntimeError, match="native raw resources"):
-        ResourceModel().install(solver, native_front_program_domain=True)
+        ResourceModel().install(solver, front_program_domain=True)
     assert solver.price(10)[0] == pytest.approx(-17.)

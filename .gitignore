@@ -121,13 +121,6 @@ Thumbs.db
 /examples/verify_*.rs
 
 /external/
-/mtw/*
-!/mtw/baldes_pricing.py
-!/mtw/test_pricing_baldes.py
-!/mtw/run_pybaldes_main.py
-!/mtw/test_pybaldes_main.py
-!/mtw/bp_mtw_baldes.py
-!/mtw/make_pybaldes_paper.py
 
-!/mtw/synchronized_baldes.py
-!/mtw/test_synchronized_baldes.py
+# Local working and experimental files
+/working/

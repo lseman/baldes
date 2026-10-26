@@ -96,10 +96,10 @@ raises `ValueError`. `to_dict()`/`from_dict()` retain explicit wire encoding.
 Use them when inserting encoded functions into network JSON descriptors.
 
 Knot functions use strict closed domains. Slope functions accept evaluation
-policy `"strict_domain"` (default) or `"native_tolerance"`. Slope interval/paired
+policy `"strict_domain"` (default) or `"endpoint_tolerance"`. Slope interval/paired
 resources separately choose front policy `"strict_domain"` or
-`"native_front_algebra"`. Strict fronts require strict slope functions;
-native-front-algebra fronts require native-tolerance slope functions. Knot
+`"front_algebra"`. Strict fronts require strict slope functions;
+front-algebra fronts require endpoint-tolerance slope functions. Knot
 functions cannot be substituted where lossless slope encodings are required.
 
 Paired modes are `"feasibility"`, `"cost_bounded"`, and `"cost_unbounded"`.

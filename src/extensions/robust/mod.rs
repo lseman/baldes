@@ -9,13 +9,13 @@
 //! the worst-case load and service start are kept for each γ = 0..=Γ. Time
 //! cannot use the Γ largest deviations, because waiting absorbs some of them.
 //!
-//! Production pricing uses [`Problem::native_graph`] with the standard
-//! `crate::master::root::solve` adapter (Clp feature), or CLI `--robust`.
+//! Production pricing uses [`Problem::pricing_graph`] with the standard
+//! `crate::master::routing::solve` adapter (Clp feature), or CLI `--robust`.
 //! The independent forward labeler in [`reference`] is for validation only.
 
 use crate::{invalid, Result};
 
-mod native;
+mod physical_graph;
 pub mod reference;
 mod solomon;
 #[doc(hidden)]
@@ -23,7 +23,7 @@ mod solomon;
 pub use reference::{PricedRoute, PricingOptions, PricingResult, PricingStatistics, PricingStatus};
 #[doc(hidden)]
 #[deprecated(
-    note = "validation-only API; use robust::reference explicitly, or native_graph with the standard root solver for production"
+    note = "validation-only API; use robust::reference explicitly, or pricing_graph with the standard routing solver for production"
 )]
 pub use reference::{
     RobustColumn, RobustColumnGenerationOptions, RobustColumnGenerationResult,
@@ -96,8 +96,8 @@ pub struct RobustSchedule {
 
 impl Problem {
     /// Compatibility entry point for the validation-only forward labeler.
-    /// Production pricing uses [`Self::native_graph`] and the standard solver.
-    #[deprecated(note = "use reference::price for validation, or native_graph for production")]
+    /// Production pricing uses [`Self::pricing_graph`] and the standard solver.
+    #[deprecated(note = "use reference::price for validation, or pricing_graph for production")]
     pub fn price(
         &self,
         duals: &[f64],

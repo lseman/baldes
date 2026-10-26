@@ -1,8 +1,8 @@
 //! Directed physical arc-flow branching.
-use crate::{invalid, master::root::RootProblem, Result};
+use crate::{invalid, master::routing::RoutingContext, Result};
 
-pub(super) fn validate<const D: usize>(problem: &RootProblem<D>, arc: usize) -> Result<()> {
-    if arc >= problem.graph.arcs.len() {
+pub(super) fn validate<const D: usize>(problem: &RoutingContext<D>, arc: usize) -> Result<()> {
+    if arc >= problem.model.networks[0].graph.arcs.len() {
         return Err(invalid("branch arc index"));
     }
     Ok(())

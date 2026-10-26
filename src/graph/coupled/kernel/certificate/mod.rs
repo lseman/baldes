@@ -113,7 +113,7 @@ impl CoupledKernel {
         }
         debit(work, 1, deadline)?;
         let mut alternate = self.clone();
-        alternate.native_front_program_domain = true;
+        alternate.front_program_domain = true;
         let (feasible, objective) = alternate.certify_with_budget(arcs, work, deadline)?;
         Some(super::FrontProgramCertificate {
             feasible,

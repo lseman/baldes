@@ -5,7 +5,7 @@ fn cut(id: i32, visit_once: bool) -> RankOneCut {
         weights: vec![0, 1, 2, 1, 0, 0],
         graph_support: BTreeMap::new(),
         graph_pricing_support: BTreeMap::new(),
-        native_kpath_support: None,
+        general_kpath_support: None,
         memory: vec![true; 6],
         graph_dependent_memory: false,
         graph_memories: BTreeMap::new(),
@@ -14,7 +14,7 @@ fn cut(id: i32, visit_once: bool) -> RankOneCut {
         graph_arc_memories: BTreeMap::new(),
         arc_weights: [(3, 1)].into_iter().collect(),
         visit_once,
-        native_type2: false,
+        type2: false,
         denominator: 3,
         dual: -1.234567891,
         class: CutClass::Packing,
@@ -28,7 +28,7 @@ fn cut(id: i32, visit_once: bool) -> RankOneCut {
 fn fixture() -> (CutRegistry, Graph<2>) {
     let mut registry = CutRegistry::default();
     registry.cuts = vec![cut(0, false), cut(1, true), cut(2, true), cut(3, true)];
-    registry.cuts[2].native_kpath_support = Some(vec![2, 1]);
+    registry.cuts[2].general_kpath_support = Some(vec![2, 1]);
     registry.cuts[3].graph_dependent_memory = true;
     // A duplicated cut must contribute twice in exactly this order.
     registry.pricing_order = vec![2, 0, 2, 3];
@@ -135,7 +135,7 @@ fn every_nondual_cut_field_invalidates_the_source_snapshot() {
         |c| {
             c.graph_pricing_support.insert(0, vec![(1, 2)]);
         },
-        |c| c.native_kpath_support = Some(vec![1]),
+        |c| c.general_kpath_support = Some(vec![1]),
         |c| c.memory[0] = !c.memory[0],
         |c| c.graph_dependent_memory = !c.graph_dependent_memory,
         |c| {
@@ -152,7 +152,7 @@ fn every_nondual_cut_field_invalidates_the_source_snapshot() {
             c.arc_weights.insert(9, 2);
         },
         |c| c.visit_once = !c.visit_once,
-        |c| c.native_type2 = !c.native_type2,
+        |c| c.type2 = !c.type2,
         |c| c.denominator += 1,
         |c| c.class = CutClass::Covering,
         |c| c.rhs += 1,

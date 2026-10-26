@@ -85,7 +85,7 @@ fn increasing_arrival_and_departure_increment_use_cached_composition() {
 fn paired_composition_intersects_each_component_domain_before_waiting() {
     for policy in [
         FrontOperationPolicy::StrictDomain,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
     ] {
         let source = SlopeRelationArc {
             arrival: function(&[(0., 0.), (2., 4.)]),

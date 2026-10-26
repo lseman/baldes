@@ -3,7 +3,7 @@
 [Documentation index](../README.md)
 
 With `clp`, Rust callers can import finite column domains through
-`master::mp::imported`. Routing networks are optional. Imported
+`master::model::imported`. Routing networks are optional. Imported
 columns are original-vector patterns, so this interface also supports finite
 non-routing models without constructing synthetic routes.
 
@@ -177,7 +177,7 @@ domains. This protocol enumerates a domain; it supplies no reduced-cost pricing
 or external optimality certificate.
 
 ```rust
-use baldes::master::mp::imported::{ColumnBatch, ImportOptions, ImportStatus};
+use baldes::master::model::imported::{ColumnBatch, ImportOptions, ImportStatus};
 
 let session = node.begin_import(7)?;
 let progress = session.collect(&ImportOptions::default(), |known, remaining| {
@@ -364,7 +364,7 @@ columns. This makes an exactly validated solution using known columns a valid
 incumbent while external domains remain open.
 
 Call `tree.run(&tree_options, &import_limits, callback)` with ordinary
-`AssignmentTreeOptions` and `ImportOptions`. The callback receives fresh phase-I
+`ModelTreeOptions` and `ImportOptions`. The callback receives fresh phase-I
 or objective prices for the current node. Original-variable, qualified-column,
 routing-multiplicity and physical-arc branches remain in the restriction journal
 when new patterns arrive. Accepted patterns are shared with siblings. A source

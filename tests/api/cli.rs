@@ -13,7 +13,7 @@ fn routing_parallel_tree_is_optional_and_validates_worker_count() {
     let json = file.with_extension("json");
     std::fs::write(&file, "triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let output = command()
-        .arg("vrptw")
+        .arg("solve")
         .arg(&file)
         .args([
             "--tree",
@@ -44,7 +44,7 @@ fn routing_parallel_tree_is_optional_and_validates_worker_count() {
         ("2", "--tree-threads requires --tree"),
     ] {
         let output = command()
-            .arg("vrptw")
+            .arg("solve")
             .arg(&file)
             .args(["--tree-threads", threads])
             .output()
@@ -62,8 +62,9 @@ fn routing_phase_one_restores_expensive_costs_and_exposes_separate_diagnostics()
     let json = file.with_extension("json");
     std::fs::write(&file, "phase-i\nVEHICLE\nNUMBER CAPACITY\n1 1\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000000000000000 0\n1 10000000000000 0 1 0 1000000000000000 0\n").unwrap();
     let output = command()
-        .arg("cvrp")
+        .arg("solve")
         .arg(&file)
+        .arg("--ignore-time-windows")
         .args([
             "--rounding",
             "none",
@@ -339,8 +340,9 @@ fn fenchel_cli_separates_and_rejects_noninteger_demands() {
     let text = "fenchel-cli\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n";
     std::fs::write(&file, text).unwrap();
     let output = command()
-        .arg("cvrp")
+        .arg("solve")
         .arg(&file)
+        .arg("--ignore-time-windows")
         .args(["--fenchel-cuts", "--log", "--rounding", "none", "--json"])
         .arg(&json)
         .output()
@@ -380,8 +382,9 @@ fn fenchel_cli_separates_and_rejects_noninteger_demands() {
     assert!((report["bound"].as_f64().unwrap() - (4.0 + 2.0_f64.sqrt())).abs() < 1e-7);
     std::fs::write(&file, text.replace("1 1 0 1 0", "1 1 0 0.5 0")).unwrap();
     let output = command()
-        .arg("cvrp")
+        .arg("solve")
         .arg(&file)
+        .arg("--ignore-time-windows")
         .arg("--fenchel-cuts")
         .output()
         .unwrap();
@@ -470,8 +473,6 @@ fn help_and_invalid_instance_types() {
     for args in [
         vec!["--help"],
         vec!["solve", "--help"],
-        vec!["vrptw", "--help"],
-        vec!["cvrp", "--help"],
         vec!["hgs", "--help"],
     ] {
         let output = command().args(args).output().unwrap();
@@ -482,7 +483,7 @@ fn help_and_invalid_instance_types() {
         vec![],
         vec!["evrp"],
         vec!["solve"],
-        vec!["vrptw"],
+        vec!["solve"],
         vec!["cvrp"],
         vec!["hgs"],
     ] {
@@ -500,7 +501,7 @@ fn bound_mode_is_explicit_in_root_and_tree_json() {
         for mode in [None, Some("numerical"), Some("certified")] {
             let json = path.with_extension(format!("{tree}-{}.json", mode.unwrap_or("default")));
             let mut cmd = command();
-            cmd.arg("vrptw")
+            cmd.arg("solve")
                 .arg(&path)
                 .args(["--no-stabilization", "--no-enumeration", "--json"])
                 .arg(&json);
@@ -536,7 +537,7 @@ fn bound_mode_is_explicit_in_root_and_tree_json() {
     }
     for flags in [vec!["--bound-mode"], vec!["--bound-mode", "invalid"]] {
         let result = command()
-            .arg("vrptw")
+            .arg("solve")
             .arg(&path)
             .args(flags)
             .output()
@@ -559,10 +560,11 @@ fn cvrp_ignores_time_windows_while_vrptw_enforces_them() {
     )
     .unwrap();
     for (kind, flags, expected) in [
-        ("vrptw", vec![], 4.),
-        ("cvrp", vec![], 3.4),
-        ("cvrp", vec!["--rounding", "tenth"], 3.4),
-        ("cvrp", vec!["--rounding", "none"], 2. + 2_f64.sqrt()),
+        (
+            "solve",
+            vec!["--ignore-time-windows", "--rounding", "tenth"],
+            3.4,
+        ),
         ("solve", vec![], 4.),
         ("solve", vec!["--ignore-time-windows"], 3.4),
         (
@@ -626,7 +628,7 @@ fn tree_and_kohl_controls_reach_integer_solve_and_reject_cvrp_time_resource() {
         std::env::temp_dir().join(format!("baldes-tree-controls-{}.json", std::process::id()));
     let output = command()
         .args([
-            "vrptw",
+            "solve",
             "instances/Solomon/R101.txt",
             "--customers",
             "10",
@@ -656,7 +658,12 @@ fn tree_and_kohl_controls_reach_integer_solve_and_reject_cvrp_time_resource() {
     );
     std::fs::remove_file(json).unwrap();
     let output = command()
-        .args(["cvrp", "instances/Solomon/R101.txt", "--two-path-cuts"])
+        .args([
+            "solve",
+            "instances/Solomon/R101.txt",
+            "--ignore-time-windows",
+            "--two-path-cuts",
+        ])
         .output()
         .unwrap();
     assert!(!output.status.success());
@@ -669,7 +676,7 @@ fn tree_branching_mode_is_explicit_and_validated() {
         std::env::temp_dir().join(format!("baldes-branching-cli-{}.txt", std::process::id()));
     std::fs::write(&path,"triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for mode in [
-        "native",
+        "default",
         "vehicles",
         "ryan-foster",
         "arc",
@@ -678,7 +685,7 @@ fn tree_branching_mode_is_explicit_and_validated() {
         "hybrid",
     ] {
         let output = command()
-            .arg("vrptw")
+            .arg("solve")
             .arg(&path)
             .args(["--tree", "--branching", mode, "--no-stabilization"])
             .output()
@@ -692,7 +699,7 @@ fn tree_branching_mode_is_explicit_and_validated() {
     }
     let json = path.with_extension("no-history.json");
     let output = command()
-        .arg("vrptw")
+        .arg("solve")
         .arg(&path)
         .args(["--tree", "--no-branch-history", "--json"])
         .arg(&json)
@@ -709,7 +716,7 @@ fn tree_branching_mode_is_explicit_and_validated() {
     assert_eq!(report["branch_history_ranked"], 0);
     std::fs::remove_file(json).unwrap();
     let output = command()
-        .arg("vrptw")
+        .arg("solve")
         .arg(&path)
         .args(["--tree", "--branching", "invalid"])
         .output()
@@ -725,7 +732,7 @@ fn enumerated_mip_flag_requires_tree_and_uses_the_available_backend() {
         std::env::temp_dir().join(format!("baldes-enumerated-mip-{}.txt", std::process::id()));
     std::fs::write(&path,"triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let invalid = command()
-        .arg("vrptw")
+        .arg("solve")
         .arg(&path)
         .arg("--enumerated-mip")
         .output()
@@ -735,7 +742,7 @@ fn enumerated_mip_flag_requires_tree_and_uses_the_available_backend() {
     let json = path.with_extension("json");
     // A finite witness from the heuristic triggers automatic enumeration.
     let result = command()
-        .arg("vrptw")
+        .arg("solve")
         .arg(&path)
         .args([
             "--tree",
@@ -770,7 +777,7 @@ fn canonical_and_legacy_option_names_reach_the_same_root_and_tree_controls() {
     for prefix in ["BALDES", "RCSP"] {
         for tree in [false, true] {
             let mut args = vec![
-                "vrptw".to_owned(),
+                "solve".to_owned(),
                 "instances/Solomon/R101.txt".to_owned(),
                 "--customers".to_owned(),
                 "4".to_owned(),
@@ -810,7 +817,7 @@ fn hgs_warm_start_and_ipm_flags_reach_the_routing_master() {
     std::fs::write(&path,"tiny\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n").unwrap();
     for columns in ["best", "all", "1"] {
         let output = command()
-            .arg("vrptw")
+            .arg("solve")
             .arg(&path)
             .args([
                 "--master",
@@ -850,7 +857,7 @@ fn hgs_warm_start_and_ipm_flags_reach_the_routing_master() {
         vec!["--hgs-time", "NaN"],
     ] {
         assert!(!command()
-            .arg("vrptw")
+            .arg("solve")
             .arg(&path)
             .args(flags)
             .output()
@@ -864,7 +871,7 @@ fn hgs_warm_start_and_ipm_flags_reach_the_routing_master() {
 #[test]
 fn cg_progress_is_opt_in_periodic_and_separate_from_results() {
     let base = [
-        "vrptw",
+        "solve",
         "instances/Solomon/R101.txt",
         "--customers",
         "5",
@@ -908,9 +915,10 @@ fn cg_progress_is_opt_in_periodic_and_separate_from_results() {
     }) {
         let cells: Vec<_> = line.split_whitespace().collect();
         assert!(
-            cells[cells.len() - 3]
-                .split('/')
-                .all(|s| s.parse::<f64>().is_ok()),
+            cells[cells.len() - 3] == "--"
+                || cells[cells.len() - 3]
+                    .split('/')
+                    .all(|s| s.parse::<f64>().is_ok()),
             "{line}"
         );
     }
@@ -954,7 +962,7 @@ fn cg_progress_is_opt_in_periodic_and_separate_from_results() {
 fn highs_master_selection_respects_the_build_features() {
     let result = command()
         .args([
-            "vrptw",
+            "solve",
             "instances/Solomon/R101.txt",
             "--customers",
             "5",
@@ -982,7 +990,7 @@ fn highs_master_selection_respects_the_build_features() {
 fn hgs_solver_log_precedes_column_generation_and_preserves_stdout() {
     let output = command()
         .args([
-            "vrptw",
+            "solve",
             "instances/Solomon/R101.txt",
             "--customers",
             "5",
@@ -1054,7 +1062,7 @@ fn clp_runtime_policy_modes_are_validated() {
         ("--clp-work-areas", "invalid"),
     ] {
         let output = command()
-            .args(["vrptw", "instances/Solomon/C101.txt", flag, value])
+            .args(["solve", "instances/Solomon/C101.txt", flag, value])
             .output()
             .unwrap();
         assert!(!output.status.success());
@@ -1065,7 +1073,7 @@ fn clp_runtime_policy_modes_are_validated() {
     for scaling in ["auto", "geometric", "equilibrium", "off"] {
         for areas in ["retain", "discard"] {
             let output = command()
-                .arg("vrptw")
+                .arg("solve")
                 .arg(&path)
                 .args([
                     "--clp-scaling",
@@ -1105,7 +1113,7 @@ fn cg_progress_shows_only_enabled_cut_families() {
     ] {
         let output = command()
             .args([
-                "vrptw",
+                "solve",
                 "instances/Solomon/R101.txt",
                 "--customers",
                 "5",
@@ -1188,7 +1196,7 @@ fn solve_detects_cvrplib_and_rejects_time_window_cuts() {
 
 #[test]
 fn all_cuts_supports_capacity_only_models_and_rejects_hgs() {
-    for flags in [vec!["cvrp"], vec!["solve", "--ignore-time-windows"]] {
+    for flags in [vec!["solve", "--ignore-time-windows"]] {
         let mut cmd = command();
         cmd.arg(flags[0]).arg("instances/Solomon/R101.txt");
         cmd.args(&flags[1..]);
@@ -1246,7 +1254,7 @@ fn deluxing_flag_enables_enumerated_mip_and_checks_dependencies() {
         ),
     ] {
         let out = command()
-            .arg("vrptw")
+            .arg("solve")
             .arg(&path)
             .args(flags)
             .output()
@@ -1256,7 +1264,7 @@ fn deluxing_flag_enables_enumerated_mip_and_checks_dependencies() {
     }
     let json = path.with_extension("json");
     let out = command()
-        .arg("vrptw")
+        .arg("solve")
         .arg(&path)
         .args([
             "--tree",
@@ -1384,5 +1392,34 @@ fn robust_tree_resumes_consistent_cut_pricing_after_enumeration() {
             "{stdout}"
         );
         assert!(stdout.contains(&format!("bound={optimum:.2}")), "{stdout}");
+    }
+}
+
+#[test]
+fn routing_root_and_tree_share_the_json_stdout_sink() {
+    for tree in [false, true] {
+        let mut cmd = command();
+        cmd.args([
+            "solve",
+            "instances/Solomon/R101.txt",
+            "--customers",
+            "3",
+            "--no-enumeration",
+            "--no-stabilization",
+            "--json",
+            "-",
+        ]);
+        if tree {
+            cmd.args(["--tree", "--nodes", "20"]);
+        }
+        let output = cmd.output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let data: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(data["status"], "Optimal");
+        assert!(data.get("bound").is_some());
     }
 }

@@ -99,7 +99,7 @@ installation directory, containing `lib/`, then build:
 export GUROBI_HOME=/opt/gurobi1300/linux64
 export LD_LIBRARY_PATH="$GUROBI_HOME/lib:${LD_LIBRARY_PATH:-}"
 cargo build --release --features clp,gurobi
-./target/release/baldes vrptw instances/Solomon/R101.txt --master gurobi
+./target/release/baldes solve instances/Solomon/R101.txt --master gurobi
 ```
 
 On macOS configure `DYLD_LIBRARY_PATH` as needed instead. The build detects the
@@ -125,10 +125,10 @@ may remain serial, and more workers do not guarantee a faster solve.
 HiGHS models in one process must use a consistent worker budget because its
 native scheduler is shared; configure it before the first solve. Forks retain
 their parent's budget. In Rust, use `RootOptions::master_threads`; in Python,
-use `solve_root(..., master_threads=N)`.
+use `solve(..., master_threads=N)`.
 
 For Python, build with `maturin develop --release --features clp,gurobi` from
-`python/`, then pass `master_solver="gurobi"` to `solve_root`. Check
+`python/`, then pass `master_solver="gurobi"` to `solve`. Check
 `pybaldes.has_gurobi` to see whether that wheel includes the backend.
 In `make config`, enable **Gurobi backend** and set **Gurobi installation**,
 or leave its path empty to inherit `GUROBI_HOME` from your shell. Save and

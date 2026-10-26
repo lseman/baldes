@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use baldes::extensions::robust::{Problem, Uncertainty};
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::cg::{Options, Status};
-    use baldes::master::root::{self, RootOptions, RootProblem};
+    use baldes::master::routing::{self, RootOptions, RoutingContext};
     use std::time::Instant;
 
     let args = std::env::args().collect::<Vec<_>>();
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             problem.time_budget = gt;
             let started = Instant::now();
             let graph = problem
-                .native_graph(&vec![0.; problem.nodes.len()], 0., customers)
+                .pricing_graph(&vec![0.; problem.nodes.len()], 0., customers)
                 .map_err(error)?;
             let options = RootOptions {
                 enumerate: false,
@@ -49,8 +49,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
                 ..Default::default()
             };
-            let result = root::solve(
-                RootProblem::set_partitioning(graph, customers as f64).map_err(error)?,
+            let result = routing::solve(
+                RoutingContext::set_partitioning(graph, customers as f64).map_err(error)?,
                 options,
             )
             .map_err(error)?;

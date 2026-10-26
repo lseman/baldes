@@ -36,7 +36,7 @@ instance = Instance("matrix", 2, [
     [2, 0, 4],
     [3, 4, 0],
 ])
-result = instance.solve_root(problem_type="cvrp")
+result = instance.solve(problem_type="cvrp")
 ```
 
 `Instance.from_file(path)` accepts a string or path-like object and reads Solomon
@@ -60,10 +60,10 @@ the supplied weights. A solve's `rounding=None` uses `instance.rounding`.
 Match these conventions before comparing objective values. CVRPLIB route-length
 constraints (`DISTANCE`) are not part of this routing interface.
 
-## solve_root
+## solve
 
-`solve_root(instance, *, ...)` accepts an `Instance`, file path string, or path-like
-object. `instance.solve_root(**options)` delegates to the same function. All
+`solve(instance, *, ...)` accepts an `Instance`, file path string, or path-like
+object. `instance.solve(**options)` delegates to the same function. All
 options below are keyword-only. The call requires a Clp-enabled build.
 
 ### Model and pricing
@@ -119,9 +119,9 @@ library and a valid license. All backend choices still require the Clp model sto
 | `log_interval` | `10` | Positive interval between progress rows |
 
 ```python
-from pybaldes import solve_root
+from pybaldes import solve
 
-result = solve_root(
+result = solve(
     "instances/Solomon/R101.txt", customers=10, rounding="none",
     master_solver="ipm", hgs_time=0.5, hgs_columns="all", hgs_seed=7,
     capacity_cuts=True, bound_mode="certified", time_limit=30,

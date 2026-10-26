@@ -1,16 +1,15 @@
 //! Open-domain tree conclusions versus explicit original-coordinate models.
 use super::imported_multiple_tests::{bounds, column, envelope, fixture};
 use super::*;
-use mp::{
-    imported::{
-        self, ColumnBatch, ColumnEnvelope, ImportOptions, ImportPricingKind, ImportTreeStatus,
-    },
+use baldes::master::tree::TreeStatus;
+use model::{
+    imported::{self, ColumnBatch, ColumnEnvelope, ImportOptions, ImportPricingKind},
     MasterVariable,
 };
 use std::time::Duration;
 
-fn tree_options() -> mp::AssignmentTreeOptions {
-    mp::AssignmentTreeOptions {
+fn tree_options() -> baldes::master::tree::ModelTreeOptions {
+    baldes::master::tree::ModelTreeOptions {
         node: options(),
         ..Default::default()
     }
@@ -46,7 +45,7 @@ fn open_tree_closes_from_a_joint_certificate_without_enumerating_sources() {
         )
         .unwrap();
     assert_eq!(calls, 1);
-    assert_eq!(result.status, ImportTreeStatus::Optimal);
+    assert_eq!(result.status, TreeStatus::Optimal);
     assert_eq!(result.open_nodes, 0);
     assert_eq!(result.bound, 3.);
     assert_eq!(result.incumbent, 3.);
@@ -73,7 +72,7 @@ fn open_tree_phase_one_covers_all_groups_before_proving_infeasibility() {
             panic!("positive original-domain feasibility proof needs no callback")
         })
         .unwrap();
-    assert_eq!(result.status, ImportTreeStatus::Infeasible);
+    assert_eq!(result.status, TreeStatus::Infeasible);
     assert_eq!(result.open_nodes, 0);
     assert_eq!(result.incumbent, f64::INFINITY);
     let possible = base
@@ -100,7 +99,7 @@ fn open_tree_phase_one_covers_all_groups_before_proving_infeasibility() {
         })
         .unwrap();
     assert_eq!(kinds, vec![ImportPricingKind::Feasibility; 2]);
-    assert_eq!(result.status, ImportTreeStatus::Optimal);
+    assert_eq!(result.status, TreeStatus::Optimal);
     assert_eq!(result.incumbent, 3.);
 }
 fn fractional_fixture(original_integer: bool) -> imported::ImportedOutput<2> {
@@ -151,7 +150,7 @@ fn open_tree_original_integer_branches_use_certificates_and_preserve_the_parent(
             |_, _| panic!("both integer children close from original-domain certificates"),
         )
         .unwrap();
-    assert_eq!(result.status, ImportTreeStatus::Optimal);
+    assert_eq!(result.status, TreeStatus::Optimal);
     assert_eq!(result.incumbent, 2.);
     assert_eq!(result.bound, 2.);
     assert!(result.nodes >= 3);
@@ -197,7 +196,7 @@ fn open_tree_column_branches_replay_into_callbacks_and_share_completion_with_sib
         })
         .unwrap();
     assert_eq!(calls, 1);
-    assert_eq!(result.status, ImportTreeStatus::Optimal);
+    assert_eq!(result.status, TreeStatus::Optimal);
     assert_eq!(result.incumbent, 2.);
     assert_eq!(result.open_nodes, 0);
     let solution = result.tree.solution().unwrap();
@@ -225,7 +224,7 @@ fn open_tree_batch_limits_resume_without_promoting_the_restricted_objective() {
             })
         })
         .unwrap();
-    assert_eq!(step.status, ImportTreeStatus::BatchLimit);
+    assert_eq!(step.status, TreeStatus::BatchLimit);
     assert_eq!(step.incumbent, 3.);
     assert_eq!(step.bound, f64::NEG_INFINITY);
     assert_eq!(step.open_nodes, 1);
@@ -239,7 +238,7 @@ fn open_tree_batch_limits_resume_without_promoting_the_restricted_objective() {
             })
         })
         .unwrap();
-    assert_eq!(done.status, ImportTreeStatus::Optimal);
+    assert_eq!(done.status, TreeStatus::Optimal);
     assert_eq!(done.incumbent, 3.);
     assert_eq!(done.bound, 3.);
     assert!(start.solution().is_none());
@@ -267,7 +266,7 @@ fn open_tree_empty_batches_are_fair_and_errors_leave_the_frontier_reusable() {
         })
         .unwrap();
     assert_eq!(seen, vec![42, 7]);
-    assert_eq!(progress.status, ImportTreeStatus::Incomplete);
+    assert_eq!(progress.status, TreeStatus::Incomplete);
     assert_eq!(progress.bound, f64::NEG_INFINITY);
     let mut calls = 0;
     let failure = start.run(&tree_options(), &ImportOptions::default(), |point, _| {
@@ -306,7 +305,7 @@ fn open_tree_empty_batches_are_fair_and_errors_leave_the_frontier_reusable() {
             })
         })
         .unwrap();
-    assert_eq!(recovered.status, ImportTreeStatus::Optimal);
+    assert_eq!(recovered.status, TreeStatus::Optimal);
     assert_eq!(recovered.incumbent, 101.);
     for zero in [true, false] {
         let mut configured = tree_options();
@@ -323,9 +322,9 @@ fn open_tree_empty_batches_are_fair_and_errors_leave_the_frontier_reusable() {
         assert_eq!(
             result.status,
             if zero {
-                ImportTreeStatus::NodeLimit
+                TreeStatus::NodeLimit
             } else {
-                ImportTreeStatus::TimeLimit
+                TreeStatus::TimeLimit
             }
         );
         assert_eq!(result.open_nodes, 1);
@@ -451,7 +450,7 @@ fn open_tree_branches_routing_multiplicity_and_physical_activity() {
                     panic!("zero-cap source")
                 })
                 .unwrap();
-            assert_eq!(first.status, ImportTreeStatus::NodeLimit);
+            assert_eq!(first.status, TreeStatus::NodeLimit);
             assert_eq!(first.open_nodes, 2);
             assert!((first.bound - 0.5).abs() < 1e-8);
             let done = first
@@ -460,7 +459,7 @@ fn open_tree_branches_routing_multiplicity_and_physical_activity() {
                     panic!("children close by certificate")
                 })
                 .unwrap();
-            assert_eq!(done.status, ImportTreeStatus::Optimal);
+            assert_eq!(done.status, TreeStatus::Optimal);
             assert_eq!(done.incumbent, 1.);
             assert_eq!(done.bound, 1.);
         }
@@ -470,7 +469,7 @@ fn open_tree_branches_routing_multiplicity_and_physical_activity() {
 #[test]
 fn open_tree_replays_fixed_routes_and_new_presence_restrictions_into_phase_one() {
     use baldes::cuts::soft_conflicts::{Mode, PresenceRow};
-    use mp::PresenceCoefficients;
+    use model::PresenceCoefficients;
     let root = imported::solve(
         Problem::<2> {
             rows: vec![
@@ -538,7 +537,7 @@ fn open_tree_replays_fixed_routes_and_new_presence_restrictions_into_phase_one()
         })
         .unwrap();
     assert_eq!(calls, 1);
-    assert_eq!(done.status, ImportTreeStatus::Optimal);
+    assert_eq!(done.status, TreeStatus::Optimal);
     assert_eq!(done.incumbent, 7.);
     assert_eq!(done.bound, 7.);
     assert_eq!(done.tree.solution().unwrap().routes.len(), 1);

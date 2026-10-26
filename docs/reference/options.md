@@ -48,7 +48,7 @@ reconfigure its existing separator.
 | --- | --- | --- | --- |
 | `BALDESstopCutGenTimeThresholdInPricing` | Double | `10.0` | [src/pricing/controller.rs](../../src/pricing/controller.rs) |
 | `BALDEShardTimeThresholdInPricing` | Double | `20.0` | [src/pricing/mod.rs](../../src/pricing/mod.rs); [src/pricing/solve.rs](../../src/pricing/solve.rs); [src/master/tree/mod.rs](../../src/master/tree/mod.rs) |
-| `BALDESredCostFixingTimeThreshold` | Double | `100.0` | [src/pricing/fixing_workflow.rs](../../src/pricing/fixing_workflow.rs); [src/master/root/controller/enumeration.rs](../../src/master/root/controller/enumeration.rs) |
+| `BALDESredCostFixingTimeThreshold` | Double | `100.0` | [src/pricing/fixing_workflow.rs](../../src/pricing/fixing_workflow.rs); [src/master/routing/controller/enumeration.rs](../../src/master/routing/controller/enumeration.rs) |
 | `BALDESnumberOfBucketsPerVertex` | Int | `25.0` | [src/pricing/mod.rs](../../src/pricing/mod.rs) |
 | `BALDESdynamicBucketSteps` | Int | `1.0` | [src/pricing/controller.rs](../../src/pricing/controller.rs); [src/pricing/solve.rs](../../src/pricing/solve.rs) |
 | `BALDESuseBidirectionalSearch` | Int | `2.0` | [src/pricing/mod.rs](../../src/pricing/mod.rs) |
@@ -58,7 +58,7 @@ reconfigure its existing separator.
 | `BALDESmaxNumOfLabelsInEnumeration` | Int | `1000000.0` | [src/pricing/fixing_workflow.rs](../../src/pricing/fixing_workflow.rs); [src/pricing/universe.rs](../../src/pricing/universe.rs) |
 | `BALDESmaxNumOfEnumeratedSolutions` | Int | `1000000.0` | [src/pricing/fixing_workflow.rs](../../src/pricing/fixing_workflow.rs); [src/pricing/universe.rs](../../src/pricing/universe.rs) |
 | `BALDESinitNGneighbourhoodSize` | Int | `8.0` | [src/graph/ng.rs](../../src/graph/ng.rs) |
-| `BALDESmaxNGneighbourhoodSize` | Int | `0.0` | [src/master/root/controller/relaxation.rs](../../src/master/root/controller/relaxation.rs) |
+| `BALDESmaxNGneighbourhoodSize` | Int | `0.0` | [src/master/routing/controller/relaxation.rs](../../src/master/routing/controller/relaxation.rs) |
 | `BALDESrankOneCutsMaxNumRows` | Int | `5.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |
 | `BALDESrankOneCutsMaxNumPerRound` | Int | `100.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs); [src/cuts/kpath/mod.rs](../../src/cuts/kpath/mod.rs) |
 | `BALDESrankOneCutsMaxPerVertex` | Int | `0.0` | Experimental support/memory overlap budget; zero disables. |
@@ -71,16 +71,16 @@ reconfigure its existing separator.
 | `BALDESlabelDominanceStrategy` | Int | `0.0` | [src/pricing/mod.rs](../../src/pricing/mod.rs); label dominance mode (0 or 1), shared with the C strategy setter |
 | `BALDESdynBuckStepAdjustRatioThreshold` | Double | `500.0` | [src/pricing/controller.rs](../../src/pricing/controller.rs) |
 | `BALDESdynBuckStepAdjustNumBuckArcsThreshold` | Double | `10000.0` | [src/pricing/controller.rs](../../src/pricing/controller.rs) |
-| `BALDESdynamicNGmode` | Int | `-1.0` | [src/master/root/controller/relaxation.rs](../../src/master/root/controller/relaxation.rs) |
-| `BALDESmaxNumOfColumnsInDynamicNG` | Int | `100.0` | [src/master/root/controller/relaxation.rs](../../src/master/root/controller/relaxation.rs) |
-| `BALDESmaxCycleSizeInDynamicNG` | Int | `5.0` | [src/master/root/controller/relaxation.rs](../../src/master/root/controller/relaxation.rs) |
-| `BALDESmaxNGaverNeighbourhoodSize` | Int | `0.0` | [src/master/root/controller/relaxation.rs](../../src/master/root/controller/relaxation.rs) |
+| `BALDESdynamicNGmode` | Int | `-1.0` | [src/master/routing/controller/relaxation.rs](../../src/master/routing/controller/relaxation.rs) |
+| `BALDESmaxNumOfColumnsInDynamicNG` | Int | `100.0` | [src/master/routing/controller/relaxation.rs](../../src/master/routing/controller/relaxation.rs) |
+| `BALDESmaxCycleSizeInDynamicNG` | Int | `5.0` | [src/master/routing/controller/relaxation.rs](../../src/master/routing/controller/relaxation.rs) |
+| `BALDESmaxNGaverNeighbourhoodSize` | Int | `0.0` | [src/master/routing/controller/relaxation.rs](../../src/master/routing/controller/relaxation.rs) |
 | `BALDESselectionTighteningSchedule` | Int | `1.0` | [src/pricing/relaxation.rs](../../src/pricing/relaxation.rs) |
-| `BALDESuseCapacityCuts` | Bool | `1.0` | [src/master/root/mod.rs](../../src/master/root/mod.rs); explicit option overrides a configured capacity separator and is inherited by children |
+| `BALDESuseCapacityCuts` | Bool | `1.0` | [src/master/routing/mod.rs](../../src/master/routing/mod.rs); explicit option overrides a configured capacity separator and is inherited by children |
 | `BALDEScapacityCutsSeparator` | Int | `1.0` | [src/pricing/mod.rs](../../src/pricing/mod.rs); accepts the available built-in separator; external CVRPSEP (0) is rejected |
-| `BALDEScapCutsMaxNumPerRound` | Int | `100.0` | [src/master/root/mod.rs](../../src/master/root/mod.rs); explicit per-round override for configured capacity separation, including inherited nodes |
-| `BALDESresConsKnapsackCutsMode` | Int | `-1.0` | [src/master/root/mod.rs](../../src/master/root/mod.rs); [src/cuts/knapsack/mod.rs](../../src/cuts/knapsack/mod.rs) |
-| `BALDESresConsKnapsackCutsMaxNumPerRound` | Int | `100.0` | [src/master/root/mod.rs](../../src/master/root/mod.rs); [src/cuts/knapsack/mod.rs](../../src/cuts/knapsack/mod.rs) |
+| `BALDEScapCutsMaxNumPerRound` | Int | `100.0` | [src/master/routing/mod.rs](../../src/master/routing/mod.rs); explicit per-round override for configured capacity separation, including inherited nodes |
+| `BALDESresConsKnapsackCutsMode` | Int | `-1.0` | [src/master/routing/mod.rs](../../src/master/routing/mod.rs); [src/cuts/knapsack/mod.rs](../../src/cuts/knapsack/mod.rs) |
+| `BALDESresConsKnapsackCutsMaxNumPerRound` | Int | `100.0` | [src/master/routing/mod.rs](../../src/master/routing/mod.rs); [src/cuts/knapsack/mod.rs](../../src/cuts/knapsack/mod.rs) |
 | `BALDESrankOneCutsArcMemoryType` | Int | `2.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |
 | `BALDESrankOneCutsSpDependentMemory` | Bool | `0.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |
 | `BALDESrankOneCutsMaxNumTriplets` | Int | `10000.0` | [src/cuts/registry/rank_one.rs](../../src/cuts/registry/rank_one.rs) |
@@ -207,7 +207,7 @@ Select HiGHS for restricted-master LP solves with `--master highs`:
 
 ```sh
 cargo build --release --features clp,highs
-./target/release/baldes vrptw instances/Solomon/R101.txt --customers 25 --master highs --log
+./target/release/baldes solve instances/Solomon/R101.txt --customers 25 --master highs --log
 ```
 
 HiGHS preserves the requested stabilization setting; use `--no-stabilization`
@@ -248,7 +248,7 @@ incumbent. Existing initial columns are retained and duplicates are skipped.
 Python exposes the same root options:
 
 ```python
-result = pybaldes.solve_root(
+result = pybaldes.solve(
     "instances/cvrplib/E-n22-k4.vrp", problem_type="cvrp",
     hgs_time=10.0, hgs_columns=100, hgs_seed=7, master_solver="ipm",
 )
@@ -272,7 +272,7 @@ The interval applies to each CG solve, including descendant nodes and tree
 trials. Each node reports its depth, master algorithm, and stabilization mode.
 
 ```sh
-./target/release/baldes vrptw instances/Solomon/R101.txt --customers 25 \
+./target/release/baldes solve instances/Solomon/R101.txt --customers 25 \
   --hgs-time 2 --hgs-columns 100 --master ipm --verbose
 ```
 

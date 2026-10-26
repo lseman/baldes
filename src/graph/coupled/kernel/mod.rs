@@ -79,7 +79,7 @@ pub struct CoupledKernel {
     initial: Vec<f64>,
     cost_scale: f64,
     /// Explicit MODEL domain choice, never inferred from a numerical policy.
-    native_front_program_domain: bool,
+    front_program_domain: bool,
     selection_initial: Vec<u64>,
     /// Directional vertex masks and forgetting memory; None for exact arc-only
     /// resources, which need only the transition's arc intersection.
@@ -233,7 +233,7 @@ impl<const D: usize> Graph<D> {
     /// feasibility. The default is `false`; strict and other families do not
     /// change. Clones, branches and cost suppression preserve the choice.
     /// Replacing resource descriptors resets it to the default.
-    pub fn set_native_front_program_domain(&mut self, enabled: bool) -> Result<()> {
+    pub fn set_front_program_domain(&mut self, enabled: bool) -> Result<()> {
         let Some(kernel) = self.coupled.as_mut() else {
             return if enabled {
                 Err(invalid(
@@ -248,17 +248,17 @@ impl<const D: usize> Graph<D> {
                 "native front program domain requires native raw resources",
             ));
         }
-        if kernel.native_front_program_domain != enabled {
-            kernel.native_front_program_domain = enabled;
+        if kernel.front_program_domain != enabled {
+            kernel.front_program_domain = enabled;
             kernel.identity = std::sync::Arc::new(());
         }
         Ok(())
     }
     /// Whether native raw feasibility explicitly uses the machine-front model.
-    pub fn native_front_program_domain(&self) -> bool {
+    pub fn front_program_domain(&self) -> bool {
         self.coupled
             .as_ref()
-            .is_some_and(|kernel| kernel.native_front_program_domain)
+            .is_some_and(|kernel| kernel.front_program_domain)
     }
     /// Retain selection eliminations at every vertex of violating windows.
     pub(crate) fn strengthen_selection(&mut self, arcs: &[usize]) -> bool {

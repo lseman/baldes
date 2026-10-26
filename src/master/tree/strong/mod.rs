@@ -156,8 +156,8 @@ struct Candidate {
     stages: [usize; 2],
 }
 fn restricted_value<const D: usize>(
-    parent: Option<&Rc<root::NodeSnapshot<D>>>,
-    problem: &RootProblem<D>,
+    parent: Option<&Rc<routing::NodeSnapshot<D>>>,
+    problem: &RoutingContext<D>,
     branches: &[Branch],
     pool: &Pool,
     options: &TreeOptions,
@@ -174,14 +174,14 @@ fn restricted_value<const D: usize>(
     master.set_solver(options.root.master_solver);
     master.set_backend_threads(options.root.master_threads)?;
     master.set_tolerances(1e-7, 1e-7)?;
-    for row in &child.rows {
+    for row in &child.model.rows {
         master.add_row(row.sense, row.rhs, &[])?;
     }
     for route in &pool.routes {
         let entries = child.base_entries(route)?;
         master.add_column(route.original_cost, &entries)?;
     }
-    for (r, row) in child.rows.iter().enumerate() {
+    for (r, row) in child.model.rows.iter().enumerate() {
         if row.sense != RowSense::LessEqual {
             master.add_column(penalty, &[(r, 1.)])?;
         }
@@ -198,8 +198,8 @@ fn restricted_value<const D: usize>(
 /// Return a chosen candidate and its selected-mode child bounds. Restricted LP
 /// objectives and heuristic pricing values affect scores only.
 pub(super) fn choose<const D: usize>(
-    parent: Option<&Rc<root::NodeSnapshot<D>>>,
-    problem: &RootProblem<D>,
+    parent: Option<&Rc<routing::NodeSnapshot<D>>>,
+    problem: &RoutingContext<D>,
     node: &Node<D>,
     supplied: Vec<super::candidates::BranchCandidate>,
     fresh_count: usize,

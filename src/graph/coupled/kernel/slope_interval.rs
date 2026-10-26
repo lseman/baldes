@@ -129,7 +129,7 @@ impl PreparedSlopeDominance {
                     })
                 }))
             .then_some(0.),
-            FrontOperationPolicy::NativeFrontAlgebra => {
+            FrontOperationPolicy::FrontAlgebra => {
                 if scale != 0. && !tracked_order {
                     return None;
                 }

@@ -81,13 +81,13 @@ fn ryan_foster_pricing_and_enumeration_obey_both_children() {
 }
 
 #[cfg(feature = "clp")]
-fn triangle_problem() -> baldes::master::root::RootProblem {
+fn triangle_problem() -> baldes::master::routing::RoutingContext {
     use baldes::{
         inputs::{Instance, Rounding},
-        master::root::RootProblem,
+        master::routing::RoutingContext,
     };
     let instance=Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
-    RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap()
+    RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap()
 }
 
 #[cfg(feature = "clp")]
@@ -95,7 +95,7 @@ fn triangle_problem() -> baldes::master::root::RootProblem {
 fn typed_children_match_fresh_models_and_survive_snapshot_setup() {
     use baldes::master::{
         branching::BranchConstraint as B,
-        root::{self, RootOptions},
+        routing::{self, RootOptions},
         RowSense,
     };
     for enumerate in [false, true] {
@@ -106,7 +106,7 @@ fn typed_children_match_fresh_models_and_survive_snapshot_setup() {
         options.cg.stabilize = false;
         options.cg.multiplicity = 3.;
         options.incumbent = 100.;
-        let parent = root::solve(problem.clone(), options.clone()).unwrap();
+        let parent = routing::solve(problem.clone(), options.clone()).unwrap();
         let snapshot = parent.snapshot.as_ref().unwrap();
         let count = snapshot.enumerated_routes();
         for branch in [
@@ -132,10 +132,10 @@ fn typed_children_match_fresh_models_and_survive_snapshot_setup() {
             },
         ] {
             let child =
-                root::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
+                routing::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
             let mut cold = problem.clone();
             cold.branch(branch.clone()).unwrap();
-            let fresh = root::solve(cold.clone(), options.clone()).unwrap();
+            let fresh = routing::solve(cold.clone(), options.clone()).unwrap();
             assert!(
                 (child.master.bound - fresh.master.bound).abs() < 1e-6,
                 "{branch:?}: child={child:?} fresh={fresh:?}"
@@ -160,7 +160,7 @@ fn typed_children_match_fresh_models_and_survive_snapshot_setup() {
                 assigned: false,
             })
             .unwrap();
-        let forbidden = root::solve(contradictory, options.clone()).unwrap();
+        let forbidden = routing::solve(contradictory, options.clone()).unwrap();
         assert!(
             forbidden.preprocessing.infeasible
                 || forbidden.master.pruned_by_bound
@@ -179,7 +179,7 @@ fn typed_children_match_fresh_models_and_survive_snapshot_setup() {
 fn candidate_families_use_network_route_counts_and_pair_weights() {
     use baldes::master::{
         branching::{BranchConstraint as B, BranchingOptions},
-        root::{self, RootOptions},
+        routing::{self, RootOptions},
         tree::candidates::candidates,
     };
     let p = triangle_problem();
@@ -187,7 +187,7 @@ fn candidate_families_use_network_route_counts_and_pair_weights() {
     options.enumerate = false;
     options.cg.stabilize = false;
     options.cg.multiplicity = 3.;
-    let out = root::solve(p.clone(), options).unwrap();
+    let out = routing::solve(p.clone(), options).unwrap();
     let native = candidates(&p, &out, &BranchingOptions::default());
     assert_eq!(native.len(), 1);
     assert_eq!(native[0].value, 1.5);
@@ -435,7 +435,7 @@ fn accumulated_resource_windows_cover_schedules_and_restore_pricing() {
 fn aggregate_flow_candidates_count_weighted_arcs_and_children_match_fresh_masters() {
     use baldes::master::{
         branching::{AggregateVariable, BranchConstraint as B, BranchingOptions},
-        root::{self, RootOptions},
+        routing::{self, RootOptions},
         tree::candidates::candidates,
         RowSense,
     };
@@ -458,7 +458,7 @@ fn aggregate_flow_candidates_count_weighted_arcs_and_children_match_fresh_master
     options.incumbent = 100.;
     options.cg.stabilize = false;
     options.cg.multiplicity = 3.;
-    let out = root::solve(p.clone(), options.clone()).unwrap();
+    let out = routing::solve(p.clone(), options.clone()).unwrap();
     let flow = |tail: usize, head: usize| -> f64 {
         out.route_values()
             .iter()
@@ -466,7 +466,7 @@ fn aggregate_flow_candidates_count_weighted_arcs_and_children_match_fresh_master
                 r.arcs
                     .iter()
                     .filter(|&&id| {
-                        let arc = &p.graph.arcs[p.arc_position(id).unwrap()];
+                        let arc = &p.model.networks[0].graph.arcs[p.arc_position(id).unwrap()];
                         arc.tail == tail && arc.head == head
                     })
                     .count() as f64
@@ -499,7 +499,7 @@ fn aggregate_flow_candidates_count_weighted_arcs_and_children_match_fresh_master
             .unwrap();
         assert!((candidate.value - (flow(u, v) + flow(v, u))).abs() < 1e-9);
         assert!(arcs.iter().all(|&(arc, c)| {
-            let arc = &p.graph.arcs[arc];
+            let arc = &p.model.networks[0].graph.arcs[arc];
             c == 1. && arc.tail.min(arc.head) == u && arc.tail.max(arc.head) == v
         }));
     }
@@ -509,7 +509,7 @@ fn aggregate_flow_candidates_count_weighted_arcs_and_children_match_fresh_master
     };
     let ids: Vec<_> = arcs
         .iter()
-        .map(|&(a, _)| (p.graph.arcs[a].id, 2.))
+        .map(|&(a, _)| (p.model.networks[0].graph.arcs[a].id, 2.))
         .collect();
     let registered = candidates(
         &p,
@@ -531,10 +531,10 @@ fn aggregate_flow_candidates_count_weighted_arcs_and_children_match_fresh_master
     for candidate in edges.iter().take(2) {
         for branch in [&candidate.down, &candidate.up] {
             let child =
-                root::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
+                routing::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
             let mut cold = p.clone();
             cold.branch(branch.clone()).unwrap();
-            let fresh = root::solve(cold, options.clone()).unwrap();
+            let fresh = routing::solve(cold, options.clone()).unwrap();
             assert_eq!(child.master.status, fresh.master.status, "{branch:?}");
             assert!(
                 (child.master.lp - fresh.master.lp).abs() < 1e-6,
@@ -565,21 +565,21 @@ fn aggregate_flow_candidates_count_weighted_arcs_and_children_match_fresh_master
 fn aggregate_branches_match_fresh_and_inherited_masters() {
     use baldes::master::{
         branching::BranchConstraint as B,
-        root::{self, RootOptions},
+        routing::{self, RootOptions},
         RowSense,
     };
     use baldes::pricing::restrictions::AccumulatedResourceBranch;
     for (enumerate, mode) in [
-        (false, root::BoundMode::Numerical),
-        (true, root::BoundMode::Numerical),
-        (false, root::BoundMode::Certified),
+        (false, routing::BoundMode::Numerical),
+        (true, routing::BoundMode::Numerical),
+        (false, routing::BoundMode::Certified),
     ] {
         let p = triangle_problem();
-        let arc = p
+        let arc = p.model.networks[0]
             .graph
             .arcs
             .iter()
-            .find(|a| a.tail == 1 && a.head == p.graph.sink)
+            .find(|a| a.tail == 1 && a.head == p.model.networks[0].graph.sink)
             .unwrap()
             .id;
         let mut options = RootOptions::default();
@@ -589,7 +589,7 @@ fn aggregate_branches_match_fresh_and_inherited_masters() {
         options.incumbent = 100.;
         options.cg.stabilize = false;
         options.cg.multiplicity = 3.;
-        let parent = root::solve(p.clone(), options.clone()).unwrap();
+        let parent = routing::solve(p.clone(), options.clone()).unwrap();
         let snapshot = parent.snapshot.as_ref().unwrap();
         for branch in [
             B::ClusterBoundary {
@@ -609,7 +609,10 @@ fn aggregate_branches_match_fresh_and_inherited_masters() {
                 rhs: 0.,
             },
             B::ClusterPair {
-                first: vec![p.graph.source, p.graph.sink],
+                first: vec![
+                    p.model.networks[0].graph.source,
+                    p.model.networks[0].graph.sink,
+                ],
                 second: vec![1, 2],
                 sense: RowSense::GreaterEqual,
                 rhs: 2.,
@@ -634,10 +637,10 @@ fn aggregate_branches_match_fresh_and_inherited_masters() {
             }),
         ] {
             let child =
-                root::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
+                routing::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
             let mut cold = p.clone();
             cold.branch(branch.clone()).unwrap();
-            let fresh = root::solve(cold, options.clone()).unwrap();
+            let fresh = routing::solve(cold, options.clone()).unwrap();
             assert_eq!(child.master.status, fresh.master.status, "{branch:?}");
             assert!(
                 (child.master.lp - fresh.master.lp).abs() < 1e-6,

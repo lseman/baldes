@@ -56,8 +56,8 @@ Published root benchmark reproduction requires `--rounding none`.
 
 ## Concurrency and lifetime
 
-Routing `solve_root` releases the GIL during native solving. Fresh
-`solve_networks(..., tree=True)` also releases it. Shared root solves and calls
+Routing `solve` releases the GIL during native solving. Fresh
+`solve(..., tree=True)` also releases it. Shared root solves and calls
 through `NetworkNode` retain it; node handles are thread-bound and must remain
 on their creating thread. Low-level Solver calls currently retain the GIL, so
 Python threads do not imply concurrent low-level native pricing.

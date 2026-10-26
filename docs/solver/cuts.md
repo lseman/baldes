@@ -13,7 +13,7 @@ node snapshots retain active rows and the pricing state needed to use them.
 | Limited-memory rank-one | Strengthen the customer-cover relaxation | `with_rank_one_cuts()` | `--rank1` / `rank_one_cuts=True` |
 | Rounded capacity | Enforce capacity-derived subset inequalities | `with_capacity_cuts(config)` | `--capacity-cuts` / `capacity_cuts=True` |
 | Kohl 2-path | Use time-window feasibility to strengthen capacity subsets | Capacity config with time windows | `--two-path-cuts` / `two_path_cuts=True` |
-| Strong k-path | Separate route-count inequalities on customer sets | `with_kpath_cuts(config)` or `with_native_kpath_cuts(config)` | `--cuts` / Rust API |
+| Strong k-path | Separate route-count inequalities on customer sets | `with_kpath_cuts(config)` or `with_general_kpath_cuts(config)` | `--cuts` / Rust API |
 | Route-load knapsack | Separate inequalities on integer resource loads | `with_knapsack_cuts(config)` | `--cuts` / Rust API |
 | Fenchel load cuts | Search integer packing inequalities with an auxiliary LP | Knapsack config `.with_fenchel(parameters)` | `--fenchel-cuts` / Rust API |
 
@@ -47,7 +47,7 @@ registry API exposes the same control as `SeparationParameters::max_per_vertex`.
 A complete Rust example:
 
 ```rust
-use baldes::{master::root::RootOptions, inputs::{Instance, Rounding}};
+use baldes::{master::routing::RootOptions, inputs::{Instance, Rounding}};
 
 fn main() -> baldes::Result<()> {
     let mut instance = Instance::read("instances/Solomon/R101.txt")?;
@@ -57,7 +57,7 @@ fn main() -> baldes::Result<()> {
     let options = RootOptions::default()
         .with_capacity_cuts(capacity)
         .with_rank_one_cuts();
-    let result = instance.solve_root(8, rounding, options)?;
+    let result = instance.solve(8, rounding, options)?;
     println!("{:?}: root LP={}", result.master.status, result.master.lp);
     Ok(())
 }
@@ -77,10 +77,10 @@ counts can therefore exceed the number of rows still active.
 Its demand vector uses depot index 0 and customer indices `1..n`; the split
 sink is `n + 1`. `with_time_windows` supplies optional time-window data.
 
-`NativeKPathCutConfig` accepts explicit graphs, graph IDs, packing/covering
+`GeneralKPathCutConfig` accepts explicit graphs, graph IDs, packing/covering
 set incidence, and demands in the original zero-based set order without a
 depot entry. Use it when the convenience adapter does not represent the input
-mapping. `with_kpath_cuts` and `with_native_kpath_cuts` select alternative
+mapping. `with_kpath_cuts` and `with_general_kpath_cuts` select alternative
 adapters; the most recently selected one replaces the other.
 
 Graph IDs, set IDs, and pricing vertex indices have different roles. Keep

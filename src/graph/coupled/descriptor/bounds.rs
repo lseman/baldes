@@ -73,7 +73,7 @@ impl PreparedClampFilter {
             let lo = domain.0.max(ll).max(ul);
             let hi = domain.1.min(lh).min(uh);
             if lo > hi {
-                if policy == FrontOperationPolicy::NativeFrontAlgebra && near(lo, hi)? {
+                if policy == FrontOperationPolicy::FrontAlgebra && near(lo, hi)? {
                     return Err(unsupported("near-disjoint bound domains"));
                 }
                 continue;
@@ -83,7 +83,7 @@ impl PreparedClampFilter {
             // bound helpers retain its original coordinate/value, and snapping
             // a bound anchor cannot change a constant. Do not infer a domain
             // extension or substitute the native lower FILTER for our clamp.
-            if policy == FrontOperationPolicy::NativeFrontAlgebra {
+            if policy == FrontOperationPolicy::FrontAlgebra {
                 let unchanged_point = component.pairs().len() == 1
                     && self.constant_bounds
                     && component.pairs()[0].0 >= self.lower_segments[0].value
@@ -150,7 +150,7 @@ impl PreparedClampFilter {
                     }
                 }
                 let cuts = &cuts[..unique];
-                if policy == FrontOperationPolicy::NativeFrontAlgebra {
+                if policy == FrontOperationPolicy::FrontAlgebra {
                     for pair in cuts.windows(2) {
                         if near(pair[0], pair[1])? {
                             return Err(unsupported("near-coincident bound crossings"));
@@ -288,7 +288,7 @@ fn crossing(
         // Match the expanded-intercept ordering recovered for native bound
         // crossing arithmetic. If its rounding does not yield a common value,
         // decline rather than snap a feasibility boundary.
-        FrontOperationPolicy::NativeFrontAlgebra => finite(
+        FrontOperationPolicy::FrontAlgebra => finite(
             finite(finite(bh - finite(hi * b.slope)?)? - finite(ah - finite(hi * a.slope)?)?)?
                 / denominator,
         )?,

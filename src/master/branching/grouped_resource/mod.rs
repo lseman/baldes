@@ -1,8 +1,8 @@
 //! Packing-group accumulated-resource disjunctions over physical arc IDs.
 use super::{BranchConstraint, RowSense};
 use crate::{
-    invalid, master::root::RootProblem, pricing::restrictions::AccumulatedResourceBranch, Graph,
-    Result, Route,
+    invalid, master::routing::RoutingContext, pricing::restrictions::AccumulatedResourceBranch,
+    Graph, Result, Route,
 };
 mod name;
 
@@ -83,19 +83,19 @@ impl AccumulatedResourceGroupBranch {
             upper: self.upper,
         }
     }
-    pub(crate) fn validate<const D: usize>(&self, problem: &RootProblem<D>) -> Result<()> {
+    pub(crate) fn validate<const D: usize>(&self, problem: &RoutingContext<D>) -> Result<()> {
         self.validate_proof(
-            &problem.graph,
-            &problem.rows,
-            &problem.arc_entries,
-            &problem.route_entries,
+            &problem.model.networks[0].graph,
+            &problem.model.rows,
+            &problem.model.networks[0].arc_entries,
+            &problem.model.networks[0].route_entries,
             |id| problem.arc_position(id),
         )
     }
     pub(crate) fn validate_support<const D: usize>(
         &self,
         graph: &Graph<D>,
-        rows: &[crate::master::root::Row],
+        rows: &[crate::master::routing::Row],
         arc_entries: &[Vec<(usize, f64)>],
         route_entries: &[(usize, f64)],
     ) -> Result<()> {
@@ -112,7 +112,7 @@ impl AccumulatedResourceGroupBranch {
     fn validate_proof<const D: usize>(
         &self,
         graph: &Graph<D>,
-        rows: &[crate::master::root::Row],
+        rows: &[crate::master::routing::Row],
         arc_entries: &[Vec<(usize, f64)>],
         route_entries: &[(usize, f64)],
         position: impl Fn(i32) -> Option<usize>,
@@ -218,7 +218,7 @@ impl AccumulatedResourceGroupBranch {
 impl BranchConstraint {
     pub(crate) fn nonlinear_coefficient<const D: usize>(
         &self,
-        problem: &RootProblem<D>,
+        problem: &RoutingContext<D>,
         route: &Route,
     ) -> f64 {
         match self {

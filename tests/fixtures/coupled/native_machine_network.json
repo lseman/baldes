@@ -32,7 +32,7 @@
         }
       ],
       "elementary": true,
-      "native_front_program_domain": true,
+      "front_program_domain": true,
       "coupled_resources": [
         {
           "kind": "slope_interval_cost",
@@ -66,7 +66,7 @@
               ]
             }
           ],
-          "policy": "native_front_algebra"
+          "policy": "front_algebra"
         }
       ]
     }

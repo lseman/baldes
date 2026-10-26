@@ -7,11 +7,11 @@ use crate::master::branching::{
 };
 
 pub(in crate::master::tree) fn candidates<const D: usize>(
-    problem: &RootProblem<D>,
+    problem: &RoutingContext<D>,
     routes: &[(&crate::Route, f64)],
     history: &[BranchConstraint],
 ) -> Vec<BranchCandidate> {
-    let axes: Vec<_> = problem
+    let axes: Vec<_> = problem.model.networks[0]
         .graph
         .resources
         .iter()
@@ -21,31 +21,32 @@ pub(in crate::master::tree) fn candidates<const D: usize>(
     let Some(&first_resource) = axes.first() else {
         return vec![];
     };
-    let mut incoming = vec![vec![]; problem.graph.vertices.len()];
-    for arc in &problem.graph.arcs {
+    let mut incoming = vec![vec![]; problem.model.networks[0].graph.vertices.len()];
+    for arc in &problem.model.networks[0].graph.arcs {
         incoming[arc.head].push(arc.id);
     }
-    let mut packing_rows = vec![None; problem.graph.vertices.len()];
+    let mut packing_rows = vec![None; problem.model.networks[0].graph.vertices.len()];
     for &vertex in &problem.customers {
         let Some(&first) = incoming[vertex].first() else {
             continue;
         };
-        packing_rows[vertex] = problem.arc_entries[problem.arc_position(first).unwrap()]
-            .iter()
-            .find_map(|&(row, coefficient)| {
-                if coefficient < 1. {
-                    return None;
-                }
-                let group = AccumulatedResourceGroupBranch::new(
-                    row,
-                    incoming[vertex].clone(),
-                    first_resource,
-                    0.,
-                    false,
-                )
-                .ok()?;
-                group.validate(problem).ok().map(|_| row)
-            });
+        packing_rows[vertex] = problem.model.networks[0].arc_entries
+            [problem.arc_position(first).unwrap()]
+        .iter()
+        .find_map(|&(row, coefficient)| {
+            if coefficient < 1. {
+                return None;
+            }
+            let group = AccumulatedResourceGroupBranch::new(
+                row,
+                incoming[vertex].clone(),
+                first_resource,
+                0.,
+                false,
+            )
+            .ok()?;
+            group.validate(problem).ok().map(|_| row)
+        });
     }
     // Several physical heads can represent the same original packing set.
     // Aggregate by the proved row, rather than splitting that set by vertex.
@@ -62,7 +63,7 @@ pub(in crate::master::tree) fn candidates<const D: usize>(
     let mut invalid = HashSet::new();
     let mut bounds = [0.; D];
     for &resource in &axes {
-        bounds[resource] = problem
+        bounds[resource] = problem.model.networks[0]
             .graph
             .vertices
             .iter()
@@ -76,7 +77,7 @@ pub(in crate::master::tree) fn candidates<const D: usize>(
                 let Some(position) = problem.arc_position(id) else {
                     continue;
                 };
-                let vertex = problem.graph.arcs[position].head;
+                let vertex = problem.model.networks[0].graph.arcs[position].head;
                 let Some(packing_row) = packing_rows[vertex] else {
                     continue;
                 };
@@ -143,12 +144,12 @@ pub(in crate::master::tree) fn candidates<const D: usize>(
 }
 
 fn head_window<const D: usize>(
-    problem: &RootProblem<D>,
+    problem: &RoutingContext<D>,
     arc: &Arc<D>,
     resource: usize,
     history: &[BranchConstraint],
 ) -> Option<Window> {
-    let mut window = problem.graph.vertices[arc.head].bounds[resource];
+    let mut window = problem.model.networks[0].graph.vertices[arc.head].bounds[resource];
     if let Some(bound) = arc.bounds[resource] {
         window.lower = window.lower.max(bound.lower);
         window.upper = window.upper.min(bound.upper);
@@ -179,13 +180,13 @@ fn head_window<const D: usize>(
 }
 
 fn suffix_upper<const D: usize>(
-    problem: &RootProblem<D>,
+    problem: &RoutingContext<D>,
     route: &crate::Route,
     resource: usize,
     history: &[BranchConstraint],
 ) -> Option<Vec<f64>> {
     crate::master::branching::resource_intervals::suffix_upper(
-        &problem.graph,
+        &problem.model.networks[0].graph,
         route,
         resource,
         |id| problem.arc_position(id),

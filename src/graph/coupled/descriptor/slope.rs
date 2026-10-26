@@ -10,7 +10,7 @@ pub enum EvaluationPolicy {
     /// Snap at the first coordinate, and just beyond the final coordinate,
     /// using strict absolute/relative comparisons recovered for this encoding.
     /// This policy is not a tolerance for feasibility or dominance proofs.
-    NativeTolerance,
+    EndpointTolerance,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -151,7 +151,7 @@ impl PreparedSlopeFunction {
         let (lower, upper) = self.domain();
         let mut value = self.pairs[0].0;
         if argument == lower
-            || (policy == EvaluationPolicy::NativeTolerance && near(argument, lower)?)
+            || (policy == EvaluationPolicy::EndpointTolerance && near(argument, lower)?)
         {
             return Ok(Some(value));
         }
@@ -163,7 +163,7 @@ impl PreparedSlopeFunction {
         }
         if self.pairs.len() == 1 {
             return if argument == lower
-                || (policy == EvaluationPolicy::NativeTolerance && near(argument, upper)?)
+                || (policy == EvaluationPolicy::EndpointTolerance && near(argument, upper)?)
             {
                 Ok(Some(value))
             } else {
@@ -181,7 +181,7 @@ impl PreparedSlopeFunction {
             }
             previous = end;
         }
-        if policy == EvaluationPolicy::NativeTolerance && near(argument, upper)? {
+        if policy == EvaluationPolicy::EndpointTolerance && near(argument, upper)? {
             Ok(Some(value))
         } else {
             Ok(None)

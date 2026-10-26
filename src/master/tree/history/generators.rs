@@ -4,7 +4,7 @@ use super::*;
 impl BranchEvaluationHistory {
     pub(in crate::master::tree) fn refresh_generators<const D: usize>(
         &self,
-        problem: &RootProblem<D>,
+        problem: &RoutingContext<D>,
         routes: &[(&Route, f64)],
         ancestors: &[BranchConstraint],
         options: &BranchingOptions,

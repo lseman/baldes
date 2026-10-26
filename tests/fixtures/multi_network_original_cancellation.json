@@ -1,0 +1,71 @@
+{
+  "rows": [],
+  "networks": [
+    {
+      "id": 7,
+      "vertices": 4,
+      "multiplicity": [
+        0,
+        1
+      ],
+      "arcs": [
+        {
+          "tail": 0,
+          "head": 1,
+          "cost": 0.0
+        },
+        {
+          "tail": 1,
+          "head": 3,
+          "cost": 0.0
+        },
+        {
+          "tail": 0,
+          "head": 2,
+          "cost": 0.0
+        },
+        {
+          "tail": 2,
+          "head": 3,
+          "cost": 0.0
+        }
+      ]
+    }
+  ],
+  "pricing_variables": [
+    {
+      "network": 7,
+      "id": 0,
+      "cost": 1.0,
+      "arcs": [
+        [
+          0,
+          1.0
+        ],
+        [
+          2,
+          1.0
+        ]
+      ],
+      "integer": false,
+      "priority": 1000.0
+    },
+    {
+      "network": 7,
+      "id": 1,
+      "cost": -1.0,
+      "arcs": [
+        [
+          0,
+          1.0
+        ],
+        [
+          2,
+          1.0
+        ]
+      ],
+      "integer": false,
+      "priority": 1000.0
+    }
+  ]
+}

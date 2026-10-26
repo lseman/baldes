@@ -3,7 +3,7 @@ use super::*;
 impl Separation {
     /// Unique support and memory vertices in each prepared graph. Arc memory
     /// touches both endpoints; repeated arcs/sets count once per cut.
-    pub(super) fn cut_vertices(&self, cut: &NativeCut) -> BTreeSet<(i32, i32)> {
+    pub(super) fn cut_vertices(&self, cut: &SeparatedCut) -> BTreeSet<(i32, i32)> {
         let mut touched = BTreeSet::new();
         for (graph, info) in self.graph_info.iter().enumerate() {
             let Some(info) = info else { continue };
@@ -34,7 +34,7 @@ impl Separation {
     }
 
     /// Adds a memory set to the cut (and parallel arcs for arc memory).
-    pub(super) fn augment_memory(&self, cut: &mut NativeCut, graph: i32, mem: &BTreeSet<i32>) {
+    pub(super) fn augment_memory(&self, cut: &mut SeparatedCut, graph: i32, mem: &BTreeSet<i32>) {
         if mem.is_empty() {
             return;
         }
@@ -78,7 +78,7 @@ impl Separation {
 
     /// Builds the cut memory from the columns. False only for a one-row covering cut
     /// whose memory stayed empty.
-    pub fn set_cut_memory(&self, cut: &mut NativeCut, columns: &[ColumnInfo]) -> bool {
+    pub fn set_cut_memory(&self, cut: &mut SeparatedCut, columns: &[ColumnInfo]) -> bool {
         cut.memory.clear();
         for g in 0..=self.max_graph_id {
             if self.preprocessed[g as usize].is_some() {

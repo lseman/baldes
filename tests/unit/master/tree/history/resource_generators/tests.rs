@@ -1,7 +1,7 @@
 use super::*;
 use crate::master::tree::candidates::resource_groups;
 
-fn fixture() -> (RootProblem<5>, Vec<Route>) {
+fn fixture() -> (RoutingContext<5>, Vec<Route>) {
     let mut graph = crate::Graph::<5>::new(5, 5).unwrap();
     for vertex in 0..5 {
         for axis in 0..5 {
@@ -16,13 +16,13 @@ fn fixture() -> (RootProblem<5>, Vec<Route>) {
         let end = graph.add_arc(vertex, 4, 0.).unwrap();
         paths.push(vec![arc, end]);
     }
-    let mut problem = RootProblem::set_partitioning(graph, 1.).unwrap();
+    let mut problem = RoutingContext::set_partitioning(graph, 1.).unwrap();
     for path in &paths {
         let position = problem.arc_position(path[0]).unwrap();
-        problem.arc_entries[position] = vec![(1, 1.)];
+        problem.model.networks[0].arc_entries[position] = vec![(1, 1.)];
     }
-    problem.rows[2].sense = RowSense::LessEqual;
-    problem.rows[3].sense = RowSense::LessEqual;
+    problem.model.rows[2].sense = RowSense::LessEqual;
+    problem.model.rows[3].sense = RowSense::LessEqual;
     let routes = paths
         .iter()
         .map(|p| problem.elementary_route(p).unwrap())
@@ -69,7 +69,7 @@ fn history_reuses_old_threshold_when_fresh_separation_selects_another() {
     history.refresh_resource_generators(&problem, &[(&routes[0], 1.)], &[], &mut child);
     assert!(child.is_empty());
     let mut invalid_proof = problem.clone();
-    invalid_proof.rows[1].rhs = 2.;
+    invalid_proof.model.rows[1].rhs = 2.;
     history.refresh_resource_generators(&invalid_proof, &current, &[], &mut child);
     assert!(child.is_empty());
     let mut missing = routes[0].clone();

@@ -1,6 +1,6 @@
 use super::*;
 use baldes::cuts::soft_conflicts::{Mode, PresenceRow};
-use mp::{EnumerationOptions, PresenceCoefficients};
+use model::{EnumerationOptions, PresenceCoefficients};
 
 fn problem() -> Problem<2> {
     Problem {
@@ -50,7 +50,7 @@ fn presence_shared_rows_price_fix_enumerate_and_restore() {
         for bound_mode in [BoundMode::Certified, BoundMode::Numerical] {
             let mut opts = options();
             opts.cg.bound_mode = bound_mode;
-            let root = mp::solve(problem(), opts.clone()).unwrap();
+            let root = model::solve(problem(), opts.clone()).unwrap();
             optimal(&root, 2.);
             let row = Row {
                 sense: RowSense::LessEqual,
@@ -101,7 +101,7 @@ fn presence_shared_rows_price_fix_enumerate_and_restore() {
 #[test]
 fn presence_lower_and_equal_rows_keep_the_original_flow_relaxation_valid() {
     for sense in [RowSense::GreaterEqual, RowSense::Equal] {
-        let root = mp::solve(problem(), options()).unwrap();
+        let root = model::solve(problem(), options()).unwrap();
         let child = root
             .snapshot
             .with_presence_row(Row { sense, rhs: 2. }, &coefficients(Mode::PairCount))
@@ -113,8 +113,8 @@ fn presence_lower_and_equal_rows_keep_the_original_flow_relaxation_valid() {
 #[test]
 fn presence_propagation_respects_signed_master_compensation_and_budget() {
     use baldes::master::preprocessing::Bounds;
-    use mp::MasterVariable;
-    let root = mp::solve_with_master_variables(
+    use model::MasterVariable;
+    let root = model::solve_with_master_variables(
         problem(),
         vec![MasterVariable {
             id: 99,
@@ -164,7 +164,7 @@ fn presence_propagation_respects_signed_master_compensation_and_budget() {
     let mut certified = options();
     certified.cg.bound_mode = BoundMode::Certified;
     optimal(&propagated.solve(certified).unwrap(), 6.);
-    let budget = mp::PreprocessingOptions {
+    let budget = model::PreprocessingOptions {
         work_limit: 1,
         ..Default::default()
     };
@@ -176,7 +176,7 @@ fn presence_propagation_respects_signed_master_compensation_and_budget() {
 
 #[test]
 fn shared_presence_modes_distinguish_duplicate_pairs() {
-    let root = mp::solve(problem(), options()).unwrap();
+    let root = model::solve(problem(), options()).unwrap();
     for (mode, expected) in [(Mode::PairCount, 4.), (Mode::AnyPair, 2.)] {
         let mut coefficients = coefficients(mode);
         for c in &mut coefficients {
@@ -213,7 +213,7 @@ fn shared_presence_modes_distinguish_duplicate_pairs() {
 fn presence_rows_apply_before_any_route_is_priced() {
     let mut cold = options();
     cold.cg.time_limit = std::time::Duration::ZERO;
-    let root = mp::solve(problem(), cold).unwrap();
+    let root = model::solve(problem(), cold).unwrap();
     assert_eq!(root.master.pricing_calls, 0);
     let child = root
         .snapshot
@@ -236,7 +236,7 @@ fn exhausted_presence_rows_propagate_conflicts_across_separate_arcs() {
         (Mode::PairCount, RowSense::Equal),
         (Mode::AnyPair, RowSense::Equal),
     ] {
-        let root = mp::solve(problem(), options()).unwrap();
+        let root = model::solve(problem(), options()).unwrap();
         let mut emissions = coefficients(mode);
         for c in &mut emissions {
             c.arc_events[0] = vec![0];
@@ -264,7 +264,7 @@ fn exhausted_presence_rows_propagate_conflicts_across_separate_arcs() {
 
 #[test]
 fn positive_fractional_presence_budget_keeps_fractional_route_activity() {
-    let root = mp::solve(problem(), options()).unwrap();
+    let root = model::solve(problem(), options()).unwrap();
     let mut emissions = coefficients(Mode::AnyPair);
     for c in &mut emissions {
         c.arc_events[0] = vec![0];
@@ -289,8 +289,8 @@ fn positive_fractional_presence_budget_keeps_fractional_route_activity() {
 #[test]
 fn presence_walk_support_reaches_a_cross_network_static_link_fixed_point() {
     use baldes::master::preprocessing::Bounds;
-    use mp::MasterVariable;
-    let root = mp::solve_with_master_variables(
+    use model::MasterVariable;
+    let root = model::solve_with_master_variables(
         problem(),
         vec![MasterVariable {
             id: 99,
@@ -360,7 +360,7 @@ fn joint_presence_certificates_close_shared_roots_and_fixed_descendants_without_
     for mode in [Mode::PairCount, Mode::AnyPair] {
         let mut configured = options();
         configured.cg.bound_mode = BoundMode::Certified;
-        let root = mp::solve(problem(), configured.clone()).unwrap();
+        let root = model::solve(problem(), configured.clone()).unwrap();
         let node = root
             .snapshot
             .with_presence_row(
@@ -388,7 +388,7 @@ fn joint_presence_certificates_close_shared_roots_and_fixed_descendants_without_
             4.,
         );
         let tree = node
-            .solve_assignment_tree(mp::AssignmentTreeOptions {
+            .solve_tree(baldes::master::tree::ModelTreeOptions {
                 node: configured.clone(),
                 ..Default::default()
             })
@@ -406,7 +406,7 @@ fn cutoff_presence_rows_keep_both_dual_signs_fixed_copies_and_descendants() {
     use baldes::master::solvers::mip::{MipOptions, MipStatus};
     for mode in [Mode::PairCount, Mode::AnyPair] {
         for lower in [false, true] {
-            let root = mp::solve(problem(), options()).unwrap();
+            let root = model::solve(problem(), options()).unwrap();
             let mut coefficients = coefficients(mode);
             if lower {
                 // Require one expensive route; its presence dual is positive.

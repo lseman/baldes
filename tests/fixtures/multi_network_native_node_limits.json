@@ -1,0 +1,294 @@
+{
+  "native_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "provenance": "Public modern C-interface tree fixture; function-type 3, rule 1, strong branching off, default primary capacity 1000; limits 0 through 7. Native zero-node placeholder bound 0 is not published as a proof bound. Raw controls retained in internal/audits/native-parity-goal-20261025/native-runtime/*-searchN-nodesN-result.json.",
+  "cases": [
+    {
+      "policy": "best-bound",
+      "limit": 0,
+      "processed": 0,
+      "evaluated": 0,
+      "incumbent": null,
+      "bound": null,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "best-bound",
+      "limit": 1,
+      "processed": 1,
+      "evaluated": 1,
+      "incumbent": null,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "best-bound",
+      "limit": 2,
+      "processed": 2,
+      "evaluated": 2,
+      "incumbent": null,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "best-bound",
+      "limit": 3,
+      "processed": 3,
+      "evaluated": 3,
+      "incumbent": 2.0,
+      "bound": 1.666666666666667,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "best-bound",
+      "limit": 4,
+      "processed": 4,
+      "evaluated": 4,
+      "incumbent": 2.0,
+      "bound": 1.666666666666667,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "best-bound",
+      "limit": 5,
+      "processed": 5,
+      "evaluated": 5,
+      "incumbent": 2.0,
+      "bound": 2.0,
+      "status": "Optimal"
+    },
+    {
+      "policy": "best-bound",
+      "limit": 6,
+      "processed": 5,
+      "evaluated": 5,
+      "incumbent": 2.0,
+      "bound": 2.0,
+      "status": "Optimal"
+    },
+    {
+      "policy": "best-bound",
+      "limit": 7,
+      "processed": 5,
+      "evaluated": 5,
+      "incumbent": 2.0,
+      "bound": 2.0,
+      "status": "Optimal"
+    },
+    {
+      "policy": "default",
+      "limit": 0,
+      "processed": 0,
+      "evaluated": 0,
+      "incumbent": null,
+      "bound": null,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "default",
+      "limit": 1,
+      "processed": 1,
+      "evaluated": 1,
+      "incumbent": null,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "default",
+      "limit": 2,
+      "processed": 2,
+      "evaluated": 2,
+      "incumbent": null,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "default",
+      "limit": 3,
+      "processed": 3,
+      "evaluated": 3,
+      "incumbent": null,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "default",
+      "limit": 4,
+      "processed": 4,
+      "evaluated": 4,
+      "incumbent": 2.0,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "default",
+      "limit": 5,
+      "processed": 5,
+      "evaluated": 4,
+      "incumbent": 2.0,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "default",
+      "limit": 6,
+      "processed": 6,
+      "evaluated": 5,
+      "incumbent": 2.0,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "default",
+      "limit": 7,
+      "processed": 7,
+      "evaluated": 6,
+      "incumbent": 2.0,
+      "bound": 2.0,
+      "status": "Optimal"
+    },
+    {
+      "policy": "bound-priority",
+      "limit": 0,
+      "processed": 0,
+      "evaluated": 0,
+      "incumbent": null,
+      "bound": null,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "bound-priority",
+      "limit": 1,
+      "processed": 1,
+      "evaluated": 1,
+      "incumbent": null,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "bound-priority",
+      "limit": 2,
+      "processed": 2,
+      "evaluated": 2,
+      "incumbent": null,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "bound-priority",
+      "limit": 3,
+      "processed": 3,
+      "evaluated": 3,
+      "incumbent": 2.0,
+      "bound": 1.666666666666667,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "bound-priority",
+      "limit": 4,
+      "processed": 4,
+      "evaluated": 4,
+      "incumbent": 2.0,
+      "bound": 1.666666666666667,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "bound-priority",
+      "limit": 5,
+      "processed": 5,
+      "evaluated": 5,
+      "incumbent": 2.0,
+      "bound": 2.0,
+      "status": "Optimal"
+    },
+    {
+      "policy": "bound-priority",
+      "limit": 6,
+      "processed": 5,
+      "evaluated": 5,
+      "incumbent": 2.0,
+      "bound": 2.0,
+      "status": "Optimal"
+    },
+    {
+      "policy": "bound-priority",
+      "limit": 7,
+      "processed": 5,
+      "evaluated": 5,
+      "incumbent": 2.0,
+      "bound": 2.0,
+      "status": "Optimal"
+    },
+    {
+      "policy": "depth-bound-priority",
+      "limit": 0,
+      "processed": 0,
+      "evaluated": 0,
+      "incumbent": null,
+      "bound": null,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "depth-bound-priority",
+      "limit": 1,
+      "processed": 1,
+      "evaluated": 1,
+      "incumbent": null,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "depth-bound-priority",
+      "limit": 2,
+      "processed": 2,
+      "evaluated": 2,
+      "incumbent": null,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "depth-bound-priority",
+      "limit": 3,
+      "processed": 3,
+      "evaluated": 3,
+      "incumbent": null,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "depth-bound-priority",
+      "limit": 4,
+      "processed": 4,
+      "evaluated": 4,
+      "incumbent": 2.0,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "depth-bound-priority",
+      "limit": 5,
+      "processed": 5,
+      "evaluated": 4,
+      "incumbent": 2.0,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "depth-bound-priority",
+      "limit": 6,
+      "processed": 6,
+      "evaluated": 5,
+      "incumbent": 2.0,
+      "bound": 1.5,
+      "status": "NodeLimit"
+    },
+    {
+      "policy": "depth-bound-priority",
+      "limit": 7,
+      "processed": 7,
+      "evaluated": 6,
+      "incumbent": 2.0,
+      "bound": 2.0,
+      "status": "Optimal"
+    }
+  ]
+}

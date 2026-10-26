@@ -220,7 +220,7 @@ pub fn prepare_incidence(g: &GraphData) -> Option<Incidence> {
 /// 2 a third kind that rounds like packing. Memory: graph id -> vertex ids
 /// (memory type 0) or arc ids (memory type 1).
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct NativeCut {
+pub struct SeparatedCut {
     pub id: i32,
     pub rhs: f64,
     pub kind: i32,
@@ -363,7 +363,7 @@ pub struct Input<'a> {
     pub cut_memory_type: i32,
     pub solutions_are_set_sequences: bool,
     pub separation_phase: i32,
-    pub active_cuts: Vec<NativeCut>,
+    pub active_cuts: Vec<SeparatedCut>,
 }
 
 pub type Bits = [u64; 16];
@@ -392,7 +392,7 @@ pub struct Separation {
     pub num_separate_calls: i32,
     pub cut_memory_type: i32,
     pub current_max_rank: i32,
-    pub active_cuts: Vec<NativeCut>,
+    pub active_cuts: Vec<SeparatedCut>,
     /// Existing registry cuts touching each (graph, vertex), excluding retired cuts.
     pub vertex_cut_load: BTreeMap<(i32, i32), usize>,
     pub packing_neighbours: Vec<Bits>,
@@ -410,7 +410,7 @@ pub struct Separation {
     pub covering_permutations: Vec<Vec<i32>>,
     pub neighbours_208: Vec<Bits>,
     /// Candidate arena; the candidate set holds indices into it.
-    pub arena: Vec<NativeCut>,
+    pub arena: Vec<SeparatedCut>,
 }
 
 /// All distinct permutations of a multiset, in recursive swap order.

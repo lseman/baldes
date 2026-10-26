@@ -1,0 +1,35 @@
+{
+  "rows": [],
+  "networks": [
+    {
+      "id": 7,
+      "vertices": 3,
+      "multiplicity": [0, 1],
+      "resources": [
+        {
+          "kind": "disposable",
+          "bounds": [[0, 2], [0, 2], [0, 2]]
+        },
+        {
+          "kind": "disposable",
+          "initial": 5,
+          "bounds": [[5, 10], [3, 3], [0, 7]]
+        }
+      ],
+      "arcs": [
+        {
+          "tail": 0,
+          "head": 1,
+          "cost": -1,
+          "consumption": [1, -3]
+        },
+        {
+          "tail": 1,
+          "head": 2,
+          "cost": 0,
+          "consumption": [1, 4]
+        }
+      ]
+    }
+  ]
+}

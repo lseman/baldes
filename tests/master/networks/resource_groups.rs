@@ -1,6 +1,6 @@
 //! Shared grouped-resource branches preserve schedules and physical path caps.
 use super::*;
-use mp::{EnumerationOptions, ResourceGroupMember};
+use model::{EnumerationOptions, ResourceGroupMember};
 
 fn adjacent_pair_problem(q: f64) -> (Problem<5>, Vec<ResourceGroupMember>) {
     let mut networks = vec![];
@@ -88,7 +88,7 @@ fn enumeration_keeps_costlier_same_cover_path_for_fixed_resource_descendant() {
         let (problem, members) = adjacent_pair_problem(q);
         let mut configured = options();
         configured.cg.bound_mode = mode;
-        let parent = mp::solve(problem, configured.clone()).unwrap();
+        let parent = model::solve(problem, configured.clone()).unwrap();
         let complete = parent
             .snapshot
             .enumerate(&EnumerationOptions::default())
@@ -111,7 +111,7 @@ fn enumeration_keeps_costlier_same_cover_path_for_fixed_resource_descendant() {
             .unwrap();
         optimal(&child.solve(configured.clone()).unwrap(), 5.125);
         let tree = child
-            .solve_assignment_tree(mp::AssignmentTreeOptions {
+            .solve_tree(baldes::master::tree::ModelTreeOptions {
                 node: configured.clone(),
                 node_limit: 1000,
                 ..Default::default()
@@ -137,7 +137,7 @@ fn adjacent_pair_profiles_close_both_children_without_repeating_the_split() {
         for mode in [BoundMode::Numerical, BoundMode::Certified] {
             let mut configured = options();
             configured.cg.bound_mode = mode;
-            let parent = mp::solve(problem.clone(), configured.clone()).unwrap();
+            let parent = model::solve(problem.clone(), configured.clone()).unwrap();
             optimal(&parent, 4.5);
             for upper in [false, true] {
                 let child = parent
@@ -160,7 +160,7 @@ fn adjacent_pair_profiles_close_both_children_without_repeating_the_split() {
                         .any(|c| { c.packing_row == 7 && c.resource == 4 && c.threshold == 2. }));
                     let tree = solved
                         .snapshot
-                        .solve_assignment_tree(mp::AssignmentTreeOptions {
+                        .solve_tree(baldes::master::tree::ModelTreeOptions {
                             node: configured.clone(),
                             node_limit: 1000,
                             ..Default::default()
@@ -266,7 +266,7 @@ fn shared_group_children_refresh_schedules_and_survive_enumeration_and_restorati
                     if complete_parent {
                         configured.enumeration = Some(EnumerationOptions::default());
                     }
-                    let parent = mp::solve(problem, configured.clone()).unwrap();
+                    let parent = model::solve(problem, configured.clone()).unwrap();
                     optimal(&parent, 2.);
                     for upper in [false, true] {
                         let child = parent
@@ -321,7 +321,7 @@ fn shared_group_children_refresh_schedules_and_survive_enumeration_and_restorati
 #[test]
 fn a_complete_parent_keeps_a_capped_path_when_the_branch_changes_its_schedule() {
     let (problem, members) = fixture(true);
-    let parent = mp::solve(problem, options()).unwrap();
+    let parent = model::solve(problem, options()).unwrap();
     let capped = parent
         .snapshot
         .with_row(
@@ -365,7 +365,7 @@ fn a_complete_parent_keeps_a_capped_path_when_the_branch_changes_its_schedule() 
 #[test]
 fn shared_group_fixed_copies_and_infeasible_descendants_are_isolated() {
     let (problem, members) = fixture(false);
-    let parent = mp::solve(problem, options()).unwrap();
+    let parent = model::solve(problem, options()).unwrap();
     let cheap = parent
         .routes
         .iter()
@@ -432,7 +432,7 @@ fn shared_group_fixed_copies_and_infeasible_descendants_are_isolated() {
 #[test]
 fn shared_group_proof_rejects_cancellation_and_invalid_support_without_mutation() {
     let (problem, members) = fixture(false);
-    let parent = mp::solve(problem.clone(), options()).unwrap();
+    let parent = model::solve(problem.clone(), options()).unwrap();
     let mut duplicated = members.clone();
     duplicated.push(members[0].clone());
     assert!(parent
@@ -453,14 +453,14 @@ fn shared_group_proof_rejects_cancellation_and_invalid_support_without_mutation(
     too_small.networks[0].arc_entries[0][0].1 = 0.5;
     let mut no_work = options();
     no_work.cg.time_limit = std::time::Duration::ZERO;
-    let node = mp::solve(too_small, no_work.clone()).unwrap();
+    let node = model::solve(too_small, no_work.clone()).unwrap();
     assert!(node
         .snapshot
         .with_resource_group_branch(0, 4, 1.5, true, &members)
         .is_err());
     let mut cancelling = problem;
     cancelling.networks[1].arc_entries[4].push((0, -1.));
-    let node = mp::solve(cancelling, no_work).unwrap();
+    let node = model::solve(cancelling, no_work).unwrap();
     assert!(node
         .snapshot
         .with_resource_group_branch(0, 4, 1.5, true, &members)
@@ -475,7 +475,7 @@ fn shared_group_cutoff_views_keep_the_restricted_domain() {
     use baldes::master::solvers::mip::{MipOptions, MipStatus};
     for waiting in [false, true] {
         let (problem, members) = fixture(waiting);
-        let parent = mp::solve(problem, options()).unwrap();
+        let parent = model::solve(problem, options()).unwrap();
         let child = parent
             .snapshot
             .with_resource_group_branch(0, 4, 1.5, true, &members)
@@ -540,7 +540,7 @@ fn exact_feasible_but_unreconstructible_branch_leaves_parent_unchanged() {
             route_entries: vec![],
         }],
     };
-    let parent = mp::solve(problem, options()).unwrap();
+    let parent = model::solve(problem, options()).unwrap();
     optimal(&parent, 1.);
     let before = parent
         .routes
@@ -577,9 +577,9 @@ fn exact_feasible_but_unreconstructible_branch_leaves_parent_unchanged() {
 #[test]
 fn resource_load_rows_keep_original_path_semantics_when_a_branch_adds_waiting() {
     use baldes::cuts::knapsack::{KnapsackKind, RouteLoadKnapsackCut};
-    use mp::ResourceKnapsackCoefficients;
+    use model::ResourceKnapsackCoefficients;
     let (problem, members) = fixture(true);
-    let parent = mp::solve(problem, options()).unwrap();
+    let parent = model::solve(problem, options()).unwrap();
     let coefficients: Vec<_> = [7, 42]
         .into_iter()
         .map(|network| ResourceKnapsackCoefficients {
@@ -650,7 +650,7 @@ fn resource_load_rows_keep_original_path_semantics_when_a_branch_adds_waiting() 
 #[test]
 fn signed_static_terms_cannot_cancel_the_shared_occurrence_proof() {
     use baldes::master::preprocessing::Bounds;
-    use mp::MasterVariable;
+    use model::MasterVariable;
     for (coefficient, bounds) in [
         (
             1.,
@@ -670,7 +670,7 @@ fn signed_static_terms_cannot_cancel_the_shared_occurrence_proof() {
         let (problem, members) = fixture(false);
         let mut configured = options();
         configured.cg.time_limit = std::time::Duration::ZERO;
-        let node = mp::solve_with_master_variables(
+        let node = model::solve_with_master_variables(
             problem,
             vec![MasterVariable {
                 id: 99,
@@ -699,7 +699,7 @@ fn equality_resources_filter_without_introducing_waiting() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let mut configured = options();
         configured.cg.bound_mode = mode;
-        let parent = mp::solve(problem.clone(), configured.clone()).unwrap();
+        let parent = model::solve(problem.clone(), configured.clone()).unwrap();
         optimal(&parent, 2.);
         for upper in [false, true] {
             let child = parent
@@ -777,7 +777,7 @@ fn public_triangle_group_mapping_survives_actual_shared_tree_descendants() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let mut configured = options();
         configured.cg.bound_mode = mode;
-        let parent = mp::solve(problem.clone(), configured.clone()).unwrap();
+        let parent = model::solve(problem.clone(), configured.clone()).unwrap();
         optimal(&parent, 4.5);
         let choices = parent.snapshot.resource_group_candidates(1e-6).unwrap();
         let mapped = choices
@@ -798,7 +798,7 @@ fn public_triangle_group_mapping_survives_actual_shared_tree_descendants() {
         }
         let automatic = parent
             .snapshot
-            .solve_assignment_tree(mp::AssignmentTreeOptions {
+            .solve_tree(baldes::master::tree::ModelTreeOptions {
                 node: configured.clone(),
                 ..Default::default()
             })
@@ -824,7 +824,7 @@ fn public_triangle_group_mapping_survives_actual_shared_tree_descendants() {
                 .iter()
                 .any(|c| c.packing_row == 1 && c.resource == 4 && c.threshold == 2.));
             let tree = child
-                .solve_assignment_tree(mp::AssignmentTreeOptions {
+                .solve_tree(baldes::master::tree::ModelTreeOptions {
                     node: configured.clone(),
                     ..Default::default()
                 })
@@ -882,7 +882,7 @@ fn sparse_parallel_member_ids_survive_blocking_and_domain_reindexing() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let mut configured = options();
         configured.cg.bound_mode = mode;
-        let parent = mp::solve(problem.clone(), configured.clone()).unwrap();
+        let parent = model::solve(problem.clone(), configured.clone()).unwrap();
         optimal(&parent, 2.);
         for upper in [false, true] {
             let child = parent
@@ -946,7 +946,7 @@ fn rounded_compatible_profiles_cannot_hide_an_exact_fixed_resource_contradiction
             route_entries: vec![],
         }],
     };
-    let parent = mp::solve(problem, options()).unwrap();
+    let parent = model::solve(problem, options()).unwrap();
     optimal(&parent, 1.);
     let tag = parent
         .routes
@@ -1031,7 +1031,7 @@ fn automatic_shared_resource_candidates_keep_weighted_mass_and_ancestor_windows(
         if complete {
             configured.enumeration = Some(EnumerationOptions::default());
         }
-        let parent = mp::solve(problem, configured.clone()).unwrap();
+        let parent = model::solve(problem, configured.clone()).unwrap();
         optimal(&parent, 1.);
         assert!(parent.snapshot.resource_group_candidates(0.).is_err());
         let candidates = parent.snapshot.resource_group_candidates(1e-6).unwrap();
@@ -1056,7 +1056,7 @@ fn automatic_shared_resource_candidates_keep_weighted_mass_and_ancestor_windows(
             .is_empty());
         let tree = parent
             .snapshot
-            .solve_assignment_tree(mp::AssignmentTreeOptions {
+            .solve_tree(baldes::master::tree::ModelTreeOptions {
                 node: configured.clone(),
                 ..Default::default()
             })

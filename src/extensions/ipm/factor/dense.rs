@@ -1,7 +1,17 @@
-//! Lower-triangle dense LDLᵀ. Row updates stream contiguous memory; pivot
-//! selection reads the symmetric lower entry instead of maintaining a copy of
-//! the upper triangle after each pivot. The reference kernel stays in tests.
+//! Dense LDLᵀ with scalar restricted BK and optional safe matrix-multiply panels.
+//! Pivot selection reads the lower triangle. Blocked updates may write the
+//! unused upper part of a row tile; it never contributes to lower entries.
 use super::*;
+
+#[derive(Debug, Default)]
+pub(super) struct DenseScratch {
+    pub(super) used_blocked: bool,
+    multipliers: Vec<(f64, f64)>,
+    #[cfg(feature = "ipm-blocked")]
+    left: Vec<f64>,
+    #[cfg(feature = "ipm-blocked")]
+    right: Vec<f64>,
+}
 
 fn swap_lower(f: &mut [f64], n: usize, a: usize, b: usize, perm: &mut [usize]) {
     if a == b {
@@ -31,13 +41,29 @@ pub(super) fn bk_into(
     node: bool,
     blocks: &mut Vec<Block>,
     perm: &mut Vec<usize>,
-    multipliers: &mut Vec<(f64, f64)>,
+    scratch: &mut DenseScratch,
+    allow_blocked: bool,
 ) -> Result<()> {
+    scratch.used_blocked = false;
     blocks.clear();
     blocks.resize(np, Block::Skip);
     perm.clear();
     perm.extend(0..np);
-    let mut k = 0;
+    // Batch trailing updates outside each panel. A 1x1 pivot that needs
+    // interchange or regularization flushes pending work and resumes scalar BK.
+    #[cfg(feature = "ipm-blocked")]
+    let mut k = if allow_blocked && n >= 128 && np >= 32 {
+        scratch.used_blocked = true;
+        blocked_prefix(f, n, np, stats, node, blocks, scratch)
+    } else {
+        0
+    };
+    #[cfg(not(feature = "ipm-blocked"))]
+    let mut k = {
+        let _ = allow_blocked;
+        0
+    };
+    let multipliers = &mut scratch.multipliers;
     const ALPHA: f64 = (1.0 + 4.123_105_625_617_661) / 8.0;
     while k < np {
         let mut lambda = 0.0;
@@ -128,6 +154,123 @@ pub(super) fn bk_into(
     Ok(())
 }
 
+#[cfg(feature = "ipm-blocked")]
+fn blocked_prefix(
+    f: &mut [f64],
+    n: usize,
+    np: usize,
+    stats: &mut FactorStats,
+    node: bool,
+    blocks: &mut [Block],
+    scratch: &mut DenseScratch,
+) -> usize {
+    const WIDTH: usize = 64;
+    const ALPHA: f64 = (1.0 + 4.123_105_625_617_661) / 8.0;
+    let mut lo = 0;
+    while lo < np {
+        let end = (lo + WIDTH).min(np);
+        let mut k = lo;
+        while k < end {
+            let d = f[k * n + k];
+            let lambda = (k + 1..np)
+                .map(|i| f[i * n + k].abs())
+                .fold(0.0_f64, f64::max);
+            // This sufficient BK acceptance test never changes pivot policy.
+            // Pivot swaps, 2x2 blocks and pivot regularization use scalar BK.
+            if !d.is_finite() || d.abs() <= 1e-11 || d.abs() < ALPHA * lambda {
+                break;
+            }
+            blocks[k] = Block::One(d);
+            stats.min_abs_pivot = stats.min_abs_pivot.min(d.abs());
+            for i in k + 1..n {
+                f[i * n + k] /= d;
+            }
+            let start = k + 1;
+            scratch.multipliers.clear();
+            scratch
+                .multipliers
+                .extend((start..n).map(|i| (f[i * n + k], 0.)));
+            let multipliers = &scratch.multipliers;
+            for (offset, row) in f[start * n..].chunks_mut(n).enumerate() {
+                let scale = multipliers[offset].0 * d;
+                let target = &mut row[start..end.min(start + offset + 1)];
+                for (value, &(entry, _)) in target.iter_mut().zip(multipliers) {
+                    *value -= scale * entry;
+                }
+            }
+            k += 1;
+        }
+        panel_update(f, n, lo, k, end, blocks, node, scratch);
+        if k != end {
+            return k;
+        }
+        lo = end;
+    }
+    np
+}
+
+#[cfg(feature = "ipm-blocked")]
+#[allow(clippy::too_many_arguments)]
+fn panel_update(
+    f: &mut [f64],
+    n: usize,
+    lo: usize,
+    done: usize,
+    start: usize,
+    blocks: &[Block],
+    node: bool,
+    scratch: &mut DenseScratch,
+) {
+    use ndarray::{ArrayView2, ArrayViewMut2, ShapeBuilder};
+    if done == lo || start == n {
+        return;
+    }
+    let rows = n - start;
+    let width = done - lo;
+    scratch.left.resize(rows * width, 0.);
+    scratch.right.resize(rows * width, 0.);
+    for k in lo..done {
+        let Block::One(d) = blocks[k] else {
+            unreachable!()
+        };
+        for i in start..n {
+            scratch.left[(i - start) * width + k - lo] = f[i * n + k] * d;
+            scratch.right[(k - lo) * rows + i - start] = f[i * n + k];
+        }
+    }
+    let (left, right) = (&scratch.left, &scratch.right);
+    let update = |(tile, chunk): (usize, &mut [f64])| {
+        let offset = tile * 64;
+        let height = chunk.len() / n;
+        let columns = offset + height;
+        let a = ArrayView2::from_shape(
+            (height, width),
+            &left[offset * width..(offset + height) * width],
+        )
+        .unwrap();
+        let b =
+            ArrayView2::from_shape((width, columns).strides((rows, 1)), right.as_slice()).unwrap();
+        // The rectangle stops at the last row's diagonal. Only the diagonal
+        // tile has extra upper entries; GEMM never mixes output cells, so a
+        // poisoned unused upper entry cannot affect a required lower entry.
+        let mut c =
+            ArrayViewMut2::from_shape((height, columns).strides((n, 1)), &mut chunk[start..])
+                .unwrap();
+        ndarray::linalg::general_mat_mul(-1., &a, &b, 1., &mut c);
+    };
+    if node && rows >= 128 {
+        f[start * n..]
+            .par_chunks_mut(n * 64)
+            .enumerate()
+            .for_each(update);
+    } else {
+        f[start * n..]
+            .chunks_mut(n * 64)
+            .enumerate()
+            .for_each(update);
+    }
+}
+
 fn update_lower(
     f: &mut [f64],
     n: usize,
@@ -165,3 +308,7 @@ fn update_lower(
         f[start * n..].chunks_mut(n).enumerate().for_each(update);
     }
 }
+
+#[cfg(all(test, feature = "ipm-blocked"))]
+#[path = "../../../../tests/unit/extensions/ipm/factor/blocked_tests.rs"]
+mod blocked_tests;

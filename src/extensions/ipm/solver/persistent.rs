@@ -10,6 +10,21 @@ pub struct SolverStatistics {
     pub newton_iterations: usize,
 }
 
+/// Optional cumulative phase measurements. Initialization includes its own
+/// linear solves, so phase durations are not all disjoint. Newton factorization
+/// excludes initialization; linear solves include refinement and initialization.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SolverProfile {
+    pub preparation: std::time::Duration,
+    pub initialization: std::time::Duration,
+    pub newton_factorization: std::time::Duration,
+    pub linear_solve: std::time::Duration,
+    pub factorization_attempts: usize,
+    pub linear_solve_calls: usize,
+    pub correction_attempts: usize,
+    pub accepted_corrections: usize,
+}
+
 /// Reusable IPM preparation and strictly interior starting points.
 /// Matrix/bound/sense or scaling changes rebuild preparation. Cost and RHS
 /// edits retain symbolic analysis but start cold. Structural changes always
@@ -18,6 +33,7 @@ pub struct SolverStatistics {
 pub struct Solver {
     prepared: Option<Prepared>,
     statistics: SolverStatistics,
+    profile: SolverProfile,
 }
 
 #[derive(Debug, Clone)]
@@ -209,6 +225,11 @@ impl Prepared {
 }
 
 impl Solver {
+    /// Measurements accumulate only for solves with `Options::profile` enabled.
+    pub fn profile(&self) -> SolverProfile {
+        self.profile
+    }
+
     pub fn statistics(&self) -> SolverStatistics {
         self.statistics
     }
@@ -256,8 +277,15 @@ impl Solver {
             }
         }
         let warm = initial.is_some();
+        if options.profile {
+            self.profile.preparation += started.elapsed();
+        }
         self.statistics.warm_starts += usize::from(warm);
         let p = self.prepared.as_mut().unwrap();
+        p.solve_workspace.profile =
+            options.profile || options.corrections == CorrectionPolicy::Adaptive;
+        let solve_time_before = p.solve_workspace.solve_time;
+        let solve_calls_before = p.solve_workspace.solve_calls;
         p.iterations = 0;
         let mut budget = options.clone();
         budget.time_limit = options
@@ -266,7 +294,7 @@ impl Solver {
         if warm {
             budget.max_iterations = budget.max_iterations.min(20);
         }
-        let mut result = solve_prepared(model, &budget, p, initial);
+        let mut result = solve_prepared(model, &budget, p, initial, &mut self.profile);
         let first_iterations = p.iterations;
         self.statistics.newton_iterations += first_iterations;
         let retry = warm
@@ -285,11 +313,15 @@ impl Solver {
                 .time_limit
                 .map(|t| t.saturating_sub(started.elapsed()));
             p.iterations = 0;
-            result = solve_prepared(model, &budget, p, None);
+            result = solve_prepared(model, &budget, p, None, &mut self.profile);
             self.statistics.newton_iterations += p.iterations;
             if let Ok((s, _)) = &mut result {
                 s.iterations += first_iterations;
             }
+        }
+        if options.profile {
+            self.profile.linear_solve += p.solve_workspace.solve_time - solve_time_before;
+            self.profile.linear_solve_calls += p.solve_workspace.solve_calls - solve_calls_before;
         }
         let (solution, point) = result?;
         if solution.status == Status::Optimal {

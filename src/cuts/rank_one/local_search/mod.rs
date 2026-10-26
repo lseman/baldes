@@ -1,6 +1,6 @@
 //! Local-search rank-one separation (packing and covering).
 //! Randomized starts use an owned, deterministically seeded shared RNG.
-use super::separation::{bit, Bits, ColumnInfo, NativeCut, Separation};
+use super::separation::{bit, Bits, ColumnInfo, SeparatedCut, Separation};
 use super::subcuts;
 use crate::cuts::shared::rbtree::CandidateSet;
 use crate::rng::Xoroshiro128Plus;

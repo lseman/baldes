@@ -1,9 +1,9 @@
 use super::*;
-fn problem(cost: f64) -> RootProblem<2> {
+fn problem(cost: f64) -> RoutingContext<2> {
     let mut graph = Graph::new(3, 1).unwrap();
     graph.add_arc(0, 1, cost).unwrap();
     graph.add_arc(1, 2, 0.).unwrap();
-    RootProblem::set_partitioning(graph, 1.).unwrap()
+    RoutingContext::set_partitioning(graph, 1.).unwrap()
 }
 use crate::Graph;
 #[test]
@@ -21,7 +21,7 @@ fn decimal_lattice_closes_small_gaps_without_exceeding_arc_costs() {
 fn arbitrary_costs_and_empty_routes_decline_lattice_strengthening() {
     assert!(ObjectiveLattice::prepare(&problem(2f64.sqrt())).is_none());
     let mut problem = problem(0.1);
-    problem.graph.add_arc(0, 2, 0.).unwrap();
+    problem.model.networks[0].graph.add_arc(0, 2, 0.).unwrap();
     assert!(ObjectiveLattice::prepare(&problem).is_none());
 }
 

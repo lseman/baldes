@@ -30,8 +30,8 @@ Remove `--tree` for a root relaxation solve.
 
 Build robust data with `extensions::robust::Problem::from_instance` and
 `Uncertainty`, or supply `Node` and `Travel` data directly. Then call
-`Problem::native_graph` (or `native_graph_with_memory`), construct a
-`master::root::RootProblem`, and use `master::root::solve` or
+`Problem::pricing_graph` (or `pricing_graph_with_memory`), construct a
+`master::routing::RoutingContext`, and use `master::routing::solve` or
 `master::tree::solve`. The graph retains the budgeted resources throughout
 pricing; no separate robust master is needed.
 

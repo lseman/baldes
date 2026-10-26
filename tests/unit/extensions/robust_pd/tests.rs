@@ -361,10 +361,8 @@ fn native_pricing_matches_exhaustive_routes_in_both_directions() {
 #[cfg(feature = "clp")]
 #[test]
 fn native_master_tree_covers_every_request_and_matches_exact_partition() {
-    use crate::master::{
-        mp::{solve_assignment_tree, AssignmentTreeOptions},
-        tree::TreeStatus,
-    };
+    use crate::master::tree::ModelTreeOptions;
+    use crate::master::tree::TreeStatus;
     for (gq, gt) in [(0, 0), (1, 1), (2, 2)] {
         let p = fixture(10., 7., gq, gt);
         let all = routes();
@@ -381,9 +379,9 @@ fn native_master_tree_covers_every_request_and_matches_exact_partition() {
                 .fold(f64::INFINITY, f64::min)
         };
         let expected = cheapest(3).min(cheapest(1) + cheapest(2));
-        let mut options = AssignmentTreeOptions::default();
+        let mut options = ModelTreeOptions::default();
         options.node.cg.artificial_cost = 1e6;
-        let result = solve_assignment_tree(p.master_problem().unwrap(), options).unwrap();
+        let result = crate::master::tree::solve(p.master_problem().unwrap(), options).unwrap();
         assert_eq!(result.status, TreeStatus::Optimal, "{result:?}");
         assert!((result.incumbent - expected).abs() < 1e-6, "{result:?}");
         let mut covered = [0.; 2];

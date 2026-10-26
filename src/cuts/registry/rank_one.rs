@@ -183,7 +183,7 @@ impl CutRegistry {
                 p.memory_type == MemoryType::Arc
                     && !self.retired.contains(index)
                     && cut.memory_kind == MemoryKind::Arc
-                    && cut.native_kpath_support.is_none()
+                    && cut.general_kpath_support.is_none()
                     && cut.graph_support.is_empty()
                     && cut.graph_pricing_support.is_empty()
                     && cut.arc_weights.is_empty()
@@ -207,10 +207,10 @@ impl CutRegistry {
                 }
                 rows.sort();
                 let (set_ids, numerators) = rows.into_iter().unzip();
-                Some(separation::NativeCut {
+                Some(separation::SeparatedCut {
                     id: cut.id,
                     rhs: cut.rhs as f64,
-                    kind: if cut.native_type2 {
+                    kind: if cut.type2 {
                         2
                     } else if sign < 0 {
                         1
@@ -256,7 +256,7 @@ impl CutRegistry {
                 weights: vec![0; vertices],
                 graph_support: BTreeMap::new(),
                 graph_pricing_support: BTreeMap::new(),
-                native_kpath_support: None,
+                general_kpath_support: None,
                 memory: vec![false; vertices],
                 graph_dependent_memory: true,
                 graph_memories: BTreeMap::new(),
@@ -269,7 +269,7 @@ impl CutRegistry {
                 graph_arc_memories: BTreeMap::new(),
                 arc_weights: BTreeMap::new(),
                 visit_once: false,
-                native_type2: native.kind == 2,
+                type2: native.kind == 2,
                 denominator: native.denominator.abs(),
                 dual: 0.,
                 class: if native.kind == 1 {

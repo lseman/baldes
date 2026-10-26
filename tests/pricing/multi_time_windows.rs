@@ -308,7 +308,7 @@ fn nonindexed_resource_windows_and_zero_width_endpoints_are_enforced() {
 #[cfg(feature = "clp")]
 #[test]
 fn network_json_loads_and_intersects_unions() {
-    use baldes::master::mp::format::Model;
+    use baldes::master::model::format::Model;
     let text = r#"{"rows":[],"networks":[{"id":0,"vertices":3,"multiplicity":[0,1],
       "resources":[{"time_windows":[null,[[8,12],[0,2]],null],"bounds":[[0,20],[0,10],[0,20]]}],
       "arcs":[{"tail":0,"head":1,"cost":-1,"consumption":[4]},

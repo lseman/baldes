@@ -1,0 +1,44 @@
+[
+  {
+    "name": "ESA_42_2",
+    "priority": 1000.0,
+    "networks": [
+      {
+        "network": 42,
+        "arcs": [
+          [
+            0,
+            1.0
+          ],
+          [
+            6,
+            1.0
+          ]
+        ],
+        "per_route": 0.0
+      }
+    ],
+    "masters": []
+  },
+  {
+    "name": "ESA_7_1",
+    "priority": 1000.0,
+    "networks": [
+      {
+        "network": 7,
+        "arcs": [
+          [
+            0,
+            1.0
+          ],
+          [
+            6,
+            1.0
+          ]
+        ],
+        "per_route": 0.0
+      }
+    ],
+    "masters": []
+  }
+]

@@ -10,7 +10,7 @@ fn native_alignment_spacing_is_a_proof_condition_not_a_feasibility_epsilon() {
     let unit = 1. / 16384.;
     for policy in [
         FrontOperationPolicy::StrictDomain,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
     ] {
         let mut graph = Graph::<2>::new(2, 0).unwrap();
         graph.add_arc(0, 1, 0.).unwrap();
@@ -61,7 +61,7 @@ fn disconnected_native_paired_fronts_do_not_bypass_the_lattice_invariant() {
             }],
             mode: PairedResourceMode::CostUnbounded,
             normalization: PairedCostNormalization::AbsoluteFinalValue,
-            policy: FrontOperationPolicy::NativeFrontAlgebra,
+            policy: FrontOperationPolicy::FrontAlgebra,
         }])
         .unwrap();
     // Only the separated endpoints survive the upper filter. A numerical
@@ -75,7 +75,7 @@ fn disconnected_native_paired_fronts_do_not_bypass_the_lattice_invariant() {
 fn dyadic_raw_operator_certificates_match_a_shared_control_oracle() {
     for policy in [
         FrontOperationPolicy::StrictDomain,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
     ] {
         for unit in [0.5, 0.25, 0.125, 1. / 1024.] {
             for sign in [-1., 1.] {
@@ -184,7 +184,7 @@ fn native_nonconstant_paired_fronts_and_signed_waiting_match_control_paths() {
                                     .collect(),
                                 mode: PairedResourceMode::CostUnbounded,
                                 normalization,
-                                policy: FrontOperationPolicy::NativeFrontAlgebra,
+                                policy: FrontOperationPolicy::FrontAlgebra,
                             }])
                             .unwrap();
                         let path: Vec<_> = (0..length as usize).collect();
@@ -210,7 +210,7 @@ fn native_nonconstant_paired_fronts_and_signed_waiting_match_control_paths() {
 fn signed_piecewise_slope_operator_certificates_match_integer_control_oracle() {
     for policy in [
         FrontOperationPolicy::StrictDomain,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
     ] {
         for unit in [1., 0.5, 0.125, 1. / 1024.] {
             for value_factor in [0.5, 1., 2.] {
@@ -387,7 +387,7 @@ fn native_constant_paired_certificates_match_explicit_integer_state_paths() {
                             arcs,
                             mode,
                             normalization,
-                            policy: FrontOperationPolicy::NativeFrontAlgebra,
+                            policy: FrontOperationPolicy::FrontAlgebra,
                         }])
                         .unwrap();
                     let path: Vec<_> = (0..length as usize).collect();

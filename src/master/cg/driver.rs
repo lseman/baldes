@@ -214,19 +214,11 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
     };
     out.column_tags.resize(master.costs().len(), -1);
     if options.artificial_cost > 0. && !is_resume {
-        for r in 0..master.rhs().len() {
-            if master.senses()[r] != RowSense::LessEqual {
-                out.artificials
-                    .push(master.add_column(options.artificial_cost, &[(r, 1.)])?);
-                loaded.push(None);
-                out.column_tags.push(-1);
-            }
-            if master.senses()[r] != RowSense::GreaterEqual {
-                out.artificials
-                    .push(master.add_column(options.artificial_cost, &[(r, -1.)])?);
-                loaded.push(None);
-                out.column_tags.push(-1);
-            }
+        let rows = 0..master.rhs().len();
+        for (_, column) in append_artificials(master, rows, options.artificial_cost)? {
+            out.artificials.push(column);
+            loaded.push(None);
+            out.column_tags.push(-1);
         }
     }
     let mut stage = schedule.len() - 1;
@@ -391,6 +383,30 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
             ipm_accuracy.upper = ipm_accuracy.upper.min(out.lp);
         }
         controller.master_solved(master, &out.column_tags, &out.artificials)?;
+        if accurate
+            && !positive
+            && controller.original_witness_available()
+            && out.bound.is_finite()
+            && controller.incumbent().is_finite()
+            && gap_smaller_than_tolerance(
+                out.bound,
+                controller.incumbent(),
+                options.gap_absolute,
+                options.gap_relative,
+            )
+        {
+            // Original integer-domain closure is separate from LP pricing
+            // exhaustion. Publish the retained primal and inherited proof.
+            out.status = Status::Optimal;
+            out.pruned_by_bound = true;
+            out.bound = out.bound.min(controller.incumbent());
+            match out.bound_mode {
+                BoundMode::Numerical => out.numerical_bound = out.bound,
+                BoundMode::Certified => out.certified_bound = out.bound,
+            }
+            return finish(out, loaded, cut_artificials, pool, smoothing);
+        }
+
         // Stabilization compares this round's inherited lower bound with
         // its preceding artificial-free restricted-LP objective. The global
         // integer incumbent is a separate stopping/enumeration control.
@@ -536,8 +552,8 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     .collect();
                 let mut excluded = controller.unstabilized_rows();
                 if parameters.curvature.is_some()
-                    || parameters.native_explicit.is_some()
-                    || parameters.native_row_scaling
+                    || parameters.explicit.is_some()
+                    || parameters.rhs_row_scaling
                 {
                     excluded.extend(row_roles.iter().enumerate().filter_map(|(row, role)| {
                         (!role.active || role.class == CurvatureRowClass::Excluded).then_some(row)
@@ -1090,27 +1106,14 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 // Add the cut artificials in one call, then delete
                 // the columns a strengthened relaxation forbids.
                 if added > 0 && options.cut_artificial_cost > 0. {
-                    let mut artificials: Vec<(usize, f64)> = vec![];
-                    for row in previous_rows..master.rhs().len() {
-                        if master.senses()[row] != RowSense::LessEqual {
-                            artificials.push((row, 1.));
-                        }
-                        if master.senses()[row] != RowSense::GreaterEqual {
-                            artificials.push((row, -1.));
-                        }
-                    }
-                    let entries: Vec<[(usize, f64); 1]> =
-                        artificials.iter().map(|&e| [e]).collect();
-                    let batch: Vec<_> = entries
-                        .iter()
-                        .map(|e| (options.cut_artificial_cost, e.as_slice()))
-                        .collect();
-                    let columns = master.add_columns(&batch)?;
-                    for (c, &(row, _)) in columns.zip(&artificials) {
-                        out.artificials.push(c);
+                    let rows = previous_rows..master.rhs().len();
+                    for (row, column) in
+                        append_artificials(master, rows, options.cut_artificial_cost)?
+                    {
+                        out.artificials.push(column);
                         out.column_tags.push(-1);
                         loaded.push(None);
-                        cut_artificials.push((row, c));
+                        cut_artificials.push((row, column));
                     }
                 }
                 let removed = controller.take_removed_columns();

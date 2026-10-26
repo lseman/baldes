@@ -251,7 +251,7 @@ fn explicit_children_use_native_baseline_and_same_node_resume_does_not_rescale()
 #[test]
 fn multipoint_resume_extends_samples_for_new_rows_and_discards_incompatible_coordinates() {
     let (mut master, mut state, _) = checkpoint();
-    let parameters = ProximalParameters::native_multipoint();
+    let parameters = ProximalParameters::explicit_multipoint();
     let mut snapshot = state.snapshot().unwrap();
     snapshot.curvature = None;
     snapshot.configuration = None;

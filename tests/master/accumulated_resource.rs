@@ -54,13 +54,13 @@ fn stored_threshold_membership_matches_adjacent_floats() {
         }
         #[cfg(feature = "clp")]
         {
-            use baldes::master::{branching::BranchConstraint, root::RootProblem};
+            use baldes::master::{branching::BranchConstraint, routing::RoutingContext};
             let mut s = solver(ResourceKind::Disposable);
             let target = s.graph.add_arc(0, 1, 1.).unwrap();
             let parallel = s.graph.add_arc(0, 1, 2.).unwrap();
             let back = s.graph.add_arc(1, 0, 0.).unwrap();
             let end = s.graph.add_arc(1, 2, 0.).unwrap();
-            let p = RootProblem::set_partitioning(s.graph, 1.).unwrap();
+            let p = RoutingContext::set_partitioning(s.graph, 1.).unwrap();
             let profile = vec![0., 0., 0., 0., q];
             let mut route = baldes::Route {
                 nodes: vec![0, 1, 0, 1, 2],
@@ -180,7 +180,7 @@ fn windows_pricing_enumeration_and_forks_use_the_same_boundary() {
 fn threshold_children_preserve_rows_bounds_and_restore_the_parent() {
     use baldes::master::{
         branching::BranchConstraint,
-        root::{self, RootOptions, RootProblem},
+        routing::{self, RootOptions, RoutingContext},
     };
     let boundary = 1. - AccumulatedResourceBranch::THRESHOLD_OFFSET;
     let mut s = solver(ResourceKind::Disposable);
@@ -189,14 +189,14 @@ fn threshold_children_preserve_rows_bounds_and_restore_the_parent() {
         s.graph.arc_mut(arc).unwrap().consumption[4] = q;
     }
     let arc = s.graph.add_arc(1, 2, 0.).unwrap();
-    let problem = RootProblem::set_partitioning(s.graph, 1.).unwrap();
+    let problem = RoutingContext::set_partitioning(s.graph, 1.).unwrap();
     for enumerate in [false, true] {
         let mut options = RootOptions::default();
         options.capture_state = true;
         options.enumerate = enumerate;
         options.incumbent = 10.;
         options.cg.stabilize = false;
-        let parent = root::solve(problem.clone(), options.clone()).unwrap();
+        let parent = routing::solve(problem.clone(), options.clone()).unwrap();
         let snapshot = parent.snapshot.as_ref().unwrap();
         for upper in [false, true] {
             let rule = AccumulatedResourceBranch {
@@ -207,10 +207,10 @@ fn threshold_children_preserve_rows_bounds_and_restore_the_parent() {
             };
             let branch = BranchConstraint::AccumulatedResource(rule);
             let child =
-                root::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
+                routing::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
             let mut cold = problem.clone();
             cold.branch(branch.clone()).unwrap();
-            let fresh = root::solve(cold, options.clone()).unwrap();
+            let fresh = routing::solve(cold, options.clone()).unwrap();
             assert_eq!(child.master.status, fresh.master.status);
             // Pricing enforcement can wait at the new lower window on the
             // cheap route. Master-only enforcement keeps the original earliest
@@ -243,7 +243,7 @@ fn threshold_children_preserve_rows_bounds_and_restore_the_parent() {
             }
             assert_eq!(snapshot.branch_depth(), 0);
         }
-        let restored = root::inherit_branches(snapshot, &[], options.clone()).unwrap();
+        let restored = routing::inherit_branches(snapshot, &[], options.clone()).unwrap();
         assert_eq!(restored.master.status, parent.master.status);
         assert!((restored.master.lp - parent.master.lp).abs() < 1e-8);
     }
@@ -254,13 +254,13 @@ fn threshold_children_preserve_rows_bounds_and_restore_the_parent() {
 fn accumulated_branch_enforcement_keeps_master_rows_in_both_build_modes() {
     use baldes::master::{
         branching::{enforcement::ACCUMULATED_RESOURCE_IN_PRICING, BranchConstraint},
-        root::RootProblem,
+        routing::RoutingContext,
     };
     let mut s = solver(ResourceKind::Disposable);
     let arc = s.graph.add_arc(0, 1, 1.).unwrap();
     s.graph.add_arc(1, 2, 0.).unwrap();
-    let mut problem = RootProblem::set_partitioning(s.graph, 1.).unwrap();
-    let old_rows = problem.rows.len();
+    let mut problem = RoutingContext::set_partitioning(s.graph, 1.).unwrap();
+    let old_rows = problem.model.rows.len();
     let branch = AccumulatedResourceBranch {
         arc,
         resource: 4,
@@ -270,8 +270,8 @@ fn accumulated_branch_enforcement_keeps_master_rows_in_both_build_modes() {
     problem
         .branch(BranchConstraint::AccumulatedResource(branch))
         .unwrap();
-    assert_eq!(problem.rows.len(), old_rows + 1);
-    let window = problem
+    assert_eq!(problem.model.rows.len(), old_rows + 1);
+    let window = problem.model.networks[0]
         .graph
         .arcs
         .iter()
@@ -288,11 +288,11 @@ fn accumulated_branch_enforcement_keeps_master_rows_in_both_build_modes() {
 #[test]
 #[cfg(all(feature = "clp", feature = "accumulated-resource-master"))]
 fn impossible_resource_window_remains_a_master_only_resource_branch() {
-    use baldes::master::{branching::BranchConstraint, root::RootProblem};
+    use baldes::master::{branching::BranchConstraint, routing::RoutingContext};
     let mut s = solver(ResourceKind::Disposable);
     let arc = s.graph.add_arc(0, 1, 1.).unwrap();
     s.graph.add_arc(1, 2, 0.).unwrap();
-    let mut problem = RootProblem::set_partitioning(s.graph, 1.).unwrap();
+    let mut problem = RoutingContext::set_partitioning(s.graph, 1.).unwrap();
     // Head upper bound is 3: the upper child excludes every use of this arc.
     problem
         .branch(BranchConstraint::AccumulatedResource(
@@ -304,7 +304,7 @@ fn impossible_resource_window_remains_a_master_only_resource_branch() {
             },
         ))
         .unwrap();
-    assert!(problem
+    assert!(problem.model.networks[0]
         .graph
         .arcs
         .iter()

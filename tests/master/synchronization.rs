@@ -4,7 +4,7 @@ use baldes::{
     graph::{Graph, Window},
     master::{
         cg::BoundMode,
-        mp::{self, Network, Problem, SynchronizedService, SynchronizedServiceMember},
+        model::{self, Network, Problem, SynchronizedService, SynchronizedServiceMember},
         tree::TreeStatus,
     },
 };
@@ -38,8 +38,8 @@ fn service(members: &[(i32, usize)]) -> SynchronizedService {
             .collect(),
     }
 }
-fn options(services: Vec<SynchronizedService>) -> mp::AssignmentTreeOptions {
-    let mut options = mp::AssignmentTreeOptions::default();
+fn options(services: Vec<SynchronizedService>) -> baldes::master::tree::ModelTreeOptions {
+    let mut options = baldes::master::tree::ModelTreeOptions::default();
     options.time_limit = Duration::from_secs(20);
     options.node.cg.time_limit = options.time_limit;
     options.node.cg.stabilize = false;
@@ -50,8 +50,8 @@ fn options(services: Vec<SynchronizedService>) -> mp::AssignmentTreeOptions {
 fn solve(
     networks: Vec<Network<2>>,
     services: Vec<SynchronizedService>,
-) -> mp::AssignmentTreeOutput {
-    mp::solve_assignment_tree(
+) -> baldes::master::tree::ModelTreeOutput {
+    baldes::master::tree::solve(
         Problem {
             rows: vec![],
             networks,
@@ -65,7 +65,7 @@ fn waiting_synchronizes_and_counts_reward_once() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let mut opts = options(vec![service(&[(7, 1), (42, 1)])]);
         opts.node.cg.bound_mode = mode;
-        let result = mp::solve_assignment_tree(
+        let result = baldes::master::tree::solve(
             Problem {
                 rows: vec![],
                 networks: vec![network(7, 0., 9., 1.), network(42, 5., 10., 1.)],
@@ -123,7 +123,7 @@ fn singleton_start_is_enforced_from_root() {
 #[test]
 fn domains_and_fixed_routes_survive_snapshot_forks() {
     let mut opts = options(vec![service(&[(7, 1), (42, 1)])]).node;
-    let root = mp::solve(
+    let root = model::solve(
         Problem {
             rows: vec![],
             networks: vec![network(7, 0., 10., 1.), network(42, 0., 10., 1.)],
@@ -136,7 +136,7 @@ fn domains_and_fixed_routes_survive_snapshot_forks() {
     let index = root.routes.iter().position(|r| r.network == 7).unwrap();
     let fixed = child.fix_route(index, 1.).unwrap();
     let result = fixed
-        .solve_assignment_tree(mp::AssignmentTreeOptions {
+        .solve_tree(baldes::master::tree::ModelTreeOptions {
             node: opts,
             ..options(vec![])
         })
@@ -145,10 +145,7 @@ fn domains_and_fixed_routes_survive_snapshot_forks() {
     for r in result.routes {
         assert_eq!(r.route.route.resource_profile[1][0], 7.);
     }
-    let parent = root
-        .snapshot
-        .solve_assignment_tree(options(vec![]))
-        .unwrap();
+    let parent = root.snapshot.solve_tree(options(vec![])).unwrap();
     for r in parent.routes {
         assert_eq!(r.route.route.resource_profile[1][0], 0.);
     }
@@ -157,7 +154,7 @@ fn domains_and_fixed_routes_survive_snapshot_forks() {
 fn zero_node_budget_never_publishes_unsynchronized_incumbent() {
     let mut opts = options(vec![service(&[(7, 1), (42, 1)])]);
     opts.node_limit = 0;
-    let result = mp::solve_assignment_tree(
+    let result = baldes::master::tree::solve(
         Problem {
             rows: vec![],
             networks: vec![network(7, 0., 4., 1.), network(42, 6., 10., 1.)],
@@ -194,7 +191,7 @@ fn rejects_duplicate_occurrences_and_invalid_resources() {
             ..service(&[(7, 1)])
         },
     ] {
-        assert!(mp::solve(
+        assert!(model::solve(
             Problem {
                 rows: vec![],
                 networks: vec![network(7, 0., 10., 2.)]
@@ -268,12 +265,12 @@ fn integer_domain_endpoints_are_validated_even_with_zero_node_budget() {
         rows: vec![],
         networks: vec![network(7, 0., 10., 2.)],
     };
-    let result = mp::solve_assignment_tree(problem.clone(), opts).unwrap();
+    let result = baldes::master::tree::solve(problem.clone(), opts).unwrap();
     assert_eq!(result.status, TreeStatus::NodeLimit);
     spec.start = [t + 1, t + 1];
     let mut opts = options(vec![spec]);
     opts.node_limit = 0;
-    assert!(mp::solve_assignment_tree(problem, opts).is_err());
+    assert!(baldes::master::tree::solve(problem, opts).is_err());
 }
 
 #[test]
@@ -296,19 +293,19 @@ fn enumerated_mip_defers_until_common_starts_are_fixed() {
         rows: vec![],
         networks: vec![network(7, 0., 10., 2.)],
     };
-    let root = mp::solve(problem.clone(), options(vec![service(&[(7, 1)])]).node).unwrap();
+    let root = model::solve(problem.clone(), options(vec![service(&[(7, 1)])]).node).unwrap();
     let enumerated = root
         .snapshot
-        .enumerate(&mp::EnumerationOptions::default())
+        .enumerate(&model::EnumerationOptions::default())
         .unwrap();
     let mip = baldes::master::solvers::mip::MipOptions::default();
     assert!(enumerated.solve_enumerated_mip(&mip).unwrap().is_none());
     let mut spec = service(&[(7, 1)]);
     spec.start = [5, 5];
-    let root = mp::solve(problem, options(vec![spec]).node).unwrap();
+    let root = model::solve(problem, options(vec![spec]).node).unwrap();
     let enumerated = root
         .snapshot
-        .enumerate(&mp::EnumerationOptions::default())
+        .enumerate(&model::EnumerationOptions::default())
         .unwrap();
     let result = enumerated.solve_enumerated_mip(&mip).unwrap().unwrap();
     assert_eq!(result.mip.solution.unwrap().objective, -1.);
@@ -319,7 +316,7 @@ fn enumerated_mip_defers_until_common_starts_are_fixed() {
 
 #[test]
 fn a_conflict_with_a_fixed_route_proves_infeasibility() {
-    let root = mp::solve(
+    let root = model::solve(
         Problem {
             rows: vec![],
             networks: vec![network(7, 0., 4., 1.), network(42, 0., 10., 1.)],
@@ -334,16 +331,16 @@ fn a_conflict_with_a_fixed_route_proves_infeasibility() {
         .unwrap()
         .with_synchronized_start(17, 6, 8)
         .unwrap();
-    let result = child.solve_assignment_tree(options(vec![])).unwrap();
+    let result = child.solve_tree(options(vec![])).unwrap();
     assert_eq!(result.status, TreeStatus::Infeasible, "{result:?}");
     assert!(!result.incumbent.is_finite());
 }
 
 #[test]
-fn stopping_after_an_unsynchronized_root_retains_a_valid_relaxation_bound() {
+fn stopping_after_an_unsynchronized_root_retains_a_feasible_witness_and_relaxation_bound() {
     let mut opts = options(vec![service(&[(7, 1), (42, 1)])]);
     opts.node_limit = 1;
-    let result = mp::solve_assignment_tree(
+    let result = baldes::master::tree::solve(
         Problem {
             rows: vec![],
             networks: vec![network(7, 0., 4., 1.), network(42, 6., 10., 1.)],
@@ -352,7 +349,15 @@ fn stopping_after_an_unsynchronized_root_retains_a_valid_relaxation_bound() {
     )
     .unwrap();
     assert_eq!(result.status, TreeStatus::NodeLimit, "{result:?}");
-    assert!(!result.incumbent.is_finite());
+    // Pricing retains the feasible empty solution before the relaxed root
+    // serves an unsynchronizable job. No service means no earned reward.
+    assert_eq!(result.incumbent, 0., "{result:?}");
+    assert!(result.routes.is_empty());
+    assert_eq!(result.master_values.len(), 1);
+    assert!(result.master_values.iter().all(|&(_, value)| value == 0.));
+    assert_eq!(result.nodes, 1);
+    assert_eq!(result.processed_nodes, 1);
+    assert_eq!(result.strong_branching_trials, 0);
     assert_eq!(result.bound, -1.);
     assert_eq!(result.open_nodes, 2);
 }

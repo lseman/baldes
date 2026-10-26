@@ -2,7 +2,7 @@
 use super::*;
 use baldes::cuts::CutRegistry;
 use baldes::master::preprocessing::Bounds;
-use mp::{MasterVariable, RegisteredCutCoefficients};
+use model::{MasterVariable, RegisteredCutCoefficients};
 
 fn problem() -> Problem<2> {
     let networks = [7, 42]
@@ -79,8 +79,9 @@ fn row(rhs: f64) -> Row {
 
 #[test]
 fn registered_composites_reach_a_cross_network_static_link_fixed_point_without_enumeration() {
-    let root = mp::solve_with_master_variables(problem(), vec![variable(f64::INFINITY)], options())
-        .unwrap();
+    let root =
+        model::solve_with_master_variables(problem(), vec![variable(f64::INFINITY)], options())
+            .unwrap();
     optimal(&root, 2.);
     let first = root
         .snapshot
@@ -143,7 +144,7 @@ fn registered_composites_reach_a_cross_network_static_link_fixed_point_without_e
     );
     for budget in [0, 64, 128, 256, 512, 1024, 2048, 4096, 16384] {
         let partial = chain
-            .preprocess_with_options(&mp::PreprocessingOptions {
+            .preprocess_with_options(&model::PreprocessingOptions {
                 work_limit: budget,
                 ..Default::default()
             })
@@ -164,8 +165,8 @@ fn registered_composites_reach_a_cross_network_static_link_fixed_point_without_e
 #[test]
 fn signed_static_compensation_prevents_registered_zero_deductions_until_fixed() {
     for (upper, expected) in [(1., 4.), (f64::INFINITY, 2.)] {
-        let root =
-            mp::solve_with_master_variables(problem(), vec![variable(upper)], options()).unwrap();
+        let root = model::solve_with_master_variables(problem(), vec![variable(upper)], options())
+            .unwrap();
         let kernels: Vec<_> = coefficients(7)
             .into_iter()
             .chain(coefficients(42))
@@ -198,7 +199,7 @@ fn signed_static_compensation_prevents_registered_zero_deductions_until_fixed() 
 
 #[test]
 fn positive_fractional_registered_budget_preserves_fractional_activity() {
-    let root = mp::solve(problem(), options()).unwrap();
+    let root = model::solve(problem(), options()).unwrap();
     let kernels: Vec<_> = coefficients(7)
         .into_iter()
         .chain(coefficients(42))

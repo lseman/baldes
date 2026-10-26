@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn root_scaling_defaults_to_equilibrium_without_changing_low_level_policy() {
-    let root = crate::master::root::RootOptions::default();
+    let root = crate::master::routing::RootOptions::default();
     assert_eq!(root.clp_options.scaling, ClpScaling::Equilibrium);
     assert!(root.clp_options.keep_work_areas);
     assert_eq!(ClpOptions::default().scaling, ClpScaling::Auto);

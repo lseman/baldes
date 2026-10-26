@@ -19,34 +19,34 @@ fn order(candidates: &mut [BranchCandidate]) {
             .total_cmp(&((b.value - b.value.floor()) - 0.5).abs())
     });
 }
-/// Packing sets in RootProblem::set_partitioning are its customer vertices.
+/// Packing sets in RoutingContext::set_partitioning are its customer vertices.
 /// Assignment to this sole pricing network is integral once cover rows hold.
 pub fn candidates<const D: usize>(
-    problem: &RootProblem<D>,
-    result: &root::RootOutput<D>,
+    problem: &RoutingContext<D>,
+    result: &routing::RootOutput<D>,
     options: &BranchingOptions,
 ) -> Vec<BranchCandidate> {
     candidates_with_history(problem, result, options, &[])
 }
 pub fn candidates_with_history<const D: usize>(
-    problem: &RootProblem<D>,
-    result: &root::RootOutput<D>,
+    problem: &RoutingContext<D>,
+    result: &routing::RootOutput<D>,
     options: &BranchingOptions,
     history: &[BranchConstraint],
 ) -> Vec<BranchCandidate> {
     fresh_candidates(problem, result, options, history, usize::MAX)
 }
 pub(super) fn legacy_candidates_with_history<const D: usize>(
-    problem: &RootProblem<D>,
-    result: &root::RootOutput<D>,
+    problem: &RoutingContext<D>,
+    result: &routing::RootOutput<D>,
     options: &BranchingOptions,
     history: &[BranchConstraint],
 ) -> Vec<BranchCandidate> {
     generate(problem, result, options, history, false, true, true)
 }
 pub(super) fn fresh_candidates<const D: usize>(
-    problem: &RootProblem<D>,
-    result: &root::RootOutput<D>,
+    problem: &RoutingContext<D>,
+    result: &routing::RootOutput<D>,
     options: &BranchingOptions,
     history: &[BranchConstraint],
     quota: usize,
@@ -54,8 +54,8 @@ pub(super) fn fresh_candidates<const D: usize>(
     fresh_candidates_with_budget(problem, result, options, history, quota, None)
 }
 pub(super) fn fresh_candidates_with_budget<const D: usize>(
-    problem: &RootProblem<D>,
-    result: &root::RootOutput<D>,
+    problem: &RoutingContext<D>,
+    result: &routing::RootOutput<D>,
     options: &BranchingOptions,
     history: &[BranchConstraint],
     quota: usize,
@@ -95,8 +95,8 @@ pub(super) fn fresh_candidates_with_budget<const D: usize>(
     .0
 }
 fn generate<const D: usize>(
-    problem: &RootProblem<D>,
-    result: &root::RootOutput<D>,
+    problem: &RoutingContext<D>,
+    result: &routing::RootOutput<D>,
     options: &BranchingOptions,
     history: &[BranchConstraint],
     all: bool,
@@ -108,7 +108,7 @@ fn generate<const D: usize>(
         .into_iter()
         .filter(|(_, value)| *value > 1e-6)
         .collect();
-    let graph_id = problem.graph.graph_id.max(0);
+    let graph_id = problem.model.networks[0].graph.graph_id.max(0);
     let mut vehicles = vec![];
     if options.number_of_vehicles {
         let value = routes
@@ -355,7 +355,7 @@ fn generate<const D: usize>(
 }
 
 /// Sorted physical positions of arc IDs, with unit coefficients.
-fn positions<const D: usize>(problem: &RootProblem<D>, ids: &[i32]) -> Vec<(usize, f64)> {
+fn positions<const D: usize>(problem: &RoutingContext<D>, ids: &[i32]) -> Vec<(usize, f64)> {
     let mut arcs: Vec<_> = ids
         .iter()
         .filter_map(|&id| Some((problem.arc_position(id)?, 1.)))

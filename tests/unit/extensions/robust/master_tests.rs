@@ -60,7 +60,7 @@ fn lp_bound_grows_with_the_time_budget() {
 #[test]
 fn bucket_root_lp_matches_the_independent_reference_master() {
     use crate::master::cg::Status;
-    use crate::master::root::{self, RootOptions, RootProblem};
+    use crate::master::routing::{self, RootOptions, RoutingContext};
     let mut feasible = 0;
     for seed in 1..=8 {
         for (gq, gt) in [(0, 0), (1, 2), (3, 1), (8, 8)] {
@@ -68,7 +68,7 @@ fn bucket_root_lp_matches_the_independent_reference_master() {
             let (reference, _) = solve(&p);
             assert_eq!(reference.status, RobustColumnGenerationStatus::Converged);
             let graph = p
-                .native_graph(&vec![0.; p.nodes.len()], 0., p.nodes.len())
+                .pricing_graph(&vec![0.; p.nodes.len()], 0., p.nodes.len())
                 .unwrap();
             let customers = p.nodes.len() - 1;
             let mut options = RootOptions::default();
@@ -76,8 +76,8 @@ fn bucket_root_lp_matches_the_independent_reference_master() {
             options.cg.stabilize = false;
             options.cg.multiplicity = customers as f64;
             options.cg.artificial_cost = 1e4;
-            let result = root::solve(
-                RootProblem::set_partitioning(graph, customers as f64).unwrap(),
+            let result = routing::solve(
+                RoutingContext::set_partitioning(graph, customers as f64).unwrap(),
                 options,
             )
             .unwrap();
@@ -106,7 +106,7 @@ fn bucket_root_lp_matches_the_independent_reference_master() {
             );
             for (route, value) in result.route_values() {
                 if value > 1e-6 {
-                    p.replay(&p.native_route(&route.nodes)).unwrap();
+                    p.replay(&p.route_nodes(&route.nodes)).unwrap();
                 }
             }
         }

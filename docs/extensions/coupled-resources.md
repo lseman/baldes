@@ -110,7 +110,7 @@ resource = model.add_encoded_piecewise_linear_resource(
 ```
 
 `strict_domain` rejects arguments outside the exact stored domain.
-`native_tolerance` explicitly selects the recovered endpoint comparison policy,
+`endpoint_tolerance` explicitly selects the recovered endpoint comparison policy,
 which may snap arguments just inside or outside the endpoints. It does not apply
 that tolerance to other resources or interior knots. Both policies report
 nonfinite/intermediate overflow as an error. An outside-domain result is `None`;
@@ -118,7 +118,7 @@ a genuine function value of `1e12` remains a value. Dictionary/JSON round trips
 retain the encoding and policy and validate their contents.
 
 Raw-domain image, preimage and directed-certificate proofs remain conservative.
-Unknown bounds retain candidates; native-tolerance preprocessing must not discard
+Unknown bounds retain candidates; endpoint-tolerance preprocessing must not discard
 accepted near-boundary states using the nominal endpoints. Phase I still enforces
 function domains while suppressing objective contributions. Raw interval and
 paired-front support is separate work and is not provided by the numeric variants.
@@ -129,8 +129,8 @@ validation of this new API is deferred at the user's request during concurrent w
 slope functions. The Python builder is
 `add_slope_interval_cost(initial_lower, initial_upper, lower, upper, increments,
 functions, policy="strict_domain")`. Functions must be slope-encoded; knot
-conversion is rejected. The alternate operation policy `native_front_algebra`
-requires functions with leaf policy `native_tolerance`; `strict_domain` requires
+conversion is rejected. The alternate operation policy `front_algebra`
+requires functions with leaf policy `endpoint_tolerance`; `strict_domain` requires
 matching strict leaves. This keeps function evaluation and front operation
 choices explicit.
 
@@ -143,7 +143,7 @@ bitwise-equal fronts, ordered by the independent scalar prefix costs. Under
 charge is zero or costs are suppressed in phase I; such a front dominates when
 each of the other's components lies in one of its components. Unequal costly
 strict fronts never compare, because translation and addition re-round segment
-spans and can reverse a current pointwise order. Under `native_front_algebra` a
+spans and can reverse a current pointwise order. Under `front_algebra` a
 covering front may exceed the other by delta, with values within the reference
 tolerance counted as equal, and pays `delta` plus the difference of current
 minima; this follows the reference's tolerant front comparison and is a parity
@@ -287,7 +287,7 @@ zero under both conventions. Phase I suppresses this objective while keeping
 dependent transitions and bounds.
 
 Raw paired forward dominance compares covering fronts under the selected policy.
-In `cost_unbounded` mode with `native_front_algebra` and no reachable upper bound
+In `cost_unbounded` mode with `front_algebra` and no reachable upper bound
 (every upper at or above the `1e12` marker), a front may instead exceed the other
 by delta and pay `scale * delta` plus the objective difference, following the
 reference's shifted-front comparison. This is a parity rule under the recovered
@@ -299,11 +299,11 @@ function domains, terminal upper bounds above the `1e12` numerical infinity
 marker, and failed adjoints leave that upper front unknown; joins
 continue to replay the physical suffix. Different suffix programs can dominate
 only when every active feasibility relation has a known upper front and no
-other resource requires replay-dependent comparison. `native_front_algebra`
+other resource requires replay-dependent comparison. `front_algebra`
 continues to use suffix replay without this backward dominance optimization.
 
 The raw implementation retains front-operation provenance and uses a correct
-running-minimum waiting envelope. The name `native_front_algebra` selects
+running-minimum waiting envelope. The name `front_algebra` selects
 recovered arithmetic/comparison choices where supported; it does not promise
 reproduction of the reference's underpricing on accepted nonconvex waiting
 fixtures. A computed front minimum, a source replay and a directed global pricing
@@ -327,7 +327,7 @@ empty source-domain relaxation can do so. Native paired defaults retain their
 independent source-domain certificates where supported.
 
 Rust callers can explicitly select a different original model with
-`graph.set_native_front_program_domain(true)?`. For native raw interval and
+`graph.set_front_program_domain(true)?`. For native raw interval and
 paired resources, this defines feasibility by the checked ordered IEEE front
 program. It is a **model-domain change**, not a proof hint or an assertion of
 source-control/exact-real equivalence. Strict and other resource families keep
@@ -396,7 +396,7 @@ Reinstall after changing the physical arc vector order. Set up the complete grap
 before installing resources. Resource validation also runs during preparation.
 
 With `clp`, pass the attached physical graph to the ordinary
-`RootProblem::set_partitioning` or `master::mp::Network` constructor.
+`RoutingContext::set_partitioning` or `master::model::Network` constructor.
 Customer covering rows and cuts continue to refer to physical customers. No
 expanded-node adapter, duplicated rows, or route projection is needed.
 Coupled charges are included in priced and enumerated route objectives, master
@@ -430,7 +430,7 @@ assert routes[0].nodes() == [0,2,1,3]
 resource families through the same model. `Route.original_cost` reports the
 original coupled objective; `Route.cost` reports its priced cost.
 
-The shared network JSON interface, used by `baldes networks` and Python
+The shared network JSON interface, used by `baldes solve` and Python
 `PricingNetwork`, accepts an optional `coupled_resources` list and optional
 `elementary` flag. Each descriptor uses a `kind` tag:
 

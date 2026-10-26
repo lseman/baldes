@@ -117,14 +117,14 @@ RootResult(
 ## Routing function and methods
 
 ```python
-solve_root(instance: Union[Instance, str, PathLike], *, problem_type: str='vrptw', customers: Optional[int]=None, ng: int=8, reference_ng: bool=False, rounding: Optional[str]=None, capacity_cuts: bool=False, two_path_cuts: bool=False, rank_one_cuts: bool=False, stabilize: bool=True, master_solver: str='clp', master_threads: int=0, bound_mode: str='numerical', clp_scaling: str='equilibrium', clp_keep_work_areas: bool=True, verbose: bool=False, log_interval: int=10, hgs_time: Optional[float]=None, hgs_columns: Union[str, int]='best', hgs_seed: int=0, reduced_cost_fixing: bool=True, upper_bound: float=math.inf, time_limit: float=120.0, max_iterations: int=10000, max_cut_rounds: Optional[int]=None, pricing_options: Optional[Mapping[str, float]]=None) -> RootResult
+solve(instance: Union[Instance, str, PathLike], *, problem_type: str='vrptw', customers: Optional[int]=None, ng: int=8, reference_ng: bool=False, rounding: Optional[str]=None, capacity_cuts: bool=False, two_path_cuts: bool=False, rank_one_cuts: bool=False, stabilize: bool=True, master_solver: str='clp', master_threads: int=0, bound_mode: str='numerical', clp_scaling: str='equilibrium', clp_keep_work_areas: bool=True, verbose: bool=False, log_interval: int=10, hgs_time: Optional[float]=None, hgs_columns: Union[str, int]='best', hgs_seed: int=0, reduced_cost_fixing: bool=True, upper_bound: float=math.inf, time_limit: float=120.0, max_iterations: int=10000, max_cut_rounds: Optional[int]=None, pricing_options: Optional[Mapping[str, float]]=None) -> RootResult
 ```
 
 ```python
 # Instance
 from_file(cls, path: Union[str, PathLike]) -> Instance
 truncated(self, customers: int) -> Instance
-solve_root(self, **options) -> RootResult
+solve(self, **options) -> RootResult
 ```
 
 ```python
@@ -392,7 +392,7 @@ NetworkResult(
 ## Network function and methods
 
 ```python
-solve_networks(problem: NetworkProblem, *, tree: bool=False, network_pricing_schedule: str='full-sweep', network_unpromising_limit: int=1, network_branching: str='multiplicity-first', enumerate: bool=False, enumeration_route_limit: int=10000, enumeration_work_limit: int=10000000, enumeration_stored_arc_limit: int=1000000, enumeration_time_limit: float=1.0, enumerated_mip: bool=False, mip_time_limit: float=1.0, mip_node_limit: int=100000, mip_objective_cutoff: Optional[float]=None, time_limit: float=120.0, max_iterations: int=100000, node_limit: int=10000, stabilize: bool=True, proximal: Optional[Mapping[str, Any]]=None, bound_mode: str='numerical', artificial_cost: float=2.76, log_interval: Optional[int]=None, pricing_options: Optional[Mapping[str, float]]=None, synchronized_services: Tuple[SynchronizedService, ...]=()) -> NetworkResult
+solve(problem: NetworkProblem, *, tree: bool=False, network_pricing_schedule: str='full-sweep', network_unpromising_limit: int=1, network_branching: str='multiplicity-first', enumerate: bool=False, enumeration_route_limit: int=10000, enumeration_work_limit: int=10000000, enumeration_stored_arc_limit: int=1000000, enumeration_time_limit: float=1.0, enumerated_mip: bool=False, mip_time_limit: float=1.0, mip_node_limit: int=100000, mip_objective_cutoff: Optional[float]=None, time_limit: float=120.0, max_iterations: int=100000, node_limit: int=10000, stabilize: bool=True, proximal: Optional[Mapping[str, Any]]=None, bound_mode: str='numerical', artificial_cost: float=2.76, log_interval: Optional[int]=None, pricing_options: Optional[Mapping[str, float]]=None, synchronized_services: Tuple[SynchronizedService, ...]=()) -> NetworkResult
 ```
 
 ```python
@@ -428,8 +428,8 @@ to_json(self, *, indent: Optional[int]=2) -> str
 - [Native type declarations](../../python/pybaldes/_core.pyi)
 - [Pricing bindings](../../python/rust/src/lib.rs)
 - [Resource bindings](../../python/rust/src/coupled.rs)
-- [Routing bindings](../../python/rust/src/root.rs)
-- [Network bindings](../../python/rust/src/mp.rs)
+- [Routing bindings](../../python/rust/src/frontend/routing.rs)
+- [Network bindings](../../python/rust/src/frontend/networks.rs)
 
 The wrapper source determines routing/network defaults. Native binding source
 determines feature gates and runtime behavior. Type declarations aid editors;

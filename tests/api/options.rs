@@ -64,7 +64,7 @@ fn unregistered_options_are_rejected_without_changing_supported_values() {
     }
     #[cfg(feature = "clp")]
     {
-        let policy = baldes::master::root::EnumerationMipPolicy::from_options(&options).unwrap();
+        let policy = baldes::master::routing::EnumerationMipPolicy::from_options(&options).unwrap();
         assert_eq!(policy.normal_route_limit, 10_000);
         assert_eq!(policy.end_of_node_route_limit, 10_000);
     }
@@ -155,7 +155,7 @@ fn named_dominance_option_reaches_labeling() {
 #[test]
 fn capacity_option_controls_separation_in_fresh_and_inherited_nodes() {
     use baldes::inputs::{Instance, Rounding};
-    use baldes::master::root::{self, CapacityCutConfig, RootOptions};
+    use baldes::master::routing::{self, CapacityCutConfig, RootOptions};
     let instance = Instance::parse("option-test\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let mut options =
         RootOptions::default().with_capacity_cuts(CapacityCutConfig::new(vec![0., 1., 1., 1.], 2.));
@@ -164,14 +164,12 @@ fn capacity_option_controls_separation_in_fresh_and_inherited_nodes() {
     options
         .pricing_options
         .push(("RCSPuseCapacityCuts".into(), 0.));
-    let parent = instance
-        .solve_root(8, Rounding::None, options.clone())
-        .unwrap();
+    let parent = instance.solve(8, Rounding::None, options.clone()).unwrap();
     assert_eq!(parent.cuts, 0);
     let snapshot = parent.snapshot.as_ref().unwrap();
     options.pricing_options.clear();
     // An omitted child override preserves the parent's disabled separator.
-    let disabled = root::inherit_branches(snapshot, &[], options.clone()).unwrap();
+    let disabled = routing::inherit_branches(snapshot, &[], options.clone()).unwrap();
     assert_eq!(disabled.cuts, 0);
     assert!((disabled.master.lp - parent.master.lp).abs() < 1e-8);
     options
@@ -180,8 +178,8 @@ fn capacity_option_controls_separation_in_fresh_and_inherited_nodes() {
     options
         .pricing_options
         .push(("BALDEScapCutsMaxNumPerRound".into(), 1.));
-    let enabled = root::inherit_branches(snapshot, &[], options.clone()).unwrap();
-    let fresh = instance.solve_root(8, Rounding::None, options).unwrap();
+    let enabled = routing::inherit_branches(snapshot, &[], options.clone()).unwrap();
+    let fresh = instance.solve(8, Rounding::None, options).unwrap();
     assert!(enabled.cuts > 0);
     assert!(enabled.master.lp > parent.master.lp + 0.1);
     assert!((enabled.master.lp - fresh.master.lp).abs() < 1e-8);
@@ -191,7 +189,7 @@ fn capacity_option_controls_separation_in_fresh_and_inherited_nodes() {
 #[test]
 fn capacity_per_round_option_caps_the_number_of_generated_rows() {
     use baldes::inputs::{Instance, Rounding};
-    use baldes::master::root::RootOptions;
+    use baldes::master::routing::RootOptions;
     // Two distant odd customer groups each need their own capacity cut.
     let instance = Instance::parse("two-triangles\nVEHICLE\nNUMBER CAPACITY\n6 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000 0\n1 10 10 1 0 1000 0\n2 11 10 1 0 1000 0\n3 10 11 1 0 1000 0\n4 -10 -10 1 0 1000 0\n5 -11 -10 1 0 1000 0\n6 -10 -11 1 0 1000 0\n").unwrap();
     let mut options = RootOptions::default()
@@ -199,13 +197,11 @@ fn capacity_per_round_option_caps_the_number_of_generated_rows() {
     options.enumerate = false;
     options.cg.stabilize = false;
     options.cg.max_cut_rounds = 1;
-    let full = instance
-        .solve_root(8, Rounding::None, options.clone())
-        .unwrap();
+    let full = instance.solve(8, Rounding::None, options.clone()).unwrap();
     options
         .pricing_options
         .push(("BALDEScapCutsMaxNumPerRound".into(), 1.));
-    let limited = instance.solve_root(8, Rounding::None, options).unwrap();
+    let limited = instance.solve(8, Rounding::None, options).unwrap();
     assert_eq!(limited.cuts, 1);
     assert!(full.cuts > limited.cuts);
 }

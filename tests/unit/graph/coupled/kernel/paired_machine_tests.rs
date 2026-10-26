@@ -250,12 +250,12 @@ fn original_domain_machine_pairs_require_an_explicit_model_opt_in() {
     graph.add_arc(0, 1, 0.).unwrap();
     graph.set_coupled_resources(&[def]).unwrap();
     assert_eq!(graph.coupled_kernel().unwrap().certify(&[0]), None);
-    graph.set_native_front_program_domain(true).unwrap();
+    graph.set_front_program_domain(true).unwrap();
     assert_eq!(
         graph.coupled_kernel().unwrap().certify(&[0]),
         Some(expected)
     );
-    graph.set_native_front_program_domain(false).unwrap();
+    graph.set_front_program_domain(false).unwrap();
     assert_eq!(graph.coupled_kernel().unwrap().certify(&[0]), None);
 }
 

@@ -3,11 +3,21 @@ use super::*;
 
 #[derive(Debug, Clone, Default)]
 pub(super) struct NewtonScratch {
+    pub(super) rhs: NewtonRhs,
+    pub(super) delta: (Vec<f64>, Vec<f64>, Vec<f64>),
+    pub(super) affine: Point,
+    pub(super) direction: Point,
+    pub(super) correction: Point,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(super) struct NewtonRhs {
     d: Vec<f64>,
     u: Vec<f64>,
 }
 
-pub(super) fn augsys(
+#[allow(clippy::too_many_arguments)]
+pub(super) fn augsys_into(
     ls: &SparseSolver,
     f: &StandardForm,
     tvw: &[f64],
@@ -15,7 +25,10 @@ pub(super) fn augsys(
     d: &[f64],
     u: &[f64],
     workspace: &mut SolveWorkspace,
-) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+    x: &mut Vec<f64>,
+    y: &mut Vec<f64>,
+    z: &mut Vec<f64>,
+) -> Result<()> {
     let mut rhs = std::mem::take(&mut workspace.rhs);
     rhs.clear();
     rhs.extend_from_slice(d);
@@ -27,15 +40,18 @@ pub(super) fn augsys(
     workspace.rhs = rhs;
     result?;
     let sol = &workspace.solution;
-    let x = sol[..f.c.len()].to_vec();
-    let y = sol[f.c.len()..].to_vec();
-    let z = f
-        .upper
-        .iter()
-        .enumerate()
-        .map(|(i, &(j, _))| (x[j] - u[i]) * tvw[i])
-        .collect();
-    Ok((x, y, z))
+    x.clear();
+    x.extend_from_slice(&sol[..f.c.len()]);
+    y.clear();
+    y.extend_from_slice(&sol[f.c.len()..]);
+    z.clear();
+    z.extend(
+        f.upper
+            .iter()
+            .enumerate()
+            .map(|(i, &(j, _))| (x[j] - u[i]) * tvw[i]),
+    );
+    Ok(())
 }
 
 pub(super) struct Newton<'a> {
@@ -43,19 +59,21 @@ pub(super) struct Newton<'a> {
     pub(super) f: &'a StandardForm,
     pub(super) q: &'a Point,
     pub(super) tvw: &'a [f64],
-    pub(super) delta: (Vec<f64>, Vec<f64>, Vec<f64>),
+    pub(super) delta: &'a (Vec<f64>, Vec<f64>, Vec<f64>),
     pub(super) delta0: f64,
 }
 impl Newton<'_> {
-    pub(super) fn solve(
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn solve_into(
         &self,
         r: &Residual,
         xs: &[f64],
         vw: &[f64],
         tk: f64,
         workspace: &mut SolveWorkspace,
-        scratch: &mut NewtonScratch,
-    ) -> Result<Point> {
+        scratch: &mut NewtonRhs,
+        out: &mut Point,
+    ) -> Result<()> {
         let q = self.q;
         let f = self.f;
         scratch.d.clear();
@@ -66,11 +84,12 @@ impl Newton<'_> {
         scratch
             .u
             .extend(r.u.iter().zip(vw).zip(&q.w).map(|((u, vw), w)| u - vw / w));
-        let (mut x, mut y, mut w) = augsys(
-            self.ls, f, self.tvw, &r.p, &scratch.d, &scratch.u, workspace,
+        augsys_into(
+            self.ls, f, self.tvw, &r.p, &scratch.d, &scratch.u, workspace, &mut out.x, &mut out.y,
+            &mut out.w,
         )?;
-        let tau =
-            (r.g + tk / q.tau + dot(&f.c, &x) - dot(&f.b, &y) + bound_dot(f, &w)) / self.delta0;
+        let Point { x, y, w, s, v, .. } = out;
+        let tau = (r.g + tk / q.tau + dot(&f.c, x) - dot(&f.b, y) + bound_dot(f, w)) / self.delta0;
         let kappa = (tk - q.kappa * tau) / q.tau;
         for (xi, di) in x.iter_mut().zip(&self.delta.0) {
             *xi += tau * di;
@@ -81,29 +100,24 @@ impl Newton<'_> {
         for (wi, di) in w.iter_mut().zip(&self.delta.2) {
             *wi += tau * di;
         }
-        let s = xs
-            .iter()
-            .zip(&q.s)
-            .zip(&x)
-            .zip(&q.x)
-            .map(|(((xs, s), dx), x)| (xs - s * dx) / x)
-            .collect();
-        let v = vw
-            .iter()
-            .zip(&q.v)
-            .zip(&w)
-            .zip(&q.w)
-            .map(|(((vw, v), dw), w)| (vw - v * dw) / w)
-            .collect();
-        let out = Point {
-            x,
-            y,
-            s,
-            v,
-            w,
-            tau,
-            kappa,
-        };
+        s.clear();
+        s.extend(
+            xs.iter()
+                .zip(&q.s)
+                .zip(x.iter())
+                .zip(&q.x)
+                .map(|(((xs, s), dx), x)| (xs - s * dx) / x),
+        );
+        v.clear();
+        v.extend(
+            vw.iter()
+                .zip(&q.v)
+                .zip(w.iter())
+                .zip(&q.w)
+                .map(|(((vw, v), dw), w)| (vw - v * dw) / w),
+        );
+        out.tau = tau;
+        out.kappa = kappa;
         if [&out.x, &out.y, &out.s, &out.v, &out.w]
             .iter()
             .any(|v| !finite(v))
@@ -114,6 +128,6 @@ impl Newton<'_> {
                 "non-finite Newton direction".into(),
             ));
         }
-        Ok(out)
+        Ok(())
     }
 }

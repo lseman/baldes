@@ -26,7 +26,7 @@ def test_affine_preparation_and_boundary_policy_are_explicit():
     assert affine.value(0.25) == 2.75
     assert affine.value(10.0) == 32.0
     assert affine.value(-0.00001) is None
-    tolerant = EncodedFunction.affine(2.0, 3.0, 0.0, 10.0, "native_tolerance")
+    tolerant = EncodedFunction.affine(2.0, 3.0, 0.0, 10.0, "endpoint_tolerance")
     assert tolerant.value(-0.00001) == 2.0
     assert tolerant.value(10.00001) == 32.0
     assert tolerant.value(10.001) is None
@@ -38,7 +38,7 @@ def test_affine_preparation_and_boundary_policy_are_explicit():
 @pytest.mark.parametrize("function", [
     lambda: EncodedFunction.knots([(0.0, 1.0), (2.0, 3.0)]),
     lambda: EncodedFunction.slope_segments([(2.0, 0.0), (3.0, 5.0), (-1.0, 10.0)]),
-    lambda: EncodedFunction.affine(2.0, 3.0, 0.0, 10.0, "native_tolerance"),
+    lambda: EncodedFunction.affine(2.0, 3.0, 0.0, 10.0, "endpoint_tolerance"),
 ])
 def test_json_compatible_definition_round_trip_retains_encoding_and_policy(function):
     original = function()
@@ -49,8 +49,8 @@ def test_json_compatible_definition_round_trip_retains_encoding_and_policy(funct
     assert restored.policy == original.policy
     for x in [-0.00001, 0.0, 0.125, 1.0, 2.0, 5.0, 10.0, 10.00001]:
         assert restored.value(x) == original.value(x)
-    if original.policy == "native_tolerance":
-        assert wire["policy"] == "native_tolerance"
+    if original.policy == "endpoint_tolerance":
+        assert wire["policy"] == "endpoint_tolerance"
 
 
 @pytest.mark.parametrize("build", [
@@ -104,7 +104,7 @@ def test_literal_value_rejects_nonfinite_argument():
     with pytest.raises(ValueError):
         function.value(math.nan)
     with pytest.raises(AttributeError):
-        function.policy = "native_tolerance"
+        function.policy = "endpoint_tolerance"
 
 
 @pytest.mark.parametrize("mode", [0, 1, 2])
@@ -134,7 +134,7 @@ def test_encoded_numeric_maps_dependencies_and_costs_share_original_objective(mo
     assert routes[0].nodes() == [0, 1, 2]
 
 
-@pytest.mark.parametrize("policy, feasible", [("strict_domain", False), ("native_tolerance", True)])
+@pytest.mark.parametrize("policy, feasible", [("strict_domain", False), ("endpoint_tolerance", True)])
 def test_tolerated_input_remains_feasible_during_resource_preprocessing(policy, feasible):
     solver = Solver(2, 0)
     solver.new_arc(0, 1, -10.0)
@@ -152,7 +152,7 @@ def test_tolerated_input_remains_feasible_during_resource_preprocessing(policy, 
 
 
 def _encoded_network(network_id, arc_cost):
-    half = EncodedFunction.affine(0.0, 0.5, 0.0, 4.0, "native_tolerance").to_dict()
+    half = EncodedFunction.affine(0.0, 0.5, 0.0, 4.0, "endpoint_tolerance").to_dict()
     twice = EncodedFunction.affine(0.0, 2.0, 0.0, 4.0).to_dict()
     identity = EncodedFunction.knots([(0.0, 0.0), (10.0, 10.0)]).to_dict()
     return {
@@ -176,7 +176,7 @@ def test_encoded_json_phase_i_recovery_and_sibling_restoration_keep_resource_cos
     wire = {"rows": [{"sense": "eq", "rhs": 1.0}], "networks": [_encoded_network(7, 1.0), _encoded_network(8, 5.0)]}
     model = NetworkProblem.from_json(json.dumps(wire, allow_nan=False))
     serialized = json.loads(model.to_json())
-    assert serialized["networks"][0]["coupled_resources"][0]["functions"][0]["policy"] == "native_tolerance"
+    assert serialized["networks"][0]["coupled_resources"][0]["functions"][0]["policy"] == "endpoint_tolerance"
     parent = model.solve(bound_mode="numerical", stabilize=False)
     assert parent.status == "Optimal" and parent.lp == pytest.approx(7.0)
     assert parent.snapshot is not None
@@ -191,7 +191,7 @@ def test_encoded_json_phase_i_recovery_and_sibling_restoration_keep_resource_cos
 
 @pytest.mark.parametrize("front_policy, leaf_policy", [
     ("strict_domain", "strict_domain"),
-    ("native_front_algebra", "native_tolerance"),
+    ("front_algebra", "endpoint_tolerance"),
 ])
 @pytest.mark.parametrize("mode", [0, 1, 2])
 def test_slope_interval_cost_preserves_explicit_encoding_and_operator_policy(front_policy, leaf_policy, mode):
@@ -215,9 +215,9 @@ def test_slope_interval_cost_preserves_explicit_encoding_and_operator_policy(fro
 
 @pytest.mark.parametrize("functions, policy", [
     ([lambda: EncodedFunction.knots([(0.0, 0.0), (1.0, 1.0)])], "strict_domain"),
-    ([lambda: EncodedFunction.affine(0.0, 1.0, 0.0, 1.0)], "native_front_algebra"),
-    ([lambda: EncodedFunction.affine(0.0, 1.0, 0.0, 1.0, "native_tolerance")], "strict_domain"),
-    ([lambda: EncodedFunction.affine(0.0, 1.0, 0.0, 1.0)], "native_tolerance"),
+    ([lambda: EncodedFunction.affine(0.0, 1.0, 0.0, 1.0)], "front_algebra"),
+    ([lambda: EncodedFunction.affine(0.0, 1.0, 0.0, 1.0, "endpoint_tolerance")], "strict_domain"),
+    ([lambda: EncodedFunction.affine(0.0, 1.0, 0.0, 1.0)], "endpoint_tolerance"),
 ])
 def test_slope_interval_cost_rejects_lossy_conversion_and_policy_loss(functions, policy):
     with pytest.raises(ValueError):
@@ -240,7 +240,7 @@ def test_slope_interval_cost_validates_windows_and_arc_vectors(initial, bounds, 
 
 
 @pytest.mark.skipif(not has_clp, reason="Clp build required")
-@pytest.mark.parametrize("policy", ["strict_domain", "native_front_algebra"])
+@pytest.mark.parametrize("policy", ["strict_domain", "front_algebra"])
 def test_slope_interval_cost_network_json_retains_operator_policy_and_phase_i_cost(policy):
     # SlopeIntervalCost contains prepared function records, with one front policy
     # for the whole operator chain, rather than tagged numeric leaf definitions.
@@ -278,7 +278,7 @@ def _slope_pair_arguments(leaf_policy="strict_domain"):
 
 @pytest.mark.parametrize("front_policy, leaf_policy", [
     ("strict_domain", "strict_domain"),
-    ("native_front_algebra", "native_tolerance"),
+    ("front_algebra", "endpoint_tolerance"),
 ])
 @pytest.mark.parametrize("mode", [0, 1, 2])
 @pytest.mark.parametrize("normalization, expected", [
@@ -319,14 +319,14 @@ def test_slope_paired_default_normalization_charges_absolute_final_value():
 def test_slope_paired_rejects_lossy_or_mismatched_function_in_every_role(field, bad_encoding):
     arguments = _slope_pair_arguments()
     bad = (EncodedFunction.knots([(0.0, 0.0), (21.0, 21.0)]) if bad_encoding == "knots"
-           else EncodedFunction.affine(0.0, 1.0, 0.0, 21.0, "native_tolerance"))
+           else EncodedFunction.affine(0.0, 1.0, 0.0, 21.0, "endpoint_tolerance"))
     arguments[field] = bad if field == "initial" else [bad] * 2
     with pytest.raises(ValueError):
         ResourceModel().add_slope_paired(**arguments, mode="cost_bounded")
 
 
 @pytest.mark.parametrize("overrides", [
-    {"mode": "unknown"}, {"normalization": "delta"}, {"policy": "native_tolerance"},
+    {"mode": "unknown"}, {"normalization": "delta"}, {"policy": "endpoint_tolerance"},
     {"waiting": [0]}, {"increments": []}, {"initial_upper": math.inf},
 ])
 def test_slope_paired_rejects_invalid_modes_normalization_and_arc_shapes(overrides):
@@ -340,7 +340,7 @@ def test_slope_paired_rejects_invalid_modes_normalization_and_arc_shapes(overrid
 @pytest.mark.parametrize("normalization, expected", [
     ("absolute_final_value", 9.0), ("final_minus_initial_minimum", 4.0),
 ])
-@pytest.mark.parametrize("policy", ["strict_domain", "native_front_algebra"])
+@pytest.mark.parametrize("policy", ["strict_domain", "front_algebra"])
 def test_slope_paired_network_phase_i_and_sibling_restore_retain_normalization(normalization, expected, policy):
     def network(network_id, arc_cost):
         value = _encoded_network(network_id, arc_cost)

@@ -26,7 +26,7 @@ impl CutRegistry {
             weights,
             graph_support: BTreeMap::new(),
             graph_pricing_support: BTreeMap::new(),
-            native_kpath_support: None,
+            general_kpath_support: None,
             memory: vec![true; vertices],
             graph_dependent_memory: false,
             graph_memories: BTreeMap::new(),
@@ -35,7 +35,7 @@ impl CutRegistry {
             graph_arc_memories: BTreeMap::new(),
             arc_weights: BTreeMap::new(),
             visit_once: true,
-            native_type2: false,
+            type2: false,
             denominator: 2,
             dual,
             class: CutClass::Covering,
@@ -75,11 +75,11 @@ impl CutRegistry {
     /// Adapt original set support and graph-specific physical vertex memories
     /// to solver inputs. Every graph keeps its own support, including aliases
     /// where several physical vertices belong to one original set.
-    pub fn register_native_k_path_cut(
+    pub fn register_general_k_path_cut(
         &mut self,
         graphs: &[kpath::KPathGraph],
         use_packing_sets: bool,
-        cut: &kpath::NativeKPathCut,
+        cut: &kpath::GeneralKPathCut,
         dual: f64,
     ) -> Result<usize> {
         if !dual.is_finite() || cut.arc_memory {
@@ -144,7 +144,7 @@ impl CutRegistry {
             weights: vec![0; max_vertices],
             graph_support,
             graph_pricing_support,
-            native_kpath_support: Some(cut.set_ids.clone()),
+            general_kpath_support: Some(cut.set_ids.clone()),
             memory: vec![false; max_vertices],
             graph_dependent_memory: true,
             graph_memories,
@@ -153,7 +153,7 @@ impl CutRegistry {
             graph_arc_memories: BTreeMap::new(),
             arc_weights: BTreeMap::new(),
             visit_once: true,
-            native_type2: false,
+            type2: false,
             denominator: 2,
             dual,
             class: CutClass::Covering,

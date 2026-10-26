@@ -322,7 +322,7 @@ pub(super) fn restrict(
         if lo > hi {
             continue;
         }
-        if policy == FrontOperationPolicy::NativeFrontAlgebra {
+        if policy == FrontOperationPolicy::FrontAlgebra {
             for &(_, boundary) in f {
                 for point in [lo, hi] {
                     if point != boundary && m.near(point, boundary, policy)? {
@@ -358,7 +358,7 @@ fn sum_component(
 ) -> Option<Option<Function>> {
     let (alo, ahi, blo, bhi) = (a.first()?.1, a.last()?.1, b.first()?.1, b.last()?.1);
     if alo > bhi || blo > ahi {
-        if policy == FrontOperationPolicy::NativeFrontAlgebra
+        if policy == FrontOperationPolicy::FrontAlgebra
             && (m.near(alo, bhi, policy)? || m.near(blo, ahi, policy)?)
         {
             return None;
@@ -401,7 +401,7 @@ fn sum_component(
             return None;
         }
         let slope = m.add(sa, sb)?;
-        if policy == FrontOperationPolicy::NativeFrontAlgebra
+        if policy == FrontOperationPolicy::FrontAlgebra
             && out.len() > 1
             && m.near(slope, out.last()?.0, policy)?
         {
@@ -588,7 +588,7 @@ pub(super) fn raw(
     if !(scale == 0. || scale == 1.) {
         return None;
     }
-    let policy = FrontOperationPolicy::NativeFrontAlgebra;
+    let policy = FrontOperationPolicy::FrontAlgebra;
     let mut m = Machine::new(work, deadline);
     let root = if initial.lower == initial.upper {
         vec![(0., initial.lower)]

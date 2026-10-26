@@ -143,7 +143,7 @@ fn solomon_input_is_unchanged() {
 fn cli_solves_a_cvrplib_root() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_baldes"))
         .args([
-            "cvrp",
+            "solve",
             concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/instances/cvrplib/E-n22-k4.vrp"
@@ -183,7 +183,7 @@ fn cli_solves_a_cvrplib_root() {
         .output()
         .unwrap();
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("no time windows"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unknown command"));
 }
 
 #[test]

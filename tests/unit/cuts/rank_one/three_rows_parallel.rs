@@ -133,7 +133,7 @@ fn run(
     columns: &[ColumnInfo],
     covering: bool,
     reference: bool,
-) -> (Vec<NativeCut>, Vec<(f64, usize)>) {
+) -> (Vec<SeparatedCut>, Vec<(f64, usize)>) {
     let mut cuts = CandidateSet::new();
     match (covering, reference) {
         (false, false) => state.three_rows_pack(columns, &mut cuts),

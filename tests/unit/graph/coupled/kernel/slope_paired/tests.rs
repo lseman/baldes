@@ -164,7 +164,7 @@ fn shifted_prefixes(
 }
 #[test]
 fn native_unbounded_raw_paired_front_pays_its_excess() {
-    let native = FrontOperationPolicy::NativeFrontAlgebra;
+    let native = FrontOperationPolicy::FrontAlgebra;
     let (graph, falling, flat) = shifted_prefixes(native, 1e12);
     let kernel = graph.coupled_kernel().unwrap();
     // Falling exceeds flat by 1 at x=0: 1 + objective 1 - objective 0.
@@ -405,7 +405,7 @@ fn physical_graph(vertices: usize, arcs: &[(usize, usize, f64)]) -> Graph<2> {
 fn composed_arrivals_variable_increments_and_signed_waiting_match_attained_bounds() {
     for policy in [
         FrontOperationPolicy::StrictDomain,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
     ] {
         for waiting in [-1, 1] {
             for normalization in [
@@ -484,7 +484,7 @@ fn composed_arrivals_variable_increments_and_signed_waiting_match_attained_bound
 fn composed_function_bounds_retain_a_singleton_and_reject_a_cheaper_infeasible_route() {
     for policy in [
         FrontOperationPolicy::StrictDomain,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
     ] {
         let mut graph = physical_graph(4, &[(0, 1, -3.), (1, 3, -3.), (0, 2, -10.), (2, 3, -10.)]);
         let first = SlopeRelationArc {

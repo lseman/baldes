@@ -248,7 +248,7 @@ impl PreparedSlopeRelationArc {
                 let lo = x.max(tail_lo);
                 let hi = e.min(tail_hi);
                 if lo <= hi {
-                    if self.policy == FrontOperationPolicy::NativeFrontAlgebra
+                    if self.policy == FrontOperationPolicy::FrontAlgebra
                         && ((lo != x && near(lo, x)?) || (hi != e && near(hi, e)?))
                     {
                         return Err(unsupported("unresolved native tail restriction alignment"));
@@ -393,7 +393,7 @@ impl PreparedSlopeRelationArc {
             if lo > hi {
                 continue;
             }
-            if self.policy == FrontOperationPolicy::NativeFrontAlgebra
+            if self.policy == FrontOperationPolicy::FrontAlgebra
                 && ((lo != s.lo && near(lo, s.lo)?) || (hi != s.hi && near(hi, s.hi)?))
             {
                 return Err(unsupported(

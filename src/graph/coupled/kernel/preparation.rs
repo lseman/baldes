@@ -130,7 +130,7 @@ impl CoupledKernel {
             slots,
             initial,
             cost_scale: 1.,
-            native_front_program_domain: false,
+            front_program_domain: false,
             frozen,
             paired,
             plugins: definitions
@@ -312,18 +312,18 @@ impl CoupledKernel {
             matches!(
                 definition,
                 CoupledResource::SlopeIntervalCost {
-                    policy: FrontOperationPolicy::NativeFrontAlgebra,
+                    policy: FrontOperationPolicy::FrontAlgebra,
                     ..
                 } | CoupledResource::SlopePaired {
-                    policy: FrontOperationPolicy::NativeFrontAlgebra,
+                    policy: FrontOperationPolicy::FrontAlgebra,
                     ..
                 }
             )
         })
     }
     /// The explicit model choice used for native raw resource feasibility.
-    pub fn native_front_program_domain(&self) -> bool {
-        self.native_front_program_domain
+    pub fn front_program_domain(&self) -> bool {
+        self.front_program_domain
     }
     /// Whether any objective is defined by a computed raw machine front.
     /// Source-control abstract objective bounds cannot be substituted for these
@@ -332,10 +332,10 @@ impl CoupledKernel {
         self.definitions.iter().any(|definition| match definition {
             CoupledResource::SlopeIntervalCost { .. } => true,
             CoupledResource::SlopePaired {
-                policy: FrontOperationPolicy::NativeFrontAlgebra,
+                policy: FrontOperationPolicy::FrontAlgebra,
                 mode,
                 ..
-            } => self.native_front_program_domain && *mode != PairedResourceMode::Feasibility,
+            } => self.front_program_domain && *mode != PairedResourceMode::Feasibility,
             _ => false,
         })
     }

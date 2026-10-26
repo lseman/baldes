@@ -10,7 +10,7 @@ mod direct;
 mod fixed_order;
 mod functions;
 mod master;
-mod native;
+mod physical_graph;
 mod subpath;
 pub use charging::{ChargingResource, ChargingResourceArc};
 pub use direct::{
@@ -21,7 +21,7 @@ pub use master::{
     EvColumn, EvColumnGenerationOptions, EvColumnGenerationResult, EvColumnGenerationStatus,
     EvIteration, EvMaster, EvMasterPhase, EvMasterSnapshot, EvPricingBackend,
 };
-pub use native::NativeOptions;
+pub use physical_graph::PhysicalGraphOptions;
 pub use subpath::SubpathOptions;
 
 /// Cumulative time to charge from empty, represented by (energy, time) knots.

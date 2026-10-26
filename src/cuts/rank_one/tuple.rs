@@ -1,6 +1,6 @@
 //! Tuple-based 4- and 5-row rank-one separation, from the C++ reference `native/separation/TupleRankOneSeparation.h`. Its hash
 //! sets are used for membership only; `std::sort` ties follow libstdc++.
-use super::separation::{ColumnInfo, NativeCut, Separation};
+use super::separation::{ColumnInfo, SeparatedCut, Separation};
 use crate::cuts::shared::rbtree::CandidateSet;
 use crate::cuts::shared::stdsort;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -373,7 +373,7 @@ impl TupleSeparation {
             }
             let id = parent.round_cut_counter;
             parent.round_cut_counter += 1;
-            let cut = parent.push_candidate(NativeCut {
+            let cut = parent.push_candidate(SeparatedCut {
                 id,
                 rhs: 1.0,
                 kind: 0,
@@ -462,7 +462,7 @@ impl TupleSeparation {
                 }
                 let id = parent.round_cut_counter;
                 parent.round_cut_counter += 1;
-                let cut = parent.push_candidate(NativeCut {
+                let cut = parent.push_candidate(SeparatedCut {
                     id,
                     rhs,
                     kind: 0,

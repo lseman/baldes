@@ -43,7 +43,7 @@ fn same_cut_shape(a: &RankOneCut, b: &RankOneCut) -> bool {
         weights,
         graph_support,
         graph_pricing_support,
-        native_kpath_support,
+        general_kpath_support,
         memory,
         graph_dependent_memory,
         graph_memories,
@@ -52,7 +52,7 @@ fn same_cut_shape(a: &RankOneCut, b: &RankOneCut) -> bool {
         graph_arc_memories,
         arc_weights,
         visit_once,
-        native_type2,
+        type2,
         denominator,
         dual: _,
         class,
@@ -64,7 +64,7 @@ fn same_cut_shape(a: &RankOneCut, b: &RankOneCut) -> bool {
     weights == &b.weights
         && graph_support == &b.graph_support
         && graph_pricing_support == &b.graph_pricing_support
-        && native_kpath_support == &b.native_kpath_support
+        && general_kpath_support == &b.general_kpath_support
         && memory == &b.memory
         && graph_dependent_memory == &b.graph_dependent_memory
         && graph_memories == &b.graph_memories
@@ -73,7 +73,7 @@ fn same_cut_shape(a: &RankOneCut, b: &RankOneCut) -> bool {
         && graph_arc_memories == &b.graph_arc_memories
         && arc_weights == &b.arc_weights
         && visit_once == &b.visit_once
-        && native_type2 == &b.native_type2
+        && type2 == &b.type2
         && denominator == &b.denominator
         && class == &b.class
         && rhs == &b.rhs
@@ -106,7 +106,7 @@ pub(crate) fn build_inputs_cached<const D: usize>(
         }
         let cut = &registry.cuts[index];
         if cut.visit_once {
-            if cut.native_kpath_support.is_some()
+            if cut.general_kpath_support.is_some()
                 || !cut.graph_dependent_memory
                 || cut.graph_memories.contains_key(&graph)
             {

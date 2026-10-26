@@ -19,9 +19,9 @@ pub struct EncodedFunction {
 fn evaluation_policy(policy: &str) -> PyResult<EvaluationPolicy> {
     match policy {
         "strict_domain" => Ok(EvaluationPolicy::StrictDomain),
-        "native_tolerance" => Ok(EvaluationPolicy::NativeTolerance),
+        "endpoint_tolerance" => Ok(EvaluationPolicy::EndpointTolerance),
         _ => Err(PyValueError::new_err(
-            "policy must be 'strict_domain' or 'native_tolerance'",
+            "policy must be 'strict_domain' or 'endpoint_tolerance'",
         )),
     }
 }
@@ -32,12 +32,12 @@ fn front_policy(policy: &str) -> PyResult<(FrontOperationPolicy, EvaluationPolic
             FrontOperationPolicy::StrictDomain,
             EvaluationPolicy::StrictDomain,
         )),
-        "native_front_algebra" => Ok((
-            FrontOperationPolicy::NativeFrontAlgebra,
-            EvaluationPolicy::NativeTolerance,
+        "front_algebra" => Ok((
+            FrontOperationPolicy::FrontAlgebra,
+            EvaluationPolicy::EndpointTolerance,
         )),
         _ => Err(PyValueError::new_err(
-            "front policy must be 'strict_domain' or 'native_front_algebra'",
+            "front policy must be 'strict_domain' or 'front_algebra'",
         )),
     }
 }
@@ -48,7 +48,7 @@ fn slope_function(
 ) -> PyResult<PreparedSlopeFunction> {
     match definition {
         FunctionDefinition::SlopeSegments { function, policy } if *policy == expected => Ok(function.clone()),
-        FunctionDefinition::SlopeSegments { .. } => Err(PyValueError::new_err("slope function evaluation policy must match front policy: strict_domain requires strict_domain; native_front_algebra requires native_tolerance")),
+        FunctionDefinition::SlopeSegments { .. } => Err(PyValueError::new_err("slope function evaluation policy must match front policy: strict_domain requires strict_domain; front_algebra requires endpoint_tolerance")),
         FunctionDefinition::Knots { .. } => Err(PyValueError::new_err("slope resources require slope_segments functions; knots cannot be converted losslessly")),
     }
 }
@@ -151,7 +151,7 @@ impl EncodedFunction {
                     "policy",
                     match policy {
                         EvaluationPolicy::StrictDomain => "strict_domain",
-                        EvaluationPolicy::NativeTolerance => "native_tolerance",
+                        EvaluationPolicy::EndpointTolerance => "endpoint_tolerance",
                     },
                 )?;
             }
@@ -197,7 +197,7 @@ impl EncodedFunction {
             FunctionDefinition::Knots { .. } => None,
             FunctionDefinition::SlopeSegments { policy, .. } => Some(match policy {
                 EvaluationPolicy::StrictDomain => "strict_domain",
-                EvaluationPolicy::NativeTolerance => "native_tolerance",
+                EvaluationPolicy::EndpointTolerance => "endpoint_tolerance",
             }),
         }
     }
@@ -224,21 +224,21 @@ impl ResourceModel {
     }
     /// Install resource kernels on this solver's physical graph in place.
     /// Existing options remain; labels, fixing and enumeration are invalidated.
-    /// native_front_program_domain selects a computed native-program model;
+    /// front_program_domain selects a computed native-program model;
     /// the default keeps source-control feasibility.
-    #[pyo3(signature = (solver, *, native_front_program_domain=false))]
-    fn install(&self, solver: &mut Solver, native_front_program_domain: bool) -> PyResult<()> {
+    #[pyo3(signature = (solver, *, front_program_domain=false))]
+    fn install(&self, solver: &mut Solver, front_program_domain: bool) -> PyResult<()> {
         run(|| {
             let solver = solver.solver.get_mut().unwrap();
-            if native_front_program_domain {
+            if front_program_domain {
                 // Validate the modelling choice before replacing live resources.
                 let mut checked = solver.graph.clone();
                 checked.set_coupled_resources(&self.resources)?;
-                checked.set_native_front_program_domain(true)?;
+                checked.set_front_program_domain(true)?;
             }
             solver.set_coupled_resources(&self.resources)?;
-            if native_front_program_domain {
-                solver.graph.set_native_front_program_domain(true)?;
+            if front_program_domain {
+                solver.graph.set_front_program_domain(true)?;
             }
             Ok(())
         })
@@ -344,7 +344,7 @@ impl ResourceModel {
     }
     /// Optimize a shared initial interval using prepared slope-front operators.
     /// Functions must retain slope encoding and a matching leaf policy:
-    /// strict_domain for strict_domain, native_tolerance for native_front_algebra.
+    /// strict_domain for strict_domain, endpoint_tolerance for front_algebra.
     /// The result is the computed operator-front minimum, not a global minimum
     /// of a sequential binary64 source program.
     #[pyo3(signature = (initial_lower, initial_upper, lower, upper, increments, functions, policy="strict_domain"))]

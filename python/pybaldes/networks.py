@@ -59,8 +59,8 @@ class PricingArc:
 class PricingNetwork:
     """One route family with an explicit original resource domain.
 
-    native_front_program_domain=True selects the computed native front program
-    for NativeFrontAlgebra resources; the default retains source feasibility.
+    front_program_domain=True selects the computed front program
+    for FrontAlgebra resources; the default retains source feasibility.
     """
 
     id: int
@@ -74,7 +74,7 @@ class PricingNetwork:
     ng: Optional[Tuple[Tuple[int, ...], ...]] = None
     coupled_resources: Tuple[Mapping[str, Any], ...] = ()
     elementary: bool = False
-    native_front_program_domain: bool = False
+    front_program_domain: bool = False
     route_domain: Mapping[str, Any] = field(default_factory=lambda: {"kind": "physical_simple"})
 
     def __post_init__(self) -> None:
@@ -124,11 +124,15 @@ class SynchronizedService:
 @dataclass(frozen=True)
 class NetworkProblem:
     rows: Tuple[SharedRow, ...]
-    networks: Tuple[PricingNetwork, ...]
+    networks: Union[PricingNetwork, Tuple[PricingNetwork, ...]]
+    pricing_variables: Tuple[Mapping[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "pricing_variables", tuple(self.pricing_variables))
+        if not all(isinstance(v, Mapping) for v in self.pricing_variables):
+            raise TypeError("pricing_variables must contain mappings")
         object.__setattr__(self, "rows", tuple(self.rows))
-        object.__setattr__(self, "networks", tuple(self.networks))
+        object.__setattr__(self, "networks", (self.networks,) if isinstance(self.networks, PricingNetwork) else tuple(self.networks))
         if not all(isinstance(r, SharedRow) for r in self.rows):
             raise TypeError("rows must contain SharedRow objects")
         if not all(isinstance(n, PricingNetwork) for n in self.networks):
@@ -137,6 +141,13 @@ class NetworkProblem:
     @classmethod
     def from_json(cls, text: str) -> NetworkProblem:
         data = json.loads(text)
+        if isinstance(data, list):
+            data = {"networks": data}
+        elif "networks" not in data:
+            data = {"networks": [data]}
+        data.setdefault("rows", [])
+        if isinstance(data["networks"], dict):
+            data["networks"] = [data["networks"]]
         data["rows"] = tuple(SharedRow(**row) for row in data["rows"])
         networks = []
         for network in data["networks"]:
@@ -151,8 +162,10 @@ class NetworkProblem:
         return cls.from_json(Path(path).read_text(encoding="utf-8"))
 
     def to_json(self, *, indent: Optional[int] = 2) -> str:
-        """The same model format accepted by ``baldes networks MODEL.json``."""
+        """The same model format accepted by ``baldes solve MODEL.json``."""
         data = asdict(self)
+        if not data["pricing_variables"]:
+            del data["pricing_variables"]
         for network in data["networks"]:
             for resource in network["resources"]:
                 if resource["time_windows"] is None:
@@ -160,7 +173,8 @@ class NetworkProblem:
         return json.dumps(data, allow_nan=False, indent=indent)
 
     def solve(self, **options: Any) -> NetworkResult:
-        return solve_networks(self, **options)
+        from .solve import solve
+        return solve(self, **options)
 
 
 @dataclass(frozen=True)
@@ -303,6 +317,7 @@ class NetworkResult:
     strong_branching_trials: int = 0
     mapped_history_ranked: int = 0
     mapped_branch_evaluations: Tuple[MappedBranchEvaluation, ...] = ()
+    original_variables: Tuple[Mapping[str, Any], ...] = ()
     snapshot: Optional[NetworkNode] = field(default=None, repr=False, compare=False)
 
     def to_json(self, *, indent: Optional[int] = 2) -> str:
@@ -317,6 +332,7 @@ class NetworkResult:
 def _result(text: str, native: Any) -> NetworkResult:
     data = json.loads(text)
     data.setdefault("tree_processed_nodes", 0)
+    data["original_variables"] = tuple(data.get("original_variables", ()))
     data["routes"] = tuple(NetworkRoute(**r) for r in data["routes"])
     data["fixed_routes"] = tuple(NetworkRoute(**r) for r in data["fixed_routes"])
     data["enumeration_reports"] = tuple(NetworkEnumerationReport(**r) for r in data["enumeration_reports"])
@@ -336,60 +352,3 @@ def _options(options: Mapping[str, Any]) -> str:
         options["synchronized_services"] = [asdict(s) if isinstance(s, SynchronizedService) else s
                                             for s in options["synchronized_services"]]
     return json.dumps(options, allow_nan=False)
-
-
-def solve_networks(
-    problem: NetworkProblem,
-    *,
-    tree: bool = False,
-    network_pricing_schedule: str = "full-sweep",
-    network_unpromising_limit: int = 1,
-    network_promising_limit: int = 1000000,
-    network_branching: str = "multiplicity-first",
-    network_tree_search: str = "native-default",
-    network_strategy2_rounding: str = "unrounded",
-    network_open_node_limit: int = 1000,
-    network_branch_priorities: Optional[Mapping[str, float]] = None,
-    mapped_variables: Tuple[Mapping[str, Any], ...] = (),
-    mapped_strong_branching: bool = True,
-    enumerate: bool = False,
-    enumeration_route_limit: int = 10000,
-    enumeration_work_limit: int = 10000000,
-    enumeration_stored_arc_limit: int = 1000000,
-    enumeration_time_limit: float = 1.0,
-    enumerated_mip: bool = False,
-    mip_time_limit: float = 1.0,
-    mip_node_limit: int = 100000,
-    mip_objective_cutoff: Optional[float] = None,
-    time_limit: float = 120.0,
-    max_iterations: int = 100000,
-    node_limit: int = 10000,
-    stabilize: bool = True,
-    stabilization_max_tree_depth: int = 10000,
-    proximal: Optional[Mapping[str, Any]] = None,
-    bound_mode: str = "numerical",
-    artificial_cost: float = 2.76,
-    log_interval: Optional[int] = None,
-    pricing_options: Optional[Mapping[str, float]] = None,
-    synchronized_services: Tuple[SynchronizedService, ...] = (),
-) -> NetworkResult:
-    """Solve a shared LP or assignment tree. Unknown bounds serialize as null.
-
-    Roots retain thread-bound snapshots; these calls keep the GIL. Fresh
-    assignment-tree solves release the GIL and return an owned integer witness.
-    A tree may return Incomplete when another branching family is required.
-    """
-    if not isinstance(problem, NetworkProblem):
-        raise TypeError("problem must be a NetworkProblem")
-    if not _core.has_clp:
-        raise RuntimeError("multi-network solving requires a build with Clp")
-    options = dict(synchronized_services=synchronized_services, tree=tree, network_pricing_schedule=network_pricing_schedule, network_unpromising_limit=network_unpromising_limit, network_promising_limit=network_promising_limit, stabilization_max_tree_depth=stabilization_max_tree_depth, proximal=proximal, network_branching=network_branching, network_tree_search=network_tree_search, network_strategy2_bound_rounding=network_strategy2_rounding, network_open_node_limit=network_open_node_limit, network_branch_priorities=dict(network_branch_priorities or {}), mapped_variables=mapped_variables, mapped_strong_branching=mapped_strong_branching, enumerate=enumerate, enumeration_route_limit=enumeration_route_limit,
-                   enumeration_work_limit=enumeration_work_limit, enumeration_stored_arc_limit=enumeration_stored_arc_limit,
-                   enumeration_time_limit=enumeration_time_limit, enumerated_mip=enumerated_mip,
-                   mip_time_limit=mip_time_limit, mip_node_limit=mip_node_limit,
-                   mip_objective_cutoff=mip_objective_cutoff,
-                   time_limit=time_limit, max_iterations=max_iterations,
-                   node_limit=node_limit, stabilize=stabilize, bound_mode=bound_mode,
-                   artificial_cost=artificial_cost, log_interval=log_interval,
-                   pricing_options={} if pricing_options is None else dict(pricing_options))
-    return _result(*_core._solve_networks(problem.to_json(indent=None), _options(options)))

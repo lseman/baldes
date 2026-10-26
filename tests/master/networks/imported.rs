@@ -1,6 +1,6 @@
 use super::*;
 use baldes::master::{preprocessing::Bounds, tree::TreeStatus};
-use mp::{
+use model::{
     imported::{self, Column, Subproblem},
     MasterVariable,
 };
@@ -165,10 +165,7 @@ fn imported_original_vectors_fix_columns_multiplicities_and_restore_the_parent()
             assert_eq!(mip.mip.solution.unwrap().objective, 2.);
             assert_eq!(node.values(&mip.master_values).unwrap(), root.values);
         }
-        let tree = node
-            .node()
-            .solve_assignment_tree(Default::default())
-            .unwrap();
+        let tree = node.node().solve_tree(Default::default()).unwrap();
         assert_eq!(tree.status, TreeStatus::Optimal);
         assert_eq!(tree.incumbent, 2.);
         assert_eq!(node.values(&tree.master_values).unwrap(), root.values);
@@ -300,7 +297,7 @@ fn imports_validate_original_domains_before_generated_links_can_hide_errors() {
         root.snapshot()
             .unwrap()
             .node()
-            .solve_assignment_tree(Default::default())
+            .solve_tree(Default::default())
             .unwrap()
             .status,
         TreeStatus::Infeasible

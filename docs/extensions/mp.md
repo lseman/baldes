@@ -2,7 +2,7 @@
 
 [Documentation index](../README.md)
 
-With `clp`, `master::mp::solve` solves a shared root and returns an owned
+With `clp`, `master::model::solve` solves a shared root and returns an owned
 node snapshot that can be resumed or forked. Its pricing graphs share master
 rows. Each `Network` owns a graph, a unique nonnegative ID and
 nonnegative multiplicity bounds. Rust models may use a finite lower bound and
@@ -53,11 +53,11 @@ The JSON/Python option is `network_pricing_schedule`; the CLI flag is
 | `full-sweep` (default) | Visit every enabled network in input order. |
 | `cyclic` | Resume after the last visited network, wrap around, and return after a network generates a previously unregistered negative-reduced-cost route. |
 | `sorted` | Visit unseen networks first, then ascending recent minimum reduced cost, breaking ties by input order. Return on the same new-route condition. |
-| `native-promising-first` | Persistent primary/secondary queues following recovered strategy 2; normal solved networks enter the secondary queue. |
-| `native-unvisited-first` | Persistent queues following recovered strategy 3; unvisited primary entries precede newly promising entries. |
+| `promising-first` | Persistent primary/secondary queues following recovered strategy 2; normal solved networks enter the secondary queue. |
+| `unvisited-first` | Persistent queues following recovered strategy 3; unvisited primary entries precede newly promising entries. |
 
 For example, `problem.solve(network_pricing_schedule="cyclic")` in Python, or
-`baldes multi-pricing MODEL.json --network-pricing-schedule sorted`. The option
+`baldes solve MODEL.json --network-pricing-schedule sorted`. The option
 also applies to snapshot solves and the nodes of an assignment tree.
 
 A partial batch returns columns without an aggregate bound correction or
@@ -92,7 +92,7 @@ penalty, and two bands give five pieces. In JSON/Python:
 ```python
 result = problem.solve(
     proximal={"bands": [{"half_width": 0.5, "penalty": 1.0}]},
-    network_pricing_schedule="native-promising-first",
+    network_pricing_schedule="promising-first",
 )
 ```
 
@@ -226,11 +226,11 @@ Scalar resource capacity is a const generic, defaulting to two; see
 
 ## Assignment tree
 
-`solve_assignment_tree(problem, AssignmentTreeOptions)` uses network-aware
+`solve(problem, ModelTreeOptions)` uses network-aware
 snapshots. It tries proved shared resource-group splits,
 assignment rows, declared integer master variables, total network multiplicities,
 original physical-arc activities, then synchronized-service splits. With
-`AssignmentTreeOptions::time_window_selection`, arc activities are summed over
+`ModelTreeOptions::time_window_selection`, arc activities are summed over
 window copies and time-window selection counts follow them; see
 [branching on time-window selection](multi-time-windows.md#branching-on-time-window-selection).
 It returns network-tagged
@@ -240,7 +240,7 @@ shared rows and original multiplicities with exact sums; objectives round upward
 Fixed routes are included in this replay. A rounded labeling resource profile
 alone never authorizes an incumbent or fixed route.
 
-`AssignmentTreeOptions::branching` selects the family and child order.
+`ModelTreeOptions::branching` selects the family and child order.
 `NetworkBranchingPolicy::MultiplicityFirst` is the default: it tries fractional
 network route counts first and visits upper children first, following the
 observed public native controls. `ResourceFirst` preserves the resource and
@@ -249,28 +249,41 @@ It does not change disjunctions or proof bounds, and does not promise the same
 LP basis, generated columns or total node count as another backend. Select it
 with `--network-branching multiplicity-first`, JSON solve option
 `"network_branching": "multiplicity-first"`, or Python
-`solve_networks(..., tree=True, network_branching="multiplicity-first")`.
+`solve(..., tree=True, network_branching="multiplicity-first")`.
 
 Tree selection is independent of branch-family selection.
-`NetworkTreeSearchPolicy::NativeDefault` (default) processes the deepest open
-node first, then the lowest inherited bound, then creation order. It uses the
+`TreeSearchPolicy::Default` (default) processes the deepest open
+node first, then the lowest inherited numerical LP bound, then creation order. It uses the
 native 1,000-node primary frontier and its overflow queue. Select the
-bound-first queue with `NetworkTreeSearchPolicy::BestBound`, CLI
+bound-first queue with `TreeSearchPolicy::BestBound`, CLI
 `--network-tree-search best-bound`, JSON `"network_tree_search": "best-bound"`,
-or Python `network_tree_search="best-bound"`. Results retain `nodes` as the
-number of solved LP nodes and report `tree_processed_nodes` separately, including
-selected nodes closed by their inherited bound before an LP solve. Native mode
-uses this processed count for its tree node budget.
+or Python `network_tree_search="best-bound"`. Queue comparisons use the numerical
+channel even in certified mode; the selected certification bound still controls
+pruning and published proof bounds. Results retain `nodes` as the
+number of ordinary tree-node solves (excluding separate strong-branching trials).
+`tree_processed_nodes` also counts exact-pricing branching trials and fresh
+nodes closed by an inherited bound. Restricted-LP and heuristic screens are
+included in `strong_branching_trials` and do not increment that processed count. Reusing a completed exact trial does not count it twice.
+All traversal policies budget outer tree selections. A phased branching pass
+can finish its trials past that limit, as in the native solver; its processed
+count can therefore exceed the tree node limit.
 `network_open_node_limit` controls the primary frontier capacity (native
 default 1000); overflow nodes use the native secondary priority queue. The CLI
-equivalent is `--network-open-node-limit N`. Native bound comparisons treat
+equivalent is `--network-open-node-limit N`.
+The native outer loop also requires a nonempty primary queue. If only overflow
+nodes remain (including capacity zero after the root), the solve returns
+`Incomplete` with the unresolved nodes and their bound retained.
+Native bound comparisons treat
 values as tied within `1e-6 + 1e-10 * max(abs(a), abs(b))`; BALDES reproduces
 that pairwise rule and the native vector-heap operations, including overflow
 priority. Since tolerance-based pairwise ties are not transitive, this policy
 uses a custom heap rather than Rust's ordering-based `BinaryHeap`.
-`network_tree_search="native-strategy-2"` selects native strategy 2. It orders
+`network_tree_search="depth-bound-priority"` selects deeper nodes first and prefers
+the higher numerical LP bound at equal depth, followed by creation order.
+Its overflow queue retains the usual lower-bound preference, as in native.
+`network_tree_search="bound-priority"` selects native strategy 2. It orders
 queued children by the numerical LP dual bound, then the native
-child primal-bound sentinels, depth, parent branch-and-price rank and creation
+child primal-bound sentinels, depth, parent treatment rank and creation
 order. The child primal sentinels are equal before evaluation, so depth and
 parent rank decide ties. The default `network_strategy2_rounding="unrounded"`
 matches the native continuous-objective bound contract with nonpositive
@@ -280,7 +293,7 @@ CLI uses `--network-strategy2-rounding unrounded|guarded-tolerance|exact-ceil`; 
 `"network_strategy2_bound_rounding"`. These are ranking keys only and do not
 alter proof bounds.
 
-Rust callers can run `snapshot.solve_assignment_tree(options)` after installing
+Rust callers can run `snapshot.solve(options)` after installing
 shared nonlinear rows, fixing routes or restricting master variables. It forks
 the snapshot and retains cuts, bounds, fixed contributions and complete route
 universes. A zero-node run preserves only the inherited bound of the requested
@@ -319,7 +332,7 @@ For a model with no pricing subproblems, Rust callers can use
 returns the same snapshot API. Signed, one-sided, free and integer variables
 retain their usual contracts. The empty pricing family is complete immediately:
 `snapshot.solve_enumerated_mip(options)` needs no preceding enumeration, and
-`snapshot.solve_assignment_tree(options)` branches integer master variables.
+`snapshot.solve(options)` branches integer master variables.
 No dummy network is required. A `Problem::<D>` with an empty `networks` list is
 also accepted by `solve_with_master_variables`, for any compile-time `D`.
 An empty model has objective zero; original-row contradictions are available to
@@ -332,7 +345,7 @@ these variables to additive network activities;
 `with_rank_one_master_row(row, floor_coefficients, master_coefficients)` couples
 them to nonlinear floor rows. Existing parent restrictions remain in force.
 All operations preserve independent sibling snapshots. The corresponding tree
-entry point is `solve_assignment_tree_with_master_variables`.
+entry point is `solve_with_master_variables`.
 
 Signed variables retain their original coefficients and costs. Their bounds
 participate in joint propagation, and bounds tightened by original constraints
@@ -532,16 +545,16 @@ instance. It uses Clp and supports both shared roots and the assignment tree:
 
 ```sh
 cargo build --offline --features clp --bin baldes
-target/debug/baldes multi-pricing examples/networks/triangle.json --json root.json
-target/debug/baldes multi-pricing examples/networks/triangle.json --tree --json tree.json
+target/debug/baldes solve examples/networks/triangle.json --json root.json
+target/debug/baldes solve examples/networks/triangle.json --tree --json tree.json
 # JSON alone on stdout, suitable for a pipe:
-target/debug/baldes multi-pricing examples/networks/triangle.json --tree --json -
+target/debug/baldes solve examples/networks/triangle.json --tree --json -
 ```
 
 The example has shared LP optimum `1.5` and integer optimum `2`. `--time`,
 `--iterations`, `--nodes`, `--bound-mode`, `--no-stabilization`,
 `--artificial-cost`, `--option NAME=VALUE`, and `--log-interval` control solves.
-Run `baldes multi-pricing --help` for details. The previous `networks` command remains an alias. Unsupported routing flags are errors.
+Run `baldes solve --help` for details. The previous `networks` command remains an alias. Unsupported routing flags are errors.
 A successful command means the run completed and produced a result: inspect
 `status` and `open_nodes` for `NodeLimit`, `TimeLimit` or `Incomplete` outcomes.
 
@@ -581,10 +594,10 @@ inputs use the same JSON schema as the CLI, allowing a single model to drive
 both interfaces:
 
 ```python
-from pybaldes import NetworkProblem, solve_networks
+from pybaldes import NetworkProblem, solve
 
 problem = NetworkProblem.from_file("examples/networks/triangle.json")
-root = solve_networks(problem)
+root = solve(problem)
 assert root.lp == 1.5
 integer = problem.solve(tree=True)
 assert integer.incumbent == 2.0
@@ -681,7 +694,7 @@ repeated-walk objective programs. It can be too expensive for large networks.
 
 PWL paired resources and strict-domain slope pairs have independent directed
 feasibility witnesses. A cost enclosure can remain non-singleton; finite-MIP
-proof outcomes still require exact objective encoding. Native-front-algebra
+proof outcomes still require exact objective encoding. Front-algebra
 paired operations, standalone raw slope-interval fronts and plugins retain
 their explicit unsupported-proof behavior.
 
@@ -704,7 +717,7 @@ cutoff). Reports include `coverage_cutoff`: null denotes full-domain coverage;
 a number denotes coverage only below that objective. A cutoff without an
 incumbent cannot close the original tree merely because its restricted pool
 has no improving integer solution.
-Python's `solve_networks(..., tree=True, enumerated_mip=True,
+Python's `solve(..., tree=True, enumerated_mip=True,
 mip_objective_cutoff=...)` uses the same policy. Each
 `NetworkEnumerationReport.coverage_cutoff` identifies the scope of its pool;
 `None` means full-domain coverage.
@@ -720,9 +733,9 @@ published. Source masters and siblings remain unchanged after any MIP outcome.
 
 ```sh
 cargo build --offline --features clp,highs --bin baldes
-target/debug/baldes multi-pricing examples/networks/triangle.json --tree --enumerated-mip --json -
+target/debug/baldes solve examples/networks/triangle.json --tree --enumerated-mip --json -
 # Force enumeration to decline and normal pricing/branching to continue:
-target/debug/baldes multi-pricing examples/networks/triangle.json --tree --enumerated-mip --enumeration-route-limit 5 --json -
+target/debug/baldes solve examples/networks/triangle.json --tree --enumerated-mip --enumeration-route-limit 5 --json -
 ```
 
 `--enumerated-mip` requires `--tree` and HiGHS support; it also enables enumeration.
@@ -769,7 +782,7 @@ nonnegative, and each member arc has a coefficient of at least one. Signed
 master-variable domains must also preserve nonnegative packing contributions.
 
 ```rust,ignore
-use baldes::master::mp::ResourceGroupMember;
+use baldes::master::model::ResourceGroupMember;
 let members = vec![
     ResourceGroupMember { network: 7, arcs: vec![0, 2] },
     ResourceGroupMember { network: 42, arcs: vec![0, 2] },
@@ -907,7 +920,7 @@ cargo run --release --features clp -- networks \
 
 Both vehicles start service at time 5; the minimization objective is -1.
 
-### Native policy controls and registered original variables
+### Policy controls and registered original variables
 
 `stabilization_max_tree_depth` uses the recovered signed native boundary:
 activation requires actual branch depth strictly below the limit (default
@@ -922,6 +935,12 @@ reduced cost does not imply a promising status.
 
 Register original integer aggregate variables explicitly when their meaning
 spans networks, route constants or static integer master variables:
+
+Arc coefficients may be integers or exact half-integers. Half-integer mappings
+require a graph parity proof that every source-to-sink walk contributes an
+integer value, including walks with repeated arcs. This supports splitting a
+vertex assignment equally across its incoming and outgoing arcs. Per-route and
+static-master coefficients still require integers.
 
 ```python
 result = problem.solve(
@@ -946,35 +965,112 @@ Branches install floor/ceiling bounds through the shared-row lifecycle, includin
 fixed routes and future columns.
 
 Registered candidates support phased restricted-LP, heuristic-pricing and exact
-pricing trials, using the routing strong-branching controls. Trial objectives
-and history rank candidates; they do not become inherited proof bounds. Set
-`mapped_strong_branching=False` to select by priority/fractionality alone.
+pricing trials, using the routing strong-branching controls. Trial objective
+estimates and history rank candidates; estimates do not become proof bounds.
+Trial solutions that pass original-model integer witness validation can improve
+the global incumbent, including solutions found in restricted-master trials.
+Their objective is recomputed from original route and master-variable costs.
+Set `mapped_strong_branching=False` to select by priority/fractionality alone.
+Branch scores use the numerical parent bound even in certified mode. Their
+continuous-objective cutoff is the parent incumbent minus half
+`network_scoring_gap_tolerance` (default `1e-6`), matching the native absolute-gap
+scoring margin. This setting affects scores, not published proof bounds or the
+tree's stopping tolerance. Rust uses `scoring_gap_tolerance` in
+`ModelTreeOptions`; CLI uses `--network-scoring-gap-tolerance`.
+Trial witnesses update the tree incumbent after the evaluation pass returns;
+they do not replace the parent cutoff during the same pass.
 Results expose `strong_branching_trials`, `mapped_history_ranked` and
 `mapped_branch_evaluations`. The CLI accepts `--mapped-variables FILE` and
 `--no-mapped-strong-branching`; see
 [`mapped_variables.json`](../../examples/networks/mapped_variables.json).
 
 Recovered explicit proximal defaults are available through
-`proximal={"native_explicit": {}}` (three-piece), or
-`{"native_explicit": {"five_piece": True}}`. These derive initial widths from
+`proximal={"explicit": {}}` (three-piece), or
+`{"explicit": {"five_piece": True}}`. These derive initial widths from
 the first positive ordinary-row mean when Kappa is positive, retain native
 stored-float controls, and use the original row RHS for private artificial
 scaling. Existing `bands` configurations remain explicit overrides. Rust
-constructors are `native_three_piece()`, `native_five_piece()` and
-`native_multipoint()`. CLI equivalents are `--native-proximal-three-piece`,
-`--native-proximal-five-piece` and `--native-proximal-multipoint`.
+constructors are `explicit_three_piece()`, `explicit_five_piece()` and
+`explicit_multipoint()`. CLI equivalents are `--proximal-explicit-three-piece`,
+`--proximal-explicit-five-piece` and `--proximal-explicit-multipoint`.
 
-`network_branching="native-phased"` admits original resource-group, assignment,
+Unstabilized MP pricing admits near-zero arc costs using the recovered native
+`1e-6` sign precision only when a finite walk bound proves no improving path.
+Negative bound corrections are retained. An unavailable pricing subgradient
+remains unavailable, and a weak aggregate estimate falls back to real pricing.
+Cyclic NG relaxations without a hard walk cap keep their pricing calls.
+
+MP trees retain original-model integer witnesses during restricted-master solves.
+When a valid numerical or certified bound closes the witness's incumbent gap,
+the node can finish before another pricing pass; this is integer-domain pruning,
+not an LP-pricing convergence claim. Retained witnesses survive later master
+changes and are revalidated before publication. Root LP solves keep this behavior
+disabled by default; Rust `Options.integer_primal_termination` enables it explicitly.
+
+`network_branching="phased"` admits original resource-group, assignment,
 integer master-variable, route-count, arc and time-window proposals into the same
 phased evaluator as registered aggregates. Family priorities can be supplied in
 `network_branch_priorities`; defaults are the routing adapter preset, rather
 than a claim that all native models register the same priorities. Route-count
 generators do not enter retained native-style ranking history. Rust callers can
 also select completed-subtree estimates through `StrongBranchingOptions`.
-Trials use independent children, while actual children are recreated from the
-original parent; trial objectives never become their inherited proof bounds.
+Named generators can select `upper-first` or `lower-first` through
+`network_branch_directions`, for example `{"count42": "lower-first"}` for a
+registered aggregate called `count42`, or `{"ESA_7_1": "lower-first"}` for a
+registered packing assignment. The Rust field is
+`ModelTreeOptions.branch_directions`; CLI reads the same JSON map with
+`--network-branch-directions FILE`, and Python accepts the map as a keyword.
+Directions require `phased` branching (also selected by packing
+registration) and a tree solve. A name can remain dormant until its generator
+becomes fractional. Direction controls both trial construction and committed
+child admission; it does not override the frontier's depth/bound comparisons.
+Phased proposals default to upper first. Recorded side zero always
+means the lower branch and side one the upper branch, regardless of execution
+order; their history distances and proof outputs remain attached to those sides.
+Mapped activity evaluation retains signed cancellation and multiplication
+residuals when combining route copies, fixed routes and integer master terms.
+The resulting LP activity selects candidates and scores trials; it does not
+replace an independently published proof bound.
+Trials use independent children. Surviving candidates keep their private LP,
+columns and pricing workspaces between phases. Each priced phase restores the
+full parent schedule before applying its own pricing floor, so a heuristic
+slice cannot remove the later exact phase. Selected children can reuse completed exact
+pricing results and their ordinary bound provenance, including the selected
+certificate channel in certified mode. Restricted-master, heuristic and
+incomplete trials contribute ranking estimates and validated feasible solutions.
+Selected children retain those LP columns, basis and pricing workspaces even
+when the local pass stops before exact completion. Their full pricing schedules
+are restored, and ordinary tree treatment performs a fresh pricing scan.
+Numerical and certified lower-bound improvements published by an exact-pricing
+trial survive even when its final status is incomplete. Each channel remains
+independent; heuristic and restricted-LP objectives cannot replace inherited
+proof bounds. Partial estimates never become proof bounds or completed child
+outputs. Discarded candidates remain isolated.
+Phased trials follow their generator's direction, including mapped and
+packing-assignment proposals. An exact infeasible trial is retained only with an
+original-domain phase-one proof. Its closed state participates in native queue
+ordering and outer selection budgets, but it is neither re-priced nor counted
+as unresolved work. A solver status or positive artificial penalty alone does
+not authorize this closure. If the outer treatment budget is exhausted before phased
+branching starts, the current node stays unresolved without running trials.
+A candidate admitted before the strong-pass deadline attempts both sides. If
+that deadline expires during its first side, the sibling receives zero remaining
+time and retains its inherited proof bounds. This attempt still counts in trial
+and exact-processed statistics, while no LP iterations or pricing calls are
+invented. A zero-iteration output preserves the preceding LP estimate, or the
+unknown-value sentinel for a fresh side.
 
-`native_box_step()` / `--native-proximal-box-step` follows native functiontype1,
+Set `network_share_inactive_columns=true` in JSON/Python, or pass
+`--tree --network-share-inactive-columns`, to share generated physical paths
+between tree nodes and strong trials. Rust exposes
+`ModelTreeOptions.share_inactive_columns`. It defaults to false. Each
+recipient rebuilds the path's schedule, original cost and row coefficients;
+existing route caps and enumeration universes still apply. Imported paths stay
+inactive until recipient repricing accepts them. Sharing does not transfer a
+donor's proof bounds, solved LP or pricing completion. Root-only calls reject
+the flat option because there are no other tree nodes to share with.
+
+`finite_box_step()` / `--proximal-finite-box-step` follows native functiontype1,
 including its finite stored-float cap1.01; the existing `box_step(width)` remains
 a mathematical hard-band override. Public native interval names differ from the
 logical band ordering: `inner_half_width` controls the last active pair (default10)
@@ -1002,10 +1098,174 @@ Synchronized services additionally require their member vertex to belong to a
 declared hard vertex elementarity group, so revisiting a service cannot count
 one vehicle as two participants.
 
-`native_front_program_domain=True` is a separate, explicit model choice for
-native coupled-resource fronts. It defines feasibility using the computed
+`front_program_domain=True` is a separate, explicit model choice for
+coupled-resource fronts. It defines feasibility using the computed
 floating-point front program. Its independent machine checker reproduces the
 program's rounding operations; it does not prove equivalence to exact-real
 source constraints. Leave the option false for the default source-domain
 contract. Ambiguous source boundaries and nonfinite machine operations remain
 uncertified. See the retained proof-scope counterexamples.
+
+Packing-assignment branching can be registered with `packing` in solve
+options, or `--packing FILE` in the multi-pricing CLI. For example:
+
+```json
+{"priority": 1000, "networks": [
+  {"network": 7, "vertices": [[1, 1], [2, 2], [3, 0], [4, 1], [5, 2]]}
+]}
+```
+
+Each pair is `[vertex_index, packing_index]`; repeated vertex setters replace
+its preceding label. Source and sink labels are rejected. Packing labels are
+independent of elementarity and additive shared-row membership. Rust callers
+use `PackingBranching::new` and `NetworkPackingAssignment::new`; Python
+callers pass the same dictionary as `packing=...` with `tree=True`.
+Registration selects `phased` branching and replaces inferred shared-row
+assignment proposals. Other families and their priorities remain available.
+
+Each network/group expression charges half on every incident arc endpoint;
+thus an arc with both endpoints in that group contributes one. Only activities
+strictly between the tree tolerance and one minus that tolerance are admitted.
+Candidates prefer activities closest to one half, then pricing-configuration
+identity and group index; one configuration per packing group survives before
+the ordinary strong-branching quota is applied. Configuration identity remains
+stable through option clones, but allocation ties can differ across processes
+and from the native binary. This does not promise identical symmetric branch
+IDs or universal search trajectories. Explicit mappings may coexist, with
+names distinct from the generated `ESA_<network>_<group>` names.
+
+With `mapped_strong_branching=False` (CLI `--no-mapped-strong-branching`),
+the packing separator is bypassed; ordinary count/original-activity
+branching continues. Explicit `mapped_variables` retain their separate
+rank-without-trials behavior.
+
+Unstabilized network pricing accepts explicitly registered variable-box
+bounds through Rust/JSON `variable_boxes`, Python
+`variable_boxes=(...)`, or CLI `--variable-boxes FILE`. For example:
+
+```json
+[{"network": 7, "variables": [{"arc": 0, "upper": 1}, {"arc": 1, "upper": 1}]}]
+```
+
+Omitted variables/upper bounds remain unbounded; `lower` defaults to zero.
+These are verified pricing envelopes, not new route restrictions. A finite cap
+must already contain the graph's DAG/walk domain or follow from a forbidden arc.
+Positive lower bounds are accepted when every complete graph walk within the
+hard walk limit must traverse that arc. Upper-envelope checks use source/sink
+connectivity and shortest return cycles, so a cyclic graph can still prove unit
+caps on bridges and tighter repeat caps within its walk limit. Bounds requiring
+unproved resource-specific deductions are rejected. Supplied
+loose bounds retain their value; graph-derived caps do not silently replace
+native inputs. Without registration, the existing orthant/near-zero policy
+continues. Negative corrections are retained, without an invented
+subgradient. A bound-only skip must close the complete current master gap or
+accompany a fresh improving column; otherwise full pricing resumes. Aggregate
+master activity bounds are not per-route variable bounds. Grouped resource rows
+and other omitted nonlinear terms bypass these additive admission tests.
+
+
+Required network multiplicity uses a bound-only correction rather than an
+attaining zero selection. Admission requires a closing complete master gap or
+fresh improving columns; an initial required route still needs a real witness.
+The implicit nonnegative-arc box supports this test without extra registration.
+
+Inactive-column reduced-cost scanning is opt-in. Set Rust
+`Options::search_inactive_columns`, JSON/Python
+`network_search_inactive_columns`, or CLI `--network-search-inactive-columns`
+to reprice retained inactive paths before invoking the pricing oracles. This
+applies to fresh roots and resumed snapshots. Tree `share_inactive_columns`
+(JSON/Python `network_share_inactive_columns`) additionally transfers eligible
+paths between nodes/trials and enables scanning for the root, ordinary nodes,
+and strong trials. Retaining a path does not itself activate it or transfer a
+proof bound. With scanning disabled, ordinary pricing still discovers improving
+paths and supplies the required pricing certificates.
+
+### Shared pricing coordination
+
+The routing root frontend and the multi-network frontend use one pricing
+coordinator. Routing supplies a one-network collection; network models supply
+all enabled networks. Scheduling, deadlines, admission, complete-batch checks,
+quantity corrections and subgradients use the same implementation. Model
+adapters retain cut/NG updates, route-to-row coefficients and original-domain
+certificate callbacks. Retained route domains also enter this coordinator;
+explicit finite masters keep their individual column caps.
+
+Routing pricing now uses independent raw-cost pricing, as network pricing does,
+rather than treating correction of one rounded route as a global raw optimum.
+The routing result's `oracle_calls` counts actual oracle entries, including
+phase-I entries and excluding bound-only skips. It is separate from CG
+`pricing_calls`; cached and raw sweeps form one oracle entry. This metric is
+available in Rust, CLI JSON and Python results.
+
+### Original pricing-variable compilation (Rust)
+
+`compile_pricing_variables(problem, definitions)` compiles scoped
+`OriginalPricingVariable` registrations into a physical problem and a
+`PricingVariableRegistry`. Each registration supplies its network and model ID,
+original cost, shared-row entries, and `(physical_arc_id, coefficient)` setters.
+The final setter for an arc replaces earlier setters for that variable.
+Different variables, base arc costs, and base row entries remain additive.
+Expansion uses binary64 coefficients; certificates apply to that compiled model.
+The registry also retains original-space cost caching. Call
+`registry.configure_pricing(&mut options)` for a Rust root solve; the registry's
+box/tree configuration and JSON/CLI/Python option builders install it
+automatically. Each original reduced cost is rounded to1e-8 before applying its
+association coefficients, matching the reference cache order. Base arc costs
+remain separate. The raw compiled physical objective is priced independently
+for proof safety; a rounded-cache optimum alone cannot certify the raw model.
+Immutable metadata is shared across node forks and retained by default resumes;
+window compilation copies its physical arc associations. Appended shared rows
+contribute their explicit physical-arc dual terms. Replacing the compiled
+coefficient prefix falls back to ordinary physical caching and raw pricing.
+
+Signed associations retain their algebra in costs, shared rows and reported
+activities. A negative lower endpoint of an original-variable envelope remains
+negative for an optional network: choosing no route does not exclude its
+negative-activity routes. Graph feasibility still determines which activities
+are possible.
+
+The registry retains canonical expressions independently of route tags.
+`registry.activity(network, id, &output)` reports an outward `Bounds` enclosure
+at the current LP point, including fixed copies. `integer: true` requests an
+original aggregate branch registration after the existing integer-path proof;
+call `registry.configure_tree(&mut tree_options)` to add those registrations.
+It rejects name conflicts before editing the options. Generated names are
+`X_<network>_<id>` and can be used with generator direction controls.
+
+Original-variable bounds must be encoded in the pricing graph. This compiler
+does not turn them into a global master restriction or add an implicit resource.
+Optional original-variable pricing envelopes can now be attached through the
+registry with `configure_boxes(&mut options, &[OriginalVariableBound { ... }])`.
+The JSON/Python option is `original_variable_boxes`; the CLI accepts
+`--original-variable-boxes FILE`, containing an array such as:
+
+```json
+[{"network": 7, "id": 0, "lower": 0, "upper": 1}]
+```
+
+These endpoints must already enclose the registered activity on every feasible
+pricing walk. They do not impose a new graph restriction. The verifier uses
+weighted DAG walk ranges, bounded cyclic walks, or matching scalar-resource
+bounds; it rejects unsupported or unaffordable proofs. Omitted upper bounds are
+unbounded. The declared endpoints remain unchanged after verification.
+
+Admission evaluates the original variables independently, even when their costs
+cancel on shared physical arcs. It adds an outward residual bound for base arc
+costs, row edits and rounding. Overlapping associations therefore do not double
+count physical costs. Existing witness, phase and complete-master-gap gates
+still apply; unsupported nonlinear/coupled pricing falls back to the oracle.
+Registry-backed node snapshots, tree forks and window copies retain these
+expressions. Rust `SolveOptions` callers with original-variable references use
+`node_options_with_registry` or `tree_options_with_registry`; the builders
+without a registry reject unresolved references.
+
+Model JSON now accepts a top-level `pricing_variables` array with the same
+registration fields. The CLI and Python model frontend compile it once before
+solving. Python `NetworkProblem.pricing_variables` carries these declarations;
+its node handles retain the registry across row edits, fixing, resumes and
+subsequent tree solves. Results report `original_variables` entries with
+`network`, `id`, `lower`, and `upper` activity bounds. Tree/MIP results report
+activities only when an incumbent is available. Fresh-root and tree compilation
+use the original physical arc IDs; restored tree paths are used for reporting.
+Rust callers needing both the physical problem and registry can use
+`format::Model::compile()`; `problem()` returns only the compiled problem.

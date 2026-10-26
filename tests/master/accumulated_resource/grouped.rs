@@ -2,7 +2,7 @@ use baldes::{
     graph::Window,
     master::{
         branching::{AccumulatedResourceGroupBranch, BranchConstraint},
-        root::{self, BoundMode, RootOptions, RootProblem},
+        routing::{self, BoundMode, RootOptions, RoutingContext},
     },
     Graph,
 };
@@ -27,7 +27,7 @@ fn grouped_children_price_parallel_alternatives_and_preserve_parent_snapshots() 
         arcs.push(arc);
     }
     graph.add_arc(1, 2, 0.).unwrap();
-    let problem = RootProblem::set_partitioning(graph, 1.).unwrap();
+    let problem = RoutingContext::set_partitioning(graph, 1.).unwrap();
     let group = AccumulatedResourceGroupBranch::new(1, arcs, 4, 1. + 1e-6, false).unwrap();
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         for enumerate in [false, true] {
@@ -41,18 +41,18 @@ fn grouped_children_price_parallel_alternatives_and_preserve_parent_snapshots() 
                 options
                     .pricing_options
                     .push(("BALDESuseBidirectionalSearch".to_owned(), direction));
-                let parent = root::solve(problem.clone(), options.clone()).unwrap();
+                let parent = routing::solve(problem.clone(), options.clone()).unwrap();
                 assert!((parent.master.lp - 1.).abs() < 1e-8);
                 let snapshot = parent.snapshot.as_ref().unwrap();
                 for upper in [false, true] {
                     let branch =
                         BranchConstraint::AccumulatedResourceGroup(group.with_upper(upper));
                     let child =
-                        root::inherit_branches(snapshot, &[branch.clone()], options.clone())
+                        routing::inherit_branches(snapshot, &[branch.clone()], options.clone())
                             .unwrap();
                     let mut cold = problem.clone();
                     cold.branch(branch.clone()).unwrap();
-                    let fresh = root::solve(cold, options.clone()).unwrap();
+                    let fresh = routing::solve(cold, options.clone()).unwrap();
                     let expected = if upper { 2. } else { 1. };
                     assert!(
                         (fresh.master.lp - expected).abs() < 1e-8,
@@ -77,7 +77,7 @@ fn grouped_children_price_parallel_alternatives_and_preserve_parent_snapshots() 
                     }
                     assert_eq!(snapshot.branch_depth(), 0);
                 }
-                let restored = root::inherit_branches(snapshot, &[], options.clone()).unwrap();
+                let restored = routing::inherit_branches(snapshot, &[], options.clone()).unwrap();
                 assert!((restored.master.lp - 1.).abs() < 1e-8);
             }
         }

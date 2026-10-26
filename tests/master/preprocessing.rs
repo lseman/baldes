@@ -189,9 +189,9 @@ fn arc_fixing_applies_to_pricing_enumeration_rebuilds_and_siblings() {
 fn original_flow_preprocessing_rejects_contradictions_before_pricing() {
     use baldes::master::{
         branching::BranchConstraint,
-        root::{self, RootOptions, RootProblem},
+        routing::{self, RootOptions, RoutingContext},
     };
-    let mut p = RootProblem::set_partitioning(solver().graph, 2.).unwrap();
+    let mut p = RoutingContext::set_partitioning(solver().graph, 2.).unwrap();
     p.branch(BranchConstraint::ArcFlow {
         arc: 1,
         sense: GreaterEqual,
@@ -204,7 +204,7 @@ fn original_flow_preprocessing_rejects_contradictions_before_pricing() {
         rhs: 0.,
     })
     .unwrap();
-    let result = root::solve(p, RootOptions::default()).unwrap();
+    let result = routing::solve(p, RootOptions::default()).unwrap();
     assert!(result.preprocessing.infeasible);
     assert_eq!(result.master.pricing_calls, 0);
     assert_eq!(result.simplex_iterations, 0);
@@ -215,9 +215,9 @@ fn original_flow_preprocessing_rejects_contradictions_before_pricing() {
 fn a_required_arc_propagates_to_other_incoming_and_outgoing_arcs() {
     use baldes::master::{
         branching::BranchConstraint,
-        root::{self, RootOptions, RootProblem},
+        routing::{self, RootOptions, RoutingContext},
     };
-    let mut p = RootProblem::set_partitioning(solver().graph, 2.).unwrap();
+    let mut p = RoutingContext::set_partitioning(solver().graph, 2.).unwrap();
     p.branch(BranchConstraint::ArcFlow {
         arc: 1,
         sense: GreaterEqual,
@@ -227,7 +227,7 @@ fn a_required_arc_propagates_to_other_incoming_and_outgoing_arcs() {
     let mut options = RootOptions::default();
     options.cg.stabilize = false;
     options.enumerate = false;
-    let result = root::solve(p, options).unwrap();
+    let result = routing::solve(p, options).unwrap();
     assert!(!result.preprocessing.infeasible);
     assert!(result.preprocessing.bound_updates > 0);
     assert_eq!(result.master.status, baldes::master::cg::Status::Optimal);
@@ -246,14 +246,14 @@ fn a_required_arc_propagates_to_other_incoming_and_outgoing_arcs() {
 #[test]
 fn tree_reports_proved_infeasibility_without_an_incumbent() {
     use baldes::master::{
-        root::RootProblem,
+        routing::RoutingContext,
         tree::{self, TreeOptions, TreeStatus},
     };
     let mut graph = baldes::Graph::<2>::new(4, 1).unwrap();
     for (u, v) in [(0, 1), (1, 3), (0, 2), (2, 3)] {
         graph.add_arc(u, v, 1.).unwrap();
     }
-    let p = RootProblem::set_partitioning(graph, 0.5).unwrap();
+    let p = RoutingContext::set_partitioning(graph, 0.5).unwrap();
     let result = tree::solve(p, TreeOptions::default()).unwrap();
     assert_eq!(result.status, TreeStatus::Infeasible, "{result:?}");
     assert_eq!(result.open_nodes, 0);
@@ -266,13 +266,13 @@ fn tree_reports_proved_infeasibility_without_an_incumbent() {
 fn positive_aggregate_bounds_do_not_filter_unrelated_routes() {
     use baldes::master::{
         branching::BranchConstraint,
-        root::{self, RootOptions, RootProblem},
+        routing::{self, RootOptions, RoutingContext},
     };
     let mut s = baldes::pricing::Solver::<2>::new(5, 1).unwrap();
     for (u, v) in [(0, 1), (1, 2), (2, 4), (0, 3), (3, 4)] {
         s.graph.add_arc(u, v, 1.).unwrap();
     }
-    let mut p = RootProblem::set_partitioning(s.graph, 2.).unwrap();
+    let mut p = RoutingContext::set_partitioning(s.graph, 2.).unwrap();
     p.branch(BranchConstraint::ArcFlow {
         arc: 1,
         sense: GreaterEqual,
@@ -281,7 +281,7 @@ fn positive_aggregate_bounds_do_not_filter_unrelated_routes() {
     .unwrap();
     let mut options = RootOptions::default();
     options.cg.stabilize = false;
-    let result = root::solve(p, options).unwrap();
+    let result = routing::solve(p, options).unwrap();
     assert_eq!(result.master.status, baldes::master::cg::Status::Optimal);
     assert!((result.master.lp - 5.).abs() < 1e-6);
     assert!(result.routes.iter().any(|r| r.arcs == [3, 4]));
@@ -294,7 +294,7 @@ fn inherited_capacity_rows_detect_a_child_contradiction_before_pricing() {
     use baldes::master::{
         branching::BranchConstraint,
         cg::Status,
-        root::{self, CapacityCutConfig, RootOptions, RootProblem},
+        routing::{self, CapacityCutConfig, RootOptions, RoutingContext},
     };
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for complement in [false, true] {
@@ -309,17 +309,17 @@ fn inherited_capacity_rows_detect_a_child_contradiction_before_pricing() {
             .iter()
             .position(|a| a.tail == 3 && a.head == graph.sink)
             .unwrap();
-        let problem = RootProblem::set_partitioning(graph, 3.).unwrap();
+        let problem = RoutingContext::set_partitioning(graph, 3.).unwrap();
         let mut config = CapacityCutConfig::new(vec![0., 1., 1., 1.], 2.);
         config.parameters.complement_form = complement;
         let mut options = RootOptions::default().with_capacity_cuts(config);
         options.capture_state = true;
         options.enumerate = false;
         options.cg.stabilize = false;
-        let parent = root::solve(problem, options.clone()).unwrap();
+        let parent = routing::solve(problem, options.clone()).unwrap();
         let snapshot = parent.snapshot.as_ref().unwrap();
         assert!(snapshot.active_cuts() > 0);
-        let child = root::inherit_branches(
+        let child = routing::inherit_branches(
             snapshot,
             &[
                 BranchConstraint::NumberOfVehicles {
@@ -351,7 +351,7 @@ fn inherited_capacity_rows_detect_a_child_contradiction_before_pricing() {
         assert_eq!(child.inherited_cuts, snapshot.active_cuts());
         // Neither an infeasible child nor its bound propagation mutates the
         // parent pool, physical rows or a feasible sibling's warm start.
-        let sibling = root::inherit_branches(
+        let sibling = routing::inherit_branches(
             snapshot,
             &[BranchConstraint::NumberOfVehicles {
                 graph_id: 0,
@@ -363,7 +363,7 @@ fn inherited_capacity_rows_detect_a_child_contradiction_before_pricing() {
         .unwrap();
         assert!(!sibling.preprocessing.infeasible);
         assert_eq!(sibling.master.status, Status::Optimal);
-        let replay = root::inherit_branches(snapshot, &[], options).unwrap();
+        let replay = routing::inherit_branches(snapshot, &[], options).unwrap();
         assert!((replay.master.lp - parent.master.lp).abs() < 1e-7);
         assert!(snapshot.active_cuts() > 0);
     }
@@ -374,7 +374,7 @@ fn inherited_capacity_rows_detect_a_child_contradiction_before_pricing() {
 fn transitive_ryan_foster_contradictions_are_preprocessed_without_pricing() {
     use baldes::master::{
         branching::BranchConstraint,
-        root::{self, RootOptions, RootProblem},
+        routing::{self, RootOptions, RoutingContext},
     };
     use baldes::pricing::restrictions::RyanFosterConstraint;
     let mut graph = baldes::Graph::<2>::new(5, 0).unwrap();
@@ -386,7 +386,7 @@ fn transitive_ryan_foster_contradictions_are_preprocessed_without_pricing() {
             }
         }
     }
-    let mut problem = RootProblem::set_partitioning(graph, 3.).unwrap();
+    let mut problem = RoutingContext::set_partitioning(graph, 3.).unwrap();
     for (first, second, together) in [(1, 2, true), (2, 3, true), (1, 3, false)] {
         problem
             .branch(BranchConstraint::RyanFoster(RyanFosterConstraint {
@@ -396,7 +396,7 @@ fn transitive_ryan_foster_contradictions_are_preprocessed_without_pricing() {
             }))
             .unwrap();
     }
-    let result = root::solve(problem, RootOptions::default()).unwrap();
+    let result = routing::solve(problem, RootOptions::default()).unwrap();
     assert!(result.preprocessing.infeasible);
     assert_eq!(result.master.pricing_calls, 0);
     assert_eq!(result.simplex_iterations, 0);

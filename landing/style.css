@@ -1502,8 +1502,31 @@ img,svg {
   filter:drop-shadow(0 0 4px #22d3ee55)
 }
 
-.landing-dark #route-vehicles circle {
+.landing-dark #route-vehicles .customer-ping,
+.landing-dark .route-truck {
   filter:drop-shadow(0 0 7px #22d3eecc)
+}
+
+.route-truck {
+  stroke-dasharray:none;
+  stroke-width:1.6;
+  stroke-linejoin:round;
+  pointer-events:none
+}
+
+.route-truck .truck-cargo,
+.route-truck .truck-cab {
+  fill:var(--surface)
+}
+
+.route-truck .truck-window {
+  fill:none;
+  stroke-width:1
+}
+
+.route-truck .truck-wheel {
+  fill:var(--ink);
+  stroke-width:1.2
 }
 
 @media (max-width:1000px) {

@@ -73,6 +73,36 @@ fn main() {
             repeats,
         );
     }
+    if selected("deep-forest") {
+        // Different depths and pivot-block sizes expose cross-level overlap.
+        // Identity columns keep the KKT witness well conditioned; bridge
+        // columns form row cliques between adjacent blocks in each component.
+        let components = [
+            vec![16, 32, 64, 96],
+            vec![24, 48, 72, 112],
+            vec![32, 64, 96, 128],
+            vec![16, 48, 80, 160],
+        ];
+        let m = components.iter().flatten().sum::<usize>();
+        let mut entries: Vec<_> = (0..m).map(|i| (i, i, 1.)).collect();
+        let mut column = m;
+        let mut offset = 0;
+        for blocks in components {
+            for pair in blocks.windows(2) {
+                for i in offset..offset + pair[0] + pair[1] {
+                    entries.push((i, column, 0.1 + (i % 7) as f64 * 0.005));
+                }
+                column += 1;
+                offset += pair[0];
+            }
+            offset += blocks.last().unwrap();
+        }
+        measure(
+            "deep-forest",
+            SparseMatrix::from_triplets(m, column, &entries).unwrap(),
+            repeats,
+        );
+    }
 }
 
 fn selected(name: &str) -> bool {
@@ -139,7 +169,7 @@ fn measure(name: &str, a: SparseMatrix, repeats: usize) {
         assert!(max_error < 1e-8, "{name} {kind:?}: {max_error}");
         factor_ns.sort_unstable();
         solve_ns.sort_unstable();
-        println!("{name} {kind:?} mode={mode} threads={threads} rows={m} cols={n} nnz={} setup_ms={:.3} factor_us={:.3} solve_us={:.3} max_error={max_error:.3e}",
-                a.nnz(), setup.as_secs_f64() * 1000., factor_ns[repeats / 2] as f64 / 1000., solve_ns[repeats / 2] as f64 / 1000.);
+        println!("{name} {kind:?} mode={mode} threads={threads} rows={m} cols={n} nnz={} setup_ms={:.3} factor_us={:.3} solve_us={:.3} max_error={max_error:.3e} plan={:?}",
+                a.nnz(), setup.as_secs_f64() * 1000., factor_ns[repeats / 2] as f64 / 1000., solve_ns[repeats / 2] as f64 / 1000., solver.factorization_plan());
     }
 }

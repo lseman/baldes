@@ -32,7 +32,7 @@ Do not replace an unknown bound with `lp`, zero, or the incumbent.
 
 ## Status and solve mode
 
-`solve_root` returns a routing root relaxation. `Optimal` means the root LP
+`solve` returns a routing root relaxation. `Optimal` means the root LP
 converged. `NetworkResult.mode` distinguishes root, tree, and enumerated-MIP
 workflows. In a tree, `Optimal` describes integer gap closure under the selected
 bound policy and tolerances. Read `bound_mode` alongside status.

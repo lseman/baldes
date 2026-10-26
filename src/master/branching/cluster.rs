@@ -1,5 +1,5 @@
 //! Cluster boundary and pair validation, coefficients and configuration.
-use crate::{invalid, master::root::RootProblem, Result};
+use crate::{invalid, master::routing::RoutingContext, Result};
 
 pub(super) fn boundary_coefficient(vertices: &[usize], tail: usize, head: usize) -> f64 {
     (!vertices.contains(&tail) && vertices.contains(&head)) as u8 as f64
@@ -11,7 +11,7 @@ pub(super) fn pair_coefficient(first: &[usize], second: &[usize], tail: usize, h
 }
 
 pub(super) fn validate_pair<const D: usize>(
-    p: &RootProblem<D>,
+    p: &RoutingContext<D>,
     first: &[usize],
     second: &[usize],
 ) -> Result<()> {
@@ -23,10 +23,10 @@ pub(super) fn validate_pair<const D: usize>(
     Ok(())
 }
 
-pub(super) fn validate<const D: usize>(p: &RootProblem<D>, vertices: &[usize]) -> Result<()> {
+pub(super) fn validate<const D: usize>(p: &RoutingContext<D>, vertices: &[usize]) -> Result<()> {
     let depot = vertices.len() == 2
-        && vertices.contains(&p.graph.source)
-        && vertices.contains(&p.graph.sink);
+        && vertices.contains(&p.model.networks[0].graph.source)
+        && vertices.contains(&p.model.networks[0].graph.sink);
     if vertices.is_empty()
         || vertices
             .iter()

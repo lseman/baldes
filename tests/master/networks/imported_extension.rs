@@ -1,6 +1,6 @@
 use super::*;
 use baldes::master::{preprocessing::Bounds, tree::TreeStatus};
-use mp::{
+use model::{
     imported::{self, Column, Subproblem},
     MasterVariable,
 };
@@ -275,7 +275,7 @@ fn imported_expansion_reprices_routing_and_recovers_from_an_empty_import_domain(
                 .snapshot()
                 .unwrap()
                 .node()
-                .solve_assignment_tree(Default::default())
+                .solve_tree(Default::default())
                 .unwrap();
             assert_eq!(tree.status, TreeStatus::Optimal);
             assert_eq!(tree.incumbent, 1.);
@@ -556,7 +556,7 @@ fn imported_shared_routing_rows_replay_fixed_contributions_in_both_operation_ord
 #[test]
 fn imported_presence_rows_survive_expansion_and_replay_fixed_nonlinear_contributions() {
     use baldes::cuts::soft_conflicts::{Mode, PresenceRow};
-    use mp::PresenceCoefficients;
+    use model::PresenceCoefficients;
     for bound_mode in [BoundMode::Numerical, BoundMode::Certified] {
         for mode in [Mode::PairCount, Mode::AnyPair] {
             let mut opts = options();
@@ -1088,7 +1088,7 @@ fn imported_phase_one_prices_restore_missing_columns_without_claiming_global_inf
 #[test]
 fn imported_phase_one_keeps_fixed_routes_and_nonlinear_rows_in_the_feasibility_model() {
     use baldes::cuts::soft_conflicts::{Mode, PresenceRow};
-    use mp::PresenceCoefficients;
+    use model::PresenceCoefficients;
     let root = imported::solve(
         Problem::<2> {
             rows: vec![Row {
@@ -1358,7 +1358,7 @@ fn imported_objective_pricing_recovers_feasibility_above_the_artificial_penalty(
                         sense: RowSense::LessEqual,
                         rhs: 1.,
                     },
-                    &[mp::PresenceCoefficients {
+                    &[model::PresenceCoefficients {
                         network: 99,
                         row: PresenceRow::new(2, vec![(0, 1)], Mode::AnyPair).unwrap(),
                         arc_events: vec![vec![0], vec![1]],
@@ -1966,7 +1966,7 @@ fn imported_open_domain_certificate_handles_infinite_and_explicit_multiplicity_c
 fn imported_open_domain_certificates_retain_fixed_routing_and_nonlinear_contributions() {
     use baldes::cuts::soft_conflicts::{Mode, PresenceRow};
     use imported::ColumnEnvelope;
-    use mp::PresenceCoefficients;
+    use model::PresenceCoefficients;
     let root = imported::solve(
         Problem::<2> {
             rows: vec![Row {

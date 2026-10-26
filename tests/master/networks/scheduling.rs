@@ -1,5 +1,5 @@
 use super::*;
-use mp::NetworkPricingSchedule;
+use model::NetworkPricingSchedule;
 
 #[test]
 fn automatic_curvature_without_eligible_rows_does_not_fabricate_feedback() {
@@ -7,7 +7,7 @@ fn automatic_curvature_without_eligible_rows_does_not_fabricate_feedback() {
     configured.cg.stabilize = true;
     configured.cg.proximal =
         Some(baldes::master::stabilization::ProximalParameters::automatic_three_piece());
-    let root = mp::solve(
+    let root = model::solve(
         Problem {
             rows: vec![],
             networks: vec![network(7, &[(1., &[])], 0)],
@@ -38,8 +38,8 @@ fn automatic_curvature_initializes_and_survives_resume_and_child_boundaries() {
         let mut configured = options();
         configured.cg.stabilize = true;
         configured.cg.proximal = Some(proximal);
-        configured.network_pricing_schedule = NetworkPricingSchedule::NativePromisingFirst;
-        let parent = mp::solve(triangle(), configured.clone()).unwrap();
+        configured.network_pricing_schedule = NetworkPricingSchedule::PromisingFirst;
+        let parent = model::solve(triangle(), configured.clone()).unwrap();
         optimal(&parent, 1.5);
         let automatic = &parent.master.warm_start.proximal.as_ref().unwrap().snapshot;
         let curvature = automatic.curvature.unwrap();
@@ -76,7 +76,7 @@ fn automatic_curvature_initializes_and_survives_resume_and_child_boundaries() {
         optimal(&child.solve(configured.clone()).unwrap(), 2.);
         let tree = parent
             .snapshot
-            .solve_assignment_tree(mp::AssignmentTreeOptions {
+            .solve_tree(baldes::master::tree::ModelTreeOptions {
                 node: configured,
                 ..Default::default()
             })
@@ -92,28 +92,28 @@ fn network_schedules_preserve_roots_children_trees_and_transferred_universes() {
         NetworkPricingSchedule::FullSweep,
         NetworkPricingSchedule::Cyclic,
         NetworkPricingSchedule::Sorted,
-        NetworkPricingSchedule::NativePromisingFirst,
-        NetworkPricingSchedule::NativeUnvisitedFirst,
+        NetworkPricingSchedule::PromisingFirst,
+        NetworkPricingSchedule::UnvisitedFirst,
     ] {
         for stabilize in [false, true] {
             let mut configured = options();
             configured.network_pricing_schedule = policy;
             configured.cg.stabilize = stabilize;
-            let parent = mp::solve(triangle(), configured.clone()).unwrap();
+            let parent = model::solve(triangle(), configured.clone()).unwrap();
             optimal(&parent, 1.5);
             let child = parent.snapshot.branch_assignment(0, 7, true).unwrap();
             optimal(&child.solve(configured.clone()).unwrap(), 2.);
             optimal(&parent.snapshot.solve(configured.clone()).unwrap(), 1.5);
             let tree = parent
                 .snapshot
-                .solve_assignment_tree(mp::AssignmentTreeOptions {
+                .solve_tree(baldes::master::tree::ModelTreeOptions {
                     node: configured.clone(),
                     ..Default::default()
                 })
                 .unwrap();
             assert_eq!(tree.status, baldes::master::tree::TreeStatus::Optimal);
             assert!((tree.incumbent - 2.).abs() < 1e-7);
-            configured.enumeration = Some(mp::EnumerationOptions::default());
+            configured.enumeration = Some(model::EnumerationOptions::default());
             let enumerated = parent.snapshot.solve(configured).unwrap();
             optimal(&enumerated, 1.5);
             assert!(enumerated.snapshot.enumeration_report().complete);
@@ -146,14 +146,14 @@ fn explicit_proximal_bands_preserve_original_network_bounds_and_node_domains() {
             configured.cg.stabilize = true;
             configured.cg.proximal = Some(proximal.clone());
             configured.cg.bound_mode = mode;
-            configured.network_pricing_schedule = NetworkPricingSchedule::NativePromisingFirst;
-            let root = mp::solve(triangle(), configured.clone()).unwrap();
+            configured.network_pricing_schedule = NetworkPricingSchedule::PromisingFirst;
+            let root = model::solve(triangle(), configured.clone()).unwrap();
             optimal(&root, 1.5);
             let child = root.snapshot.branch_assignment(0, 7, true).unwrap();
             optimal(&child.solve(configured.clone()).unwrap(), 2.);
             let tree = root
                 .snapshot
-                .solve_assignment_tree(mp::AssignmentTreeOptions {
+                .solve_tree(baldes::master::tree::ModelTreeOptions {
                     node: configured,
                     ..Default::default()
                 })
@@ -181,13 +181,13 @@ fn one_partial_exact_batch_cannot_publish_a_bound_above_an_unvisited_network() {
         configured.preprocessing.enabled = false;
         configured.network_pricing_schedule = policy;
         configured.cg.max_iterations = 1;
-        let limited = mp::solve(problem.clone(), configured.clone()).unwrap();
+        let limited = model::solve(problem.clone(), configured.clone()).unwrap();
         assert_eq!(limited.oracle_calls, vec![(7, 1), (42, 0)]);
         assert_eq!(limited.master.status, Status::IterationLimit);
         assert!(!limited.master.history[0].exact);
         assert_eq!(limited.master.numerical_bound, f64::NEG_INFINITY);
         configured.cg.max_iterations = 100;
-        let full = mp::solve(problem, configured).unwrap();
+        let full = model::solve(problem, configured).unwrap();
         optimal(&full, -303.);
     }
 }

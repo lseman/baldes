@@ -133,7 +133,7 @@ fn rounding_ambiguity_near_topology_and_work_exhaustion_are_unknown() {
             &input,
             &lower,
             &upper,
-            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontOperationPolicy::FrontAlgebra,
             FrontierBudget::default()
         ),
         FrontierOutcome::Unknown(_)
@@ -144,7 +144,7 @@ fn rounding_ambiguity_near_topology_and_work_exhaustion_are_unknown() {
             &input,
             &near,
             &line(100., 0., 2.),
-            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontOperationPolicy::FrontAlgebra,
             FrontierBudget::default()
         ),
         FrontierOutcome::Unknown(_)
@@ -178,7 +178,7 @@ fn native_point_inside_constant_bounds_keeps_nearby_domain_endpoints() {
             &front,
             &lower,
             &upper,
-            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontOperationPolicy::FrontAlgebra,
             FrontierBudget::default(),
         ));
         assert_eq!(result.components().len(), 1);
@@ -199,7 +199,7 @@ fn native_point_exception_does_not_widen_domains_or_guess_clamp_values() {
             &front,
             &disjoint,
             &upper,
-            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontOperationPolicy::FrontAlgebra,
             FrontierBudget::default()
         ),
         FrontierOutcome::Unknown(FrontierUnknown::Unsupported("near-disjoint bound domains"))
@@ -222,7 +222,7 @@ fn native_point_exception_does_not_widen_domains_or_guess_clamp_values() {
             &front,
             &raises,
             &upper,
-            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontOperationPolicy::FrontAlgebra,
             FrontierBudget::default()
         ),
         FrontierOutcome::Unknown(FrontierUnknown::Unsupported(

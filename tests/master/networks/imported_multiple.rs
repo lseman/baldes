@@ -1,6 +1,6 @@
 use super::*;
 use baldes::master::preprocessing::Bounds;
-use mp::{
+use model::{
     imported::{
         self, Column, ColumnBatch, ColumnEnvelope, ImportOptions, ImportPricingKind, ImportStatus,
     },

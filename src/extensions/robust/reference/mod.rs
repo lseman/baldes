@@ -1,8 +1,8 @@
 //! Validation-only elementary forward labeler and minimal LP master.
 //!
 //! This independent implementation is retained as a correctness oracle for
-//! small instances. Production solves use [`Problem::native_graph`] with
-//! `crate::master::root::solve` or the CLI's `--robust` option.
+//! small instances. Production solves use [`Problem::pricing_graph`] with
+//! `crate::master::routing::solve` or the CLI's `--robust` option.
 use super::Problem;
 use crate::Result;
 

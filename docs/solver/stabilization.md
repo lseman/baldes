@@ -171,7 +171,7 @@ make it valid. The 54-case parameter corpus covers this capacity-row transition.
 A complete Rust example, requiring `clp`:
 
 ```rust
-use baldes::{master::root::RootOptions, inputs::{Instance, Rounding}};
+use baldes::{master::routing::RootOptions, inputs::{Instance, Rounding}};
 
 fn main() -> baldes::Result<()> {
     let mut instance = Instance::read("instances/Solomon/R101.txt")?;
@@ -180,7 +180,7 @@ fn main() -> baldes::Result<()> {
     options.cg.smoothing.initial_alpha = 0.5;
     options.cg.smoothing.beta_factor = 0.0;
     options.cg.smoothing.max_updates = 10;
-    let result = instance.solve_root(8, Rounding::None, options)?;
+    let result = instance.solve(8, Rounding::None, options)?;
     println!("{:?}: root LP={}", result.master.status, result.master.lp);
     Ok(())
 }
@@ -198,7 +198,7 @@ Python exposes the enable/disable switch through the public root API:
 ```python
 import pybaldes
 
-result = pybaldes.solve_root(
+result = pybaldes.solve(
     "instances/Solomon/R101.txt", customers=10, stabilize=False,
 )
 print(result.status, result.lp)

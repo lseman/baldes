@@ -13,7 +13,7 @@ pub enum FrontOperationPolicy {
     /// Exact domain intersection and exact coordinate comparisons.
     StrictDomain,
     /// Native left-coordinate choices at near-aligned segment ends and starts.
-    NativeFrontAlgebra,
+    FrontAlgebra,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct FrontierBudget {
@@ -259,7 +259,7 @@ impl SlopeFront {
             if lo > hi {
                 continue;
             }
-            if policy == FrontOperationPolicy::NativeFrontAlgebra {
+            if policy == FrontOperationPolicy::FrontAlgebra {
                 for &(_, boundary) in function.pairs() {
                     for coordinate in [lo, hi] {
                         if coordinate != boundary {
@@ -434,7 +434,7 @@ impl SlopeFront {
     pub(crate) fn excess(&self, other: &Self, policy: FrontOperationPolicy) -> Option<f64> {
         let evaluation = match policy {
             FrontOperationPolicy::StrictDomain => EvaluationPolicy::StrictDomain,
-            FrontOperationPolicy::NativeFrontAlgebra => EvaluationPolicy::NativeTolerance,
+            FrontOperationPolicy::FrontAlgebra => EvaluationPolicy::EndpointTolerance,
         };
         let value = |f: &PreparedSlopeFunction, x: f64| f.evaluate(x, evaluation).ok().flatten();
         let gap = |a: f64, b: f64| {
@@ -621,7 +621,7 @@ fn value_at(
 ) -> FrontResult<f64> {
     let policy = match policy {
         FrontOperationPolicy::StrictDomain => EvaluationPolicy::StrictDomain,
-        FrontOperationPolicy::NativeFrontAlgebra => EvaluationPolicy::NativeTolerance,
+        FrontOperationPolicy::FrontAlgebra => EvaluationPolicy::EndpointTolerance,
     };
     function
         .evaluate(x, policy)
@@ -648,7 +648,7 @@ fn add_component(
     let (as_, ae) = a.domain();
     let (bs, be) = b.domain();
     if as_ > be || bs > ae {
-        if policy == FrontOperationPolicy::NativeFrontAlgebra
+        if policy == FrontOperationPolicy::FrontAlgebra
             && (near(as_, be, policy)? || near(bs, ae, policy)?)
         {
             return Err(FrontierUnknown::Unsupported(
@@ -698,7 +698,7 @@ fn add_component(
         }
         work.pair()?;
         let slope = arithmetic(sa + sb, "front slope addition")?;
-        if policy == FrontOperationPolicy::NativeFrontAlgebra
+        if policy == FrontOperationPolicy::FrontAlgebra
             && pairs.len() > 1
             && near(slope, pairs[pairs.len() - 1].0, policy)?
         {

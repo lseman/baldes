@@ -2,7 +2,7 @@
 //! generic variables and undirected edges. A generic variable here is a fixed
 //! integer combination of arc traversals, so every integral routing solution
 //! gives it an integral value and floor/ceil children partition the space.
-use crate::{invalid, master::root::RootProblem, Result};
+use crate::{invalid, master::routing::RoutingContext, Result};
 use std::collections::BTreeMap;
 
 /// A model-registered aggregate branching variable: a name and integer
@@ -18,7 +18,7 @@ impl AggregateVariable {
         if name.is_empty() {
             return Err(invalid("aggregate branching variable needs a model name"));
         }
-        let mut merged = BTreeMap::<i32, crate::master::root::ExactSum>::new();
+        let mut merged = BTreeMap::<i32, crate::master::numerics::ExactSum>::new();
         for &(arc, coefficient) in arcs {
             merged
                 .entry(arc)
@@ -57,7 +57,7 @@ impl AggregateVariable {
     /// is absent from this problem.
     pub(crate) fn positions<const D: usize>(
         &self,
-        problem: &RootProblem<D>,
+        problem: &RoutingContext<D>,
     ) -> Option<Vec<(usize, f64)>> {
         let mut arcs = self
             .arcs
@@ -88,7 +88,7 @@ fn validate_coefficients<T>(arcs: &[(T, f64)]) -> Result<()> {
 
 /// `arcs` are physical arc positions sorted by position.
 pub(super) fn validate<const D: usize>(
-    problem: &RootProblem<D>,
+    problem: &RoutingContext<D>,
     arcs: &[(usize, f64)],
 ) -> Result<()> {
     validate_coefficients(arcs)?;
@@ -97,7 +97,7 @@ pub(super) fn validate<const D: usize>(
     }
     if arcs
         .last()
-        .is_some_and(|&(arc, _)| arc >= problem.graph.arcs.len())
+        .is_some_and(|&(arc, _)| arc >= problem.model.networks[0].graph.arcs.len())
     {
         return Err(invalid("aggregate branch arc index"));
     }
@@ -111,9 +111,11 @@ pub(super) fn coefficient(arcs: &[(usize, f64)], arc: usize) -> f64 {
 
 /// Every undirected edge {u, v}, u < v, with its arcs in both directions.
 /// Loops have no edge. Parallel arcs share their edge.
-pub(crate) fn edges<const D: usize>(problem: &RootProblem<D>) -> Vec<(String, Vec<(usize, f64)>)> {
+pub(crate) fn edges<const D: usize>(
+    problem: &RoutingContext<D>,
+) -> Vec<(String, Vec<(usize, f64)>)> {
     let mut edges = BTreeMap::<(usize, usize), Vec<(usize, f64)>>::new();
-    for (position, arc) in problem.graph.arcs.iter().enumerate() {
+    for (position, arc) in problem.model.networks[0].graph.arcs.iter().enumerate() {
         if arc.tail != arc.head {
             let key = (arc.tail.min(arc.head), arc.tail.max(arc.head));
             edges.entry(key).or_default().push((position, 1.));

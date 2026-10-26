@@ -11,16 +11,16 @@ networks. Solves run in the Rust library; no CLI subprocess is required.
 
 | Your task | Interface | Result |
 | --- | --- | --- |
-| Solve the LP relaxation of a CVRP or VRPTW instance | `solve_root` or `Instance.solve_root` | `RootResult`, potentially fractional routes |
+| Solve the LP relaxation of a CVRP or VRPTW instance | `solve` or `Instance.solve` | `RootResult`, potentially fractional routes |
 | Price paths for your own column-generation loop | `Solver` | Reduced costs, owned `Route` objects, pricing exactness |
-| Combine vehicle types, route families, or independent pricing graphs | `NetworkProblem.solve` or `solve_networks` | `NetworkResult`, with a resumable root node |
-| Search for an integer solution of a shared-master model | `solve_networks(..., tree=True)` | Integer witness when found, bound and tree status |
+| Combine vehicle types, route families, or independent pricing graphs | `NetworkProblem.solve` or `solve` | `NetworkResult`, with a resumable root node |
+| Search for an integer solution of a shared-master model | `solve(..., tree=True)` | Integer witness when found, bound and tree status |
 | Add state-dependent feasibility or objective terms | `ResourceModel`, `EncodedFunction` | Resources attached to a low-level solver |
 
 The routing convenience API exposes root solving. It does not expose the CLI's
 single-network routing tree or a standalone HGS function. `hgs_time` seeds a
 routing root solve with heuristic routes. Network tree search has its own model
-and branching rules; it is not an `Instance.solve_root(tree=True)` option.
+and branching rules; it is not an `Instance.solve(tree=True)` option.
 
 ## Start here
 
@@ -34,7 +34,7 @@ and branching rules; it is not an `Instance.solve_root(tree=True)` option.
 
 - [Installation](installation.md): source builds, features, backends, compiled capacities, and development setup.
 - [Quickstart](quickstart.md): self-contained routing and pricing examples.
-- [Routing inputs and options](routing.md): `Customer`, `Instance`, file formats, distance conventions, and every `solve_root` keyword.
+- [Routing inputs and options](routing.md): `Customer`, `Instance`, file formats, distance conventions, and every `solve` keyword.
 - [Results and guarantees](results.md): root/network result fields, status interpretation, certificates, and JSON export.
 - [Pricing solver](pricing.md): graph construction, scalar resources, NG memory, repeated pricing, route ownership, and method reference.
 - [Coupled and encoded resources](resources.md): resource declaration, dependencies, piecewise functions, paired fronts, and build-dependent windows.

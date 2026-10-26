@@ -2,7 +2,7 @@
 //! Root-tree branching on time-window selection counts.
 use baldes::graph::Window;
 use baldes::master::{
-    root::{RootOptions, RootProblem},
+    routing::{RootOptions, RoutingContext},
     tree::{self, TreeOptions, TreeStatus},
 };
 use baldes::Graph;
@@ -164,7 +164,7 @@ fn window_selection_branching_matches_exhaustive_optima_in_input_arc_ids() {
         let g = graph(&inst);
         let input_arcs: std::collections::HashSet<_> = g.arcs.iter().map(|a| a.id).collect();
         for selection in [false, true] {
-            let problem = RootProblem::set_partitioning(g.clone(), vehicles as f64).unwrap();
+            let problem = RoutingContext::set_partitioning(g.clone(), vehicles as f64).unwrap();
             let output = tree::solve(problem, options(selection)).unwrap();
             assert_eq!(
                 output.status,
@@ -197,7 +197,7 @@ fn window_selection_branching_matches_exhaustive_optima_in_input_arc_ids() {
 #[test]
 fn window_selection_requires_a_disposable_resource() {
     let inst = instance(4, 1);
-    let problem = RootProblem::set_partitioning(graph(&inst), 2.).unwrap();
+    let problem = RoutingContext::set_partitioning(graph(&inst), 2.).unwrap();
     let mut controls = options(true);
     controls.branching.time_window_selection = Some(3);
     assert!(tree::solve(problem, controls).is_err());
@@ -216,11 +216,11 @@ fn split_trees_branch_on_summed_arc_flows_then_window_counts() {
         }
         let mut g = graph(&inst);
         let split = g.split_time_window_arcs(0).unwrap();
-        let problem = RootProblem::set_partitioning(g, 3.).unwrap();
+        let problem = RoutingContext::set_partitioning(g, 3.).unwrap();
         let mut root = RootOptions::default();
         root.cg.stabilize = false;
         root.enumerate = false;
-        let result = baldes::master::root::solve(problem.clone(), root).unwrap();
+        let result = baldes::master::routing::solve(problem.clone(), root).unwrap();
         let values = result.route_values();
         let flow = |ids: &[i32]| -> f64 {
             values
@@ -249,7 +249,7 @@ fn split_trees_branch_on_summed_arc_flows_then_window_counts() {
             match &c.down {
                 BranchConstraint::ArcFlow { arc, .. } => {
                     assert!(
-                        !copied.contains(&problem.graph.arcs[*arc].id),
+                        !copied.contains(&problem.model.networks[0].graph.arcs[*arc].id),
                         "seed {seed}: copy {arc}"
                     )
                 }

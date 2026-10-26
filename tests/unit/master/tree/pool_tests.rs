@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn global_integer_pool_does_not_preload_child_masters() {
     let instance = crate::inputs::Instance::parse("one\nVEHICLE\nNUMBER CAPACITY\n1 1\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n").unwrap();
-    let problem = RootProblem::set_partitioning(
+    let problem = RoutingContext::set_partitioning(
         instance.graph(1, crate::inputs::Rounding::None).unwrap(),
         1.,
     )
@@ -12,9 +12,14 @@ fn global_integer_pool_does_not_preload_child_masters() {
     options.root.capture_state = true;
     options.root.enumerate = false;
     options.root.cg.time_limit = Duration::ZERO;
-    let root = root::solve(problem.clone(), options.root.clone()).unwrap();
+    let root = routing::solve(problem.clone(), options.root.clone()).unwrap();
     let parent = root.snapshot.unwrap();
-    let arcs: Vec<_> = problem.graph.arcs.iter().map(|arc| arc.id).collect();
+    let arcs: Vec<_> = problem.model.networks[0]
+        .graph
+        .arcs
+        .iter()
+        .map(|arc| arc.id)
+        .collect();
     assert_eq!(arcs.len(), 2);
     let mut pool = Pool {
         routes: vec![],

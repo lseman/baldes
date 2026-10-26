@@ -302,7 +302,7 @@ fn exhaustive_masks_preserve_exact_routes_and_tightening_rejects_bad_routes_at_e
 #[cfg(feature = "clp")]
 #[test]
 fn relaxed_vertex_selection_matches_exact_master_and_never_accepts_improper_incumbent() {
-    use crate::master::root::{self, RootOptions, RootProblem};
+    use crate::master::routing::{self, RootOptions, RoutingContext};
     for direction in [0., 1., 2.] {
         for (relaxed, arc_only) in [(false, false), (true, false), (false, true), (true, true)] {
             let mut graph = graph(relaxed);
@@ -320,13 +320,13 @@ fn relaxed_vertex_selection_matches_exact_master_and_never_accepts_improper_incu
                 graph.set_coupled_resources(&definitions).unwrap();
             }
             let kernel = graph.coupled_kernel().unwrap().clone();
-            let problem = RootProblem::set_partitioning(graph, 2.).unwrap();
+            let problem = RoutingContext::set_partitioning(graph, 2.).unwrap();
             let mut options = RootOptions::default();
             options.cg.stabilize = false;
             options
                 .pricing_options
                 .push(("BALDESuseBidirectionalSearch".into(), direction));
-            let output = root::solve(problem, options).unwrap();
+            let output = routing::solve(problem, options).unwrap();
             assert!((output.master.lp - 4.).abs() < 1e-8, "{output:?}");
             assert!((output.incumbent - 4.).abs() < 1e-8, "{output:?}");
             for (route, value) in output.route_values() {

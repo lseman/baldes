@@ -2,7 +2,7 @@
 use baldes::{
     inputs::{Instance, Rounding},
     master::{
-        root::{BoundMode, RootOptions, RootProblem},
+        routing::{BoundMode, RootOptions, RoutingContext},
         tree::{self, TreeOptions, TreeStatus},
     },
 };
@@ -27,14 +27,16 @@ fn options() -> TreeOptions {
 fn parallel_tree_matches_exhaustive_routes_in_both_bound_modes() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         for backend in [
-            baldes::master::root::MasterSolver::Clp,
-            baldes::master::root::MasterSolver::Ipm,
+            baldes::master::routing::MasterSolver::Clp,
+            baldes::master::routing::MasterSolver::Ipm,
         ] {
             for threads in [1, 2, 4] {
                 let instance = triangle();
-                let problem =
-                    RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.)
-                        .unwrap();
+                let problem = RoutingContext::set_partitioning(
+                    instance.graph(1, Rounding::None).unwrap(),
+                    3.,
+                )
+                .unwrap();
                 let mut controls = options();
                 controls.threads = threads;
                 controls.root.bound_mode = mode;
@@ -59,7 +61,8 @@ fn parallel_tree_preserves_global_node_and_time_budgets() {
     let optimum = exhaustive(&instance);
     for limit in [0, 1, 2, 3] {
         let problem =
-            RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
+            RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.)
+                .unwrap();
         let mut controls = options();
         controls.threads = 4;
         controls.node_limit = limit;
@@ -74,7 +77,7 @@ fn parallel_tree_preserves_global_node_and_time_budgets() {
         }
     }
     let problem =
-        RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
+        RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
     let mut controls = options();
     controls.threads = 2;
     controls.time_limit = Duration::ZERO;
@@ -97,7 +100,7 @@ fn integer_heuristic_incumbent_bounds_the_original_arc_sum() {
     }
     graph.add_arc(0, 1, 1e16).unwrap();
     graph.add_arc(1, 2, 1.).unwrap();
-    let problem = RootProblem::set_partitioning(graph, 1.).unwrap();
+    let problem = RoutingContext::set_partitioning(graph, 1.).unwrap();
     let mut controls = options();
     controls.node_limit = 0;
     let output = tree::solve(problem, controls).unwrap();
@@ -116,7 +119,7 @@ fn tolerance_closed_tree_keeps_its_lower_certificate() {
     for (tail, head, cost) in [(0, 1, 0.), (1, 3, 1.), (0, 2, 0.), (2, 3, 1.), (1, 2, 0.)] {
         graph.add_arc(tail, head, cost).unwrap();
     }
-    let problem = RootProblem::set_partitioning(graph, 2.).unwrap();
+    let problem = RoutingContext::set_partitioning(graph, 2.).unwrap();
     let mut controls = options();
     controls.root.bound_mode = BoundMode::Certified;
     controls.absolute_gap = 3.;
@@ -134,7 +137,7 @@ fn tree_closes_fractional_root_with_and_without_integer_heuristic() {
     let instance = triangle();
     for (mip, fleet) in [(0, 2.), (0, 3.), (10000, 2.), (10000, 3.)] {
         let problem =
-            RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), fleet)
+            RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), fleet)
                 .unwrap();
         let mut controls = options();
         controls.mip_node_limit = mip;
@@ -161,7 +164,7 @@ fn tree_closes_fractional_root_with_and_without_integer_heuristic() {
 #[test]
 fn tree_rejects_nonfinite_family_priorities_before_solving() {
     let problem =
-        RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
+        RoutingContext::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
     for priority in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         let mut controls = options();
         controls.node_limit = 0;
@@ -175,7 +178,7 @@ fn tree_rejects_nonfinite_family_priorities_before_solving() {
 fn quota_one_records_trials_without_ranking_history_or_weakening_bounds() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let problem =
-            RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.)
+            RoutingContext::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.)
                 .unwrap();
         let mut controls = options();
         controls.root.cg.bound_mode = mode;
@@ -201,7 +204,7 @@ fn quota_one_records_trials_without_ranking_history_or_weakening_bounds() {
 fn adaptive_trial_budget_changes_work_without_changing_the_optimum() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let problem =
-            RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.)
+            RoutingContext::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.)
                 .unwrap();
         let mut counts = vec![];
         for ratio in [0., 0.5e-12] {
@@ -227,7 +230,7 @@ fn adaptive_trial_budget_changes_work_without_changing_the_optimum() {
 fn completed_depth_history_keeps_numerical_and_certified_tree_bounds() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let problem =
-            RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.)
+            RoutingContext::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.)
                 .unwrap();
         let mut controls = options();
         controls.root.cg.bound_mode = mode;
@@ -247,7 +250,7 @@ fn completed_depth_history_keeps_numerical_and_certified_tree_bounds() {
 #[test]
 fn invalid_subtree_ratios_are_rejected_before_solving() {
     let problem =
-        RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
+        RoutingContext::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
     for ratio in [-1., f64::NAN, f64::INFINITY] {
         let mut controls = options();
         controls.node_limit = 0;
@@ -265,7 +268,7 @@ fn invalid_subtree_ratios_are_rejected_before_solving() {
 fn singleton_skips_ranking_phases_but_keeps_exact_trials_and_bounds() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let problem =
-            RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.)
+            RoutingContext::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.)
                 .unwrap();
         let mut controls = options();
         controls.root.cg.bound_mode = mode;
@@ -294,7 +297,7 @@ fn singleton_skips_ranking_phases_but_keeps_exact_trials_and_bounds() {
 #[test]
 fn node_limit_preserves_open_bound_and_never_certifies_restricted_mip() {
     let problem =
-        RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
+        RoutingContext::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
     let mut controls = options();
     controls.node_limit = 1;
     let out = tree::solve(problem, controls).unwrap();
@@ -307,7 +310,7 @@ fn node_limit_preserves_open_bound_and_never_certifies_restricted_mip() {
 #[test]
 fn time_limit_and_cost_only_incumbent_do_not_claim_a_solution() {
     let problem =
-        RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
+        RoutingContext::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
     let mut controls = options();
     controls.time_limit = Duration::ZERO;
     controls.root.incumbent = 0.;
@@ -375,9 +378,11 @@ fn small_trees_agree_with_exhaustive_elementary_route_universe() {
         let instance = Instance::parse(&text).unwrap();
         let exact = exhaustive(&instance);
         for mode in [BoundMode::Numerical, BoundMode::Certified] {
-            let problem =
-                RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), n as f64)
-                    .unwrap();
+            let problem = RoutingContext::set_partitioning(
+                instance.graph(1, Rounding::None).unwrap(),
+                n as f64,
+            )
+            .unwrap();
             let mut advanced = options();
             advanced.root.bound_mode = mode;
             advanced.strong_branching = Some(Default::default());
@@ -403,7 +408,7 @@ fn small_trees_agree_with_exhaustive_elementary_route_universe() {
 fn strong_branching_solves_with_certified_child_bounds() {
     use baldes::master::tree::StrongBranchingOptions;
     let problem =
-        RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 2.).unwrap();
+        RoutingContext::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 2.).unwrap();
     let mut controls = options();
     controls.root.bound_mode = BoundMode::Certified;
     controls.strong_branching = Some(StrongBranchingOptions::default());
@@ -418,7 +423,7 @@ fn strong_branching_solves_with_certified_child_bounds() {
 fn diving_without_mip_finds_incumbent_but_does_not_certify_original_node() {
     use baldes::master::tree::DivingOptions;
     let problem =
-        RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 2.).unwrap();
+        RoutingContext::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 2.).unwrap();
     let mut controls = options();
     controls.node_limit = 1;
     controls.mip_node_limit = 0;
@@ -439,7 +444,7 @@ fn heuristic_pricing_trial_never_certifies_a_bound() {
     let mut root = RootOptions::default();
     root.enumerate = false;
     root.pricing_phase_floor = 1;
-    let out = instance.solve_root(1, Rounding::None, root).unwrap();
+    let out = instance.solve(1, Rounding::None, root).unwrap();
     assert!(!out.master.bound.is_finite(), "{out:?}");
     assert!(!out.master.pruned_by_bound);
 }
@@ -447,7 +452,7 @@ fn heuristic_pricing_trial_never_certifies_a_bound() {
 #[test]
 fn fork_and_carry_inherits_cuts_basis_and_protects_branch_rows() {
     use baldes::master::{
-        root::{self, CapacityCutConfig},
+        routing::{self, CapacityCutConfig},
         tree::{DivingOptions, StrongBranchingOptions},
         RowSense,
     };
@@ -463,7 +468,7 @@ fn fork_and_carry_inherits_cuts_basis_and_protects_branch_rows() {
     }
     let instance = Instance::parse(&text).unwrap();
     let problem =
-        RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 5.).unwrap();
+        RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 5.).unwrap();
     let demands: Vec<f64> = instance.customers.iter().map(|c| c.demand).collect();
     let mut root_opts = RootOptions::default()
         .with_capacity_cuts(CapacityCutConfig::new(demands, instance.capacity))
@@ -472,11 +477,11 @@ fn fork_and_carry_inherits_cuts_basis_and_protects_branch_rows() {
     root_opts.cg.stabilize = false;
     root_opts.enumerate = false;
 
-    let parent_out = root::solve(problem.clone(), root_opts.clone()).unwrap();
+    let parent_out = routing::solve(problem.clone(), root_opts.clone()).unwrap();
     let snapshot = parent_out
         .snapshot
         .as_ref()
-        .expect("root::solve must capture NodeSnapshot");
+        .expect("routing::solve must capture NodeSnapshot");
     assert_eq!(snapshot.branch_depth(), 0);
     assert!(
         snapshot.active_cuts() > 0,
@@ -485,26 +490,26 @@ fn fork_and_carry_inherits_cuts_basis_and_protects_branch_rows() {
 
     // Pick a fractional customer-to-customer arc from the root solution to branch on.
     let mut branch_arc = 0;
-    for (index, arc) in problem.graph.arcs.iter().enumerate() {
+    for (index, arc) in problem.model.networks[0].graph.arcs.iter().enumerate() {
         if arc.tail >= 1 && arc.head >= 1 {
             branch_arc = index;
             break;
         }
     }
     let delta = [(branch_arc, RowSense::LessEqual, 0.)];
-    let child_down = root::inherit(snapshot, &delta, root_opts.clone()).unwrap();
+    let child_down = routing::inherit(snapshot, &delta, root_opts.clone()).unwrap();
     assert_eq!(child_down.inherited_cuts, snapshot.active_cuts());
     let child_snap = child_down
         .snapshot
         .as_ref()
-        .expect("root::inherit must capture child NodeSnapshot");
+        .expect("routing::inherit must capture child NodeSnapshot");
     assert_eq!(child_snap.branch_depth(), 1);
 
     // Fork a grandchild with a second branch delta to verify incremental delta slicing
     // and branch-row protection across cut cleanup rounds.
-    let second_arc = (branch_arc + 1) % problem.graph.arcs.len();
+    let second_arc = (branch_arc + 1) % problem.model.networks[0].graph.arcs.len();
     let grandchild_delta = [(second_arc, RowSense::LessEqual, 0.)];
-    let grandchild = root::inherit(child_snap, &grandchild_delta, root_opts.clone()).unwrap();
+    let grandchild = routing::inherit(child_snap, &grandchild_delta, root_opts.clone()).unwrap();
     assert_eq!(
         grandchild.snapshot.as_ref().unwrap().branch_depth(),
         2,
@@ -542,9 +547,11 @@ fn ryan_foster_tree_agrees_with_exhaustive_routes_and_strong_trials() {
         let instance = Instance::parse(&text).unwrap();
         let exact = exhaustive(&instance);
         for enumerate in [false, true] {
-            let problem =
-                RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), n as f64)
-                    .unwrap();
+            let problem = RoutingContext::set_partitioning(
+                instance.graph(1, Rounding::None).unwrap(),
+                n as f64,
+            )
+            .unwrap();
             let mut controls = options();
             controls.root.enumerate = enumerate;
             controls.branching = BranchingOptions {
@@ -579,7 +586,7 @@ fn cluster_resource_and_history_trees_preserve_exhaustive_optimum() {
     for family in ["cluster", "resource", "hybrid"] {
         for strong in [false, true] {
             let graph = inst.graph(8, Rounding::None).unwrap();
-            let problem = RootProblem::set_partitioning(graph, inst.vehicles as f64).unwrap();
+            let problem = RoutingContext::set_partitioning(graph, inst.vehicles as f64).unwrap();
             let mut controls = options();
             controls.root.enumerate = false;
             controls.mip_node_limit = 0;
@@ -629,7 +636,7 @@ fn root_and_exact_incumbent_validation_support_more_than_two_resources() {
         graph.arc_mut(a).unwrap().consumption[r] = 1.;
         graph.arc_mut(b).unwrap().consumption[r] = 2.;
     }
-    let problem = RootProblem::set_partitioning(graph, 1.).unwrap();
+    let problem = RoutingContext::set_partitioning(graph, 1.).unwrap();
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let mut controls = options();
         controls.root.bound_mode = mode;
@@ -645,13 +652,16 @@ fn root_and_exact_incumbent_validation_support_more_than_two_resources() {
 fn edge_and_registered_aggregate_branching_reach_the_exhaustive_optimum() {
     use baldes::master::branching::{AggregateVariable, BranchingOptions};
     let problem =
-        RootProblem::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
+        RoutingContext::set_partitioning(triangle().graph(1, Rounding::None).unwrap(), 3.).unwrap();
     // A registered generic variable: the route count, as source departures.
-    let departures: Vec<_> = problem
+    let departures: Vec<_> = problem.model.networks[0]
         .graph
         .arcs
         .iter()
-        .filter(|a| a.tail == problem.graph.source && a.head != problem.graph.sink)
+        .filter(|a| {
+            a.tail == problem.model.networks[0].graph.source
+                && a.head != problem.model.networks[0].graph.sink
+        })
         .map(|a| (a.id, 1.))
         .collect();
     let routes = AggregateVariable::new("routes", &departures).unwrap();

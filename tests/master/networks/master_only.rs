@@ -1,6 +1,7 @@
 use super::*;
+use baldes::master::tree::ModelTreeOptions;
 use baldes::master::{preprocessing::Bounds, tree::TreeStatus};
-use mp::{AssignmentTreeOptions, MasterVariable};
+use model::MasterVariable;
 
 fn variable(
     id: i32,
@@ -24,7 +25,7 @@ fn master_only_signed_free_variables_fix_and_restore_without_a_dummy_network() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let mut opts = options();
         opts.cg.bound_mode = mode;
-        let root = mp::solve_master(
+        let root = model::solve_master(
             vec![Row {
                 sense: RowSense::Equal,
                 rhs: -1.5,
@@ -80,7 +81,7 @@ fn master_only_integer_policy_tree_and_mip_share_the_complete_domain() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let mut opts = options();
         opts.cg.bound_mode = mode;
-        let root = mp::solve_master(
+        let root = model::solve_master(
             vec![Row {
                 sense: RowSense::GreaterEqual,
                 rhs: 0.5,
@@ -90,7 +91,7 @@ fn master_only_integer_policy_tree_and_mip_share_the_complete_domain() {
         )
         .unwrap();
         optimal(&root, 0.5);
-        let mut integer_policy = mp::PreprocessingOptions::default();
+        let mut integer_policy = model::PreprocessingOptions::default();
         integer_policy.integer_domains = true;
         let integral = root
             .snapshot
@@ -99,7 +100,7 @@ fn master_only_integer_policy_tree_and_mip_share_the_complete_domain() {
         optimal(&integral.solve(opts.clone()).unwrap(), 1.);
         let tree = root
             .snapshot
-            .solve_assignment_tree(AssignmentTreeOptions {
+            .solve_tree(ModelTreeOptions {
                 node: opts.clone(),
                 ..Default::default()
             })
@@ -126,10 +127,10 @@ fn master_only_integer_policy_tree_and_mip_share_the_complete_domain() {
 
 #[test]
 fn empty_master_domain_and_original_infeasibility_have_explicit_outcomes() {
-    let empty = mp::solve_master(vec![], vec![], options()).unwrap();
+    let empty = model::solve_master(vec![], vec![], options()).unwrap();
     optimal(&empty, 0.);
     assert!(empty.master_values.is_empty());
-    let impossible = mp::solve_master(
+    let impossible = model::solve_master(
         vec![Row {
             sense: RowSense::Equal,
             rhs: 1.,
@@ -145,13 +146,10 @@ fn empty_master_domain_and_original_infeasibility_have_explicit_outcomes() {
             .propagation
             .infeasible
     );
-    let tree = impossible
-        .snapshot
-        .solve_assignment_tree(Default::default())
-        .unwrap();
+    let tree = impossible.snapshot.solve_tree(Default::default()).unwrap();
     assert_eq!(tree.status, TreeStatus::Infeasible);
     assert_eq!(tree.open_nodes, 0);
-    let malformed = mp::solve_master(
+    let malformed = model::solve_master(
         vec![Row {
             sense: RowSense::Equal,
             rhs: f64::NAN,
@@ -164,7 +162,7 @@ fn empty_master_domain_and_original_infeasibility_have_explicit_outcomes() {
 
 #[test]
 fn master_only_preserves_unbounded_directions_and_arbitrary_snapshot_dimensions() {
-    let unbounded = mp::solve_master(
+    let unbounded = model::solve_master(
         vec![],
         vec![variable(
             3,
@@ -182,7 +180,7 @@ fn master_only_preserves_unbounded_directions_and_arbitrary_snapshot_dimensions(
         rows: vec![],
         networks: vec![],
     };
-    let bounded = mp::solve_with_master_variables(
+    let bounded = model::solve_with_master_variables(
         p,
         vec![variable(3, 1., -2., 3., false, vec![])],
         options(),
@@ -210,15 +208,17 @@ fn inferred_integer_bounds_publish_both_signs_in_fresh_and_warm_masters() {
                 },
             };
             let vars = vec![variable(9, cost, lower, upper, true, vec![(0, 1.)])];
-            let root = mp::solve_with_master_variables(p.clone(), vars.clone(), options()).unwrap();
+            let root =
+                model::solve_with_master_variables(p.clone(), vars.clone(), options()).unwrap();
             optimal(&root, 0.5);
             let mut integer_options = options();
             integer_options.preprocessing.integer_domains = true;
-            let fresh = mp::solve_with_master_variables(p, vars, integer_options.clone()).unwrap();
+            let fresh =
+                model::solve_with_master_variables(p, vars, integer_options.clone()).unwrap();
             optimal(&fresh, 1.);
             let warm = root.snapshot.solve(integer_options).unwrap();
             optimal(&warm, 1.);
-            let policy = mp::PreprocessingOptions {
+            let policy = model::PreprocessingOptions {
                 integer_domains: true,
                 ..Default::default()
             };
@@ -266,10 +266,10 @@ fn master_only_original_multiplicity_links_propagate_and_survive_fixing() {
     ];
     let mut opts = options();
     opts.cg.bound_mode = BoundMode::Certified;
-    let root = mp::solve_master(rows, variables, opts.clone()).unwrap();
+    let root = model::solve_master(rows, variables, opts.clone()).unwrap();
     optimal(&root, 1.5);
     assert_eq!(root.master_values, vec![(1, 1.5), (2, 0.), (3, 1.5)]);
-    let policy = mp::PreprocessingOptions {
+    let policy = model::PreprocessingOptions {
         integer_domains: true,
         ..Default::default()
     };
@@ -299,7 +299,7 @@ fn master_only_original_multiplicity_links_propagate_and_survive_fixing() {
     optimal(&fixed.solve(opts.clone()).unwrap(), 3.);
     let tree = root
         .snapshot
-        .solve_assignment_tree(AssignmentTreeOptions {
+        .solve_tree(ModelTreeOptions {
             node: opts.clone(),
             ..Default::default()
         })

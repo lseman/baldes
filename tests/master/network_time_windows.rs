@@ -3,8 +3,8 @@
 use baldes::{
     graph::{Graph, Window},
     master::{
-        mp::{self, Network, Problem, SynchronizedService, SynchronizedServiceMember},
-        root::Row,
+        model::{self, Network, Problem, SynchronizedService, SynchronizedServiceMember},
+        routing::Row,
         tree::TreeStatus,
         RowSense,
     },
@@ -18,8 +18,8 @@ fn windows(pairs: &[(f64, f64)]) -> Vec<Window> {
         .collect()
 }
 
-fn options(selection: bool) -> mp::AssignmentTreeOptions {
-    let mut options = mp::AssignmentTreeOptions::default();
+fn options(selection: bool) -> baldes::master::tree::ModelTreeOptions {
+    let mut options = baldes::master::tree::ModelTreeOptions::default();
     options.time_limit = Duration::from_secs(30);
     options.node.cg.time_limit = options.time_limit;
     options.node.cg.stabilize = false;
@@ -183,7 +183,7 @@ fn network_window_selection_matches_exhaustive_optima_in_input_arc_ids() {
         let input: std::collections::HashSet<_> =
             base.networks[0].graph.arcs.iter().map(|a| a.id).collect();
         for selection in [false, true] {
-            let output = mp::solve_assignment_tree(base.clone(), options(selection)).unwrap();
+            let output = baldes::master::tree::solve(base.clone(), options(selection)).unwrap();
             // A stalled column generation leaves nodes open in either mode.
             if output.status == TreeStatus::Incomplete {
                 continue;
@@ -214,7 +214,10 @@ fn network_window_selection_matches_exhaustive_optima_in_input_arc_ids() {
 
 /// Members in networks 7 and 42 with different window sets that overlap
 /// only in [6, 8]; both vehicles must start the service there.
-fn synchronized(first: &[(f64, f64)], second: &[(f64, f64)]) -> mp::AssignmentTreeOutput {
+fn synchronized(
+    first: &[(f64, f64)],
+    second: &[(f64, f64)],
+) -> baldes::master::tree::ModelTreeOutput {
     let network = |id: i32, w: &[(f64, f64)]| {
         let mut graph = Graph::<2>::new(3, 1).unwrap();
         graph.set_bounds(0, 0, 0., 0.).unwrap();
@@ -249,7 +252,7 @@ fn synchronized(first: &[(f64, f64)], second: &[(f64, f64)]) -> mp::AssignmentTr
             },
         ],
     }];
-    mp::solve_assignment_tree(
+    baldes::master::tree::solve(
         Problem {
             rows: vec![],
             networks: vec![network(7, first), network(42, second)],
@@ -288,6 +291,6 @@ fn synchronized_members_without_a_common_window_are_not_served() {
 #[test]
 fn window_selection_requires_a_fresh_problem() {
     let inst = instance(4, 1);
-    let root = mp::solve(problem(&inst, 2.), options(false).node).unwrap();
-    assert!(root.snapshot.solve_assignment_tree(options(true)).is_err());
+    let root = model::solve(problem(&inst, 2.), options(false).node).unwrap();
+    assert!(root.snapshot.solve_tree(options(true)).is_err());
 }

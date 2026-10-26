@@ -1,6 +1,68 @@
 use super::*;
 
 #[test]
+fn dense_symbolic_suffix_matches_explicit_elimination_patterns() {
+    for n in [1, 7, 33, 65, 129] {
+        for topology in 0..3 {
+            let mut entries = Vec::new();
+            for i in 0..n {
+                entries.push((i, i, n as f64 + 1.));
+                for j in i + 1..n {
+                    if (topology == 0 && i == 0)
+                        || (topology == 1 && j == i + 1)
+                        || (topology == 2 && (i * 37 + j * 13) % 17 < 3)
+                    {
+                        entries.push((i, j, 0.1));
+                        entries.push((j, i, 0.1));
+                    }
+                }
+            }
+            let a = SparseMatrix::from_triplets(n, n, &entries).unwrap();
+            for reverse in [false, true] {
+                let mut order: Vec<_> = (0..n).collect();
+                if reverse {
+                    order.reverse();
+                }
+                let mut inverse = vec![0; n];
+                for (k, &i) in order.iter().enumerate() {
+                    inverse[i] = k;
+                }
+                let mut graph = vec![BTreeSet::new(); n];
+                for &(i, j, _) in &entries {
+                    if i != j {
+                        graph[inverse[i]].insert(inverse[j]);
+                    }
+                }
+                let mut expected = Vec::new();
+                for k in 0..n {
+                    let neighbors: Vec<_> = graph[k].iter().copied().filter(|&i| i > k).collect();
+                    for &i in &neighbors {
+                        graph[i].remove(&k);
+                        for &j in &neighbors {
+                            if i != j {
+                                graph[i].insert(j);
+                            }
+                        }
+                    }
+                    expected.push(neighbors);
+                }
+                for boundary in [0, n / 2, n] {
+                    let symbolic = Symbolic::analyze(&a, order.clone(), boundary);
+                    for front in &symbolic.fronts {
+                        for j in front.lo..front.end {
+                            let actual: Vec<_> = (j + 1..front.end)
+                                .chain(front.updates.iter().copied())
+                                .collect();
+                            assert_eq!(actual, expected[j], "n={n} topology={topology} reverse={reverse} boundary={boundary} column={j}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn independent_primal_order_preserves_fill_and_kkt_solution() {
     let (m, n) = (9, 80);
     let mut entries = Vec::new();
@@ -328,7 +390,7 @@ fn lower_triangle_kernel_matches_reference_with_partial_and_indefinite_pivots() 
                 }
                 let mut blocks = Vec::new();
                 let mut perm = Vec::new();
-                let mut multipliers = Vec::new();
+                let mut multipliers = DenseScratch::default();
                 let mut stats = FactorStats {
                     min_abs_pivot: f64::INFINITY,
                     ..FactorStats::default()
@@ -344,6 +406,7 @@ fn lower_triangle_kernel_matches_reference_with_partial_and_indefinite_pivots() 
                         &mut blocks,
                         &mut perm,
                         &mut multipliers,
+                        true,
                     )
                 })
                 .unwrap();

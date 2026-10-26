@@ -9,11 +9,24 @@ mod workspace;
 use workspace::Assembly;
 pub(crate) use workspace::FactorWorkspace;
 mod dense;
-use dense::bk_into;
+use dense::{bk_into, DenseScratch};
+mod relax;
 mod storage;
 use storage::LowerFactor;
 mod uplooking;
 pub(crate) use uplooking::Uplooking;
+
+/// Structural work and storage estimates; these exclude numeric pivoting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FactorizationPlan {
+    pub fronts: usize,
+    pub tree_levels: usize,
+    pub factor_entries: usize,
+    pub max_front: usize,
+    pub max_pivot_block: usize,
+    pub estimated_work: usize,
+    pub dependency_tree: bool,
+}
 
 /// Deterministic minimum-degree ordering. `order[new] = old`.
 /// Uses explicit graph updates rather than the C++ approximate-degree quotient graph.
@@ -160,6 +173,7 @@ struct Front {
 
 #[derive(Debug, Clone)]
 pub(crate) struct Symbolic {
+    relaxed: bool,
     order: Vec<usize>,
     inverse: Vec<usize>,
     fronts: Vec<Front>,
@@ -168,6 +182,31 @@ pub(crate) struct Symbolic {
 }
 
 impl Symbolic {
+    pub(crate) fn plan(&self) -> FactorizationPlan {
+        FactorizationPlan {
+            fronts: self.fronts.len(),
+            tree_levels: self.levels.len(),
+            factor_entries: self.order.len()
+                + self
+                    .fronts
+                    .iter()
+                    .map(|f| {
+                        let width = f.end - f.lo;
+                        width * (width - 1) / 2 + width * f.updates.len()
+                    })
+                    .sum::<usize>(),
+            max_front: self
+                .fronts
+                .iter()
+                .map(|f| f.end - f.lo + f.updates.len())
+                .max()
+                .unwrap_or(0),
+            max_pivot_block: self.fronts.iter().map(|f| f.end - f.lo).max().unwrap_or(0),
+            estimated_work: self.work_estimate(),
+            dependency_tree: false,
+        }
+    }
+
     /// Append independent primal vertices when their row cliques are already
     /// covered by the filled dual graph. Keep the old dual order and fronts;
     /// a missing edge requires fresh symbolic analysis.
@@ -244,6 +283,7 @@ impl Symbolic {
             }
         }
         Some(Self {
+            relaxed: self.relaxed,
             order,
             inverse,
             levels: Self::tree_levels(&fronts),
@@ -272,6 +312,15 @@ impl Symbolic {
         let mut pattern = vec![vec![]; n];
         for k in 0..n {
             let nb: Vec<_> = graph[k].iter().copied().filter(|&i| i > k).collect();
+            // Eliminating a vertex adjacent to the entire remaining suffix
+            // makes that suffix a clique. Its subsequent patterns are known;
+            // avoid cubic reinsertion of edges that can no longer add fill.
+            if nb.len() == n - k - 1 {
+                for (j, column) in pattern.iter_mut().enumerate().skip(k) {
+                    column.extend(j + 1..n);
+                }
+                break;
+            }
             for (p, &i) in nb.iter().enumerate() {
                 graph[i].remove(&k);
                 for &j in &nb[p + 1..] {
@@ -314,6 +363,7 @@ impl Symbolic {
             }
         }
         let mut symbolic = Self {
+            relaxed: false,
             order,
             inverse,
             levels: Self::tree_levels(&fronts),

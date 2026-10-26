@@ -2,7 +2,7 @@
 #[cfg(feature = "clp")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use baldes::extensions::robust_pd::{DistanceRounding, Instance, Parameters, Problem};
-    use baldes::master::mp::{solve_assignment_tree, AssignmentTreeOptions};
+    use baldes::master::tree::ModelTreeOptions;
     use std::time::{Duration, Instant};
 
     fn invalid(message: &str) -> baldes::core::error::OrError {
@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .first()
             .map_or("instances/RobustPDPTW/AA05.txt", String::as_str);
         let problem = Problem::new(Instance::read(path)?, parameters)?;
-        let mut options = AssignmentTreeOptions {
+        let mut options = ModelTreeOptions {
             time_limit: Duration::from_secs_f64(seconds),
             ..Default::default()
         };
@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         options.node.cg.artificial_cost =
             (parameters.vehicle_cost + 100_000.) * problem.instance().requests() as f64;
         let started = Instant::now();
-        let output = solve_assignment_tree(problem.master_problem()?, options)?;
+        let output = baldes::master::tree::solve(problem.master_problem()?, options)?;
         println!(
             "instance={path} gamma_q={} gamma_t={} sigma_q={} sigma_t={}",
             parameters.demand_budget,

@@ -203,7 +203,7 @@ fn root_snapshots_and_tree_modes_do_not_promote_an_unsupported_certificate() {
     use baldes::{
         graph::ResourceKind,
         master::{
-            root::{self, BoundMode, RootOptions, RootProblem},
+            routing::{self, BoundMode, RootOptions, RoutingContext},
             tree::{self, TreeOptions, TreeStatus},
         },
         Graph,
@@ -216,17 +216,17 @@ fn root_snapshots_and_tree_modes_do_not_promote_an_unsupported_certificate() {
     graph.set_bounds(2, 0, 0., 0.).unwrap();
     graph.add_arc(0, 1, 1.).unwrap();
     graph.add_arc(1, 2, 1.).unwrap();
-    let problem = RootProblem::set_partitioning(graph, 1.).unwrap();
+    let problem = RoutingContext::set_partitioning(graph, 1.).unwrap();
     let mut options = RootOptions::default();
     options.capture_state = true;
     options.enumerate = false;
     options.cg.stabilize = false;
-    let parent = root::solve(problem.clone(), options.clone()).unwrap();
+    let parent = routing::solve(problem.clone(), options.clone()).unwrap();
     assert_eq!(parent.master.bound, 2.);
     let snapshot = parent.snapshot.as_ref().unwrap();
     assert_eq!(snapshot.bound_mode(), BoundMode::Numerical);
     options.bound_mode = BoundMode::Certified;
-    let child = root::inherit_branches(snapshot, &[], options.clone()).unwrap();
+    let child = routing::inherit_branches(snapshot, &[], options.clone()).unwrap();
     assert_eq!(child.master.lp, parent.master.lp);
     assert_eq!(child.master.numerical_bound, 2.);
     assert_eq!(child.master.bound, f64::NEG_INFINITY);
@@ -391,7 +391,7 @@ fn original_feasible_columns_can_recover_an_exhausted_penalized_master() {
 fn large_original_routes_recover_before_a_rank_cut_certificate_closes_the_root() {
     use baldes::{
         inputs::{Instance, Rounding},
-        master::root::RootOptions,
+        master::routing::RootOptions,
     };
     let scale = 1_000_000.;
     let diagonal = (2f64 * scale * scale).sqrt();
@@ -405,10 +405,10 @@ fn large_original_routes_recover_before_a_rank_cut_certificate_closes_the_root()
     };
     let instance=Instance::parse("large triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100000000 0\n1 1000000 0 1 0 100000000 0\n2 0 1000000 1 0 100000000 0\n3 1000000 1000000 1 0 100000000 0\n").unwrap();
     let mut options = RootOptions::default().with_rank_one_cuts();
-    options.bound_mode = baldes::master::root::BoundMode::Certified;
+    options.bound_mode = baldes::master::routing::BoundMode::Certified;
     options.incumbent = upper;
-    let output = instance.solve_root(5, Rounding::None, options).unwrap();
-    assert_eq!(output.master.status, Status::Optimal);
+    let output = instance.solve(5, Rounding::None, options).unwrap();
+    assert_eq!(output.master.status, Status::Optimal, "{:?}", output.master);
     // The exact original optimum is 4*scale plus the supplied floating
     // diagonal. TwoSum's residual decides which side of `nearest` it lies.
     assert!(output.master.bound < nearest || output.master.bound == nearest && error >= 0.);
@@ -588,7 +588,7 @@ fn heuristic_stage_value_skips_pricing_resets_and_never_certifies_the_global_bou
 #[test]
 fn resource_rounding_retry_does_not_publish_a_root_feasibility_proof() {
     use baldes::{
-        master::root::{self, RootOptions, RootProblem},
+        master::routing::{self, RootOptions, RoutingContext},
         Graph,
     };
     let upper = f64::from_bits(1f64.to_bits() - 1);
@@ -612,12 +612,12 @@ fn resource_rounding_retry_does_not_publish_a_root_feasibility_proof() {
         let id = graph.add_arc(u, v, cost).unwrap();
         graph.arc_mut(id).unwrap().consumption[0] = cost;
     }
-    let problem = RootProblem::set_partitioning(graph, 2.).unwrap();
+    let problem = RoutingContext::set_partitioning(graph, 2.).unwrap();
     let mut options = RootOptions::default();
     options.enumerate = false;
     options.cg.max_penalty_updates = 0;
     options.cg.time_limit = std::time::Duration::from_secs(1);
-    let output = root::solve(problem, options).unwrap();
+    let output = routing::solve(problem, options).unwrap();
     assert_eq!(output.master.status, Status::Stalled);
     assert!(output.incumbent.is_infinite());
 }
@@ -625,7 +625,7 @@ fn resource_rounding_retry_does_not_publish_a_root_feasibility_proof() {
 #[test]
 fn rounded_resource_feasibility_does_not_publish_an_integer_incumbent() {
     use baldes::{
-        master::root::{self, RootOptions, RootProblem},
+        master::routing::{self, RootOptions, RoutingContext},
         Graph,
     };
     let mut graph = Graph::<2>::new(3, 1).unwrap();
@@ -644,14 +644,20 @@ fn rounded_resource_feasibility_does_not_publish_an_integer_incumbent() {
     options
         .pricing_options
         .push(("BALDESuseBidirectionalSearch".into(), 0.));
-    let output = root::solve(RootProblem::set_partitioning(graph, 1.).unwrap(), options).unwrap();
+    let output = routing::solve(
+        RoutingContext::set_partitioning(graph, 1.).unwrap(),
+        options,
+    )
+    .unwrap();
     assert!(output.routes.iter().any(|r| r.arcs == [0, 1]));
     assert!(output.incumbent.is_infinite());
 }
 
 #[test]
 fn ipm_master_handles_edits_limits_and_independent_forks() {
-    use baldes::master::{clp::ClpMaster, root::MasterSolver, LpMaster, LpSolveOutcome, RowSense};
+    use baldes::master::{
+        clp::ClpMaster, routing::MasterSolver, LpMaster, LpSolveOutcome, RowSense,
+    };
     let mut master = ClpMaster::new().unwrap();
     master.set_solver(MasterSolver::Ipm);
     master.add_row(RowSense::Equal, 1., &[]).unwrap();
@@ -687,7 +693,7 @@ fn ipm_master_handles_edits_limits_and_independent_forks() {
 
 #[test]
 fn ipm_column_generation_tightens_from_lp_bounds_and_finishes_accurately() {
-    use baldes::master::root::MasterSolver;
+    use baldes::master::routing::MasterSolver;
     let mut master = ClpMaster::new().unwrap();
     master.set_solver(MasterSolver::Ipm);
     master.add_row(RowSense::Equal, 1., &[]).unwrap();
@@ -739,7 +745,7 @@ fn ipm_column_generation_tightens_from_lp_bounds_and_finishes_accurately() {
 
 #[test]
 fn ipm_pricing_accuracy_does_not_leak_into_standalone_solves() {
-    use baldes::master::{root::MasterSolver, LpMaster, LpSolveOutcome};
+    use baldes::master::{routing::MasterSolver, LpMaster, LpSolveOutcome};
     use std::time::Duration;
     let mut master = ClpMaster::new().unwrap();
     master.set_solver(MasterSolver::Ipm);
@@ -767,7 +773,7 @@ fn ipm_pricing_accuracy_does_not_leak_into_standalone_solves() {
 
 #[test]
 fn ipm_cut_round_resets_the_primal_accuracy_bound() {
-    use baldes::master::root::MasterSolver;
+    use baldes::master::routing::MasterSolver;
     struct CutOnce {
         added: bool,
     }
@@ -827,13 +833,14 @@ fn ipm_cut_round_resets_the_primal_accuracy_bound() {
 fn hgs_seeded_ipm_root_and_tree_match_the_small_routing_optimum() {
     use baldes::inputs::{HgsColumns, HgsWarmStart, Instance, Rounding};
     use baldes::master::{
-        root::{self, MasterSolver, RootOptions, RootProblem},
+        routing::{self, MasterSolver, RootOptions, RoutingContext},
         tree,
     };
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for columns in [HgsColumns::Best, HgsColumns::All, HgsColumns::Top(1)] {
         let problem =
-            RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
+            RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.)
+                .unwrap();
         let mut options = RootOptions::default().with_rank_one_cuts();
         options.master_solver = MasterSolver::Ipm;
         options.enumerate = false;
@@ -861,7 +868,7 @@ fn hgs_seeded_ipm_root_and_tree_match_the_small_routing_optimum() {
             .all(|r| r.nodes.first() == Some(&0) && r.nodes.last() == Some(&4)));
         let mut root_options = options.clone();
         root_options.capture_state = true;
-        let root = root::solve(problem.clone(), root_options).unwrap();
+        let root = routing::solve(problem.clone(), root_options).unwrap();
         assert_eq!(root.master.status, baldes::master::cg::Status::Optimal);
         assert!(
             (root.master.lp - (4. + 2_f64.sqrt())).abs() < 1e-6,
@@ -873,7 +880,8 @@ fn hgs_seeded_ipm_root_and_tree_match_the_small_routing_optimum() {
             root.snapshot.as_ref().unwrap().master_solver(),
             MasterSolver::Ipm
         );
-        let child = root::inherit(root.snapshot.as_ref().unwrap(), &[], options.clone()).unwrap();
+        let child =
+            routing::inherit(root.snapshot.as_ref().unwrap(), &[], options.clone()).unwrap();
         assert!((child.master.lp - root.master.lp).abs() < 1e-6);
         let mut controls = tree::TreeOptions::default();
         controls.root = options;
@@ -889,10 +897,10 @@ fn hgs_seeded_ipm_root_and_tree_match_the_small_routing_optimum() {
 #[test]
 fn hgs_seeding_rejects_integer_approximation_false_feasibility() {
     use baldes::inputs::{HgsColumns, HgsWarmStart, Instance, Rounding};
-    use baldes::master::root::{RootOptions, RootProblem};
+    use baldes::master::routing::{RootOptions, RoutingContext};
     let instance = Instance::parse("one\nVEHICLE\nNUMBER CAPACITY\n1 1\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1.001 0 100 0\n").unwrap();
     let problem =
-        RootProblem::set_partitioning(instance.capacity_graph(1, Rounding::None).unwrap(), 1.)
+        RoutingContext::set_partitioning(instance.capacity_graph(1, Rounding::None).unwrap(), 1.)
             .unwrap();
     let mut options = RootOptions::default();
     let warm = HgsWarmStart {
@@ -922,10 +930,10 @@ fn hgs_seeding_rejects_integer_approximation_false_feasibility() {
 #[test]
 fn hgs_capacity_seeds_ignore_file_windows_and_deduplicate_existing_columns() {
     use baldes::inputs::{HgsColumns, HgsWarmStart, Instance, Rounding};
-    use baldes::master::root::{RootOptions, RootProblem};
+    use baldes::master::routing::{RootOptions, RoutingContext};
     let instance = Instance::parse("one\nVEHICLE\nNUMBER CAPACITY\n1 1\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1 0\n1 10 0 1 0 1 0\n").unwrap();
     let problem =
-        RootProblem::set_partitioning(instance.capacity_graph(1, Rounding::None).unwrap(), 1.)
+        RoutingContext::set_partitioning(instance.capacity_graph(1, Rounding::None).unwrap(), 1.)
             .unwrap();
     let mut options = RootOptions::default();
     for (mode, expected) in [(HgsColumns::Best, 1), (HgsColumns::All, 0)] {
@@ -950,7 +958,7 @@ fn hgs_capacity_seeds_ignore_file_windows_and_deduplicate_existing_columns() {
 #[cfg(feature = "highs")]
 #[test]
 fn highs_routing_master_keeps_solution_basis_and_limits_independent() {
-    use baldes::master::{root::MasterSolver, LpMaster, LpSolveOutcome};
+    use baldes::master::{routing::MasterSolver, LpMaster, LpSolveOutcome};
     let mut master = ClpMaster::new().unwrap();
     master.set_solver(MasterSolver::Highs);
     master.add_row(RowSense::Equal, 1., &[]).unwrap();
@@ -996,20 +1004,21 @@ fn highs_routing_master_keeps_solution_basis_and_limits_independent() {
 fn highs_solves_routing_roots_cuts_and_inherited_tree_nodes() {
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
-        root::{self, MasterSolver, RootOptions, RootProblem},
+        routing::{self, MasterSolver, RootOptions, RoutingContext},
         tree,
     };
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for stabilize in [false, true] {
         let problem =
-            RootProblem::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.).unwrap();
+            RoutingContext::set_partitioning(instance.graph(1, Rounding::None).unwrap(), 3.)
+                .unwrap();
         let mut options = RootOptions::default().with_rank_one_cuts();
         options.master_solver = MasterSolver::Highs;
         options.cg.stabilize = stabilize;
         options.cg.time_limit = std::time::Duration::from_secs(5);
         options.capture_state = true;
         options.enumerate = false;
-        let result = root::solve(problem.clone(), options.clone()).unwrap();
+        let result = routing::solve(problem.clone(), options.clone()).unwrap();
         assert_eq!(result.master.status, Status::Optimal);
         assert!(
             (result.master.lp - (4. + 2_f64.sqrt())).abs() < 1e-6,
@@ -1018,9 +1027,9 @@ fn highs_solves_routing_roots_cuts_and_inherited_tree_nodes() {
         );
         let snapshot = result.snapshot.unwrap();
         assert_eq!(snapshot.master_solver(), MasterSolver::Highs);
-        let inherited = root::inherit(&snapshot, &[], options.clone()).unwrap();
+        let inherited = routing::inherit(&snapshot, &[], options.clone()).unwrap();
         assert!((inherited.master.lp - result.master.lp).abs() < 1e-6);
-        let branched = root::inherit_branches(
+        let branched = routing::inherit_branches(
             &snapshot,
             &[
                 baldes::master::branching::BranchConstraint::NumberOfVehicles {
@@ -1056,7 +1065,7 @@ fn highs_solves_routing_roots_cuts_and_inherited_tree_nodes() {
 #[cfg(not(feature = "highs"))]
 #[test]
 fn unavailable_highs_master_is_rejected_explicitly() {
-    use baldes::master::root::MasterSolver;
+    use baldes::master::routing::MasterSolver;
     assert!(MasterSolver::Highs
         .ensure_available()
         .unwrap_err()
@@ -1068,12 +1077,12 @@ fn unavailable_highs_master_is_rejected_explicitly() {
 #[test]
 fn highs_recovers_the_r201_hundred_customer_warm_basis_failure() {
     use baldes::inputs::{Instance, Rounding};
-    use baldes::master::root::{MasterSolver, RootOptions};
+    use baldes::master::routing::{MasterSolver, RootOptions};
     let instance = Instance::read("instances/Solomon/R201.txt").unwrap();
     let mut options = RootOptions::default();
     options.master_solver = MasterSolver::Highs;
     options.cg.time_limit = std::time::Duration::from_secs(30);
-    let result = instance.solve_root(8, Rounding::None, options).unwrap();
+    let result = instance.solve(8, Rounding::None, options).unwrap();
     // The retained HiGHS basis used to return Unknown at master solve 430.
     // Warm reoptimization must complete pricing and agree with the Clp root LP.
     assert_eq!(result.master.status, Status::Optimal);

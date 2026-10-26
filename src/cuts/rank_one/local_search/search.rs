@@ -440,7 +440,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
         }
         let id = parent.round_cut_counter;
         parent.round_cut_counter += 1;
-        let cut = parent.push_candidate(NativeCut {
+        let cut = parent.push_candidate(SeparatedCut {
             id,
             rhs,
             kind: COVERING as i32,

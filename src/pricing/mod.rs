@@ -54,6 +54,7 @@ pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     accumulated_original_bounds: Vec<(i32, usize, Option<crate::graph::Window>, bool)>,
     ng_baseline: Option<(Vec<Vec<usize>>, Vec<Vec<usize>>)>,
     pub variable_costs: Vec<f64>,
+    raw_arc_costs: Option<Vec<f64>>,
     arc_cost_scratch: Vec<f64>,
     // Private full-domain workspace: it never receives reduced-cost fixing or
     // enumeration, and is never copied into node/transaction forks.

@@ -400,14 +400,14 @@ fn build_inputs_with_duals<const D: usize>(
             .collect();
         let ordered_support = cut.pricing_ordered_support_for_graph(graph);
         if cut.visit_once
-            && cut.native_kpath_support.is_none()
+            && cut.general_kpath_support.is_none()
             && cut.graph_dependent_memory
             && !cut.graph_memories.contains_key(&graph)
         {
             // coefficient zero. Enumerated paths still use full incidence.
             let support: Vec<bool> = (0..vertices).map(|v| weights[v] != 0).collect();
             full_kpath.push(FullKPathInput {
-                ordered_support: cut.native_kpath_support.clone().unwrap_or_else(|| {
+                ordered_support: cut.general_kpath_support.clone().unwrap_or_else(|| {
                     ordered_support.map_or_else(
                         || (0..vertices).filter(|&v| support[v]).collect(),
                         |s| s.iter().map(|&(v, _)| v).collect(),
@@ -424,7 +424,7 @@ fn build_inputs_with_duals<const D: usize>(
             let memory_vertices: Vec<usize> = (0..vertices)
                 .filter(|&v| {
                     memory.get(v).copied().unwrap_or(false)
-                        && (cut.native_kpath_support.is_some() || !support[v])
+                        && (cut.general_kpath_support.is_some() || !support[v])
                 })
                 .collect();
             kpath.push(LimitedKPathInput {
@@ -434,7 +434,7 @@ fn build_inputs_with_duals<const D: usize>(
                 memory_vertices,
             });
             let ordered_support =
-                cut.native_kpath_support
+                cut.general_kpath_support
                     .clone()
                     .unwrap_or_else(|| match ordered_support {
                         Some(s) => s.iter().map(|&(v, _)| v).collect(),
@@ -457,7 +457,7 @@ fn build_inputs_with_duals<const D: usize>(
             .collect();
         limited.push(LimitedInput {
             covering,
-            type2: cut.native_type2,
+            type2: cut.type2,
             arc_memory: cut.memory_kind == MemoryKind::Arc,
             denominator: sign * cut.denominator,
             dual,

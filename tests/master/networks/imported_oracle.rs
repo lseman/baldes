@@ -1,7 +1,7 @@
 //! Exhaustive original-unit checks, independent of LP and propagation code.
 use super::*;
 use baldes::master::{preprocessing::Bounds, solvers::mip::MipStatus};
-use mp::{
+use model::{
     imported::{self, Column, Subproblem},
     MasterVariable,
 };
@@ -231,7 +231,7 @@ fn signed_import_fixing_and_propagation_preserve_every_exhaustive_integer_witnes
 #[test]
 fn shared_presence_fixing_and_import_extension_match_exhaustive_original_route_counts() {
     use baldes::cuts::soft_conflicts::{Mode, PresenceRow};
-    use mp::PresenceCoefficients;
+    use model::PresenceCoefficients;
     let mut feasible = 0;
     let mut infeasible = 0;
     let mut checked = 0;

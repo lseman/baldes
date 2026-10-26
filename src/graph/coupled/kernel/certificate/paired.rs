@@ -480,7 +480,7 @@ impl CoupledKernel {
                         .collect::<Option<Vec<_>>>()?,
                 ),
                 CoupledResource::SlopePaired { .. } => {
-                    let (feasible, cost) = if self.native_front_program_domain {
+                    let (feasible, cost) = if self.front_program_domain {
                         super::paired_machine::certify(
                             definition,
                             path,
@@ -489,7 +489,7 @@ impl CoupledKernel {
                             work.1,
                         )?
                     } else {
-                        operators::native_pair(
+                        operators::front_algebra_pair(
                             definition,
                             path,
                             self.cost_scale,

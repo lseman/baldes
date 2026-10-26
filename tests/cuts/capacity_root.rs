@@ -2,7 +2,7 @@
 use baldes::inputs::{Instance, Rounding};
 use baldes::master::{
     cg::Status,
-    root::{CapacityCutConfig, RootOptions},
+    routing::{CapacityCutConfig, RootOptions},
 };
 
 #[test]
@@ -31,9 +31,7 @@ fn capacity_root_prices_complement_rows_with_and_without_rank_one_and_fixing() {
     let instance = Instance::parse("capacity-root\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let mut plain_options = RootOptions::default();
     plain_options.enumerate = false;
-    let plain = instance
-        .solve_root(8, Rounding::None, plain_options)
-        .unwrap();
+    let plain = instance.solve(8, Rounding::None, plain_options).unwrap();
     assert!((plain.master.lp - 1.5 * (2. + 2f64.sqrt())).abs() < 1e-8);
     for (rank1, fixing) in [(false, false), (true, false), (false, true)] {
         let mut options = RootOptions::default();
@@ -42,7 +40,7 @@ fn capacity_root_prices_complement_rows_with_and_without_rank_one_and_fixing() {
             options = options.with_rank_one_cuts();
         }
         options = options.with_capacity_cuts(CapacityCutConfig::new(vec![0., 1., 1., 1.], 2.));
-        let result = instance.solve_root(8, Rounding::None, options).unwrap();
+        let result = instance.solve(8, Rounding::None, options).unwrap();
         assert_eq!(result.master.status, Status::Optimal);
         assert!((result.master.lp - (4. + 2f64.sqrt())).abs() < 1e-8);
         assert!((result.lp_before_cuts - plain.master.lp).abs() < 1e-8);
@@ -102,12 +100,10 @@ fn kohl_time_resource_closes_r101_ten_customer_root_gap() {
     let mut options = RootOptions::default();
     options.enumerate = false;
     options.cg.stabilize = false;
-    let plain = instance
-        .solve_root(10, Rounding::None, options.clone())
-        .unwrap();
+    let plain = instance.solve(10, Rounding::None, options.clone()).unwrap();
     assert!((plain.master.lp - 261.30231910442023).abs() < 1e-5);
     let capacity_only = instance
-        .solve_root(
+        .solve(
             10,
             Rounding::None,
             options
@@ -116,7 +112,7 @@ fn kohl_time_resource_closes_r101_ten_customer_root_gap() {
         )
         .unwrap();
     let kohl = instance
-        .solve_root(
+        .solve(
             10,
             Rounding::None,
             options.with_capacity_cuts(instance.capacity_cut_config(Rounding::None, true)),

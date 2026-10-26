@@ -28,7 +28,7 @@ impl Separation {
     ) -> usize {
         let id = self.round_cut_counter;
         self.round_cut_counter += 1;
-        self.push_candidate(NativeCut {
+        self.push_candidate(SeparatedCut {
             id,
             rhs,
             kind,
@@ -42,7 +42,7 @@ impl Separation {
         })
     }
 
-    pub fn push_candidate(&mut self, cut: NativeCut) -> usize {
+    pub fn push_candidate(&mut self, cut: SeparatedCut) -> usize {
         self.arena.push(cut);
         self.arena.len() - 1
     }
@@ -53,7 +53,7 @@ impl Separation {
     }
 
     /// Coefficient of a column in a cut (memory-filtered state walk).
-    pub fn coefficient(&self, sol: &Solution, cut: &NativeCut) -> f64 {
+    pub fn coefficient(&self, sol: &Solution, cut: &SeparatedCut) -> f64 {
         let graph = sol.graph_id;
         let mem = cut.memory.get(&graph);
         if sol.arc_ids.is_empty() {
@@ -117,7 +117,7 @@ impl Separation {
 
     /// Separates packing then covering cuts rank by rank. Returned cuts carry
     /// final ids and memories.
-    pub fn separate(&mut self, input: &Input) -> Option<Vec<NativeCut>> {
+    pub fn separate(&mut self, input: &Input) -> Option<Vec<SeparatedCut>> {
         let mut out = vec![];
         if self.num_packing_sets == 0 && self.num_covering_sets == 0 {
             return Some(out);

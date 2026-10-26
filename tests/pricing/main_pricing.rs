@@ -32,6 +32,19 @@ fn cycle_graph() -> Graph<2> {
         ],
     )
 }
+
+#[test]
+fn designated_main_disposable_resource_requires_monotone_consumption() {
+    let mut g = Graph::<2>::new(2, 1).unwrap();
+    g.main_resource = Some(0);
+    let arc = g.add_arc(0, 1, -1.).unwrap();
+    g.arc_mut(arc).unwrap().consumption[0] = -1.;
+    assert!(price(&g, &Controls::default())
+        .unwrap_err()
+        .to_string()
+        .contains("main disposable resource"));
+}
+
 #[test]
 fn cpp_cycle_fixture_and_reconstruction() {
     let result = price(&cycle_graph(), &Controls::default()).unwrap();

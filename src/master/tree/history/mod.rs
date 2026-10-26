@@ -31,7 +31,7 @@ pub struct BranchEvaluation {
 #[derive(Clone, Debug)]
 pub struct BranchHistoryOptions {
     /// Observations required on each side for `Reliable` (at least one).
-    /// Ignored by `ObservedNative`.
+    /// Ignored by `Default`.
     pub minimum_observations: usize,
     pub policy: BranchHistoryPolicy,
 }
@@ -40,16 +40,15 @@ pub struct BranchHistoryOptions {
 pub enum BranchHistoryPolicy {
     /// Earlier local policy, retained for controlled comparisons in Rust.
     Reliable,
-    /// Recovered native arithmetic and active-phase positions, with canonical
-    /// constraint names. Full native generator-name equivalence is unverified.
+    /// Phase-aware mean-cost ranking with canonical constraint names.
     #[default]
-    ObservedNative,
+    Default,
 }
 impl Default for BranchHistoryOptions {
     fn default() -> Self {
         Self {
             minimum_observations: 2,
-            policy: BranchHistoryPolicy::ObservedNative,
+            policy: BranchHistoryPolicy::Default,
         }
     }
 }
@@ -75,7 +74,7 @@ use crate::master::branching::generator_identity::key;
 // Native phased strong branching excludes component-set generators before
 // attaching evaluation history. Per-graph route count is that generator: it
 // sums the pricing configuration's columns, rather than an original variable.
-fn native_history_eligible(constraint: &BranchConstraint) -> bool {
+fn history_eligible(constraint: &BranchConstraint) -> bool {
     !matches!(constraint, BranchConstraint::NumberOfVehicles { .. })
 }
 
@@ -141,7 +140,7 @@ impl BranchEvaluationHistory {
                 / stats.signed_count as f64;
         }
         if let Some(stage) = stage.filter(|&stage| stage > 0) {
-            if signed_cost.is_finite() && native_history_eligible(&candidate.down) {
+            if signed_cost.is_finite() && history_eligible(&candidate.down) {
                 let registry = if matches!(
                     candidate.down,
                     BranchConstraint::AccumulatedResourceGroup(_)
@@ -209,9 +208,7 @@ impl BranchEvaluationHistory {
         options: &BranchHistoryOptions,
         gap: f64,
     ) -> Option<(usize, f64)> {
-        if options.policy == BranchHistoryPolicy::ObservedNative
-            && !native_history_eligible(&candidate.down)
-        {
+        if options.policy == BranchHistoryPolicy::Default && !history_eligible(&candidate.down) {
             return None;
         }
         let fraction = candidate.value - candidate.value.floor();
@@ -229,7 +226,7 @@ impl BranchEvaluationHistory {
                     })?;
                 (kind as usize + 1, stats)
             }
-            BranchHistoryPolicy::ObservedNative => {
+            BranchHistoryPolicy::Default => {
                 let (&stage, stats) = self
                     .phase_costs
                     .get(&identity)?
@@ -243,7 +240,7 @@ impl BranchEvaluationHistory {
             BranchHistoryPolicy::Reliable => {
                 (stats[0].mean * fraction).max(1e-6) * (stats[1].mean * (1. - fraction)).max(1e-6)
             }
-            BranchHistoryPolicy::ObservedNative => {
+            BranchHistoryPolicy::Default => {
                 if gap.is_nan() || gap <= 0. || stats.iter().any(|s| !s.signed_mean.is_finite()) {
                     return None;
                 }
@@ -269,7 +266,7 @@ impl BranchEvaluationHistory {
                 self.prediction(c, options, gap).map(|(kind, score)| {
                     let name = match options.policy {
                         BranchHistoryPolicy::Reliable => String::new(),
-                        BranchHistoryPolicy::ObservedNative => match &c.down {
+                        BranchHistoryPolicy::Default => match &c.down {
                             BranchConstraint::AccumulatedResourceGroup(group) => {
                                 group.generator_name()
                             }
@@ -283,7 +280,7 @@ impl BranchEvaluationHistory {
         ranked.sort_by(|a, b| {
             match options.policy {
                 BranchHistoryPolicy::Reliable => b.2.total_cmp(&a.2),
-                BranchHistoryPolicy::ObservedNative => {
+                BranchHistoryPolicy::Default => {
                     b.1.cmp(&a.1)
                         .then_with(|| b.2.partial_cmp(&a.2).unwrap())
                         .then_with(|| a.3.cmp(&b.3))

@@ -204,8 +204,8 @@ fn paired_limited_memory_cut_dual_refresh_keeps_original_route_costs() {
 fn paired_phase_i_restores_costs_and_certified_controls_allow_complete_transfer() {
     use baldes::master::{
         cg::{FeasibilityStatus, Status},
-        mp::{self, format::Model, EnumerationOptions, Options},
-        root::{self, RootOptions, RootProblem},
+        model::{self, format::Model, EnumerationOptions, Options},
+        routing::{self, RootOptions, RoutingContext},
     };
     let graph = fixture(PairedResourceMode::CostBounded, 0.);
     let mut options = RootOptions {
@@ -217,7 +217,11 @@ fn paired_phase_i_restores_costs_and_certified_controls_allow_complete_transfer(
     options.cg.max_penalty_updates = 0;
     options.cg.insert_non_negative = false;
     options.cg.stabilize = false;
-    let output = root::solve(RootProblem::set_partitioning(graph, 2.).unwrap(), options).unwrap();
+    let output = routing::solve(
+        RoutingContext::set_partitioning(graph, 2.).unwrap(),
+        options,
+    )
+    .unwrap();
     assert_eq!(output.master.status, Status::Optimal, "{output:?}");
     assert!((output.master.lp - 12.).abs() < 1e-8);
     assert!(output
@@ -247,7 +251,7 @@ fn paired_phase_i_restores_costs_and_certified_controls_allow_complete_transfer(
     let mut options = Options::default();
     options.cg.artificial_cost = 100.;
     options.cg.stabilize = false;
-    let parent = mp::solve(problem, options.clone()).unwrap();
+    let parent = model::solve(problem, options.clone()).unwrap();
     assert_eq!(parent.master.status, Status::Optimal);
     assert!((parent.master.lp - 12.).abs() < 1e-8);
     let attempted = parent

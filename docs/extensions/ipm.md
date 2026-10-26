@@ -4,7 +4,7 @@
 
 `baldes::extensions::ipm` implements an interior-point LP solver in Rust. It is
 part of the main `baldes` crate under `src/extensions/ipm`, requires Rust 1.70+,
-and has no external dependencies, C++ bindings, BLAS requirement, or unsafe code.
+and has no C++ bindings, BLAS requirement, or unsafe code.
 Use its direct model API below, or select `master_solver="ipm"` in a
 [pyBaldes routing root solve](../pybaldes/routing.md#master-and-bound-policy).
 
@@ -93,6 +93,22 @@ cold retries, and completed Newton iterations. Cloning a solver creates an
 independent mutable state with its existing statistics and immutable shared
 factor patterns.
 
+Set `Options::profile` to collect cumulative phase durations and work counters
+through `Solver::profile()`. Preparation, initialization, Newton factorization,
+linear solves, and attempted/accepted centrality corrections are reported.
+Initialization includes its linear solves, so these durations are not all
+disjoint. Profiling is disabled by default and leaves mathematical stopping
+criteria unchanged.
+
+`CorrectionPolicy::Fixed(3)` retains the default extra-correction limit.
+`CorrectionPolicy::Adaptive` measures the current factorization and direction
+solve cost and targets half a factorization's cost for extra solves, bounded
+to one through three corrections. It retains the same acceptance test and
+stopping tolerances. As the budget depends on measured costs, iteration counts
+can vary between runs. Select it with `Options::corrections`; the benchmark
+example also accepts `BALDES_IPM_CORRECTIONS=adaptive` and
+`BALDES_IPM_PROFILE=1` for growing-master sequences.
+
 The persistent solver also retains scratch for KKT right-hand sides,
 permutations, solutions, residuals and refinement corrections. Initialization
 and Newton directions use the same workspace, including after model growth;
@@ -101,6 +117,12 @@ buffers are resized and overwritten before use. Refinement computes `K*x` and
 the separate products. Its `1e-10` backward-error acceptance test and numerical
 recovery remain unchanged. The public allocating linear-solve APIs remain
 available, and solver clones own independent mutable scratch.
+
+Homogeneous, affine, search and centrality-correction directions also retain
+separate output buffers. Each Newton solve overwrites every component, including
+empty upper-bound components; rejected corrections and failed attempts cannot
+be reused as successful directions. This reduces repeated direction allocation
+without changing the equations, correction budget or stopping tolerances.
 
 The IPM master adapter retains this solver and a CSC model mirror. Column
 appends copy only the new columns; coefficient edits and row/column removals
@@ -194,9 +216,8 @@ Deliberate differences from C++:
   per eligible LP; it is not a warm start from the previous CG solve.
 
 The restricted master selects this solver with `--master ipm`; the API is also
-usable independently. Performance parity with the
-C++ solver and large-instance robustness have not been established; there is
-no parallel factorization, relaxed supernode amalgamation or nested dissection.
+usable independently. Performance parity with the C++ solver and large-instance
+robustness have not been established. Nested dissection is not implemented.
 
 ## Validation
 
@@ -256,8 +277,12 @@ let options = Options {
 };
 ```
 
-`On` uses the requested factorization level. Tree mode processes independent
-fronts at each elimination-tree level. Node mode parallelizes trailing dense
+`On` uses the requested factorization level. Tree mode batches independent
+fronts at each elimination-tree level for small work. Trees with substantial
+pivot blocks at multiple levels can use dependency-ready tasks, so a parent
+does not wait for unrelated fronts at the same level. Child contributions are
+still summed in symbolic order. No shared workspace lock spans nested dense
+work; the number of in-flight fronts is bounded by the worker budget. Node mode parallelizes trailing dense
 updates within a front; pivot selection remains serial. Small dense updates
 stay serial to avoid scheduling overhead. Both levels share one private worker
 pool, bounded by `threads`, including nested work. Solver clones share the pool
@@ -279,3 +304,30 @@ Changing thread or effective parallel options on a persistent `Solver` rebuilds 
 preparation. Numeric failures invalidate the old factor, as in serial mode.
 Parallel tree levels can retain more frontal workspace than serial traversal.
 These controls currently belong to the native IPM Rust API.
+
+Multifrontal plans can merge adjacent child/parent supernodes without changing
+the permutation. The augmented primal block and eligible sparse up-looking
+plans are preserved. Merging adds at most 12.5% artificial factor entries in
+total, limits merged pivot blocks to 64 columns, and bounds estimated work growth
+per merge. These are storage/work bounds, not a promise of faster factorization
+on every sparsity pattern. `SparseSolver::factorization_plan()` reports front
+sizes, factor entries, estimated work and the selected tree schedule.
+
+The default `ipm-blocked` feature (also forwarded by default pyBaldes builds)
+uses safe `ndarray` views and the Rust
+`matrixmultiply` kernel for large fronts, without native BLAS or a second thread
+pool. It accepts safe 1×1 pivots in panels of up to 64 columns and applies
+trailing updates in 64-row tiles. A pivot needing interchange, a 2×2 block, or
+regularization flushes the pending panel and resumes the scalar restricted-BK
+algorithm. Scalar kernels remain available when the feature is disabled. Builds
+that disable default features can enable `ipm-blocked` explicitly.
+
+If a blocked factorization fails numerically, the front is reassembled from its
+immutable matrix/child contributions and retried with the scalar kernel before
+Newton regularization changes. This also handles batched-sum overflow when the
+corresponding sequential subtractions remain finite.
+
+Batched matrix multiplication changes floating-point accumulation order, so
+factor entries need not be bit-identical to scalar results. Tests compare
+full/partial fronts and mid-panel fallback with the scalar oracle, poison the
+unused upper triangle, and check KKT witnesses and solver residuals.

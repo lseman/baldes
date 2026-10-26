@@ -88,9 +88,9 @@ A separate handbook for the Python package, with its own entry point and API ref
 | Operation | Rust | CLI | Python | Backend |
 | --- | --- | --- | --- | --- |
 | RCSP pricing and enumeration | Yes | Through routing solves | Low-level `Solver` | Core Rust |
-| Routing root relaxation | Yes | Default `vrptw` / `cvrp` mode | `pybaldes.solve_root` | Clp model store; Clp/IPM/optional HiGHS/Gurobi solves |
+| Routing root relaxation | Yes | Default `vrptw` / `cvrp` mode | `pybaldes.solve` | Clp model store; Clp/IPM/optional HiGHS/Gurobi solves |
 | Branch-and-price tree | Yes | `--tree` | Not exposed | Clp model store; Clp/IPM/optional HiGHS/Gurobi solves |
-| Shared-master root and integer tree | Yes | `multi-pricing` | `solve_networks` | Clp; HiGHS for optional enumerated MIP |
+| Shared-master root and integer tree | Yes | `multi-pricing` | `solve` | Clp; HiGHS for optional enumerated MIP |
 | Complete enumerated node MIP | Yes, opt-in | `--tree --enumerated-mip` | Not exposed | Clp + HiGHS |
 | Generic mixed-integer master solve | `highs::solve_integer` | Not exposed directly | Not exposed | HiGHS |
 
@@ -107,9 +107,9 @@ not prove a lower bound for the full routing problem.
 ## Rust module organization
 
 Core modules implement graphs, labeling, pricing, cuts, enumeration and the
-master. `master::mp` coordinates one master with multiple pricing
+master. `master::model` coordinates one master with multiple pricing
 subproblems and belongs to the core master framework. Rust callers can also use
-`master::mp::solve_master` for original master variables with no
+`master::model::solve_master` for original master variables with no
 pricing subproblems.
 
 | Module | Purpose |
@@ -118,10 +118,10 @@ pricing subproblems.
 | `extensions::ipm` | Native interior-point LP backend |
 | `extensions::evrp` | Electric-vehicle routing models and charging schedules |
 | `extensions::pstep` | P-step CVRP LP with parallel bucket pricing and reference enumeration |
-| `master::mp` | Shared rows, per-subproblem multiplicities and node lifecycle |
+| `master::model` | Shared rows, per-subproblem multiplicities and node lifecycle |
 
 `extensions` groups algorithms and specialized models in the same crate; it
 does not imply runtime plugins or new build features. Existing `baldes::hgs`,
-`baldes::ipm`, `baldes::evrp` and `master::networks` paths remain compatibility
+`baldes::ipm`, `baldes::evrp` and `master::model` paths remain compatibility
 re-exports. New Rust code should use the module paths above. CLI JSON fields
-and Python names such as `NetworkProblem` and `solve_networks` stay compatible.
+and Python names such as `NetworkProblem` and `solve` stay compatible.

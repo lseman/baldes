@@ -1,0 +1,16 @@
+[
+  {
+    "network": 7,
+    "variables": [
+      {
+        "arc": 0,
+        "lower": 1,
+        "upper": 1
+      },
+      {
+        "arc": 1,
+        "upper": 1
+      }
+    ]
+  }
+]

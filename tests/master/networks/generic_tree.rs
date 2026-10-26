@@ -1,6 +1,7 @@
 use super::*;
+use baldes::master::tree::ModelTreeOptions;
 use baldes::master::{preprocessing::Bounds, tree::TreeStatus};
-use mp::{AssignmentTreeOptions, MasterVariable};
+use model::MasterVariable;
 
 #[test]
 fn tree_from_snapshot_branches_signed_integer_master_variables() {
@@ -39,21 +40,21 @@ fn tree_from_snapshot_branches_signed_integer_master_variables() {
             let mut configured = options();
             configured.cg.bound_mode = mode;
             let root =
-                mp::solve_with_master_variables(p, vec![variable], configured.clone()).unwrap();
+                model::solve_with_master_variables(p, vec![variable], configured.clone()).unwrap();
             optimal(&root, 0.5);
-            let mut zero = AssignmentTreeOptions {
+            let mut zero = ModelTreeOptions {
                 node: configured.clone(),
                 node_limit: 0,
                 ..Default::default()
             };
             zero.node.cg.bound_mode = BoundMode::Certified;
-            let stopped = root.snapshot.solve_assignment_tree(zero).unwrap();
+            let stopped = root.snapshot.solve_tree(zero).unwrap();
             assert_eq!(stopped.bound, root.master.certified_bound);
             assert_eq!(stopped.open_nodes, 1);
 
             let tree = root
                 .snapshot
-                .solve_assignment_tree(AssignmentTreeOptions {
+                .solve_tree(ModelTreeOptions {
                     node: configured.clone(),
                     ..Default::default()
                 })
@@ -96,7 +97,7 @@ fn tree_branches_multiplicity_and_original_arc_activity_without_assignment_candi
         for mode in [BoundMode::Numerical, BoundMode::Certified] {
             let mut configured = options();
             configured.cg.bound_mode = mode;
-            let root = mp::solve(p.clone(), configured.clone()).unwrap();
+            let root = model::solve(p.clone(), configured.clone()).unwrap();
             optimal(&root, 0.5);
             assert!(root
                 .snapshot
@@ -105,7 +106,7 @@ fn tree_branches_multiplicity_and_original_arc_activity_without_assignment_candi
                 .is_empty());
             let tree = root
                 .snapshot
-                .solve_assignment_tree(AssignmentTreeOptions {
+                .solve_tree(ModelTreeOptions {
                     node: configured.clone(),
                     ..Default::default()
                 })
@@ -115,7 +116,7 @@ fn tree_branches_multiplicity_and_original_arc_activity_without_assignment_candi
             assert_eq!(tree.nodes, 3);
             let limited = root
                 .snapshot
-                .solve_assignment_tree(AssignmentTreeOptions {
+                .solve_tree(ModelTreeOptions {
                     node: configured.clone(),
                     node_limit: 1,
                     ..Default::default()
@@ -144,19 +145,21 @@ fn continuous_master_values_do_not_trigger_integer_branching() {
         ],
         networks: vec![network(7, &[(0., &[0])], 2)],
     };
-    let tree = mp::solve_assignment_tree_with_master_variables(
-        p,
-        vec![MasterVariable {
-            id: 99,
-            cost: 1.,
-            integer: false,
-            bounds: Bounds {
-                lower: 0.,
-                upper: 1.,
-            },
-            entries: vec![(1, 1.)],
-        }],
-        AssignmentTreeOptions {
+    let tree = baldes::master::tree::solve(
+        (
+            p,
+            vec![MasterVariable {
+                id: 99,
+                cost: 1.,
+                integer: false,
+                bounds: Bounds {
+                    lower: 0.,
+                    upper: 1.,
+                },
+                entries: vec![(1, 1.)],
+            }],
+        ),
+        ModelTreeOptions {
             node: options(),
             ..Default::default()
         },

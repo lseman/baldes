@@ -10,7 +10,8 @@ name = "_core"
 crate-type = ["cdylib"]
 
 [features]
-default = ["clp", "ryan-foster-master", "accumulated-resource-master"]
+default = ["clp", "ryan-foster-master", "accumulated-resource-master", "ipm-blocked"]
+ipm-blocked = ["baldes/ipm-blocked"]
 clp = ["baldes/clp"]
 highs = ["baldes/highs"]
 gurobi = ["baldes/gurobi"]

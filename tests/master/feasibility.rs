@@ -4,7 +4,7 @@ use baldes::{
     master::{
         branching::BranchConstraint,
         cg::{FeasibilityStatus, Status},
-        root::{self, BoundMode, FixedRoute, MasterSolver, RootOptions, RootProblem},
+        routing::{self, BoundMode, FixedRoute, MasterSolver, RootOptions, RoutingContext},
         tree::{self, TreeOptions, TreeStatus},
         RowSense,
     },
@@ -12,7 +12,7 @@ use baldes::{
 };
 use std::time::Duration;
 
-fn singleton_problem() -> RootProblem<2> {
+fn singleton_problem() -> RoutingContext<2> {
     let mut graph = Graph::<2>::new(4, 1).unwrap();
     for vertex in 0..4 {
         graph.set_bounds(vertex, 0, 0., 10.).unwrap();
@@ -20,7 +20,7 @@ fn singleton_problem() -> RootProblem<2> {
     for (a, b, cost) in [(0, 1, 100.), (1, 3, 100.), (0, 2, 150.), (2, 3, 150.)] {
         graph.add_arc(a, b, cost).unwrap();
     }
-    RootProblem::set_partitioning(graph, 2.).unwrap()
+    RoutingContext::set_partitioning(graph, 2.).unwrap()
 }
 
 fn options(mode: BoundMode) -> RootOptions {
@@ -43,7 +43,7 @@ fn expensive_columns_are_recovered_then_optimized_at_original_costs() {
         for stabilized in [false, true] {
             let mut options = options(mode);
             options.cg.stabilize = stabilized;
-            let output = root::solve(singleton_problem(), options).unwrap();
+            let output = routing::solve(singleton_problem(), options).unwrap();
             assert_eq!(output.master.status, Status::Optimal, "{output:?}");
             assert!((output.master.lp - 500.).abs() < 1e-7, "{output:?}");
             assert!(
@@ -79,14 +79,15 @@ fn phase_one_recovers_ryan_foster_children_before_original_cost_optimization() {
     use baldes::pricing::restrictions::RyanFosterConstraint;
 
     let mut problem = singleton_problem();
-    problem.graph.add_arc(1, 2, 50.).unwrap();
+    problem.model.networks[0].graph.add_arc(1, 2, 50.).unwrap();
     // Rebuild arc coefficients after adding the pair route.
-    let problem = RootProblem::set_partitioning(problem.graph, 2.).unwrap();
+    let problem =
+        RoutingContext::set_partitioning(problem.model.networks[0].graph.clone(), 2.).unwrap();
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         for stabilized in [false, true] {
             let mut controls = options(mode);
             controls.cg.stabilize = stabilized;
-            let parent = root::solve(problem.clone(), controls.clone()).unwrap();
+            let parent = routing::solve(problem.clone(), controls.clone()).unwrap();
             for together in [false, true] {
                 let rule = RyanFosterConstraint {
                     first: 1,
@@ -96,7 +97,7 @@ fn phase_one_recovers_ryan_foster_children_before_original_cost_optimization() {
                 let branch = BranchConstraint::RyanFoster(rule);
                 let mut fresh = problem.clone();
                 fresh.branch(branch.clone()).unwrap();
-                let fresh = root::solve(fresh, controls.clone()).unwrap();
+                let fresh = routing::solve(fresh, controls.clone()).unwrap();
                 assert!(
                     fresh
                         .master
@@ -107,7 +108,7 @@ fn phase_one_recovers_ryan_foster_children_before_original_cost_optimization() {
                 );
                 for output in [
                     fresh,
-                    root::inherit_branches(
+                    routing::inherit_branches(
                         parent.snapshot.as_ref().unwrap(),
                         &[branch],
                         controls.clone(),
@@ -150,7 +151,7 @@ fn phase_one_closes_infeasible_ryan_foster_child_without_pair_route() {
                 together: true,
             }))
             .unwrap();
-        let output = root::solve(problem, options(mode)).unwrap();
+        let output = routing::solve(problem, options(mode)).unwrap();
         assert_eq!(output.master.status, Status::Infeasible, "{output:?}");
         assert_eq!(output.master.bound, f64::INFINITY);
         assert!(
@@ -172,7 +173,7 @@ fn recovery_uses_all_supported_lp_backends() {
     for backend in backends {
         let mut options = options(BoundMode::Numerical);
         options.master_solver = backend;
-        let output = root::solve(singleton_problem(), options).unwrap();
+        let output = routing::solve(singleton_problem(), options).unwrap();
         assert_eq!(
             output.master.status,
             Status::Optimal,
@@ -190,7 +191,7 @@ fn recovery_uses_all_supported_lp_backends() {
     }
 }
 
-fn fractional_infeasible_problem() -> RootProblem<2> {
+fn fractional_infeasible_problem() -> RoutingContext<2> {
     let mut graph = Graph::<2>::new(5, 1).unwrap();
     for vertex in 0..5 {
         graph.set_bounds(vertex, 0, 0., 2.).unwrap();
@@ -209,13 +210,13 @@ fn fractional_infeasible_problem() -> RootProblem<2> {
     }
     // Every route serves at most two customers: covering three needs at least
     // 1.5 routes even fractionally, while individual original flows remain viable.
-    RootProblem::set_partitioning(graph, 1.4).unwrap()
+    RoutingContext::set_partitioning(graph, 1.4).unwrap()
 }
 
 #[test]
 fn true_infeasibility_requires_a_positive_whole_domain_feasibility_bound() {
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
-        let output = root::solve(fractional_infeasible_problem(), options(mode)).unwrap();
+        let output = routing::solve(fractional_infeasible_problem(), options(mode)).unwrap();
         assert!(
             !output.preprocessing.infeasible,
             "exercise phase I rather than preprocessing"
@@ -242,8 +243,8 @@ fn rounding_boundary_without_a_directed_proof_stays_unknown_in_both_modes() {
         graph.arc_mut(id).unwrap().consumption[0] = load;
     }
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
-        let result = root::solve(
-            RootProblem::set_partitioning(graph.clone(), 1.).unwrap(),
+        let result = routing::solve(
+            RoutingContext::set_partitioning(graph.clone(), 1.).unwrap(),
             options(mode),
         )
         .unwrap();
@@ -262,9 +263,9 @@ fn recovered_parent_fixed_routes_children_and_sibling_keep_original_objective() 
     let problem = singleton_problem();
     let original = problem.clone();
     let options = options(BoundMode::Certified);
-    let parent = root::solve(problem, options.clone()).unwrap();
+    let parent = routing::solve(problem, options.clone()).unwrap();
     let snapshot = parent.snapshot.as_ref().unwrap();
-    let fixed = root::inherit_fixed_routes(
+    let fixed = routing::inherit_fixed_routes(
         snapshot,
         &[FixedRoute {
             arcs: parent.route_values()[0].0.arcs.clone(),
@@ -281,13 +282,13 @@ fn recovered_parent_fixed_routes_children_and_sibling_keep_original_objective() 
         sense: RowSense::GreaterEqual,
         rhs: 2.,
     };
-    let child = root::inherit_branches(snapshot, &[branch], options.clone()).unwrap();
+    let child = routing::inherit_branches(snapshot, &[branch], options.clone()).unwrap();
     assert_eq!(child.master.status, Status::Optimal, "{child:?}");
     assert!((child.master.lp - 500.).abs() < 1e-7);
-    let sibling = root::inherit_branches(snapshot, &[], options.clone()).unwrap();
+    let sibling = routing::inherit_branches(snapshot, &[], options.clone()).unwrap();
     assert_eq!(sibling.master.status, Status::Optimal);
     assert!((sibling.master.lp - parent.master.lp).abs() < 1e-7);
-    let fresh = root::solve(original, options).unwrap();
+    let fresh = routing::solve(original, options).unwrap();
     assert!((fresh.master.lp - parent.master.lp).abs() < 1e-7);
 }
 
@@ -297,7 +298,7 @@ fn iteration_limited_recovery_retains_original_columns_and_can_resume() {
     for budget in 2..12 {
         let mut controls = options(BoundMode::Numerical);
         controls.cg.max_iterations = budget;
-        let output = root::solve(singleton_problem(), controls).unwrap();
+        let output = routing::solve(singleton_problem(), controls).unwrap();
         assert!(output.master.iterations <= budget, "{output:?}");
         if output
             .master
@@ -315,7 +316,7 @@ fn iteration_limited_recovery_retains_original_columns_and_can_resume() {
     for column in output.master.warm_start.columns.iter().flatten() {
         assert!(column.cost >= 200., "never retain zero phase-I costs");
     }
-    let resumed = root::inherit_branches(
+    let resumed = routing::inherit_branches(
         output.snapshot.as_ref().unwrap(),
         &[],
         options(BoundMode::Numerical),
@@ -336,14 +337,14 @@ fn recovered_parent_keeps_both_arc_branch_children_isolated() {
     graph.add_arc(1, 2, 100.).unwrap();
     for mode in [BoundMode::Numerical, BoundMode::Certified] {
         let controls = options(mode);
-        let parent = root::solve(
-            RootProblem::set_partitioning(graph.clone(), 1.).unwrap(),
+        let parent = routing::solve(
+            RoutingContext::set_partitioning(graph.clone(), 1.).unwrap(),
             controls.clone(),
         )
         .unwrap();
         assert_eq!(parent.master.lp, 200.);
         let snapshot = parent.snapshot.as_ref().unwrap();
-        let down = root::inherit_branches(
+        let down = routing::inherit_branches(
             snapshot,
             &[BranchConstraint::ArcFlow {
                 arc: 0,
@@ -359,7 +360,7 @@ fn recovered_parent_keeps_both_arc_branch_children_isolated() {
             assert!(route.arcs.contains(&expensive));
             assert!(!route.arcs.contains(&cheap));
         }
-        let up = root::inherit_branches(
+        let up = routing::inherit_branches(
             snapshot,
             &[BranchConstraint::ArcFlow {
                 arc: 0,
@@ -371,7 +372,7 @@ fn recovered_parent_keeps_both_arc_branch_children_isolated() {
         .unwrap();
         assert_eq!(up.master.status, Status::Optimal, "{up:?}");
         assert_eq!(up.master.lp, 200.);
-        let restored = root::inherit_branches(snapshot, &[], controls).unwrap();
+        let restored = routing::inherit_branches(snapshot, &[], controls).unwrap();
         assert_eq!(restored.master.lp, 200.);
     }
 }

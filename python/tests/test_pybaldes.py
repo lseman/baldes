@@ -6,7 +6,7 @@ import math
 import pytest
 
 import pybaldes
-from pybaldes import Customer, Instance, solve_root
+from pybaldes import Customer, Instance, solve
 
 
 def triangle():
@@ -38,8 +38,8 @@ def test_package_identity():
 
 
 def test_bound_modes_keep_numerical_estimates_separate_from_certificates():
-    numerical = solve_root(triangle(), reduced_cost_fixing=False, stabilize=False)
-    certified = solve_root(triangle(), bound_mode="certified", reduced_cost_fixing=False, stabilize=False)
+    numerical = solve(triangle(), reduced_cost_fixing=False, stabilize=False)
+    certified = solve(triangle(), bound_mode="certified", reduced_cost_fixing=False, stabilize=False)
     assert numerical.bound_mode == "numerical"
     assert numerical.bound == numerical.numerical_bound
     assert numerical.certified_bound == -math.inf
@@ -52,15 +52,15 @@ def test_bound_modes_keep_numerical_estimates_separate_from_certificates():
     assert_routes(numerical, 3, 2)
     assert_routes(certified, 3, 2)
     with pytest.raises(ValueError, match="bound mode"):
-        solve_root(triangle(), bound_mode="invalid")
+        solve(triangle(), bound_mode="invalid")
 
 
 @pytest.mark.parametrize("problem_type", ["vrptw", "cvrp"])
 @pytest.mark.parametrize("rank_one_cuts,fixing", [(False, False), (True, False), (False, True), (True, True)])
 def test_capacity_root(problem_type, rank_one_cuts, fixing):
     instance = triangle()
-    plain = solve_root(instance, problem_type=problem_type, reduced_cost_fixing=False)
-    result = instance.solve_root(
+    plain = solve(instance, problem_type=problem_type, reduced_cost_fixing=False)
+    result = instance.solve(
         problem_type=problem_type, capacity_cuts=True, rank_one_cuts=rank_one_cuts,
         reduced_cost_fixing=fixing,
     )
@@ -71,10 +71,13 @@ def test_capacity_root(problem_type, rank_one_cuts, fixing):
     assert result.lp_before_cuts == pytest.approx(plain.lp)
     assert result.cuts > 0 and result.cut_rounds > 0
     assert result.history and result.pricing_calls > 0
+    assert result.oracle_calls > 0
+    assert result.oracle_calls <= result.pricing_calls + sum(r.pricing_calls for r in result.feasibility)
     assert len(result.duals) >= 3
     assert_routes(result, 3, 2)
     serialized = json.loads(result.to_json())
     assert serialized["lp"] == result.lp
+    assert serialized["oracle_calls"] == result.oracle_calls
     assert serialized["routes"][0]["nodes"] == list(result.routes[0].nodes)
 
 
@@ -91,11 +94,11 @@ def test_solomon_file_and_time_window_semantics(tmp_path):
     assert len(instance.customers) == 3
     assert len(instance.truncated(1).customers) == 2
     assert len(instance.customers) == 3
-    vrptw = solve_root(path, reduced_cost_fixing=False)
-    cvrp = solve_root(path, problem_type="cvrp", reduced_cost_fixing=False)
+    vrptw = solve(path, reduced_cost_fixing=False)
+    cvrp = solve(path, problem_type="cvrp", reduced_cost_fixing=False)
     assert vrptw.lp == pytest.approx(4)
     assert cvrp.lp == pytest.approx(2 + math.sqrt(2))
-    assert solve_root(path, customers=1, reference_ng=True, reduced_cost_fixing=False).lp == pytest.approx(2)
+    assert solve(path, customers=1, reference_ng=True, reduced_cost_fixing=False).lp == pytest.approx(2)
     with pytest.raises(ValueError):
         Instance.from_file(tmp_path / "absent.txt")
 
@@ -106,7 +109,7 @@ def test_cvrp_ignores_service_and_time_windows():
         Customer(1, 0, 1, ready=100, due=100, service=100),
         Customer(0, 1, 1, ready=100, due=100, service=100),
     ])
-    result = solve_root(instance, problem_type="cvrp", reduced_cost_fixing=False)
+    result = solve(instance, problem_type="cvrp", reduced_cost_fixing=False)
     assert result.lp == pytest.approx(2 + math.sqrt(2))
 
 
@@ -117,24 +120,24 @@ def test_cvrp_ignores_service_and_time_windows():
 ])
 def test_invalid_options(options):
     with pytest.raises(ValueError):
-        solve_root(triangle(), **options)
+        solve(triangle(), **options)
 
 
 def test_invalid_instance_and_pricing_options():
     with pytest.raises(ValueError):
-        solve_root(Instance("bad", -1, [Customer(0, 0), Customer(1, 0, 1)]))
+        solve(Instance("bad", -1, [Customer(0, 0), Customer(1, 0, 1)]))
     with pytest.raises(ValueError):
         triangle().truncated(0)
     with pytest.raises(TypeError):
         Instance("bad", 1, [(0, 0)])
     with pytest.raises(RuntimeError):
-        solve_root(triangle(), pricing_options={"does_not_exist": 1})
+        solve(triangle(), pricing_options={"does_not_exist": 1})
 
 
 @pytest.mark.parametrize("rounding,expected", [("none", math.sqrt(2) * 2), ("nearest", 2), ("tenth", 2.8)])
 def test_rounding(rounding, expected):
     instance = Instance("diagonal", 1, [Customer(0, 0), Customer(1, 1, 1)])
-    result = solve_root(instance, problem_type="cvrp", rounding=rounding, reduced_cost_fixing=False)
+    result = solve(instance, problem_type="cvrp", rounding=rounding, reduced_cost_fixing=False)
     assert result.lp == pytest.approx(expected)
 
 
@@ -171,8 +174,8 @@ def test_low_level_pricing_validation_and_route_ownership():
 def test_kohl_time_resource_closes_r101_root_gap():
     from pathlib import Path
     instance = Instance.from_file(Path(__file__).resolve().parents[2] / 'instances/Solomon/R101.txt').truncated(10)
-    plain = solve_root(instance, stabilize=False, reduced_cost_fixing=False)
-    kohl = solve_root(instance, two_path_cuts=True, stabilize=False, reduced_cost_fixing=False)
+    plain = solve(instance, stabilize=False, reduced_cost_fixing=False)
+    kohl = solve(instance, two_path_cuts=True, stabilize=False, reduced_cost_fixing=False)
     assert plain.lp == pytest.approx(261.30231910442023)
     assert kohl.status == 'Optimal'
     assert kohl.lp == pytest.approx(269.533140900765)
@@ -181,11 +184,11 @@ def test_kohl_time_resource_closes_r101_root_gap():
 
 def test_kohl_rejects_cvrp_without_time_resource():
     with pytest.raises(ValueError, match='time windows'):
-        solve_root(triangle(), problem_type='cvrp', two_path_cuts=True)
+        solve(triangle(), problem_type='cvrp', two_path_cuts=True)
 
 @pytest.mark.parametrize("columns", ["best", "all", 1])
 def test_hgs_columns_and_ipm_master(columns):
-    result = solve_root(
+    result = solve(
         triangle(), rank_one_cuts=True, reduced_cost_fixing=False,
         master_solver="ipm", hgs_time=0.03, hgs_columns=columns, hgs_seed=7,
     )
@@ -203,31 +206,31 @@ def test_hgs_columns_and_ipm_master(columns):
 ])
 def test_invalid_hgs_and_master_options(options):
     with pytest.raises(ValueError):
-        solve_root(triangle(), **options)
+        solve(triangle(), **options)
 
 
 def test_cg_progress_is_opt_in_and_goes_to_stderr(capfd):
-    quiet = solve_root(triangle(), reduced_cost_fixing=False)
+    quiet = solve(triangle(), reduced_cost_fixing=False)
     assert "COLUMN GENERATION" not in capfd.readouterr().err
-    logged = solve_root(triangle(), reduced_cost_fixing=False, verbose=True, log_interval=1)
+    logged = solve(triangle(), reduced_cost_fixing=False, verbose=True, log_interval=1)
     captured = capfd.readouterr()
     assert "COLUMN GENERATION" in captured.err
     assert "RMP obj" in captured.err and "CG Optimal" in captured.err
     assert "COLUMN GENERATION" not in captured.out
     assert logged.lp == pytest.approx(quiet.lp)
     with pytest.raises(ValueError, match="positive"):
-        solve_root(triangle(), log_interval=0)
+        solve(triangle(), log_interval=0)
 
 
 def test_highs_master_selection_respects_the_build_features():
     if pybaldes.has_highs:
-        result = solve_root(triangle(), master_solver="highs", rank_one_cuts=True, reduced_cost_fixing=False)
+        result = solve(triangle(), master_solver="highs", rank_one_cuts=True, reduced_cost_fixing=False)
         assert result.status == "Optimal"
         assert result.lp == pytest.approx(4 + math.sqrt(2), abs=1e-6)
         assert_routes(result, 3, 2)
     else:
         with pytest.raises(ValueError, match="highs build feature"):
-            solve_root(triangle(), master_solver="highs")
+            solve(triangle(), master_solver="highs")
 
 
 def test_general_scalar_resource_dimensions():
@@ -256,7 +259,7 @@ def test_resource_capacity_is_fixed_at_build_time():
 @pytest.mark.parametrize("keep", [False, True])
 @pytest.mark.parametrize("rank_one", [False, True])
 def test_clp_runtime_policy_preserves_routing_solution(scaling, keep, rank_one):
-    result = solve_root(
+    result = solve(
         triangle(), clp_scaling=scaling, clp_keep_work_areas=keep,
         reduced_cost_fixing=False, rank_one_cuts=rank_one,
     )
@@ -268,28 +271,27 @@ def test_clp_runtime_policy_preserves_routing_solution(scaling, keep, rank_one):
 
 def test_invalid_clp_scaling_is_rejected():
     with pytest.raises(ValueError, match="Clp scaling"):
-        solve_root(triangle(), clp_scaling="invalid")
+        solve(triangle(), clp_scaling="invalid")
 
 
 def test_master_worker_budget_defaults_and_validation():
     import inspect
 
-    assert inspect.signature(solve_root).parameters["master_threads"].default == 0
-    assert inspect.signature(pybaldes._core._solve_root).parameters["master_threads"].default == 0
+    default = solve(triangle(), reduced_cost_fixing=False)
+    explicit = solve(triangle(), master_threads=0, reduced_cost_fixing=False)
+    assert default.lp == pytest.approx(explicit.lp)
     for threads in [-1, 2**64, 2**31]:
         with pytest.raises((ValueError, OverflowError)):
-            solve_root(triangle(), master_threads=threads)
-    result = solve_root(triangle(), master_threads=1, reduced_cost_fixing=False)
+            solve(triangle(), master_threads=threads)
+    result = solve(triangle(), master_threads=1, reduced_cost_fixing=False)
     assert result.status == "Optimal"
 
 
 def test_root_scaling_defaults_to_equilibrium():
     import inspect
 
-    assert inspect.signature(solve_root).parameters["clp_scaling"].default == "equilibrium"
-    assert inspect.signature(pybaldes._core._solve_root).parameters["clp_scaling"].default == "equilibrium"
-    default = solve_root(triangle(), reduced_cost_fixing=False)
-    explicit = solve_root(triangle(), reduced_cost_fixing=False, clp_scaling="equilibrium")
+    default = solve(triangle(), reduced_cost_fixing=False)
+    explicit = solve(triangle(), reduced_cost_fixing=False, clp_scaling="equilibrium")
     assert default.status == explicit.status == "Optimal"
     assert default.lp == pytest.approx(explicit.lp, abs=1e-8)
 

@@ -1,5 +1,119 @@
 use super::*;
 
+#[test]
+fn functor_searches_only_the_raw_objective_and_advances_one_round() {
+    let mut solver = model();
+    solver.cache_variable_costs(&[1e-9]).unwrap();
+    let cached: Vec<_> = solver.graph.arcs.iter().map(|a| a.reduced_cost).collect();
+    let answer = solver.price_functor_phase(0, 8).unwrap();
+    assert!(answer.exact);
+    assert_eq!(answer.minimum_reduced_cost, 0.05);
+    assert_eq!(answer.columns[0].arcs, [2, 3]);
+    // A second cached search would create this engine and collect another
+    // exact-phase observation despite publishing only the raw result.
+    assert!(solver.engine.is_none());
+    assert_eq!(solver.round.times.len(), 1);
+    assert_eq!(
+        solver
+            .graph
+            .arcs
+            .iter()
+            .map(|a| a.reduced_cost)
+            .collect::<Vec<_>>(),
+        cached
+    );
+    let answer = solver.price_functor_phase(0, 8).unwrap();
+    assert_eq!(answer.minimum_reduced_cost, 0.05);
+    assert_eq!(solver.round.times.len(), 2);
+}
+
+#[test]
+fn functor_round_refines_the_grid_used_by_the_raw_search() {
+    let mut solver = model();
+    solver.bucket_steps[0] = 2.;
+    solver.cache_variable_costs(&[1e-9]).unwrap();
+    solver.price_functor_phase(0, 8).unwrap();
+    assert!(solver.engine.is_none());
+    assert_eq!(solver.pricing_engine().unwrap().grid.step[0], 2.);
+    solver.round.pending_decrease = true;
+    solver.column_generation_terminated(0, 0).unwrap();
+    assert_eq!(solver.pricing_engine().unwrap().grid.step[0], 1.);
+    assert_eq!(solver.bucket_steps[0], 1.);
+    assert!(solver.round.times.is_empty());
+    assert!(!solver.round.pending_decrease);
+    solver.price_functor_phase(0, 8).unwrap();
+    assert_eq!(solver.pricing_engine().unwrap().grid.step[0], 1.);
+}
+
+#[test]
+fn original_space_physical_cache_cannot_replace_the_raw_optimum_or_route_correction() {
+    let mut solver = Solver::<2>::new(4, 1).unwrap();
+    for v in 0..4 {
+        solver.graph.set_bounds(v, 0, 0., 10.).unwrap();
+    }
+    for (p, (tail, head)) in [(0, 1), (1, 3), (0, 2), (2, 3)].into_iter().enumerate() {
+        let id = solver.graph.add_arc(tail, head, 0.).unwrap();
+        let arc = solver.graph.arc_mut(id).unwrap();
+        arc.variables = vec![(p, 1.)];
+        arc.consumption[0] = 1.;
+    }
+    solver
+        .set_option("BALDESuseBidirectionalSearch", 0.)
+        .unwrap();
+    let raw = [-1.000000004, 0., -1.000000003, 0.];
+    let cached = [-1., 0., -1.01, 0.];
+    solver.cache_physical_costs(&raw, &cached).unwrap();
+    let rounded = solver.price_phase(0, 8, false).unwrap();
+    assert_eq!(rounded.columns[0].arcs, [2, 3]);
+    assert_eq!(
+        solver
+            .corrected_bound(rounded.columns[0].cost, &rounded.columns[0])
+            .unwrap(),
+        raw[2]
+    );
+    let answer = solver.price_functor_phase(0, 8).unwrap();
+    assert!(answer.exact);
+    assert_eq!(answer.minimum_reduced_cost, raw[0]);
+    assert_eq!(answer.columns[0].arcs, [0, 1]);
+    assert_eq!(
+        solver
+            .graph
+            .arcs
+            .iter()
+            .map(|a| a.reduced_cost)
+            .collect::<Vec<_>>(),
+        cached
+    );
+}
+
+#[test]
+fn invalid_physical_cache_does_not_publish_partial_costs() {
+    let mut solver = model();
+    solver.cache_variable_costs(&[1e-9]).unwrap();
+    let previous = solver
+        .graph
+        .arcs
+        .iter()
+        .map(|a| a.reduced_cost)
+        .collect::<Vec<_>>();
+    assert!(solver
+        .cache_physical_costs(&[1e-9], &[f64::NAN; 4])
+        .is_err());
+    // This solver has grouped variables, rather than the required physical
+    // identity representation. Even finite custom costs must be rejected.
+    assert!(solver.cache_physical_costs(&[1e-9], &[0.; 4]).is_err());
+    assert_eq!(
+        solver
+            .graph
+            .arcs
+            .iter()
+            .map(|a| a.reduced_cost)
+            .collect::<Vec<_>>(),
+        previous
+    );
+    assert_eq!(solver.variable_costs, [1e-9]);
+}
+
 fn model() -> Solver<2> {
     let mut solver = Solver::new(4, 1).unwrap();
     for v in 0..4 {
@@ -180,7 +294,7 @@ fn raw_workspace_refreshes_cut_shapes_duals_and_rollback_budgets() {
         weights: vec![0, 1, 1, 0],
         graph_support: Default::default(),
         graph_pricing_support: Default::default(),
-        native_kpath_support: None,
+        general_kpath_support: None,
         memory: vec![true; 4],
         graph_dependent_memory: false,
         graph_memories: Default::default(),
@@ -189,7 +303,7 @@ fn raw_workspace_refreshes_cut_shapes_duals_and_rollback_budgets() {
         graph_arc_memories: Default::default(),
         arc_weights: Default::default(),
         visit_once: false,
-        native_type2: false,
+        type2: false,
         denominator: 2,
         dual: 0.2,
         class: CutClass::Packing,

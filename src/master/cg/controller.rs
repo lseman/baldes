@@ -77,6 +77,12 @@ pub trait Controller<M> {
     ) -> Result<bool> {
         Ok(false)
     }
+    /// A validated original-model primal is retained for publication. This
+    /// permits an inherited bound to prune before pricing, without claiming
+    /// that the pricing LP has converged. Compatibility controllers opt out.
+    fn original_witness_available(&self) -> bool {
+        false
+    }
     fn incumbent(&self) -> f64 {
         f64::INFINITY
     }

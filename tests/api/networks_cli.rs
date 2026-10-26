@@ -9,7 +9,7 @@ fn command() -> Command {
 }
 fn solve(flags: &[&str]) -> Value {
     let output = command()
-        .arg("multi-pricing")
+        .arg("solve")
         .arg(fixture())
         .args(flags)
         .args(["--json", "-"])
@@ -24,13 +24,44 @@ fn solve(flags: &[&str]) -> Value {
 }
 
 #[test]
+fn signed_secondary_disposable_resource_is_supported_through_json_cli() {
+    let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/multi_network_native_signed_secondary_resource.json");
+    let output = command()
+        .arg("solve")
+        .arg(model)
+        .args(["--no-stabilization", "--json", "-"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["status"], "Optimal");
+    assert_eq!(result["lp"], -1.);
+    assert_eq!(result["bound"], -1.);
+    assert_eq!(result["oracle_calls"][0], json!([7, 3]));
+    let route = result["routes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|route| route["value"].as_f64().unwrap_or_default() > 0.5)
+        .unwrap();
+    assert_eq!(route["resource_profile"][0][1], 5.);
+    assert_eq!(route["resource_profile"][1][1], 3.);
+    assert_eq!(route["resource_profile"][2][1], 7.);
+}
+
+#[test]
 fn network_schedule_flags_keep_root_and_tree_objectives() {
     for policy in [
         "full-sweep",
         "cyclic",
         "sorted",
-        "native-promising-first",
-        "native-unvisited-first",
+        "promising-first",
+        "unvisited-first",
     ] {
         let root = solve(&["--network-pricing-schedule", policy]);
         assert_eq!(root["status"], "Optimal");
@@ -40,7 +71,7 @@ fn network_schedule_flags_keep_root_and_tree_objectives() {
         assert_eq!(tree["incumbent"], 2.);
     }
     assert!(!command()
-        .arg("multi-pricing")
+        .arg("solve")
         .arg(fixture())
         .args(["--network-pricing-schedule", "unknown"])
         .output()
@@ -54,10 +85,10 @@ fn proximal_flags_use_original_objective_and_validate_configuration() {
     for flag in [
         "--automatic-curvature",
         "--automatic-curvature-five-piece",
-        "--native-proximal-box-step",
-        "--native-proximal-three-piece",
-        "--native-proximal-five-piece",
-        "--native-proximal-multipoint",
+        "--proximal-finite-box-step",
+        "--proximal-explicit-three-piece",
+        "--proximal-explicit-five-piece",
+        "--proximal-explicit-multipoint",
     ] {
         let root = solve(&[flag]);
         assert_eq!(root["status"], "Optimal");
@@ -80,7 +111,7 @@ fn proximal_flags_use_original_objective_and_validate_configuration() {
         vec!["--network-unpromising-limit", "0"],
     ] {
         assert!(!command()
-            .arg("multi-pricing")
+            .arg("solve")
             .arg(fixture())
             .args(flags)
             .output()
@@ -112,7 +143,8 @@ fn root_and_assignment_tree_use_all_networks() {
         assert_eq!(tree["incumbent"], 2.);
         assert_eq!(tree["bound"], 2.);
         assert_eq!(tree["open_nodes"], 0);
-        assert_eq!(tree["nodes"], 3);
+        assert_eq!(tree["nodes"], 6);
+        assert_eq!(tree["tree_processed_nodes"], 7);
         assert!(tree["pricing_calls"].as_u64().unwrap() > 0);
         assert!(tree["oracle_calls"]
             .as_array()
@@ -142,6 +174,49 @@ fn budgets_keep_unknown_bounds_and_open_nodes_explicit() {
 }
 
 #[test]
+fn native_node_limit_boundaries_match_all_four_retained_controls() {
+    let observations: Value = serde_json::from_str(include_str!(
+        "../fixtures/multi_network_native_node_limits.json"
+    ))
+    .unwrap();
+    let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/multi_network_native_tree.json");
+    for case in observations["cases"].as_array().unwrap() {
+        let output = command()
+            .arg("solve")
+            .arg(&model)
+            .args([
+                "--tree",
+                "--network-branching",
+                "multiplicity-first",
+                "--proximal-explicit-five-piece",
+                "--network-tree-search",
+                case["policy"].as_str().unwrap(),
+                "--nodes",
+                &case["limit"].to_string(),
+                "--json",
+                "-",
+            ])
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{:?}", output.stderr);
+        let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(result["tree_processed_nodes"], case["processed"], "{case}");
+        assert_eq!(result["nodes"], case["evaluated"], "{case}");
+        assert_eq!(result["status"], case["status"], "{case}");
+        assert_eq!(result["incumbent"], case["incumbent"], "{case}");
+        if case["bound"].is_null() {
+            assert!(result["bound"].is_null(), "{case}");
+        } else {
+            assert!(
+                (result["bound"].as_f64().unwrap() - case["bound"].as_f64().unwrap()).abs() < 1e-8,
+                "{case}"
+            );
+        }
+    }
+}
+
+#[test]
 fn explicit_network_family_order_preserves_the_integer_optimum() {
     for policy in ["resource-first", "multiplicity-first"] {
         let tree = solve(&[
@@ -161,7 +236,7 @@ fn explicit_network_family_order_preserves_the_integer_optimum() {
             .all(|calls| calls[1].as_u64().unwrap() > 0));
     }
     assert!(!command()
-        .arg("networks")
+        .arg("solve")
         .arg(fixture())
         .args(["--network-branching", "unknown"])
         .output()
@@ -174,7 +249,7 @@ fn writes_json_files_and_rejects_unknown_options() {
     let path =
         std::env::temp_dir().join(format!("baldes-network-output-{}.json", std::process::id()));
     let output = command()
-        .arg("networks")
+        .arg("solve")
         .arg(fixture())
         .arg("--json")
         .arg(&path)
@@ -194,7 +269,7 @@ fn writes_json_files_and_rejects_unknown_options() {
         vec!["--json"],
     ] {
         let output = command()
-            .arg("networks")
+            .arg("solve")
             .arg(fixture())
             .args(args)
             .output()
@@ -203,7 +278,7 @@ fn writes_json_files_and_rejects_unknown_options() {
         assert!(!output.stderr.is_empty());
     }
     assert!(command()
-        .args(["networks", "--help"])
+        .args(["solve", "--help"])
         .output()
         .unwrap()
         .status
@@ -235,11 +310,11 @@ fn model_validation_rejects_bad_ids_rows_resources_and_unknown_fields() {
     ));
     for value in invalid {
         std::fs::write(&path, value.to_string()).unwrap();
-        let output = command().arg("networks").arg(&path).output().unwrap();
+        let output = command().arg("solve").arg(&path).output().unwrap();
         assert!(!output.status.success(), "{value}");
         assert!(!output.stderr.is_empty());
         let zero = command()
-            .arg("networks")
+            .arg("solve")
             .arg(&path)
             .args(["--tree", "--nodes", "0"])
             .output()
@@ -248,7 +323,7 @@ fn model_validation_rejects_bad_ids_rows_resources_and_unknown_fields() {
     }
     std::fs::write(&path, "{not-json").unwrap();
     assert!(!command()
-        .arg("networks")
+        .arg("solve")
         .arg(&path)
         .output()
         .unwrap()
@@ -268,7 +343,7 @@ fn enumeration_reporting_is_shared_with_python_and_partial_transfer_falls_back()
     assert_eq!(partial["enumeration_reports"][0]["complete"], false);
     assert_eq!(partial["enumeration_reports"][0]["transferred"], 0);
     let output = command()
-        .arg("networks")
+        .arg("solve")
         .arg(fixture())
         .arg("--enumerated-mip")
         .output()
@@ -276,7 +351,7 @@ fn enumeration_reporting_is_shared_with_python_and_partial_transfer_falls_back()
     assert!(!output.status.success()); // --tree is required.
     #[cfg(not(feature = "highs"))]
     assert!(!command()
-        .arg("networks")
+        .arg("solve")
         .arg(fixture())
         .args(["--tree", "--enumerated-mip"])
         .output()
@@ -321,7 +396,7 @@ fn cutoff_pool_is_explicit_and_cannot_claim_original_infeasibility() {
         vec!["--tree", "--enumerated-mip", "--mip-cutoff", "NaN"],
     ] {
         assert!(!command()
-            .arg("multi-pricing")
+            .arg("solve")
             .arg(fixture())
             .args(flags)
             .output()
@@ -338,7 +413,7 @@ fn resource_group_files_restrict_both_pricing_networks_and_tree_descendants() {
         for enumerate in [false, true] {
             let mut command = command();
             command
-                .arg("multi-pricing")
+                .arg("solve")
                 .arg(root.join("examples/networks/resource_groups.json"))
                 .arg("--resource-branches")
                 .arg(root.join("examples/networks/resource_group_upper.json"))
@@ -391,7 +466,13 @@ fn native_depth_budgets_and_registered_aggregate_branches_preserve_objectives() 
     let mappings =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/networks/mapped_variables.json");
     for strong in [true, false] {
-        let mut flags = vec!["--tree", "--mapped-variables", mappings.to_str().unwrap()];
+        let mut flags = vec![
+            "--tree",
+            "--network-branching",
+            "phased",
+            "--mapped-variables",
+            mappings.to_str().unwrap(),
+        ];
         if !strong {
             flags.push("--no-mapped-strong-branching");
         }
@@ -404,7 +485,7 @@ fn native_depth_budgets_and_registered_aggregate_branches_preserve_objectives() 
         );
     }
     assert!(!command()
-        .arg("multi-pricing")
+        .arg("solve")
         .arg(fixture())
         .args(["--network-promising-limit", "0"])
         .output()
@@ -415,10 +496,50 @@ fn native_depth_budgets_and_registered_aggregate_branches_preserve_objectives() 
 
 #[test]
 fn native_phased_registry_evaluates_original_fallback_candidates() {
-    let tree = solve(&["--tree", "--network-branching", "native-phased"]);
+    let tree = solve(&["--tree", "--network-branching", "phased"]);
     assert_eq!(tree["status"], "Optimal");
     assert_eq!(tree["incumbent"], 2.);
     assert!(tree["strong_branching_trials"].as_u64().unwrap() > 0);
+}
+
+#[test]
+fn native_phased_trial_budget_and_prepared_children_match_retained_controls() {
+    let cases: Value = serde_json::from_str(include_str!(
+        "../fixtures/multi_network_native_strong_limits.json"
+    ))
+    .unwrap();
+    for bound_mode in ["numerical", "certified"] {
+        for case in cases.as_array().unwrap() {
+            let limit = case["limit"].as_u64().unwrap().to_string();
+            let tree = solve(&[
+                "--tree",
+                "--network-branching",
+                "phased",
+                "--nodes",
+                &limit,
+                "--bound-mode",
+                bound_mode,
+            ]);
+            assert_eq!(
+                tree["tree_processed_nodes"], case["processed"],
+                "{bound_mode} {case}"
+            );
+            assert_eq!(tree["incumbent"], case["incumbent"], "{bound_mode} {case}");
+            assert_eq!(tree["status"], case["status"], "{bound_mode} {case}");
+            if let Some(bound) = case["bound"].as_f64() {
+                assert!(
+                    (tree["bound"].as_f64().unwrap() - bound).abs() < 1e-8,
+                    "{bound_mode} {case}: {tree}"
+                );
+            } else {
+                assert!(tree["bound"].is_null());
+            }
+            assert_eq!(
+                tree["strong_branching_trials"], case["trials"],
+                "{bound_mode} {case}"
+            );
+        }
+    }
 }
 
 #[test]
@@ -427,7 +548,7 @@ fn native_depth_first_search_separates_processed_and_evaluated_nodes() {
         .join("tests/fixtures/multi_network_native_tree.json");
     let run = |selection: &str, open_limit: Option<&str>, rounding: Option<&str>| {
         let output = command()
-            .arg("multi-pricing")
+            .arg("solve")
             .arg(&model)
             .args([
                 "--tree",
@@ -435,7 +556,7 @@ fn native_depth_first_search_separates_processed_and_evaluated_nodes() {
                 "multiplicity-first",
                 "--network-tree-search",
                 selection,
-                "--native-proximal-five-piece",
+                "--proximal-explicit-five-piece",
                 "--json",
                 "-",
             ])
@@ -458,14 +579,15 @@ fn native_depth_first_search_separates_processed_and_evaluated_nodes() {
         );
         serde_json::from_slice::<Value>(&output.stdout).unwrap()
     };
-    let native = run("native-default", None, None);
-    let overflow = run("native-default", Some("1"), None);
-    let all_overflow = run("native-default", Some("0"), None);
+    let native = run("default", None, None);
+    let overflow = run("default", Some("1"), None);
+    let all_overflow = run("default", Some("0"), None);
     let best_bound = run("best-bound", None, None);
-    let strategy2 = run("native-strategy-2", None, None);
-    let strategy2_unrounded = run("native-strategy-2", None, Some("unrounded"));
-    let strategy2_guarded = run("native-strategy-2", None, Some("guarded-tolerance"));
-    let strategy2_exact_ceil = run("native-strategy-2", None, Some("exact-ceil"));
+    let strategy2 = run("bound-priority", None, None);
+    let strategy3 = run("depth-bound-priority", None, None);
+    let strategy2_unrounded = run("bound-priority", None, Some("unrounded"));
+    let strategy2_guarded = run("bound-priority", None, Some("guarded-tolerance"));
+    let strategy2_exact_ceil = run("bound-priority", None, Some("exact-ceil"));
     assert_eq!(native["status"], "Optimal");
     assert_eq!(best_bound["status"], "Optimal");
     assert_eq!(native["incumbent"], 2.);
@@ -477,8 +599,19 @@ fn native_depth_first_search_separates_processed_and_evaluated_nodes() {
     assert!(
         overflow["tree_processed_nodes"].as_u64().unwrap() >= overflow["nodes"].as_u64().unwrap()
     );
-    assert_eq!(all_overflow["status"], "Optimal");
-    assert_eq!(all_overflow["incumbent"], 2.);
+    assert_eq!(all_overflow["status"], "Incomplete");
+    assert!(all_overflow["incumbent"].is_null());
+    assert_eq!(all_overflow["bound"], 1.5);
+    assert_eq!(all_overflow["open_nodes"], 2);
+    assert_eq!(all_overflow["tree_processed_nodes"], 1);
+    for policy in ["best-bound", "bound-priority", "depth-bound-priority"] {
+        let stopped = run(policy, Some("0"), None);
+        assert_eq!(stopped["status"], "Incomplete");
+        assert!(stopped["incumbent"].is_null());
+        assert_eq!(stopped["bound"], 1.5);
+        assert_eq!(stopped["open_nodes"], 2);
+        assert_eq!(stopped["tree_processed_nodes"], 1);
+    }
     assert_eq!(native["tree_processed_nodes"], 7);
     assert!(native["tree_processed_nodes"].as_u64().unwrap() > native["nodes"].as_u64().unwrap());
     assert_eq!(best_bound["nodes"], 5);
@@ -488,6 +621,9 @@ fn native_depth_first_search_separates_processed_and_evaluated_nodes() {
     );
     assert_eq!(strategy2["status"], "Optimal");
     assert_eq!(strategy2["incumbent"], 2.);
+    assert_eq!(strategy3["status"], "Optimal");
+    assert_eq!(strategy3["incumbent"], 2.);
+    assert_eq!(strategy3["tree_processed_nodes"], 7);
     assert_eq!(strategy2["tree_processed_nodes"], 5);
     assert_eq!(strategy2["nodes"], 5);
     assert_eq!(strategy2_unrounded["tree_processed_nodes"], 5);
@@ -496,7 +632,7 @@ fn native_depth_first_search_separates_processed_and_evaluated_nodes() {
     let model: Value =
         serde_json::from_slice(&std::fs::read(&model).expect("read native comparison fixture"))
             .unwrap();
-    for result in [&native, &best_bound, &strategy2] {
+    for result in [&native, &best_bound, &strategy2, &strategy3] {
         let mut coverage = vec![0.; 3];
         let mut objective = 0.;
         for route in result["routes"].as_array().unwrap() {
@@ -529,7 +665,7 @@ fn explicitly_declared_front_program_domain_survives_original_cost_recovery() {
     let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/coupled/native_machine_network.json");
     let output = command()
-        .arg("multi-pricing")
+        .arg("solve")
         .arg(model)
         .args([
             "--tree",
@@ -557,7 +693,7 @@ fn bounded_walk_json_preserves_repeated_visits_and_negative_cycle_cost() {
     let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/coupled/bounded_walk_network.json");
     let output = command()
-        .arg("multi-pricing")
+        .arg("solve")
         .arg(model)
         .args([
             "--tree",
@@ -578,4 +714,313 @@ fn bounded_walk_json_preserves_repeated_visits_and_negative_cycle_cost() {
     assert_eq!(result["status"], "Optimal");
     assert_eq!(result["incumbent"], -3.);
     assert_eq!(result["bound"], -3.);
+}
+
+#[test]
+fn native_scoring_gap_controls_are_finite_nonnegative_and_keep_original_optimum() {
+    for gap in ["0", "0.000001", "0.4"] {
+        let tree = solve(&[
+            "--tree",
+            "--network-branching",
+            "phased",
+            "--network-scoring-gap-tolerance",
+            gap,
+        ]);
+        assert_eq!(tree["status"], "Optimal");
+        assert_eq!(tree["incumbent"], 2.);
+        assert_eq!(tree["bound"], 2.);
+    }
+    for gap in ["-1", "NaN", "inf"] {
+        let output = command()
+            .arg("solve")
+            .arg(fixture())
+            .args(["--tree", "--network-scoring-gap-tolerance", gap])
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("scoring gap tolerance"));
+    }
+}
+
+#[test]
+fn exact_infeasible_trial_is_not_resolved_or_left_open_at_native_budget_boundaries() {
+    let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/multi_network_native_infeasible_trial.json");
+    let cases: Value = serde_json::from_str(include_str!(
+        "../fixtures/multi_network_native_infeasible_trial_limits.json"
+    ))
+    .unwrap();
+    for mode in ["numerical", "certified"] {
+        for case in cases.as_array().unwrap() {
+            let limit = case["limit"].as_u64().unwrap().to_string();
+            let output = command()
+                .arg("solve")
+                .arg(&model)
+                .args([
+                    "--tree",
+                    "--network-branching",
+                    "phased",
+                    "--network-tree-search",
+                    case["policy"].as_str().unwrap(),
+                    "--nodes",
+                    &limit,
+                    "--bound-mode",
+                    mode,
+                    "--json",
+                    "-",
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(result["status"], case["status"], "{mode} {case}: {result}");
+            assert_eq!(
+                result["tree_processed_nodes"], case["processed"],
+                "{mode} {case}"
+            );
+            assert_eq!(result["incumbent"], case["incumbent"], "{mode} {case}");
+            if let Some(bound) = case["bound"].as_f64() {
+                assert!(
+                    (result["bound"].as_f64().unwrap() - bound).abs() < 1e-8,
+                    "{mode} {case}: {result}"
+                );
+            } else {
+                assert!(result["bound"].is_null());
+            }
+            if case["limit"].as_u64().unwrap() > 0 {
+                assert_eq!(result["nodes"], 1, "{mode} {case}");
+            }
+        }
+    }
+}
+
+#[test]
+fn mapped_phase_continuation_separates_native_screens_from_processed_exact_nodes() {
+    let mappings = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/multi_network_native_phased_mappings.json");
+    for mode in ["numerical", "certified"] {
+        let output = command()
+            .arg("solve")
+            .arg(fixture())
+            .args([
+                "--tree",
+                "--network-branching",
+                "resource-first",
+                "--mapped-variables",
+            ])
+            .arg(&mappings)
+            .args(["--bound-mode", mode, "--no-stabilization", "--json", "-"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(result["status"], "Optimal");
+        assert_eq!(result["incumbent"], 2.);
+        assert_eq!(result["bound"], 2.);
+        // Native assignment control: 4 heuristic screens + 2 exact trials;
+        // NodeTreat=7 includes the root, NodeProc=3 excludes the screens.
+        assert_eq!(result["strong_branching_trials"], 6);
+        assert_eq!(result["tree_processed_nodes"], 3);
+        assert_eq!(result["nodes"], 1);
+        assert_eq!(result["iterations"], 18);
+        let calls: u64 = result["oracle_calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry[1].as_u64().unwrap())
+            .sum();
+        // This fixture deliberately puts each whole assignment on incoming
+        // arcs. Nonnegative box admission leaves only two physical entries;
+        // native accounting36 is not a count of actual solver invocations.
+        // The incident-arc paired control has its own integration regression.
+        assert_eq!(calls, 2);
+    }
+}
+
+#[test]
+fn shared_inactive_tree_paths_keep_both_original_bound_modes() {
+    for mode in ["numerical", "certified"] {
+        let result = solve(&[
+            "--tree",
+            "--network-share-inactive-columns",
+            "--bound-mode",
+            mode,
+        ]);
+        assert_eq!(result["status"], "Optimal");
+        assert_eq!(result["incumbent"], 2.);
+        assert!((result["bound"].as_f64().unwrap() - 2.).abs() < 1e-8);
+    }
+    let output = command()
+        .arg("solve")
+        .arg(fixture())
+        .args(["--network-share-inactive-columns", "--json", "-"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("requires tree=true"));
+}
+
+#[test]
+fn native_packing_file_registers_original_assignment_branching() {
+    let packing = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/multi_network_native_packing.json");
+    for mode in ["numerical", "certified"] {
+        let result = solve(&[
+            "--tree",
+            "--packing",
+            packing.to_str().unwrap(),
+            "--no-stabilization",
+            "--bound-mode",
+            mode,
+        ]);
+        assert_eq!(result["status"], "Optimal");
+        assert_eq!(result["incumbent"], 2.);
+        assert_eq!(result["bound"], 2.);
+        assert_eq!(result["tree_processed_nodes"], 3);
+        assert_eq!(result["strong_branching_trials"], 6);
+    }
+    let invalid = command()
+        .arg("solve")
+        .arg(fixture())
+        .args(["--packing", packing.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(!invalid.status.success());
+    assert!(String::from_utf8_lossy(&invalid.stderr).contains("requires tree=true"));
+}
+
+#[test]
+fn named_native_branch_direction_controls_trial_order_through_cli() {
+    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let packing = fixtures.join("multi_network_native_packing.json");
+    let directions = fixtures.join("multi_network_native_branch_directions.json");
+    let result = solve(&[
+        "--tree",
+        "--no-stabilization",
+        "--packing",
+        packing.to_str().unwrap(),
+        "--network-branch-directions",
+        directions.to_str().unwrap(),
+    ]);
+    assert_eq!(result["status"], "Optimal");
+    assert_eq!(result["incumbent"], 2.);
+    assert_eq!(result["bound"], 2.);
+    let evaluations = result["mapped_branch_evaluations"].as_array().unwrap();
+    assert!(!evaluations.is_empty());
+    let mut observed = std::collections::HashSet::new();
+    for evaluation in evaluations {
+        let key = (
+            evaluation["name"].as_str().unwrap(),
+            evaluation["stage"].as_u64().unwrap(),
+        );
+        if observed.insert(key) {
+            assert_eq!(evaluation["side"], 0, "lower side must be evaluated first");
+        }
+    }
+    let root = command()
+        .arg("solve")
+        .arg(fixture())
+        .args(["--network-branch-directions", directions.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(!root.status.success());
+    assert!(String::from_utf8_lossy(&root.stderr).contains("requires tree=true"));
+}
+
+#[test]
+fn original_variables_compile_once_and_report_root_and_tree_activities() {
+    let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/multi_network_original_variables.json");
+    for tree in [false, true] {
+        let mut cmd = command();
+        cmd.arg("solve")
+            .arg(&model)
+            .args(["--no-stabilization", "--json", "-"]);
+        if tree {
+            cmd.arg("--tree");
+        }
+        let output = cmd.output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(value[if tree { "incumbent" } else { "lp" }], -1.);
+        assert_eq!(
+            value["original_variables"],
+            json!([{"network":7,"id":0,"lower":1.,"upper":1.}])
+        );
+    }
+}
+
+#[test]
+fn original_variable_boxes_preserve_original_cost_space_under_cancellation() {
+    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let output = command()
+        .arg("solve")
+        .arg(fixtures.join("multi_network_original_cancellation.json"))
+        .arg("--original-variable-boxes")
+        .arg(fixtures.join("multi_network_original_cancellation_boxes.json"))
+        .args(["--no-stabilization", "--json", "-"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["lp"], 0.);
+    assert_eq!(result["oracle_calls"], json!([[7, 3]]));
+}
+
+#[test]
+fn solve_normalizes_scalar_and_array_pricing_and_removes_old_command_aliases() {
+    let network = json!({"id":7,"vertices":3,"multiplicity":[0,1],"arcs":[{"tail":0,"head":1,"cost":-2},{"tail":1,"head":2,"cost":0}]});
+    let path =
+        std::env::temp_dir().join(format!("baldes-pricing-shape-{}.json", std::process::id()));
+    let mut results = vec![];
+    for input in [
+        network.clone(),
+        json!([network.clone()]),
+        json!({"networks":network.clone()}),
+        json!({"networks":[network]}),
+    ] {
+        std::fs::write(&path, input.to_string()).unwrap();
+        let output = command()
+            .arg("solve")
+            .arg(&path)
+            .args(["--no-stabilization", "--json", "-"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let data: Value = serde_json::from_slice(&output.stdout).unwrap();
+        results.push((
+            data["lp"].clone(),
+            data["bound"].clone(),
+            data["oracle_calls"].clone(),
+            data["routes"].clone(),
+        ));
+    }
+    std::fs::remove_file(path).unwrap();
+    assert!(results.windows(2).all(|r| r[0] == r[1]));
+    assert_eq!(results[0].0, json!(-2.));
+    for command_name in ["multi-pricing", "networks", "vrptw", "cvrp"] {
+        let output = command().args([command_name, "--help"]).output().unwrap();
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("unknown command"));
+    }
 }

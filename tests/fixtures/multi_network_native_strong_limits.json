@@ -1,0 +1,66 @@
+[
+  {
+    "limit": 0,
+    "processed": 0,
+    "incumbent": null,
+    "bound": null,
+    "status": "NodeLimit",
+    "trials": 0
+  },
+  {
+    "limit": 1,
+    "processed": 1,
+    "incumbent": null,
+    "bound": 1.5,
+    "status": "NodeLimit",
+    "trials": 0
+  },
+  {
+    "limit": 2,
+    "processed": 3,
+    "incumbent": 2.0,
+    "bound": 1.6666666666666667,
+    "status": "NodeLimit",
+    "trials": 2
+  },
+  {
+    "limit": 3,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal",
+    "trials": 4
+  },
+  {
+    "limit": 4,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal",
+    "trials": 4
+  },
+  {
+    "limit": 5,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal",
+    "trials": 4
+  },
+  {
+    "limit": 6,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal",
+    "trials": 4
+  },
+  {
+    "limit": 7,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal",
+    "trials": 4
+  }
+]

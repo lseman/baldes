@@ -22,11 +22,14 @@ pub enum RowSense {
 #[cfg(feature = "clp")]
 pub mod branching;
 #[cfg(feature = "clp")]
-pub mod mp;
+pub mod formulation;
 #[cfg(feature = "clp")]
-pub mod root;
-/// Compatibility path; prefer [`mp`] for shared-master models.
+pub mod model;
 #[cfg(feature = "clp")]
-pub use mp as networks;
+pub(crate) mod numerics;
+#[cfg(feature = "clp")]
+pub(crate) mod pricing;
+#[cfg(feature = "clp")]
+pub mod routing;
 #[cfg(feature = "clp")]
 pub mod tree;

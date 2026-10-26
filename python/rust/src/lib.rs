@@ -5,9 +5,7 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
 mod coupled;
-#[cfg(feature = "clp")]
-mod mp;
-mod root;
+mod frontend;
 
 fn run<T>(f: impl FnOnce() -> baldes::Result<T>) -> PyResult<T> {
     baldes::core::error::catch(f)
@@ -430,7 +428,7 @@ impl Solver {
                 weights,
                 graph_support: Default::default(),
                 graph_pricing_support: Default::default(),
-                native_kpath_support: None,
+                general_kpath_support: None,
                 memory: vec![false; vertices],
                 graph_dependent_memory: false,
                 graph_memories: Default::default(),
@@ -439,7 +437,7 @@ impl Solver {
                 graph_arc_memories: Default::default(),
                 arc_weights: Default::default(),
                 visit_once: false,
-                native_type2: false,
+                type2: false,
                 denominator,
                 dual,
                 class: baldes::cuts::CutClass::Packing,
@@ -622,8 +620,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("has_highs", cfg!(feature = "highs"))?;
     m.add("has_gurobi", cfg!(feature = "gurobi"))?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-    root::register(m)?;
-    #[cfg(feature = "clp")]
-    mp::register(m)?;
+    frontend::register(m)?;
     Ok(())
 }

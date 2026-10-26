@@ -57,9 +57,9 @@ fn main() -> baldes::Result<()> {
         for (name, backend) in [
             (
                 "native",
-                EvPricingBackend::Native(NativeOptions {
+                EvPricingBackend::PhysicalGraph(PhysicalGraphOptions {
                     max_arcs: pricing.max_arcs,
-                    ..NativeOptions::default()
+                    ..PhysicalGraphOptions::default()
                 }),
             ),
             ("direct", EvPricingBackend::Direct(pricing)),

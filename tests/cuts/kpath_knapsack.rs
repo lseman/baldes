@@ -30,7 +30,7 @@ fn enumeration_keeps_routes_with_same_support_and_distinct_cut_denominators() {
                 weights: vec![0, 1, 1, 0],
                 graph_support: BTreeMap::new(),
                 graph_pricing_support: BTreeMap::new(),
-                native_kpath_support: None,
+                general_kpath_support: None,
                 memory: vec![true; 4],
                 graph_dependent_memory: false,
                 graph_memories: BTreeMap::new(),
@@ -39,7 +39,7 @@ fn enumeration_keeps_routes_with_same_support_and_distinct_cut_denominators() {
                 graph_arc_memories: BTreeMap::new(),
                 arc_weights: BTreeMap::new(),
                 visit_once: false,
-                native_type2: false,
+                type2: false,
                 denominator,
                 dual,
                 class: CutClass::Packing,
@@ -969,7 +969,7 @@ fn enumeration_reprices_current_arc_and_strong_k_path_duals() {
         solver.cuts.cuts.push(RankOneCut {
             graph_support: BTreeMap::new(),
             graph_pricing_support: BTreeMap::new(),
-            native_kpath_support: None,
+            general_kpath_support: None,
             weights: vec![0, 1, 1, 0],
             memory: vec![false, true, true, false],
             graph_dependent_memory: false,
@@ -979,7 +979,7 @@ fn enumeration_reprices_current_arc_and_strong_k_path_duals() {
             graph_arc_memories: BTreeMap::new(),
             arc_weights: BTreeMap::new(),
             visit_once: false,
-            native_type2: false,
+            type2: false,
             denominator: 3,
             dual: 0.0,
             class,
@@ -1096,7 +1096,7 @@ fn bidirectional_pricing_and_non_elementary_memory_with_strong_k_path_cut() {
 #[cfg(feature = "clp")]
 #[test]
 fn root_master_with_kpath_cuts() {
-    use baldes::master::root::{solve, KPathCutConfig, RootOptions, RootProblem};
+    use baldes::master::routing::{solve, KPathCutConfig, RootOptions, RoutingContext};
 
     let mut g = Graph::<2>::new(5, 1).unwrap();
     for v in 0..5 {
@@ -1118,7 +1118,7 @@ fn root_master_with_kpath_cuts() {
             g.arc_mut(id).unwrap().consumption[0] = d;
         }
     }
-    let problem = RootProblem::set_partitioning(g, 3.0).unwrap();
+    let problem = RoutingContext::set_partitioning(g, 3.0).unwrap();
     let options = RootOptions::default().with_kpath_cuts(KPathCutConfig::new(demands, 4.0));
     let out = solve(problem, options).unwrap();
     assert!(out.master.lp.is_finite());
@@ -1310,12 +1310,12 @@ fn knapsack_root_cuts_close_fractional_capacity_gap_and_survive_snapshot() {
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         cg::Status,
-        root::{KnapsackCutConfig, RootOptions},
+        routing::{KnapsackCutConfig, RootOptions},
     };
     let instance = Instance::parse("knapsack-root\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let scaled = RootOptions::default()
         .with_knapsack_cuts(KnapsackCutConfig::new(vec![KnapsackRow::new(0, 1, 2., 6)]));
-    let scaled = instance.solve_root(8, Rounding::None, scaled).unwrap();
+    let scaled = instance.solve(8, Rounding::None, scaled).unwrap();
     assert_eq!(scaled.master.status, Status::Optimal);
     assert!(scaled.master.lp.is_finite());
     for enumerate in [false, true] {
@@ -1331,7 +1331,7 @@ fn knapsack_root_cuts_close_fractional_capacity_gap_and_survive_snapshot() {
             let mut options = RootOptions::default().with_knapsack_cuts(config);
             options.enumerate = enumerate;
             options.capture_state = true;
-            let out = instance.solve_root(8, Rounding::None, options).unwrap();
+            let out = instance.solve(8, Rounding::None, options).unwrap();
             assert_eq!(out.master.status, Status::Optimal);
             assert!(out.cuts > 0);
             assert!(out.master.cut_rounds > 0);
@@ -1340,9 +1340,12 @@ fn knapsack_root_cuts_close_fractional_capacity_gap_and_survive_snapshot() {
             let mut child_options = RootOptions::default();
             child_options.enumerate = enumerate;
             child_options.node_depth = 1;
-            let child =
-                baldes::master::root::inherit(out.snapshot.as_ref().unwrap(), &[], child_options)
-                    .unwrap();
+            let child = baldes::master::routing::inherit(
+                out.snapshot.as_ref().unwrap(),
+                &[],
+                child_options,
+            )
+            .unwrap();
             assert_eq!(child.master.status, Status::Optimal);
             assert!(child.inherited_cuts > 0);
             assert!((child.master.lp - out.master.lp).abs() < 1e-8);

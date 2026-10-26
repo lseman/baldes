@@ -3,14 +3,14 @@ use baldes::inputs::{Instance, Rounding};
 use baldes::master::{
     branching::BranchConstraint,
     cg::Status,
-    root::{
+    routing::{
         self, CapacityCutConfig, FixedRoute, KPathCutConfig, KnapsackCutConfig, RootOptions,
-        RootProblem,
+        RoutingContext,
     },
     RowSense,
 };
 
-fn fixture(family: usize) -> (RootProblem, RootOptions, Vec<i32>, Vec<i32>) {
+fn fixture(family: usize) -> (RoutingContext, RootOptions, Vec<i32>, Vec<i32>) {
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let graph = instance.graph(3, Rounding::None).unwrap();
     let arcs = |nodes: &[usize]| {
@@ -28,7 +28,7 @@ fn fixture(family: usize) -> (RootProblem, RootOptions, Vec<i32>, Vec<i32>) {
     };
     let pair = arcs(&[0, 1, 2, graph.sink]);
     let single = arcs(&[0, 3, graph.sink]);
-    let problem = RootProblem::set_partitioning(graph, 3.).unwrap();
+    let problem = RoutingContext::set_partitioning(graph, 3.).unwrap();
     let mut options = RootOptions::default();
     options.capture_state = true;
     options.cg.stabilize = false;
@@ -48,12 +48,12 @@ fn fixture(family: usize) -> (RootProblem, RootOptions, Vec<i32>, Vec<i32>) {
 fn fixed_routes_keep_all_cut_families_costs_and_parent_isolation() {
     for family in 0..5 {
         let (problem, options, pair, single) = fixture(family);
-        let parent = root::solve(problem, options.clone()).unwrap();
+        let parent = routing::solve(problem, options.clone()).unwrap();
         let snapshot = parent.snapshot.as_ref().unwrap();
         if family > 0 {
             assert!(snapshot.active_cuts() > 0, "family {family}");
         }
-        let fixed = root::inherit_fixed_routes(
+        let fixed = routing::inherit_fixed_routes(
             snapshot,
             &[FixedRoute {
                 arcs: pair.clone(),
@@ -86,7 +86,7 @@ fn fixed_routes_keep_all_cut_families_costs_and_parent_isolation() {
         assert!((cost - expected).abs() < 1e-8);
         let child = fixed.snapshot.as_ref().unwrap();
         assert_eq!(child.fixed_routes().len(), 1);
-        let complete = root::inherit_fixed_routes(
+        let complete = routing::inherit_fixed_routes(
             child,
             &[FixedRoute {
                 arcs: single.clone(),
@@ -98,10 +98,10 @@ fn fixed_routes_keep_all_cut_families_costs_and_parent_isolation() {
         assert_eq!(complete.master.status, Status::Optimal, "{complete:?}");
         assert!((complete.master.lp - expected).abs() < 1e-7);
         assert_eq!(complete.route_values().len(), 2);
-        let replay = root::inherit_branches(child, &[], options.clone()).unwrap();
+        let replay = routing::inherit_branches(child, &[], options.clone()).unwrap();
         assert!((replay.master.lp - fixed.master.lp).abs() < 1e-7);
         assert_eq!(replay.fixed_routes.len(), 1);
-        let original = root::inherit_branches(snapshot, &[], options.clone()).unwrap();
+        let original = routing::inherit_branches(snapshot, &[], options.clone()).unwrap();
         assert!((original.master.lp - parent.master.lp).abs() < 1e-7);
         assert!(snapshot.fixed_routes().is_empty());
         assert_eq!(snapshot.fixed_cost(), 0.);
@@ -113,7 +113,7 @@ fn residual_branches_and_invalid_fixings_do_not_corrupt_snapshots() {
     use baldes::pricing::restrictions::RyanFosterConstraint;
     let (problem, options, pair, _) = fixture(2);
     let arc = problem.arc_position(pair[0]).unwrap();
-    let parent = root::solve(problem, options.clone()).unwrap();
+    let parent = routing::solve(problem, options.clone()).unwrap();
     let snapshot = parent.snapshot.as_ref().unwrap();
     for entry in [
         FixedRoute {
@@ -129,9 +129,9 @@ fn residual_branches_and_invalid_fixings_do_not_corrupt_snapshots() {
             quantity: 1,
         },
     ] {
-        assert!(root::inherit_fixed_routes(snapshot, &[entry], options.clone()).is_err());
+        assert!(routing::inherit_fixed_routes(snapshot, &[entry], options.clone()).is_err());
     }
-    let fixed = root::inherit_fixed_routes(
+    let fixed = routing::inherit_fixed_routes(
         snapshot,
         &[FixedRoute {
             arcs: pair.clone(),
@@ -163,11 +163,11 @@ fn residual_branches_and_invalid_fixings_do_not_corrupt_snapshots() {
             rhs: 0.,
         },
     ] {
-        let result = root::inherit_branches(child, &[branch], options.clone()).unwrap();
+        let result = routing::inherit_branches(child, &[branch], options.clone()).unwrap();
         assert!(result.preprocessing.infeasible, "{result:?}");
         assert_eq!(result.master.pricing_calls, 0);
     }
-    let repeated = root::inherit_fixed_routes(
+    let repeated = routing::inherit_fixed_routes(
         snapshot,
         &[FixedRoute {
             arcs: pair,
@@ -179,7 +179,7 @@ fn residual_branches_and_invalid_fixings_do_not_corrupt_snapshots() {
     assert!(repeated.preprocessing.infeasible);
     assert_eq!(repeated.master.pricing_calls, 0);
     assert!(
-        (root::inherit_branches(snapshot, &[], options)
+        (routing::inherit_branches(snapshot, &[], options)
             .unwrap()
             .master
             .lp

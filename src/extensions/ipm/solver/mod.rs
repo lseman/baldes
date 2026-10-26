@@ -1,12 +1,29 @@
 mod initialization;
 mod persistent;
-pub use persistent::{Solver, SolverStatistics};
+pub use persistent::{Solver, SolverProfile, SolverStatistics};
 
 use super::model::StandardForm;
 use super::{dot, finite, norm, Error, ModelData, Result, SolverType, SparseSolver};
 
+/// Budget for extra centrality corrections after the predictor/corrector step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CorrectionPolicy {
+    Fixed(usize),
+    /// Target half a factorization's cost in extra solves, bounded to 1–3.
+    Adaptive,
+}
+
+impl Default for CorrectionPolicy {
+    fn default() -> Self {
+        Self::Fixed(3)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Options {
+    /// Collect cumulative phase measurements in `Solver::profile`.
+    pub profile: bool,
+    pub corrections: CorrectionPolicy,
     /// Cooperative wall-time budget, checked between Newton iterations.
     pub time_limit: Option<std::time::Duration>,
     pub tolerance: f64,
@@ -27,6 +44,8 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            profile: false,
+            corrections: CorrectionPolicy::default(),
             time_limit: None,
             tolerance: 1e-8,
             gap_tolerance: None,
@@ -67,7 +86,7 @@ pub struct Solution {
     pub certificate: Option<Vec<f64>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct Point {
     x: Vec<f64>,
     y: Vec<f64>,
@@ -223,6 +242,7 @@ fn solve_prepared(
     options: &Options,
     prepared: &mut persistent::Prepared,
     initial: Option<Point>,
+    profile: &mut SolverProfile,
 ) -> Result<(Solution, Point)> {
     let started = std::time::Instant::now();
     let persistent::Prepared {
@@ -242,9 +262,24 @@ fn solve_prepared(
     let n = f.c.len();
     let m = f.b.len();
     let nu = f.upper.len();
-    let mut q = initial
-        .or_else(|| initialization::least_squares(f, ls, solve_workspace))
-        .unwrap_or_else(|| initialization::unit(f));
+    // Directions stay distinct while in use and retain their allocations across
+    // iterations and persistent solves. Every solve overwrites all components.
+    let newton::NewtonScratch {
+        rhs: newton_scratch,
+        delta,
+        affine,
+        direction,
+        correction,
+    } = newton_scratch;
+    let mut q = initial.unwrap_or_else(|| {
+        let start = options.profile.then(std::time::Instant::now);
+        let point = initialization::least_squares(f, ls, solve_workspace)
+            .unwrap_or_else(|| initialization::unit(f));
+        if let Some(start) = start {
+            profile.initialization += start.elapsed();
+        }
+        point
+    });
     // Start at the regularization floor, like HiPO's small static values.
     // Large initial values perturb early directions and cost iterations;
     // numerical failures still raise regularization for the retried step.
@@ -343,9 +378,31 @@ fn solve_prepared(
         // A factor can be finite yet unusable. Retry the entire Newton step
         // with stronger regularization when a solve or refinement fails.
         for _ in 0..8 {
-            let result = (|| -> Result<(Point, f64)> {
-                ls.factorize(&theta, &rp, &rd)?;
-                let delta = augsys(ls, f, &tvw, &f.b, &f.c, &upper, solve_workspace)?;
+            let result = (|| -> Result<f64> {
+                let collect_costs =
+                    options.profile || options.corrections == CorrectionPolicy::Adaptive;
+                let start = collect_costs.then(std::time::Instant::now);
+                let factorization = ls.factorize(&theta, &rp, &rd);
+                let factorization_time = start.map(|start| start.elapsed());
+                if options.profile {
+                    profile.newton_factorization += factorization_time.unwrap();
+                    profile.factorization_attempts += 1;
+                }
+                factorization?;
+                let solve_time_before = solve_workspace.solve_time;
+                let solve_calls_before = solve_workspace.solve_calls;
+                augsys_into(
+                    ls,
+                    f,
+                    &tvw,
+                    &f.b,
+                    &f.c,
+                    &upper,
+                    solve_workspace,
+                    &mut delta.0,
+                    &mut delta.1,
+                    &mut delta.2,
+                )?;
                 // Equivalent positive quadratic form avoids cancellation between the
                 // three dot products in the original homogeneous Schur complement.
                 let delta0 = rg
@@ -386,15 +443,16 @@ fn solve_prepared(
                 vw.extend(q.v.iter().zip(&q.w).map(|(v, w)| -v * w));
                 let mu = (q.tau * q.kappa - xs.iter().sum::<f64>() - vw.iter().sum::<f64>())
                     / (n + nu + 1) as f64;
-                let affine = newton.solve(
+                newton.solve_into(
                     &r,
                     &xs,
                     &vw,
                     -q.tau * q.kappa,
                     solve_workspace,
                     newton_scratch,
+                    affine,
                 )?;
-                let one_minus = 1. - q.alpha(&affine);
+                let one_minus = 1. - q.alpha(affine);
                 // alpha is in [0, 1], so the expression before clipping is at most
                 // 0.1. A lower bound of 0.1 would make centering constant and damp
                 // even near-full affine steps. Retain strong centering for short
@@ -422,18 +480,34 @@ fn solve_prepared(
                         .zip(&affine.w)
                         .map(|((vw, v), w)| vw + gamma * mu - v * w),
                 );
-                let mut direction = newton.solve(
+                newton.solve_into(
                     &damped,
                     &cx,
                     &cv,
                     -q.tau * q.kappa + gamma * mu - affine.tau * affine.kappa,
                     solve_workspace,
                     newton_scratch,
+                    direction,
                 )?;
-                let mut alpha = q.alpha(&direction);
+                let mut alpha = q.alpha(direction);
                 // Gondzio centrality corrections are added to the existing direction.
                 // The C++ path overwrites it, which can discard the feasibility step.
-                for _ in 0..3 {
+                let correction_budget = match options.corrections {
+                    CorrectionPolicy::Fixed(limit) => limit,
+                    CorrectionPolicy::Adaptive => {
+                        let solves = solve_workspace.solve_calls - solve_calls_before;
+                        let solve_time =
+                            (solve_workspace.solve_time - solve_time_before).as_secs_f64();
+                        if solve_time > 0. && solves > 0 {
+                            let ratio = factorization_time.unwrap().as_secs_f64() * solves as f64
+                                / solve_time;
+                            ((ratio * 0.5).floor() as usize).clamp(1, 3)
+                        } else {
+                            1
+                        }
+                    }
+                };
+                for _ in 0..correction_budget {
                     if alpha >= 0.9995 {
                         break;
                     }
@@ -477,26 +551,39 @@ fn solve_prepared(
                         d: vec![0.; n],
                         g: 0.,
                     });
-                    let correction =
-                        newton.solve(zero, &tx, &tv, t0, solve_workspace, newton_scratch)?;
+                    if options.profile {
+                        profile.correction_attempts += 1;
+                    }
+                    newton.solve_into(
+                        zero,
+                        &tx,
+                        &tv,
+                        t0,
+                        solve_workspace,
+                        newton_scratch,
+                        correction,
+                    )?;
                     // Weight the correction by the best of nine points in
                     // [alpha², 1], following HiPO's bestWeight search.
                     let low = alpha * alpha;
                     let weights: [f64; 9] =
                         std::array::from_fn(|k| low + (1. - low) * k as f64 / 8.);
                     let (improved, weight) = q
-                        .alphas_with_weighted_correction(&direction, &correction, &weights)
+                        .alphas_with_weighted_correction(direction, correction, &weights)
                         .into_iter()
                         .zip(weights)
                         .fold((0., 1.), |best, c| if c.0 > best.0 { c } else { best });
                     if improved > alpha {
-                        direction.add_scaled_direction(&correction, weight);
+                        if options.profile {
+                            profile.accepted_corrections += 1;
+                        }
+                        direction.add_scaled_direction(correction, weight);
                         alpha = improved;
                     } else {
                         break;
                     }
                 }
-                Ok((direction, alpha))
+                Ok(alpha)
             })();
             match result {
                 Ok(value) => {
@@ -511,8 +598,8 @@ fn solve_prepared(
             }
             rg *= 10.;
         }
-        let (direction, alpha) = step.ok_or(last_error)?;
-        q.update(&direction, 0.9995 * alpha)?;
+        let alpha = step.ok_or(last_error)?;
+        q.update(direction, 0.9995 * alpha)?;
     }
     let primal: Vec<_> = f
         .recovery
@@ -575,7 +662,7 @@ fn primal_residual(model: &ModelData, x: &[f64], activity: &mut Vec<f64>) -> f64
 }
 
 mod newton;
-use newton::{augsys, Newton};
+use newton::{augsys_into, Newton};
 
 mod scaling;
 use scaling::{certificate, scale};

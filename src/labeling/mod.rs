@@ -461,7 +461,7 @@ pub fn reference_price<const D: usize>(g: &Graph<D>, controls: &Controls) -> Res
 }
 
 /// Native bucket pricing. Equality resources with a non-fixed sink use the
-/// supported forward search, since a backward equality root is undefined.
+/// supported forward search, since a backward equality routing is undefined.
 pub fn price<const D: usize>(g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
     g.validate()?;
     let bidirectional = !g.resources.iter().enumerate().any(|(r, k)| {

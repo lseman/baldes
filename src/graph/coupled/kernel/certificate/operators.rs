@@ -140,7 +140,7 @@ fn constant(
         .then_some(function.pairs()[0].0)
 }
 
-pub(super) fn native_pair(
+pub(super) fn front_algebra_pair(
     definition: &CoupledResource,
     path: &[usize],
     scale: f64,
@@ -148,7 +148,7 @@ pub(super) fn native_pair(
     deadline: Option<Instant>,
 ) -> Option<(bool, [f64; 2])> {
     constant_pair(definition, path, scale, work, deadline)
-        .or_else(|| super::lattice::native_pair(definition, path, scale, work, deadline))
+        .or_else(|| super::lattice::front_algebra_pair(definition, path, scale, work, deadline))
 }
 
 fn constant_pair(
@@ -260,12 +260,12 @@ impl CoupledKernel {
             else {
                 return None;
             };
-            if *policy == descriptor::FrontOperationPolicy::NativeFrontAlgebra {
+            if *policy == descriptor::FrontOperationPolicy::FrontAlgebra {
                 // The native program also merges near-equal summed slopes.
                 // Coordinate-lattice spacing alone does not prove source
                 // equivalence after that merge. Check the declared machine
                 // program independently instead of reusing its optimized min.
-                if !self.native_front_program_domain {
+                if !self.front_program_domain {
                     match super::machine::source_feasibility(
                         *initial, *bounds, increments, functions, path, work, deadline,
                     )? {
@@ -284,7 +284,7 @@ impl CoupledKernel {
                     deadline,
                 )?;
                 if !feasible {
-                    return self.native_front_program_domain.then_some((false, [0.; 2]));
+                    return self.front_program_domain.then_some((false, [0.; 2]));
                 }
                 total = total.add(Interval {
                     lo: cost[0],
@@ -301,7 +301,7 @@ impl CoupledKernel {
                 path,
                 increments,
                 functions,
-                *policy == descriptor::FrontOperationPolicy::NativeFrontAlgebra,
+                *policy == descriptor::FrontOperationPolicy::FrontAlgebra,
                 work,
                 deadline,
             )?;

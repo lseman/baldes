@@ -39,6 +39,7 @@ impl BucketGraph {
             .filter_map(|(r, k)| {
                 (r == main
                     || (*k == crate::graph::ResourceKind::Disposable
+                        && g.arcs.iter().all(|arc| arc.consumption[r] >= 0.)
                         && steps.get(r).copied().unwrap_or(0.) > 1e-6))
                     .then_some(r)
             })

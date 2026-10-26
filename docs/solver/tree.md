@@ -44,7 +44,7 @@ A complete Rust entry point, requiring `clp`:
 
 ```rust
 use baldes::{
-    master::{root::RootProblem, tree::{self, TreeOptions}},
+    master::{root::RoutingContext, tree::{self, TreeOptions}},
     inputs::{Instance, Rounding},
 };
 use std::time::Duration;
@@ -53,7 +53,7 @@ fn main() -> baldes::Result<()> {
     let mut instance = Instance::read("instances/Solomon/R101.txt")?;
     instance.truncate(10)?;
     let graph = instance.graph(8, Rounding::None)?;
-    let problem = RootProblem::set_partitioning(graph, instance.vehicles as f64)?;
+    let problem = RoutingContext::set_partitioning(graph, instance.vehicles as f64)?;
     let mut options = TreeOptions::default();
     options.time_limit = Duration::from_secs(60);
     options.root.cg.multiplicity = (instance.customers.len() - 1) as f64;
@@ -65,8 +65,8 @@ fn main() -> baldes::Result<()> {
 ```
 
 The CLI tree uses `Instance::vehicles` as its fleet bound. Root-only CLI and
-`Instance::solve_root` use the customer count instead. A custom Rust caller
-chooses the bound in `RootProblem::set_partitioning` and configures the
+`Instance::solve` use the customer count instead. A custom Rust caller
+chooses the bound in `RoutingContext::set_partitioning` and configures the
 column-generation multiplicity separately.
 
 ## Node processing
@@ -198,7 +198,7 @@ The Rust API can fix additional integer quantities of physical elementary routes
 in a captured node:
 
 ```rust,ignore
-use baldes::master::root::{self, FixedRoute};
+use baldes::master::routing::{self, FixedRoute};
 
 let child = root::inherit_fixed_routes(
     parent_snapshot,

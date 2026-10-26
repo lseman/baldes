@@ -32,7 +32,7 @@ print(root.routes[0].network, root.routes[0].nodes)
 
 The only covering route costs 3, contributes one unit to shared row 0, consumes
 one load unit, and uses one copy of network 19's allowed route multiplicity.
-`problem.solve(**options)` delegates to `solve_networks(problem, **options)`.
+`problem.solve(**options)` delegates to `solve(problem, **options)`.
 Both require Clp.
 
 ## Model reference
@@ -78,21 +78,21 @@ Path("model.json").write_text(text, encoding="utf-8")
 restored = NetworkProblem.from_file("model.json")
 ```
 
-The same model format is accepted by `baldes multi-pricing model.json` (alias
-`baldes networks`). JSON requires finite numeric fields; it cannot represent
+The same model format is accepted by `baldes solve model.json` (alias
+`baldes solve`). JSON requires finite numeric fields; it cannot represent
 infinity. Synchronization definitions are solve options, not fields in
 `NetworkProblem.to_json()`; save them separately for reproducibility.
 
 ## Solve controls
 
-All options to `solve_networks` are keyword-only.
+All options to `solve` are keyword-only.
 
 | Keyword | Default | Meaning |
 | --- | --- | --- |
 | `tree` | `False` | Solve a root LP or search a shared-master integer tree |
-| `network_pricing_schedule` | `"full-sweep"` | `full-sweep`, `cyclic`, `sorted`, `native-promising-first`, `native-unvisited-first` |
+| `network_pricing_schedule` | `"full-sweep"` | `full-sweep`, `cyclic`, `sorted`, `promising-first`, `unvisited-first` |
 | `network_unpromising_limit` | `1` | Positive native queue batch budget |
-| `network_branching` | `"multiplicity-first"` | `multiplicity-first`, `resource-first` or `native-phased` branching policy |
+| `network_branching` | `"multiplicity-first"` | `multiplicity-first`, `resource-first` or `phased` branching policy |
 | `stabilize` | `True` | Dual smoothing when no explicit proximal configuration replaces it |
 | `proximal` | `None` | Explicit proximal bands and optional multi-point policy |
 | `bound_mode` | `"numerical"` | Numerical or certified lower bounds |
@@ -112,7 +112,7 @@ Example proximal configuration:
 
 ```python
 root = problem.solve(
-    network_pricing_schedule="native-promising-first",
+    network_pricing_schedule="promising-first",
     proximal={"bands": [{"half_width": 0.5, "penalty": 1.0}], "multi_point": True},
 )
 ```
@@ -120,7 +120,7 @@ root = problem.solve(
 `penalty=None` selects a hard band. Use positive validated widths/penalties;
 see [proximal pricing](../extensions/mp.md#proximal-pricing) for the mathematical
 contract. Root and tree APIs have different option sets from routing
-`solve_root`; there is no `master_solver` keyword here.
+`solve`; there is no `master_solver` keyword here.
 
 ## Resume, branch, and add rows
 
@@ -269,3 +269,18 @@ A snapshot's service definitions are immutable. Narrow a start domain with
 MIP is deferred while common start domains are non-singleton. The
 [synchronization contract](../extensions/mp.md#synchronized-service-across-vehicles)
 explains coverage equations and schedule validation.
+
+
+Original-variable pricing envelopes can be passed to `solve` or a node solve:
+
+```python
+result = problem.solve(
+    original_variable_boxes=({"network": 7, "id": 0, "lower": 0, "upper": 1},),
+)
+```
+
+Each identity must occur in `problem.pricing_variables`. The bound must already
+follow from the pricing graph; an unproved envelope raises an error. These
+bounds guide pricing admission without adding a route restriction. Original
+variable costs remain separate during this calculation even if they cancel on
+shared physical arcs. See the [compilation contract](../extensions/mp.md#original-pricing-variable-compilation-rust).

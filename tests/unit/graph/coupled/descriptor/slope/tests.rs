@@ -63,37 +63,37 @@ fn explicit_boundary_policy_matches_native_start_and_end_observations() {
     );
     assert_eq!(
         function
-            .evaluate(-0.00001, EvaluationPolicy::NativeTolerance)
+            .evaluate(-0.00001, EvaluationPolicy::EndpointTolerance)
             .unwrap(),
         Some(2.)
     );
     assert_eq!(
         function
-            .evaluate(0.00001, EvaluationPolicy::NativeTolerance)
+            .evaluate(0.00001, EvaluationPolicy::EndpointTolerance)
             .unwrap(),
         Some(2.)
     );
     assert_eq!(
         function
-            .evaluate(-0.0001, EvaluationPolicy::NativeTolerance)
+            .evaluate(-0.0001, EvaluationPolicy::EndpointTolerance)
             .unwrap(),
         None
     );
     assert_eq!(
         function
-            .evaluate(0.0001, EvaluationPolicy::NativeTolerance)
+            .evaluate(0.0001, EvaluationPolicy::EndpointTolerance)
             .unwrap(),
         Some(2.0003)
     );
     assert_eq!(
         function
-            .evaluate(10.00001, EvaluationPolicy::NativeTolerance)
+            .evaluate(10.00001, EvaluationPolicy::EndpointTolerance)
             .unwrap(),
         Some(12.)
     );
     assert_eq!(
         function
-            .evaluate(10.001, EvaluationPolicy::NativeTolerance)
+            .evaluate(10.001, EvaluationPolicy::EndpointTolerance)
             .unwrap(),
         None
     );
@@ -101,19 +101,19 @@ fn explicit_boundary_policy_matches_native_start_and_end_observations() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(2., 1e8), (3., 1e8 + 10.)]).unwrap();
     assert_eq!(
         large
-            .evaluate(1e8 - 0.01, EvaluationPolicy::NativeTolerance)
+            .evaluate(1e8 - 0.01, EvaluationPolicy::EndpointTolerance)
             .unwrap(),
         Some(2.)
     );
     assert_eq!(
         large
-            .evaluate(1e8 + 0.01, EvaluationPolicy::NativeTolerance)
+            .evaluate(1e8 + 0.01, EvaluationPolicy::EndpointTolerance)
             .unwrap(),
         Some(2.)
     );
     assert_eq!(
         large
-            .evaluate(1e8 + 10.01, EvaluationPolicy::NativeTolerance)
+            .evaluate(1e8 + 10.01, EvaluationPolicy::EndpointTolerance)
             .unwrap(),
         Some(32.)
     );
@@ -171,12 +171,12 @@ fn validation_and_arithmetic_failures_are_explicit() {
     let point = PreparedSlopeFunction::constant_point(0., 1e308).unwrap();
     assert_eq!(
         point
-            .evaluate(1e308, EvaluationPolicy::NativeTolerance)
+            .evaluate(1e308, EvaluationPolicy::EndpointTolerance)
             .unwrap(),
         Some(0.)
     );
     assert!(point
-        .evaluate(1e308 - 1e300, EvaluationPolicy::NativeTolerance)
+        .evaluate(1e308 - 1e300, EvaluationPolicy::EndpointTolerance)
         .is_err());
     assert!(point
         .evaluate(f64::INFINITY, EvaluationPolicy::StrictDomain)
@@ -205,7 +205,7 @@ fn signed_zero_at_anchor_is_preserved_without_a_knot_conversion() {
     );
     assert_eq!(
         function
-            .evaluate(0., EvaluationPolicy::NativeTolerance)
+            .evaluate(0., EvaluationPolicy::EndpointTolerance)
             .unwrap()
             .unwrap()
             .to_bits(),

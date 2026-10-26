@@ -5,10 +5,11 @@ use baldes::cuts::{
     CutRegistry,
 };
 use baldes::master::preprocessing::Bounds;
-use mp::{
+use baldes::master::tree::TreeStatus;
+use model::{
     imported::{
-        self, Column, ColumnBatch, ImportOptions, ImportPricingKind, ImportTreeStatus,
-        ImportedSnapshot, MultiImport, Subproblem,
+        self, Column, ColumnBatch, ImportOptions, ImportPricingKind, ImportedSnapshot, MultiImport,
+        Subproblem,
     },
     MasterVariable, RegisteredCutCoefficients, ResourceKnapsackCoefficients,
 };
@@ -249,7 +250,7 @@ fn open_import_trees_keep_registered_composite_and_resource_rows_during_phase_on
                 .with_multiplicity(42, bounds(0., 2.))
                 .unwrap();
             let session = kind.session(&base);
-            let mut tree = mp::AssignmentTreeOptions {
+            let mut tree = baldes::master::tree::ModelTreeOptions {
                 node: options(),
                 ..Default::default()
             };
@@ -274,7 +275,7 @@ fn open_import_trees_keep_registered_composite_and_resource_rows_during_phase_on
                 })
                 .unwrap();
             assert_eq!(calls, 1, "{kind:?} {mode:?}");
-            assert_eq!(done.status, ImportTreeStatus::Optimal, "{kind:?} {mode:?}");
+            assert_eq!(done.status, TreeStatus::Optimal, "{kind:?} {mode:?}");
             assert_eq!(done.bound, 15.);
             assert_eq!(done.incumbent, 15.);
             assert_eq!(done.tree.solution().unwrap().values.original, vec![(0, 2.)]);

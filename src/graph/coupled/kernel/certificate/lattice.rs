@@ -45,7 +45,7 @@ fn count(lo: f64, hi: f64, work: &mut usize, deadline: Option<Instant>) -> Optio
     Some(n)
 }
 
-pub(super) fn native_pair(
+pub(super) fn front_algebra_pair(
     definition: &CoupledResource,
     path: &[usize],
     scale: f64,

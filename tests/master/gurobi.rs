@@ -143,17 +143,17 @@ fn wrapper_switches_backends_and_forks_without_losing_matrix() {
 #[test]
 fn routing_root_matches_clp() {
     use baldes::inputs::{Instance, Rounding};
-    use baldes::master::root::{self, MasterSolver, RootOptions, RootProblem};
+    use baldes::master::routing::{self, MasterSolver, RootOptions, RoutingContext};
     let instance = Instance::parse("triangle\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     let mut objectives = vec![];
     for solver in [MasterSolver::Clp, MasterSolver::Gurobi] {
         let graph = instance.graph(3, Rounding::None).unwrap();
-        let problem = RootProblem::set_partitioning(graph, instance.vehicles as f64).unwrap();
+        let problem = RoutingContext::set_partitioning(graph, instance.vehicles as f64).unwrap();
         let options = RootOptions {
             master_solver: solver,
             ..Default::default()
         };
-        let output = root::solve(problem, options).unwrap();
+        let output = routing::solve(problem, options).unwrap();
         assert_eq!(output.master.status, baldes::master::cg::Status::Optimal);
         objectives.push(output.master.lp);
     }

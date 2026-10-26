@@ -496,6 +496,130 @@ fn relaxed_optimality_keeps_primal_and_dual_feasibility_tight() {
     }
 }
 
+#[test]
+fn dense_newton_front_converges_with_an_active_upper_bound_and_both_backends() {
+    use baldes::extensions::ipm::{Parallel, ParallelType};
+    let rows = 160;
+    let mut entries: Vec<_> = (0..rows).map(|i| (i, i, 1.)).collect();
+    entries.extend((0..rows).map(|i| (i, rows, 1.)));
+    let mut lp = ModelData {
+        a: SparseMatrix::from_triplets(rows, rows + 1, &entries).unwrap(),
+        b: vec![1.; rows],
+        c: vec![1.; rows + 1],
+        lower: vec![0.; rows + 1],
+        upper: vec![f64::INFINITY; rows + 1],
+        sense: vec![Sense::Equal; rows],
+    };
+    lp.c[rows] = 0.;
+    lp.upper[rows] = 0.5;
+    // Every equality gives x_i = 1-z. The zero-cost dense column reaches
+    // its upper bound z=0.5, so x_i=0.5 and the known objective is 80.
+    for solver in [SolverType::HiPO, SolverType::NormalEquations] {
+        let plan = baldes::extensions::ipm::SparseSolver::new(lp.a.clone(), solver)
+            .unwrap()
+            .factorization_plan();
+        assert!(plan.max_pivot_block >= 128);
+        for parallel in [Parallel::Off, Parallel::On] {
+            let solution = solve(
+                &lp,
+                &Options {
+                    solver,
+                    parallel,
+                    parallel_type: ParallelType::Both,
+                    threads: 3,
+                    tolerance: 1e-8,
+                    ..Options::default()
+                },
+            )
+            .unwrap();
+            assert_eq!(solution.status, Status::Optimal);
+            assert!(solution.primal_residual <= 1e-8);
+            assert!(solution.dual_residual <= 1e-8);
+            assert!(solution.relative_gap <= 1e-8);
+            assert!((solution.objective - 80.).abs() < 2e-6);
+            assert!(solution.primal.iter().all(|x| (x - 0.5).abs() < 1e-6));
+        }
+    }
+}
+
+#[test]
+fn optional_phase_profile_preserves_solution_and_stops_counting_when_disabled() {
+    let (lp, _) = captured_master(include_str!("fixtures/r201_master.txt"));
+    let options = Options {
+        tolerance: 1e-9,
+        threads: 1,
+        ..Options::default()
+    };
+    let mut solver = Solver::default();
+    let reference = solver.solve(&lp, &options).unwrap();
+    assert_eq!(solver.profile(), Default::default());
+    let mut profiled = Solver::default();
+    let measured = profiled
+        .solve(
+            &lp,
+            &Options {
+                profile: true,
+                ..options.clone()
+            },
+        )
+        .unwrap();
+    assert_eq!(measured.iterations, reference.iterations);
+    assert_eq!(measured.primal, reference.primal);
+    assert_eq!(measured.dual, reference.dual);
+    let profile = profiled.profile();
+    assert!(profile.factorization_attempts >= measured.iterations);
+    assert!(profile.linear_solve_calls >= 3 * measured.iterations);
+    assert!(profile.accepted_corrections <= profile.correction_attempts);
+    assert!(profile.preparation > std::time::Duration::ZERO);
+    assert!(profile.newton_factorization > std::time::Duration::ZERO);
+    // Force new work with changed costs, while retaining compatible preparation.
+    let mut changed = lp.clone();
+    changed.c[0] += 0.5;
+    assert_eq!(
+        profiled.solve(&changed, &options).unwrap().status,
+        Status::Optimal
+    );
+    assert_eq!(profiled.profile(), profile);
+}
+
+#[test]
+fn adaptive_corrections_preserve_routing_master_accuracy_with_both_backends() {
+    use baldes::extensions::ipm::CorrectionPolicy;
+    for text in [
+        include_str!("fixtures/r201_master.txt"),
+        include_str!("fixtures/c202_rank1_master.txt"),
+    ] {
+        let (lp, _) = captured_master(text);
+        let reference = solve(
+            &lp,
+            &Options {
+                tolerance: 1e-9,
+                threads: 1,
+                ..Options::default()
+            },
+        )
+        .unwrap();
+        for backend in [SolverType::HiPO, SolverType::NormalEquations] {
+            let actual = solve(
+                &lp,
+                &Options {
+                    tolerance: 1e-9,
+                    solver: backend,
+                    threads: 1,
+                    corrections: CorrectionPolicy::Adaptive,
+                    ..Options::default()
+                },
+            )
+            .unwrap();
+            assert_eq!(actual.status, Status::Optimal);
+            assert!(actual.primal_residual <= 1e-9);
+            assert!(actual.dual_residual <= 1e-9);
+            assert!(actual.relative_gap <= 1e-9);
+            assert!((actual.objective - reference.objective).abs() < 2e-6);
+        }
+    }
+}
+
 fn captured_master(text: &str) -> (ModelData, f64) {
     let mut lines = text.lines();
     let mut header = lines.next().unwrap().split_whitespace();

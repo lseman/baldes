@@ -5,7 +5,7 @@ failed with `iterate left the strict interior` on R201 (100 customers), using:
 
 ```sh
 cargo build --offline --release --features clp --bin baldes
-target/release/baldes vrptw instances/R201.txt --master ipm --time 120
+target/release/baldes solve instances/R201.txt --master ipm --time 120
 ```
 
 The capture used revision `b2c3dfafd714596cc4d00f3404fe085038d48bee` plus
@@ -29,7 +29,7 @@ and the default strict gap tolerance, retaining primal/dual tolerance `1e-9`.
 # C202 rank-1 master regression
 
 `c202_rank1_master.txt` captures the master that failed with `non-finite
-triangular solution` using `baldes vrptw instances/C202.txt --customers 100
+triangular solution` using `baldes solve instances/C202.txt --customers 100
 --rank1 --log --master ipm`. It contains 101 rows, 2,440 columns, and 49,453
 nonzeros, in the same format as the R201 fixture. The capture uses the working
 tree of 2026-10-20 and temporary instrumentation, removed after capture.

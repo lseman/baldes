@@ -85,13 +85,7 @@ fn independent_and_production_native_sum_match_all_retained_binary_fixtures() {
         let mut m = Machine::new(&mut work, None);
         let left = vec![prepare(&case.left, &mut m).unwrap()];
         let right = vec![prepare(&case.right, &mut m).unwrap()];
-        let checked = add(
-            &left,
-            &right,
-            FrontOperationPolicy::NativeFrontAlgebra,
-            &mut m,
-        )
-        .unwrap();
+        let checked = add(&left, &right, FrontOperationPolicy::FrontAlgebra, &mut m).unwrap();
         assert_eq!(checked.len(), 1);
         assert_eq!(
             checked[0]
@@ -109,7 +103,7 @@ fn independent_and_production_native_sum_match_all_retained_binary_fixtures() {
         let right = PreparedSlopeFunction::from_prepared_pairs(case.right).unwrap();
         let FrontierOutcome::Complete(actual) = SlopeFront::from_prepared(left).add(
             &SlopeFront::from_prepared(right),
-            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontOperationPolicy::FrontAlgebra,
             FrontierBudget::default(),
         ) else {
             panic!("retained native addition must complete")
@@ -171,7 +165,7 @@ fn general_native_raw_certificates_match_independent_nonlattice_machine_programs
                 bounds: Window::new(spec.bounds[0], spec.bounds[1]).unwrap(),
                 increments: spec.increments,
                 functions,
-                policy: FrontOperationPolicy::NativeFrontAlgebra,
+                policy: FrontOperationPolicy::FrontAlgebra,
             }])
             .unwrap();
         if spec.scale == 0. {
@@ -179,7 +173,7 @@ fn general_native_raw_certificates_match_independent_nonlattice_machine_programs
         }
         // Fixtures describe the explicitly selected MACHINE feasibility
         // model. Its scope cannot silently replace a default source witness.
-        graph.set_native_front_program_domain(true).unwrap();
+        graph.set_front_program_domain(true).unwrap();
         let kernel = graph.coupled_kernel().unwrap();
         assert!(kernel.has_machine_front_contracts());
         let path: Vec<_> = (0..graph.arcs.len()).collect();
@@ -214,10 +208,10 @@ fn machine_feasibility_requires_explicit_model_choice_and_survives_cloning() {
         bounds: Window::new(0., 1.).unwrap(),
         increments: vec![0.2],
         functions: vec![PreparedSlopeFunction::constant_point(3., 0.30000000000000004).unwrap()],
-        policy: FrontOperationPolicy::NativeFrontAlgebra,
+        policy: FrontOperationPolicy::FrontAlgebra,
     };
     graph.set_coupled_resources(&[definition.clone()]).unwrap();
-    assert!(!graph.native_front_program_domain());
+    assert!(!graph.front_program_domain());
     assert!(graph
         .coupled_kernel()
         .unwrap()
@@ -234,25 +228,25 @@ fn machine_feasibility_requires_explicit_model_choice_and_survives_cloning() {
         .unwrap();
     assert!(alternate.feasible);
     assert_eq!(alternate.objective, [3., 3.]);
-    assert!(!graph.native_front_program_domain());
+    assert!(!graph.front_program_domain());
 
-    graph.set_native_front_program_domain(true).unwrap();
+    graph.set_front_program_domain(true).unwrap();
     assert_eq!(
         graph.coupled_kernel().unwrap().certify(&[0]),
         Some((true, [3., 3.]))
     );
     let mut child = graph.clone();
     child.suppress_coupled_costs();
-    assert!(child.native_front_program_domain());
+    assert!(child.front_program_domain());
     assert_eq!(
         child.coupled_kernel().unwrap().certify(&[0]),
         Some((true, [0., 0.]))
     );
-    child.set_native_front_program_domain(false).unwrap();
-    assert!(graph.native_front_program_domain());
-    assert!(!child.native_front_program_domain());
+    child.set_front_program_domain(false).unwrap();
+    assert!(graph.front_program_domain());
+    assert!(!child.front_program_domain());
     graph.set_coupled_resources(&[definition]).unwrap();
-    assert!(!graph.native_front_program_domain());
+    assert!(!graph.front_program_domain());
 }
 
 #[test]
@@ -267,11 +261,11 @@ fn computed_front_emptiness_cannot_prove_default_source_infeasibility() {
             functions: vec![
                 PreparedSlopeFunction::from_prepared_pairs(vec![(1., 1.), (0.3, 2.)]).unwrap(),
             ],
-            policy: FrontOperationPolicy::NativeFrontAlgebra,
+            policy: FrontOperationPolicy::FrontAlgebra,
         }])
         .unwrap();
     assert_eq!(graph.coupled_kernel().unwrap().certify(&[0]), None);
-    graph.set_native_front_program_domain(true).unwrap();
+    graph.set_front_program_domain(true).unwrap();
     assert_eq!(
         graph.coupled_kernel().unwrap().certify(&[0]),
         Some((false, [0.; 2]))
@@ -293,7 +287,7 @@ fn machine_component_points_do_not_turn_rounded_aggregate_costs_into_exact_point
                 (0., 1.),
             ])
             .unwrap()],
-            policy: FrontOperationPolicy::NativeFrontAlgebra,
+            policy: FrontOperationPolicy::FrontAlgebra,
         })
         .collect();
     graph.set_coupled_resources(&definitions).unwrap();
@@ -310,7 +304,7 @@ fn machine_component_points_do_not_turn_rounded_aggregate_costs_into_exact_point
 fn source_objective_walk_relaxation_never_overbounds_native_machine_costs() {
     for policy in [
         FrontOperationPolicy::StrictDomain,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
     ] {
         let mut graph = Graph::<2>::new(3, 0).unwrap();
         graph.add_arc(0, 1, 0.).unwrap();
@@ -344,7 +338,7 @@ fn source_objective_walk_relaxation_never_overbounds_native_machine_costs() {
             kernel.objective_walk_lower_bound(&graph, 2, &mut 10000, deadline),
             None
         );
-        if policy == FrontOperationPolicy::NativeFrontAlgebra {
+        if policy == FrontOperationPolicy::FrontAlgebra {
             assert!(kernel.certify(&[0, 1]).unwrap().0);
         }
     }
@@ -378,7 +372,7 @@ fn machine_scope_does_not_claim_a_source_control_minimum() {
     let source = SourceReplayWitness::evaluate_shared_argument(
         &functions,
         x,
-        EvaluationPolicy::NativeTolerance,
+        EvaluationPolicy::EndpointTolerance,
     )
     .unwrap()
     .unwrap();

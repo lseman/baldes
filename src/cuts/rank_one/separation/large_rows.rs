@@ -9,7 +9,7 @@ impl Separation {
         max_num: i32,
         sort_and_set_memory: bool,
         insert: bool,
-        out: &mut Vec<NativeCut>,
+        out: &mut Vec<SeparatedCut>,
     ) {
         if !insert {
             cuts.clear();
@@ -200,7 +200,7 @@ impl Separation {
                                 self.permutations_130[best_perm as usize][..5].to_vec();
                             let id = self.round_cut_counter;
                             self.round_cut_counter += 1;
-                            let cut = self.push_candidate(NativeCut {
+                            let cut = self.push_candidate(SeparatedCut {
                                 id,
                                 rhs: five_or_more_row_rhs(0, kind),
                                 kind: 0,

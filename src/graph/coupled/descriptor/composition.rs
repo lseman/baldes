@@ -151,7 +151,7 @@ impl<'a> Cached<'a> {
             return Err(unsupported("composition endpoint outside outer domain"));
         }
         if argument == lower
-            || (policy == FrontOperationPolicy::NativeFrontAlgebra && near(argument, lower)?)
+            || (policy == FrontOperationPolicy::FrontAlgebra && near(argument, lower)?)
         {
             return Ok(self.knots[0].1);
         }
@@ -294,7 +294,7 @@ fn compose_cached(
         return Err(unsupported("composition needs a finite ordered interval"));
     }
     let outer = Cached::new(outer, false, work)?;
-    if policy == FrontOperationPolicy::NativeFrontAlgebra
+    if policy == FrontOperationPolicy::FrontAlgebra
         && lower < inner.function.domain().0
         && near(lower, inner.function.domain().0)?
     {
@@ -303,7 +303,7 @@ fn compose_cached(
     let lo = lower.max(inner.function.domain().0);
     let hi = upper.min(inner.function.domain().1);
     if lo > hi {
-        if policy == FrontOperationPolicy::NativeFrontAlgebra && near(lo, hi)? {
+        if policy == FrontOperationPolicy::FrontAlgebra && near(lo, hi)? {
             return Err(unsupported("native near-disjoint composition interval"));
         }
         return Ok(None);
@@ -311,16 +311,16 @@ fn compose_cached(
     // The native helper treats a tolerance-sized interval as a constant
     // front evaluated at its requested start, rather than fitting a secant.
     // Keep exact domain intersection above: tolerance must not invent a domain.
-    if policy == FrontOperationPolicy::NativeFrontAlgebra && near(lo, hi)? {
+    if policy == FrontOperationPolicy::FrontAlgebra && near(lo, hi)? {
         work.charge(inner.function.pairs().len() + outer.function.pairs().len())?;
         let inner_value = inner
             .function
-            .evaluate(lo, super::EvaluationPolicy::NativeTolerance)
+            .evaluate(lo, super::EvaluationPolicy::EndpointTolerance)
             .map_err(FrontierUnknown::Arithmetic)?
             .ok_or_else(|| unsupported("native singleton inner evaluation outside domain"))?;
         let value = outer
             .function
-            .evaluate(inner_value, super::EvaluationPolicy::NativeTolerance)
+            .evaluate(inner_value, super::EvaluationPolicy::EndpointTolerance)
             .map_err(FrontierUnknown::Arithmetic)?
             .ok_or_else(|| unsupported("native singleton outer evaluation outside domain"))?;
         let pairs = if lo == hi {
@@ -335,7 +335,7 @@ fn compose_cached(
     if inner.knots.len() == 1 {
         let (x, y) = inner.knots[0];
         if y < outer_lo || y > outer_hi {
-            if policy == FrontOperationPolicy::NativeFrontAlgebra
+            if policy == FrontOperationPolicy::FrontAlgebra
                 && (near(y, outer_lo)? || near(y, outer_hi)?)
             {
                 return Err(unsupported("native near-disjoint point composition"));
@@ -346,9 +346,9 @@ fn compose_cached(
     }
     let mut output = Vec::new();
     let mut last: Option<(f64, f64)> = None;
-    let mut native_inner_end = None;
-    let mut native_outer_anchor = None;
-    let mut native_outer_next = None;
+    let mut inner_endpoint = None;
+    let mut outer_anchor = None;
+    let mut outer_next = None;
     for index in 1..inner.knots.len() {
         work.charge(1)?;
         let (gx, gy) = inner.knots[index - 1];
@@ -363,8 +363,8 @@ fn compose_cached(
         // carrying the rounded endpoint into the following segment. Reusing
         // the original knot anchor is mathematically equivalent, but can
         // change both a crossing and the final secant by a binary64 bit.
-        let (anchor_x, anchor_y) = if policy == FrontOperationPolicy::NativeFrontAlgebra {
-            let y = match native_inner_end {
+        let (anchor_x, anchor_y) = if policy == FrontOperationPolicy::FrontAlgebra {
+            let y = match inner_endpoint {
                 Some(y) => y,
                 None if near(lo, inner.function.domain().0)? => inner.knots[0].1,
                 None => segment_value(gx, gy, slope, x0)?,
@@ -375,16 +375,16 @@ fn compose_cached(
         };
         let mut y0 = segment_value(anchor_x, anchor_y, slope, x0)?;
         let mut y1 = segment_value(anchor_x, anchor_y, slope, x1)?;
-        native_inner_end = Some(y1);
+        inner_endpoint = Some(y1);
         if y0 > outer_hi || y1 < outer_lo {
-            if policy == FrontOperationPolicy::NativeFrontAlgebra
+            if policy == FrontOperationPolicy::FrontAlgebra
                 && (near(y0, outer_hi)? || near(y1, outer_lo)?)
             {
                 return Err(unsupported("native near-disjoint composition image"));
             }
             continue;
         }
-        if policy == FrontOperationPolicy::NativeFrontAlgebra
+        if policy == FrontOperationPolicy::FrontAlgebra
             && !allow_outer_clipping
             && (y0 < outer_lo || y1 > outer_hi)
         {
@@ -405,7 +405,7 @@ fn compose_cached(
         if x0 < lo || x1 > hi || x0 > x1 || (x0 == x1 && y0 != y1) {
             return Err(unsupported("rounded composition domain crossing"));
         }
-        let native = policy == FrontOperationPolicy::NativeFrontAlgebra;
+        let native = policy == FrontOperationPolicy::FrontAlgebra;
         let f0 = if native {
             match last {
                 Some((x, value)) if x == x0 => value,
@@ -414,8 +414,8 @@ fn compose_cached(
         } else {
             outer.value(y0, policy, work)?
         };
-        if native && native_outer_anchor.is_none() {
-            native_outer_anchor = Some((y0, f0));
+        if native && outer_anchor.is_none() {
+            outer_anchor = Some((y0, f0));
         }
         match last {
             None => {
@@ -431,7 +431,7 @@ fn compose_cached(
             }
         }
         let mut next = if native {
-            match native_outer_next {
+            match outer_next {
                 Some(next) => next,
                 None => {
                     // getYvalueAndSegId advances past a near upper knot but
@@ -454,9 +454,9 @@ fn compose_cached(
             && (outer.knots[next].0 < y1 || (native && near(outer.knots[next].0, y1)?))
         {
             let (target, cached_value) = outer.knots[next];
-            let value = if let Some((y, value)) = native_outer_anchor {
+            let value = if let Some((y, value)) = outer_anchor {
                 let value = segment_value(y, value, outer.function.pairs()[next].0, target)?;
-                native_outer_anchor = Some((target, value));
+                outer_anchor = Some((target, value));
                 value
             } else {
                 cached_value
@@ -476,7 +476,7 @@ fn compose_cached(
             // A snapped outer knot already emitted this endpoint. The native
             // inner-end branch skips it and retains the knot's accumulated value.
             last.unwrap().1
-        } else if let Some((y, value)) = native_outer_anchor {
+        } else if let Some((y, value)) = outer_anchor {
             // At an exact final knot `next` still names its incoming segment.
             // Once it was consumed, use the following segment's slope.
             if y1 == y {
@@ -494,10 +494,10 @@ fn compose_cached(
             outer.value(y1, policy, work)?
         };
         if native && outer.knots.get(next).is_some_and(|&(knot, _)| knot == y1) {
-            native_outer_anchor = Some((y1, end));
+            outer_anchor = Some((y1, end));
         }
         if native {
-            native_outer_next = Some(next);
+            outer_next = Some(next);
         }
         let inner_endpoint =
             !(native && outer.knots.get(next).is_some_and(|&(knot, _)| knot == y1));
@@ -546,8 +546,7 @@ fn emit(
     }
     // Unlike an outer-knot crossing, a nearby inner endpoint emits no piece
     // in the native helper. Keep the previous value/coordinate as its anchor.
-    if policy == FrontOperationPolicy::NativeFrontAlgebra && inner_endpoint && near(x, previous_x)?
-    {
+    if policy == FrontOperationPolicy::FrontAlgebra && inner_endpoint && near(x, previous_x)? {
         return Ok(());
     }
     if x <= previous_x {
@@ -558,7 +557,7 @@ fn emit(
         checked(value - previous_value, "composition secant difference")? / span,
         "composition secant division",
     )?;
-    let merge = if policy == FrontOperationPolicy::NativeFrontAlgebra && output.len() > 1 {
+    let merge = if policy == FrontOperationPolicy::FrontAlgebra && output.len() > 1 {
         let old = output.last().unwrap().0;
         near(old, slope)?
     } else {

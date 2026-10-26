@@ -144,8 +144,8 @@ fn same_parameters(a: &ProximalParameters, b: &ProximalParameters) -> bool {
     a.curvature == b.curvature
         && a.child_half_interval_factor == b.child_half_interval_factor
         && a.artificial_activity_factor == b.artificial_activity_factor
-        && a.native_row_scaling == b.native_row_scaling
-        && a.native_explicit == b.native_explicit
+        && a.rhs_row_scaling == b.rhs_row_scaling
+        && a.explicit == b.explicit
         && a.multi_point == b.multi_point
         && a.max_points == b.max_points
         && a.bands.len() == b.bands.len()

@@ -179,7 +179,7 @@ fn strict_slope_pairs_and_exact_native_subset_keep_ordered_encoding() {
         let CoupledResource::SlopePaired { policy, .. } = &mut definition else {
             unreachable!()
         };
-        *policy = FrontOperationPolicy::NativeFrontAlgebra;
+        *policy = FrontOperationPolicy::FrontAlgebra;
         graph.set_coupled_resources(&[definition.clone()]).unwrap();
         assert_eq!(
             graph.coupled_kernel().unwrap().certify(&[0]),

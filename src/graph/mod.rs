@@ -520,6 +520,14 @@ impl<const D: usize> Graph<D> {
         if let Some(kernel) = &self.coupled {
             kernel.validate_for(self)?;
         }
+        let main_disposable = self
+            .main_resource
+            .filter(|&resource| self.resources.get(resource) == Some(&ResourceKind::Disposable))
+            .or_else(|| {
+                self.resources
+                    .iter()
+                    .position(|kind| *kind == ResourceKind::Disposable)
+            });
         let mut ids = HashSet::new();
         for a in &self.arcs {
             if a.consumption.len() < self.resources.len()
@@ -540,8 +548,13 @@ impl<const D: usize> Graph<D> {
                 Window::new(window.lower, window.upper)?;
             }
             for (r, k) in self.resources.iter().enumerate() {
-                if *k == ResourceKind::Disposable && a.consumption[r] < 0.0 {
-                    return Err(invalid("negative disposable consumption is not supported"));
+                if *k == ResourceKind::Disposable
+                    && Some(r) == main_disposable
+                    && a.consumption[r] < 0.0
+                {
+                    return Err(invalid(
+                        "designated main disposable resource must have nonnegative consumption",
+                    ));
                 }
             }
         }

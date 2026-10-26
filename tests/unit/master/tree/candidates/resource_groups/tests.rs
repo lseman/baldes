@@ -15,11 +15,11 @@ fn one_packing_row_combines_distinct_physical_heads() {
     let high = graph.add_arc(0, 2, 1.).unwrap();
     graph.arc_mut(high).unwrap().consumption[4] = 2.5;
     let high_end = graph.add_arc(2, 3, 0.).unwrap();
-    let mut problem = RootProblem::set_partitioning(graph, 1.).unwrap();
+    let mut problem = RoutingContext::set_partitioning(graph, 1.).unwrap();
     // The two physical heads are alternatives for one original unit cover.
     let high_position = problem.arc_position(high).unwrap();
-    problem.arc_entries[high_position] = vec![(1, 1.)];
-    problem.rows[2].sense = RowSense::LessEqual;
+    problem.model.networks[0].arc_entries[high_position] = vec![(1, 1.)];
+    problem.model.rows[2].sense = RowSense::LessEqual;
     let low_route = problem.elementary_route(&[low, low_end]).unwrap();
     let high_route = problem.elementary_route(&[high, high_end]).unwrap();
     let routes = [(&low_route, 0.25), (&high_route, 0.75)];
@@ -34,7 +34,7 @@ fn one_packing_row_combines_distinct_physical_heads() {
     assert_eq!(group.threshold(), 2.5);
     assert_eq!(choices[0].value, 0.25);
     assert!(candidates(&problem, &routes, &[choices[0].down.clone()]).is_empty());
-    for (index, row) in problem.rows.iter().enumerate() {
+    for (index, row) in problem.model.rows.iter().enumerate() {
         let activity: f64 = routes
             .iter()
             .map(|(route, weight)| {
@@ -62,24 +62,29 @@ fn one_packing_row_combines_distinct_physical_heads() {
             .filter_map(|path| child.elementary_route(path))
             .filter(|route| {
                 let entries = child.base_entries(route).unwrap();
-                child.rows.iter().enumerate().all(|(row, constraint)| {
-                    let activity: f64 = entries
-                        .iter()
-                        .filter(|(r, _)| *r == row)
-                        .map(|(_, a)| a)
-                        .sum();
-                    match constraint.sense {
-                        RowSense::Equal => activity == constraint.rhs,
-                        RowSense::LessEqual => activity <= constraint.rhs,
-                        RowSense::GreaterEqual => activity >= constraint.rhs,
-                    }
-                })
+                child
+                    .model
+                    .rows
+                    .iter()
+                    .enumerate()
+                    .all(|(row, constraint)| {
+                        let activity: f64 = entries
+                            .iter()
+                            .filter(|(r, _)| *r == row)
+                            .map(|(_, a)| a)
+                            .sum();
+                        match constraint.sense {
+                            RowSense::Equal => activity == constraint.rhs,
+                            RowSense::LessEqual => activity <= constraint.rhs,
+                            RowSense::GreaterEqual => activity >= constraint.rhs,
+                        }
+                    })
             })
             .collect();
         assert_eq!(feasible.len(), 1);
     }
 }
-pub(crate) fn fixture() -> (RootProblem<5>, Vec<(crate::Route, f64)>, Vec<i32>) {
+pub(crate) fn fixture() -> (RoutingContext<5>, Vec<(crate::Route, f64)>, Vec<i32>) {
     let mut graph = crate::Graph::<5>::new(6, 5).unwrap();
     for v in 0..6 {
         for r in 0..5 {
@@ -105,7 +110,7 @@ pub(crate) fn fixture() -> (RootProblem<5>, Vec<(crate::Route, f64)>, Vec<i32>) 
     let e1 = graph.add_arc(1, 5, 1.).unwrap();
     let e2 = graph.add_arc(2, 5, 1.).unwrap();
     let e4 = graph.add_arc(4, 5, 1.).unwrap();
-    let problem = RootProblem::set_partitioning(graph, 3.).unwrap();
+    let problem = RoutingContext::set_partitioning(graph, 3.).unwrap();
     let paths = [
         (vec![a, low, end], 0.25),
         (vec![b, high, end], 0.75),
@@ -124,7 +129,7 @@ fn inherited_suffix_window_limits_intervals_before_selection() {
     let (mut problem, routes, arcs) = fixture();
     let route = &routes[0].0;
     for arc in arcs {
-        problem.graph.arc_mut(arc).unwrap().bounds[4] = Some(Window {
+        problem.model.networks[0].graph.arc_mut(arc).unwrap().bounds[4] = Some(Window {
             lower: 0.,
             upper: 3.,
         });

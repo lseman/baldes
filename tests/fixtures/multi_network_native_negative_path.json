@@ -1,0 +1,67 @@
+{
+  "rows": [],
+  "networks": [
+    {
+      "id": 7,
+      "vertices": 3,
+      "multiplicity": [
+        0,
+        1
+      ],
+      "resources": [
+        {
+          "bounds": [
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ]
+          ]
+        },
+        {
+          "bounds": [
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              2
+            ]
+          ]
+        }
+      ],
+      "arcs": [
+        {
+          "tail": 0,
+          "head": 1,
+          "cost": -1,
+          "consumption": [
+            1,
+            1
+          ]
+        },
+        {
+          "tail": 1,
+          "head": 2,
+          "cost": 0,
+          "consumption": [
+            1,
+            1
+          ]
+        }
+      ]
+    }
+  ]
+}

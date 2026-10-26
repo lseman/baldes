@@ -18,9 +18,9 @@ The distribution and import name are both `pybaldes`.
 | Look up a public class or method | [API reference](../pybaldes/api.md) |
 | Diagnose builds, errors, or objective differences | [Troubleshooting](../pybaldes/troubleshooting.md) |
 
-`solve_root` solves a routing LP relaxation; its `Optimal` status does not prove
+`solve` solves a routing LP relaxation; its `Optimal` status does not prove
 an integer VRP optimum. Shared-master models expose their own integer tree via
-`solve_networks(..., tree=True)`. Choose the interface that matches your model.
+`solve(..., tree=True)`. Choose the interface that matches your model.
 
 This page remains at its original path so existing documentation links continue
 to work. Start new Python documentation links at the dedicated section above.

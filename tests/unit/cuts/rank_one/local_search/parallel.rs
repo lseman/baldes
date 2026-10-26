@@ -121,7 +121,7 @@ impl<const COVERING: bool> LocalSearch<COVERING> {
             }
             let id = parent.round_cut_counter;
             parent.round_cut_counter += 1;
-            let cut = parent.push_candidate(NativeCut {
+            let cut = parent.push_candidate(SeparatedCut {
                 id,
                 rhs,
                 kind: COVERING as i32,
@@ -167,7 +167,7 @@ fn fixture(
     };
     assert!(parent.prepare(&[&graph], vec![(0, Incidence::default())]));
     parent.round_cut_counter = 17;
-    parent.arena.push(NativeCut {
+    parent.arena.push(SeparatedCut {
         id: 16,
         ..Default::default()
     });

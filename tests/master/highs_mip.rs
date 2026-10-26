@@ -182,9 +182,9 @@ mod routing {
     use baldes::inputs::{Instance, Rounding};
     use baldes::master::{
         branching::BranchConstraint,
-        root::{
+        routing::{
             self, CapacityCutConfig, EnumerationMipPolicy, KPathCutConfig, KnapsackCutConfig,
-            RootOptions, RootProblem,
+            RootOptions, RoutingContext,
         },
     };
     use baldes::pricing::restrictions::RyanFosterConstraint;
@@ -195,7 +195,8 @@ mod routing {
     fn enumerated_mip_keeps_active_cut_families_and_typed_child_rows() {
         let instance = instance();
         let problem =
-            RootProblem::set_partitioning(instance.graph(3, Rounding::None).unwrap(), 3.).unwrap();
+            RoutingContext::set_partitioning(instance.graph(3, Rounding::None).unwrap(), 3.)
+                .unwrap();
         for family in 0..6 {
             let mut options = RootOptions::default();
             options.capture_state = true;
@@ -212,7 +213,7 @@ mod routing {
                 5 => options.with_knapsack_cuts(instance.fenchel_cut_config().unwrap()),
                 _ => options,
             };
-            let parent = root::solve(problem.clone(), options.clone()).unwrap();
+            let parent = routing::solve(problem.clone(), options.clone()).unwrap();
             let snapshot = parent.snapshot.as_ref().unwrap();
             assert!(snapshot.enumerated_routes().is_some(), "family {family}");
             if family > 0 {
@@ -255,8 +256,8 @@ mod routing {
                     assigned: false,
                 },
             ] {
-                let child =
-                    root::inherit_branches(snapshot, &[branch.clone()], options.clone()).unwrap();
+                let child = routing::inherit_branches(snapshot, &[branch.clone()], options.clone())
+                    .unwrap();
                 if matches!(
                     branch,
                     BranchConstraint::PackingSetAssignment {
@@ -274,7 +275,12 @@ mod routing {
                 let mip = child
                     .solve_enumerated_mip(&MipOptions::default())
                     .unwrap()
-                    .unwrap();
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "missing child universe: family={family} branch={branch:?} count={:?}",
+                            child.enumerated_routes()
+                        )
+                    });
                 assert_eq!(mip.mip.status, MipStatus::Optimal, "{mip:?}");
                 if matches!(branch, BranchConstraint::NumberOfVehicles { .. }) {
                     assert_eq!(mip.route_values.len(), 3);
@@ -288,7 +294,9 @@ mod routing {
                                 assert!(!(r.nodes.contains(&1) && r.nodes.contains(&2)))
                             }
                             BranchConstraint::ArcFlow { arc, .. } => {
-                                assert!(!r.arcs.contains(&problem.graph.arcs[arc].id))
+                                assert!(!r
+                                    .arcs
+                                    .contains(&problem.model.networks[0].graph.arcs[arc].id))
                             }
                             _ => unreachable!(),
                         }
@@ -306,7 +314,7 @@ mod routing {
     fn optional_tree_mip_closes_only_complete_enumeration() {
         use baldes::master::tree::{self, TreeOptions, TreeStatus};
         let problem =
-            RootProblem::set_partitioning(instance().graph(3, Rounding::None).unwrap(), 3.)
+            RoutingContext::set_partitioning(instance().graph(3, Rounding::None).unwrap(), 3.)
                 .unwrap();
         let mut options = TreeOptions::default();
         options.root.cg.stabilize = false;

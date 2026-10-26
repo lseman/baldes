@@ -1,0 +1,258 @@
+[
+  {
+    "policy": "best-bound",
+    "limit": 0,
+    "processed": 0,
+    "incumbent": null,
+    "bound": null,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "best-bound",
+    "limit": 1,
+    "processed": 1,
+    "incumbent": null,
+    "bound": 1.5,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "best-bound",
+    "limit": 2,
+    "processed": 3,
+    "incumbent": null,
+    "bound": 1.666666666666667,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "best-bound",
+    "limit": 3,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "best-bound",
+    "limit": 4,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "best-bound",
+    "limit": 5,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "best-bound",
+    "limit": 6,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "best-bound",
+    "limit": 7,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "default",
+    "limit": 0,
+    "processed": 0,
+    "incumbent": null,
+    "bound": null,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "default",
+    "limit": 1,
+    "processed": 1,
+    "incumbent": null,
+    "bound": 1.5,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "default",
+    "limit": 2,
+    "processed": 3,
+    "incumbent": null,
+    "bound": 1.666666666666667,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "default",
+    "limit": 3,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "default",
+    "limit": 4,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "default",
+    "limit": 5,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "default",
+    "limit": 6,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "default",
+    "limit": 7,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "bound-priority",
+    "limit": 0,
+    "processed": 0,
+    "incumbent": null,
+    "bound": null,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "bound-priority",
+    "limit": 1,
+    "processed": 1,
+    "incumbent": null,
+    "bound": 1.5,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "bound-priority",
+    "limit": 2,
+    "processed": 3,
+    "incumbent": null,
+    "bound": 1.666666666666667,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "bound-priority",
+    "limit": 3,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "bound-priority",
+    "limit": 4,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "bound-priority",
+    "limit": 5,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "bound-priority",
+    "limit": 6,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "bound-priority",
+    "limit": 7,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "depth-bound-priority",
+    "limit": 0,
+    "processed": 0,
+    "incumbent": null,
+    "bound": null,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "depth-bound-priority",
+    "limit": 1,
+    "processed": 1,
+    "incumbent": null,
+    "bound": 1.5,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "depth-bound-priority",
+    "limit": 2,
+    "processed": 3,
+    "incumbent": null,
+    "bound": 1.666666666666667,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "depth-bound-priority",
+    "limit": 3,
+    "processed": 3,
+    "incumbent": null,
+    "bound": 1.666666666666667,
+    "status": "NodeLimit"
+  },
+  {
+    "policy": "depth-bound-priority",
+    "limit": 4,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "depth-bound-priority",
+    "limit": 5,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "depth-bound-priority",
+    "limit": 6,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  },
+  {
+    "policy": "depth-bound-priority",
+    "limit": 7,
+    "processed": 5,
+    "incumbent": 2.0,
+    "bound": 2.0,
+    "status": "Optimal"
+  }
+]

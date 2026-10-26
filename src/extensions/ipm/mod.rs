@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 mod factor;
+pub use factor::FactorizationPlan;
 mod matrix;
 mod parallel;
 pub use parallel::{Parallel, ParallelType};
@@ -13,7 +14,9 @@ mod sparse_solver;
 
 pub use matrix::SparseMatrix;
 pub use model::{ModelData, Sense};
-pub use solver::{solve, Options, Solution, Solver, SolverStatistics, Status};
+pub use solver::{
+    solve, CorrectionPolicy, Options, Solution, Solver, SolverProfile, SolverStatistics, Status,
+};
 pub use sparse_solver::{
     estimate_fill, FillEstimate, HiPOLDLT, NormalEqLDLT, SolverType, SparseSolver,
 };

@@ -226,8 +226,8 @@ impl CurvatureState {
             max_points: 1,
             curvature: None,
             child_half_interval_factor: 10.,
-            native_explicit: None,
-            native_row_scaling: false,
+            explicit: None,
+            rhs_row_scaling: false,
             artificial_activity_factor: 10.,
         };
         parameters.validate()?;

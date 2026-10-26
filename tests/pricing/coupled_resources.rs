@@ -732,7 +732,7 @@ fn selection_simultaneous_loads_and_signed_cumulative_dependencies_match_tiny_pa
 fn root_phase_i_recovers_nonlinear_cost_columns_then_restores_original_objective() {
     use baldes::master::{
         cg::{FeasibilityStatus, Status},
-        root::{self, RootOptions, RootProblem},
+        routing::{self, RootOptions, RoutingContext},
     };
     let mut graph: Graph<2> = Graph::new(4, 1).unwrap();
     for vertex in 0..4 {
@@ -772,7 +772,11 @@ fn root_phase_i_recovers_nonlinear_cost_columns_then_restores_original_objective
     options.cg.max_penalty_updates = 0;
     options.cg.insert_non_negative = false;
     options.cg.stabilize = false;
-    let output = root::solve(RootProblem::set_partitioning(graph, 2.).unwrap(), options).unwrap();
+    let output = routing::solve(
+        RoutingContext::set_partitioning(graph, 2.).unwrap(),
+        options,
+    )
+    .unwrap();
     assert_eq!(output.master.status, Status::Optimal, "{output:?}");
     assert!((output.master.lp - 60.).abs() < 1e-7, "{output:?}");
     assert!(output
@@ -1062,7 +1066,7 @@ fn interval_front_pricing_cuts_fixing_retention_and_forks_preserve_physical_path
 fn interval_cost_phase_i_keeps_domains_and_restores_original_front_objective() {
     use baldes::master::{
         cg::{FeasibilityStatus, Status},
-        root::{self, RootOptions, RootProblem},
+        routing::{self, RootOptions, RoutingContext},
     };
     let mut graph = Graph::<2>::new(4, 1).unwrap();
     for v in 0..4 {
@@ -1100,7 +1104,11 @@ fn interval_cost_phase_i_keeps_domains_and_restores_original_front_objective() {
     options.cg.max_penalty_updates = 0;
     options.cg.insert_non_negative = false;
     options.cg.stabilize = false;
-    let output = root::solve(RootProblem::set_partitioning(graph, 2.).unwrap(), options).unwrap();
+    let output = routing::solve(
+        RoutingContext::set_partitioning(graph, 2.).unwrap(),
+        options,
+    )
+    .unwrap();
     assert_eq!(output.master.status, Status::Optimal, "{output:?}");
     assert!((output.master.lp - 40.).abs() < 1e-8);
     assert!(output

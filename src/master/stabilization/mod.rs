@@ -418,4 +418,4 @@ pub mod proximal;
 #[path = "../../../tests/unit/master/stabilization/tests.rs"]
 mod tests;
 pub use curvature::{AutomaticCurvatureParameters, CurvatureFeedback, CurvatureState};
-pub use proximal::{NativeExplicitParameters, ProximalBand, ProximalParameters, ProximalSnapshot};
+pub use proximal::{ExplicitParameters, ProximalBand, ProximalParameters, ProximalSnapshot};

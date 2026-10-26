@@ -20,7 +20,7 @@ instance = Instance(
     ],
     vehicles=3,
 )
-result = instance.solve_root(
+result = instance.solve(
     problem_type="vrptw",
     capacity_cuts=True,
     time_limit=30,
@@ -47,7 +47,7 @@ Run from the repository root:
 ```python
 import pybaldes
 
-result = pybaldes.solve_root(
+result = pybaldes.solve(
     "instances/Solomon/R101.txt",
     customers=10,
     rounding="none",
@@ -62,7 +62,7 @@ For a CVRPLIB file, explicitly select the capacity-only model:
 from pybaldes import Instance
 
 instance = Instance.from_file("instances/cvrplib/A-n32-k5.vrp")
-result = instance.solve_root(problem_type="cvrp", time_limit=30)
+result = instance.solve(problem_type="cvrp", time_limit=30)
 ```
 
 Python defaults to the instance's distance convention. CLI routing defaults to

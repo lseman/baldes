@@ -7,7 +7,7 @@ import pytest
 
 from pybaldes import (
     NetworkProblem, NetworkRowCoefficients, PricingArc, PricingNetwork,
-    PricingResource, SharedRow, has_clp, solve_networks,
+    PricingResource, SharedRow, has_clp, solve,
 )
 
 pytestmark = pytest.mark.skipif(not has_clp, reason="Clp build required")
@@ -18,7 +18,37 @@ def triangle():
     return NetworkProblem.from_file(FIXTURE)
 
 
-@pytest.mark.parametrize("schedule", ["full-sweep", "cyclic", "sorted", "native-promising-first", "native-unvisited-first"])
+@pytest.mark.parametrize("direction,first_side", [("upper-first", 1), ("lower-first", 0)])
+def test_named_native_branch_direction_reaches_trial_evaluation(direction, first_side):
+    result = triangle().solve(
+        tree=True, stabilize=False, network_branching="phased",
+        mapped_variables=({"name": "count42", "priority": 1000.,
+                           "networks": [{"network": 42, "per_route": 1.}]},),
+        network_branch_directions={"count42": direction},
+    )
+    assert result.status == "Optimal"
+    assert result.incumbent == pytest.approx(2.)
+    assert result.bound == pytest.approx(2.)
+    observations = [e for e in result.mapped_branch_evaluations if e.name == "count42"]
+    assert observations
+    assert observations[0].side == first_side
+
+
+def test_named_branch_directions_reject_root_calls_and_unknown_directions():
+    with pytest.raises(ValueError, match="requires tree=true"):
+        triangle().solve(network_branch_directions={"count42": "lower-first"})
+    with pytest.raises(ValueError, match="unknown variant"):
+        triangle().solve(tree=True, network_branching="phased",
+                         network_branch_directions={"count42": "up"})
+    with pytest.raises(ValueError, match="require phased"):
+        triangle().solve(tree=True, node_limit=0,
+                         network_branch_directions={"count42": "lower-first"})
+    with pytest.raises(ValueError, match="nonempty generator name"):
+        triangle().solve(tree=True, node_limit=0, network_branching="phased",
+                         network_branch_directions={" ": "lower-first"})
+
+
+@pytest.mark.parametrize("schedule", ["full-sweep", "cyclic", "sorted", "promising-first", "unvisited-first"])
 def test_network_pricing_schedules_across_fresh_and_snapshot_solves(schedule):
     root = triangle().solve(network_pricing_schedule=schedule)
     assert root.status == "Optimal"
@@ -41,7 +71,7 @@ def test_unknown_network_pricing_schedule_is_rejected():
 ])
 def test_explicit_proximal_bands_keep_original_network_objectives(bands):
     proximal = {"bands": bands}
-    root = triangle().solve(proximal=proximal, network_pricing_schedule="native-promising-first")
+    root = triangle().solve(proximal=proximal, network_pricing_schedule="promising-first")
     assert root.lp == pytest.approx(1.5)
     assert root.snapshot.branch_assignment(0, 7, True).solve(proximal=proximal).lp == pytest.approx(2.)
     assert triangle().solve(tree=True, proximal=proximal).incumbent == pytest.approx(2.)
@@ -50,14 +80,14 @@ def test_explicit_proximal_bands_keep_original_network_objectives(bands):
 
 
 def test_native_queue_budget_is_validated():
-    assert triangle().solve(network_pricing_schedule="native-unvisited-first", network_unpromising_limit=2).lp == pytest.approx(1.5)
+    assert triangle().solve(network_pricing_schedule="unvisited-first", network_unpromising_limit=2).lp == pytest.approx(1.5)
     with pytest.raises(ValueError, match="network_unpromising_limit"):
         triangle().solve(network_unpromising_limit=0)
 
 
 def test_multipoint_proximal_support_planes_preserve_network_solutions():
     proximal = {"bands": [{"half_width": .5, "penalty": 1.}], "multi_point": True}
-    root = triangle().solve(proximal=proximal, network_pricing_schedule="native-unvisited-first")
+    root = triangle().solve(proximal=proximal, network_pricing_schedule="unvisited-first")
     assert root.lp == pytest.approx(1.5)
     assert root.snapshot.solve(proximal=proximal).lp == pytest.approx(1.5)
     assert triangle().solve(tree=True, proximal=proximal).incumbent == pytest.approx(2.)
@@ -92,11 +122,13 @@ def test_model_json_round_trip_and_shared_root():
 
 @pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
 def test_assignment_tree_and_limits(bound_mode):
-    result = solve_networks(triangle(), tree=True, bound_mode=bound_mode)
+    result = solve(triangle(), tree=True, bound_mode=bound_mode)
     assert result.status == "Optimal" and result.mode == "tree"
     assert result.incumbent == pytest.approx(2)
     assert result.bound == pytest.approx(2)
-    assert result.nodes == 3 and result.open_nodes == 0
+    assert result.nodes == 6 and result.open_nodes == 0
+    assert result.tree_processed_nodes == 7
+    assert result.strong_branching_trials == 0
     assert result.pricing_calls > 0
     assert {n for n, calls in result.oracle_calls if calls} == {7, 42}
     assert result.snapshot is None
@@ -108,7 +140,7 @@ def test_assignment_tree_and_limits(bound_mode):
     assert zero.bound is None and json.loads(zero.to_json())["bound"] is None
 
 
-@pytest.mark.parametrize("policy", ["resource-first", "multiplicity-first", "native-phased"])
+@pytest.mark.parametrize("policy", ["resource-first", "multiplicity-first", "phased"])
 def test_explicit_network_branch_order_in_fresh_and_snapshot_trees(policy):
     model = triangle()
     fresh = model.solve(tree=True, network_branching=policy, stabilize=False)
@@ -392,6 +424,7 @@ def test_registered_cross_network_aggregate_branching_preserves_original_tree(st
                      {"network": 42, "per_route": 1.}],
     },)
     result = triangle().solve(tree=True, mapped_variables=mappings,
+                              network_branching="resource-first",
                               mapped_strong_branching=strong)
     assert result.status == "Optimal"
     assert result.incumbent == pytest.approx(2.)
@@ -403,31 +436,43 @@ def test_registered_cross_network_aggregate_branching_preserves_original_tree(st
 
 def test_native_tree_selection_and_processed_node_accounting():
     native = triangle().solve(tree=True, network_branching="multiplicity-first",
-                              network_tree_search="native-default")
+                              network_tree_search="default")
     best_bound = triangle().solve(tree=True, network_branching="multiplicity-first",
                                   network_tree_search="best-bound")
     strategy2 = triangle().solve(tree=True, network_branching="multiplicity-first",
-                                 network_tree_search="native-strategy-2")
+                                 network_tree_search="bound-priority")
+    strategy3 = triangle().solve(tree=True, network_branching="multiplicity-first",
+                                 network_tree_search="depth-bound-priority")
+    assert strategy3.status == "Optimal"
+    assert strategy3.incumbent == pytest.approx(2.)
+    strategy2_unrounded = triangle().solve(tree=True, network_branching="multiplicity-first",
+                                          network_tree_search="bound-priority",
+                                          network_strategy2_rounding="unrounded")
     strategy2_exact = triangle().solve(tree=True, network_branching="multiplicity-first",
-                                       network_tree_search="native-strategy-2",
+                                       network_tree_search="bound-priority",
                                        network_strategy2_rounding="exact-ceil")
     assert native.status == best_bound.status == strategy2.status == strategy2_exact.status == "Optimal"
     assert native.incumbent == pytest.approx(2.)
     assert best_bound.incumbent == pytest.approx(2.)
     assert strategy2.incumbent == pytest.approx(2.)
+    assert strategy2_unrounded.incumbent == pytest.approx(2.)
+    assert strategy2_unrounded.tree_processed_nodes == strategy2.tree_processed_nodes
     assert strategy2_exact.incumbent == pytest.approx(2.)
     assert native.tree_processed_nodes >= native.nodes
     assert best_bound.tree_processed_nodes >= best_bound.nodes
     assert json.loads(native.to_json())["tree_processed_nodes"] == native.tree_processed_nodes
     assert json.loads(strategy2.to_json())["tree_processed_nodes"] == strategy2.tree_processed_nodes
     overflow = triangle().solve(tree=True, network_branching="multiplicity-first",
-                                network_tree_search="native-default", network_open_node_limit=1)
+                                network_tree_search="default", network_open_node_limit=1)
     assert overflow.status == "Optimal"
     assert overflow.incumbent == pytest.approx(2.)
     all_overflow = triangle().solve(tree=True, network_branching="multiplicity-first",
-                                    network_tree_search="native-default", network_open_node_limit=0)
-    assert all_overflow.status == "Optimal"
-    assert all_overflow.incumbent == pytest.approx(2.)
+                                    network_tree_search="default", network_open_node_limit=0)
+    assert all_overflow.status == "Incomplete"
+    assert all_overflow.incumbent is None
+    assert all_overflow.bound == pytest.approx(1.5)
+    assert all_overflow.open_nodes == 2
+    assert all_overflow.tree_processed_nodes == 1
 
 
 @pytest.mark.parametrize("depth", [-1, 0, 1])
@@ -440,12 +485,12 @@ def test_signed_stabilization_depth_and_promising_budget_are_public(depth):
 
 
 @pytest.mark.parametrize("proximal", [
-    {"native_explicit": {"box_step": True}},
-    {"native_explicit": {}},
-    {"native_explicit": {"five_piece": True}},
+    {"explicit": {"box_step": True}},
+    {"explicit": {}},
+    {"explicit": {"five_piece": True}},
     {"bands": [{"half_width": 0., "penalty": 0.8999999761581421},
                {"half_width": 0., "penalty": 0.8999999761581421}],
-     "multi_point": True, "native_row_scaling": True},
+     "multi_point": True, "rhs_row_scaling": True},
 ])
 def test_native_explicit_defaults_preserve_root_resume_child_and_tree(proximal):
     root = triangle().solve(proximal=proximal)
@@ -458,7 +503,7 @@ def test_native_explicit_defaults_preserve_root_resume_child_and_tree(proximal):
 def test_explicit_front_program_model_round_trip_and_certified_original_objective():
     model_file = Path(__file__).resolve().parents[2] / "tests/fixtures/coupled/native_machine_network.json"
     model = NetworkProblem.from_json(model_file.read_text())
-    assert model.networks[0].native_front_program_domain is True
+    assert model.networks[0].front_program_domain is True
     assert NetworkProblem.from_json(model.to_json()) == model
     root = model.solve(stabilize=False, bound_mode="certified")
     assert root.lp == pytest.approx(1003.)
@@ -479,3 +524,333 @@ def test_bounded_walk_model_round_trip_and_certified_negative_cycle():
     assert result.status == "Optimal"
     assert result.incumbent == pytest.approx(-3.)
     assert result.bound == pytest.approx(-3.)
+
+
+@pytest.mark.parametrize("gap", [0., 1e-6, 0.4])
+def test_native_branch_scoring_gap_keeps_original_proof_bounds(gap):
+    result = triangle().solve(tree=True, network_branching="phased",
+                              network_scoring_gap_tolerance=gap)
+    assert result.status == "Optimal"
+    assert result.incumbent == pytest.approx(2.)
+    assert result.bound == pytest.approx(2.)
+
+
+def test_negative_native_branch_scoring_gap_is_rejected():
+    with pytest.raises(ValueError, match="scoring gap tolerance"):
+        triangle().solve(tree=True, network_scoring_gap_tolerance=-1.)
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+def test_native_multiphase_screens_are_distinct_from_processed_exact_trials(mode):
+    mappings = json.loads((Path(__file__).resolve().parents[2] / "tests/fixtures/multi_network_native_phased_mappings.json").read_text())
+    result = triangle().solve(tree=True, network_branching="resource-first",
+                              mapped_variables=tuple(mappings), stabilize=False,
+                              bound_mode=mode)
+    assert result.status == "Optimal"
+    assert result.incumbent == pytest.approx(2.)
+    assert result.bound == pytest.approx(2.)
+    assert result.nodes == 1
+    assert result.tree_processed_nodes == 3
+    assert result.strong_branching_trials == 6
+    assert result.iterations == 18
+    assert sum(calls for _, calls in result.oracle_calls) == 2
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+def test_shared_inactive_tree_paths_keep_original_bounds(mode):
+    result = triangle().solve(tree=True, network_share_inactive_columns=True,
+                              bound_mode=mode)
+    assert result.status == "Optimal"
+    assert result.incumbent == 2.
+    assert abs(result.bound - 2.) < 1e-8
+
+
+def test_shared_inactive_paths_require_a_tree():
+    with pytest.raises(ValueError, match="requires tree=true"):
+        triangle().solve(network_share_inactive_columns=True)
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+def test_half_incident_mapping_preserves_integer_tree_bounds(mode):
+    mapping = {
+        "name": "ESA_7_1",
+        "priority": 1000.,
+        "networks": [{
+            "network": 7,
+            "arcs": [[0, 0.5], [1, 0.5], [6, 0.5], [7, 0.5]],
+        }],
+    }
+    result = triangle().solve(tree=True, mapped_variables=(mapping,),
+                              network_branching="resource-first", stabilize=False,
+                              bound_mode=mode)
+    assert result.status == "Optimal"
+    assert result.incumbent == pytest.approx(2.)
+    assert result.bound == pytest.approx(2.)
+
+
+def test_unpaired_half_mapping_is_rejected_before_branching():
+    mapping = {"name": "fractional-route", "networks": [{"network": 7,
+               "arcs": [[0, 0.5]]}]}
+    with pytest.raises(ValueError, match="integer on every graph path"):
+        triangle().solve(tree=True, mapped_variables=(mapping,), stabilize=False)
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+def test_native_plain_near_zero_admission_matches_physical_entries(mode):
+    fixture = Path(__file__).resolve().parents[2] / "tests/fixtures/multi_network_native_tree.json"
+    model = NetworkProblem.from_json(fixture.read_text())
+    result = model.solve(tree=True, stabilize=False, bound_mode=mode)
+    assert result.status == "Optimal"
+    assert result.incumbent == pytest.approx(2.)
+    assert result.bound == pytest.approx(2.)
+    assert result.nodes == 6
+    assert result.tree_processed_nodes == 7
+    assert result.iterations == 17
+    assert result.pricing_calls == 16
+    assert dict(result.oracle_calls) == {7: 4, 42: 7}
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+def test_native_packing_registration_without_manual_mappings(mode):
+    fixture = Path(__file__).resolve().parents[2] / "tests/fixtures/multi_network_native_packing.json"
+    packing = json.loads(fixture.read_text())
+    result = triangle().solve(tree=True, packing=packing, stabilize=False,
+                              bound_mode=mode)
+    assert result.status == "Optimal"
+    assert result.incumbent == pytest.approx(2.)
+    assert result.bound == pytest.approx(2.)
+    assert result.tree_processed_nodes == 3
+    assert result.strong_branching_trials == 6
+
+
+def test_native_packing_requires_tree_and_rejects_endpoint_labels():
+    packing = {"priority": 1000., "networks": [{"network": 7, "vertices": [[0, 1]]}]}
+    with pytest.raises(ValueError, match="requires tree=true"):
+        triangle().solve(packing=packing)
+    with pytest.raises(ValueError, match="source and sink"):
+        triangle().solve(tree=True, packing=packing, node_limit=0)
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+def test_native_packing_separator_is_bypassed_without_strong_branching(mode):
+    fixture = Path(__file__).resolve().parents[2] / "tests/fixtures/multi_network_native_packing.json"
+    packing = json.loads(fixture.read_text())
+    model_fixture = fixture.with_name("multi_network_native_tree.json")
+    result = NetworkProblem.from_json(model_fixture.read_text()).solve(
+        tree=True, packing=packing, mapped_strong_branching=False,
+        stabilize=False, bound_mode=mode)
+    assert result.status == "Optimal"
+    assert result.incumbent == pytest.approx(2.)
+    assert result.bound == pytest.approx(2.)
+    assert result.tree_processed_nodes == 7
+    assert result.strong_branching_trials == 0
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+def test_finite_variable_box_matches_native_negative_path(mode):
+    fixture = Path(__file__).resolve().parents[2] / "tests/fixtures/multi_network_native_negative_path.json"
+    boxes = json.loads(fixture.with_name("multi_network_native_negative_boxes.json").read_text())
+    result = NetworkProblem.from_json(fixture.read_text()).solve(
+        stabilize=False, bound_mode=mode, variable_boxes=tuple(boxes))
+    assert result.status == "Optimal"
+    assert result.lp == pytest.approx(-1.)
+    assert result.bound == pytest.approx(-1.)
+    assert dict(result.oracle_calls) == {7: 1}
+
+    unbounded = NetworkProblem.from_json(fixture.read_text()).solve(stabilize=False, bound_mode=mode)
+    assert unbounded.bound == pytest.approx(-1.)
+    assert dict(unbounded.oracle_calls) == {7: 3}
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+@pytest.mark.parametrize("fixture,boxes,objective,calls", [
+    ("multi_network_native_positive_lower.json", "multi_network_native_positive_boxes.json", 0., 0),
+    ("multi_network_native_positive_lower.json", "multi_network_native_negative_boxes.json", 0., 3),
+    ("multi_network_native_cyclic_box.json", "multi_network_native_cyclic_boxes.json", -2., 1),
+])
+def test_positive_lower_and_cyclic_native_boxes(mode, fixture, boxes, objective, calls):
+    folder = Path(__file__).resolve().parents[2] / "tests/fixtures"
+    model = NetworkProblem.from_json((folder / fixture).read_text())
+    result = model.solve(stabilize=False, bound_mode=mode,
+                         variable_boxes=tuple(json.loads((folder / boxes).read_text())))
+    assert result.status == "Optimal"
+    assert result.lp == pytest.approx(objective)
+    assert result.bound == pytest.approx(objective)
+    assert dict(result.oracle_calls) == {7: calls}
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+@pytest.mark.parametrize("registered", [False, True])
+def test_required_zero_cost_quantity_has_a_real_route_witness(mode, registered):
+    folder = Path(__file__).resolve().parents[2] / "tests/fixtures"
+    data = json.loads((folder / "multi_network_native_negative_path.json").read_text())
+    data["networks"][0]["multiplicity"] = [1, 1]
+    for arc in data["networks"][0]["arcs"]:
+        arc["cost"] = 0.
+    boxes = tuple(json.loads((folder / "multi_network_native_negative_boxes.json").read_text())) if registered else ()
+    result = NetworkProblem.from_json(json.dumps(data)).solve(
+        stabilize=False, bound_mode=mode, variable_boxes=boxes)
+    assert result.status == "Optimal"
+    assert result.lp == pytest.approx(0.)
+    assert result.bound == pytest.approx(0.)
+    assert dict(result.oracle_calls) == {7: 1}
+    assert result.routes
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+def test_inactive_scan_option_applies_to_root_and_resumed_nodes(mode):
+    for enabled in [False, True]:
+        root = triangle().solve(stabilize=False, bound_mode=mode,
+                                network_search_inactive_columns=enabled)
+        assert root.status == "Optimal"
+        assert root.lp == pytest.approx(1.5)
+        child = root.snapshot.branch_assignment(0, 7, True)
+        result = child.solve(stabilize=False, bound_mode=mode,
+                             network_search_inactive_columns=enabled)
+        assert result.status == "Optimal"
+        assert result.lp == pytest.approx(2.)
+        assert result.bound == pytest.approx(2.)
+
+
+def test_original_variable_model_survives_forks_resume_fixed_and_tree():
+    model = NetworkProblem.from_file(Path(__file__).resolve().parents[2] /
+                                     "tests/fixtures/multi_network_original_variables.json")
+    assert NetworkProblem.from_json(model.to_json()).pricing_variables
+    root = model.solve(stabilize=False)
+    assert root.lp == -1.
+    assert root.original_variables == ({"network": 7, "id": 0, "lower": 1., "upper": 1.},)
+    assert root.snapshot.solve(stabilize=False).lp == -1.
+    route = next(r for r in root.routes if r.value > 0.5)
+    fixed = root.snapshot.fix_route(route.route_index, 1).solve(stabilize=False)
+    assert fixed.lp == -1.
+    assert fixed.original_variables == root.original_variables
+    child = root.snapshot.with_row(SharedRow("le", 0.), (
+        NetworkRowCoefficients(7, (1., 0., 1., 0.)),))
+    result = child.solve(stabilize=False)
+    assert result.lp == 0.
+    assert result.original_variables[0]["upper"] == 0.
+    assert root.snapshot.solve(stabilize=False).lp == -1.
+    assert model.solve(tree=True, stabilize=False).original_variables == root.original_variables
+    assert root.snapshot.solve(tree=True, stabilize=False).original_variables == root.original_variables
+
+
+def test_original_integer_registration_reaches_fresh_and_snapshot_trials():
+    data = json.loads(FIXTURE.read_text())
+    data["pricing_variables"] = [{"network": 7, "id": 4, "cost": 0.,
+                                 "arcs": [[0, 1.]], "integer": True, "priority": 1000.}]
+    model = NetworkProblem.from_json(json.dumps(data))
+    root = model.solve(stabilize=False)
+    assert root.original_variables[0]["lower"] == pytest.approx(0.5)
+    for result in [model.solve(tree=True, network_branching="phased", stabilize=False),
+                   root.snapshot.solve(tree=True, network_branching="phased", stabilize=False)]:
+        assert result.incumbent == 2.
+        assert any(e.name == "X_7_4" for e in result.mapped_branch_evaluations)
+        activity = result.original_variables[0]
+        assert activity["lower"] == activity["upper"]
+        assert activity["lower"] in (0., 1.)
+
+
+@pytest.mark.skipif(not __import__("pybaldes").has_highs, reason="HiGHS required")
+def test_original_variable_registry_reports_enumerated_mip_activity():
+    model = NetworkProblem.from_file(Path(__file__).resolve().parents[2] /
+                                     "tests/fixtures/multi_network_original_variables.json")
+    completed = model.solve(enumerate=True, stabilize=False)
+    result = completed.snapshot.solve_enumerated_mip()
+    assert result.incumbent == -1.
+    assert result.original_variables == ({"network": 7, "id": 0, "lower": 1., "upper": 1.},)
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+def test_original_variable_boxes_survive_root_resume_and_tree(mode):
+    model = NetworkProblem.from_file(Path(__file__).resolve().parents[2] /
+                                     "tests/fixtures/multi_network_original_variables.json")
+    boxes = ({"network": 7, "id": 0, "lower": 0., "upper": 1.},)
+    plain = model.solve(stabilize=False, bound_mode=mode)
+    boxed = model.solve(stabilize=False, bound_mode=mode, original_variable_boxes=boxes)
+    assert boxed.lp == boxed.bound == -1.
+    assert sum(c for _, c in boxed.oracle_calls) < sum(c for _, c in plain.oracle_calls)
+    resumed = boxed.snapshot.solve(stabilize=False, bound_mode=mode, original_variable_boxes=boxes)
+    assert resumed.lp == -1.
+    assert resumed.original_variables == boxed.original_variables
+    assert model.solve(tree=True, stabilize=False, bound_mode=mode,
+                       original_variable_boxes=boxes).incumbent == -1.
+    with pytest.raises(ValueError, match="unproved"):
+        model.solve(time_limit=0., original_variable_boxes=({"network": 7, "id": 0, "upper": 0.5},))
+    with pytest.raises(ValueError, match="identity"):
+        model.solve(original_variable_boxes=({"network": 7, "id": 100, "upper": 1.},))
+
+
+def test_original_variable_box_retains_native_cost_space_under_cancellation():
+    model = NetworkProblem.from_file(Path(__file__).resolve().parents[2] /
+                                     "tests/fixtures/multi_network_original_cancellation.json")
+    boxes = tuple({"network": 7, "id": i, "upper": 1.} for i in [0, 1])
+    assert model.solve(stabilize=False).oracle_calls == ((7, 0),)
+    result = model.solve(stabilize=False, original_variable_boxes=boxes)
+    assert result.lp == 0.
+    assert result.oracle_calls == ((7, 3),)
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+def test_signed_original_boxes_preserve_negative_activity_and_zero_upper(mode):
+    data = json.loads((Path(__file__).resolve().parents[2] /
+                       "tests/fixtures/multi_network_original_variables.json").read_text())
+    variable = data["pricing_variables"][0]
+    variable.update(cost=1., integer=False, arcs=[[0, -0.5], [2, -0.5]])
+    model = NetworkProblem.from_json(json.dumps(data))
+    for upper in [0., 4.]:
+        boxes = ({"network": 7, "id": 0, "lower": -4., "upper": upper},)
+        result = model.solve(stabilize=False, bound_mode=mode, original_variable_boxes=boxes)
+        assert result.lp == result.bound == -0.5
+        assert result.oracle_calls == ((7, 3),)
+        assert result.original_variables == ({"network": 7, "id": 0,
+                                              "lower": -0.5, "upper": -0.5},)
+        resumed = result.snapshot.solve(stabilize=False, bound_mode=mode,
+                                        original_variable_boxes=boxes)
+        assert resumed.lp == resumed.bound == -0.5
+        assert resumed.original_variables == result.original_variables
+
+
+@pytest.mark.parametrize("mode", ["numerical", "certified"])
+def test_original_cost_rounding_preserves_raw_objective_through_row_edits(mode):
+    data = json.loads((Path(__file__).resolve().parents[2] /
+                       "tests/fixtures/multi_network_original_variables.json").read_text())
+    variable = data["pricing_variables"][0]
+    variable.update(cost=-0.1234567893, integer=False, arcs=[[0, 0.5], [2, 0.5]])
+    model = NetworkProblem.from_json(json.dumps(data))
+    result = model.solve(stabilize=False, bound_mode=mode)
+    raw = -0.1234567893 * 0.5
+    assert result.lp == raw
+    assert result.bound <= raw
+    assert result.bound == pytest.approx(raw, abs=1e-12)
+    assert result.original_variables[0]["lower"] == result.original_variables[0]["upper"] == 0.5
+    edited = result.snapshot.with_row(
+        SharedRow("le", 0.25),
+        (NetworkRowCoefficients(7, (0.5, 0., 0.5, 0.)),),
+    ).solve(stabilize=False, bound_mode=mode)
+    assert edited.lp == pytest.approx(raw * 0.5, abs=1e-12)
+    assert edited.bound <= edited.lp
+    assert edited.bound == pytest.approx(edited.lp, abs=1e-12)
+    assert edited.original_variables[0]["lower"] == edited.original_variables[0]["upper"] == 0.25
+
+@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
+def test_scalar_and_array_pricings_use_the_same_solve_path(bound_mode):
+    network = PricingNetwork(7, 3, (0, 1), (PricingArc(0, 1, -2), PricingArc(1, 2, 0)))
+    results = [solve(model, bound_mode=bound_mode, stabilize=False) for model in
+               (network, [network], (network,), NetworkProblem((), network), NetworkProblem((), (network,)))]
+    for result in results:
+        assert result.status == "Optimal"
+        assert result.lp == -2
+        assert result.bound == -2
+        assert result.oracle_calls == results[0].oracle_calls
+        assert result.routes == results[0].routes
+    second = replace(network, id=42, arcs=(PricingArc(0, 1, -3), PricingArc(1, 2, 0)))
+    assert solve([network, second], bound_mode=bound_mode, stabilize=False).lp == -5
+
+
+def test_modern_frontend_exports_one_solve_operation():
+    import pybaldes
+    assert callable(pybaldes.solve)
+    assert callable(pybaldes._core._solve)
+    for name in ("solve_root", "solve_networks"):
+        assert not hasattr(pybaldes, name)
+        assert not hasattr(pybaldes._core, "_" + name)

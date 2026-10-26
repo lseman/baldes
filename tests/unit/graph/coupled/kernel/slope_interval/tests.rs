@@ -134,7 +134,7 @@ fn raw_interval_uses_computed_native_front_not_global_source_program_minimum() {
         bounds: Window::new(0., 1.).unwrap(),
         increments: vec![0.; 3],
         functions: functions.clone(),
-        policy: FrontOperationPolicy::NativeFrontAlgebra,
+        policy: FrontOperationPolicy::FrontAlgebra,
     };
     graph.set_coupled_resources(&[resource]).unwrap();
     let kernel = graph.coupled_kernel().unwrap();
@@ -360,7 +360,7 @@ fn native_raw_fronts_compare_with_an_excess_penalty() {
         let CoupledResource::SlopeIntervalCost { policy, .. } = &mut resource else {
             unreachable!()
         };
-        *policy = FrontOperationPolicy::NativeFrontAlgebra;
+        *policy = FrontOperationPolicy::FrontAlgebra;
         resource
     };
     let (mut graph, ..) = parallel_prefixes(charges(), [0., 0.]);

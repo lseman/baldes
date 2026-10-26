@@ -68,7 +68,7 @@ pub(super) fn image(
         } => slope_function_range(function, argument, work, deadline),
         EncodedFunction::SlopeSegments {
             function,
-            policy: EvaluationPolicy::NativeTolerance,
+            policy: EvaluationPolicy::EndpointTolerance,
         } => {
             debit(work, 1, deadline)?;
             let (lower, upper) = function.domain();

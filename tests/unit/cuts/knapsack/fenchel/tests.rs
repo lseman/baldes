@@ -204,7 +204,7 @@ fn root_fenchel_only_cuts_survive_enumeration_and_child_restore() {
     use crate::inputs::{Instance, Rounding};
     use crate::master::{
         cg::Status,
-        root::{inherit, RootOptions},
+        routing::{inherit, RootOptions},
     };
     let instance = Instance::parse("fenchel-root\nVEHICLE\nNUMBER CAPACITY\n3 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 100 0\n1 1 0 1 0 100 0\n2 0 1 1 0 100 0\n3 1 1 1 0 100 0\n").unwrap();
     for enumerate in [false, true] {
@@ -213,7 +213,7 @@ fn root_fenchel_only_cuts_survive_enumeration_and_child_restore() {
         let mut options = RootOptions::default().with_knapsack_cuts(config);
         options.enumerate = enumerate;
         options.capture_state = true;
-        let out = instance.solve_root(8, Rounding::None, options).unwrap();
+        let out = instance.solve(8, Rounding::None, options).unwrap();
         assert_eq!(out.master.status, Status::Optimal);
         assert!(out.cuts > 0);
         assert!((out.master.lp - (4.0 + 2.0_f64.sqrt())).abs() < 1e-7);

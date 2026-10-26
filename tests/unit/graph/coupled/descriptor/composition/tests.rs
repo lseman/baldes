@@ -17,7 +17,7 @@ fn native_affine_and_outer_knot_secants() {
         &f(&[(2., 0.), (3., 2.)]),
         0.,
         2.,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         budget,
     ));
     assert_eq!(affine.pairs(), &[(5., 0.), (6., 2.)]);
@@ -26,7 +26,7 @@ fn native_affine_and_outer_knot_secants() {
         &f(&[(0., 0.), (2., 3.)]),
         0.,
         3.,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         budget,
     ));
     assert_eq!(crossed.pairs(), &[(1., 0.), (4., 1.), (-2., 3.)]);
@@ -61,7 +61,7 @@ fn native_fractional_secants_match_retained_helper_observation() {
         &f(&[(0.1, 0.), (0.3, 0.7), (-0.2, 2.)]),
         0.1,
         1.7,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         FrontierBudget::default(),
     ));
     assert_eq!(
@@ -90,7 +90,7 @@ fn clipped_native_and_strict_composition_preserve_their_arithmetic() {
         &inner,
         0.1,
         1.7,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         FrontierBudget::default(),
     ));
     assert_eq!(strict.pairs()[2].0.to_bits(), (-0.14_f64).to_bits());
@@ -103,7 +103,7 @@ fn native_composition_carries_an_outer_knot_at_an_inner_segment_end() {
         &f(&[(0.034, 0.), (0.74, 0.9), (0.629, 2.)]),
         0.167,
         1.593,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         FrontierBudget::default(),
     ));
     let bits: Vec<_> = actual
@@ -190,7 +190,7 @@ fn native_exhausted_outer_domain_is_unknown_while_strict_composition_clips() {
                     &inner,
                     lower,
                     upper,
-                    FrontOperationPolicy::NativeFrontAlgebra,
+                    FrontOperationPolicy::FrontAlgebra,
                     FrontierBudget::default()
                 ),
                 FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
@@ -214,7 +214,7 @@ fn native_exhausted_outer_domain_is_unknown_while_strict_composition_clips() {
                 &inner,
                 lower,
                 1.6,
-                FrontOperationPolicy::NativeFrontAlgebra,
+                FrontOperationPolicy::FrontAlgebra,
                 FrontierBudget::default()
             ),
             FrontierOutcome::Complete(_)
@@ -298,7 +298,7 @@ fn native_snaps_and_near_slope_merges_match_original_helper_bits() {
             &inner,
             lo,
             hi,
-            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontOperationPolicy::FrontAlgebra,
             FrontierBudget::default(),
         ));
         let bits: Vec<_> = actual
@@ -315,7 +315,7 @@ fn native_snaps_and_near_slope_merges_match_original_helper_bits() {
             &outer,
             lo,
             hi,
-            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontOperationPolicy::FrontAlgebra,
             FrontierBudget::default(),
         ));
         assert_eq!(cached.pairs(), actual.pairs());
@@ -340,7 +340,7 @@ fn native_constant_short_front_does_not_change_strict_composition() {
         &inner,
         0.5,
         0.50001,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         FrontierBudget::default(),
     ));
     assert_eq!(native.pairs()[1].0, 0.);
@@ -350,7 +350,7 @@ fn native_constant_short_front_does_not_change_strict_composition() {
             &inner,
             0.5,
             0.50001,
-            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontOperationPolicy::FrontAlgebra,
             FrontierBudget {
                 max_pairs: 0,
                 ..FrontierBudget::default()
@@ -364,7 +364,7 @@ fn native_constant_short_front_does_not_change_strict_composition() {
             &inner,
             -0.00001,
             1.,
-            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontOperationPolicy::FrontAlgebra,
             FrontierBudget::default()
         ),
         FrontierOutcome::Unknown(_)
@@ -378,7 +378,7 @@ fn native_near_knots_preserve_segment_advancement_and_endpoint_snaps() {
         &f(&[(0.037, 0.0), (0.387, 0.9), (0.456, 2.0)]),
         0.251,
         1.59,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         FrontierBudget::default(),
     ));
     assert_eq!(
@@ -399,7 +399,7 @@ fn native_near_knots_preserve_segment_advancement_and_endpoint_snaps() {
         &f(&[(0.99999, 0.0), (1.0, 2.0)]),
         0.0,
         1.0,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         FrontierBudget::default(),
     ));
     assert_eq!(
@@ -419,7 +419,7 @@ fn native_near_knots_preserve_segment_advancement_and_endpoint_snaps() {
         &f(&[(0.0, 0.0), (0.99999, 1.0), (1.0, 2.0)]),
         0.0,
         2.0,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         FrontierBudget::default(),
     ));
     assert_eq!(

@@ -1,16 +1,18 @@
 //! Global numerical oracle feedback versus independent pattern-domain optima.
 use super::imported_multiple_tests::{bounds, column, fixture};
 use super::*;
-use mp::{
+use baldes::master::tree::ModelTreeOptions;
+use baldes::master::tree::TreeStatus;
+use model::{
     imported::{
         self, Column, ColumnBatch, ImportOptions, ImportOracleReply, ImportPricing,
-        ImportPricingKind, ImportPricingMinimum, ImportTreeStatus,
+        ImportPricingKind, ImportPricingMinimum,
     },
-    AssignmentTreeOptions, MasterVariable,
+    MasterVariable,
 };
 use std::time::Duration;
-fn configured(mode: BoundMode) -> AssignmentTreeOptions {
-    let mut result = AssignmentTreeOptions {
+fn configured(mode: BoundMode) -> ModelTreeOptions {
+    let mut result = ModelTreeOptions {
         node: options(),
         ..Default::default()
     };
@@ -38,7 +40,7 @@ fn numerical_minima_do_not_become_certificates_or_enumeration_completion() {
             |point, _| Ok(empty(point, f64::INFINITY)),
         )
         .unwrap();
-    assert_eq!(stopped.status, ImportTreeStatus::Incomplete);
+    assert_eq!(stopped.status, TreeStatus::Incomplete);
     assert_eq!(stopped.bound_mode, BoundMode::Certified);
     assert_eq!(stopped.bound, f64::NEG_INFINITY);
     assert_eq!(stopped.incumbent, 101.);
@@ -51,7 +53,7 @@ fn numerical_minima_do_not_become_certificates_or_enumeration_completion() {
             |point, _| Ok(empty(point, f64::INFINITY)),
         )
         .unwrap();
-    assert_eq!(solved.status, ImportTreeStatus::Optimal);
+    assert_eq!(solved.status, TreeStatus::Optimal);
     assert_eq!(solved.incumbent, 101.);
     assert!(session.solve(options()).is_err());
 }
@@ -78,7 +80,7 @@ fn global_coverage_handles_negative_minima_missing_groups_and_unknown_values() {
         .unwrap();
     // A future group-42 pattern at cost -99 can replace known cost one,
     // giving full optimum 100-99=1. Group 7's oracle alone cannot prune it.
-    assert_eq!(mixed.status, ImportTreeStatus::Incomplete);
+    assert_eq!(mixed.status, TreeStatus::Incomplete);
     assert_eq!(mixed.bound, 1.);
     assert_eq!(mixed.incumbent, 101.);
     for unknown in [false, true] {
@@ -101,7 +103,7 @@ fn global_coverage_handles_negative_minima_missing_groups_and_unknown_values() {
                 },
             )
             .unwrap();
-        assert_eq!(result.status, ImportTreeStatus::Incomplete);
+        assert_eq!(result.status, TreeStatus::Incomplete);
         assert_eq!(result.bound, f64::NEG_INFINITY);
     }
 }
@@ -120,7 +122,7 @@ fn numerical_phase_one_requires_all_groups_and_recovers_into_objective_requests(
             },
         )
         .unwrap();
-    assert_eq!(impossible.status, ImportTreeStatus::Infeasible);
+    assert_eq!(impossible.status, TreeStatus::Infeasible);
     let incomplete = session
         .begin_tree()
         .run_with_oracles(
@@ -138,7 +140,7 @@ fn numerical_phase_one_requires_all_groups_and_recovers_into_objective_requests(
             },
         )
         .unwrap();
-    assert_eq!(incomplete.status, ImportTreeStatus::Incomplete);
+    assert_eq!(incomplete.status, TreeStatus::Incomplete);
     let mut kinds = vec![];
     let recovered = session
         .begin_tree()
@@ -169,7 +171,7 @@ fn numerical_phase_one_requires_all_groups_and_recovers_into_objective_requests(
             },
         )
         .unwrap();
-    assert_eq!(recovered.status, ImportTreeStatus::Optimal);
+    assert_eq!(recovered.status, TreeStatus::Optimal);
     assert_eq!(recovered.incumbent, 3.);
     assert_eq!(
         kinds,
@@ -288,7 +290,7 @@ fn partial_rounds_resume_with_fresh_coverage_and_do_not_upgrade_bound_modes() {
         })
         .unwrap();
     assert_eq!(seen, vec![7]);
-    assert_eq!(first.status, ImportTreeStatus::BatchLimit);
+    assert_eq!(first.status, TreeStatus::BatchLimit);
     assert_eq!(first.bound, f64::NEG_INFINITY);
     let mut larger = limits.clone();
     larger.max_batches = 2;
@@ -300,7 +302,7 @@ fn partial_rounds_resume_with_fresh_coverage_and_do_not_upgrade_bound_modes() {
         })
         .unwrap();
     assert_eq!(seen, vec![7, 42, 7]);
-    assert_eq!(done.status, ImportTreeStatus::Optimal);
+    assert_eq!(done.status, TreeStatus::Optimal);
     assert!(first
         .tree
         .run_with_oracles(
@@ -317,7 +319,7 @@ fn partial_rounds_resume_with_fresh_coverage_and_do_not_upgrade_bound_modes() {
             .run_with_oracles(&no_time, &larger, |_, _| unreachable!())
             .unwrap()
             .status,
-        ImportTreeStatus::TimeLimit
+        TreeStatus::TimeLimit
     );
     let contradiction = session.begin_tree().run_with_oracles(
         &configured(BoundMode::Numerical),
@@ -375,7 +377,7 @@ fn adverse_unlimited_quantities_keep_numerical_oracle_bounds_unknown() {
             },
         )
         .unwrap();
-    assert_eq!(result.status, ImportTreeStatus::Incomplete);
+    assert_eq!(result.status, TreeStatus::Incomplete);
     assert_eq!(result.bound, f64::NEG_INFINITY);
     assert_eq!(result.incumbent, -1.);
 }

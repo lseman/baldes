@@ -37,7 +37,7 @@ macro_rules! div {
         $m.div(a, b)?
     }};
 }
-const NATIVE: FrontOperationPolicy = FrontOperationPolicy::NativeFrontAlgebra;
+const NATIVE: FrontOperationPolicy = FrontOperationPolicy::FrontAlgebra;
 const STRICT: FrontOperationPolicy = FrontOperationPolicy::StrictDomain;
 const MAX_PAIRS: usize = 4096;
 
@@ -862,7 +862,7 @@ fn clamp_filter(
 }
 
 /// A point objective interval for the declared computed-front program. This
-/// entry deliberately accepts only NativeFrontAlgebra raw paired descriptors;
+/// entry deliberately accepts only FrontAlgebra raw paired descriptors;
 /// source-control paired resources keep their independent outward verifier.
 pub(super) fn certify(
     definition: &CoupledResource,

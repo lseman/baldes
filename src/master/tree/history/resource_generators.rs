@@ -5,7 +5,7 @@ impl BranchEvaluationHistory {
     #[cfg(test)]
     pub(crate) fn refresh_resource_generators<const D: usize>(
         &self,
-        problem: &RootProblem<D>,
+        problem: &RoutingContext<D>,
         routes: &[(&Route, f64)],
         ancestors: &[BranchConstraint],
         supplied: &mut Vec<BranchCandidate>,
@@ -21,7 +21,7 @@ impl BranchEvaluationHistory {
     }
     pub(super) fn refresh_resource_generators_admitted<const D: usize>(
         &self,
-        problem: &RootProblem<D>,
+        problem: &RoutingContext<D>,
         routes: &[(&Route, f64)],
         ancestors: &[BranchConstraint],
         options: Option<&BranchingOptions>,

@@ -506,5 +506,5 @@ mod separation;
 mod setup;
 mod two_path;
 
-mod native;
-pub use native::{NativeKPathCut, NativeKPathSeparator};
+mod general;
+pub use general::{GeneralKPathCut, GeneralKPathSeparator};

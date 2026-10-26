@@ -32,7 +32,7 @@ fn fixture(policy: EvaluationPolicy) -> Graph<2> {
 }
 #[test]
 fn native_tolerance_survives_preprocessing_forward_and_every_suffix_join() {
-    let graph = fixture(EvaluationPolicy::NativeTolerance);
+    let graph = fixture(EvaluationPolicy::EndpointTolerance);
     let kernel = graph.coupled_kernel().unwrap();
     assert_eq!(kernel.preprocessing().usable_arcs, 2);
     let (state, cost) = kernel.replay_state(&[0, 1]).unwrap().unwrap();
@@ -73,7 +73,7 @@ fn encoded_numeric_pricing_and_enumeration_share_literal_program_in_all_modes() 
             CoupledResource::EncodedPiecewiseLinearResource {
                 initial: -0.00005,
                 bounds: Window::new(-1., 10.).unwrap(),
-                functions: vec![slope(1., EvaluationPolicy::NativeTolerance); 4],
+                functions: vec![slope(1., EvaluationPolicy::EndpointTolerance); 4],
             },
             CoupledResource::EncodedPiecewiseLinearDependent {
                 parent: 0,
@@ -133,7 +133,7 @@ fn unknown_and_empty_enclosures_are_not_conflated() {
             .unwrap(),
         Range { lo: 0., hi: 1. }
     );
-    let tolerant = slope(2., EvaluationPolicy::NativeTolerance);
+    let tolerant = slope(2., EvaluationPolicy::EndpointTolerance);
     assert!(matches!(
         tolerant.image(Range::point(-0.00005)),
         FunctionEnclosure::Unknown
@@ -185,7 +185,7 @@ fn encoded_function_deserialization_validates_both_encodings() {
 #[cfg(feature = "clp")]
 #[test]
 fn phase_i_keeps_literal_domains_and_round_trips_encoding() {
-    let graph = fixture(EvaluationPolicy::NativeTolerance);
+    let graph = fixture(EvaluationPolicy::EndpointTolerance);
     let definitions = graph.coupled_kernel().unwrap().definitions();
     let json = serde_json::to_string(definitions).unwrap();
     let restored: Vec<CoupledResource> = serde_json::from_str(&json).unwrap();

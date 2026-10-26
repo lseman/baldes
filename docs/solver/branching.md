@@ -11,7 +11,7 @@ unit customer coverage with equality rows.
 
 | CLI mode | Candidate families, in priority order |
 | --- | --- |
-| `--branching native` (default) | Vehicle count, packing-set assignment, Ryan–Foster, arc flow |
+| `--branching default` (default) | Vehicle count, packing-set assignment, Ryan–Foster, arc flow |
 | `--branching vehicles` | Vehicle count, then arc-flow fallback |
 | `--branching ryan-foster` | Ryan–Foster, then arc-flow fallback |
 | `--branching arc` | Arc flow |
@@ -115,7 +115,7 @@ the arc; branch duals also reach pricing through that arc.
 
 `BranchConstraint::ArcFlow::arc` takes the arc's **position in
 `problem.graph.arcs`**, while `Route::arcs` stores public arc IDs. Use
-`RootProblem::arc_position(id)` to convert an ID to a position.
+`RoutingContext::arc_position(id)` to convert an ID to a position.
 
 ## Aggregate flow and edges
 
@@ -321,7 +321,7 @@ remains unverified, so
 identical native candidate selection is not guaranteed. No speed improvement
 is claimed.
 
-Rust defaults select `BranchHistoryPolicy::ObservedNative` in
+Rust defaults select `BranchHistoryPolicy::Default` in
 `BranchHistoryOptions`. Per-network route-count branches remain fresh candidates;
 this policy excludes them from stored-history ranking and generator replay.
 Their trial measurements remain available in diagnostics. The earlier `Reliable` policy remains available through

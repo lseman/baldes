@@ -59,16 +59,22 @@ Every active coordinate participates in extension, dominance, forward/backward
 joins, route reconstruction, enumeration, branching, resource knapsack charges,
 conservative path domains, and exact incumbent checks.
 
-A disposable resource accumulates nonnegative arc consumption and may wait to
-reach a lower bound. An equality resource accumulates signed consumption without
-waiting. Arc windows constrain the head state after extension. Initial values
-default to source lower bounds. Backward equality search requires fixed sink
-windows; `price` selects forward search when those are not fixed.
+A main disposable resource has nonnegative arc consumption and may wait to reach
+a lower bound. Pricing also supports signed consumption on non-main disposable
+axes; a negative increment can make waiting necessary to enter the next vertex
+window. Equality resources accumulate signed consumption without waiting. Arc
+windows constrain the head state after extension. Initial values default to
+source lower bounds. Backward equality search requires fixed sink windows;
+`price` selects forward search when those are not fixed.
 
 Bucket indexing uses at most two selected axes, independently of scalar capacity.
 A resource above index one can be the main axis through `Graph::main_resource`.
 Positive `EngineControls::steps` or `Solver::bucket_steps` select additional
-disposable axes; at most one joins the main axis. Unselected resources still
-participate in feasibility and dominance. More active resources can retain more
-nondominated labels and increase time and memory. Existing resource-kind,
-NG, budget, and certificate-eligibility restrictions still apply.
+nonnegative disposable axes; at most one joins the main axis. Signed secondary
+disposable axes stay in exact extension, dominance, joins and route replay but
+are not discretized. Resource-group branching and resource-load zero-arc
+propagation also decline signed axes when their proof requires nonnegative
+cumulative loads. Unselected resources still participate in feasibility and
+dominance. More active resources can retain more nondominated labels and increase
+time and memory. Existing resource-kind, NG, budget, and certificate-eligibility
+restrictions still apply.

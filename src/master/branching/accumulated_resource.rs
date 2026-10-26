@@ -1,13 +1,14 @@
 //! Master-side accumulated-resource validation and schedule violations.
 use crate::{
-    master::root::RootProblem, pricing::restrictions::AccumulatedResourceBranch, Result, Route,
+    master::routing::RoutingContext, pricing::restrictions::AccumulatedResourceBranch, Result,
+    Route,
 };
 
 pub(super) fn validate<const D: usize>(
-    problem: &RootProblem<D>,
+    problem: &RoutingContext<D>,
     rule: AccumulatedResourceBranch,
 ) -> Result<()> {
-    rule.window(&problem.graph)?;
+    rule.window(&problem.model.networks[0].graph)?;
     Ok(())
 }
 

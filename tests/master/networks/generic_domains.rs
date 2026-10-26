@@ -1,9 +1,11 @@
 //! Shared external features, original fixing and counts versus exact fixtures.
 use super::*;
 use baldes::master::preprocessing::Bounds;
-use mp::{
-    imported::{self, Column, ColumnBatch, ImportOptions, ImportOracleReply, ImportTreeStatus},
-    AssignmentTreeOptions, MasterVariable,
+use baldes::master::tree::ModelTreeOptions;
+use baldes::master::tree::TreeStatus;
+use model::{
+    imported::{self, Column, ColumnBatch, ImportOptions, ImportOracleReply},
+    MasterVariable,
 };
 use serde_json::Value;
 fn b(lower: f64, upper: f64) -> Bounds {
@@ -164,7 +166,7 @@ fn generic_fixing_links_and_nonlinear_features_match_exact_domains_and_numerical
         let oracle = session
             .begin_tree()
             .run_with_oracles(
-                &AssignmentTreeOptions {
+                &ModelTreeOptions {
                     node: options(),
                     ..Default::default()
                 },
@@ -188,11 +190,7 @@ fn generic_fixing_links_and_nonlinear_features_match_exact_domains_and_numerical
                 },
             )
             .unwrap();
-        assert_eq!(
-            oracle.status,
-            ImportTreeStatus::Optimal,
-            "{name}: {oracle:?}"
-        );
+        assert_eq!(oracle.status, TreeStatus::Optimal, "{name}: {oracle:?}");
         assert!(
             (oracle.incumbent - ip).abs() < 1e-7,
             "{name}: {} != {ip}",

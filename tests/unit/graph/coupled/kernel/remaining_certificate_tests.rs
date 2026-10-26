@@ -45,7 +45,7 @@ fn encoded_numeric_dependencies_and_objective_keep_their_literal_encodings() {
             },
             CoupledResource::EncodedPiecewiseLinearCost {
                 parent: 1,
-                functions: vec![encoded(5., 0., EvaluationPolicy::NativeTolerance); 2],
+                functions: vec![encoded(5., 0., EvaluationPolicy::EndpointTolerance); 2],
             },
         ])
         .unwrap();
@@ -67,7 +67,7 @@ fn encoded_native_endpoint_snapping_requires_proved_acceptance() {
             .set_coupled_resources(&[CoupledResource::EncodedPiecewiseLinearResource {
                 initial,
                 bounds: Window::new(-100., 100.).unwrap(),
-                functions: vec![encoded(7., 1., EvaluationPolicy::NativeTolerance)],
+                functions: vec![encoded(7., 1., EvaluationPolicy::EndpointTolerance)],
             }])
             .unwrap();
         assert_eq!(graph.coupled_kernel().unwrap().certify(&[0]), expected);
@@ -78,7 +78,7 @@ fn encoded_native_endpoint_snapping_requires_proved_acceptance() {
 fn raw_interval_operator_certificate_preserves_one_shared_initial_value() {
     for policy in [
         descriptor::FrontOperationPolicy::StrictDomain,
-        descriptor::FrontOperationPolicy::NativeFrontAlgebra,
+        descriptor::FrontOperationPolicy::FrontAlgebra,
     ] {
         let mut graph = Graph::<2>::new(3, 0).unwrap();
         graph.add_arc(0, 1, 0.).unwrap();
@@ -110,7 +110,7 @@ fn raw_interval_operator_certificate_preserves_one_shared_initial_value() {
         };
         increments[0] = 0.1;
         graph.set_coupled_resources(&[definition]).unwrap();
-        let expected = if policy == descriptor::FrontOperationPolicy::NativeFrontAlgebra {
+        let expected = if policy == descriptor::FrontOperationPolicy::FrontAlgebra {
             // Independent software-IEEE program: general native certificates
             // cover the declared machine front, including decimal shifts.
             Some((true, [6., 6.]))

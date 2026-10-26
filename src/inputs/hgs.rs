@@ -3,7 +3,7 @@ use super::{Instance, Rounding};
 use crate::{
     hgs::driver::{self, HgsOptions},
     invalid,
-    master::root::{RootOptions, RootProblem},
+    master::routing::{RootOptions, RoutingContext},
     Result,
 };
 use std::{collections::HashSet, time::Duration};
@@ -88,12 +88,12 @@ impl Instance {
     /// HGS uses the selected distance metric; the target graph validates every route.
     pub fn seed_hgs<const D: usize>(
         &self,
-        problem: &RootProblem<D>,
+        problem: &RoutingContext<D>,
         rounding: Rounding,
         options: &mut RootOptions,
         warm: &HgsWarmStart,
     ) -> Result<HgsSeedSummary> {
-        let graph = &problem.graph;
+        let graph = &problem.model.networks[0].graph;
         let n = self.customers.len().saturating_sub(1);
         if warm.time_limit.is_zero()
             || n == 0
@@ -147,7 +147,7 @@ impl Instance {
                 .map(|w| arcs.get(&(w[0], w[1])).copied())
                 .collect::<Option<Vec<_>>>()?;
             let route = problem.elementary_route(&ids)?;
-            crate::master::root::exact_route_feasible(problem, &route)?;
+            crate::master::routing::exact_route_feasible(problem, &route)?;
             Some(route)
         };
         let best = found

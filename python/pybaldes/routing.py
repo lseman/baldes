@@ -72,8 +72,9 @@ class Instance:
             distances = tuple(row[:customers + 1] for row in distances[:customers + 1])
         return replace(self, customers=self.customers[:customers + 1], distances=distances)
 
-    def solve_root(self, **options) -> RootResult:
-        return solve_root(self, **options)
+    def solve(self, **options) -> RootResult:
+        from .solve import solve
+        return solve(self, **options)
 
 
 @dataclass(frozen=True)
@@ -143,6 +144,7 @@ class RootResult:
     simplex_iterations: int = 0
     ipm_iterations: int = 0
     feasibility: Tuple[FeasibilityReport, ...] = ()
+    oracle_calls: int = 0
 
     def to_dict(self) -> dict:
         """Return ordinary Python data, retaining infinite unknown incumbents."""
@@ -160,85 +162,3 @@ class RootResult:
             return value
 
         return json.dumps(clean(self.to_dict()), indent=indent, allow_nan=False)
-
-
-def solve_root(
-    instance: Union[Instance, str, PathLike],
-    *,
-    problem_type: str = "vrptw",
-    customers: Optional[int] = None,
-    ng: int = 8,
-    reference_ng: bool = False,
-    rounding: Optional[str] = None,
-    capacity_cuts: bool = False,
-    two_path_cuts: bool = False,
-    rank_one_cuts: bool = False,
-    stabilize: bool = True,
-    stabilization_max_tree_depth: int = 10000,
-    master_solver: str = "clp",
-    master_threads: int = 0,
-    bound_mode: str = "numerical",
-    clp_scaling: str = "equilibrium",
-    clp_keep_work_areas: bool = True,
-    verbose: bool = False,
-    log_interval: int = 10,
-    hgs_time: Optional[float] = None,
-    hgs_columns: Union[str, int] = "best",
-    hgs_seed: int = 0,
-    reduced_cost_fixing: bool = True,
-    upper_bound: float = math.inf,
-    time_limit: float = 120.0,
-    max_iterations: int = 10_000,
-    max_cut_rounds: Optional[int] = None,
-    pricing_options: Optional[Mapping[str, float]] = None,
-) -> RootResult:
-    """Solve a VRPTW/CVRP root relaxation directly in Rust, releasing the GIL.
-
-    Input paths use Solomon or CVRPLIB format. CVRP ignores time windows and
-    service times. Distances follow the instance's convention by default
-    (unrounded for Solomon, TSPLIB nint for CVRPLIB EUC_2D); rounding accepts
-    'none', 'nearest', 'tenth' and 'ceil'.
-    verbose=True prints a CG progress table to stderr every log_interval iterations.
-    clp_scaling selects equilibrium (default), auto, geometric, or off for Clp.
-    clp_keep_work_areas retains native work buffers between LP solves by default.
-    master_solver='highs' selects HiGHS (requires a build with its feature);
-    master_solver='gurobi' selects Gurobi (requires its feature and a license);
-    master_threads limits HiGHS/Gurobi workers; 0 uses all available CPUs.
-    master_solver='ipm' uses native IPM and disables stabilization. hgs_time
-    gives HGS a separate positive search budget before column generation;
-    hgs_columns='best' seeds the best feasible plan, 'all' seeds all distinct
-    encountered routes that pass target-graph feasibility checks. A positive integer
-    selects up to that many cheapest new routes by original route cost.
-    Capacity cuts use complement form; rank-one cuts use limited memory.
-    two_path_cuts attaches the time resource for Kohl separation and enables
-    the capacity family. It requires problem_type='vrptw'.
-    Disabling reduced_cost_fixing also disables route enumeration. Cut counts
-    include generated rows that were later retired. These are root relaxations:
-    status 'Optimal' does not mean an optimal integer routing solution.
-    bound_mode='numerical' uses floating-point pricing bounds by default.
-    'certified' requires independent bound validation; an unknown certificate
-    leaves bound/certified_bound at negative infinity. numerical_bound is
-    reported separately and never substitutes for a missing certificate.
-    """
-    if not _core.has_clp:
-        raise RuntimeError("root solving requires pybaldes built with the clp feature")
-    if not isinstance(instance, Instance):
-        instance = Instance.from_file(instance)
-    if customers is not None:
-        instance = instance.truncated(customers)
-    rows = [(c.x, c.y, c.demand, c.ready, c.due, c.service) for c in instance.customers]
-    distances = None if instance.distances is None else [list(row) for row in instance.distances]
-    data = _core._solve_root(
-        instance.name, instance.vehicles, instance.capacity, rows, distances, problem_type,
-        ng, reference_ng, rounding or instance.rounding, capacity_cuts, rank_one_cuts, stabilize,
-        reduced_cost_fixing, upper_bound, time_limit, max_iterations,
-        max_cut_rounds, dict(pricing_options or {}), two_path_cuts, master_solver, hgs_time, str(hgs_columns), hgs_seed, verbose, log_interval, bound_mode, clp_scaling, clp_keep_work_areas, master_threads, stabilization_max_tree_depth,
-    )
-    data["duals"] = tuple(data["duals"])
-    data["routes"] = tuple(
-        RootRoute(**{**r, "nodes": tuple(r["nodes"]), "arcs": tuple(r["arcs"])})
-        for r in data["routes"]
-    )
-    data["history"] = tuple(Iteration(**h) for h in data["history"])
-    data["feasibility"] = tuple(FeasibilityReport(**r) for r in data["feasibility"])
-    return RootResult(**data)

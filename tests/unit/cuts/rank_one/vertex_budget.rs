@@ -17,8 +17,8 @@ fn fixture(limit: usize) -> Separation {
     })];
     separator
 }
-fn cut(row: i32, memory_type: i32, memory: &[i32]) -> NativeCut {
-    NativeCut {
+fn cut(row: i32, memory_type: i32, memory: &[i32]) -> SeparatedCut {
+    SeparatedCut {
         num_rows: 1,
         set_ids: vec![row],
         numerators: vec![1],
@@ -28,7 +28,7 @@ fn cut(row: i32, memory_type: i32, memory: &[i32]) -> NativeCut {
         ..Default::default()
     }
 }
-fn select(separator: &mut Separation, candidates: Vec<NativeCut>, out: &mut Vec<NativeCut>) {
+fn select(separator: &mut Separation, candidates: Vec<SeparatedCut>, out: &mut Vec<SeparatedCut>) {
     let mut ranked = CandidateSet::new();
     for (i, mut cut) in candidates.into_iter().enumerate() {
         cut.id = i as i32;

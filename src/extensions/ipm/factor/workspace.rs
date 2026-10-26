@@ -3,6 +3,8 @@
 use super::*;
 use std::ops::Range;
 
+mod schedule;
+
 #[derive(Debug, Clone)]
 pub(super) struct Assembly {
     /// (offset in the dense front, position in the original CSC values).
@@ -12,6 +14,30 @@ pub(super) struct Assembly {
 }
 
 impl Symbolic {
+    pub(crate) fn dependency_schedule(&self) -> bool {
+        let heavy = |&s: &usize| {
+            let front = &self.fronts[s];
+            let width = front.end - front.lo;
+            let size = width + front.updates.len();
+            width >= 16 && size.saturating_mul(size).saturating_mul(width) >= 100_000
+        };
+        // Large numbers of cheap primal leaves make per-front ready-task
+        // bookkeeping more expensive than level batching.
+        let heavy_count = (0..self.fronts.len()).filter(|s| heavy(s)).count();
+        if self.fronts.len() > heavy_count.saturating_mul(8) {
+            return false;
+        }
+        self.levels
+            .iter()
+            .filter(|level| level.iter().any(heavy))
+            .count()
+            >= 2
+            && self
+                .levels
+                .iter()
+                .any(|level| level.iter().filter(|s| heavy(s)).count() >= 2)
+    }
+
     pub(crate) fn prepare_assembly(&mut self, a: &SparseMatrix) {
         let mut owner = vec![0; self.order.len()];
         for (s, front) in self.fronts.iter().enumerate() {
@@ -93,6 +119,12 @@ impl Symbolic {
         } else {
             1
         };
+        // Ready tasks amortize their state locks only when substantial pivot
+        // blocks can overlap across levels. Keep cheap leaves and one heavy
+        // root level on the retained, batched schedule.
+        if tree && self.dependency_schedule() {
+            return self.factorize_dependencies(a, regularize, execution, work, node, workers);
+        }
         work.prepare(self, tree, workers);
         let FactorWorkspace {
             tasks,
@@ -223,37 +255,61 @@ impl Symbolic {
         task: &mut FrontWork,
     ) -> Result<()> {
         let front = &self.fronts[task.s];
+        self.compute_front_values(
+            a,
+            regularize,
+            node,
+            |i| {
+                let child = front.children[i];
+                valid[child].then_some(schur[child].as_slice())
+            },
+            scratch,
+            task,
+        )
+    }
+
+    fn compute_front_values<'a>(
+        &self,
+        a: &SparseMatrix,
+        regularize: bool,
+        node: bool,
+        mut child_values: impl FnMut(usize) -> Option<&'a [f64]>,
+        scratch: &mut DenseWorkspace,
+        task: &mut FrontWork,
+    ) -> Result<()> {
+        let front = &self.fronts[task.s];
         let assembly = &self.assembly[task.s];
         let np = front.end - front.lo;
         let nf = np + front.updates.len();
         let f = &mut scratch.matrix;
-        f.resize(nf * nf, 0.);
-        for i in 0..nf {
-            f[i * nf..i * nf + i + 1].fill(0.);
-        }
-        for &(offset, p) in &assembly.entries {
-            f[offset] += a.val[p];
-        }
-        for (&child, rows) in front.children.iter().zip(&assembly.children) {
-            if !valid[child] {
-                return Err(Error::NumericalFailure(
-                    "missing child Schur complement".into(),
-                ));
+        let mut assemble = |f: &mut Vec<f64>| -> Result<()> {
+            f.resize(nf * nf, 0.);
+            for i in 0..nf {
+                f[i * nf..i * nf + i + 1].fill(0.);
             }
-            let values = &schur[child];
-            for (i, &r) in rows.iter().enumerate() {
-                let offset = i * (i + 1) / 2;
-                let row = &mut f[r * nf..(r + 1) * nf];
-                for (j, &c) in rows[..=i].iter().enumerate() {
-                    row[c] += values[offset + j];
+            for &(offset, p) in &assembly.entries {
+                f[offset] += a.val[p];
+            }
+            for (child, rows) in assembly.children.iter().enumerate() {
+                let values = child_values(child).ok_or_else(|| {
+                    Error::NumericalFailure("missing child Schur complement".into())
+                })?;
+                for (i, &r) in rows.iter().enumerate() {
+                    let offset = i * (i + 1) / 2;
+                    let row = &mut f[r * nf..(r + 1) * nf];
+                    for (j, &c) in rows[..=i].iter().enumerate() {
+                        row[c] += values[offset + j];
+                    }
                 }
             }
-        }
+            Ok(())
+        };
+        assemble(f)?;
         task.stats = FactorStats {
             min_abs_pivot: f64::INFINITY,
             ..FactorStats::default()
         };
-        bk_into(
+        let result = bk_into(
             f,
             nf,
             np,
@@ -263,7 +319,32 @@ impl Symbolic {
             &mut task.blocks,
             &mut task.perm,
             &mut scratch.multipliers,
-        )?;
+            true,
+        );
+        if result.is_err() && scratch.multipliers.used_blocked {
+            // A batched sum can overflow even when sequential subtractions
+            // stay finite. Reassemble from immutable sources and try the
+            // original scalar kernel before changing Newton regularization.
+            assemble(f)?;
+            task.stats = FactorStats {
+                min_abs_pivot: f64::INFINITY,
+                ..Default::default()
+            };
+            bk_into(
+                f,
+                nf,
+                np,
+                regularize,
+                &mut task.stats,
+                node,
+                &mut task.blocks,
+                &mut task.perm,
+                &mut scratch.multipliers,
+                false,
+            )?;
+        } else {
+            result?;
+        }
         for k in 0..np {
             let column = &mut task.l[k];
             column.clear();
@@ -415,10 +496,10 @@ impl FactorWorkspace {
 #[derive(Debug, Default)]
 struct DenseWorkspace {
     matrix: Vec<f64>,
-    multipliers: Vec<(f64, f64)>,
+    multipliers: DenseScratch,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct FrontWork {
     s: usize,
     l: Vec<Vec<(usize, f64)>>,
@@ -428,6 +509,12 @@ struct FrontWork {
     stats: FactorStats,
 }
 impl FrontWork {
+    fn empty(s: usize) -> Self {
+        Self {
+            s,
+            ..Self::default()
+        }
+    }
     fn new(s: usize, front: &Front) -> Self {
         Self {
             s,

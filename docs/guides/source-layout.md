@@ -14,7 +14,11 @@ commands. Runnable demonstrations belong in `examples/`.
 | `src/enumeration/` | Route-domain proofs and bounded path enumeration |
 | `src/cuts/` | Cut families, registration, and shared separation machinery |
 | `src/master/` | LP interfaces, column generation, root solving, branching, and tree search |
-| `src/master/mp/` | Shared masters with independently priced networks and imported columns |
+| `src/master/pricing/` | Shared network scheduling, proof admission, oracle invocation, and batch accounting |
+| `src/master/formulation/` | Common master construction and dynamic row insertion |
+| `src/master/tree/` | Common tree lifecycle, evaluation dispatch, frontier and queue policies |
+| `src/master/routing/` | Routing rows, cuts, certificates, and the routing pricing adapter |
+| `src/master/model/` | Shared masters with independently priced networks and imported columns |
 | `src/master/solvers/` | Clp, HiGHS, and Gurobi adapters and shared MIP controls |
 | `src/extensions/` | HGS, IPM, electric-vehicle routing, p-step, robust routing, and column elimination (`ce`) |
 | `src/inputs/` | Instance parsing and graph construction |
@@ -26,11 +30,24 @@ paths stay independent of these physical filenames. Private implementation
 modules group work by responsibility, while the parent defines shared data and
 exports the public interface.
 
-`pricing/mod.rs` defines the solver state. Construction, configuration, cut
-preparation, restriction application, and lifecycle changes have separate
-implementations. `master/mp/mod.rs` defines its shared model and
-state; `pricing.rs` implements network pricing callbacks, and `solve.rs`
-implements initialization and the solve workflow.
+`pricing/mod.rs` defines the resource-pricing solver state. The canonical master
+model lives in `master/model/mod.rs`: shared rows plus a collection of networks.
+`RoutingContext` registers routing metadata around that same model; it does not
+own another graph, row or coefficient definition.
+
+`master/formulation/` constructs masters for every registration.
+`master/preprocessing/` owns propagation and flow construction. `master/tree/`
+owns the single tree driver, frontier, statuses, policies and branching helpers.
+Its routing, general-model and imported-domain adapters supply evaluation,
+branching and certificate callbacks. They do not maintain separate search loops.
+Adapter files may be attached as private children of their data-owning module
+with `#[path]`, keeping implementation fields private while giving each subsystem
+one physical source location.
+
+`master/pricing/` coordinates one or more pricing networks. Exact arithmetic
+lives in `master/numerics.rs`. The CLI is `src/bin/baldes/cli.rs`; Python uses
+`pybaldes.solve` and the `_solve` extension transport. See the
+[unified solve guide](solve.md) for accepted inputs and the breaking API changes.
 
 Keep test bodies and fixtures outside `src/`. Attach private unit tests with
 feature-gated `#[path]` module declarations so tests do not require widening
@@ -53,12 +70,12 @@ its routes into a restricted master belongs to `master/`.
 | `graph/coupled/kernel/preparation.rs` | Prepare definitions, configure objectives, and validate graph compatibility |
 | `graph/coupled/kernel/extension.rs` | Create directional labels, extend arcs, and replay paths |
 | `graph/coupled/kernel/joining.rs` | Join forward/backward states and compute the joined objective |
-| `master/mp/enumeration/mod.rs` | Public options/reports and snapshot enumeration entry point |
-| `master/mp/enumeration/collection.rs` | Collect complete or cutoff-bounded route universes under shared budgets |
-| `master/mp/enumeration/transfer.rs` | Install a collected universe atomically on a private master |
-| `master/mp/enumeration/pricing.rs` | Price the installed finite universe |
-| `master/mp/enumeration/mip.rs` | Solve integer copies and check original-domain encoding |
-| `master/mp/enumeration/cutoff.rs` | Own the improvement-domain snapshot and expose its restricted guarantees |
+| `master/model/enumeration/mod.rs` | Public options/reports and snapshot enumeration entry point |
+| `master/model/enumeration/collection.rs` | Collect complete or cutoff-bounded route universes under shared budgets |
+| `master/model/enumeration/transfer.rs` | Install a collected universe atomically on a private master |
+| `master/pricing/mod.rs` | Coordinate live and retained pricing for both model adapters |
+| `master/model/enumeration/mip.rs` | Solve integer copies and check original-domain encoding |
+| `master/model/enumeration/cutoff.rs` | Own the improvement-domain snapshot and expose its restricted guarantees |
 | `master/cg/setup.rs` | Validate options and warm-start metadata before execution |
 | `master/cg/driver.rs` | Sequence master solves, pricing, stabilization, cuts, and handoffs |
 
@@ -107,7 +124,7 @@ The organization review identifies these next areas for deeper work:
   execution and result rendering when adding another routing command.
 
 The canonical namespaces are `baldes::master::cg` for column generation,
-`baldes::master::mp` for multi-pricing, and `baldes::extensions::ce` for column
+`baldes::master::model` for multi-pricing, and `baldes::extensions::ce` for column
 elimination. Source and mirrored unit-test
 folders use those abbreviations as well. These namespace renames require Rust
 callers to update their imports; descriptive algorithm method names remain

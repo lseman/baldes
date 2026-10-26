@@ -1,7 +1,7 @@
 //! Assignment of a customer packing set to a pricing network.
 use crate::{
     invalid,
-    master::{root::RootProblem, RowSense},
+    master::{routing::RoutingContext, RowSense},
     Result,
 };
 
@@ -14,7 +14,7 @@ pub(super) fn row(assigned: bool) -> (RowSense, f64) {
 }
 
 pub(super) fn validate<const D: usize>(
-    problem: &RootProblem<D>,
+    problem: &RoutingContext<D>,
     vertex: usize,
     graph_id: i32,
 ) -> Result<()> {
@@ -27,11 +27,11 @@ pub(super) fn validate<const D: usize>(
 }
 
 pub(super) fn coefficient<const D: usize>(
-    problem: &RootProblem<D>,
+    problem: &RoutingContext<D>,
     arc: usize,
     vertex: usize,
     graph_id: i32,
 ) -> f64 {
-    (graph_id == problem.graph.graph_id.max(0) && problem.graph.arcs[arc].head == vertex) as u8
-        as f64
+    (graph_id == problem.model.networks[0].graph.graph_id.max(0)
+        && problem.model.networks[0].graph.arcs[arc].head == vertex) as u8 as f64
 }

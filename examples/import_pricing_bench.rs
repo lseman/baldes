@@ -2,7 +2,7 @@
 //! cargo run --release --features clp --example import_pricing_bench -- 256 2000
 use baldes::master::{
     cg::BoundMode,
-    mp::{
+    model::{
         imported::{self, Column, ColumnEnvelope, Subproblem},
         MasterVariable, Options, Problem,
     },

@@ -152,19 +152,19 @@ include heterogeneous/non-concave charging, repeated stations, and a route with
 two consecutive charging stops in both directions. Global versus bounded
 coverage and phase-one/phase-two work limits have separate checks.
 
-## Native physical-graph backend
+## Physical-graph backend
 
-`Problem::price_native(duals, fleet_dual, departure, NativeOptions::default())`
+`Problem::price_physical_graph(duals, fleet_dual, departure, PhysicalGraphOptions::default())`
 uses the ordinary Baldes labeling engine. Select
-`EvPricingBackend::Native(NativeOptions::default())` in the shared EV master to
+`EvPricingBackend::PhysicalGraph(PhysicalGraphOptions::default())` in the shared EV master to
 use it in both feasibility and travel-cost phases. The reference direct and
 subpath backends remain available; the default backend is unchanged.
 
-`Problem::native_graph(...)` also exposes the compiled `Graph<3>` for a native
+`Problem::pricing_graph(...)` also exposes the compiled `Graph<3>` for a
 `pricing::Solver<3>`. The graph preserves location IDs and duplicates the depot
 at vertex `locations.len()` as the sink. Its active scalar resources track arc
 count and delivered load. Only customers receive elementarity sets, so station
-visits may repeat. A native PWL boolean state records whether a customer has
+visits may repeat. A PWL boolean state records whether a customer has
 been served; the sink requires that state to be one. Customer duals are charged
 on incoming arcs and the fleet dual is charged once on source departure.
 The delivery-only native simultaneous-load resource additionally guards load
@@ -198,7 +198,7 @@ retain their numerical coverage meanings; no directed-rounding certificate is
 provided for charging. The largest absolute reduced arc cost times `max_arcs`
 must be below `1e12 - 1`, because the native engine reserves `1e12` as a sentinel;
 unsupported scales are rejected explicitly and require rescaling cost units.
-Native cuts and restrictions can be attached to the
+Cuts and restrictions can be attached to the
 exposed graph/solver; the shared EV master does not add cut separation or tree
 search. The tiny regression comparisons establish agreement on the tested
 fixtures, with no performance or large-instance scaling claim.

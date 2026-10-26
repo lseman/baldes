@@ -98,13 +98,13 @@ and progress logging.
 
 ## Use pybaldes
 
-`solve_root` reads an instance, runs the Rust solver, and returns a typed result
+`solve` reads an instance, runs the Rust solver, and returns a typed result
 with bounds, routes, and iteration history:
 
 ```python
 import pybaldes
 
-result = pybaldes.solve_root(
+result = pybaldes.solve(
     "instances/Solomon/R101.txt",
     problem_type="vrptw",
     customers=25,

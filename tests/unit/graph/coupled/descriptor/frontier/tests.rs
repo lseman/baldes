@@ -18,13 +18,13 @@ fn native_slope_addition_and_literal_replay_have_distinct_witnesses() {
     let budget = FrontierBudget::default();
     let ab = complete(SlopeFront::from_prepared(a.clone()).add(
         &SlopeFront::from_prepared(b.clone()),
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         budget,
     ));
     assert_eq!(ab.components()[0].pairs(), &[(0., 0.), (1., 1.)]);
     let abc = complete(ab.add(
         &SlopeFront::from_prepared(c.clone()),
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         budget,
     ));
     assert_eq!(abc.components()[0].pairs(), &[(0., 0.), (0., 1.)]);
@@ -35,7 +35,7 @@ fn native_slope_addition_and_literal_replay_have_distinct_witnesses() {
     let replay = SourceReplayWitness::evaluate_shared_argument(
         &[a, b, c],
         x,
-        EvaluationPolicy::NativeTolerance,
+        EvaluationPolicy::EndpointTolerance,
     )
     .unwrap()
     .unwrap();
@@ -51,7 +51,7 @@ fn native_alignment_preserves_left_coordinates_and_active_slopes() {
     let budget = FrontierBudget::default();
     let a = SlopeFront::from_prepared(function(&[(0., 0.), (1., 5.), (2., 10.)]));
     let b = SlopeFront::from_prepared(function(&[(0., 0.), (3., 5.00001), (4., 10.)]));
-    let native = complete(a.add(&b, FrontOperationPolicy::NativeFrontAlgebra, budget));
+    let native = complete(a.add(&b, FrontOperationPolicy::FrontAlgebra, budget));
     assert_eq!(
         native.components()[0].pairs(),
         &[(0., 0.), (4., 5.), (6., 10.)]
@@ -71,7 +71,7 @@ fn strict_policy_does_not_expand_a_nearby_source_start() {
     let b = SlopeFront::from_prepared(function(&[(3., 0.00001), (4., 10.)]));
     let native = complete(a.add(
         &b,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         FrontierBudget::default(),
     ));
     assert_eq!(native.components()[0].pairs(), &[(4., 0.), (6., 10.)]);
@@ -86,7 +86,7 @@ fn strict_policy_does_not_expand_a_nearby_source_start() {
     let b = SlopeFront::from_prepared(function(&[(3., 0.), (4., 10.)]));
     let native = complete(a.add(
         &b,
-        FrontOperationPolicy::NativeFrontAlgebra,
+        FrontOperationPolicy::FrontAlgebra,
         FrontierBudget::default(),
     ));
     assert_eq!(native.components()[0].pairs(), &[(4., 0.), (6., 10.00001)]);
@@ -154,7 +154,7 @@ fn empty_unknown_limits_and_arithmetic_are_distinct() {
     assert!(matches!(
         a.add(
             &near_point,
-            FrontOperationPolicy::NativeFrontAlgebra,
+            FrontOperationPolicy::FrontAlgebra,
             FrontierBudget::default()
         ),
         FrontierOutcome::Unknown(FrontierUnknown::Unsupported(_))
@@ -173,11 +173,9 @@ fn zero_translation_and_restriction_preserve_slope_arithmetic() {
         &[(0., 0.), (0., 2.)]
     );
     let source = SlopeFront::from_prepared(function(&[(1., 0.), (2., 2.)]));
-    let interior =
-        complete(source.restrict(0.5, 1.5, FrontOperationPolicy::NativeFrontAlgebra, budget));
+    let interior = complete(source.restrict(0.5, 1.5, FrontOperationPolicy::FrontAlgebra, budget));
     assert_eq!(interior.components()[0].pairs(), &[(2., 0.5), (2., 1.5)]);
-    let singleton =
-        complete(source.restrict(1., 1., FrontOperationPolicy::NativeFrontAlgebra, budget));
+    let singleton = complete(source.restrict(1., 1., FrontOperationPolicy::FrontAlgebra, budget));
     assert_eq!(singleton.components()[0].pairs(), &[(3., 1.)]);
     let shifted = complete(interior.translate(4., budget));
     assert_eq!(shifted.components()[0].pairs(), &[(2., 4.5), (2., 5.5)]);
@@ -211,12 +209,7 @@ fn restriction_retains_gaps_and_translation_collapse_is_unknown() {
         FrontierOutcome::Unknown(FrontierUnknown::Unsupported(_))
     ));
     assert!(matches!(
-        source.restrict(
-            0.00001,
-            0.5,
-            FrontOperationPolicy::NativeFrontAlgebra,
-            budget
-        ),
+        source.restrict(0.00001, 0.5, FrontOperationPolicy::FrontAlgebra, budget),
         FrontierOutcome::Unknown(FrontierUnknown::Unsupported(_))
     ));
     assert!(matches!(

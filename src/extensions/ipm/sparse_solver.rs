@@ -129,10 +129,14 @@ impl HiPOLDLT {
         pattern: SparseMatrix,
         mut symbolic: Symbolic,
     ) -> Result<Self> {
+        // Keep the exact sparse pattern when the up-looking path is available.
+        let uplooking = Uplooking::new(&symbolic, a.cols);
+        if uplooking.is_none() {
+            symbolic.relax(a.cols);
+        }
         if symbolic.assembly_is_missing() {
             symbolic.prepare_assembly(&pattern);
         }
-        let uplooking = Uplooking::new(&symbolic, a.cols);
         let diagonal = (0..pattern.cols)
             .map(|j| {
                 let start = pattern.ptr[j];
@@ -295,7 +299,11 @@ impl NormalEqLDLT {
         } else {
             minimum_degree(graph)
         };
-        let symbolic = Symbolic::analyze(&pattern, order, a.rows);
+        let mut symbolic = Symbolic::analyze(&pattern, order, a.rows);
+        symbolic.relax(a.rows);
+        if symbolic.assembly_is_missing() {
+            symbolic.prepare_assembly(&pattern);
+        }
         let work = vec![0.; a.rows];
         Ok(Self {
             a,
@@ -410,6 +418,9 @@ fn refinement_error(
 /// Per-IPM scratch; no mutable workspace is shared between solver clones.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct SolveWorkspace {
+    pub(crate) profile: bool,
+    pub(crate) solve_time: std::time::Duration,
+    pub(crate) solve_calls: usize,
     pub(crate) rhs: Vec<f64>,
     pub(crate) solution: Vec<f64>,
     permuted: Vec<f64>,
@@ -432,6 +443,18 @@ pub struct SparseSolver {
     m: usize,
 }
 impl SparseSolver {
+    /// Return the selected structural plan without performing numeric work.
+    pub fn factorization_plan(&self) -> super::FactorizationPlan {
+        let (symbolic, execution) = match &self.backend {
+            Backend::HiPO(s) => (&s.symbolic, &s.execution),
+            Backend::Normal(s) => (&s.symbolic, &s.execution),
+        };
+        let mut plan = symbolic.plan();
+        plan.dependency_tree =
+            symbolic.parallel_levels(execution).0 && symbolic.dependency_schedule();
+        plan
+    }
+
     pub fn new(a: SparseMatrix, kind: SolverType) -> Result<Self> {
         let n = a.cols;
         let m = a.rows;
@@ -554,17 +577,25 @@ impl SparseSolver {
         if rhs.len() != self.n + self.m {
             return Err(Error::InvalidInput("KKT RHS dimension mismatch".into()));
         }
-        match &self.backend {
-            Backend::HiPO(s) => {
-                s.solve_refined_into(rhs, workspace)?;
+        let start = workspace.profile.then(std::time::Instant::now);
+        let result = (|| {
+            match &self.backend {
+                Backend::HiPO(s) => {
+                    s.solve_refined_into(rhs, workspace)?;
+                }
+                Backend::Normal(s) => {
+                    let (mut x, y) = s.solve(&rhs[..self.n], &rhs[self.n..])?;
+                    x.extend(y);
+                    workspace.solution = x;
+                }
             }
-            Backend::Normal(s) => {
-                let (mut x, y) = s.solve(&rhs[..self.n], &rhs[self.n..])?;
-                x.extend(y);
-                workspace.solution = x;
-            }
+            Ok(())
+        })();
+        if let Some(start) = start {
+            workspace.solve_time += start.elapsed();
+            workspace.solve_calls += 1;
         }
-        Ok(())
+        result
     }
     pub fn solve(&self, rhs: &[f64]) -> Result<Vec<f64>> {
         if rhs.len() != self.n + self.m {

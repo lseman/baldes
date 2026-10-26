@@ -1,7 +1,7 @@
 //! Fractional schedules are checked against the equivalent integer model.
 use super::*;
 use baldes::cuts::knapsack::{KnapsackKind, RouteLoadKnapsackCut};
-use mp::{EnumerationOptions, ResourceKnapsackCoefficients};
+use model::{EnumerationOptions, ResourceKnapsackCoefficients};
 
 fn fixture(divisor: f64, variant: &str) -> (Problem<2>, Vec<ResourceKnapsackCoefficients>) {
     let mut networks = vec![
@@ -70,7 +70,7 @@ fn fractional_resource_steps_match_integer_schedules_through_fixing_enumeration_
             forward
                 .pricing_options
                 .push(("BALDESuseBidirectionalSearch".into(), 0.));
-            let root = mp::solve(problem, forward).unwrap();
+            let root = model::solve(problem, forward).unwrap();
             optimal(&root, 2.);
             let child = root
                 .snapshot
@@ -138,7 +138,7 @@ fn fractional_resource_steps_propagate_original_zero_penalties_without_enumerati
             forward
                 .pricing_options
                 .push(("BALDESuseBidirectionalSearch".into(), 0.));
-            let root = mp::solve(problem, forward).unwrap();
+            let root = model::solve(problem, forward).unwrap();
             let zero = root
                 .snapshot
                 .with_resource_knapsack_row(
@@ -172,7 +172,7 @@ fn cutoff_resource_rows_preserve_fractional_waiting_equality_and_fixing() {
     for divisor in [2., 262_144.] {
         for variant in ["plain", "initial", "vertex_wait", "arc_wait", "equality"] {
             let (problem, coefficients) = fixture(divisor, variant);
-            let root = mp::solve(problem, options()).unwrap();
+            let root = model::solve(problem, options()).unwrap();
             let child = root
                 .snapshot
                 .with_resource_knapsack_row(

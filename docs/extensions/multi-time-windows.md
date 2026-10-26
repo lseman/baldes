@@ -88,7 +88,7 @@ selected, following Li et al. (2020, *Transportation Research Part E* 140,
 let mut tree = baldes::master::tree::TreeOptions::default();
 tree.branching.time_window_selection = Some(0);          // routing tree
 
-let mut network = baldes::master::mp::AssignmentTreeOptions::default();
+let mut network = baldes::master::tree::ModelTreeOptions::default();
 network.time_window_selection = Some(0);                 // network tree
 ```
 

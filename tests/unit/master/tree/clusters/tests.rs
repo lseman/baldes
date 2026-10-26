@@ -17,14 +17,15 @@ fn mst_partition_and_aggregate_coefficients_match_physical_crossings() {
                 .unwrap();
         }
     }
-    let p = RootProblem::set_partitioning(graph, 4.).unwrap();
+    let p = RoutingContext::set_partitioning(graph, 4.).unwrap();
     let groups = partition(&p, &Default::default()).unwrap();
     assert_eq!(groups, vec![vec![1, 2], vec![3, 4]]);
     let nodes = vec![0, 1, 3, 2, 4, 5];
     let arcs = nodes
         .windows(2)
         .map(|pair| {
-            p.graph
+            p.model.networks[0]
+                .graph
                 .arcs
                 .iter()
                 .find(|a| a.tail == pair[0] && a.head == pair[1])

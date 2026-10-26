@@ -105,7 +105,7 @@ impl PreparedSlopePaired {
                 ));
             }
             shifts = mode == PairedResourceMode::CostUnbounded
-                && policy == FrontOperationPolicy::NativeFrontAlgebra
+                && policy == FrontOperationPolicy::FrontAlgebra
                 && upper >= 1e12;
             if mode == PairedResourceMode::CostBounded {
                 if witness.value < lower || arcs.iter().any(|arc| arc.waiting < 0) {

@@ -98,7 +98,7 @@ fn dense_packing_matches_graph_support_for_walks_and_memory_policies() {
         weights: vec![0, 1, -1, 4],
         graph_support: BTreeMap::new(),
         graph_pricing_support: BTreeMap::new(),
-        native_kpath_support: None,
+        general_kpath_support: None,
         memory: vec![],
         graph_dependent_memory: false,
         graph_memories: BTreeMap::new(),
@@ -107,7 +107,7 @@ fn dense_packing_matches_graph_support_for_walks_and_memory_policies() {
         graph_arc_memories: BTreeMap::new(),
         arc_weights: BTreeMap::new(),
         visit_once: false,
-        native_type2: false,
+        type2: false,
         denominator: 2,
         dual: 0.0,
         class: CutClass::Packing,
@@ -130,7 +130,7 @@ fn dense_packing_matches_graph_support_for_walks_and_memory_policies() {
                     dense.graph_memories.insert(7, dense.memory.clone());
                 }
                 for native in [false, true] {
-                    dense.native_type2 = native;
+                    dense.type2 = native;
                     dense.class = if native {
                         CutClass::Covering
                     } else {

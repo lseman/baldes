@@ -11,7 +11,7 @@
 use super::BranchConstraint;
 use crate::master::{
     cg::{self, BoundMode, FeasibilityStatus},
-    root::RootProblem,
+    routing::RoutingContext,
 };
 use crate::{pricing::restrictions::RyanFosterConstraint, Route};
 
@@ -34,13 +34,13 @@ impl BranchConstraint {
 }
 
 /// Whether the node carries a branch that pricing does not see.
-pub(crate) fn has_master_only<const D: usize>(problem: &RootProblem<D>) -> bool {
+pub(crate) fn has_master_only<const D: usize>(problem: &RoutingContext<D>) -> bool {
     problem.branches().any(BranchConstraint::master_only)
 }
 
 /// The Ryan–Foster rules pricing enforces with binary resources.
 pub(crate) fn pricing_ryan_foster<const D: usize>(
-    problem: &RootProblem<D>,
+    problem: &RoutingContext<D>,
 ) -> Vec<RyanFosterConstraint> {
     problem
         .branches()
@@ -72,7 +72,7 @@ pub(crate) fn retires_column(constraint: &BranchConstraint, route: &Route) -> bo
 /// with no artificial left closes at its master objective, since no new
 /// master-improving column remains and the branch duals never reach pricing.
 pub(crate) fn close_at_master_objective<const D: usize>(
-    problem: &RootProblem<D>,
+    problem: &RoutingContext<D>,
     phase_floor: usize,
     values: &[f64],
     output: &mut cg::Output,
@@ -98,7 +98,7 @@ pub(crate) fn close_at_master_objective<const D: usize>(
 /// original-domain proof) instead. Returns the phase-I status and whether it
 /// is certified, or None when the policy does not apply.
 pub(crate) fn phase_one_stall<const D: usize>(
-    problem: &RootProblem<D>,
+    problem: &RoutingContext<D>,
     exact: bool,
     bound_mode: BoundMode,
     certify: impl FnOnce() -> bool,

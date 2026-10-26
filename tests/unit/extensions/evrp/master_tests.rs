@@ -161,9 +161,9 @@ fn backends(max_arcs: usize) -> [EvPricingBackend; 3] {
         ..DirectOptions::default()
     };
     [
-        EvPricingBackend::Native(NativeOptions {
+        EvPricingBackend::PhysicalGraph(PhysicalGraphOptions {
             max_arcs,
-            ..NativeOptions::default()
+            ..PhysicalGraphOptions::default()
         }),
         EvPricingBackend::Direct(options),
         EvPricingBackend::Subpath(SubpathOptions {

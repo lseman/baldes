@@ -1,10 +1,11 @@
 //! Master-side Ryan–Foster validation and route violation coefficients.
 use crate::{
-    invalid, master::root::RootProblem, pricing::restrictions::RyanFosterConstraint, Result, Route,
+    invalid, master::routing::RoutingContext, pricing::restrictions::RyanFosterConstraint, Result,
+    Route,
 };
 
 pub(super) fn validate<const D: usize>(
-    problem: &RootProblem<D>,
+    problem: &RoutingContext<D>,
     rule: RyanFosterConstraint,
 ) -> Result<()> {
     if rule.first == rule.second

@@ -27,7 +27,7 @@ fn engine_minimum(
     fleet: f64,
     bidirectional: bool,
 ) -> (f64, Vec<Vec<usize>>) {
-    let graph = p.native_graph(duals, fleet, p.nodes.len()).unwrap();
+    let graph = p.pricing_graph(duals, fleet, p.nodes.len()).unwrap();
     let phase = Phase {
         check_ng: true,
         jump_arcs: true,
@@ -50,7 +50,7 @@ fn engine_minimum(
     let routes = result
         .columns
         .iter()
-        .map(|c| p.native_route(&c.nodes))
+        .map(|c| p.route_nodes(&c.nodes))
         .collect();
     (result.minimum_reduced_cost, routes)
 }
@@ -106,7 +106,7 @@ fn every_forward_backward_split_joins_exactly_when_the_route_is_robust() {
             let mut p = random(seed, 6, gq, gt, 0.5);
             // Tighten capacity so the load vector also binds.
             p.capacity = 14.;
-            let graph = p.native_graph(&vec![0.; p.nodes.len()], 0., 7).unwrap();
+            let graph = p.pricing_graph(&vec![0.; p.nodes.len()], 0., 7).unwrap();
             let kernel = graph.coupled_kernel().unwrap();
             let sink = p.nodes.len();
             let arc_of = |u: usize, v: usize| {
@@ -191,7 +191,7 @@ fn backward_labels_completed_at_the_source_respect_the_worst_departure() {
         // Build the graph nominally so the arc filter keeps the source arc.
         let mut nominal = p.clone();
         nominal.time_budget = 0;
-        let mut graph = nominal.native_graph(&[0., 0.], 0., 1).unwrap();
+        let mut graph = nominal.pricing_graph(&[0., 0.], 0., 1).unwrap();
         let arcs = [(0, 1), (1, 2)];
         graph
             .set_coupled_resources(&p.budgeted_resources(&arcs, 2).unwrap())
@@ -221,7 +221,7 @@ fn directed_certificates_agree_with_robust_replay() {
     for seed in 1..7 {
         let mut p = random(seed, 6, 2, 2, 0.5);
         p.capacity = 14.;
-        let graph = p.native_graph(&vec![0.; p.nodes.len()], 0., 7).unwrap();
+        let graph = p.pricing_graph(&vec![0.; p.nodes.len()], 0., 7).unwrap();
         let kernel = graph.coupled_kernel().unwrap();
         let sink = p.nodes.len();
         for _ in 0..80 {
@@ -279,14 +279,14 @@ fn fixing_and_enumeration_keep_every_robust_route_under_the_cutoff() {
                 .collect();
             expected.sort();
             let mut solver = crate::pricing::Solver::<2>::new(2, 0).unwrap();
-            solver.graph = p.native_graph(&duals, fleet, ng).unwrap();
+            solver.graph = p.pricing_graph(&duals, fleet, ng).unwrap();
             solver.price_phase(0, 10, false).unwrap();
             solver.fix(cutoff).unwrap();
             let mut found: Vec<_> = solver
                 .enumerate(cutoff)
                 .unwrap()
                 .iter()
-                .map(|r| p.native_route(&r.nodes))
+                .map(|r| p.route_nodes(&r.nodes))
                 .filter(|r| reduced(r, p.replay(r).unwrap().cost, &duals, fleet) <= cutoff - 1e-6)
                 .collect();
             found.sort();

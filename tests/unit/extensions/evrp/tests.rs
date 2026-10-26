@@ -93,20 +93,22 @@ fn native_pricing_excludes_station_only_routes_and_preserves_positive_columns() 
     // Station-only return costs four; the cheapest customer route costs four
     // as well. A large fleet reward must never admit an empty customer column.
     for bidirectional in [false, true] {
-        let options = NativeOptions {
+        let options = PhysicalGraphOptions {
             bidirectional,
             max_arcs: 4,
-            ..NativeOptions::default()
+            ..PhysicalGraphOptions::default()
         };
         for fleet in [0., 100.] {
-            let r = p.price_native(&[0.; 3], fleet, 0., options).unwrap();
+            let r = p
+                .price_physical_graph(&[0.; 3], fleet, 0., options)
+                .unwrap();
             let route = r.best_route.unwrap();
             assert!(route.charging.visits.iter().any(|v| v.location == 2));
             assert_eq!(route.reduced_cost, 4. - fleet);
             p.replay(&route.charging.visits, 0.).unwrap();
         }
         p.locations[2].kind = LocationKind::Station { curve: curve() };
-        let r = p.price_native(&[0.; 3], 100., 0., options).unwrap();
+        let r = p.price_physical_graph(&[0.; 3], 100., 0., options).unwrap();
         assert_eq!(r.status, EvPricingStatus::Complete);
         assert!(r.best_route.is_none());
         p.locations[2].kind = LocationKind::Customer { demand: 2. };
@@ -116,21 +118,21 @@ fn native_pricing_excludes_station_only_routes_and_preserves_positive_columns() 
 #[test]
 fn native_limits_and_failed_schedule_reconstruction_never_claim_completeness() {
     for options in [
-        NativeOptions {
+        PhysicalGraphOptions {
             max_labels: 0,
-            ..NativeOptions::default()
+            ..PhysicalGraphOptions::default()
         },
-        NativeOptions {
+        PhysicalGraphOptions {
             max_front_work: 0,
-            ..NativeOptions::default()
+            ..PhysicalGraphOptions::default()
         },
-        NativeOptions {
+        PhysicalGraphOptions {
             max_reconstruction_work: 0,
-            ..NativeOptions::default()
+            ..PhysicalGraphOptions::default()
         },
     ] {
         let r = problem()
-            .price_native(&[0., 0., 20.], 0., 0., options)
+            .price_physical_graph(&[0., 0., 20.], 0., 0., options)
             .unwrap();
         assert_eq!(r.status, EvPricingStatus::WorkLimit, "{r:?}");
     }
@@ -143,7 +145,7 @@ fn native_pricing_rejects_objective_scales_reserved_for_native_sentinels() {
         arc.cost = 1e12;
     }
     let error = p
-        .price_native(&[0.; 3], 0., 0., NativeOptions::default())
+        .price_physical_graph(&[0.; 3], 0., 0., PhysicalGraphOptions::default())
         .unwrap_err();
     assert!(error.message.contains("rescale cost units"));
 }
@@ -191,14 +193,14 @@ fn native_load_tolerance_matches_exhaustive_replay() {
     let expected = exhaustive_route_best(&p, &duals, 0., 6);
     assert_eq!(expected, Some(-50.));
     let native = p
-        .price_native(
+        .price_physical_graph(
             &duals,
             0.,
             0.,
-            NativeOptions {
+            PhysicalGraphOptions {
                 max_arcs: 6,
                 bidirectional: false,
-                ..NativeOptions::default()
+                ..PhysicalGraphOptions::default()
             },
         )
         .unwrap();
@@ -486,26 +488,26 @@ fn bidirectional_pricing_matches_exhaustive_route_orders_with_station_repeats() 
                 .unwrap();
             assert!(subpath.statistics.subpaths > 0);
             let native_forward = p
-                .price_native(
+                .price_physical_graph(
                     &duals,
                     -2.0,
                     0.0,
-                    NativeOptions {
+                    PhysicalGraphOptions {
                         max_arcs: 6,
                         bidirectional: false,
-                        ..NativeOptions::default()
+                        ..PhysicalGraphOptions::default()
                     },
                 )
                 .unwrap();
             let native_backward = p
-                .price_native(
+                .price_physical_graph(
                     &duals,
                     -2.0,
                     0.0,
-                    NativeOptions {
+                    PhysicalGraphOptions {
                         max_arcs: 6,
                         bidirectional: true,
-                        ..NativeOptions::default()
+                        ..PhysicalGraphOptions::default()
                     },
                 )
                 .unwrap();
@@ -553,14 +555,14 @@ fn pricing_covers_elementary_customers_capacity_and_global_status() {
         assert_eq!(r.best_route.map(|r| r.reduced_cost), expected);
         for bidirectional in [false, true] {
             let native = p
-                .price_native(
+                .price_physical_graph(
                     &duals,
                     0.,
                     0.,
-                    NativeOptions {
+                    PhysicalGraphOptions {
                         max_arcs: 3,
                         bidirectional,
-                        ..NativeOptions::default()
+                        ..PhysicalGraphOptions::default()
                     },
                 )
                 .unwrap();
@@ -828,26 +830,26 @@ fn both_pricers_match_enumeration_with_two_customers_across_subpaths() {
                 )
                 .unwrap();
             let native_forward = p
-                .price_native(
+                .price_physical_graph(
                     &duals,
                     -1.0,
                     0.0,
-                    NativeOptions {
+                    PhysicalGraphOptions {
                         max_arcs: 7,
                         bidirectional: false,
-                        ..NativeOptions::default()
+                        ..PhysicalGraphOptions::default()
                     },
                 )
                 .unwrap();
             let native_backward = p
-                .price_native(
+                .price_physical_graph(
                     &duals,
                     -1.0,
                     0.0,
-                    NativeOptions {
+                    PhysicalGraphOptions {
                         max_arcs: 7,
                         bidirectional: true,
-                        ..NativeOptions::default()
+                        ..PhysicalGraphOptions::default()
                     },
                 )
                 .unwrap();

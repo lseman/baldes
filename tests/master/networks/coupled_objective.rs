@@ -63,11 +63,11 @@ fn paired_network_costs_reach_certified_enumeration_fixing_and_integer_solving()
             }])
             .unwrap();
     }
-    let root = mp::solve(problem, options()).unwrap();
+    let root = model::solve(problem, options()).unwrap();
     optimal(&root, 1.);
     let partial = root
         .snapshot
-        .enumerate(&mp::EnumerationOptions {
+        .enumerate(&model::EnumerationOptions {
             max_work: 80,
             ..Default::default()
         })
@@ -77,7 +77,7 @@ fn paired_network_costs_reach_certified_enumeration_fixing_and_integer_solving()
     assert!(partial.enumeration_report().failure.is_some());
     let full = root
         .snapshot
-        .enumerate(&mp::EnumerationOptions::default())
+        .enumerate(&model::EnumerationOptions::default())
         .unwrap();
     assert!(
         full.enumeration_report().complete,
@@ -119,12 +119,12 @@ fn paired_network_costs_reach_certified_enumeration_fixing_and_integer_solving()
 fn signed_coupled_costs_survive_full_transfer_certificates_fixing_and_siblings() {
     // Independent route objectives: network 7: 10-9=1, 0+5=5;
     // network 42: 2+0=2, 0+4=4. The unit cover has LP/IP optimum one.
-    let root = mp::solve(problem(), options()).unwrap();
+    let root = model::solve(problem(), options()).unwrap();
     optimal(&root, 1.);
     assert!(root.oracle_calls.iter().all(|&(_, calls)| calls > 0));
     let full = root
         .snapshot
-        .enumerate(&mp::EnumerationOptions::default())
+        .enumerate(&model::EnumerationOptions::default())
         .unwrap();
     assert!(full.enumeration_report().complete);
     assert_eq!(full.enumeration_report().routes, 4);
@@ -146,10 +146,10 @@ fn signed_coupled_costs_survive_full_transfer_certificates_fixing_and_siblings()
 
 #[test]
 fn cutoff_keeps_an_expensive_scalar_path_with_a_negative_resource_charge() {
-    let root = mp::solve(problem(), options()).unwrap();
+    let root = model::solve(problem(), options()).unwrap();
     let view = root
         .snapshot
-        .enumerate_below(1.5, &mp::EnumerationOptions::default())
+        .enumerate_below(1.5, &model::EnumerationOptions::default())
         .unwrap();
     assert!(view.report().complete);
     assert_eq!(view.coverage_cutoff(), 1.5);
@@ -172,7 +172,7 @@ fn cutoff_keeps_an_expensive_scalar_path_with_a_negative_resource_charge() {
         .snapshot
         .enumerate_below(
             1.5,
-            &mp::EnumerationOptions {
+            &model::EnumerationOptions {
                 max_work: 1,
                 ..Default::default()
             },

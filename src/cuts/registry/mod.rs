@@ -57,7 +57,7 @@ pub struct RankOneCut {
     /// packing/covering universe selected by separation and coefficients.
     pub graph_pricing_support: BTreeMap<i32, Vec<(usize, i32)>>,
     /// Full-memory native grouping uses original set IDs, before expansion.
-    pub native_kpath_support: Option<Vec<usize>>,
+    pub general_kpath_support: Option<Vec<usize>>,
     pub memory: Vec<bool>,
     pub graph_dependent_memory: bool,
     pub graph_memories: BTreeMap<i32, Vec<bool>>,
@@ -66,7 +66,7 @@ pub struct RankOneCut {
     pub graph_arc_memories: BTreeMap<i32, BTreeSet<i32>>,
     pub arc_weights: BTreeMap<i32, i32>,
     pub visit_once: bool,
-    pub native_type2: bool,
+    pub type2: bool,
     pub denominator: i32,
     pub dual: f64,
     pub class: CutClass,
@@ -292,7 +292,7 @@ pub fn coefficient(
     // The usual rank-one packing row needs only dense vertex weights and
     // vertex memory. Keep the general arc/support policies out of its loop.
     if !input.visit_once
-        && (input.native_type2 || input.class == CutClass::Packing)
+        && (input.type2 || input.class == CutClass::Packing)
         && input.memory_kind == MemoryKind::Vertex
         && input.graph_support.is_empty()
         && input.arc_weights.is_empty()
@@ -326,7 +326,7 @@ pub fn coefficient(
         }
         return Ok(count);
     }
-    let kind = if input.native_type2 {
+    let kind = if input.type2 {
         2
     } else if input.class == CutClass::Covering {
         1

@@ -64,7 +64,7 @@ Build the CLI with the Clp backend, then run from the repository root:
 ```sh
 cargo build --release --features clp
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 taskset -c 0,1 \
-  ./target/release/baldes vrptw instances/Solomon/R201.txt --customers 100 \
+  ./target/release/baldes solve instances/Solomon/R201.txt --customers 100 \
   --master clp --reference-ng --ng 8 --rounding none --no-enumeration \
   --bound-mode numerical --time 240 --json /tmp/r201-root.json
 ```

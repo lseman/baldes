@@ -14,7 +14,9 @@ use crate::{invalid, Result};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 mod proximal;
+mod rows;
 pub use proximal::ProximalWarmStart;
+pub(crate) use rows::append_artificials;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CurvatureRowClass {
