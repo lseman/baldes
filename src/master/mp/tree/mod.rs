@@ -675,8 +675,10 @@ pub(super) fn validate_routes<const D: usize>(
 }
 
 /// Best-bound assignment tree. Each child prices all its networks and carries
-/// inherited rows/fixed routes. Incomplete pricing or lack of an assignment
-/// candidate leaves an open node; finite artificial penalties never prune it.
+/// inherited rows/fixed routes. A selected lower bound that rules out improving
+/// an original-model incumbent closes the node even if its LP is unfinished.
+/// Otherwise incomplete pricing or lack of an assignment candidate leaves an
+/// open node; finite artificial penalties alone never prove infeasibility.
 pub fn solve_assignment_tree<const D: usize>(
     problem: Problem<D>,
     options: AssignmentTreeOptions,
@@ -1041,6 +1043,19 @@ fn solve_split<const D: usize>(
             }
             continue;
         }
+        // Exact pricing can already rule out improvement while phase I remains
+        // unable to certify original infeasibility, or the LP hits a limit.
+        // Use the selected lower-bound channel, never the artificial objective,
+        // and require an existing original-model incumbent to close such a node.
+        if result.incumbent.is_finite()
+            && bound.is_finite()
+            && bound >= result.incumbent - options.tolerance
+        {
+            if let Some(history) = &mut subtree_history {
+                history.close(lineage);
+            }
+            continue;
+        }
         if output.master.status != cg::Status::Optimal {
             result.status = if output.master.status == cg::Status::TimeLimit {
                 TreeStatus::TimeLimit
@@ -1049,12 +1064,6 @@ fn solve_split<const D: usize>(
             };
             unresolved = Some(bound);
             break;
-        }
-        if bound >= result.incumbent - options.tolerance {
-            if let Some(history) = &mut subtree_history {
-                history.close(lineage);
-            }
-            continue;
         }
         if let Some((objective, routes, master_values)) =
             output.snapshot.integer_witness(options.tolerance)?
@@ -1178,3 +1187,7 @@ fn solve_split<const D: usize>(
 #[cfg(test)]
 #[path = "../../../../tests/unit/master/mp/tree_search_tests.rs"]
 mod tree_search_tests;
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/master/mp/stalled_bound_tests.rs"]
+mod stalled_bound_tests;

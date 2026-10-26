@@ -124,7 +124,12 @@ can produce exponentially many labels; large-instance scalability is
 not established. The pairing/load plugin supplies an independent bounded-work certificate
 using outward-rounded load sums. The example uses the master's numerical
 bound mode; no large-instance bound-certification campaign has been run.
-In a twelve-case ten-request smoke test, all incumbents replayed successfully;
-five runs returned Optimal and seven returned Incomplete. Equal values at
-printed precision do not override that status. Evidence and remaining work are tracked in
+The initial twelve-case ten-request smoke test returned five Optimal and seven
+Incomplete results. A subsequent shared-master fix closes stalled nodes when
+their selected lower bound rules out improving an existing validated incumbent.
+It does not treat finite artificial penalties as an infeasibility proof.
+Repeating all 24 five-/ten-request settings three times now returns Optimal in
+all 72 runs, with unchanged objectives and independently replayed incumbents.
+The 21 formerly incomplete ten-request repetitions all close. Evidence and
+remaining work are tracked in
 [`internal/robust-pd`](../../internal/robust-pd/).
