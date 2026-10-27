@@ -255,6 +255,90 @@ fn terminal_vertex_sweep_finds_joint_extrema_missed_by_coordinate_objectives() {
 }
 
 #[test]
+fn joint_control_recovers_a_three_resource_vertex_missed_by_coordinate_targets() {
+    let mut source: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../fixtures/coupled/joint-interior-model.json"
+    ))
+    .unwrap();
+    source["rows"] = serde_json::json!([
+        {"sense":"le", "rhs":10.},
+        {"sense":"le", "rhs":10.},
+        {"sense":"le", "rhs":10.}
+    ]);
+    source["networks"][0]["resources"] = serde_json::json!([
+        {"kind":"disposable", "bounds":[[0.,0.],[0.,10.]]}
+    ]);
+    let mut definitions = source["networks"][0]["coupled_resources"]
+        .as_array()
+        .unwrap()
+        .clone();
+    definitions.push(definitions[0].clone());
+    source["networks"][0]["coupled_resources"] = serde_json::json!(definitions);
+    source["pricing_variables"] = serde_json::json!([
+        {"network":42, "id":901, "cost":0., "accumulated_resource":0,
+         "entries":[[0,1.],[2,1.]]},
+        {"network":42, "id":902, "cost":0., "accumulated_resource":1,
+         "entries":[[0,1.],[1,1.]]},
+        {"network":42, "id":903, "cost":0., "accumulated_resource":2,
+         "entries":[[1,1.],[2,1.]]}
+    ]);
+    let (problem, registry) = format::Model::from_json(&source.to_string())
+        .unwrap()
+        .compile::<2>()
+        .unwrap();
+    let mut options = Options::default();
+    options.integer_primal_termination = true;
+    options.cg.stabilize = false;
+    registry.configure_pricing(&mut options);
+    let output = solve(problem, options).unwrap();
+    let state = output.snapshot.state.fork_state();
+    let oracle = &state.oracles[0];
+    let mut work = 1_000_000;
+    let mut iterations = 100_000;
+    let priced = path(
+        oracle,
+        state.shared_offset,
+        &vec![0.; state.rhs.len()],
+        &[0],
+        &mut work,
+        &mut iterations,
+        state.deadline,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(priced.resources, vec![0, 1, 2]);
+    let graph = oracle.network.graph.clone();
+    let initial = priced
+        .route
+        .as_ref()
+        .unwrap()
+        .clone()
+        .with_paired_controls(graph.as_ref(), sorted(priced.greedy.clone()))
+        .unwrap();
+    let proposals = joint_controls(
+        &state,
+        oracle,
+        &[0],
+        &priced,
+        &initial,
+        1.,
+        (&mut work, &mut iterations),
+    )
+    .expect("the jointly feasible terminal vertex should be proposed");
+    let values: Vec<_> = proposals
+        .into_iter()
+        .map(|controls| {
+            initial
+                .clone()
+                .with_paired_controls(graph.as_ref(), sorted(controls))
+                .unwrap()
+                .coupled_values
+        })
+        .collect();
+    assert!(values.contains(&vec![(0, 5.), (1, 5.), (2, 5.)]));
+}
+
+#[test]
 fn joint_control_projects_one_resource_through_opposing_rows() {
     let output = root();
     let mut state = output.snapshot.state.fork_state();
