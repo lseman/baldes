@@ -343,7 +343,7 @@ impl Problem {
         }
         // Each customer remembers its own request and the requests whose
         // pickups are nearest by travel time.
-        let size = self.parameters.ng_size.max(1);
+        let size = self.parameters.ng_size.unwrap_or(n).max(1);
         let neighbours = (0..=sink)
             .map(|v| {
                 let mut near = vec![size >= n; n];

@@ -7,7 +7,10 @@
 use crate::{invalid, Graph, Result};
 use std::path::Path;
 
+mod heuristic;
 mod physical_graph;
+
+pub use heuristic::{HeuristicOptions, HeuristicSolution};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Node {
@@ -132,9 +135,9 @@ pub struct Parameters {
     pub distance_rounding: DistanceRounding,
     /// Apply the nominal-demand adjustment in paper §6.1, including Γq=0.
     pub adjust_demands: bool,
-    /// Requests in each vertex's NG neighbourhood; at least the request
-    /// count prices only elementary routes.
-    pub ng_size: usize,
+    /// Requests in each vertex's NG neighbourhood. `None`, or at least the
+    /// request count, prices only elementary routes.
+    pub ng_size: Option<usize>,
 }
 impl Default for Parameters {
     fn default() -> Self {
@@ -146,7 +149,7 @@ impl Default for Parameters {
             vehicle_cost: 10_000.,
             distance_rounding: DistanceRounding::NearestHundredth,
             adjust_demands: true,
-            ng_size: 8,
+            ng_size: None,
         }
     }
 }
@@ -376,6 +379,7 @@ impl Problem {
                 multiplicity: crate::Window::new(0., n as f64)?,
                 arc_entries,
                 route_entries: vec![],
+                activity_entries: vec![],
             }],
         })
     }

@@ -25,7 +25,15 @@ cargo run --release --features clp,multi-time-windows --example robust_pdptw -- 
 # Deterministic baseline, retaining the paper's nominal-demand adjustment.
 cargo run --release --features clp,multi-time-windows --example robust_pdptw -- \
   instances/RobustPDPTW/AA05.txt 0 0 0 0 60
+
+# NG-route relaxation with 8 requests per neighbourhood.
+cargo run --release --features clp,multi-time-windows --example robust_pdptw -- \
+  instances/RobustPDPTW/AA05.txt 1 1 0.1 0.1 60 --ng 8
 ```
+
+Pricing is elementary unless `--ng N` (`Parameters::ng_size = Some(N)`) is
+given. On 40 benchmark cases with 10–30 requests and 30 s limits,
+elementary pricing proved 32 optimal and NG 8 proved 31, so NG is opt-in.
 
 The example prints termination status, numerical lower bound, incumbent,
 routes, worst load, and worst return time. It independently replays every
@@ -63,11 +71,35 @@ Every customer window and the return-depot window must hold. Waiting can
 absorb delays, so summing the largest travel deviations alone is insufficient.
 
 The physical graph has one vertex per original node. A coupled plugin
-tracks visited and open requests, enforces elementarity, precedence and
-pairing, and checks capacity in both directions. Joins replay the suffix
-against the forward state. Conservative equality dominance compares
-both sets. The shared master has one set-partitioning row per request;
-the pickup contributes its coefficient exactly once.
+tracks a request memory and the open (on-board) requests, enforces
+precedence and pairing, and checks capacity in both directions. Joins
+replay the suffix against the forward state. A label dominates another
+with equal open requests and a memory subset; no delivery is skipped, so
+no triangle inequality is assumed. The weaker subset test on open requests
+is unsound here: under budgeted travel times, a shortcut that skips a
+delivery can be later than the detour. Requests that can no longer be
+picked up and delivered in time join the memory, using shortest nominal
+durations as lower bounds. The shared master has one set-partitioning row
+per request; the pickup contributes its coefficient exactly once.
+
+With `--ng N`, memories are NG neighbourhoods: the request and the N−1
+requests with the nearest pickups. A route may then pick up a request again
+after delivering and forgetting it; such a column covers that request twice
+and cannot be integral. The graph declares bounded walks of at most
+2(2n+1) arcs and the plugin certificate applies the same memory, so
+window-fallback branching keeps NG columns instead of stalling.
+
+## Heuristic
+
+`Problem::heuristic` (example flag `--heuristic`, using SECONDS as its time
+limit) returns robust-feasible routes without branch-and-price. It builds
+routes by cheapest pair insertion, then applies pair relocation, route
+elimination, and ruin-and-recreate. Each route caches forward worst-case
+starts, the backward thresholds used by pricing joins, and per-position
+on-board load summaries, so a placement check costs O(Γt) time work per
+position and O(1) capacity work. `Problem::replay` verifies every accepted
+route. A unit test compares the cached check with full replay on every
+placement of random instances.
 
 ## Input conventions
 

@@ -455,7 +455,7 @@ fn random_problem(n: usize, seed: u64, gq: usize, gt: usize, ng_size: usize) -> 
             time_deviation: 0.3,
             vehicle_cost: 0.,
             adjust_demands: false,
-            ng_size,
+            ng_size: Some(ng_size),
             ..Default::default()
         },
     )
@@ -689,6 +689,7 @@ fn ng_benchmark_trees_close_after_fallback_branching() {
                 time_budget: budget,
                 demand_deviation: sigma,
                 time_deviation: sigma,
+                ng_size: Some(8),
                 ..Default::default()
             },
         )
