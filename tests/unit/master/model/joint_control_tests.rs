@@ -502,7 +502,7 @@ fn paired_witness_allocations_split_counts_across_capped_identities() {
     state.route_upper_bounds.insert(second, 1.);
     let choices = [first, second].map(|tag| (tag, 0.5, state.routes[tag].as_ref().clone()));
 
-    let allocations = identity_allocations(&state, &choices, 2., 128);
+    let allocations = identity_allocations(&state, &choices, 2., 128, state.deadline);
 
     assert!(allocations.iter().any(|allocation| {
         allocation.len() == 2
@@ -531,14 +531,13 @@ fn lazy_identity_search_reaches_allocations_beyond_the_old_shortlist() {
         choices.push((tag, 0.5, route));
     }
 
-    let mut visits_left = 10_000;
     let mut saw_first_registered_identity = false;
     let stopped = for_each_identity_allocation(
         &state,
         &choices,
         1.,
-        &mut visits_left,
-        &mut |allocation, _visits_left| {
+        state.deadline,
+        &mut |allocation, _deadline| {
             saw_first_registered_identity |= allocation
                 .iter()
                 .any(|route| route.route.route.coupled_values == vec![(0, 0.)]);
@@ -549,7 +548,37 @@ fn lazy_identity_search_reaches_allocations_beyond_the_old_shortlist() {
 
     assert!(stopped);
     assert!(saw_first_registered_identity);
-    assert!(visits_left > 0);
+}
+
+#[test]
+fn lazy_identity_search_streams_past_one_hundred_thousand_allocations() {
+    let output = root();
+    let mut state = output.snapshot.state.fork_state();
+    let template = state.routes[0].as_ref().clone();
+    let mut choices = Vec::new();
+    for _ in 0..20 {
+        let tag = state.routes.len();
+        state.routes.push(Arc::new(template.clone()));
+        state.route_upper_bounds.insert(tag, 1.);
+        choices.push((tag, 0.5, template.clone()));
+    }
+
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut allocations_seen = 0;
+    let stopped = for_each_identity_allocation(
+        &state,
+        &choices,
+        10.,
+        deadline,
+        &mut |_allocation, _deadline| {
+            allocations_seen += 1;
+            Ok(allocations_seen == 100_001)
+        },
+    )
+    .unwrap();
+
+    assert!(stopped);
+    assert_eq!(allocations_seen, 100_001);
 }
 
 #[test]
@@ -575,7 +604,7 @@ fn paired_witness_allocations_search_nonendpoint_integer_splits() {
     assert_eq!(enumeration::route_upper(&state, second), Some(8.));
     let choices = [first, second].map(|tag| (tag, 0.5, state.routes[tag].as_ref().clone()));
 
-    let allocations = identity_allocations(&state, &choices, 10., 128);
+    let allocations = identity_allocations(&state, &choices, 10., 128, state.deadline);
 
     assert!(allocations.iter().any(|allocation| {
         allocation.len() == 2

@@ -797,7 +797,7 @@ pub(super) fn repair_witness<const D: usize>(
         // remains a valid identity candidate when a path count is split across
         // fractional LP columns.
         choices.sort_by(|a, b| (b.1 > 0.).cmp(&(a.1 > 0.)).then_with(|| a.0.cmp(&b.0)));
-        let seed = identity_allocations(state, &choices, rounded, 1);
+        let seed = identity_allocations(state, &choices, rounded, 1, state.deadline);
         if seed.is_empty() {
             return Ok(None);
         }
@@ -808,14 +808,15 @@ pub(super) fn repair_witness<const D: usize>(
         return Ok(None);
     }
     let mut routes = witness.clone();
-    let mut search_budget = 100_000;
+    let now = Instant::now();
+    let identity_search_deadline = now + state.deadline.saturating_duration_since(now) / 2;
     if let Some(result) = search_identity_groups(
         state,
         &allocation_groups,
         0,
         &mut routes,
         &masters,
-        &mut search_budget,
+        identity_search_deadline,
     )? {
         return Ok(Some(result));
     }
@@ -829,20 +830,19 @@ pub(super) fn repair_witness<const D: usize>(
 
 /// Search registered identity allocations lazily. This avoids a fixed
 /// identity shortlist and materializing the Cartesian product of all groups.
-/// Exhausting the shared visit budget or deadline is inconclusive.
+/// Exhausting the phase deadline is inconclusive.
 fn search_identity_groups<const D: usize>(
     state: &State<D>,
     groups: &[(Vec<(usize, f64, NetworkRoute)>, f64)],
     index: usize,
     routes: &mut Vec<FixedRoute>,
     masters: &[(i32, f64)],
-    visits_left: &mut usize,
+    deadline: Instant,
 ) -> Result<Option<IntegerWitness>> {
-    if *visits_left == 0 || Instant::now() >= state.deadline {
+    if Instant::now() >= deadline {
         return Ok(None);
     }
     if index == groups.len() {
-        *visits_left -= 1;
         if let Some(scheduled) = synchronization::witness(state, routes)? {
             if scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..]) {
                 if let Some(objective) = tree_adapter::validate_routes(state, &scheduled, masters)?
@@ -860,11 +860,11 @@ fn search_identity_groups<const D: usize>(
         state,
         choices,
         *quantity,
-        visits_left,
-        &mut |allocation, visits_left| {
+        deadline,
+        &mut |allocation, deadline| {
             let old_len = routes.len();
             routes.extend_from_slice(allocation);
-            found = search_identity_groups(state, groups, index + 1, routes, masters, visits_left)?;
+            found = search_identity_groups(state, groups, index + 1, routes, masters, deadline)?;
             routes.truncate(old_len);
             Ok(found.is_some())
         },
@@ -879,6 +879,7 @@ fn identity_allocations<const D: usize>(
     choices: &[(usize, f64, NetworkRoute)],
     quantity: f64,
     limit: usize,
+    deadline: Instant,
 ) -> Vec<Vec<FixedRoute>> {
     fn visit<const D: usize>(
         state: &State<D>,
@@ -887,13 +888,12 @@ fn identity_allocations<const D: usize>(
         remaining: f64,
         selected: &mut Vec<FixedRoute>,
         allocations: &mut Vec<Vec<FixedRoute>>,
-        visits: &mut usize,
         limit: usize,
+        deadline: Instant,
     ) {
-        if allocations.len() >= limit || *visits >= 100_000 || Instant::now() >= state.deadline {
+        if allocations.len() >= limit || Instant::now() >= deadline {
             return;
         }
-        *visits += 1;
         if remaining == 0. {
             allocations.push(selected.clone());
             return;
@@ -915,14 +915,14 @@ fn identity_allocations<const D: usize>(
                 remaining,
                 selected,
                 allocations,
-                visits,
                 limit,
+                deadline,
             );
             return;
         }
 
-        // Try LP-near and cap-boundary counts first, then enumerate all remaining
-        // integral counts until the shared visit/allocation budgets are exhausted.
+        // Try LP-near and cap-boundary counts first, then enumerate remaining
+        // integral counts until the allocation limit or phase deadline.
         let preferred_floor = preferred.floor().clamp(0., max_count);
         let preferred_ceil = preferred.ceil().clamp(0., max_count);
         let mut ordered = vec![
@@ -946,8 +946,8 @@ fn identity_allocations<const D: usize>(
         let try_count = |count: f64,
                          selected: &mut Vec<FixedRoute>,
                          allocations: &mut Vec<Vec<FixedRoute>>,
-                         visits: &mut usize| {
-            if allocations.len() >= limit || *visits >= 100_000 {
+                         deadline: Instant| {
+            if allocations.len() >= limit || Instant::now() >= deadline {
                 return;
             }
             if count > 0. {
@@ -963,20 +963,20 @@ fn identity_allocations<const D: usize>(
                 remaining - count,
                 selected,
                 allocations,
-                visits,
                 limit,
+                deadline,
             );
             if count > 0. {
                 selected.pop();
             }
         };
         for count in ordered {
-            try_count(count, selected, allocations, visits);
+            try_count(count, selected, allocations, deadline);
         }
         let mut count = 0.;
-        while count <= max_count && allocations.len() < limit && *visits < 100_000 {
+        while count <= max_count && allocations.len() < limit && Instant::now() < deadline {
             if !seen.contains(&count) {
-                try_count(count, selected, allocations, visits);
+                try_count(count, selected, allocations, deadline);
             }
             count += 1.;
         }
@@ -986,7 +986,6 @@ fn identity_allocations<const D: usize>(
         return Vec::new();
     }
     let mut allocations = Vec::new();
-    let mut visits = 0;
     visit(
         state,
         choices,
@@ -994,20 +993,20 @@ fn identity_allocations<const D: usize>(
         quantity,
         &mut Vec::new(),
         &mut allocations,
-        &mut visits,
         limit,
+        deadline,
     );
     allocations
 }
 
 /// Stream every bounded allocation to a caller without materializing a large
-/// candidate list. `visits_left` is shared across path groups by the caller.
+/// candidate list. A phase deadline bounds recursion across path groups.
 fn for_each_identity_allocation<const D: usize>(
     state: &State<D>,
     choices: &[(usize, f64, NetworkRoute)],
     quantity: f64,
-    visits_left: &mut usize,
-    on_allocation: &mut impl FnMut(&[FixedRoute], &mut usize) -> Result<bool>,
+    deadline: Instant,
+    on_allocation: &mut impl FnMut(&[FixedRoute], Instant) -> Result<bool>,
 ) -> Result<bool> {
     fn try_count<const D: usize>(
         state: &State<D>,
@@ -1017,8 +1016,8 @@ fn for_each_identity_allocation<const D: usize>(
         count: f64,
         route: &NetworkRoute,
         selected: &mut Vec<FixedRoute>,
-        visits_left: &mut usize,
-        on_allocation: &mut impl FnMut(&[FixedRoute], &mut usize) -> Result<bool>,
+        deadline: Instant,
+        on_allocation: &mut impl FnMut(&[FixedRoute], Instant) -> Result<bool>,
     ) -> Result<bool> {
         if count > 0. {
             selected.push(FixedRoute {
@@ -1032,7 +1031,7 @@ fn for_each_identity_allocation<const D: usize>(
             index + 1,
             remaining - count,
             selected,
-            visits_left,
+            deadline,
             on_allocation,
         )?;
         if count > 0. {
@@ -1047,15 +1046,14 @@ fn for_each_identity_allocation<const D: usize>(
         index: usize,
         remaining: f64,
         selected: &mut Vec<FixedRoute>,
-        visits_left: &mut usize,
-        on_allocation: &mut impl FnMut(&[FixedRoute], &mut usize) -> Result<bool>,
+        deadline: Instant,
+        on_allocation: &mut impl FnMut(&[FixedRoute], Instant) -> Result<bool>,
     ) -> Result<bool> {
-        if *visits_left == 0 || Instant::now() >= state.deadline {
+        if Instant::now() >= deadline {
             return Ok(false);
         }
-        *visits_left -= 1;
         if remaining == 0. {
-            return on_allocation(selected, visits_left);
+            return on_allocation(selected, deadline);
         }
         let Some((_, preferred, route)) = choices.get(index) else {
             return Ok(false);
@@ -1071,7 +1069,7 @@ fn for_each_identity_allocation<const D: usize>(
                 index + 1,
                 remaining,
                 selected,
-                visits_left,
+                deadline,
                 on_allocation,
             );
         }
@@ -1107,14 +1105,14 @@ fn for_each_identity_allocation<const D: usize>(
                 count,
                 route,
                 selected,
-                visits_left,
+                deadline,
                 on_allocation,
             )? {
                 return Ok(true);
             }
         }
         let mut count = 0.;
-        while count <= max_count && *visits_left > 0 && Instant::now() < state.deadline {
+        while count <= max_count && Instant::now() < deadline {
             if !seen.contains(&count)
                 && try_count(
                     state,
@@ -1124,7 +1122,7 @@ fn for_each_identity_allocation<const D: usize>(
                     count,
                     route,
                     selected,
-                    visits_left,
+                    deadline,
                     on_allocation,
                 )?
             {
@@ -1144,7 +1142,7 @@ fn for_each_identity_allocation<const D: usize>(
         0,
         quantity,
         &mut Vec::new(),
-        visits_left,
+        deadline,
         on_allocation,
     )
 }
