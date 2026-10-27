@@ -134,3 +134,46 @@ fn rebuilt_dual_inputs_reuse_engine_arrays_and_reload_mismatched_layouts() {
         }
     }
 }
+
+#[test]
+fn cut_activation_and_deactivation_refresh_reused_engine_inputs() {
+    fn assert_same(actual: &PricingResult, expected: &PricingResult) {
+        assert_eq!(
+            actual.minimum_reduced_cost.to_bits(),
+            expected.minimum_reduced_cost.to_bits()
+        );
+        assert_eq!(actual.exact, expected.exact);
+        assert_eq!(actual.columns.len(), expected.columns.len());
+        for (a, b) in actual.columns.iter().zip(&expected.columns) {
+            assert_eq!(a.nodes, b.nodes);
+            assert_eq!(a.arcs, b.arcs);
+            assert_eq!(a.cost.to_bits(), b.cost.to_bits());
+        }
+    }
+
+    let mut cached = solver();
+    cached.price_phase(0, 4, false).unwrap();
+    let active_cut = cached.cuts.cuts.clone();
+
+    cached.cuts.cuts.clear();
+    cached.refresh_cuts().unwrap();
+    let after_deactivation = cached.price_phase(0, 4, false).unwrap();
+    let mut fresh_without_cuts = solver();
+    fresh_without_cuts.cuts.cuts.clear();
+    fresh_without_cuts.refresh_cuts().unwrap();
+    let fresh_without_cuts = fresh_without_cuts.price_phase(0, 4, false).unwrap();
+    assert_same(&after_deactivation, &fresh_without_cuts);
+
+    let mut forked = cached.fork_for_node();
+    forked.cuts.cuts.clear();
+    forked.refresh_cuts().unwrap();
+    let after_forked_deactivation = forked.price_phase(0, 4, false).unwrap();
+    assert_same(&after_forked_deactivation, &fresh_without_cuts);
+
+    cached.cuts.cuts = active_cut;
+    cached.refresh_cuts().unwrap();
+    let after_activation = cached.price_phase(0, 4, false).unwrap();
+    let mut fresh_with_cut = solver();
+    let fresh_with_cut = fresh_with_cut.price_phase(0, 4, false).unwrap();
+    assert_same(&after_activation, &fresh_with_cut);
+}
