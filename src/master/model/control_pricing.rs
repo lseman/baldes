@@ -296,9 +296,13 @@ fn joint_controls<const D: usize>(
     }
     // Keep the coordinate proposals from consuming the entire path budget;
     // reserve work both to enumerate joint vertices and to realize their
-    // source controls. Unused reservations return to the caller below.
+    // source controls. Reserve simplex iterations for vertex realization too,
+    // so coordinate proposals cannot consume its entire source-query budget.
     let vertex_enumeration_reserve = *work / 3;
     let vertex_realization_reserve = *work / 3;
+    let vertex_iteration_reserve = *iterations / 3;
+    let mut vertex_iterations = vertex_iteration_reserve;
+    let mut coordinate_iterations = iterations.checked_sub(vertex_iteration_reserve)?;
     *work =
         work.checked_sub(vertex_enumeration_reserve.checked_add(vertex_realization_reserve)?)?;
     let mut proposals = Vec::with_capacity(objectives.len());
@@ -317,7 +321,7 @@ fn joint_controls<const D: usize>(
             &priced.domains,
             &constraints,
             &objective,
-            iterations,
+            &mut coordinate_iterations,
             state.deadline,
         ) else {
             continue;
@@ -331,7 +335,7 @@ fn joint_controls<const D: usize>(
                 resource,
                 targets[i],
                 work,
-                iterations,
+                &mut coordinate_iterations,
                 state.deadline,
             ) else {
                 attainable = false;
@@ -378,7 +382,7 @@ fn joint_controls<const D: usize>(
                 resource,
                 target,
                 &mut vertex_realization_work,
-                iterations,
+                &mut vertex_iterations,
                 state.deadline,
             ) else {
                 attainable = false;
@@ -397,6 +401,7 @@ fn joint_controls<const D: usize>(
     *work = work
         .checked_add(enumeration_work)?
         .checked_add(vertex_realization_work)?;
+    *iterations = coordinate_iterations.checked_add(vertex_iterations)?;
     (!proposals.is_empty()).then_some(proposals)
 }
 // Both route-local proposals and cross-path witness recovery use the same
@@ -1266,6 +1271,9 @@ fn joint_witness_targets<const D: usize>(
     let proposal_count = variables.len().checked_mul(2)?.checked_add(2)?;
     let vertex_enumeration_reserve = work / 3;
     let vertex_realization_reserve = work / 3;
+    let vertex_iteration_reserve = iterations / 3;
+    let mut vertex_iterations = vertex_iteration_reserve;
+    let mut coordinate_iterations = iterations.checked_sub(vertex_iteration_reserve)?;
     work = work.checked_sub(vertex_enumeration_reserve.checked_add(vertex_realization_reserve)?)?;
     for proposal in 0..proposal_count {
         if Instant::now() >= state.deadline {
@@ -1277,9 +1285,13 @@ fn joint_witness_targets<const D: usize>(
         };
         work = remaining_work;
         let objective = terminal_objective(&costs, proposal)?;
-        let Some(totals) =
-            solve_terminal_targets(&domains, &rows, &objective, &mut iterations, state.deadline)
-        else {
+        let Some(totals) = solve_terminal_targets(
+            &domains,
+            &rows,
+            &objective,
+            &mut coordinate_iterations,
+            state.deadline,
+        ) else {
             continue;
         };
         let targets: Vec<_> = variables
@@ -1298,7 +1310,7 @@ fn joint_witness_targets<const D: usize>(
                 &variables,
                 &targets,
                 split,
-                (&mut work, &mut iterations),
+                (&mut work, &mut coordinate_iterations),
             ) else {
                 continue;
             };
@@ -1350,7 +1362,7 @@ fn joint_witness_targets<const D: usize>(
                 &variables,
                 &targets,
                 split,
-                (&mut vertex_realization_work, &mut iterations),
+                (&mut vertex_realization_work, &mut vertex_iterations),
             ) else {
                 continue;
             };
