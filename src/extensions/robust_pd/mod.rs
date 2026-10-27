@@ -132,6 +132,9 @@ pub struct Parameters {
     pub distance_rounding: DistanceRounding,
     /// Apply the nominal-demand adjustment in paper §6.1, including Γq=0.
     pub adjust_demands: bool,
+    /// Requests in each vertex's NG neighbourhood; at least the request
+    /// count prices only elementary routes.
+    pub ng_size: usize,
 }
 impl Default for Parameters {
     fn default() -> Self {
@@ -143,6 +146,7 @@ impl Default for Parameters {
             vehicle_cost: 10_000.,
             distance_rounding: DistanceRounding::NearestHundredth,
             adjust_demands: true,
+            ng_size: 8,
         }
     }
 }

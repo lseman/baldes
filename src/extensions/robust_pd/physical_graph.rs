@@ -3,36 +3,90 @@ use crate::graph::coupled::{
     plugin::{CoupledPlugin, PluginResource, PluginState},
     CoupledResource,
 };
+use crate::graph::RouteDomain;
 use crate::{invalid, Graph, Result, Window};
 use std::sync::Arc;
 use std::time::Instant;
 
 #[derive(Clone, Debug, PartialEq)]
 struct State {
-    /// Pickups already visited forward; deliveries already visited backward.
-    seen: Vec<bool>,
+    /// NG memory of requests whose pickup may not be entered next: picked
+    /// up within the memory, or proven unreachable from this label.
+    memory: Vec<bool>,
     /// Requests crossing the current cut of the path.
     open: Vec<bool>,
+    /// The γ = 0 time entry: earliest service start forward, latest start
+    /// excluding the vertex's own window backward. Used only for marking.
+    time: f64,
 }
 
 #[derive(Debug)]
 struct Pairing {
     problem: Arc<Problem>,
     arcs: Vec<(usize, usize)>,
+    /// Tail service plus nominal travel, per arc.
+    durations: Vec<f64>,
+    /// Shortest nominal duration between vertices over the graph's arcs; a
+    /// lower bound on any path, so marking needs no triangle inequality.
+    shortest: Vec<Vec<f64>>,
+    /// NG neighbourhood of each vertex as request flags.
+    neighbours: Vec<Vec<bool>>,
+    /// Every neighbourhood holds every request, so routes are elementary.
+    elementary: bool,
 }
+
+impl Pairing {
+    fn window(&self, v: usize) -> (f64, f64) {
+        let node = &self.problem.instance.nodes[v];
+        (node.open, node.close)
+    }
+    /// Whether no continuation after service starts at `v` no earlier than
+    /// `time` can serve request `k`: pickup, delivery and return in time.
+    fn unreachable_forward(&self, v: usize, time: f64, k: usize) -> bool {
+        let n = self.problem.instance.requests;
+        let (p, d, sink) = (k + 1, k + 1 + n, 2 * n + 1);
+        let (ep, lp) = self.window(p);
+        let pickup = ep.max(time + self.shortest[v][p]);
+        let (ed, ld) = self.window(d);
+        let delivery = ed.max(pickup + self.shortest[p][d]);
+        !(pickup <= lp
+            && delivery <= ld
+            && delivery + self.shortest[d][sink] <= self.window(sink).1)
+    }
+    /// Whether no prefix before `v`, whose latest start excluding its own
+    /// window is `latest`, can serve request `k`.
+    fn unreachable_backward(&self, v: usize, latest: f64, k: usize) -> bool {
+        let n = self.problem.instance.requests;
+        let (p, d) = (k + 1, k + 1 + n);
+        let at_v = self.window(v).1.min(latest);
+        let (ed, ld) = self.window(d);
+        let delivery_latest = ld.min(at_v - self.shortest[d][v]);
+        let (ep, lp) = self.window(p);
+        let pickup_earliest = ep.max(self.window(0).0 + self.shortest[0][p]);
+        let pickup_latest = lp.min(delivery_latest - self.shortest[p][d]);
+        !(pickup_earliest <= pickup_latest
+            && ed.max(pickup_earliest + self.shortest[p][d]) <= delivery_latest)
+    }
+}
+
 impl CoupledPlugin for Pairing {
     fn validate(&self, arcs: usize) -> Result<()> {
-        if arcs != self.arcs.len() {
+        if arcs != self.arcs.len() || arcs != self.durations.len() {
             return Err(invalid("PD plugin arc count"));
         }
         Ok(())
     }
 
-    fn root(&self, _forward: bool) -> PluginState {
+    fn root(&self, forward: bool) -> PluginState {
         let n = self.problem.instance.requests;
         PluginState::new(State {
-            seen: vec![false; n],
+            memory: vec![false; n],
             open: vec![false; n],
+            time: if forward {
+                self.window(0).0
+            } else {
+                f64::INFINITY
+            },
         })
     }
 
@@ -47,6 +101,12 @@ impl CoupledPlugin for Pairing {
             .ok_or_else(|| invalid("PD plugin state"))?
             .clone();
         let &(tail, head) = self.arcs.get(arc).ok_or_else(|| invalid("PD plugin arc"))?;
+        let (open_time, close_time) = self.window(head);
+        state.time = if forward {
+            open_time.max(state.time + self.durations[arc])
+        } else {
+            close_time.min(state.time) - self.durations[arc]
+        };
         let n = self.problem.instance.requests;
         let v = if forward { head } else { tail };
         if v == 0 || v == 2 * n + 1 {
@@ -54,21 +114,40 @@ impl CoupledPlugin for Pairing {
         }
         let pickup = v <= n;
         let request = if pickup { v - 1 } else { v - n - 1 };
+        // A remembered pickup closes an NG cycle in either direction. With
+        // complete memories a backward delivery after its pickup also would.
         if pickup == forward {
-            if state.seen[request] {
+            if state.open[request] || (state.memory[request] && (pickup || self.elementary)) {
                 return Ok(None);
             }
-            state.seen[request] = true;
             state.open[request] = true;
         } else {
-            if !state.open[request] {
+            if !state.open[request] || (pickup && state.memory[request]) {
                 return Ok(None);
             }
             state.open[request] = false;
         }
+        for (m, &keep) in state.memory.iter_mut().zip(&self.neighbours[v]) {
+            *m &= keep;
+        }
+        if pickup {
+            state.memory[request] = true;
+        }
         // Reverse traversal checks the same physical cuts, from the end.
         if self.problem.load(&state.open) > self.problem.instance.capacity {
             return Ok(None);
+        }
+        for k in 0..n {
+            if !state.memory[k]
+                && !state.open[k]
+                && if forward {
+                    self.unreachable_forward(v, state.time, k)
+                } else {
+                    self.unreachable_backward(v, state.time, k)
+                }
+            {
+                state.memory[k] = true;
+            }
         }
         Ok(Some(PluginState::new(state)))
     }
@@ -88,12 +167,22 @@ impl CoupledPlugin for Pairing {
             .iter()
             .any(|o| *o))
     }
-    // Equality dominance is conservative: both history and on-board set matter.
+
+    /// Equal on-board sets and a smaller memory. No delivery is skipped, so
+    /// no triangle inequality is assumed; budgeted times are compared by the
+    /// kernel, and marking is monotone in its nominal time entry.
+    fn dominates(&self, a: &PluginState, b: &PluginState, _forward: bool) -> bool {
+        let (Some(a), Some(b)) = (a.get::<State>(), b.get::<State>()) else {
+            return false;
+        };
+        a.open == b.open && a.memory.iter().zip(&b.memory).all(|(a, b)| !a || *b)
+    }
 
     fn certify(&self, arcs: &[usize], work: &mut usize, deadline: Option<Instant>) -> Option<bool> {
         use crate::core::rounding::{add_down, add_up};
         let n = self.problem.instance.requests;
         let sink = 2 * n + 1;
+        // NG memory of picked-up requests, as in `extend`.
         let mut seen = vec![false; n];
         let mut open = vec![false; n];
         let mut vertex = 0;
@@ -123,16 +212,24 @@ impl CoupledPlugin for Pairing {
             }
             let r = if head <= n { head - 1 } else { head - n - 1 };
             if head <= n {
-                if seen[r] {
+                if seen[r] || open[r] {
                     return Some(false);
                 }
-                seen[r] = true;
                 open[r] = true;
             } else {
                 if !open[r] {
                     return Some(false);
                 }
                 open[r] = false;
+            }
+            // The pricing domain: NG memory without unreachable marking.
+            // Complete neighbourhoods make it elementary; a repeated pickup
+            // has coefficient 2 in an equality cover row, never integral.
+            for (m, &keep) in seen.iter_mut().zip(&self.neighbours[head]) {
+                *m &= keep;
+            }
+            if head <= n {
+                seen[r] = true;
             }
             // Independent outward interval for the exact-real load of this cut.
             let (mut lower, mut upper) = (0., 0.);
@@ -227,19 +324,70 @@ impl Problem {
                 )?);
             }
         }
+        let mut shortest = vec![vec![f64::INFINITY; sink + 1]; sink + 1];
+        for (v, row) in shortest.iter_mut().enumerate() {
+            row[v] = 0.;
+        }
+        for (&(tail, head), &duration) in arcs.iter().zip(&durations) {
+            shortest[tail][head] = shortest[tail][head].min(duration);
+        }
+        for k in 0..=sink {
+            for i in 0..=sink {
+                for j in 0..=sink {
+                    let through = shortest[i][k] + shortest[k][j];
+                    if through < shortest[i][j] {
+                        shortest[i][j] = through;
+                    }
+                }
+            }
+        }
+        // Each customer remembers its own request and the requests whose
+        // pickups are nearest by travel time.
+        let size = self.parameters.ng_size.max(1);
+        let neighbours = (0..=sink)
+            .map(|v| {
+                let mut near = vec![size >= n; n];
+                if size < n {
+                    let own = (1..sink).contains(&v).then(|| (v - 1) % n);
+                    let mut order: Vec<usize> = (0..n).collect();
+                    order.sort_by(|&a, &b| {
+                        (Some(a) != own)
+                            .cmp(&(Some(b) != own))
+                            .then(self.travel[v][a + 1].total_cmp(&self.travel[v][b + 1]))
+                            .then(a.cmp(&b))
+                    });
+                    for &r in &order[..size] {
+                        near[r] = true;
+                    }
+                }
+                near
+            })
+            .collect();
         graph.set_coupled_resources(&[
             CoupledResource::BudgetedTime {
                 initial: self.instance.nodes[0].open,
                 budget: self.parameters.time_budget.min(sink),
-                durations,
+                durations: durations.clone(),
                 deviations,
                 windows,
             },
             CoupledResource::Plugin(PluginResource::new(Pairing {
                 problem: Arc::new(self.clone()),
                 arcs,
+                durations,
+                shortest,
+                neighbours,
+                elementary: size >= n,
             })),
         ])?;
+        // NG routes may revisit a pickup after delivering it, so the route
+        // domain must admit walks. Twice the elementary length keeps every
+        // elementary route and every walk that repeats each request once.
+        if size < n {
+            graph.set_route_domain(RouteDomain::BoundedWalks {
+                max_arcs: 2 * (2 * n + 1),
+            })?;
+        }
         graph.validate()?;
         Ok(graph)
     }

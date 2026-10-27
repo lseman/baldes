@@ -403,3 +403,304 @@ fn native_master_tree_covers_every_request_and_matches_exact_partition() {
         assert_eq!(covered, [1., 1.]);
     }
 }
+
+/// Random paired instance with tight windows, so unreachable marking fires.
+fn random_problem(n: usize, seed: u64, gq: usize, gt: usize, ng_size: usize) -> Problem {
+    let mut state = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    let mut next = |m: u64| {
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (state >> 33) % m
+    };
+    let mut text = format!("n {n} Q 10 r_mod 2\n0 0 0 0 0 0 200\n");
+    let mut rows = vec![];
+    for i in 1..=n {
+        let demand = 1 + next(5);
+        let open = next(40);
+        rows.push((
+            next(30),
+            next(30),
+            demand as i64,
+            open,
+            open + 15 + next(40),
+        ));
+        let open = 10 + next(60);
+        rows.push((
+            next(30),
+            next(30),
+            -(demand as i64),
+            open,
+            open + 15 + next(50),
+        ));
+        let _ = i;
+    }
+    for (k, r) in rows
+        .iter()
+        .step_by(2)
+        .chain(rows.iter().skip(1).step_by(2))
+        .enumerate()
+    {
+        text += &format!("{} {} {} 1 {} {} {}\n", k + 1, r.0, r.1, r.2, r.3, r.4);
+    }
+    text += &format!("{} 0 0 0 0 0 200\n", 2 * n + 1);
+    Problem::new(
+        Instance::from_text(&text).unwrap(),
+        Parameters {
+            demand_budget: gq,
+            time_budget: gt,
+            demand_deviation: 0.5,
+            time_deviation: 0.3,
+            vehicle_cost: 0.,
+            adjust_demands: false,
+            ng_size,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+}
+
+/// Every precedence-respecting elementary route of an n-request instance.
+fn paired_routes(n: usize) -> Vec<Vec<usize>> {
+    fn visit(route: &mut Vec<usize>, n: usize, out: &mut Vec<Vec<usize>>) {
+        let open = (1..=n).any(|i| route.contains(&i) && !route.contains(&(i + n)));
+        if route.len() > 1 && !open {
+            let mut done = route.clone();
+            done.push(2 * n + 1);
+            out.push(done);
+        }
+        for v in 1..=2 * n {
+            if !route.contains(&v) && (v <= n || route.contains(&(v - n))) {
+                route.push(v);
+                visit(route, n, out);
+                route.pop();
+            }
+        }
+    }
+    let mut out = vec![];
+    visit(&mut vec![0], n, &mut out);
+    out
+}
+
+fn reduced_cost(p: &Problem, route: &[usize], duals: &[f64]) -> f64 {
+    let n = p.instance.requests;
+    p.replay(route).unwrap().cost
+        - route
+            .iter()
+            .filter(|v| (1..=n).contains(*v))
+            .map(|v| duals[v - 1])
+            .sum::<f64>()
+}
+
+fn price(p: &Problem, duals: &[f64], bidirectional: bool) -> crate::labeling::PricingResult {
+    use crate::labeling::{
+        engine::{EngineControls, LabelingEngine},
+        Controls,
+    };
+    use crate::pricing::phases::Phase;
+    let graph = p.pricing_graph(duals, 0.).unwrap();
+    LabelingEngine::prepare(
+        &graph,
+        EngineControls {
+            bidirectional,
+            ..Default::default()
+        },
+        Phase {
+            check_ng: true,
+            jump_arcs: true,
+            labels_per_bucket: i64::MAX,
+        },
+    )
+    .unwrap()
+    .solve(
+        &graph,
+        &Controls {
+            max_columns: 1000,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+}
+
+#[test]
+fn subset_dominance_and_unreachable_marking_keep_pricing_exact() {
+    let all = paired_routes(4);
+    let mut checked = 0;
+    for seed in 0..12 {
+        for (gq, gt) in [(0, 0), (1, 1), (2, 3)] {
+            let p = random_problem(4, seed, gq, gt, 4);
+            let duals: Vec<f64> = (0..4)
+                .map(|i| 40. + 9. * ((seed as usize + i) % 5) as f64)
+                .collect();
+            let best = all
+                .iter()
+                .filter(|r| p.replay(r).is_ok())
+                .map(|r| reduced_cost(&p, r, &duals))
+                .fold(f64::INFINITY, f64::min);
+            if !best.is_finite() {
+                continue;
+            }
+            for bidirectional in [false, true] {
+                let result = price(&p, &duals, bidirectional);
+                assert!(
+                    (result.minimum_reduced_cost - best).abs() < 1e-6,
+                    "seed={seed} ({gq},{gt}) bidir={bidirectional}: {} vs {best}",
+                    result.minimum_reduced_cost
+                );
+                for column in &result.columns {
+                    let route: Vec<usize> = column.nodes.iter().map(|v| *v as usize).collect();
+                    assert!(p.replay(&route).is_ok(), "{route:?}");
+                }
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked > 40, "{checked}");
+}
+
+#[test]
+fn ng_pricing_is_a_relaxation_of_elementary_pricing() {
+    let all = paired_routes(4);
+    for seed in 0..12 {
+        for (gq, gt) in [(0, 0), (1, 1), (2, 3)] {
+            let duals: Vec<f64> = (0..4)
+                .map(|i| 40. + 9. * ((seed as usize + i) % 5) as f64)
+                .collect();
+            let exact = random_problem(4, seed, gq, gt, 4);
+            let best = all
+                .iter()
+                .filter(|r| exact.replay(r).is_ok())
+                .map(|r| reduced_cost(&exact, r, &duals))
+                .fold(f64::INFINITY, f64::min);
+            for ng in [1, 2] {
+                let p = random_problem(4, seed, gq, gt, ng);
+                for bidirectional in [false, true] {
+                    let result = price(&p, &duals, bidirectional);
+                    assert!(
+                        result.minimum_reduced_cost <= best + 1e-6,
+                        "seed={seed} ng={ng}: {} > {best}",
+                        result.minimum_reduced_cost
+                    );
+                    for column in &result.columns {
+                        let route: Vec<usize> = column.nodes.iter().map(|v| *v as usize).collect();
+                        let mut pickups = route
+                            .iter()
+                            .filter(|v| (1..=4).contains(*v))
+                            .collect::<Vec<_>>();
+                        pickups.sort();
+                        pickups.dedup();
+                        if pickups.len() * 2 + 2 == route.len() {
+                            assert!(p.replay(&route).is_ok(), "{route:?}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn ng_master_tree_matches_exact_partition_on_random_instances() {
+    use crate::master::tree::{ModelTreeOptions, TreeStatus};
+    // Fractional points with integral arc activity arise only from NG walks;
+    // fallback branching must keep them in the domain instead of stalling.
+    for n in [3, 4] {
+        let all = paired_routes(n);
+        let full = (1 << n) - 1;
+        for seed in 0..10 {
+            for (gq, gt) in [(0, 0), (1, 1), (2, 2)] {
+                let mut p = random_problem(n, seed, gq, gt, 1);
+                p.parameters.vehicle_cost = 100.;
+                let mut cheapest = vec![f64::INFINITY; full + 1];
+                for r in &all {
+                    if let Ok(schedule) = p.replay(r) {
+                        let mask = r
+                            .iter()
+                            .filter(|v| (1..=n).contains(*v))
+                            .fold(0, |m, v| m | 1 << (v - 1));
+                        cheapest[mask] = cheapest[mask].min(schedule.cost);
+                    }
+                }
+                let mut best = vec![f64::INFINITY; full + 1];
+                best[0] = 0.;
+                for mask in 1..=full {
+                    let low = mask & mask.wrapping_neg();
+                    let mut sub = mask;
+                    while sub > 0 {
+                        if sub & low != 0 {
+                            best[mask] = best[mask].min(cheapest[sub] + best[mask ^ sub]);
+                        }
+                        sub = (sub - 1) & mask;
+                    }
+                }
+                let mut options = ModelTreeOptions::default();
+                options.node.cg.artificial_cost = 1e6;
+                let result =
+                    crate::master::tree::solve(p.master_problem().unwrap(), options).unwrap();
+                if !best[full].is_finite() {
+                    assert_ne!(result.status, TreeStatus::Optimal, "n={n} seed={seed}");
+                    continue;
+                }
+                assert_eq!(
+                    result.status,
+                    TreeStatus::Optimal,
+                    "n={n} seed={seed} ({gq},{gt}) {result:?}"
+                );
+                assert!(
+                    (result.incumbent - best[full]).abs() < 1e-6,
+                    "n={n} seed={seed} ({gq},{gt}): {} vs {}",
+                    result.incumbent,
+                    best[full]
+                );
+                for fixed in &result.routes {
+                    let route: Vec<_> = fixed
+                        .route
+                        .route
+                        .nodes
+                        .iter()
+                        .map(|v| *v as usize)
+                        .collect();
+                    p.replay(&route).unwrap();
+                }
+            }
+        }
+    }
+}
+
+/// Fallback branching on these instances meets NG walks; they previously
+/// stalled because the route domain and certificate rejected the walks.
+#[cfg(feature = "clp")]
+#[test]
+#[ignore = "requires benchmark download: python3 scripts/download_robust_pd.py --download"]
+fn ng_benchmark_trees_close_after_fallback_branching() {
+    use crate::master::tree::{ModelTreeOptions, TreeStatus};
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("instances/RobustPDPTW");
+    for (name, budget, sigma, expected) in [
+        ("CC15.txt", 5, 0.3, 20589.98),
+        ("DD15.txt", 1, 0.1, 20683.07),
+    ] {
+        let p = Problem::new(
+            Instance::read(root.join(name)).unwrap(),
+            Parameters {
+                demand_budget: budget,
+                time_budget: budget,
+                demand_deviation: sigma,
+                time_deviation: sigma,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let mut options = ModelTreeOptions::default();
+        options.node.cg.artificial_cost = (p.parameters.vehicle_cost + 100_000.) * 15.;
+        let result = crate::master::tree::solve(p.master_problem().unwrap(), options).unwrap();
+        assert_eq!(result.status, TreeStatus::Optimal, "{name}: {result:?}");
+        assert!(
+            (result.incumbent - expected).abs() < 1e-6,
+            "{name}: {}",
+            result.incumbent
+        );
+    }
+}

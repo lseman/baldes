@@ -1,4 +1,4 @@
-//! cargo run --release --features clp --example robust_pdptw -- [FILE Γq Γt σq σt SECONDS ROUNDING]
+//! cargo run --release --features clp --example robust_pdptw -- [FILE Γq Γt σq σt SECONDS ROUNDING NG]
 #[cfg(feature = "clp")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use baldes::extensions::robust_pd::{DistanceRounding, Instance, Parameters, Problem};
@@ -14,11 +14,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fn solve() -> baldes::Result<()> {
         let args: Vec<_> = std::env::args().skip(1).collect();
         if args.iter().any(|a| a == "--help" || a == "-h") {
-            println!("robust_pdptw [FILE Γq Γt σq σt SECONDS ROUNDING]\nDefaults: instances/RobustPDPTW/AA05.txt 1 1 0.1 0.1 60 hundredth\nROUNDING: hundredth or none. Paper §6.1 demand adjustment enabled.");
+            println!("robust_pdptw [FILE Γq Γt σq σt SECONDS ROUNDING NG]\nDefaults: instances/RobustPDPTW/AA05.txt 1 1 0.1 0.1 60 hundredth 8\nROUNDING: hundredth or none. NG: requests per NG neighbourhood; at least the request count prices elementary routes. Paper §6.1 demand adjustment enabled.");
             return Ok(());
         }
-        if args.len() > 7 {
-            return Err(invalid("expected FILE Γq Γt σq σt SECONDS ROUNDING"));
+        if args.len() > 8 {
+            return Err(invalid("expected FILE Γq Γt σq σt SECONDS ROUNDING NG"));
         }
         let number = |i: usize, default: &str| args.get(i).map_or(default.to_owned(), Clone::clone);
         let parse_error = || invalid("invalid numeric argument");
@@ -32,6 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "none" => DistanceRounding::FullPrecision,
                 _ => return Err(invalid("rounding must be hundredth or none")),
             },
+            ng_size: number(7, "8").parse().map_err(|_| parse_error())?,
             ..Default::default()
         };
         let seconds: f64 = number(5, "60").parse().map_err(|_| parse_error())?;
@@ -52,11 +53,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let started = Instant::now();
         let output = baldes::master::tree::solve(problem.master_problem()?, options)?;
         println!(
-            "instance={path} gamma_q={} gamma_t={} sigma_q={} sigma_t={}",
+            "instance={path} gamma_q={} gamma_t={} sigma_q={} sigma_t={} ng={}",
             parameters.demand_budget,
             parameters.time_budget,
             parameters.demand_deviation,
-            parameters.time_deviation
+            parameters.time_deviation,
+            parameters.ng_size
         );
         println!(
             "status={:?} bound={:.6} incumbent={:.6} nodes={} pricing_calls={} seconds={:.3}",
