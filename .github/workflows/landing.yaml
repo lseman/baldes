@@ -16,6 +16,9 @@ concurrency:
   group: github-pages-deployment
   cancel-in-progress: false
 
+env:
+  SITE_DOMAIN: baldes.laioseman.com
+
 jobs:
   deploy:
     name: Build documentation and deploy website
@@ -34,7 +37,7 @@ jobs:
       - name: Test documentation compiler
         run: python -m unittest discover -s .github/scripts -p 'test_compile_docs.py'
       - name: Compile Markdown guides
-        run: python .github/scripts/compile_docs.py
+        run: python .github/scripts/compile_docs.py --base-url "https://${SITE_DOMAIN}/"
       - name: GH Pages Deployment
         uses: peaceiris/actions-gh-pages@v3
         with:
@@ -44,3 +47,4 @@ jobs:
           enable_jekyll: false
           allow_empty_commit: false
           publish_branch: gh-pages
+          cname: ${{ env.SITE_DOMAIN }}

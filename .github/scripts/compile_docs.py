@@ -347,7 +347,7 @@ def render_shell(page: Page, pages: list[Page], body: str, repository: str, base
 
 def build(source: Path, output: Path, root: Path = ROOT,
           repository: str = "https://github.com/lseman/baldes",
-          base_url: str = "https://laioseman.com/baldes/") -> int:
+          base_url: str = "https://baldes.laioseman.com/") -> int:
     source, output, root = source.resolve(), output.resolve(), root.resolve()
     if source == output or source in output.parents or output in source.parents:
         raise ValueError("Source and output directories must be separate, not nested.")
@@ -399,7 +399,7 @@ def main() -> int:
     cli.add_argument("--source", type=Path, default=ROOT / "docs")
     cli.add_argument("--output", type=Path, default=ROOT / "landing" / "docs")
     cli.add_argument("--repository-url", default="https://github.com/lseman/baldes")
-    cli.add_argument("--base-url", default="https://laioseman.com/baldes/", help="Public site URL, including its project prefix")
+    cli.add_argument("--base-url", default="https://baldes.laioseman.com/", help="Public site URL, including any path prefix")
     args = cli.parse_args()
     try:
         count = build(args.source, args.output, repository=args.repository_url, base_url=args.base_url)
