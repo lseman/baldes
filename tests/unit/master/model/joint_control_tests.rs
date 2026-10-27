@@ -255,6 +255,37 @@ fn terminal_vertex_sweep_finds_joint_extrema_missed_by_coordinate_objectives() {
 }
 
 #[test]
+fn terminal_vertex_sweep_uses_shared_work_instead_of_a_fixed_vertex_cap() {
+    let count = 140;
+    let domains = [Interval { lo: 0., hi: 1. }; 2];
+    let rows: Vec<_> = (0..count)
+        .map(|index| {
+            let angle = 2. * std::f64::consts::PI * index as f64 / count as f64;
+            let a = angle.cos();
+            let b = angle.sin();
+            let rhs = 0.5 * (a + b) + 0.4 * (std::f64::consts::PI / count as f64).cos();
+            (RowSense::LessEqual, rhs, vec![(0, a), (1, b)])
+        })
+        .collect();
+    let mut work = 100_000;
+    let vertices = terminal_vertices(
+        &domains,
+        &rows,
+        &mut work,
+        Instant::now() + Duration::from_secs(2),
+    );
+    assert!(
+        vertices.len() >= 129,
+        "only found {} vertices",
+        vertices.len()
+    );
+    assert!(vertices
+        .iter()
+        .flatten()
+        .all(|value| (0. ..=1.).contains(value)));
+}
+
+#[test]
 fn joint_control_recovers_a_three_resource_vertex_missed_by_coordinate_targets() {
     let mut source: serde_json::Value = serde_json::from_str(include_str!(
         "../../../fixtures/coupled/joint-interior-model.json"

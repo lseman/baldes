@@ -581,8 +581,9 @@ fn terminal_vertices(
         work: &mut usize,
         deadline: Instant,
         vertices: &mut Vec<Vec<f64>>,
+        seen: &mut std::collections::HashSet<Vec<u64>>,
     ) {
-        if vertices.len() >= 128 || Instant::now() >= deadline || *work == 0 {
+        if Instant::now() >= deadline || *work == 0 {
             return;
         }
         let n = domains.len();
@@ -602,11 +603,11 @@ fn terminal_vertices(
             if !feasible(&point, domains, rows) {
                 return;
             }
-            if !vertices.iter().any(|old| {
-                old.iter()
-                    .zip(&point)
-                    .all(|(a, b)| (a - b).abs() <= 1e-9 * (1. + a.abs().max(b.abs())))
-            }) {
+            let key: Vec<_> = point
+                .iter()
+                .map(|value| if *value == 0. { 0 } else { value.to_bits() })
+                .collect();
+            if seen.insert(key) {
                 vertices.push(point);
             }
             return;
@@ -626,15 +627,17 @@ fn terminal_vertices(
                 work,
                 deadline,
                 vertices,
+                seen,
             );
             active.pop();
-            if vertices.len() >= 128 || Instant::now() >= deadline || *work == 0 {
+            if Instant::now() >= deadline || *work == 0 {
                 break;
             }
         }
     }
 
     let mut vertices = Vec::new();
+    let mut seen = std::collections::HashSet::new();
     visit(
         0,
         &mut Vec::with_capacity(n),
@@ -644,6 +647,7 @@ fn terminal_vertices(
         work,
         deadline,
         &mut vertices,
+        &mut seen,
     );
     vertices
 }
