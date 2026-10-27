@@ -232,12 +232,11 @@ impl<const D: usize> LabelingEngine<D> {
         for (total, part) in self.filter_checks.iter_mut().zip(&self.backward_checks.1) {
             *total = total.wrapping_add(*part);
         }
-        if forward_result.is_ok() {
-            insert_terminals(pool, true, &forward_terminals);
-            if backward_result.is_ok() {
-                insert_terminals(pool, false, &backward_terminals);
-            }
-        }
+        // Complete terminal paths survive a work/deadline interruption. The
+        // caller still propagates arithmetic errors and marks partial pricing
+        // inexact; retaining candidates never proves a minimum.
+        insert_terminals(pool, true, &forward_terminals);
+        insert_terminals(pool, false, &backward_terminals);
         forward_terminals.clear();
         backward_terminals.clear();
         self.forward_scratch.terminals = forward_terminals;

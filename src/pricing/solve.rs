@@ -50,6 +50,27 @@ impl<const D: usize> Solver<D> {
         maximum: usize,
         negative_only: bool,
     ) -> Result<PricingResult> {
+        self.price_phase_internal(index, maximum, negative_only, false)
+    }
+
+    /// Price with completed columns retained when a label or time limit fires.
+    /// `exact == false` forbids interpreting the observed minimum as a bound.
+    pub fn price_phase_partial(
+        &mut self,
+        index: usize,
+        maximum: usize,
+        negative_only: bool,
+    ) -> Result<PricingResult> {
+        self.price_phase_internal(index, maximum, negative_only, true)
+    }
+
+    fn price_phase_internal(
+        &mut self,
+        index: usize,
+        maximum: usize,
+        negative_only: bool,
+        allow_partial: bool,
+    ) -> Result<PricingResult> {
         if self
             .graph
             .coupled_kernel()
@@ -141,7 +162,11 @@ impl<const D: usize> Solver<D> {
         engine.controls = engine_controls;
         self.requires_rollback = false;
         controls.time_limit = call_time_limit.saturating_sub(started.elapsed());
-        let mut answer = engine.solve(&self.graph, &controls);
+        let mut answer = if allow_partial {
+            engine.solve_partial(&self.graph, &controls)
+        } else {
+            engine.solve(&self.graph, &controls)
+        };
         if engine.controls.bidirectional
             && answer.as_ref().is_err_and(|error| {
                 error.kind == crate::core::error::ErrorKind::Runtime
@@ -159,7 +184,11 @@ impl<const D: usize> Solver<D> {
             match self.new_engine(forward, phase) {
                 Ok(mut retry) => {
                     controls.time_limit = call_time_limit.saturating_sub(started.elapsed());
-                    answer = retry.solve(&self.graph, &controls);
+                    answer = if allow_partial {
+                        retry.solve_partial(&self.graph, &controls)
+                    } else {
+                        retry.solve(&self.graph, &controls)
+                    };
                     engine = retry;
                 }
                 Err(error) => answer = Err(error),

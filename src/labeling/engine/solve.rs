@@ -2,6 +2,21 @@ use super::*;
 
 impl<const D: usize> LabelingEngine<D> {
     pub fn solve(&mut self, g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
+        self.solve_internal(g, controls, false)
+    }
+
+    /// Retain completed routes and statistics on label/deadline exhaustion.
+    /// An interrupted result is never exact; arithmetic/state errors propagate.
+    pub fn solve_partial(&mut self, g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
+        self.solve_internal(g, controls, true)
+    }
+
+    fn solve_internal(
+        &mut self,
+        g: &Graph<D>,
+        controls: &Controls,
+        allow_partial: bool,
+    ) -> Result<PricingResult> {
         if g.coupled_kernel()
             .is_some_and(|kernel| kernel.has_negative_paired_objectives())
         {
@@ -58,161 +73,182 @@ impl<const D: usize> LabelingEngine<D> {
             controls.max_columns,
             self.controls.group_limit,
         );
-        let parallel = self.runtime_bidirectional() && !self.consumption_joins;
-        if parallel {
-            (self.statistics.forward_time, self.statistics.backward_time) =
-                self.run_both_directions(g, controls, started, &mut pool)?;
-        } else {
-            self.run_direction(g, true, controls, started, &mut pool)?;
-            self.statistics.forward_time = started.elapsed().as_secs_f64();
-        }
-        self.refresh_coupled_completion(g);
-        // The native solver balances the half-way point right after backward
-        // extension, so the move survives a concatenation timeout.
-        if parallel && self.phase.exact() {
-            let f = self
-                .forward
-                .buckets
-                .iter()
-                .flatten()
-                .map(|b| b.active.len())
-                .sum::<usize>() as f64;
-            let b = self
-                .backward
-                .buckets
-                .iter()
-                .flatten()
-                .map(|b| b.active.len())
-                .sum::<usize>() as f64;
-            if f / b > 1.2 {
-                self.pending_middle = Some(false);
-            } else if b / f > 1.2 {
-                self.pending_middle = Some(true);
-            }
-        }
-        // Small heuristic sweeps may perform fewer than 64 extensions and
-        // have no concatenation pass. They still consume the call deadline.
-        if started.elapsed() >= controls.time_limit {
-            return Err(incomplete("pricing hard time limit exceeded"));
-        }
         let mut concatenation_tests = 0;
-        if self.runtime_bidirectional() {
-            if !parallel {
-                self.statistics.backward_time =
-                    started.elapsed().as_secs_f64() - self.statistics.forward_time;
+        let outcome: Result<()> = (|| {
+            let parallel = self.runtime_bidirectional() && !self.consumption_joins;
+            if parallel {
+                (self.statistics.forward_time, self.statistics.backward_time) =
+                    self.run_both_directions(g, controls, started, &mut pool)?;
+            } else {
+                self.run_direction(g, true, controls, started, &mut pool)?;
+                self.statistics.forward_time = started.elapsed().as_secs_f64();
             }
-            let concatenation_started = Instant::now();
-            self.update_unreachable(self.consumption_joins);
-            // Crossing labels share a traversal stack; each traversal resets
-            // its contents while retaining capacity from the previous label.
-            let mut work = Vec::new();
-            for internal in 0..self.grid.order.len() {
-                let v = self.grid.order[internal];
-                let mut cutoff = pool.cutoff(v);
-                for &f in &self.forward.crossing[v] {
-                    let label = self.forward.labels.view(f);
-                    let mut coordinate = self.grid.coordinate(label.resources());
-                    if self.consumption_joins {
-                        for r in 0..self.grid.dimensions {
-                            coordinate[r] = (self.grid.upper[internal][r]
-                                + self.grid.lower[internal][r])
-                                - coordinate[r];
+            self.refresh_coupled_completion(g);
+            // The native solver balances the half-way point right after backward
+            // extension, so the move survives a concatenation timeout.
+            if parallel && self.phase.exact() {
+                let f = self
+                    .forward
+                    .buckets
+                    .iter()
+                    .flatten()
+                    .map(|b| b.active.len())
+                    .sum::<usize>() as f64;
+                let b = self
+                    .backward
+                    .buckets
+                    .iter()
+                    .flatten()
+                    .map(|b| b.active.len())
+                    .sum::<usize>() as f64;
+                if f / b > 1.2 {
+                    self.pending_middle = Some(false);
+                } else if b / f > 1.2 {
+                    self.pending_middle = Some(true);
+                }
+            }
+            // Small heuristic sweeps may perform fewer than 64 extensions and
+            // have no concatenation pass. They still consume the call deadline.
+            if started.elapsed() >= controls.time_limit {
+                return Err(incomplete("pricing hard time limit exceeded"));
+            }
+            if self.runtime_bidirectional() {
+                if !parallel {
+                    self.statistics.backward_time =
+                        started.elapsed().as_secs_f64() - self.statistics.forward_time;
+                }
+                let concatenation_started = Instant::now();
+                self.update_unreachable(self.consumption_joins);
+                // Crossing labels share a traversal stack; each traversal resets
+                // its contents while retaining capacity from the previous label.
+                let mut work = Vec::new();
+                for internal in 0..self.grid.order.len() {
+                    let v = self.grid.order[internal];
+                    let mut cutoff = pool.cutoff(v);
+                    for &f in &self.forward.crossing[v] {
+                        let label = self.forward.labels.view(f);
+                        let mut coordinate = self.grid.coordinate(label.resources());
+                        if self.consumption_joins {
+                            for r in 0..self.grid.dimensions {
+                                coordinate[r] = (self.grid.upper[internal][r]
+                                    + self.grid.lower[internal][r])
+                                    - coordinate[r];
+                            }
                         }
-                    }
-                    let Some(bucket) =
-                        self.grid
-                            .bucket_id(self.consumption_joins, internal, coordinate)
-                    else {
-                        continue;
-                    };
-                    let key =
-                        label.key() + self.cuts.knapsack.partial_cost(g, label.resources(), true);
-                    let base_key = key;
-                    let key = self.ctx().resource_completion_key(
-                        g,
-                        true,
-                        label.coupled_state(),
-                        label.presence_state(),
-                        key,
-                    );
-                    work.clear();
-                    work.push((bucket, 0usize));
-                    while let Some((k, min)) = work.pop() {
-                        let row = &self.storage(self.consumption_joins).buckets[internal][k];
-                        if self
-                            .ctx()
-                            .completion_sum(key, row.completion_bound(self.cuts.knapsack.active))
-                            >= cutoff
-                        {
+                        let Some(bucket) =
+                            self.grid
+                                .bucket_id(self.consumption_joins, internal, coordinate)
+                        else {
                             continue;
-                        }
-                        if let Some(scan_key) = self.ctx().bucket_completion(
+                        };
+                        let key = label.key()
+                            + self.cuts.knapsack.partial_cost(g, label.resources(), true);
+                        let base_key = key;
+                        let key = self.ctx().resource_completion_key(
                             g,
                             true,
-                            label,
-                            base_key,
-                            BucketId {
-                                vertex: internal,
-                                bucket: k,
-                            },
-                            row.hot.key.first().copied(),
-                            cutoff,
-                        ) {
-                            for &b in &row.active {
-                                let other = self.storage(self.consumption_joins).labels.view(b);
-                                if self.ctx().completion_sum(scan_key, other.key()) >= cutoff {
-                                    break;
-                                }
-                                concatenation_tests += 1;
-                                if let Some(cost) = self.ctx().join_cost(g, v, label, other) {
-                                    if cost < cutoff
-                                        && controls.max_route_arcs.is_none_or(|limit| {
-                                            label
-                                                .hops()
-                                                .checked_add(other.hops())
-                                                .is_some_and(|hops| hops <= limit)
-                                        })
-                                    {
-                                        pool.insert(v, cost, 0., (Some(f), Some(b)));
-                                        cutoff = pool.cutoff(v);
+                            label.coupled_state(),
+                            label.presence_state(),
+                            key,
+                        );
+                        work.clear();
+                        work.push((bucket, 0usize));
+                        while let Some((k, min)) = work.pop() {
+                            let row = &self.storage(self.consumption_joins).buckets[internal][k];
+                            if self.ctx().completion_sum(
+                                key,
+                                row.completion_bound(self.cuts.knapsack.active),
+                            ) >= cutoff
+                            {
+                                continue;
+                            }
+                            if let Some(scan_key) = self.ctx().bucket_completion(
+                                g,
+                                true,
+                                label,
+                                base_key,
+                                BucketId {
+                                    vertex: internal,
+                                    bucket: k,
+                                },
+                                row.hot.key.first().copied(),
+                                cutoff,
+                            ) {
+                                for &b in &row.active {
+                                    let other = self.storage(self.consumption_joins).labels.view(b);
+                                    if self.ctx().completion_sum(scan_key, other.key()) >= cutoff {
+                                        break;
+                                    }
+                                    concatenation_tests += 1;
+                                    if let Some(cost) = self.ctx().join_cost(g, v, label, other) {
+                                        if cost < cutoff
+                                            && controls.max_route_arcs.is_none_or(|limit| {
+                                                label
+                                                    .hops()
+                                                    .checked_add(other.hops())
+                                                    .is_some_and(|hops| hops <= limit)
+                                            })
+                                        {
+                                            pool.insert(v, cost, 0., (Some(f), Some(b)));
+                                            cutoff = pool.cutoff(v);
+                                        }
                                     }
                                 }
                             }
-                        }
-                        for p in self.grid.direction(self.consumption_joins).buckets[internal][k]
-                            .predecessors
-                            .iter()
-                            .rev()
-                        {
-                            if p.bucket.bucket >= min {
-                                work.push((p.bucket.bucket, min.max(p.minimum)));
+                            for p in self.grid.direction(self.consumption_joins).buckets[internal]
+                                [k]
+                                .predecessors
+                                .iter()
+                                .rev()
+                            {
+                                if p.bucket.bucket >= min {
+                                    work.push((p.bucket.bucket, min.max(p.minimum)));
+                                }
                             }
                         }
                     }
+                    if started.elapsed() > controls.time_limit {
+                        return Err(incomplete("pricing concatenation time limit exceeded"));
+                    }
                 }
-                if started.elapsed() > controls.time_limit {
-                    return Err(incomplete("pricing concatenation time limit exceeded"));
+                self.statistics.concatenation_time = concatenation_started.elapsed().as_secs_f64();
+                if self.phase.exact() && !self.consumption_joins {
+                    self.half_ready = self.controls.direction_flags == 1;
                 }
             }
-            self.statistics.concatenation_time = concatenation_started.elapsed().as_secs_f64();
-            if self.phase.exact() && !self.consumption_joins {
-                self.half_ready = self.controls.direction_flags == 1;
-            }
-        }
-        if self.phase.exact() && self.controls.filter_other_buckets {
-            for v in 0..self.grid.order.len() {
-                if self.grid.forward.depth[v] > 0
-                    && self.filter_checks[v] > self.extension_checks[v].wrapping_mul(3)
-                {
-                    self.grid.forward.depth[v] =
-                        (self.grid.forward.depth[v] as f64 * 0.9).floor() as i32;
-                    if self.grid.bidirectional {
-                        self.grid.backward.depth[v] =
-                            (self.grid.backward.depth[v] as f64 * 0.9).floor() as i32;
+            if self.phase.exact() && self.controls.filter_other_buckets {
+                for v in 0..self.grid.order.len() {
+                    if self.grid.forward.depth[v] > 0
+                        && self.filter_checks[v] > self.extension_checks[v].wrapping_mul(3)
+                    {
+                        self.grid.forward.depth[v] =
+                            (self.grid.forward.depth[v] as f64 * 0.9).floor() as i32;
+                        if self.grid.bidirectional {
+                            self.grid.backward.depth[v] =
+                                (self.grid.backward.depth[v] as f64 * 0.9).floor() as i32;
+                        }
                     }
                 }
             }
-        }
+            Ok(())
+        })();
+        let interrupted = match outcome {
+            Ok(()) => false,
+            Err(error)
+                if allow_partial
+                    && matches!(
+                        error.message.as_str(),
+                        "pricing label limit exceeded"
+                            | "pricing hard time limit exceeded"
+                            | "pricing concatenation time limit exceeded"
+                    ) =>
+            {
+                self.half_ready = false;
+                self.full_ready = false;
+                true
+            }
+            Err(error) => return Err(error),
+        };
         self.statistics.concatenation_tests = concatenation_tests;
         self.statistics.forward_labels = self
             .forward
@@ -251,7 +287,7 @@ impl<const D: usize> LabelingEngine<D> {
         Ok(PricingResult {
             columns,
             minimum_reduced_cost: minimum,
-            exact: self.phase.exact(),
+            exact: self.phase.exact() && !interrupted,
             statistics: self.statistics.clone(),
         })
     }
