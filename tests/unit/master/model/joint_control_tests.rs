@@ -213,6 +213,27 @@ fn joint_control_proposals_include_attainable_extremes_of_an_equality_face() {
 }
 
 #[test]
+fn global_joint_target_objectives_cover_coordinate_extremes() {
+    let domains = [Interval { lo: 0., hi: 8. }; 2];
+    let rows = [(RowSense::Equal, 8., vec![(0, 1.), (1, 1.)])];
+    let costs = [0., 0.];
+    let proposal_count = costs.len() * 2 + 2;
+    assert_eq!(proposal_count, 6);
+
+    let mut iterations = 100_000;
+    let deadline = Instant::now() + std::time::Duration::from_secs(10);
+    let targets: Vec<_> = (0..proposal_count)
+        .filter_map(|proposal| {
+            let objective = terminal_objective(&costs, proposal)?;
+            solve_terminal_targets(&domains, &rows, &objective, &mut iterations, deadline)
+        })
+        .collect();
+
+    assert!(targets.contains(&vec![0., 8.]));
+    assert!(targets.contains(&vec![8., 0.]));
+}
+
+#[test]
 fn joint_control_projects_one_resource_through_opposing_rows() {
     let output = root();
     let mut state = output.snapshot.state.fork_state();

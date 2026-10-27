@@ -336,6 +336,26 @@ fn joint_controls<const D: usize>(
 // Both route-local proposals and cross-path witness recovery use the same
 // shifted terminal-box LP. Its solution is a proposal, never a proof bound.
 type TerminalRow = (RowSense, f64, Vec<(usize, f64)>);
+
+// The cost optimum is useful for witness recovery, but it can land on a
+// source-unattainable point of a coupled face. Also propose a feasible point
+// selected by a zero objective and both extrema of every terminal
+// coordinate. These targets are candidates only; source replay remains the
+// acceptance test.
+fn terminal_objective(costs: &[f64], proposal: usize) -> Option<Vec<f64>> {
+    if proposal == 0 {
+        return Some(costs.to_vec());
+    }
+    if proposal == 1 {
+        return Some(vec![0.; costs.len()]);
+    }
+    let coordinate = (proposal - 2) / 2;
+    let sign = if proposal % 2 == 0 { -1. } else { 1. };
+    let mut objective = vec![0.; costs.len()];
+    *objective.get_mut(coordinate)? = sign;
+    Some(objective)
+}
+
 fn solve_terminal_targets(
     domains: &[Interval],
     rows: &[TerminalRow],
@@ -960,7 +980,8 @@ fn joint_witness_targets<const D: usize>(
     if variables.is_empty() {
         return None;
     }
-    work = work.checked_sub(variables.len().checked_mul(rhs.len().checked_add(1)?)?)?;
+    let row_count = rhs.len();
+    work = work.checked_sub(variables.len().checked_mul(row_count.checked_add(1)?)?)?;
     let rows: Vec<_> = state
         .shared_rows
         .iter()
@@ -968,35 +989,53 @@ fn joint_witness_targets<const D: usize>(
         .zip(coefficients)
         .map(|((row, rhs), a)| (row.sense, rhs, a))
         .collect();
-    let totals = solve_terminal_targets(&domains, &rows, &costs, &mut iterations, state.deadline)?;
-    let targets: Vec<_> = variables
-        .iter()
-        .zip(totals)
-        .map(|((index, _, _), total)| TerminalTarget {
-            average: total / routes[*index].quantity,
-            total,
-        })
-        .collect();
-    for split in [false, true] {
-        let Some(candidate) = realize_joint_targets(
-            state,
-            &routes,
-            background.len(),
-            &variables,
-            &targets,
-            split,
-            (&mut work, &mut iterations),
-        ) else {
-            continue;
-        };
-        let Some(scheduled) = synchronization::witness(state, &candidate).ok()? else {
-            continue;
-        };
-        if !scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..]) {
-            continue;
+    let proposal_count = variables.len().checked_mul(2)?.checked_add(2)?;
+    for proposal in 0..proposal_count {
+        if Instant::now() >= state.deadline {
+            return None;
         }
-        if let Some(objective) = tree_adapter::validate_routes(state, &scheduled, masters).ok()? {
-            return Some((objective, scheduled, masters.to_vec()));
+        let proposal_work = variables.len().checked_mul(row_count.checked_add(1)?)?;
+        let Some(remaining_work) = work.checked_sub(proposal_work) else {
+            break;
+        };
+        work = remaining_work;
+        let objective = terminal_objective(&costs, proposal)?;
+        let Some(totals) =
+            solve_terminal_targets(&domains, &rows, &objective, &mut iterations, state.deadline)
+        else {
+            continue;
+        };
+        let targets: Vec<_> = variables
+            .iter()
+            .zip(totals)
+            .map(|((index, _, _), total)| TerminalTarget {
+                average: total / routes[*index].quantity,
+                total,
+            })
+            .collect();
+        for split in [false, true] {
+            let Some(candidate) = realize_joint_targets(
+                state,
+                &routes,
+                background.len(),
+                &variables,
+                &targets,
+                split,
+                (&mut work, &mut iterations),
+            ) else {
+                continue;
+            };
+            let Some(scheduled) = synchronization::witness(state, &candidate).ok()? else {
+                continue;
+            };
+            if !scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..]) {
+                continue;
+            }
+            if let Some(objective) =
+                tree_adapter::validate_routes(state, &scheduled, masters).ok()?
+            {
+                return Some((objective, scheduled, masters.to_vec()));
+            }
         }
     }
     None
