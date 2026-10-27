@@ -751,7 +751,6 @@ pub(super) fn repair_witness<const D: usize>(
     }
     let mut witness = state.fixed_routes.clone();
     let mut allocation_groups: Vec<(Vec<(usize, f64, NetworkRoute)>, f64)> = vec![];
-    let mut seed_allocations: Vec<Vec<Vec<FixedRoute>>> = vec![];
     for ((network, arcs), (quantity, fractional, lp_routes)) in groups {
         // Integer-tolerance path counts can still carry a fractional paired
         // control. Reconstruct source controls before trusting their rows.
@@ -797,11 +796,6 @@ pub(super) fn repair_witness<const D: usize>(
         // remains a valid identity candidate when a path count is split across
         // fractional LP columns.
         choices.sort_by(|a, b| (b.1 > 0.).cmp(&(a.1 > 0.)).then_with(|| a.0.cmp(&b.0)));
-        let seed = identity_allocations(state, &choices, rounded, 1, state.deadline);
-        if seed.is_empty() {
-            return Ok(None);
-        }
-        seed_allocations.push(seed);
         allocation_groups.push((choices, rounded));
     }
     if allocation_groups.is_empty() {
@@ -823,7 +817,7 @@ pub(super) fn repair_witness<const D: usize>(
     Ok(joint_witness_targets(
         state,
         &witness,
-        &seed_allocations,
+        &allocation_groups,
         &masters,
     ))
 }
@@ -874,6 +868,7 @@ fn search_identity_groups<const D: usize>(
 
 /// Enumerate bounded integral allocations of one physical-path count across
 /// registered route identities, respecting each identity's residual cap.
+#[cfg(test)]
 fn identity_allocations<const D: usize>(
     state: &State<D>,
     choices: &[(usize, f64, NetworkRoute)],
@@ -1153,7 +1148,7 @@ fn for_each_identity_allocation<const D: usize>(
 fn joint_witness_targets<const D: usize>(
     state: &State<D>,
     background: &[FixedRoute],
-    alternatives: &[Vec<Vec<FixedRoute>>],
+    allocation_groups: &[(Vec<(usize, f64, NetworkRoute)>, f64)],
     masters: &[(i32, f64)],
 ) -> Option<IntegerWitness> {
     if Instant::now() >= state.deadline {
@@ -1161,223 +1156,310 @@ fn joint_witness_targets<const D: usize>(
     }
     let mut work = 4_000_000;
     let mut iterations = 100_000;
-    let mut routes = background.to_vec();
-    routes.extend(
-        alternatives
-            .iter()
-            .filter_map(|allocations| allocations.first())
-            .flatten()
-            .cloned(),
-    );
-    let mut rhs: Vec<_> = state.shared_rows.iter().map(|r| r.rhs).collect();
-    for (index, fixed) in routes.iter().enumerate() {
-        let oracle = state
-            .oracles
-            .iter()
-            .find(|o| o.network.id == fixed.route.network)?;
-        let terms = if index < background.len() {
-            entries(oracle, &fixed.route.route, state.shared_offset).ok()?
-        } else {
-            // Variable paired contributions belong to the target matrix, not
-            // to a rounded baseline which would then need cancellation.
-            entries_base(oracle, &fixed.route.route, state.shared_offset)
-                .ok()?
-                .into_iter()
-                .collect()
-        };
-        for (row, a) in terms {
-            if let Some(row) = row
-                .checked_sub(state.shared_offset)
-                .and_then(|r| rhs.get_mut(r))
-            {
-                *row -= a * fixed.quantity;
-            }
-        }
-    }
-    for variable in &state.master_variables {
-        let value = masters.iter().find(|(id, _)| *id == variable.id)?.1;
-        for &(row, a) in &variable.entries {
-            *rhs.get_mut(row)? -= a * value;
-        }
-    }
-    let mut domains = vec![];
-    let mut costs = vec![];
-    let mut variables = vec![];
-    let mut coefficients = vec![Vec::new(); rhs.len()];
-    for (index, fixed) in routes.iter().enumerate().skip(background.len()) {
-        let oracle = state
-            .oracles
-            .iter()
-            .find(|o| o.network.id == fixed.route.network)?;
-        let path: Vec<_> = fixed
-            .route
-            .route
-            .arcs
-            .iter()
-            .map(|id| oracle.index.get(id).copied())
-            .collect::<Option<_>>()?;
-        for resource in resources(oracle) {
-            let domain = domain(
-                oracle,
-                &path,
-                resource,
-                &mut work,
-                &mut iterations,
-                state.deadline,
-            )??;
-            let variable = domains.len();
-            let lower = domain.lower * fixed.quantity;
-            let upper = domain.upper * fixed.quantity;
-            if !lower.is_finite() || !upper.is_finite() {
-                return None;
-            }
-            for entry in oracle
-                .activity_rows
-                .iter()
-                .filter(|e| e.resource == resource)
-            {
-                let a = entry.coefficient;
-                coefficients.get_mut(entry.row)?.push((variable, a));
-                *rhs.get_mut(entry.row)? -= a * lower;
-            }
-            costs.push(
-                oracle
-                    .network
-                    .graph
-                    .coupled_kernel()?
-                    .effective_objective_coefficient(resource)?,
-            );
-            domains.push(Interval {
-                lo: lower,
-                hi: upper,
-            });
-            variables.push((index, resource, path.clone()));
-        }
-    }
-    if variables.is_empty() {
+    let mut seed = Vec::new();
+    search_joint_witness_seeds(
+        state,
+        background,
+        allocation_groups,
+        0,
+        &mut seed,
+        masters,
+        &mut work,
+        &mut iterations,
+    )
+}
+
+/// Enumerate fallback identity combinations lazily under a single shared
+/// work, LP-iteration and solve-deadline budget.
+fn search_joint_witness_seeds<const D: usize>(
+    state: &State<D>,
+    background: &[FixedRoute],
+    groups: &[(Vec<(usize, f64, NetworkRoute)>, f64)],
+    index: usize,
+    selected: &mut Vec<FixedRoute>,
+    masters: &[(i32, f64)],
+    work: &mut usize,
+    iterations: &mut usize,
+) -> Option<IntegerWitness> {
+    if Instant::now() >= state.deadline || *work == 0 || *iterations == 0 {
         return None;
     }
-    let row_count = rhs.len();
-    work = work.checked_sub(variables.len().checked_mul(row_count.checked_add(1)?)?)?;
-    let rows: Vec<_> = state
-        .shared_rows
-        .iter()
-        .zip(rhs)
-        .zip(coefficients)
-        .map(|((row, rhs), a)| (row.sense, rhs, a))
-        .collect();
-    let proposal_count = variables.len().checked_mul(2)?.checked_add(2)?;
-    let vertex_enumeration_reserve = work / 3;
-    let vertex_realization_reserve = work / 3;
-    let vertex_iteration_reserve = iterations / 3;
-    let mut vertex_iterations = vertex_iteration_reserve;
-    let mut coordinate_iterations = iterations.checked_sub(vertex_iteration_reserve)?;
-    work = work.checked_sub(vertex_enumeration_reserve.checked_add(vertex_realization_reserve)?)?;
-    for proposal in 0..proposal_count {
-        if Instant::now() >= state.deadline {
+    if index == groups.len() {
+        return joint_witness_targets_for_seed(
+            state, background, selected, masters, work, iterations,
+        );
+    }
+    let (choices, quantity) = &groups[index];
+    let mut found = None;
+    for_each_identity_allocation(
+        state,
+        choices,
+        *quantity,
+        state.deadline,
+        &mut |allocation, _| {
+            let old_len = selected.len();
+            selected.extend_from_slice(allocation);
+            found = search_joint_witness_seeds(
+                state,
+                background,
+                groups,
+                index + 1,
+                selected,
+                masters,
+                work,
+                iterations,
+            );
+            selected.truncate(old_len);
+            Ok(found.is_some()
+                || *work == 0
+                || *iterations == 0
+                || Instant::now() >= state.deadline)
+        },
+    )
+    .ok()?;
+    found
+}
+
+fn joint_witness_targets_for_seed<const D: usize>(
+    state: &State<D>,
+    background: &[FixedRoute],
+    seed: &[FixedRoute],
+    masters: &[(i32, f64)],
+    shared_work: &mut usize,
+    shared_iterations: &mut usize,
+) -> Option<IntegerWitness> {
+    if Instant::now() >= state.deadline {
+        return None;
+    }
+    let mut work = *shared_work;
+    let mut iterations = *shared_iterations;
+    let result = (|| -> Option<IntegerWitness> {
+        let mut routes = background.to_vec();
+        routes.extend_from_slice(seed);
+        let mut rhs: Vec<_> = state.shared_rows.iter().map(|r| r.rhs).collect();
+        for (index, fixed) in routes.iter().enumerate() {
+            let oracle = state
+                .oracles
+                .iter()
+                .find(|o| o.network.id == fixed.route.network)?;
+            let terms = if index < background.len() {
+                entries(oracle, &fixed.route.route, state.shared_offset).ok()?
+            } else {
+                // Variable paired contributions belong to the target matrix, not
+                // to a rounded baseline which would then need cancellation.
+                entries_base(oracle, &fixed.route.route, state.shared_offset)
+                    .ok()?
+                    .into_iter()
+                    .collect()
+            };
+            for (row, a) in terms {
+                if let Some(row) = row
+                    .checked_sub(state.shared_offset)
+                    .and_then(|r| rhs.get_mut(r))
+                {
+                    *row -= a * fixed.quantity;
+                }
+            }
+        }
+        for variable in &state.master_variables {
+            let value = masters.iter().find(|(id, _)| *id == variable.id)?.1;
+            for &(row, a) in &variable.entries {
+                *rhs.get_mut(row)? -= a * value;
+            }
+        }
+        let mut domains = vec![];
+        let mut costs = vec![];
+        let mut variables = vec![];
+        let mut coefficients = vec![Vec::new(); rhs.len()];
+        for (index, fixed) in routes.iter().enumerate().skip(background.len()) {
+            let oracle = state
+                .oracles
+                .iter()
+                .find(|o| o.network.id == fixed.route.network)?;
+            let path: Vec<_> = fixed
+                .route
+                .route
+                .arcs
+                .iter()
+                .map(|id| oracle.index.get(id).copied())
+                .collect::<Option<_>>()?;
+            for resource in resources(oracle) {
+                let domain = domain(
+                    oracle,
+                    &path,
+                    resource,
+                    &mut work,
+                    &mut iterations,
+                    state.deadline,
+                )??;
+                let variable = domains.len();
+                let lower = domain.lower * fixed.quantity;
+                let upper = domain.upper * fixed.quantity;
+                if !lower.is_finite() || !upper.is_finite() {
+                    return None;
+                }
+                for entry in oracle
+                    .activity_rows
+                    .iter()
+                    .filter(|e| e.resource == resource)
+                {
+                    let a = entry.coefficient;
+                    coefficients.get_mut(entry.row)?.push((variable, a));
+                    *rhs.get_mut(entry.row)? -= a * lower;
+                }
+                costs.push(
+                    oracle
+                        .network
+                        .graph
+                        .coupled_kernel()?
+                        .effective_objective_coefficient(resource)?,
+                );
+                domains.push(Interval {
+                    lo: lower,
+                    hi: upper,
+                });
+                variables.push((index, resource, path.clone()));
+            }
+        }
+        if variables.is_empty() {
             return None;
         }
-        let proposal_work = variables.len().checked_mul(row_count.checked_add(1)?)?;
-        let Some(remaining_work) = work.checked_sub(proposal_work) else {
-            break;
-        };
-        work = remaining_work;
-        let objective = terminal_objective(&costs, proposal)?;
-        let Some(totals) = solve_terminal_targets(
-            &domains,
-            &rows,
-            &objective,
-            &mut coordinate_iterations,
-            state.deadline,
-        ) else {
-            continue;
-        };
-        let targets: Vec<_> = variables
+        let row_count = rhs.len();
+        work = work.checked_sub(variables.len().checked_mul(row_count.checked_add(1)?)?)?;
+        let rows: Vec<_> = state
+            .shared_rows
             .iter()
-            .zip(totals)
-            .map(|((index, _, _), total)| TerminalTarget {
-                average: total / routes[*index].quantity,
-                total,
-            })
+            .zip(rhs)
+            .zip(coefficients)
+            .map(|((row, rhs), a)| (row.sense, rhs, a))
             .collect();
-        for split in [false, true] {
-            let Some(candidate) = realize_joint_targets(
-                state,
-                &routes,
-                background.len(),
-                &variables,
-                &targets,
-                split,
-                (&mut work, &mut coordinate_iterations),
-            ) else {
-                continue;
-            };
-            let Some(scheduled) = synchronization::witness(state, &candidate).ok()? else {
-                continue;
-            };
-            if !scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..]) {
-                continue;
+        let proposal_count = variables.len().checked_mul(2)?.checked_add(2)?;
+        let vertex_enumeration_reserve = work / 3;
+        let vertex_realization_reserve = work / 3;
+        let vertex_iteration_reserve = iterations / 3;
+        let mut vertex_iterations = vertex_iteration_reserve;
+        let mut coordinate_iterations = iterations.checked_sub(vertex_iteration_reserve)?;
+        work =
+            work.checked_sub(vertex_enumeration_reserve.checked_add(vertex_realization_reserve)?)?;
+        let mut enumeration_work = vertex_enumeration_reserve;
+        let mut vertex_realization_work = vertex_realization_reserve;
+        let proposal_result = (|| -> Option<IntegerWitness> {
+            for proposal in 0..proposal_count {
+                if Instant::now() >= state.deadline {
+                    return None;
+                }
+                let proposal_work = variables.len().checked_mul(row_count.checked_add(1)?)?;
+                let Some(remaining_work) = work.checked_sub(proposal_work) else {
+                    break;
+                };
+                work = remaining_work;
+                let objective = terminal_objective(&costs, proposal)?;
+                let Some(totals) = solve_terminal_targets(
+                    &domains,
+                    &rows,
+                    &objective,
+                    &mut coordinate_iterations,
+                    state.deadline,
+                ) else {
+                    continue;
+                };
+                let targets: Vec<_> = variables
+                    .iter()
+                    .zip(totals)
+                    .map(|((index, _, _), total)| TerminalTarget {
+                        average: total / routes[*index].quantity,
+                        total,
+                    })
+                    .collect();
+                for split in [false, true] {
+                    let Some(candidate) = realize_joint_targets(
+                        state,
+                        &routes,
+                        background.len(),
+                        &variables,
+                        &targets,
+                        split,
+                        (&mut work, &mut coordinate_iterations),
+                    ) else {
+                        continue;
+                    };
+                    let Some(scheduled) = synchronization::witness(state, &candidate).ok()? else {
+                        continue;
+                    };
+                    if !scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..])
+                    {
+                        continue;
+                    }
+                    if let Some(objective) =
+                        tree_adapter::validate_routes(state, &scheduled, masters).ok()?
+                    {
+                        return Some((objective, scheduled, masters.to_vec()));
+                    }
+                }
             }
-            if let Some(objective) =
-                tree_adapter::validate_routes(state, &scheduled, masters).ok()?
-            {
-                return Some((objective, scheduled, masters.to_vec()));
+            // Global cross-path/network faces can have vertices that are not exposed
+            // by any one terminal coordinate. Use the same bounded LP vertex sweep as
+            // route-local pricing, while reserving half of the remaining work for
+            // source realization and whole-witness validation.
+            let vertices =
+                terminal_vertices(&domains, &rows, &mut enumeration_work, state.deadline);
+            for vertex in vertices {
+                if Instant::now() >= state.deadline || vertex_realization_work == 0 {
+                    break;
+                }
+                let totals: Vec<_> = domains
+                    .iter()
+                    .zip(vertex)
+                    .map(|(domain, shift)| domain.lo + shift)
+                    .collect();
+                if totals.iter().any(|total| !total.is_finite()) {
+                    continue;
+                }
+                let targets: Vec<_> = variables
+                    .iter()
+                    .zip(totals)
+                    .map(|((index, _, _), total)| TerminalTarget {
+                        average: total / routes[*index].quantity,
+                        total,
+                    })
+                    .collect();
+                for split in [false, true] {
+                    let Some(candidate) = realize_joint_targets(
+                        state,
+                        &routes,
+                        background.len(),
+                        &variables,
+                        &targets,
+                        split,
+                        (&mut vertex_realization_work, &mut vertex_iterations),
+                    ) else {
+                        continue;
+                    };
+                    let Some(scheduled) = synchronization::witness(state, &candidate).ok()? else {
+                        continue;
+                    };
+                    if !scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..])
+                    {
+                        continue;
+                    }
+                    if let Some(objective) =
+                        tree_adapter::validate_routes(state, &scheduled, masters).ok()?
+                    {
+                        return Some((objective, scheduled, masters.to_vec()));
+                    }
+                }
             }
-        }
-    }
-    // Global cross-path/network faces can have vertices that are not exposed
-    // by any one terminal coordinate. Use the same bounded LP vertex sweep as
-    // route-local pricing, while reserving half of the remaining work for
-    // source realization and whole-witness validation.
-    let mut enumeration_work = vertex_enumeration_reserve;
-    let vertices = terminal_vertices(&domains, &rows, &mut enumeration_work, state.deadline);
-    let mut vertex_realization_work = vertex_realization_reserve;
-    for vertex in vertices {
-        if Instant::now() >= state.deadline || vertex_realization_work == 0 {
-            break;
-        }
-        let totals: Vec<_> = domains
-            .iter()
-            .zip(vertex)
-            .map(|(domain, shift)| domain.lo + shift)
-            .collect();
-        if totals.iter().any(|total| !total.is_finite()) {
-            continue;
-        }
-        let targets: Vec<_> = variables
-            .iter()
-            .zip(totals)
-            .map(|((index, _, _), total)| TerminalTarget {
-                average: total / routes[*index].quantity,
-                total,
-            })
-            .collect();
-        for split in [false, true] {
-            let Some(candidate) = realize_joint_targets(
-                state,
-                &routes,
-                background.len(),
-                &variables,
-                &targets,
-                split,
-                (&mut vertex_realization_work, &mut vertex_iterations),
-            ) else {
-                continue;
-            };
-            let Some(scheduled) = synchronization::witness(state, &candidate).ok()? else {
-                continue;
-            };
-            if !scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..]) {
-                continue;
-            }
-            if let Some(objective) =
-                tree_adapter::validate_routes(state, &scheduled, masters).ok()?
-            {
-                return Some((objective, scheduled, masters.to_vec()));
-            }
-        }
-    }
-    None
+            None
+        })();
+        work = work
+            .saturating_add(enumeration_work)
+            .saturating_add(vertex_realization_work);
+        iterations = coordinate_iterations.saturating_add(vertex_iterations);
+        proposal_result
+    })();
+    *shared_work = work;
+    *shared_iterations = iterations;
+    result
 }
 
 type TerminalVariable = (usize, usize, Vec<usize>);
