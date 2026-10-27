@@ -13,6 +13,46 @@ fn reduced_cost_interval_touching_zero_enumerates_paired_endpoints() {
     assert!(!sign_ambiguous(Interval::point(0.)));
 }
 
+#[test]
+fn bounded_walk_resource_pruning_uses_label_transition_semantics() {
+    let mut graph = crate::graph::Graph::<2>::new(2, 1).unwrap();
+    graph.initial[0] = Some(0.);
+    graph.add_arc(0, 1, 0.).unwrap();
+    graph.arcs[0].consumption[0] = -1.;
+    let state = crate::graph::ResourceValues::from([0.]);
+
+    assert_eq!(
+        extend_bounded_walk_resources(&graph, 0, state),
+        Some(Some(crate::graph::ResourceValues::from([0.])))
+    );
+
+    graph.resources[0] = crate::graph::ResourceKind::Equality;
+    assert_eq!(extend_bounded_walk_resources(&graph, 0, state), Some(None));
+}
+
+#[cfg(feature = "multi-time-windows")]
+#[test]
+fn bounded_walk_resource_pruning_respects_window_gaps_and_arc_bounds() {
+    let mut graph = crate::graph::Graph::<2>::new(2, 1).unwrap();
+    graph.initial[0] = Some(0.);
+    graph.add_arc(0, 1, 0.).unwrap();
+    graph.arcs[0].consumption[0] = 4.;
+    graph.arcs[0].bounds[0] = Some(crate::graph::Window::new(0., 5.).unwrap());
+    graph
+        .set_time_windows(
+            1,
+            0,
+            &[
+                crate::graph::Window::new(2., 3.).unwrap(),
+                crate::graph::Window::new(7., 8.).unwrap(),
+            ],
+        )
+        .unwrap();
+
+    let state = crate::graph::ResourceValues::from([0.]);
+    assert_eq!(extend_bounded_walk_resources(&graph, 0, state), Some(None));
+}
+
 fn root() -> Output<2> {
     let mut source: serde_json::Value = serde_json::from_str(include_str!(
         "../../../fixtures/coupled/joint-interior-model.json"

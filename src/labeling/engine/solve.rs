@@ -18,25 +18,7 @@ impl<const D: usize> LabelingEngine<D> {
         g: &Graph<D>,
         controls: &Controls,
     ) -> Result<PricingResult> {
-        let mut result = match self.solve_internal(g, controls, true, true) {
-            Ok(result) => result,
-            // Raw-slope signed envelopes are not implemented yet. In this
-            // proposal-only search, decline SCC seeds and let source-control
-            // pricing continue; never turn the unsupported frontier into a
-            // pricing certificate.
-            Err(error)
-                if error.kind == crate::core::error::ErrorKind::InvalidArgument
-                    && error.message == "signed raw paired-slope frontier is unavailable" =>
-            {
-                return Ok(PricingResult {
-                    columns: vec![],
-                    minimum_reduced_cost: 0.,
-                    exact: false,
-                    statistics: Default::default(),
-                });
-            }
-            Err(error) => return Err(error),
-        };
+        let mut result = self.solve_internal(g, controls, true, true)?;
         result.minimum_reduced_cost = 0.;
         result.exact = false;
         Ok(result)
