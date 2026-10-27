@@ -564,8 +564,8 @@ fn identity_allocations<const D: usize>(
             return;
         }
 
-        // Keep the search near the LP proposal while also exploring cap-boundary
-        // splits such as two copies across two identities capped at one each.
+        // Try LP-near and cap-boundary counts first, then enumerate all remaining
+        // integral counts until the shared visit/allocation budgets are exhausted.
         let preferred_floor = preferred.floor().clamp(0., max_count);
         let preferred_ceil = preferred.ceil().clamp(0., max_count);
         let mut ordered = vec![
@@ -586,9 +586,12 @@ fn identity_allocations<const D: usize>(
                 true
             }
         });
-        for count in ordered {
+        let try_count = |count: f64,
+                         selected: &mut Vec<FixedRoute>,
+                         allocations: &mut Vec<Vec<FixedRoute>>,
+                         visits: &mut usize| {
             if allocations.len() >= limit || *visits >= 100_000 {
-                break;
+                return;
             }
             if count > 0. {
                 selected.push(FixedRoute {
@@ -609,6 +612,16 @@ fn identity_allocations<const D: usize>(
             if count > 0. {
                 selected.pop();
             }
+        };
+        for count in ordered {
+            try_count(count, selected, allocations, visits);
+        }
+        let mut count = 0.;
+        while count <= max_count && allocations.len() < limit && *visits < 100_000 {
+            if !seen.contains(&count) {
+                try_count(count, selected, allocations, visits);
+            }
+            count += 1.;
         }
     }
 

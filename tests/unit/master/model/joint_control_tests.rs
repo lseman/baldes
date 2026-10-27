@@ -228,6 +228,39 @@ fn paired_witness_allocations_split_counts_across_capped_identities() {
 }
 
 #[test]
+fn paired_witness_allocations_search_nonendpoint_integer_splits() {
+    let output = root();
+    let mut state = output.snapshot.state.fork_state();
+    state.oracles[0].network.multiplicity = Window::new(10., 10.).unwrap();
+    state.oracles[0].total_multiplicity = Window::new(10., 10.).unwrap();
+    let first = state
+        .routes
+        .iter()
+        .position(|route| route.route.coupled_values == vec![(0, 0.), (1, 0.)])
+        .unwrap();
+    let second = state
+        .routes
+        .iter()
+        .position(|route| route.route.coupled_values == vec![(0, 8.), (1, 8.)])
+        .unwrap();
+    state.route_upper_bounds.insert(first, 8.);
+    state.route_upper_bounds.insert(second, 8.);
+    let choices = [first, second].map(|tag| (tag, 0.5, state.routes[tag].as_ref().clone()));
+
+    let allocations = identity_allocations(&state, &choices, 10., 128);
+
+    assert!(allocations.iter().any(|allocation| {
+        allocation.len() == 2
+            && allocation.iter().any(|route| {
+                route.quantity == 4. && route.route.route.coupled_values == vec![(0, 0.), (1, 0.)]
+            })
+            && allocation.iter().any(|route| {
+                route.quantity == 6. && route.route.route.coupled_values == vec![(0, 8.), (1, 8.)]
+            })
+    }));
+}
+
+#[test]
 fn paired_witness_repair_recovers_path_count_from_capped_identities() {
     let output = root();
     let mut state = output.snapshot.state.fork_state();
