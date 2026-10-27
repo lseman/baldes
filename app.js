@@ -4,6 +4,8 @@
   if (capacity) {
     const customers = [[180,85],[310,70],[430,90],[530,145],[545,260],[460,325],[335,345],[220,320],[125,245],[110,150]];
     const depot = [330,210];
+    // Milliseconds per map unit: trucks, customer highlights and pings share it.
+    const pace = 7;
     const controls = document.querySelector('.route-controls');
     const demo = document.createElement('button');
     demo.type = 'button';
@@ -44,7 +46,7 @@
       document.querySelector('#route-map').append(vehicles);
       paths.forEach((path, route) => {
         const length = path.getTotalLength();
-        const duration = length * 3;
+        const duration = length * pace;
         // A small box truck drawn facing +x, centred on its position.
         const vehicle = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         vehicle.setAttribute('class', `route-truck route-${route}`);
@@ -66,7 +68,7 @@
         };
         // With reduced motion the routes stay drawn and only the trucks loop.
         if (motion.matches) {
-          const lap = length * 7;
+          const lap = length * 16;
           const offset = performance.now() - route * lap / paths.length;
           let frame;
           const loop = now => {
@@ -116,7 +118,7 @@
           previous = point;
           animations.push(nodes[route * size + index].animate([
             { opacity:.3 }, { opacity:1 }
-          ], { duration:250, delay:delay + distance * 3, fill:'backwards' }));
+          ], { duration:250, delay:delay + distance * pace, fill:'backwards' }));
           // A ring spreads from the customer as the vehicle arrives.
           const ping = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
           ping.setAttribute('cx', point[0]);
@@ -127,7 +129,7 @@
           vehicles.append(ping);
           animations.push(ping.animate([
             { r:13, opacity:.75 }, { r:30, opacity:0 }
-          ], { duration:700, delay:delay + distance * 3, easing:'ease-out' }));
+          ], { duration:700, delay:delay + distance * pace, easing:'ease-out' }));
         });
         delay += duration + 180;
       });
@@ -177,6 +179,21 @@
     });
     syncDemo();
     update();
+  }
+  // End the title underline with the last line of text, not the wrapped box.
+  const road = document.querySelector('.title-road');
+  const roadText = road?.querySelector('em');
+  if (road && roadText) {
+    const fit = () => {
+      const range = document.createRange();
+      range.selectNodeContents(roadText);
+      const lines = [...range.getClientRects()];
+      const last = lines[lines.length - 1];
+      if (last) road.style.setProperty('--road-width', `${last.right - road.getBoundingClientRect().left}px`);
+    };
+    fit();
+    document.fonts?.ready.then(fit);
+    window.addEventListener('resize', fit);
   }
   // Tilted hero card: follow the pointer on fine-pointer screens, rest otherwise.
   const card = document.querySelector('.hero .route-card');
