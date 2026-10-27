@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Stochastic branch-and-cut versus branch-and-price scripts/benchmarks/stochastic_branch_cut.py is a directed Pythonreimplementation of Approach 4 (BC-Theta) from Tomazella, Munari a">
+<meta name="theme-color" content="#0b0e11">
+<title>Stochastic branch-and-cut versus branch-and-price — BALDES docs</title>
+<link rel="canonical" href="https://baldes.laioseman.com/docs/benchmarks/stochastic.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/solve.html">Unified solve interface</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/architecture.html">Solver architecture and ownership</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: pyBaldes</a><a href="../guides/releases.html">Python wheels and releases</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">pyBaldes documentation</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/installation.html">Install pyBaldes</a><a href="../pybaldes/quickstart.html">pyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/api.html">pyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/models.html">Network models and shared masters</a><a href="../solver/column-imports.html">Finite column imports</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="../extensions/coupled-resources.html">Coupled resources</a><a href="../extensions/multi-time-windows.html">Multiple time windows</a><a href="../extensions/pstep.html">P-step CVRP and VRPTW extension</a><a href="../extensions/evrp.html">EVRP implementation status</a><a href="../extensions/robust.html">Robust vehicle routing</a><a href="../extensions/robust-pd.html">Robust pickup and delivery with time windows</a><a href="../extensions/ipm.html">BALDES IPM in Rust</a><a href="../extensions/ce.html">Column elimination</a><a href="../extensions/stochastic.html">Stochastic demands and replenishment recourse</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="root.html">Root benchmarks</a><a href="rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a><a href="stochastic.html" aria-current="page">Stochastic branch-and-cut versus branch-and-price</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/benchmarks/stochastic.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Benchmarks</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="stochastic-branch-and-cut-versus-branch-and-price">Stochastic branch-and-cut versus branch-and-price</h1>
+<p><code>scripts/benchmarks/stochastic_branch_cut.py</code> is a <strong>directed Python
+reimplementation of Approach 4 (BC-Theta)</strong> from Tomazella, Munari and Morabito
+(2026), not the authors' implementation:
+https://optimization-online.org/wp-content/uploads/2026/04/Tomazella_Munari_Morabito_2026_Formulations-1.pdf</p>
+<p>It uses gurobipy and supports P1 (classical) and P3 (optimal restocking). It
+reads the same generated JSON consumed by the Rust stochastic extension. A
+working Gurobi license is required. No extra failure penalty is added.</p>
+<h2 id="implemented-mathematical-components">Implemented mathematical components</h2>
+<ul>
+<li>Directed binary routing arcs, exact customer degrees and upper fleet count,
+corresponding to equations (2)-(4),(6). The depot has source and sink copies.</li>
+<li>Expected-capacity inequalities (5). Every integer candidate is decomposed
+into depot routes and disconnected cycles. Violated capacity/subtour rows
+are added with <code>cbLazy</code>; this separation is complete on integer candidates.
+Zero-demand cycles also receive a subtour inequality.</li>
+<li>Nonnegative route-recourse variables and route Theta cuts, equation (31),
+generated at integer candidates. Each route is anchored at its minimum
+customer ID. Route recourse is computed by a separate Python Bellman evaluator
+using equations (9) or (11). Returned incumbents are independently replayed.</li>
+<li>Fractional capacity cuts through <code>cbCut</code>. Up to 12 customers all subsets are
+checked. Larger cases use threshold components and pairs. This separator is
+<strong>not CVRPSEP</strong>, and may miss fractional cuts; integer separation still
+establishes the intended integer model to Gurobi's tolerances.</li>
+</ul>
+<p>The paper specializes BC-Theta to an undirected formulation for symmetric costs.
+This implementation retains directed arcs, including both orientations and their
+potentially distinct recourse costs. It has a different relaxation/model size;
+it is not a reproduction of the reported C++/Gurobi 11.0.3/CVRPSEP run times.
+Approaches 1-3 (full EECR MIP and EECR separation) are not implemented here.</p>
+<p>Rounded Euclidean costs can violate triangle inequalities. For such inputs, a
+safe nonnegative per-route shift <code>B = -n * min(0, min(c_i0+c_0j-c_ij))</code> (with a
+small numerical margin) makes route recourse charges nonnegative for Theta cuts;
+<code>B</code> is subtracted on every depot departure. This preserves the original
+objective. The shift is zero for metric matrices. <code>recourse_shift_per_route</code>
+records it; no metric closure silently changes either solver's costs.</p>
+<h2 id="running-a-baseline">Running a baseline</h2>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">.venv/bin/python<span class="w"> </span>scripts/benchmarks/stochastic_branch_cut.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>instances/stochastic/generated_salavati_style/synthetic-n20-m2-r01-fr0.90.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--policy<span class="w"> </span>p3<span class="w"> </span>--seconds<span class="w"> </span><span class="m">30</span><span class="w"> </span>--threads<span class="w"> </span><span class="m">1</span>
+</code></pre></div>
+<p>The output is JSON with status, incumbent, lower bound, gap, replayed objective,
+node/cut counts, Gurobi version and build/solve times. <code>--log</code> enables Gurobi
+console logging. The default clean JSON mode is used by the comparison runner.
+<code>--no-fractional-cuts</code> retains complete integer separation with a weaker search.
+Callback errors terminate the solve and are raised, never reported as optima.</p>
+<h2 id="paired-timing-runs">Paired timing runs</h2>
+<p>Build before timing. The full generated grid needs 63-entry NG memory:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,ng-memory-63<span class="w"> </span>--example<span class="w"> </span>stochastic_instance
+.venv/bin/python<span class="w"> </span>scripts/benchmarks/compare_stochastic.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>instances/stochastic/generated_salavati_style/synthetic-n20-m2-r01-fr0.90.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--baldes-bin<span class="w"> </span>target/release/examples/stochastic_instance<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>results/stochastic-comparison-new<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--policy<span class="w"> </span>p3<span class="w"> </span>--seconds<span class="w"> </span><span class="m">30</span><span class="w"> </span>--threads<span class="w"> </span><span class="m">1</span><span class="w"> </span>--repetitions<span class="w"> </span><span class="m">3</span>
+</code></pre></div>
+<p>The destination must be new/empty. Each solver runs as a separate process on
+identical input bytes. Run order alternates. Gurobi threads and Rayon/OMP/BLAS
+thread environment variables share the requested count. Reports contain input
+and binary/source hashes, solver versions, commands, build description, bounds,
+gaps, statuses and both <strong>process wall time</strong> and <strong>internal solve time</strong>.</p>
+<p>Gurobi's TimeLimit covers optimization after model construction; BALDES's limit
+also includes node master construction. Read build/process times alongside
+internal solve times. Neither algorithm receives an external warm start; BALDES
+internally seeds singleton columns and a greedy feasible route packing. BALDES's default runner work budget
+is 1,000,000 labels per pricing call (<code>--max-labels</code> changes it). Work limits and
+incomplete pricing remain visible and do not certify optimality. Completed
+pricing columns/statistics, incumbents and relaxation bounds are retained.
+Column generation defaults to NG prepricing with eight-customer memories;
+<code>--ng-size 0</code> on the runner disables this stage. Every emitted column is replayed
+with true stochastic recourse; cyclic walks are excluded from incumbents.
+The reverse Bellman-vector fallback can be compared with the original
+adapter using <code>stochastic_instance ... --bidirectional</code>.</p>
+<p>The runner marks comparable completed solves only if BOTH statuses are Optimal,
+and then checks objective agreement. An Error, timeout, work limit or absence
+of an incumbent is not a speedup. <code>results.json</code> retains full records;
+<code>summary.csv</code> is the flat timing table. Synthetic instances cannot be compared
+to original published best-known costs. Shared-host smoke timings are not a
+scalability study.</p>
+<h2 id="verification">Verification</h2>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">.venv/bin/python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>scripts/tests/test_stochastic_branch_cut.py<span class="w"> </span>-q
+</code></pre></div>
+<p>Tests compare against independent scenario-tree evaluation and exhaustive route
+partitions, including both policies, asymmetric costs, negative recourse from
+nonmetric distances, zero-demand subtours, fleet infeasibility and zero time.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="../guides/releases.html"><small>Previous guide</small>Python wheels and releases <span aria-hidden="true">↗</span></a><a href="../extensions/stochastic.html"><small>Next guide</small>Stochastic demands and replenishment recourse <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#implemented-mathematical-components">Implemented mathematical components</a><a class="toc-level-2" href="#running-a-baseline">Running a baseline</a><a class="toc-level-2" href="#paired-timing-runs">Paired timing runs</a><a class="toc-level-2" href="#verification">Verification</a></nav></aside>
+</div>
+</body></html>
