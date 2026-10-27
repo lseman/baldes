@@ -50,3 +50,30 @@ def test_invalid_resource_and_integer_domain_are_rejected():
         model().solve(synchronized_services=(service((9, 8)),))
     with pytest.raises(ValueError):
         model().solve(synchronized_services=(service((0.5, 8)),))
+
+
+@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
+@pytest.mark.parametrize("copies", [1, 2])
+def test_recovered_joint_controls_return_synchronized_profiles(bound_mode, copies):
+    import json
+    from pathlib import Path
+    data = json.loads((Path(__file__).resolve().parents[2] /
+        "tests/fixtures/coupled/joint-synchronized-model.json").read_text())
+    data["networks"][0]["multiplicity"] = [copies, copies]
+    problem = NetworkProblem.from_json(json.dumps(data))
+    synchronized = SynchronizedService(17, 0, copies + 1, 1., (0, 10),
+        (SynchronizedServiceMember(42, 1), SynchronizedServiceMember(7, 1)))
+    root = problem.solve(stabilize=False, bound_mode=bound_mode,
+                         synchronized_services=(synchronized,))
+    fresh = problem.solve(tree=True, stabilize=False, bound_mode=bound_mode,
+                          synchronized_services=(synchronized,))
+    resumed = root.snapshot.solve(tree=True, stabilize=False, bound_mode=bound_mode)
+    pinned = root.snapshot.with_synchronized_start(17, 8, 9).solve(
+        tree=True, stabilize=False, bound_mode=bound_mode)
+    for result, start in ((fresh, 5.), (resumed, 5.), (pinned, 8.)):
+        assert result.status == "Optimal"
+        assert result.incumbent == -10. * copies + 1.
+        assert all(route.resource_profile[1][0] == start for route in result.routes)
+        primary = next(route for route in result.routes if route.network == 42)
+        assert primary.value == copies
+        assert primary.coupled_values == ((0, 4. / copies), (1, 4. / copies))

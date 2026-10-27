@@ -1415,8 +1415,10 @@ minimum-front pricing is unchanged for models without paired rows. With source
 paired rows, automatic pricing supplies minimum, maximum and row-boundary
 control proposals and an independently bounded reduced cost. A bounded joint
 terminal LP also proposes controls satisfying several paired rows together.
-Registered source points can recover an integer witness from fractional
-control mixtures when physical-path counts are integral; exact whole-model
+Global recovery can couple physical paths and networks, preserving fixed and
+background routes and signed master-variable contributions. Registered or newly
+queried points, including integer copy blocks at neighboring dyadic Gamma
+values, can recover a witness when physical-path counts are integral; exact whole-model
 replay and column caps decide acceptance. These proposals do not prove coverage
 of varying controls. Enumeration of
 paired rows or negative objectives succeeds when each relevant terminal value

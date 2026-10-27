@@ -234,7 +234,6 @@ fn joint_controls<const D: usize>(
     quantity: f64,
     budget: (&mut usize, &mut usize),
 ) -> Option<Vec<PairedControl>> {
-    use crate::master::clp::{ClpMaster, ClpSolveOutcome};
     let (work, iterations) = budget;
     if !quantity.is_finite() || quantity < 1. || quantity.fract() != 0. {
         return None;
@@ -255,11 +254,7 @@ fn joint_controls<const D: usize>(
         };
         rows.entry(entry.row).or_insert_with(|| vec![0.; n])[i] += entry.coefficient;
     }
-    let mut master = ClpMaster::new().ok()?;
-    for domain in &priced.domains {
-        let column = master.add_column(0., &[]).ok()?;
-        master.set_upper(column, domain.hi - domain.lo).ok()?;
-    }
+    let mut constraints = vec![];
     for (row, coefficients) in rows {
         if coefficients.iter().all(|&a| a == 0.) {
             continue;
@@ -280,25 +275,18 @@ fn joint_controls<const D: usize>(
             .enumerate()
             .filter(|(_, a)| *a != 0.)
             .collect();
-        master
-            .add_row(state.shared_rows.get(row)?.sense, rhs, &coefficients)
-            .ok()?;
+        constraints.push((state.shared_rows.get(row)?.sense, rhs, coefficients));
     }
-    let before = master.simplex_iterations;
-    let solved = master
-        .solve_limited(
-            *iterations,
-            state.deadline.saturating_duration_since(Instant::now()),
-        )
-        .ok()?;
-    *iterations =
-        iterations.checked_sub(master.simplex_iterations.saturating_sub(before).max(1))?;
-    if solved != ClpSolveOutcome::Optimal {
-        return None;
-    }
+    let targets = solve_terminal_targets(
+        &priced.domains,
+        &constraints,
+        &vec![0.; n],
+        iterations,
+        state.deadline,
+    )?;
     let mut controls = vec![];
     for (i, &resource) in priced.resources.iter().enumerate() {
-        let target = priced.domains[i].lo + master.values[i];
+        let target = targets[i];
         let proposal = target_control(
             oracle,
             path,
@@ -312,6 +300,49 @@ fn joint_controls<const D: usize>(
     }
     Some(controls)
 }
+// Both route-local proposals and cross-path witness recovery use the same
+// shifted terminal-box LP. Its solution is a proposal, never a proof bound.
+type TerminalRow = (RowSense, f64, Vec<(usize, f64)>);
+fn solve_terminal_targets(
+    domains: &[Interval],
+    rows: &[TerminalRow],
+    costs: &[f64],
+    iterations: &mut usize,
+    deadline: Instant,
+) -> Option<Vec<f64>> {
+    use crate::master::clp::{ClpMaster, ClpSolveOutcome};
+    if *iterations == 0 || Instant::now() >= deadline {
+        return None;
+    }
+    let mut master = ClpMaster::new().ok()?;
+    for (domain, &cost) in domains.iter().zip(costs) {
+        let column = master.add_column(cost, &[]).ok()?;
+        master.set_upper(column, domain.hi - domain.lo).ok()?;
+    }
+    for (sense, rhs, entries) in rows {
+        master.add_row(*sense, *rhs, entries).ok()?;
+    }
+    let before = master.simplex_iterations;
+    let solved = master
+        .solve_limited(
+            *iterations,
+            deadline.saturating_duration_since(Instant::now()),
+        )
+        .ok()?;
+    *iterations =
+        iterations.checked_sub(master.simplex_iterations.saturating_sub(before).max(1))?;
+    if solved != ClpSolveOutcome::Optimal {
+        return None;
+    }
+    Some(
+        domains
+            .iter()
+            .zip(master.values())
+            .map(|(domain, v)| domain.lo + v)
+            .collect(),
+    )
+}
+
 fn sorted(mut controls: Vec<PairedControl>) -> Vec<PairedControl> {
     controls.sort_by_key(|c| c.resource);
     controls
@@ -332,13 +363,23 @@ pub(super) fn repair_witness<const D: usize>(
     let mut groups = BTreeMap::<(i32, Vec<i32>), (f64, bool, Vec<FixedRoute>)>::new();
     let mut masters: Vec<_> = state.master_variables.iter().map(|v| (v.id, 0.)).collect();
     for (column, &value) in master.values().iter().enumerate() {
+        let tag = metadata(column);
+        // Clp can leave tiny signed residuals on artificial/unmapped columns.
+        // They are only proposal data: exact source replay must still satisfy
+        // every original row without any artificial contribution.
+        if tag.is_none() || tag == Some(-1) {
+            if value.is_finite() && value.abs() <= tolerance {
+                continue;
+            }
+            return Ok(None);
+        }
         if !value.is_finite()
             || !(0. ..=9_007_199_254_740_992.).contains(&value)
             || value > master.upper[column]
         {
             return Ok(None);
         }
-        if let Some((index, sign)) = metadata(column).and_then(master_variables::decode) {
+        if let Some((index, sign)) = tag.and_then(master_variables::decode) {
             let Some(variable) = state.master_variables.get(index) else {
                 return Ok(None);
             };
@@ -356,7 +397,7 @@ pub(super) fn repair_witness<const D: usize>(
         if value <= tolerance {
             continue;
         }
-        let Some(route) = metadata(column)
+        let Some(route) = tag
             .and_then(|tag| usize::try_from(tag).ok())
             .and_then(|tag| state.routes.get(tag))
         else {
@@ -425,8 +466,13 @@ pub(super) fn repair_witness<const D: usize>(
                 .zip(&positions)
                 .map(|(choices, &i)| choices[i].clone()),
         );
-        if let Some(objective) = tree_adapter::validate_routes(state, &routes, &masters)? {
-            return Ok(Some((objective, routes, masters)));
+        if let Some(scheduled) = synchronization::witness(state, &routes)? {
+            if scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..]) {
+                if let Some(objective) = tree_adapter::validate_routes(state, &scheduled, &masters)?
+                {
+                    return Ok(Some((objective, scheduled, masters)));
+                }
+            }
         }
         let mut carry = true;
         for (i, choices) in positions.iter_mut().zip(&alternatives).rev() {
@@ -441,7 +487,390 @@ pub(super) fn repair_witness<const D: usize>(
             break;
         }
     }
-    Ok(None)
+    Ok(joint_witness_targets(
+        state,
+        &witness,
+        &alternatives,
+        &masters,
+    ))
+}
+
+// If registered points cannot realize the LP's integral physical path counts,
+// solve all shared Gamma rows together, retaining fixed and integral background
+// contributions. Each new terminal target still needs a source trajectory.
+fn joint_witness_targets<const D: usize>(
+    state: &State<D>,
+    background: &[FixedRoute],
+    alternatives: &[Vec<FixedRoute>],
+    masters: &[(i32, f64)],
+) -> Option<IntegerWitness> {
+    if state.universe.is_some() || Instant::now() >= state.deadline {
+        return None;
+    }
+    let mut work = 4_000_000;
+    let mut iterations = 100_000;
+    let mut routes = background.to_vec();
+    routes.extend(alternatives.iter().map(|choices| choices[0].clone()));
+    let mut rhs: Vec<_> = state.shared_rows.iter().map(|r| r.rhs).collect();
+    for (index, fixed) in routes.iter().enumerate() {
+        let oracle = state
+            .oracles
+            .iter()
+            .find(|o| o.network.id == fixed.route.network)?;
+        let terms = if index < background.len() {
+            entries(oracle, &fixed.route.route, state.shared_offset).ok()?
+        } else {
+            // Variable paired contributions belong to the target matrix, not
+            // to a rounded baseline which would then need cancellation.
+            entries_base(oracle, &fixed.route.route, state.shared_offset)
+                .ok()?
+                .into_iter()
+                .collect()
+        };
+        for (row, a) in terms {
+            if let Some(row) = row
+                .checked_sub(state.shared_offset)
+                .and_then(|r| rhs.get_mut(r))
+            {
+                *row -= a * fixed.quantity;
+            }
+        }
+    }
+    for variable in &state.master_variables {
+        let value = masters.iter().find(|(id, _)| *id == variable.id)?.1;
+        for &(row, a) in &variable.entries {
+            *rhs.get_mut(row)? -= a * value;
+        }
+    }
+    let mut domains = vec![];
+    let mut costs = vec![];
+    let mut variables = vec![];
+    let mut coefficients = vec![Vec::new(); rhs.len()];
+    for (index, fixed) in routes.iter().enumerate().skip(background.len()) {
+        let oracle = state
+            .oracles
+            .iter()
+            .find(|o| o.network.id == fixed.route.network)?;
+        let path: Vec<_> = fixed
+            .route
+            .route
+            .arcs
+            .iter()
+            .map(|id| oracle.index.get(id).copied())
+            .collect::<Option<_>>()?;
+        for resource in resources(oracle) {
+            let domain = domain(
+                oracle,
+                &path,
+                resource,
+                &mut work,
+                &mut iterations,
+                state.deadline,
+            )??;
+            let variable = domains.len();
+            let lower = domain.lower * fixed.quantity;
+            let upper = domain.upper * fixed.quantity;
+            if !lower.is_finite() || !upper.is_finite() {
+                return None;
+            }
+            for entry in oracle
+                .activity_rows
+                .iter()
+                .filter(|e| e.resource == resource)
+            {
+                let a = entry.coefficient;
+                coefficients.get_mut(entry.row)?.push((variable, a));
+                *rhs.get_mut(entry.row)? -= a * lower;
+            }
+            costs.push(
+                oracle
+                    .network
+                    .graph
+                    .coupled_kernel()?
+                    .effective_objective_coefficient(resource)?,
+            );
+            domains.push(Interval {
+                lo: lower,
+                hi: upper,
+            });
+            variables.push((index, resource, path.clone()));
+        }
+    }
+    if variables.is_empty() {
+        return None;
+    }
+    work = work.checked_sub(variables.len().checked_mul(rhs.len().checked_add(1)?)?)?;
+    let rows: Vec<_> = state
+        .shared_rows
+        .iter()
+        .zip(rhs)
+        .zip(coefficients)
+        .map(|((row, rhs), a)| (row.sense, rhs, a))
+        .collect();
+    let totals = solve_terminal_targets(&domains, &rows, &costs, &mut iterations, state.deadline)?;
+    let targets: Vec<_> = variables
+        .iter()
+        .zip(totals)
+        .map(|((index, _, _), total)| TerminalTarget {
+            average: total / routes[*index].quantity,
+            total,
+        })
+        .collect();
+    for split in [false, true] {
+        let Some(candidate) = realize_joint_targets(
+            state,
+            &routes,
+            background.len(),
+            &variables,
+            &targets,
+            split,
+            (&mut work, &mut iterations),
+        ) else {
+            continue;
+        };
+        let Some(scheduled) = synchronization::witness(state, &candidate).ok()? else {
+            continue;
+        };
+        if !scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..]) {
+            continue;
+        }
+        if let Some(objective) = tree_adapter::validate_routes(state, &scheduled, masters).ok()? {
+            return Some((objective, scheduled, masters.to_vec()));
+        }
+    }
+    None
+}
+
+type TerminalVariable = (usize, usize, Vec<usize>);
+#[derive(Clone, Copy)]
+struct TerminalTarget {
+    average: f64,
+    total: f64,
+}
+
+// A nonrepresentable average need not rule out an exact integer witness.
+// Try integer copy blocks at dyadic neighboring Gamma values, then replay
+// the complete source model; rounded aggregate targets never become proofs.
+fn realize_joint_targets<const D: usize>(
+    state: &State<D>,
+    routes: &[FixedRoute],
+    first: usize,
+    variables: &[TerminalVariable],
+    targets: &[TerminalTarget],
+    split: bool,
+    budget: (&mut usize, &mut usize),
+) -> Option<Vec<FixedRoute>> {
+    let (work, iterations) = budget;
+    let mut result = routes[..first].to_vec();
+    let mut divided = false;
+    for (index, fixed) in routes.iter().enumerate().skip(first) {
+        let oracle = state
+            .oracles
+            .iter()
+            .find(|o| o.network.id == fixed.route.network)?;
+        let q = fixed.quantity;
+        let mut breaks = vec![0., q];
+        let mut points = vec![];
+        for ((_, resource, path), &target) in variables
+            .iter()
+            .zip(targets)
+            .filter(|((i, _, _), _)| *i == index)
+        {
+            let (low, high, cut) = if split && q > 1. && target.average.fract() != 0. {
+                let points = dyadic_copy_controls(
+                    oracle,
+                    path,
+                    *resource,
+                    target,
+                    q,
+                    (work, iterations),
+                    state.deadline,
+                )?;
+                divided = true;
+                points
+            } else {
+                let control = target_control(
+                    oracle,
+                    path,
+                    *resource,
+                    target.average,
+                    work,
+                    iterations,
+                    state.deadline,
+                )?
+                .control?;
+                (control.clone(), control, q)
+            };
+            breaks.push(cut);
+            points.push((*resource, low, high, cut));
+        }
+        breaks.sort_by(f64::total_cmp);
+        breaks.dedup();
+        for segment in breaks.windows(2) {
+            if segment[0] == segment[1] {
+                continue;
+            }
+            let mut controls = fixed.route.route.coupled_controls.clone();
+            for (resource, low, high, cut) in &points {
+                controls.retain(|c| c.resource != *resource);
+                controls.push(if segment[0] >= *cut {
+                    high.clone()
+                } else {
+                    low.clone()
+                });
+            }
+            let mut route = fixed.route.clone();
+            route.route = route
+                .route
+                .with_paired_controls(&oracle.network.graph, sorted(controls))
+                .ok()?;
+            result.push(FixedRoute {
+                route,
+                quantity: segment[1] - segment[0],
+            });
+        }
+    }
+    (!split || divided).then_some(result)
+}
+
+// Search at most 53 binary grids, from the target's magnitude down to its
+// binary64 lattice. Counts are exact expansion identities for the proposed
+// aggregate; only source replay can establish the model's row feasibility.
+fn dyadic_copy_controls<const D: usize>(
+    oracle: &Oracle<D>,
+    path: &[usize],
+    resource: usize,
+    target: TerminalTarget,
+    copies: f64,
+    budget: (&mut usize, &mut usize),
+    deadline: Instant,
+) -> Option<(PairedControl, PairedControl, f64)> {
+    use crate::master::numerics::ExactSum;
+    let (work, iterations) = budget;
+    let total = target.total;
+    let target = target.average;
+    if !target.is_finite() || !total.is_finite() || copies <= 1. {
+        return None;
+    }
+    let exponent = (((target.abs().to_bits() >> 52) & 0x7ff) as i32 - 1023).max(-1022);
+    for precision in 0..=52 {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        let power = exponent - precision;
+        let step = if power >= -1022 {
+            f64::from_bits(((power + 1023) as u64) << 52)
+        } else {
+            f64::from_bits(1u64 << (power + 1074))
+        };
+        let lo = (target / step).floor() * step;
+        let hi = lo + step;
+        if !lo.is_finite() || !hi.is_finite() || lo == hi {
+            continue;
+        }
+        let mut residual = ExactSum::default();
+        if residual.add(total).is_none() || residual.product(-lo, copies).is_none() {
+            continue;
+        }
+        let high_count = residual.upper()? / step;
+        if !high_count.is_finite()
+            || high_count.fract() != 0.
+            || !(0. ..=copies).contains(&high_count)
+        {
+            continue;
+        }
+        if residual.product(-step, high_count).is_none() || residual.sign() != 0. {
+            continue;
+        }
+        let Some(low) = attained_control(
+            oracle,
+            path,
+            resource,
+            if high_count == copies { hi } else { lo },
+            work,
+            iterations,
+            deadline,
+        ) else {
+            continue;
+        };
+        let high = if high_count == 0. || high_count == copies {
+            low.clone()
+        } else {
+            let Some(high) =
+                attained_control(oracle, path, resource, hi, work, iterations, deadline)
+            else {
+                continue;
+            };
+            high
+        };
+        return Some((low, high, copies - high_count));
+    }
+    None
+}
+
+fn attained_control<const D: usize>(
+    oracle: &Oracle<D>,
+    path: &[usize],
+    resource: usize,
+    value: f64,
+    work: &mut usize,
+    iterations: &mut usize,
+    deadline: Instant,
+) -> Option<PairedControl> {
+    let control =
+        target_control(oracle, path, resource, value, work, iterations, deadline)?.control?;
+    let proof = oracle
+        .network
+        .graph
+        .coupled_kernel()?
+        .certify_paired_control(path, &control, work, Some(deadline))
+        .ok()??;
+    proof.certifies_value(value).then_some(control)
+}
+
+// Scheduling can change a scalar profile, hence the column identity. Check
+// caps and retained coverage on the actual variable copies being returned;
+// fixed copies already have their contribution removed from residual caps.
+fn scheduled_identities_allowed<const D: usize>(state: &State<D>, routes: &[FixedRoute]) -> bool {
+    use crate::master::numerics::ExactSum;
+    if state.universe.is_none() && state.route_upper_bounds.is_empty() {
+        return true;
+    }
+    let identities: Vec<_> = routes
+        .iter()
+        .map(|r| (r.route.network, r.route.route.identity(), r.quantity))
+        .collect();
+    if let Some(universe) = &state.universe {
+        if identities.iter().any(|(network, identity, _)| {
+            !universe.iter().any(|&tag| {
+                let candidate = &state.routes[tag];
+                candidate.network == *network && candidate.route.identity() == *identity
+            })
+        }) {
+            return false;
+        }
+    }
+    for (&tag, &cap) in &state.route_upper_bounds {
+        if cap == f64::INFINITY {
+            continue;
+        }
+        let candidate = &state.routes[tag];
+        let identity = candidate.route.identity();
+        let mut quantity = ExactSum::default();
+        for (network, selected, value) in &identities {
+            if *network == candidate.network
+                && *selected == identity
+                && quantity.add(*value).is_none()
+            {
+                return false;
+            }
+        }
+        if quantity.add(-cap).is_none() || quantity.sign() > 0.0 {
+            return false;
+        }
+    }
+    true
 }
 fn hull(a: Interval, b: f64) -> Option<Interval> {
     b.is_finite().then_some(Interval {

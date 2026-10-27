@@ -36,12 +36,15 @@ with a finite cost (negative costs require a source model). Reporting reads the 
 `OriginalColumn`; arc-only reporting rejects such bindings. Source-domain paired
 shared rows accept signed coefficients. Pricing bounds minimum/maximum terminal
 controls and retains row-boundary proposals through the common coordinator.
-For several paired resources, a bounded terminal LP also proposes joint row
-targets, and each target requires its own replayed source control. Integer
-witness recovery can replace a fractional mixture of controls on an integer
-physical-path count with registered source points. It validates the entire
+Bounded terminal LPs also propose joint row targets across resources, physical
+paths and networks, retaining fixed routes and signed master contributions.
+Each target requires its own replayed source control. Integer witness recovery
+can replace fractional control mixtures with registered or newly queried points
+and integer copy blocks. It validates the entire
 solution, including other networks, fixed routes, master variables and column
-caps. Proposal failure supplies no infeasibility proof or enumeration coverage.
+caps. With simultaneous service, recovery returns the jointly certified scalar
+schedule and checks the resulting column identities against caps and retained
+coverage. Proposal failure supplies no infeasibility proof or enumeration coverage.
 Source paired bindings also support verified variable envelopes and integer
 activity registration. Integer proofs must cover every control: a bounded
 integer recurrence or singleton integral terminal enclosures on every covered

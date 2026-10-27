@@ -1449,3 +1449,39 @@ def test_joint_paired_rows_recover_interior_integer_witnesses(bound_mode, shape,
         assert primary.value == copies
         assert primary.coupled_values == ((0, 4. / copies), (1, 4. / copies))
         assert len(primary.coupled_controls) == 2
+
+
+@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
+@pytest.mark.parametrize("cross_network", [False, True])
+@pytest.mark.parametrize("counts", [(1, 1), (2, 2), (2, 1), (3, 1), (3, 3)])
+def test_joint_control_recovery_couples_active_networks_and_physical_paths(bound_mode, cross_network, counts):
+    name = "cross-network-interior-model.json" if cross_network else "cross-path-interior-model.json"
+    data = json.loads((Path(__file__).resolve().parents[2] /
+        "tests/fixtures/coupled" / name).read_text())
+    if cross_network:
+        for network, count in zip(data["networks"], counts):
+            network["multiplicity"] = [count, count]
+    else:
+        data["networks"][0]["multiplicity"] = [sum(counts), sum(counts)]
+        for row, count in zip(data["rows"][:2], counts):
+            row["rhs"] = count
+    model = NetworkProblem.from_json(json.dumps(data))
+    root = model.solve(stabilize=False, bound_mode=bound_mode)
+    for tree in (model.solve(tree=True, stabilize=False, bound_mode=bound_mode),
+                 root.snapshot.solve(tree=True, stabilize=False, bound_mode=bound_mode)):
+        assert tree.status == "Optimal"
+        assert tree.incumbent == -10 * counts[0] + 2 * counts[1]
+        assert tree.bound <= tree.incumbent and tree.bound == pytest.approx(tree.incumbent)
+        quantities = [0., 0.]
+        gamma = [0., 0.]
+        for route in tree.routes:
+            second = route.network == 7 if cross_network else tuple(route.arcs) == (1,)
+            index = int(second)
+            assert route.value > 0 and route.value == int(route.value)
+            quantities[index] += route.value
+            values = dict(route.coupled_values)
+            gamma[index] += route.value * values[0 if cross_network else index]
+            if not cross_network:
+                assert values[1 - index] == 0.
+        assert quantities == list(counts)
+        assert gamma == [4., 4.]
