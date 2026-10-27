@@ -1290,6 +1290,59 @@ fn joint_witness_targets<const D: usize>(
             }
         }
     }
+    // Global cross-path/network faces can have vertices that are not exposed
+    // by any one terminal coordinate. Use the same bounded LP vertex sweep as
+    // route-local pricing, while reserving half of the remaining work for
+    // source realization and whole-witness validation.
+    let enumeration_budget = work / 2;
+    let mut enumeration_work = enumeration_budget;
+    let vertices = terminal_vertices(&domains, &rows, &mut enumeration_work, state.deadline);
+    work = work.checked_sub(enumeration_budget - enumeration_work)?;
+    for vertex in vertices {
+        if Instant::now() >= state.deadline || work == 0 {
+            break;
+        }
+        let totals: Vec<_> = domains
+            .iter()
+            .zip(vertex)
+            .map(|(domain, shift)| domain.lo + shift)
+            .collect();
+        if totals.iter().any(|total| !total.is_finite()) {
+            continue;
+        }
+        let targets: Vec<_> = variables
+            .iter()
+            .zip(totals)
+            .map(|((index, _, _), total)| TerminalTarget {
+                average: total / routes[*index].quantity,
+                total,
+            })
+            .collect();
+        for split in [false, true] {
+            let Some(candidate) = realize_joint_targets(
+                state,
+                &routes,
+                background.len(),
+                &variables,
+                &targets,
+                split,
+                (&mut work, &mut iterations),
+            ) else {
+                continue;
+            };
+            let Some(scheduled) = synchronization::witness(state, &candidate).ok()? else {
+                continue;
+            };
+            if !scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..]) {
+                continue;
+            }
+            if let Some(objective) =
+                tree_adapter::validate_routes(state, &scheduled, masters).ok()?
+            {
+                return Some((objective, scheduled, masters.to_vec()));
+            }
+        }
+    }
     None
 }
 
