@@ -379,7 +379,6 @@ impl Problem {
                 multiplicity: crate::Window::new(0., n as f64)?,
                 arc_entries,
                 route_entries: vec![],
-                activity_entries: vec![],
             }],
         })
     }
