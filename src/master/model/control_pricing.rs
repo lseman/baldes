@@ -2110,7 +2110,7 @@ struct PhysicalSuffixBounds {
     suffix: Vec<Vec<Option<f64>>>,
     arc_costs: Vec<f64>,
     route_constant: f64,
-    paired_lower: f64,
+    other_coupled_lower: f64,
 }
 
 fn row_simple_supported<const D: usize>(oracle: &Oracle<D>) -> bool {
@@ -2126,16 +2126,17 @@ fn row_simple_supported<const D: usize>(oracle: &Oracle<D>) -> bool {
         && oracle.solver.cuts.knapsack_cuts.is_empty()
 }
 
-fn paired_global_lower_bound<const D: usize>(
+fn coupled_lower_bounds<const D: usize>(
     oracle: &Oracle<D>,
     offset: usize,
     duals: &[f64],
     work: &mut usize,
     deadline: Instant,
-) -> Option<f64> {
+) -> Option<(f64, Vec<f64>)> {
     let graph = &oracle.network.graph;
     let kernel = graph.coupled_kernel()?;
     let mut lower = 0.;
+    let mut paired_arc_lower = vec![0.; graph.arcs.len()];
     for (resource, definition) in kernel.definitions().iter().enumerate() {
         let accumulated = match definition {
             CoupledResource::CumulativeCost {
@@ -2171,6 +2172,9 @@ fn paired_global_lower_bound<const D: usize>(
             | CoupledResource::PiecewiseLinearCost { functions, .. } => {
                 piecewise_charge_hull(functions, work, deadline)
             }
+            CoupledResource::EncodedPiecewiseLinearCost { functions, .. } => {
+                encoded_charge_hull(functions, work, deadline)
+            }
             CoupledResource::SlopeIntervalCost { functions, .. } => {
                 slope_charge_hull(functions, work, deadline)
             }
@@ -2185,14 +2189,23 @@ fn paired_global_lower_bound<const D: usize>(
             }
             continue;
         }
-        let (normalization, value_lower, value_upper, cost_mode) = match definition {
+        let (normalization, cost_mode) = match definition {
             CoupledResource::PairedPiecewiseLinear {
-                initial,
-                arcs,
                 mode,
                 normalization,
+                arcs,
                 ..
             } => {
+                if *mode == crate::graph::coupled::PairedResourceMode::CostUnbounded
+                    && arcs
+                        .first()
+                        .and_then(|arc| arc.upper.points.first())
+                        .is_some_and(|point| point[1] >= 1e12)
+                {
+                    // This descriptor uses 1e12 as infinity; the state may
+                    // grow beyond the stored upper function.
+                    return None;
+                }
                 if *mode == crate::graph::coupled::PairedResourceMode::Feasibility
                     && !oracle
                         .activity_rows
@@ -2201,52 +2214,33 @@ fn paired_global_lower_bound<const D: usize>(
                 {
                     continue;
                 }
-                let initial_lower = initial
-                    .points
-                    .iter()
-                    .map(|point| point[1])
-                    .fold(f64::INFINITY, f64::min);
-                let initial_upper = initial
-                    .points
-                    .iter()
-                    .map(|point| point[1])
-                    .fold(f64::NEG_INFINITY, f64::max);
-                let mut low = initial_lower;
-                let mut high = initial_upper;
-                for arc in arcs {
-                    low = low.min(
-                        arc.lower
-                            .points
-                            .iter()
-                            .map(|point| point[1])
-                            .fold(f64::INFINITY, f64::min),
-                    );
-                    high = high.max(
-                        arc.upper
-                            .points
-                            .iter()
-                            .map(|point| point[1])
-                            .fold(f64::NEG_INFINITY, f64::max),
-                    );
-                }
                 (
                     *normalization,
-                    low,
-                    high,
                     *mode != crate::graph::coupled::PairedResourceMode::Feasibility,
                 )
             }
             CoupledResource::SlopePaired { .. } => {
                 let CoupledResource::SlopePaired {
-                    initial,
-                    arcs,
                     mode,
                     normalization,
+                    arcs,
+                    policy,
                     ..
                 } = definition
                 else {
                     unreachable!()
                 };
+                if *mode == crate::graph::coupled::PairedResourceMode::CostUnbounded
+                    && *policy == crate::graph::coupled::FrontOperationPolicy::FrontAlgebra
+                    && arcs
+                        .first()
+                        .and_then(|arc| arc.upper.pairs().first())
+                        .is_some_and(|pair| pair.0 >= 1e12)
+                {
+                    // Match the raw-slope shift policy: this is an unbounded
+                    // resource, so its declared sentinel is not a cap.
+                    return None;
+                }
                 if *mode == crate::graph::coupled::PairedResourceMode::Feasibility
                     && !oracle
                         .activity_rows
@@ -2255,60 +2249,120 @@ fn paired_global_lower_bound<const D: usize>(
                 {
                     continue;
                 }
-                let mut hull = slope_function_hull(initial, work, deadline)?;
-                for arc in arcs {
-                    for function in [&arc.lower, &arc.upper] {
-                        let next = slope_function_hull(function, work, deadline)?;
-                        hull.lo = hull.lo.min(next.lo);
-                        hull.hi = hull.hi.max(next.hi);
-                    }
-                }
                 (
                     *normalization,
-                    hull.lo,
-                    hull.hi,
                     *mode != crate::graph::coupled::PairedResourceMode::Feasibility,
                 )
             }
             _ => continue,
-        };
-        if !value_lower.is_finite() || !value_upper.is_finite() || value_lower > value_upper {
-            return None;
-        }
-        let values = Interval {
-            lo: value_lower,
-            hi: value_upper,
         };
         let objective_coefficient = if cost_mode {
             kernel.effective_objective_coefficient(resource)?
         } else {
             0.
         };
-        if objective_coefficient != 0. {
-            let amount = match normalization {
-                crate::graph::coupled::PairedCostNormalization::AbsoluteFinalValue => values,
-                crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum => {
-                    let baseline = kernel.paired_initial_minimum(resource, work, Some(deadline))?;
-                    Interval {
-                        lo: crate::core::rounding::add_down(values.lo, -baseline[1])?,
-                        hi: crate::core::rounding::add_up(values.hi, -baseline[0])?,
-                    }
-                }
-            };
-            lower =
-                crate::core::rounding::add_down(lower, amount.scale(objective_coefficient)?.lo)?;
-        }
-        for entry in oracle
-            .activity_rows
-            .iter()
-            .filter(|entry| entry.resource == resource)
+        let baseline = if cost_mode
+            && normalization
+                == crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum
         {
-            let dual = *duals.get(offset.checked_add(entry.row)?)?;
-            let row_value = values.scale(entry.coefficient)?;
-            lower = crate::core::rounding::add_down(lower, row_value.scale(-dual)?.lo)?;
+            Some(kernel.paired_initial_minimum(resource, work, Some(deadline))?)
+        } else {
+            None
+        };
+        for (arc_index, paired_arc_lower) in paired_arc_lower.iter_mut().enumerate() {
+            let (lower_function, upper_function) = match definition {
+                CoupledResource::PairedPiecewiseLinear { arcs, .. } => {
+                    let arc = arcs.get(arc_index)?;
+                    (&arc.lower, &arc.upper)
+                }
+                CoupledResource::SlopePaired { arcs, .. } => {
+                    let arc = arcs.get(arc_index)?;
+                    let low = slope_function_hull(&arc.lower, work, deadline)?;
+                    let high = slope_function_hull(&arc.upper, work, deadline)?;
+                    let values = Interval {
+                        lo: low.lo,
+                        hi: high.hi,
+                    };
+                    add_paired_arc_contribution(
+                        oracle,
+                        offset,
+                        duals,
+                        resource,
+                        normalization,
+                        objective_coefficient,
+                        baseline,
+                        values,
+                        paired_arc_lower,
+                    )?;
+                    continue;
+                }
+                _ => continue,
+            };
+            let lower_hull = piecewise_value_hull(lower_function, work, deadline)?;
+            let upper_hull = piecewise_value_hull(upper_function, work, deadline)?;
+            let values = Interval {
+                lo: lower_hull.lo,
+                hi: upper_hull.hi,
+            };
+            if values.lo > values.hi {
+                return None;
+            }
+            add_paired_arc_contribution(
+                oracle,
+                offset,
+                duals,
+                resource,
+                normalization,
+                objective_coefficient,
+                baseline,
+                values,
+                paired_arc_lower,
+            )?;
         }
     }
-    Some(lower)
+    Some((lower, paired_arc_lower))
+}
+
+fn add_paired_arc_contribution<const D: usize>(
+    oracle: &Oracle<D>,
+    offset: usize,
+    duals: &[f64],
+    resource: usize,
+    normalization: crate::graph::coupled::PairedCostNormalization,
+    objective_coefficient: f64,
+    baseline: Option<[f64; 2]>,
+    values: Interval,
+    lower: &mut f64,
+) -> Option<()> {
+    if !values.lo.is_finite() || !values.hi.is_finite() || values.lo > values.hi {
+        return None;
+    }
+    let cost = if objective_coefficient == 0. {
+        0.
+    } else {
+        let amount = match normalization {
+            crate::graph::coupled::PairedCostNormalization::AbsoluteFinalValue => values,
+            crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum => {
+                let baseline = baseline?;
+                Interval {
+                    lo: crate::core::rounding::add_down(values.lo, -baseline[1])?,
+                    hi: crate::core::rounding::add_up(values.hi, -baseline[0])?,
+                }
+            }
+        };
+        amount.scale(objective_coefficient)?.lo
+    };
+    *lower = crate::core::rounding::add_down(*lower, cost)?;
+    for entry in oracle
+        .activity_rows
+        .iter()
+        .filter(|entry| entry.resource == resource)
+    {
+        let dual = *duals.get(offset.checked_add(entry.row)?)?;
+        let row_value = values.scale(entry.coefficient)?;
+        *lower = crate::core::rounding::add_down(*lower, row_value.scale(-dual)?.lo)?;
+    }
+    Some(())
 }
 
 /// Directed enclosure of every value on a prepared raw-slope function.
@@ -2367,6 +2421,37 @@ fn slope_charge_hull(
     }
 }
 
+/// Directed hull for encoded state costs. Knot functions clamp interpolation
+/// to their segment endpoints; slope functions retain their prepared
+/// sequential arithmetic, which `slope_function_hull` encloses outward.
+fn encoded_charge_hull(
+    functions: &[crate::graph::coupled::EncodedFunction],
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<Interval> {
+    let mut hull = Interval {
+        lo: f64::INFINITY,
+        hi: f64::NEG_INFINITY,
+    };
+    for function in functions {
+        let range = match function {
+            crate::graph::coupled::EncodedFunction::Knots { function } => {
+                piecewise_charge_hull(std::slice::from_ref(function), work, deadline)?
+            }
+            crate::graph::coupled::EncodedFunction::SlopeSegments { function, .. } => {
+                slope_function_hull(function, work, deadline)?
+            }
+        };
+        hull.lo = hull.lo.min(range.lo);
+        hull.hi = hull.hi.max(range.hi);
+    }
+    if functions.is_empty() {
+        Some(Interval::point(0.))
+    } else {
+        Some(hull)
+    }
+}
+
 /// Piecewise-linear source evaluation clamps interpolation to its segment's
 /// endpoint values, so the global knot hull encloses every rounded charge.
 fn piecewise_charge_hull(
@@ -2379,20 +2464,35 @@ fn piecewise_charge_hull(
         hi: f64::NEG_INFINITY,
     };
     for function in functions {
-        for point in &function.points {
-            *work = work.checked_sub(1)?;
-            if Instant::now() >= deadline || !point[1].is_finite() {
-                return None;
-            }
-            hull.lo = hull.lo.min(point[1]);
-            hull.hi = hull.hi.max(point[1]);
-        }
+        let values = piecewise_value_hull(function, work, deadline)?;
+        hull.lo = hull.lo.min(values.lo);
+        hull.hi = hull.hi.max(values.hi);
     }
     if functions.is_empty() {
         Some(Interval::point(0.))
     } else {
         Some(hull)
     }
+}
+
+fn piecewise_value_hull(
+    function: &crate::graph::coupled::PiecewiseLinearFunction,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<Interval> {
+    let mut hull = Interval {
+        lo: f64::INFINITY,
+        hi: f64::NEG_INFINITY,
+    };
+    for point in &function.points {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline || !point[1].is_finite() {
+            return None;
+        }
+        hull.lo = hull.lo.min(point[1]);
+        hull.hi = hull.hi.max(point[1]);
+    }
+    (hull.lo.is_finite() && hull.hi.is_finite()).then_some(hull)
 }
 
 /// Sum a global per-arc charge range over all path lengths up to `hops`.
@@ -2524,14 +2624,11 @@ fn physical_suffix_bounds<const D: usize>(
             !matches!(
                 definition,
                 CoupledResource::PairedPiecewiseLinear { .. } | CoupledResource::SlopePaired { .. }
-            ) && matches!(
-                definition,
-                CoupledResource::EncodedPiecewiseLinearCost { .. } | CoupledResource::Plugin(_)
-            )
+            ) && matches!(definition, CoupledResource::Plugin(_))
         })
     {
-        // This branch has no separate directed lower bound for non-paired
-        // resource charges. Do not omit them from a certificate.
+        // Plugin costs have no directed lower bound. Do not omit them from a
+        // certificate.
         return None;
     }
     if oracle.network.arc_entries.len() != graph.arcs.len() {
@@ -2562,7 +2659,7 @@ fn physical_suffix_bounds<const D: usize>(
             crate::core::rounding::multiply_down(-dual(offset.checked_add(row)?)?, coefficient)?,
         )?;
     }
-    let arc_costs = if let Some(original) = original_costs {
+    let mut arc_costs = if let Some(original) = original_costs {
         original_arc_cost_lower_bounds(oracle, original, offset, duals, work, deadline)?
     } else {
         let mut costs = Vec::with_capacity(graph.arcs.len());
@@ -2582,13 +2679,30 @@ fn physical_suffix_bounds<const D: usize>(
         }
         costs
     };
-    let paired_lower = paired_global_lower_bound(oracle, offset, duals, work, deadline)?;
-    let suffix = suffix_table(graph, &arc_costs, graph.original_max_arcs(), work, deadline)?;
+    let (other_coupled_lower, paired_arc_lower) =
+        coupled_lower_bounds(oracle, offset, duals, work, deadline)?;
+    let hops = graph.original_max_arcs();
+    // A paired objective or activity is charged once at the terminal state.
+    // Its directed per-arc envelope can therefore be attached to the final
+    // physical arc entering the sink. The ordinary suffix DP then keeps the
+    // terminal arc and physical path costs correlated without storing a
+    // separate resource-state table.
+    for (index, arc) in graph.arcs.iter().enumerate() {
+        if arc.head == graph.sink {
+            *work = work.checked_sub(1)?;
+            if Instant::now() >= deadline {
+                return None;
+            }
+            arc_costs[index] =
+                crate::core::rounding::add_down(arc_costs[index], paired_arc_lower[index])?;
+        }
+    }
+    let suffix = suffix_table(graph, &arc_costs, hops, work, deadline)?;
     Some(PhysicalSuffixBounds {
         suffix,
         arc_costs,
         route_constant,
-        paired_lower,
+        other_coupled_lower,
     })
 }
 
@@ -2861,9 +2975,10 @@ fn branch_and_bound_price<const D: usize>(
                     "paired cyclic pricing bound arithmetic failed",
                 )));
             };
-            let Some(constant) =
-                crate::core::rounding::add_down(physical.route_constant, physical.paired_lower)
-            else {
+            let Some(constant) = crate::core::rounding::add_down(
+                physical.route_constant,
+                physical.other_coupled_lower,
+            ) else {
                 return Some(Err(incomplete(
                     "paired cyclic pricing bound arithmetic failed",
                 )));
