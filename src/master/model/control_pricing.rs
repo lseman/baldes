@@ -233,7 +233,7 @@ fn joint_controls<const D: usize>(
     initial: &Route,
     quantity: f64,
     budget: (&mut usize, &mut usize),
-) -> Option<Vec<PairedControl>> {
+) -> Option<Vec<Vec<PairedControl>>> {
     let (work, iterations) = budget;
     if !quantity.is_finite() || quantity < 1. || quantity.fract() != 0. {
         return None;
@@ -277,28 +277,56 @@ fn joint_controls<const D: usize>(
             .collect();
         constraints.push((state.shared_rows.get(row)?.sense, rhs, coefficients));
     }
-    let targets = solve_terminal_targets(
-        &priced.domains,
-        &constraints,
-        &vec![0.; n],
-        iterations,
-        state.deadline,
-    )?;
-    let mut controls = vec![];
-    for (i, &resource) in priced.resources.iter().enumerate() {
-        let target = targets[i];
-        let proposal = target_control(
-            oracle,
-            path,
-            resource,
-            target,
-            work,
+    // A zero-cost feasible point can be an unattainable interior Gamma even
+    // when an endpoint of the same equality-constrained face is source-
+    // attainable. Sweep both coordinate directions (plus the original
+    // feasibility point) to expose those bounded transfer candidates.
+    let mut objectives = vec![vec![0.; n]];
+    for i in 0..n {
+        for cost in [-1., 1.] {
+            let mut objective = vec![0.; n];
+            objective[i] = cost;
+            objectives.push(objective);
+        }
+    }
+    let mut proposals = Vec::with_capacity(objectives.len());
+    for objective in objectives {
+        *work = work.checked_sub(n.checked_mul(oracle.activity_rows.len().checked_add(1)?)?)?;
+        let Some(targets) = solve_terminal_targets(
+            &priced.domains,
+            &constraints,
+            &objective,
             iterations,
             state.deadline,
-        )?;
-        controls.push(proposal.control?);
+        ) else {
+            continue;
+        };
+        let mut controls = Vec::with_capacity(n);
+        let mut attainable = true;
+        for (i, &resource) in priced.resources.iter().enumerate() {
+            let Some(proposal) = target_control(
+                oracle,
+                path,
+                resource,
+                targets[i],
+                work,
+                iterations,
+                state.deadline,
+            ) else {
+                attainable = false;
+                break;
+            };
+            let Some(control) = proposal.control else {
+                attainable = false;
+                break;
+            };
+            controls.push(control);
+        }
+        if attainable {
+            proposals.push(controls);
+        }
     }
-    Some(controls)
+    (!proposals.is_empty()).then_some(proposals)
 }
 // Both route-local proposals and cross-path witness recovery use the same
 // shifted terminal-box LP. Its solution is a proposal, never a proof bound.
@@ -1533,7 +1561,7 @@ pub(super) fn price<const D: usize>(
                 quantity,
                 (&mut work, &mut iterations),
             ) {
-                choices.push(controls);
+                choices.extend(controls);
             }
         }
         choices.extend([

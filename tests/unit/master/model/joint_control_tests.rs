@@ -128,7 +128,7 @@ fn joint_control_targets_share_work_iterations_and_deadlines() {
         (&mut work, &mut 0),
     )
     .is_none());
-    let controls = joint_controls(
+    let proposals = joint_controls(
         &state,
         oracle,
         &[0],
@@ -140,7 +140,7 @@ fn joint_control_targets_share_work_iterations_and_deadlines() {
     .unwrap();
     let route = initial
         .clone()
-        .with_paired_controls(&oracle.network.graph, sorted(controls))
+        .with_paired_controls(&oracle.network.graph, sorted(proposals[0].clone()))
         .unwrap();
     assert_eq!(route.coupled_values, vec![(0, 4.), (1, 4.)]);
     state.deadline = Instant::now();
@@ -154,6 +154,62 @@ fn joint_control_targets_share_work_iterations_and_deadlines() {
         (&mut work, &mut iterations),
     )
     .is_none());
+}
+
+#[test]
+fn joint_control_proposals_include_attainable_extremes_of_an_equality_face() {
+    let output = root();
+    let mut state = output.snapshot.state.fork_state();
+    let oracle = &state.oracles[0];
+    let mut work = 1_000_000;
+    let mut iterations = 100_000;
+    let priced = path(
+        oracle,
+        state.shared_offset,
+        &vec![0.; state.rhs.len()],
+        &[0],
+        &mut work,
+        &mut iterations,
+        state.deadline,
+    )
+    .unwrap()
+    .unwrap();
+    let initial = priced
+        .route
+        .as_ref()
+        .unwrap()
+        .clone()
+        .with_paired_controls(&oracle.network.graph, sorted(priced.greedy.clone()))
+        .unwrap();
+
+    // Gamma0 + Gamma1 = 8 leaves a line segment. The other row is made
+    // redundant so optimizing either coordinate exposes both face endpoints.
+    state.shared_rows[1].sense = RowSense::LessEqual;
+    state.shared_rows[1].rhs = 8.;
+    state.rhs[state.shared_offset + 1] = 8.;
+    let proposals = joint_controls(
+        &state,
+        oracle,
+        &[0],
+        &priced,
+        &initial,
+        1.,
+        (&mut work, &mut iterations),
+    )
+    .expect("bounded LP face should produce source-replayed proposals");
+    let values: Vec<_> = proposals
+        .into_iter()
+        .map(|controls| {
+            initial
+                .clone()
+                .with_paired_controls(&oracle.network.graph, sorted(controls))
+                .unwrap()
+                .coupled_values
+        })
+        .collect();
+
+    assert!(values.contains(&vec![(0, 0.), (1, 8.)]));
+    assert!(values.contains(&vec![(0, 8.), (1, 0.)]));
 }
 
 #[test]
