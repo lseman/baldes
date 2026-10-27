@@ -10,8 +10,9 @@ pub use cost::CostBoundedResourceRelaxation;
 #[derive(Clone, Copy, Debug)]
 pub struct PathDomainLimits {
     pub max_paths: usize,
-    /// Logical stored arc entries; profiles add one fixed-size state per arc
-    /// plus one per path. Allocator/graph-validation overhead is not included.
+    /// For collection, total retained arc entries; profiles add one fixed-size
+    /// state per arc plus one per path. For `visit`, the maximum path buffer.
+    /// Allocator/graph-validation overhead is not included.
     pub max_stored_arcs: usize,
     pub max_work: usize,
     /// Absolute shared deadline; None deliberately disables the time limit.
@@ -90,9 +91,13 @@ impl<const D: usize> RelaxedResourcePath<D> {
 pub struct CompleteResourceRelaxation<'g, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     data: CollectedPaths<'g, RelaxedResourcePath<D>, D>,
 }
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PathDomainStats {
+    pub paths: usize,
+    pub work_used: usize,
+}
 impl<'g, const D: usize> CompleteResourceRelaxation<'g, D> {
-    /// The same path/work/storage/deadline controls as canonical collection.
-    /// Unsupported kinds or arithmetic failure return no partial universe.
+    /// Collect every path in the same conservative finite relaxation.
     pub fn collect(
         graph: &'g Graph<D>,
         limits: PathDomainLimits,
@@ -112,12 +117,43 @@ impl<'g, const D: usize> CompleteResourceRelaxation<'g, D> {
             limits,
             false,
             extend_resource_lower_bounds,
-            |arcs, lower_resources| RelaxedResourcePath {
-                arcs,
-                lower_resources,
+            |arcs, lower_resources| {
+                Ok(Some(RelaxedResourcePath {
+                    arcs,
+                    lower_resources,
+                }))
             },
         )?;
         Ok(Self { data })
+    }
+    /// Retained arc storage is replaced by a per-path buffer bounded by
+    /// `max_stored_arcs`; path count, work, resource and deadline limits remain.
+    pub fn visit(
+        graph: &'g Graph<D>,
+        limits: PathDomainLimits,
+        mut visitor: impl FnMut(&[usize]) -> Result<(), PathDomainFailure>,
+    ) -> Result<PathDomainStats, PathDomainFailure> {
+        if graph
+            .resources
+            .iter()
+            .any(|r| *r != crate::graph::ResourceKind::Disposable)
+        {
+            return Err(PathDomainFailure::UnsupportedResources);
+        }
+        let data = collect_paths(
+            graph,
+            limits,
+            false,
+            extend_resource_lower_bounds,
+            |arcs, _| {
+                visitor(&arcs)?;
+                Ok(None::<RelaxedResourcePath<D>>)
+            },
+        )?;
+        Ok(PathDomainStats {
+            paths: data.path_count,
+            work_used: data.work_used,
+        })
     }
     pub fn graph(&self) -> &'g Graph<D> {
         self.data.graph
@@ -177,6 +213,7 @@ struct CollectedPaths<'g, P, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIO
     paths: Vec<P>,
     work_used: usize,
     stored_arcs: usize,
+    path_count: usize,
 }
 struct Budget<C> {
     remaining: usize,
@@ -223,7 +260,10 @@ fn collect_paths<'g, P, const D: usize>(
         &crate::graph::Arc<D>,
         crate::graph::ResourceValues<D>,
     ) -> Result<Option<crate::graph::ResourceValues<D>>, PathDomainFailure>,
-    make_path: impl FnMut(Vec<usize>, Vec<crate::graph::ResourceValues<D>>) -> P,
+    make_path: impl FnMut(
+        Vec<usize>,
+        Vec<crate::graph::ResourceValues<D>>,
+    ) -> Result<Option<P>, PathDomainFailure>,
 ) -> Result<CollectedPaths<'g, P, D>, PathDomainFailure> {
     // These collectors certify a scalar relaxation with additive costs. Until
     // coupled interval costs are carried by that relaxation, report unsupported.
@@ -249,7 +289,10 @@ fn collect_paths_with_clock<'g, P, const D: usize>(
         &crate::graph::Arc<D>,
         crate::graph::ResourceValues<D>,
     ) -> Result<Option<crate::graph::ResourceValues<D>>, PathDomainFailure>,
-    make_path: impl FnMut(Vec<usize>, Vec<crate::graph::ResourceValues<D>>) -> P,
+    make_path: impl FnMut(
+        Vec<usize>,
+        Vec<crate::graph::ResourceValues<D>>,
+    ) -> Result<Option<P>, PathDomainFailure>,
     clock: impl FnMut() -> Instant,
 ) -> Result<CollectedPaths<'g, P, D>, PathDomainFailure> {
     collect_paths_with_clock_and_cost(
@@ -272,7 +315,10 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
         &crate::graph::Arc<D>,
         crate::graph::ResourceValues<D>,
     ) -> Result<Option<crate::graph::ResourceValues<D>>, PathDomainFailure>,
-    mut make_path: impl FnMut(Vec<usize>, Vec<crate::graph::ResourceValues<D>>) -> P,
+    mut make_path: impl FnMut(
+        Vec<usize>,
+        Vec<crate::graph::ResourceValues<D>>,
+    ) -> Result<Option<P>, PathDomainFailure>,
     clock: impl FnMut() -> Instant,
     cost_bounds: Option<(&[f64], f64)>,
 ) -> Result<CollectedPaths<'g, P, D>, PathDomainFailure> {
@@ -301,6 +347,7 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
         paths: vec![],
         work_used: 0,
         stored_arcs: 0,
+        path_count: 0,
     };
     let mut initial = crate::graph::ResourceValues::filled(graph.resources.len(), 0.);
     for (r, value) in initial.iter_mut().enumerate().take(graph.resources.len()) {
@@ -438,15 +485,15 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
             }
         }
         if arc.head == graph.sink {
-            if result.paths.len() == limits.max_paths {
+            if result.path_count == limits.max_paths {
                 return Err(PathDomainFailure::PathLimit);
             }
+            result.path_count = result
+                .path_count
+                .checked_add(1)
+                .ok_or(PathDomainFailure::PathLimit)?;
             let length = prefix.len() + 1;
-            let stored = result
-                .stored_arcs
-                .checked_add(length)
-                .ok_or(PathDomainFailure::StoredArcLimit)?;
-            if stored > limits.max_stored_arcs {
+            if length > limits.max_stored_arcs {
                 return Err(PathDomainFailure::StoredArcLimit);
             }
             budget.spend(
@@ -462,13 +509,24 @@ fn collect_paths_with_clock_and_cost<'g, P, const D: usize>(
             reserve(&mut profile, stack.len() + 1)?;
             profile.extend(stack.iter().map(|frame| frame.resources));
             profile.push(resources);
-            if result.paths.len() == result.paths.capacity() {
-                let additional =
-                    (limits.max_paths - result.paths.len()).min(result.paths.len().max(16));
-                reserve(&mut result.paths, additional)?;
+            if let Some(path) = make_path(arcs, profile)? {
+                let stored = result
+                    .stored_arcs
+                    .checked_add(length)
+                    .ok_or(PathDomainFailure::StoredArcLimit)?;
+                if stored > limits.max_stored_arcs {
+                    return Err(PathDomainFailure::StoredArcLimit);
+                }
+                if result.paths.len() == result.paths.capacity() {
+                    let additional =
+                        (limits.max_paths - result.paths.len()).min(result.paths.len().max(16));
+                    reserve(&mut result.paths, additional)?;
+                }
+                result.paths.push(path);
+                result.stored_arcs = stored;
+            } else if length > limits.max_stored_arcs {
+                return Err(PathDomainFailure::StoredArcLimit);
             }
-            result.paths.push(make_path(arcs, profile));
-            result.stored_arcs = stored;
             while element_path.len() > elementarity_len {
                 used_elements[element_path.pop().unwrap()] = false;
             }
@@ -506,7 +564,7 @@ impl<'g, const D: usize> CompleteCanonicalPaths<'g, D> {
             limits,
             true,
             |g, arc, q| Ok(extend_resources(g, arc, &q, true)),
-            |arcs, resources| CanonicalPath { arcs, resources },
+            |arcs, resources| Ok(Some(CanonicalPath { arcs, resources })),
         )?;
         Ok(Self { data })
     }

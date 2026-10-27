@@ -21,7 +21,8 @@ mod storage;
 pub use controls::Controls;
 pub use domain::{
     CanonicalPath, CompleteCanonicalPaths, CompleteResourceRelaxation,
-    CostBoundedResourceRelaxation, PathDomainFailure, PathDomainLimits, RelaxedResourcePath,
+    CostBoundedResourceRelaxation, PathDomainFailure, PathDomainLimits, PathDomainStats,
+    RelaxedResourcePath,
 };
 pub use engine::Enumeration;
 pub use frontier::PruningFrontier;

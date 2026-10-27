@@ -8,7 +8,7 @@ use crate::master::controls::{
     query, terminal_domain, ControlOptimization, ControlSearchLimits, TerminalDomain,
 };
 use crate::master::LpMaster;
-use bounds::columns::{components, physical_paths, SourceColumn};
+use bounds::columns::{components, SourceColumn};
 
 pub(super) fn needed<const D: usize>(oracle: &Oracle<D>) -> bool {
     oracle
@@ -1503,22 +1503,18 @@ pub(super) fn minimum<const D: usize>(
     work: &mut usize,
     deadline: Instant,
 ) -> Option<Option<f64>> {
-    let paths = physical_paths(oracle, work, deadline)?;
     let mut iterations = 100_000;
     let mut lower: Option<f64> = None;
-    for arcs in paths {
-        if let Some(result) = path(
-            oracle,
-            offset,
-            duals,
-            &arcs,
-            work,
-            &mut iterations,
-            deadline,
-        )? {
+    bounds::columns::visit_physical_paths(oracle, work, deadline, |arcs, work| {
+        let Some(result) = path(oracle, offset, duals, arcs, work, &mut iterations, deadline)
+        else {
+            return Err(crate::enumeration::PathDomainFailure::Arithmetic);
+        };
+        if let Some(result) = result {
             lower = Some(lower.map_or(result.lower, |old| old.min(result.lower)));
         }
-    }
+        Ok(())
+    })?;
     (Instant::now() < deadline).then_some(lower)
 }
 
@@ -1552,122 +1548,141 @@ pub(super) fn price<const D: usize>(
     let oracle = &state.oracles[index];
     let mut work = 4_000_000;
     let mut iterations = 100_000;
-    let paths = physical_paths(oracle, &mut work, state.deadline)
-        .ok_or_else(|| incomplete("paired source-control pricing path coverage incomplete"))?;
     let mut minimum = f64::INFINITY;
     let mut routes = vec![];
     let mut seen = HashSet::new();
-    for arcs in paths {
-        let result = path(
-            oracle,
-            state.shared_offset,
-            duals,
-            &arcs,
-            &mut work,
-            &mut iterations,
-            state.deadline,
-        )
-        .ok_or_else(|| incomplete("paired source-control pricing control coverage incomplete"))?;
-        let Some(result) = result else {
-            continue;
-        };
-        minimum = minimum.min(result.lower);
-        let Some(ref route) = result.route else {
-            continue;
-        };
-        // Row boundary proposals enrich the restricted master. They are never
-        // used to assert exhaustive control coverage or source infeasibility.
-        let initial = route
-            .clone()
-            .with_paired_controls(&oracle.network.graph, sorted(result.greedy.clone()))?;
-        let coefficients: BTreeMap<_, _> = entries(oracle, &initial, state.shared_offset)?
-            .into_iter()
-            .collect();
-        let mut quantities = vec![1.];
-        for count in [
-            oracle.network.multiplicity.lower.ceil(),
-            oracle.multiplicity_upper().floor(),
-        ] {
-            if count.is_finite() && (1. ..=9_007_199_254_740_992.).contains(&count) {
-                quantities.push(count);
-            }
-        }
-        quantities.sort_by(f64::total_cmp);
-        quantities.dedup();
-        let mut choices = vec![];
-        for quantity in quantities {
-            if let Some(controls) = joint_controls(
-                state,
-                oracle,
-                &arcs,
-                &result,
-                &initial,
-                quantity,
-                (&mut work, &mut iterations),
-            ) {
-                choices.extend(controls);
-            }
-        }
-        choices.extend([
-            result.minimum.clone(),
-            result.maximum.clone(),
-            result.greedy.clone(),
-        ]);
-        for (i, &resource) in result.resources.iter().enumerate() {
-            for c in oracle
-                .activity_rows
-                .iter()
-                .filter(|c| c.resource == resource && c.coefficient != 0.)
-            {
-                let r = state.shared_offset + c.row;
-                let coefficient: f64 = oracle
-                    .activity_rows
-                    .iter()
-                    .filter(|other| other.resource == resource && other.row == c.row)
-                    .map(|other| other.coefficient)
-                    .sum();
-                let value = initial
-                    .coupled_values
-                    .iter()
-                    .find(|(r, _)| *r == resource)
-                    .map(|(_, v)| *v)
-                    .unwrap_or(0.);
-                let target = value
-                    + (state.rhs[r] - coefficients.get(&r).copied().unwrap_or(0.)) / coefficient;
-                if !target.is_finite()
-                    || target < result.domains[i].lo
-                    || target > result.domains[i].hi
-                {
-                    continue;
-                }
-                if let Some(proposal) = target_control(
+    let mut visitor_error = None;
+    let visited =
+        bounds::columns::visit_physical_paths(oracle, &mut work, state.deadline, |arcs, work| {
+            let result: Result<()> = (|| {
+                let result = path(
                     oracle,
+                    state.shared_offset,
+                    duals,
                     &arcs,
-                    resource,
-                    target,
-                    &mut work,
+                    work,
                     &mut iterations,
                     state.deadline,
-                ) {
-                    if let Some(control) = proposal.control {
-                        let mut selection = result.greedy.clone();
-                        selection[i] = control;
-                        choices.push(selection);
+                )
+                .ok_or_else(|| {
+                    incomplete("paired source-control pricing control coverage incomplete")
+                })?;
+                let Some(result) = result else {
+                    return Ok(());
+                };
+                minimum = minimum.min(result.lower);
+                let Some(ref route) = result.route else {
+                    return Ok(());
+                };
+                // Row boundary proposals enrich the restricted master. They are never
+                // used to assert exhaustive control coverage or source infeasibility.
+                let initial = route
+                    .clone()
+                    .with_paired_controls(&oracle.network.graph, sorted(result.greedy.clone()))?;
+                let coefficients: BTreeMap<_, _> = entries(oracle, &initial, state.shared_offset)?
+                    .into_iter()
+                    .collect();
+                let mut quantities = vec![1.];
+                for count in [
+                    oracle.network.multiplicity.lower.ceil(),
+                    oracle.multiplicity_upper().floor(),
+                ] {
+                    if count.is_finite() && (1. ..=9_007_199_254_740_992.).contains(&count) {
+                        quantities.push(count);
                     }
                 }
+                quantities.sort_by(f64::total_cmp);
+                quantities.dedup();
+                let mut choices = vec![];
+                for quantity in quantities {
+                    if let Some(controls) = joint_controls(
+                        state,
+                        oracle,
+                        &arcs,
+                        &result,
+                        &initial,
+                        quantity,
+                        (work, &mut iterations),
+                    ) {
+                        choices.extend(controls);
+                    }
+                }
+                choices.extend([
+                    result.minimum.clone(),
+                    result.maximum.clone(),
+                    result.greedy.clone(),
+                ]);
+                for (i, &resource) in result.resources.iter().enumerate() {
+                    for c in oracle
+                        .activity_rows
+                        .iter()
+                        .filter(|c| c.resource == resource && c.coefficient != 0.)
+                    {
+                        let r = state.shared_offset + c.row;
+                        let coefficient: f64 = oracle
+                            .activity_rows
+                            .iter()
+                            .filter(|other| other.resource == resource && other.row == c.row)
+                            .map(|other| other.coefficient)
+                            .sum();
+                        let value = initial
+                            .coupled_values
+                            .iter()
+                            .find(|(r, _)| *r == resource)
+                            .map(|(_, v)| *v)
+                            .unwrap_or(0.);
+                        let target = value
+                            + (state.rhs[r] - coefficients.get(&r).copied().unwrap_or(0.))
+                                / coefficient;
+                        if !target.is_finite()
+                            || target < result.domains[i].lo
+                            || target > result.domains[i].hi
+                        {
+                            continue;
+                        }
+                        if let Some(proposal) = target_control(
+                            oracle,
+                            &arcs,
+                            resource,
+                            target,
+                            work,
+                            &mut iterations,
+                            state.deadline,
+                        ) {
+                            if let Some(control) = proposal.control {
+                                let mut selection = result.greedy.clone();
+                                selection[i] = control;
+                                choices.push(selection);
+                            }
+                        }
+                    }
+                }
+                for controls in choices {
+                    let candidate = route
+                        .clone()
+                        .with_paired_controls(&oracle.network.graph, sorted(controls))?;
+                    if lifecycle::integer_route_feasible(oracle, &candidate)?
+                        && seen.insert(candidate.identity())
+                    {
+                        routes.push(candidate);
+                    }
+                }
+                Ok(())
+            })();
+            match result {
+                Ok(()) => Ok(()),
+                Err(error) => {
+                    visitor_error = Some(error);
+                    Err(crate::enumeration::PathDomainFailure::Arithmetic)
+                }
             }
-        }
-        for controls in choices {
-            let candidate = route
-                .clone()
-                .with_paired_controls(&oracle.network.graph, sorted(controls))?;
-            if lifecycle::integer_route_feasible(oracle, &candidate)?
-                && seen.insert(candidate.identity())
-            {
-                routes.push(candidate);
-            }
-        }
+        });
+    if let Some(error) = visitor_error {
+        return Err(error);
     }
+    visited.ok_or_else(|| {
+        incomplete("paired source-control pricing path/control coverage incomplete")
+    })?;
     Ok((
         routes,
         if minimum == f64::INFINITY {

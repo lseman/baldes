@@ -367,6 +367,23 @@ fn source_path_preparation_uses_the_callers_budget_beyond_fixed_path_and_scan_ca
     assert_eq!(paths.first().unwrap(), &[0, count + 100]);
     assert_eq!(paths.last().unwrap(), &[count - 1, count + 100]);
     assert!(work < 4_000_000 - 250_000 && work > 2_000_000);
+
+    let mut streamed_work = 4_000_000;
+    let mut streamed = Vec::new();
+    let streamed_count = super::columns::visit_physical_paths(
+        oracle,
+        &mut streamed_work,
+        Instant::now() + std::time::Duration::from_secs(2),
+        |path, _| {
+            streamed.push(path.to_vec());
+            Ok(())
+        },
+    )
+    .unwrap();
+    assert_eq!(streamed_count, count);
+    assert_eq!(streamed, paths);
+    assert!(streamed_work < 4_000_000 - 250_000 && streamed_work > 2_000_000);
+
     assert!(super::columns::physical_paths(
         oracle,
         &mut 8,

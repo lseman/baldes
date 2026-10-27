@@ -94,6 +94,49 @@ fn limits_reject_partial_results_and_accept_exact_boundaries() {
         );
     }
 }
+
+#[test]
+fn streaming_visits_match_collection_and_enforce_the_path_buffer_limit() {
+    let mut graph = Graph::<1>::new(5, 1).unwrap();
+    graph.add_arc(0, 1, 0.).unwrap();
+    graph.add_arc(1, 4, 0.).unwrap();
+    graph.add_arc(0, 2, 0.).unwrap();
+    graph.add_arc(2, 3, 0.).unwrap();
+    graph.add_arc(3, 4, 0.).unwrap();
+    let collected = CompleteResourceRelaxation::collect(&graph, limits()).unwrap();
+    let mut visited = Vec::new();
+    let stats = CompleteResourceRelaxation::visit(&graph, limits(), |path| {
+        visited.push(path.to_vec());
+        Ok(())
+    })
+    .unwrap();
+
+    let collected_paths: Vec<_> = collected
+        .paths()
+        .iter()
+        .map(|path| path.arc_positions().to_vec())
+        .collect();
+    assert_eq!(visited, collected_paths);
+    assert_eq!(stats.paths, collected.paths().len());
+    assert_eq!(stats.work_used, collected.work_used());
+
+    let mut partial = Vec::new();
+    let error = CompleteResourceRelaxation::visit(
+        &graph,
+        PathDomainLimits {
+            max_stored_arcs: 2,
+            ..limits()
+        },
+        |path| {
+            partial.push(path.to_vec());
+            Ok(())
+        },
+    )
+    .unwrap_err();
+    assert_eq!(error, PathDomainFailure::StoredArcLimit);
+    assert_eq!(partial, [vec![0, 1]]);
+}
+
 #[test]
 fn empty_domain_and_impossible_initial_state_are_complete() {
     let graph = Graph::<2>::new(2, 0).unwrap();
@@ -303,7 +346,7 @@ fn deadline_after_a_materialized_path_discards_the_partial_collection() {
         },
         |arcs, _| {
             created.set(created.get() + 1);
-            arcs
+            Ok(Some(arcs))
         },
         || {
             if created.get() == 0 {

@@ -37,9 +37,11 @@ impl<'g, const D: usize> CostBoundedResourceRelaxation<'g, D> {
             limits,
             false,
             extend_resource_lower_bounds,
-            |arcs, lower_resources| RelaxedResourcePath {
-                arcs,
-                lower_resources,
+            |arcs, lower_resources| {
+                Ok(Some(RelaxedResourcePath {
+                    arcs,
+                    lower_resources,
+                }))
             },
             Instant::now,
             Some((arc_cost_lower_bounds, ceiling)),

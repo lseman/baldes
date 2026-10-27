@@ -10,6 +10,7 @@ fn push(rows: &mut BTreeMap<usize, Interval>, row: usize, value: Interval) -> Op
     Some(())
 }
 
+#[cfg(test)]
 pub(in crate::master::model) fn physical_paths<const D: usize>(
     oracle: &Oracle<D>,
     work: &mut usize,
@@ -65,6 +66,67 @@ pub(in crate::master::model) fn physical_paths<const D: usize>(
     )
 }
 
+/// Stream complete conservative paths under the same shared caller budget.
+/// The visitor sees each path only for the duration of the callback.
+pub(in crate::master::model) fn visit_physical_paths<const D: usize>(
+    oracle: &Oracle<D>,
+    work: &mut usize,
+    deadline: Instant,
+    mut visitor: impl FnMut(
+        &[usize],
+        &mut usize,
+    ) -> std::result::Result<(), crate::enumeration::PathDomainFailure>,
+) -> Option<usize> {
+    let domain = super::super::resource_groups::residual_domain_graph(oracle).ok()?;
+    let mut relaxed = domain.as_ref().clone();
+    relaxed
+        .resources
+        .fill(crate::graph::ResourceKind::Disposable);
+    relaxed.arcs.retain(|arc| {
+        !oracle
+            .proved_zero_arcs
+            .get(oracle.index[&arc.id])
+            .copied()
+            .unwrap_or(false)
+    });
+    relaxed.set_coupled_resources(&[]).ok()?;
+    let allowance = *work / 2;
+    let mut visitor_work = work.checked_sub(allowance)?;
+    let stats = match CompleteResourceRelaxation::visit(
+        &relaxed,
+        PathDomainLimits {
+            max_paths: allowance,
+            max_work: allowance,
+            max_stored_arcs: allowance,
+            deadline: Some(deadline),
+        },
+        |path| {
+            let Some(mapped) = path
+                .iter()
+                .map(|&position| {
+                    relaxed
+                        .arcs
+                        .get(position)
+                        .and_then(|arc| oracle.index.get(&arc.id))
+                        .copied()
+                })
+                .collect::<Option<Vec<_>>>()
+            else {
+                return Err(crate::enumeration::PathDomainFailure::InvalidGraph);
+            };
+            visitor(&mapped, &mut visitor_work)
+        },
+    ) {
+        Ok(stats) => stats,
+        Err(_) => {
+            *work = visitor_work;
+            return None;
+        }
+    };
+    *work = visitor_work.checked_add(allowance.checked_sub(stats.work_used)?)?;
+    Some(stats.paths)
+}
+
 pub(super) fn minimum<const D: usize>(
     oracle: &Oracle<D>,
     offset: usize,
@@ -75,13 +137,16 @@ pub(super) fn minimum<const D: usize>(
     if super::super::control_pricing::needed(oracle) {
         return super::super::control_pricing::minimum(oracle, offset, duals, work, deadline);
     }
-    let paths = physical_paths(oracle, work, deadline)?;
     let mut minimum: Option<f64> = None;
-    for positions in paths {
-        if let Some(lower) = column(oracle, offset, duals, &positions, work, deadline)? {
+    visit_physical_paths(oracle, work, deadline, |positions, work| {
+        let Some(bound) = column(oracle, offset, duals, positions, work, deadline) else {
+            return Err(crate::enumeration::PathDomainFailure::Arithmetic);
+        };
+        if let Some(lower) = bound {
             minimum = Some(minimum.map_or(lower, |old| old.min(lower)));
         }
-    }
+        Ok(())
+    })?;
     (Instant::now() < deadline).then_some(minimum)
 }
 
@@ -102,34 +167,50 @@ pub(super) fn cutoff_minimum<const D: usize>(
     if weights.len() != oracle.network.graph.arcs.len() {
         return None;
     }
-    let paths = physical_paths(oracle, work, deadline)?;
     let mut minimum: Option<CutoffMinimum> = None;
     let mut iterations = 100_000;
-    for path in paths {
+    visit_physical_paths(oracle, work, deadline, |path, work| {
         let bound = if super::super::control_pricing::needed(oracle) {
             super::super::control_pricing::column_bound_using(
                 oracle,
                 offset,
                 duals,
-                &path,
+                path,
                 work,
                 &mut iterations,
                 deadline,
-            )?
+            )
         } else {
-            column(oracle, offset, duals, &path, work, deadline)?
+            column(oracle, offset, duals, path, work, deadline)
+        };
+        let Some(bound) = bound else {
+            return Err(crate::enumeration::PathDomainFailure::Arithmetic);
         };
         let Some(reduced) = bound else {
-            continue;
+            return Ok(());
         };
-        *work = work.checked_sub(path.len().checked_add(1)?)?;
+        *work = work
+            .checked_sub(
+                path.len()
+                    .checked_add(1)
+                    .ok_or(crate::enumeration::PathDomainFailure::WorkLimit)?,
+            )
+            .ok_or(crate::enumeration::PathDomainFailure::WorkLimit)?;
         let mut sum = 0.;
-        for &arc in &path {
-            sum = crate::core::rounding::add_up(sum, *weights.get(arc)?)?;
+        for &arc in path {
+            let Some(weight) = weights.get(arc) else {
+                return Err(crate::enumeration::PathDomainFailure::InvalidGraph);
+            };
+            let Some(next) = crate::core::rounding::add_up(sum, *weight) else {
+                return Err(crate::enumeration::PathDomainFailure::Arithmetic);
+            };
+            sum = next;
         }
-        let remainder = crate::core::rounding::add_down(reduced, -sum)?;
+        let Some(remainder) = crate::core::rounding::add_down(reduced, -sum) else {
+            return Err(crate::enumeration::PathDomainFailure::Arithmetic);
+        };
         if !reduced.is_finite() || !remainder.is_finite() {
-            return None;
+            return Err(crate::enumeration::PathDomainFailure::Arithmetic);
         }
         match &mut minimum {
             Some(old) => {
@@ -138,7 +219,8 @@ pub(super) fn cutoff_minimum<const D: usize>(
             }
             None => minimum = Some(CutoffMinimum { reduced, remainder }),
         }
-    }
+        Ok(())
+    })?;
     (Instant::now() < deadline).then_some(minimum)
 }
 
