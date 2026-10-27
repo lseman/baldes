@@ -230,35 +230,42 @@ fn integer_program_range<const D: usize>(graph: &Graph<D>, resource: usize) -> O
     })
 }
 
-fn relaxed_activity_paths<const D: usize>(
+fn visit_relaxed_activity_paths<const D: usize>(
     graph: &Graph<D>,
     work: &mut usize,
     deadline: Instant,
-) -> Option<Vec<Vec<usize>>> {
+    mut visitor: impl FnMut(
+        &[usize],
+        &mut usize,
+    ) -> std::result::Result<(), crate::enumeration::PathDomainFailure>,
+) -> Option<()> {
     use crate::enumeration::{CompleteResourceRelaxation, PathDomainLimits};
     let mut relaxed = graph.clone();
     relaxed
         .resources
         .fill(crate::graph::ResourceKind::Disposable);
     relaxed.set_coupled_resources(&[]).ok()?;
-    let paths = CompleteResourceRelaxation::collect(
+    let allowance = *work / 2;
+    let mut proof_work = work.checked_sub(allowance)?;
+    let stats = CompleteResourceRelaxation::visit(
         &relaxed,
         PathDomainLimits {
-            max_paths: 4096,
-            max_work: (*work / 2).min(250_000),
-            max_stored_arcs: (*work / 2).min(250_000),
+            max_paths: allowance,
+            max_work: allowance,
+            max_stored_arcs: allowance,
             deadline: Some(deadline),
         },
+        |path| visitor(path, &mut proof_work),
     )
-    .ok()?;
-    *work = work.checked_sub(paths.work_used())?;
-    Some(
-        paths
-            .paths()
-            .iter()
-            .map(|path| path.arc_positions().to_vec())
-            .collect(),
-    )
+    .ok();
+    let Some(stats) = stats else {
+        // A failed visitor does not expose partial traversal work. Charge the
+        // reserved path budget and keep every proof failure conservative.
+        *work = proof_work;
+        return None;
+    };
+    *work = proof_work.checked_add(allowance.checked_sub(stats.work_used)?)?;
+    (Instant::now() < deadline).then_some(())
 }
 
 fn activity_proof<const D: usize>(
@@ -268,22 +275,24 @@ fn activity_proof<const D: usize>(
 ) -> Option<Option<Bounds>> {
     let kernel = graph.coupled_kernel()?;
     let deadline = Instant::now().checked_add(std::time::Duration::from_secs(1))?;
-    let mut work = 250_000;
-    let paths = relaxed_activity_paths(graph, &mut work, deadline)?;
+    // This internal proof has no caller work budget; rely on its shared
+    // deadline instead of imposing another fixed work ceiling.
+    let mut work = usize::MAX;
     let mut range: Option<Bounds> = None;
-    for path in &paths {
-        let (feasible, [lower, upper]) =
-            kernel.certify_accumulated_activity(resource, path, &mut work, Some(deadline))?;
+    visit_relaxed_activity_paths(graph, &mut work, deadline, |path, proof_work| {
+        let (feasible, [lower, upper]) = kernel
+            .certify_accumulated_activity(resource, path, proof_work, Some(deadline))
+            .ok_or(crate::enumeration::PathDomainFailure::WorkLimit)?;
         if !feasible {
-            continue;
+            return Ok(());
         }
         if integer
             && (lower != upper
                 || lower.fract() != 0.
                 || lower.abs() > 9_007_199_254_740_992.
-                || kernel.accumulated_activity(resource, path).ok()? != lower)
+                || kernel.accumulated_activity(resource, path).ok() != Some(lower))
         {
-            return None;
+            return Err(crate::enumeration::PathDomainFailure::Arithmetic);
         }
         match &mut range {
             Some(old) => {
@@ -292,8 +301,9 @@ fn activity_proof<const D: usize>(
             }
             None => range = Some(Bounds { lower, upper }),
         }
-    }
-    (Instant::now() < deadline).then_some(range)
+        Ok(())
+    })?;
+    Some(range)
 }
 
 /// Preserve original coordinates even when the caller supplies no finite box.

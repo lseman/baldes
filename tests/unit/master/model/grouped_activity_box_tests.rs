@@ -110,6 +110,47 @@ fn integer_program_proof_covers_millions_of_paths_without_enumerating_them() {
 }
 
 #[test]
+fn activity_proof_streams_more_than_four_thousand_physical_paths() {
+    const LAYERS: usize = 13;
+    let sink = 2 * LAYERS + 1;
+    let mut graph = Graph::<2>::new(sink + 1, 0).unwrap();
+    let mut previous = vec![0];
+    for layer in 0..LAYERS {
+        let current = vec![2 * layer + 1, 2 * layer + 2];
+        for &tail in &previous {
+            for &head in &current {
+                graph.add_arc(tail, head, 0.).unwrap();
+            }
+        }
+        previous = current;
+    }
+    for tail in previous {
+        graph.add_arc(tail, sink, 0.).unwrap();
+    }
+    let arc_count = graph.arcs.len();
+    graph
+        .set_coupled_resources(&[CoupledResource::CumulativeCost {
+            initial: 0.,
+            increments: vec![1.; arc_count],
+            weights: vec![1.; arc_count],
+            sink_upper: None,
+            source_upper: None,
+        }])
+        .unwrap();
+
+    // The 8,192 paths have 14 arcs each; their cumulative activity is
+    // 1 + ... + 14. This uses the source activity certificate path directly,
+    // beyond the old retained-path ceiling.
+    assert_eq!(
+        activity_proof(&graph, 0, false),
+        Some(Some(Bounds {
+            lower: 105.,
+            upper: 105.,
+        }))
+    );
+}
+
+#[test]
 fn symbolic_integer_proof_rejects_overflow_but_retains_exact_half_weight_fallback() {
     for (increment, weight, expected) in [(9_007_199_254_740_992., 2., None), (2., 0.5, Some(1.))] {
         let mut graph = Graph::<2>::new(2, 0).unwrap();
