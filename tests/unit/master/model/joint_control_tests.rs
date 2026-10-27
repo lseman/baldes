@@ -233,6 +233,7 @@ fn paired_witness_allocations_search_nonendpoint_integer_splits() {
     let mut state = output.snapshot.state.fork_state();
     state.oracles[0].network.multiplicity = Window::new(10., 10.).unwrap();
     state.oracles[0].total_multiplicity = Window::new(10., 10.).unwrap();
+    state.oracles[0].proved_multiplicity_upper = None;
     let first = state
         .routes
         .iter()
@@ -245,6 +246,8 @@ fn paired_witness_allocations_search_nonendpoint_integer_splits() {
         .unwrap();
     state.route_upper_bounds.insert(first, 8.);
     state.route_upper_bounds.insert(second, 8.);
+    assert_eq!(enumeration::route_upper(&state, first), Some(8.));
+    assert_eq!(enumeration::route_upper(&state, second), Some(8.));
     let choices = [first, second].map(|tag| (tag, 0.5, state.routes[tag].as_ref().clone()));
 
     let allocations = identity_allocations(&state, &choices, 10., 128);
