@@ -103,6 +103,74 @@ impl RelationPiece {
     }
 }
 
+fn strict_piece_value_range(
+    piece: &RelationPiece,
+    lower: f64,
+    upper: f64,
+) -> Option<super::bounds::Range> {
+    use super::bounds::Range;
+
+    if lower > upper || lower < piece.left[0] || upper > piece.right[0] {
+        return None;
+    }
+    if lower == upper {
+        return Some(Range::point(piece.value(lower).ok()?));
+    }
+    let dx = finite(piece.right[0] - piece.left[0]).ok()?;
+    let dy = finite(piece.right[1] - piece.left[1]).ok()?;
+    if dx <= 0. {
+        return None;
+    }
+    let t = Range {
+        lo: lower,
+        hi: upper,
+    }
+    .subtract(Range::point(piece.left[0]))
+    .divide_positive(dx);
+    let mut values = Range::point(piece.left[1]).add(t.multiply(Range::point(dy)));
+    for x in [lower, upper] {
+        let value = piece.value(x).ok()?;
+        values.lo = values.lo.min(value);
+        values.hi = values.hi.max(value);
+    }
+    values.finite().then_some(values)
+}
+
+fn strict_piece_below(
+    left: &RelationPiece,
+    right: &RelationPiece,
+    lower: f64,
+    upper: f64,
+    work: &mut usize,
+    depth: usize,
+) -> bool {
+    if left == right {
+        return true;
+    }
+    if *work == 0 {
+        return false;
+    }
+    *work -= 1;
+    let (Some(left_values), Some(right_values)) = (
+        strict_piece_value_range(left, lower, upper),
+        strict_piece_value_range(right, lower, upper),
+    ) else {
+        return false;
+    };
+    if left_values.subtract(right_values).hi <= 0. {
+        return true;
+    }
+    if depth >= 48 || lower == upper {
+        return false;
+    }
+    let middle = lower * 0.5 + upper * 0.5;
+    if !middle.is_finite() || middle <= lower || middle >= upper {
+        return false;
+    }
+    strict_piece_below(left, right, lower, middle, work, depth + 1)
+        && strict_piece_below(left, right, middle, upper, work, depth + 1)
+}
+
 #[derive(Clone, Debug)]
 pub(in crate::graph::coupled) struct RelationFront {
     // Immutable once published. Cached metadata lives in explicit fields in
@@ -323,6 +391,77 @@ impl RelationFront {
     #[cfg(test)]
     pub(in crate::graph::coupled) fn covers_below(&self, other: &Self) -> bool {
         self.excess(other).is_some_and(|excess| excess <= 0.)
+    }
+    /// Directed, no-tolerance continuation coverage for signed dominance.
+    /// Interval subdivision may fail to prove close fronts; failure only
+    /// retains the label. The bounded work cap keeps this proof off the
+    /// unbounded path when frontiers are large or nearly coincident.
+    pub(in crate::graph::coupled) fn covers_below_strict(&self, other: &Self) -> bool {
+        const WORK_LIMIT: usize = 200_000;
+        let mut work = WORK_LIMIT;
+        for other_piece in &other.pieces {
+            let mut knots = vec![other_piece.left[0], other_piece.right[0]];
+            for piece in &self.pieces {
+                if work == 0 {
+                    return false;
+                }
+                work -= 1;
+                for x in [piece.left[0], piece.right[0]] {
+                    if other_piece.left[0] < x && x < other_piece.right[0] {
+                        knots.push(x);
+                    }
+                }
+            }
+            knots.sort_by(f64::total_cmp);
+            knots.dedup();
+            if knots.len() == 1 {
+                if !self.covers_piece_interval(other_piece, knots[0], knots[0], &mut work, 0) {
+                    return false;
+                }
+                continue;
+            }
+            for span in knots.windows(2) {
+                if !self.covers_piece_interval(other_piece, span[0], span[1], &mut work, 0) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    fn covers_piece_interval(
+        &self,
+        other: &RelationPiece,
+        lower: f64,
+        upper: f64,
+        work: &mut usize,
+        depth: usize,
+    ) -> bool {
+        if *work == 0 {
+            return false;
+        }
+        *work -= 1;
+        for piece in &self.pieces {
+            if *work == 0 {
+                return false;
+            }
+            *work -= 1;
+            if piece.left[0] <= lower
+                && upper <= piece.right[0]
+                && strict_piece_below(piece, other, lower, upper, work, 0)
+            {
+                return true;
+            }
+        }
+        if depth >= 48 || lower == upper {
+            return false;
+        }
+        let middle = lower * 0.5 + upper * 0.5;
+        if !middle.is_finite() || middle <= lower || middle >= upper {
+            return false;
+        }
+        self.covers_piece_interval(other, lower, middle, work, depth + 1)
+            && self.covers_piece_interval(other, middle, upper, work, depth + 1)
     }
     /// This backward upper front is defined wherever `other` is and is no
     /// lower there: it admits every prefix `other` admits.

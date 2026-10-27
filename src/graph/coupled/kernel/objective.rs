@@ -16,6 +16,9 @@ impl CoupledKernel {
             .get(resource)
             .and_then(|value| finite(self.cost_scale * value).ok())
     }
+    pub(crate) fn objective_scale(&self) -> f64 {
+        self.cost_scale
+    }
     pub fn objective_coefficient(&self, resource: usize) -> Option<f64> {
         self.objective_coefficients.get(resource).copied()
     }

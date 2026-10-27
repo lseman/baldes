@@ -1,6 +1,18 @@
 use super::*;
 use std::time::Duration;
 
+#[test]
+fn reduced_cost_interval_touching_zero_enumerates_paired_endpoints() {
+    assert!(sign_ambiguous(Interval { lo: -1., hi: 0. }));
+    assert!(sign_ambiguous(Interval { lo: -1., hi: 1. }));
+    assert!(!sign_ambiguous(Interval {
+        lo: -1.,
+        hi: -f64::EPSILON
+    }));
+    assert!(!sign_ambiguous(Interval { lo: 0., hi: 1. }));
+    assert!(!sign_ambiguous(Interval::point(0.)));
+}
+
 fn root() -> Output<2> {
     let mut source: serde_json::Value = serde_json::from_str(include_str!(
         "../../../fixtures/coupled/joint-interior-model.json"

@@ -45,3 +45,29 @@ fn lower_wider_front_covers_and_crossing_or_narrower_fronts_do_not() {
     assert!(!front(&[([2., 6.5], [2., 6.5])]).covers_below(&point));
     assert!(a.covers_below(&a));
 }
+
+#[test]
+fn strict_coverage_rejects_tolerance_only_order_and_domain_gaps() {
+    let flat = |value| front(&[([0., value], [2., value])]);
+    assert!(flat(1. + 0.5e-4).covers_below(&flat(1.)));
+    assert!(!flat(1. + 0.5e-4).covers_below_strict(&flat(1.)));
+    assert!(flat(0.).covers_below_strict(&flat(1.)));
+    assert!(flat(1.).covers_below_strict(&flat(1.)));
+    let gap = front(&[([0., 0.], [0.75, 0.]), ([1.25, 0.], [2., 0.])]);
+    assert!(!gap.covers_below_strict(&flat(1.)));
+    let bump = front(&[([0., 0.], [1., 2.]), ([1., 2.], [2., 0.])]);
+    assert!(!bump.covers_below_strict(&flat(1.)));
+}
+
+#[test]
+fn strict_coverage_handles_subdivision_singletons_and_exhausted_work() {
+    let lower = front(&[([0., 0.], [2., 2.])]);
+    let upper = front(&[([0., 0.25], [2., 2.25])]);
+    assert!(lower.covers_below_strict(&upper));
+    assert!(!upper.covers_below_strict(&lower));
+    let point = front(&[([1., 1.5], [1., 1.5])]);
+    assert!(lower.covers_below_strict(&point));
+    assert!(!point.covers_below_strict(&lower));
+    let mut work = 0;
+    assert!(!lower.covers_piece_interval(&upper.pieces[0], 0., 2., &mut work, 0));
+}

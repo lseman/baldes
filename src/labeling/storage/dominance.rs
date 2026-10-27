@@ -47,10 +47,30 @@ impl<const D: usize> LabelStorage<D> {
         let Some(penalty) = g.coupled_dominance_penalty(a_state, b_state, forward, vertex) else {
             return false;
         };
+        let strict_signed = g
+            .coupled_kernel()
+            .is_some_and(|kernel| kernel.has_negative_paired_objectives());
+        if strict_signed {
+            if !Self::signed_scalar_state_not_worse(g, a, b, forward)
+                || !a.cost.is_finite()
+                || !b.cost.is_finite()
+                || !a.additional_cost.is_finite()
+                || !b.additional_cost.is_finite()
+                || a.additional_cost > b.additional_cost
+            {
+                return false;
+            }
+            let Some(adjusted_cost) = crate::core::rounding::add_up(a.cost, penalty) else {
+                return false;
+            };
+            if adjusted_cost > b.cost {
+                return false;
+            }
+        }
         let retained_fronts = g
             .coupled_kernel()
             .map_or(false, |k| k.retains_cost_components());
-        let (cached_words, pending_words) = if retained_fronts {
+        let (cached_words, pending_words) = if retained_fronts || strict_signed {
             // Rounded common future costs can shrink the current mixed-key
             // gap. Do not spend that gap on different future cut behavior or
             // on an oppositely ordered additional-cost component.
@@ -76,6 +96,30 @@ impl<const D: usize> LabelStorage<D> {
         };
         let adjusted = HotLabel { cost, ..*a };
         Self::dominates_hot_slices(g, &adjusted, b, forward, test, hop_limit, cuts, words)
+    }
+
+    fn signed_scalar_state_not_worse(
+        g: &Graph<D>,
+        a: &HotLabel<D>,
+        b: &HotLabel<D>,
+        forward: bool,
+    ) -> bool {
+        if g.resources.len() > D {
+            return false;
+        }
+        g.resources
+            .iter()
+            .enumerate()
+            .all(|(resource, kind)| match kind {
+                ResourceKind::Disposable => {
+                    if forward {
+                        a.resources[resource] <= b.resources[resource]
+                    } else {
+                        b.resources[resource] <= a.resources[resource]
+                    }
+                }
+                ResourceKind::Equality => a.resources[resource] == b.resources[resource],
+            })
     }
 
     /// `dominates` on the packed fields; `words` loads the cut words only

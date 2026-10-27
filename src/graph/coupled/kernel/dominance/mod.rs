@@ -131,10 +131,18 @@ impl CoupledKernel {
         if self.has_negative_paired_objectives() {
             self.check_state(a).ok()?;
             self.check_state(b).ok()?;
-            // Maximum-envelope comparison remains approximate or unknown for
-            // some front policies. Until directed coverage is available,
-            // signed continuations only dominate identical coupled states.
-            return (a == b).then_some(0.);
+            // A signed front alone does not identify the selected source
+            // control used by its terminal charge. Keep even identical
+            // unselected states unknown; path-level pricing/certification
+            // supplies that control separately.
+            if a == b {
+                return None;
+            }
+            // Signed paired fronts compare only when their directed coverage
+            // proofs succeed and every other continuation/accounting
+            // component is identical. The hot label key checks current cost.
+            // Native tolerance is never used as a proof rule.
+            return self.signed_paired_fronts_dominate(a, b, forward);
         }
         if self.weighted_objective || !self.pricing_activities.is_empty() {
             // Until a joint component proof is available, only identical
@@ -335,6 +343,56 @@ impl CoupledKernel {
         Some(penalty)
     }
 
+    fn signed_paired_fronts_dominate(
+        &self,
+        a: &CoupledLabelState,
+        b: &CoupledLabelState,
+        forward: bool,
+    ) -> Option<f64> {
+        let relation_changed = a.relations != b.relations;
+        let slope_changed = a.slope_relations != b.slope_relations;
+        if !forward
+            || self.cost_scale <= 0.
+            || (!relation_changed && !slope_changed)
+            || a.accounting.is_none()
+            || a.accounting != b.accounting
+            || a.numeric_cost != b.numeric_cost
+            || a.numeric != b.numeric
+            || a.relations.len() != self.paired.len()
+            || b.relations.len() != self.paired.len()
+            || a.relations.iter().zip(&b.relations).zip(&self.paired).any(
+                |((left, right), prepared)| {
+                    let scale = self.cost_scale * prepared.objective_coefficient;
+                    left != right && (!prepared.has_costs() || !scale.is_finite() || scale >= 0.)
+                },
+            )
+            || a.slope_relations.len() != self.slope_paired.len()
+            || b.slope_relations.len() != self.slope_paired.len()
+            || a.slope_relations
+                .iter()
+                .zip(&b.slope_relations)
+                .zip(&self.slope_paired)
+                .any(|((left, right), prepared)| {
+                    left != right && !prepared.uses_strict_front_policy()
+                })
+        {
+            return None;
+        }
+        // Permit only paired labels and their recomputed objective total to
+        // differ. Scalar sums, other resource fronts, plugins, row adjustments,
+        // route masks, and suffix state must match exactly.
+        let mut normalized = a.clone();
+        normalized.relations.clone_from(&b.relations);
+        normalized.slope_relations.clone_from(&b.slope_relations);
+        normalized.resource_objective = b.resource_objective;
+        if normalized != *b {
+            return None;
+        }
+        let relations = self.relations_dominate(a, b, true, true)?;
+        let slopes = self.slope_relations_dominate(a, b, true, true)?;
+        add_up(relations, slopes)
+    }
+
     /// Backward labels with different suffix arc programs may still compare
     /// when nothing else replays the program at a join: no deferred numeric
     /// transitions or plugins, and only feasibility paired relations (including
@@ -439,11 +497,26 @@ impl CoupledKernel {
                     _ => return None,
                 }
             }
+            let upper_left = left.forward_upper_negative();
+            let upper_right = right.forward_upper_negative();
             let (Some(left), Some(right)) = (left.forward(), right.forward()) else {
                 return None;
             };
             let charged = prepared.has_costs() && self.cost_scale != 0.;
             if !forward || (charged && !(tracked_order && self.cost_scale > 0.)) {
+                return None;
+            }
+            let signed_scale = self.cost_scale * prepared.objective_coefficient;
+            if !signed_scale.is_finite() {
+                return None;
+            }
+            if charged && signed_scale < 0. {
+                let (Some(upper_left), Some(upper_right)) = (upper_left, upper_right) else {
+                    return None;
+                };
+                if left.covers_below_strict(right) && upper_left.covers_below_strict(upper_right) {
+                    continue;
+                }
                 return None;
             }
             let excess = left.excess(right)?;

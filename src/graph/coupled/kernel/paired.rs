@@ -139,7 +139,12 @@ impl PreparedPaired {
     }
     pub(super) fn objective(&self, state: &PairedLabel, scale: f64) -> Result<f64> {
         let scale = finite(scale * self.objective_coefficient)?;
-        if self.mode == PairedResourceMode::Feasibility || scale == 0. {
+        // A backward label retains a suffix program, not an attained value.
+        // Charge it only when replaying the suffix from a forward frontier.
+        if self.mode == PairedResourceMode::Feasibility
+            || scale == 0.
+            || matches!(state, PairedLabel::Backward { .. })
+        {
             return Ok(0.);
         }
         let selected = if scale < 0. {

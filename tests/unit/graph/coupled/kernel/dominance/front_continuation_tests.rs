@@ -569,3 +569,48 @@ fn permanently_zero_fronts_keep_domain_inclusion_dominance() {
     assert_eq!(kernel.dominance_penalty(&a, &b, true), Some(0.));
     assert_eq!(kernel.dominance_penalty(&b, &a, true), None);
 }
+
+#[test]
+fn signed_paired_forward_dominance_requires_both_envelopes_and_equal_accounting() {
+    use crate::graph::coupled::{PairedResourceArc, PairedResourceMode};
+    let line = |a, b| PiecewiseLinearFunction::new(vec![[0., a], [2., b]]).unwrap();
+    let mut graph = Graph::<2>::new(2, 0).unwrap();
+    graph.add_arc(0, 1, 0.).unwrap();
+    graph.add_arc(0, 1, 0.).unwrap();
+    let arc = |increment| PairedResourceArc {
+        arrival: line(0., 2.),
+        increment: line(increment, increment),
+        lower: line(0., 0.),
+        upper: line(10., 10.),
+        waiting: 0,
+    };
+    graph
+        .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+            normalization: crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
+            initial: line(0., 0.),
+            initial_base: Window::new(0., 2.).unwrap(),
+            arcs: vec![arc(0.), arc(1.)],
+            mode: PairedResourceMode::CostUnbounded,
+        }])
+        .unwrap();
+    graph
+        .set_coupled_objective_coefficients(&[(0, -1.)])
+        .unwrap();
+    let kernel = graph.coupled_kernel().unwrap();
+    let root = kernel.root(true);
+    let mut low = kernel.extend(&root, 0, true).unwrap().unwrap().0;
+    let mut high = kernel.extend(&root, 1, true).unwrap().unwrap().0;
+    low.account_extension(&root, 0., 0.).unwrap();
+    high.account_extension(&root, 0., 0.).unwrap();
+    assert_eq!(kernel.dominance_penalty(&low, &high, true), Some(0.));
+    assert_eq!(kernel.dominance_penalty(&high, &low, true), None);
+    let mut unknown = low.clone();
+    if let super::super::paired::PairedLabel::Forward { upper_negative, .. } =
+        &mut unknown.relations[0]
+    {
+        *upper_negative = None;
+    }
+    assert_eq!(kernel.dominance_penalty(&unknown, &high, true), None);
+    low.accounting = None;
+    assert_eq!(kernel.dominance_penalty(&low, &high, true), None);
+}

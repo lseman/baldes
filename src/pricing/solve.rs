@@ -78,6 +78,15 @@ impl<const D: usize> Solver<D> {
         solver.prepared = None;
         solver.engine = None;
         solver.enumeration = None;
+        // Match the native paired-label schedule: let SCC propagation reach
+        // its fixed point instead of inheriting a restricted-master phase's
+        // per-bucket label cap. This pass only proposes source-replayed
+        // candidates; signed pricing certification remains in the caller.
+        solver.phases = vec![phases::Phase {
+            check_ng: true,
+            jump_arcs: true,
+            labels_per_bucket: i64::MAX,
+        }];
         solver.controls.time_limit = solver
             .controls
             .time_limit

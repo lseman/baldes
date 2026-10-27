@@ -242,7 +242,7 @@ impl PreparedSlopePaired {
             };
         }
         if scale < 0. {
-            if self.shifts {
+            if self.shifts || self.policy != FrontOperationPolicy::StrictDomain {
                 return None;
             }
             let (Some(front_a), Some(front_b)) = (&a.upper_negative, &b.upper_negative) else {
@@ -271,6 +271,9 @@ impl PreparedSlopePaired {
     }
     pub(super) fn has_costs(&self) -> bool {
         self.mode != PairedResourceMode::Feasibility
+    }
+    pub(super) fn uses_strict_front_policy(&self) -> bool {
+        self.policy == FrontOperationPolicy::StrictDomain
     }
     pub(super) fn selected_value(&self, label: &SlopeLabel, scale: f64) -> Result<f64> {
         if self.has_costs() && finite(scale * self.objective_coefficient)? < 0. {

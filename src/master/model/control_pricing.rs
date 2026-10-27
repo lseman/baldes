@@ -220,6 +220,43 @@ struct PathPricing {
     minimum: Vec<PairedControl>,
     maximum: Vec<PairedControl>,
     greedy: Vec<PairedControl>,
+    sign_ambiguous: Vec<usize>,
+}
+
+fn sign_ambiguous(coefficient: Interval) -> bool {
+    coefficient.lo < 0. && coefficient.hi >= 0.
+}
+
+/// Certify an affine reduced-cost lower bound over each descriptor's complete
+/// source-control regions. Paired descriptors own independent base-control
+/// programs, so the affine objective separates by terminal resource after all
+/// objective and row-dual terms have been combined in `reduced`. `domains`
+/// comes from complete min/max source-control searches. Coefficient intervals
+/// account for floating-point accumulation; checking both endpoints covers
+/// every coefficient value represented by the enclosure without repeating
+/// those source-control searches.
+fn source_control_lower_bound(domains: &[Interval], reduced: &Expression) -> Option<f64> {
+    if domains.len() != reduced.coefficient_count() {
+        return None;
+    }
+    let mut lower = reduced.constant_interval().lo;
+    for (index, &domain) in domains.iter().enumerate() {
+        let coefficient = reduced.coefficient(index);
+        let mut resource_lower = f64::INFINITY;
+        for weight in [coefficient.lo, coefficient.hi] {
+            if weight == 0. {
+                resource_lower = resource_lower.min(0.);
+                continue;
+            }
+            let signed_bound = if weight < 0. { -domain.hi } else { domain.lo };
+            // A negative coefficient uses -upper(Gamma), a lower bound on
+            // -Gamma. Multiplying by |weight| bounds weight*Gamma below.
+            let contribution = crate::core::rounding::multiply_down(weight.abs(), signed_bound)?;
+            resource_lower = resource_lower.min(contribution);
+        }
+        lower = crate::core::rounding::add_down(lower, resource_lower)?;
+    }
+    Some(lower)
 }
 
 // Propose one jointly row-feasible unit column. This small terminal relaxation
@@ -1918,7 +1955,7 @@ fn path<const D: usize>(
     for (r, value) in rows {
         reduced = reduced.add(&value.scale(-*duals.get(r)?, &domains)?, &domains)?;
     }
-    let lower = reduced.range(&domains)?.lo;
+    let lower = source_control_lower_bound(&domains, &reduced)?;
     let greedy = resources
         .iter()
         .enumerate()
@@ -1930,6 +1967,9 @@ fn path<const D: usize>(
             }
         })
         .collect();
+    let sign_ambiguous = (0..resources.len())
+        .filter(|&index| sign_ambiguous(reduced.coefficient(index)))
+        .collect();
     Some(Some(PathPricing {
         lower,
         route,
@@ -1938,6 +1978,7 @@ fn path<const D: usize>(
         minimum,
         maximum,
         greedy,
+        sign_ambiguous,
     }))
 }
 
@@ -2032,7 +2073,24 @@ fn process_path<const D: usize>(
     }
     quantities.sort_by(f64::total_cmp);
     quantities.dedup();
-    let mut choices = vec![];
+    let mut choices = vec![
+        result.minimum.clone(),
+        result.maximum.clone(),
+        result.greedy.clone(),
+    ];
+    let combinations = if result.sign_ambiguous.is_empty() {
+        0
+    } else {
+        let shift = u32::try_from(result.sign_ambiguous.len())
+            .map_err(|_| incomplete("paired endpoint proposal dimension overflow"))?;
+        let count = 1usize
+            .checked_shl(shift)
+            .ok_or_else(|| incomplete("paired endpoint proposal dimension overflow"))?;
+        *work = work
+            .checked_sub(count)
+            .ok_or_else(|| incomplete("paired endpoint proposal work budget exhausted"))?;
+        count
+    };
     for quantity in quantities {
         if let Some(controls) = joint_controls(
             state,
@@ -2046,11 +2104,6 @@ fn process_path<const D: usize>(
             choices.extend(controls);
         }
     }
-    choices.extend([
-        result.minimum.clone(),
-        result.maximum.clone(),
-        result.greedy.clone(),
-    ]);
     for (i, &resource) in result.resources.iter().enumerate() {
         for c in oracle
             .activity_rows
@@ -2093,7 +2146,23 @@ fn process_path<const D: usize>(
             }
         }
     }
-    for controls in choices {
+    // Stream the exponential endpoint sweep: the work budget bounds its
+    // count, while the deadline also bounds cloning and source replay.
+    let endpoints = (0..combinations).map(|mask| {
+        let mut controls = result.greedy.clone();
+        for (bit, &index) in result.sign_ambiguous.iter().enumerate() {
+            controls[index] = if mask & (1usize << bit) == 0 {
+                result.minimum[index].clone()
+            } else {
+                result.maximum[index].clone()
+            };
+        }
+        controls
+    });
+    for controls in choices.into_iter().chain(endpoints) {
+        if Instant::now() >= state.deadline {
+            return Err(incomplete("paired endpoint proposal deadline exhausted"));
+        }
         let candidate = route
             .clone()
             .with_paired_controls(&oracle.network.graph, sorted(controls))?;
@@ -2114,16 +2183,34 @@ struct PhysicalSuffixBounds {
 }
 
 fn row_simple_supported<const D: usize>(oracle: &Oracle<D>) -> bool {
-    oracle
-        .activity_rows
-        .iter()
-        .all(|entry| activity_rows::paired(&oracle.network.graph, entry.resource))
-        && oracle.nonlinear_rows.is_empty()
-        && oracle.knapsack_rows.is_empty()
-        && oracle.presence_rows.is_empty()
-        && oracle.resource_groups.is_empty()
-        && oracle.solver.cuts.cuts.is_empty()
-        && oracle.solver.cuts.knapsack_cuts.is_empty()
+    let graph = &oracle.network.graph;
+    let Some(kernel) = graph.coupled_kernel() else {
+        return false;
+    };
+    oracle.activity_rows.iter().all(|entry| {
+        activity_rows::paired(graph, entry.resource)
+            || matches!(
+                kernel.definitions().get(entry.resource),
+                Some(
+                    CoupledResource::CumulativeCost { .. } | CoupledResource::CustomResource { .. }
+                )
+            )
+    }) && (0..oracle.solver.cuts.cuts.len()).all(|cut| {
+        oracle
+            .nonlinear_rows
+            .iter()
+            .any(|&(mapped, _)| mapped == cut)
+    }) && (0..oracle.solver.cuts.knapsack_cuts.len()).all(|cut| {
+        oracle
+            .knapsack_rows
+            .iter()
+            .any(|&(mapped, _)| mapped == cut)
+    }) && (0..oracle.solver.presence_rows().len()).all(|input| {
+        oracle
+            .presence_rows
+            .iter()
+            .any(|&(mapped, _)| mapped == input)
+    })
 }
 
 fn coupled_lower_bounds<const D: usize>(
@@ -2154,7 +2241,11 @@ fn coupled_lower_bounds<const D: usize>(
         };
         if let Some((initial, increments, weights)) = accumulated {
             let coefficient = kernel.effective_objective_coefficient(resource)?;
-            if coefficient != 0. {
+            let has_activity = oracle
+                .activity_rows
+                .iter()
+                .any(|entry| entry.resource == resource && entry.coefficient != 0.);
+            if coefficient != 0. || has_activity {
                 let amount = accumulated_cost_hull(
                     initial,
                     increments,
@@ -2163,7 +2254,20 @@ fn coupled_lower_bounds<const D: usize>(
                     work,
                     deadline,
                 )?;
-                lower = crate::core::rounding::add_down(lower, amount.scale(coefficient)?.lo)?;
+                if coefficient != 0. {
+                    lower = crate::core::rounding::add_down(lower, amount.scale(coefficient)?.lo)?;
+                }
+                for entry in oracle
+                    .activity_rows
+                    .iter()
+                    .filter(|entry| entry.resource == resource && entry.coefficient != 0.)
+                {
+                    let dual = *duals.get(offset.checked_add(entry.row)?)?;
+                    lower = crate::core::rounding::add_down(
+                        lower,
+                        amount.scale(entry.coefficient)?.scale(-dual)?.lo,
+                    )?;
+                }
             }
             continue;
         }
@@ -2320,7 +2424,93 @@ fn coupled_lower_bounds<const D: usize>(
             )?;
         }
     }
+    let hops = graph.original_max_arcs();
+    for &(cut, row) in &oracle.nonlinear_rows {
+        let mut per_arc = 0u64;
+        for arc in 0..graph.arcs.len() {
+            *work = work.checked_sub(1)?;
+            if Instant::now() >= deadline {
+                return None;
+            }
+            per_arc = per_arc.max(super::nonlinear::arc_upper(oracle, cut, arc) as u64);
+        }
+        let maximum = u128::try_from(hops)
+            .ok()?
+            .checked_mul(u128::from(per_arc))?;
+        if maximum > (1u128 << 53) {
+            return None;
+        }
+        add_master_row_lower(
+            offset,
+            duals,
+            row,
+            Interval {
+                lo: 0.,
+                hi: maximum as f64,
+            },
+            &mut lower,
+        )?;
+    }
+    for &(cut, row) in &oracle.knapsack_rows {
+        let cut = &oracle.solver.cuts.knapsack_cuts.get(cut)?.cut;
+        let mut low = 0i32;
+        let mut high = 0i32;
+        for &value in cut.coefficients.values() {
+            *work = work.checked_sub(1)?;
+            if Instant::now() >= deadline {
+                return None;
+            }
+            low = low.min(value);
+            high = high.max(value);
+        }
+        add_master_row_lower(
+            offset,
+            duals,
+            row,
+            Interval {
+                lo: f64::from(low),
+                hi: f64::from(high),
+            },
+            &mut lower,
+        )?;
+    }
+    for &(input, row) in &oracle.presence_rows {
+        let maximum = oracle
+            .solver
+            .presence_rows()
+            .get(input)?
+            .row
+            .maximum_coefficient();
+        if maximum as u128 > (1u128 << 53) {
+            return None;
+        }
+        add_master_row_lower(
+            offset,
+            duals,
+            row,
+            Interval {
+                lo: 0.,
+                hi: maximum as f64,
+            },
+            &mut lower,
+        )?;
+    }
+    for &(row, _) in &oracle.resource_groups {
+        add_master_row_lower(offset, duals, row, Interval { lo: 0., hi: 1. }, &mut lower)?;
+    }
     Some((lower, paired_arc_lower))
+}
+
+fn add_master_row_lower(
+    offset: usize,
+    duals: &[f64],
+    row: usize,
+    values: Interval,
+    lower: &mut f64,
+) -> Option<()> {
+    let dual = *duals.get(offset.checked_add(row)?)?;
+    *lower = crate::core::rounding::add_down(*lower, values.scale(-dual)?.lo)?;
+    Some(())
 }
 
 fn add_paired_arc_contribution<const D: usize>(
@@ -2784,40 +2974,104 @@ fn signed_scc_seed_paths<const D: usize>(
     state: &State<D>,
     oracle: &Oracle<D>,
     duals: &[f64],
+    original_costs: Option<&OriginalVariableCosts>,
+    work: &mut usize,
     deadline: Instant,
 ) -> Option<Vec<Vec<usize>>> {
     let mut graph = oracle.network.graph.as_ref().clone();
-    for (index, arc) in graph.arcs.iter_mut().enumerate() {
-        let mut reduced = arc.cost;
-        for &(row, coefficient) in oracle.network.arc_entries.get(index)? {
-            reduced = crate::core::rounding::add_down(
-                reduced,
-                crate::core::rounding::multiply_down(
-                    -*duals.get(state.shared_offset.checked_add(row)?)?,
-                    coefficient,
-                )?,
-            )?;
+    if let Some(original) = original_costs {
+        let reduced = original_arc_cost_lower_bounds(
+            oracle,
+            original,
+            state.shared_offset,
+            duals,
+            work,
+            deadline,
+        )?;
+        for (arc, cost) in graph.arcs.iter_mut().zip(reduced) {
+            arc.reduced_cost = cost;
         }
-        arc.reduced_cost = reduced;
+    } else {
+        for (index, arc) in graph.arcs.iter_mut().enumerate() {
+            let mut reduced = arc.cost;
+            for &(row, coefficient) in oracle.network.arc_entries.get(index)? {
+                reduced = crate::core::rounding::add_down(
+                    reduced,
+                    crate::core::rounding::multiply_down(
+                        -*duals.get(state.shared_offset.checked_add(row)?)?,
+                        coefficient,
+                    )?,
+                )?;
+            }
+            arc.reduced_cost = reduced;
+        }
     }
+    let kernel = graph.coupled_kernel()?;
     let mut adjustments = BTreeMap::<usize, f64>::new();
+    let mut paired_adjustments = BTreeMap::<usize, f64>::new();
     for entry in &oracle.activity_rows {
-        if entry.coefficient == 0. || !activity_rows::paired(&graph, entry.resource) {
+        if entry.coefficient == 0. {
             continue;
         }
+        let definition = kernel.definitions().get(entry.resource)?;
         let dual = *duals.get(state.shared_offset.checked_add(entry.row)?)?;
         let adjustment = crate::core::rounding::multiply_down(-dual, entry.coefficient)?;
-        let value = adjustments.entry(entry.resource).or_default();
+        let target = match definition {
+            CoupledResource::PairedPiecewiseLinear { .. } | CoupledResource::SlopePaired { .. } => {
+                &mut paired_adjustments
+            }
+            CoupledResource::CumulativeCost { .. } | CoupledResource::CustomResource { .. } => {
+                &mut adjustments
+            }
+            _ => continue,
+        };
+        let value = target.entry(entry.resource).or_default();
         *value = crate::core::rounding::add_down(*value, adjustment)?;
     }
-    graph
-        .set_coupled_pricing_adjustments(
-            &adjustments
-                .into_iter()
-                .filter(|(_, coefficient)| *coefficient != 0.)
-                .collect::<Vec<_>>(),
-        )
-        .ok()?;
+    if !paired_adjustments.is_empty() {
+        let objective_scale = kernel.objective_scale();
+        if !objective_scale.is_finite() || objective_scale == 0. {
+            return None;
+        }
+        let mut coefficients = BTreeMap::new();
+        for (resource, definition) in kernel.definitions().iter().enumerate() {
+            let supported = match definition {
+                CoupledResource::CustomResource { .. } | CoupledResource::CumulativeCost { .. } => {
+                    true
+                }
+                CoupledResource::PairedPiecewiseLinear { mode, .. }
+                | CoupledResource::SlopePaired { mode, .. } => {
+                    *mode != crate::graph::coupled::PairedResourceMode::Feasibility
+                }
+                _ => false,
+            };
+            if supported {
+                coefficients.insert(resource, kernel.objective_coefficient(resource)?);
+            }
+        }
+        for (resource, adjustment) in paired_adjustments {
+            let coefficient = coefficients.get_mut(&resource)?;
+            let adjustment = adjustment / objective_scale;
+            if !adjustment.is_finite() {
+                return None;
+            }
+            *coefficient = crate::core::rounding::add_down(*coefficient, adjustment)?;
+        }
+        let coefficients = coefficients.into_iter().collect::<Vec<_>>();
+        graph
+            .set_coupled_objective_coefficients(&coefficients)
+            .ok()?;
+    }
+    if !adjustments.is_empty() {
+        graph
+            .set_coupled_pricing_adjustments(
+                &adjustments
+                    .into_iter()
+                    .filter(|(_, coefficient)| *coefficient != 0.)
+                    .collect::<Vec<_>>(),
+            )
+            .ok()?;
+    }
     let candidates = oracle
         .solver
         .signed_candidate_routes(graph, 32, deadline)
@@ -2864,22 +3118,40 @@ fn branch_and_bound_price<const D: usize>(
     )?;
     let graph = &oracle.network.graph;
     let hops = physical.suffix.len().checked_sub(1)?;
-    if physical
+    // The scalar suffix remains a walk relaxation, but this proof traversal
+    // only needs route-domain paths. Avoid revisiting vertices when physical
+    // simplicity is declared or implied by hard groups; bounded walks that
+    // permit repeats continue to explore them.
+    let vertex_simple_domain = graph.route_domain() == crate::graph::RouteDomain::PhysicalSimple
+        || graph.bounded_walks_are_vertex_simple();
+    let prune_repeated_vertices = vertex_simple_domain && !graph.is_acyclic();
+    let Some(global_tail) = physical
         .suffix
         .get(hops)?
         .get(graph.source)
         .copied()
         .flatten()
-        .is_none()
-    {
+    else {
         return Some(Ok((Vec::new(), 0.)));
+    };
+    let Some(global_constant) =
+        crate::core::rounding::add_down(physical.route_constant, physical.other_coupled_lower)
+    else {
+        return None;
+    };
+    // This suffix relaxation bounds every admissible walk. If branch
+    // refinement later hits its budget, retained pricing can still use this
+    // certified minimum bound alongside the source-validated columns found.
+    let global_lower_bound = crate::core::rounding::add_down(global_tail, global_constant)?;
+    // The universal bound closes pricing immediately when it is nonnegative;
+    // candidate generation cannot produce a negative column in that case.
+    if global_lower_bound >= 0. {
+        return Some(Ok((Vec::new(), global_lower_bound)));
     }
     let mut outgoing = vec![Vec::new(); graph.vertices.len()];
     for (arc, data) in graph.arcs.iter().enumerate() {
         let Some(left) = work.checked_sub(1) else {
-            return Some(Err(incomplete(
-                "paired cyclic pricing work budget exhausted",
-            )));
+            return Some(Ok((Vec::new(), global_lower_bound)));
         };
         *work = left;
         outgoing.get_mut(data.tail)?.push(arc);
@@ -2905,6 +3177,7 @@ fn branch_and_bound_price<const D: usize>(
     let mut minimum = f64::INFINITY;
     let mut routes = Vec::new();
     let mut seen = HashSet::new();
+    let mut priced_paths = HashSet::<Vec<usize>>::new();
     // Native SCC label sweeps are useful candidate generators, but their
     // minima and dominance trajectory are not proof. Re-price every seed
     // through the source-control model before the bounded-walk proof pass.
@@ -2917,12 +3190,22 @@ fn branch_and_bound_price<const D: usize>(
     let mut seed_work = seed_budget;
     let seed_iterations = iterations / 4;
     let mut remaining_seed_iterations = seed_iterations;
-    if let Some(candidates) = signed_scc_seed_paths(state, oracle, duals, seed_deadline) {
+    if let Some(candidates) = signed_scc_seed_paths(
+        state,
+        oracle,
+        duals,
+        original_costs,
+        &mut seed_work,
+        seed_deadline,
+    ) {
         for candidate in candidates {
             if Instant::now() >= seed_deadline {
                 break;
             }
             if candidate.iter().any(|&arc| arc >= graph.arcs.len()) {
+                continue;
+            }
+            if priced_paths.contains(&candidate) {
                 continue;
             }
             if process_path(
@@ -2940,20 +3223,19 @@ fn branch_and_bound_price<const D: usize>(
             {
                 break;
             }
+            priced_paths.insert(candidate);
         }
     }
     *work = work.checked_sub(seed_budget - seed_work)?;
     iterations = iterations.checked_sub(seed_iterations - remaining_seed_iterations)?;
     while !stack.is_empty() {
         if Instant::now() >= state.deadline {
-            return Some(Err(incomplete("paired cyclic pricing time limit exceeded")));
+            return Some(Ok((routes, global_lower_bound)));
         }
         let top = stack.len() - 1;
         if !stack[top].entered {
             let Some(left) = work.checked_sub(1) else {
-                return Some(Err(incomplete(
-                    "paired cyclic pricing work budget exhausted",
-                )));
+                return Some(Ok((routes, global_lower_bound)));
             };
             *work = left;
             let frame = &stack[top];
@@ -2971,22 +3253,16 @@ fn branch_and_bound_price<const D: usize>(
                 continue;
             };
             let Some(prefix_tail) = crate::core::rounding::add_down(frame.prefix, tail) else {
-                return Some(Err(incomplete(
-                    "paired cyclic pricing bound arithmetic failed",
-                )));
+                return Some(Ok((routes, global_lower_bound)));
             };
             let Some(constant) = crate::core::rounding::add_down(
                 physical.route_constant,
                 physical.other_coupled_lower,
             ) else {
-                return Some(Err(incomplete(
-                    "paired cyclic pricing bound arithmetic failed",
-                )));
+                return Some(Ok((routes, global_lower_bound)));
             };
             let Some(bound) = crate::core::rounding::add_down(prefix_tail, constant) else {
-                return Some(Err(incomplete(
-                    "paired cyclic pricing bound arithmetic failed",
-                )));
+                return Some(Ok((routes, global_lower_bound)));
             };
             if bound >= 0. {
                 minimum = minimum.min(bound);
@@ -2997,18 +3273,23 @@ fn branch_and_bound_price<const D: usize>(
                 continue;
             }
             if frame.vertex == graph.sink {
-                if let Err(error) = process_path(
-                    state,
-                    oracle,
-                    duals,
-                    &path,
-                    work,
-                    &mut iterations,
-                    &mut minimum,
-                    &mut routes,
-                    &mut seen,
-                ) {
-                    return Some(Err(error));
+                if !priced_paths.contains(&path) {
+                    if process_path(
+                        state,
+                        oracle,
+                        duals,
+                        &path,
+                        work,
+                        &mut iterations,
+                        &mut minimum,
+                        &mut routes,
+                        &mut seen,
+                    )
+                    .is_err()
+                    {
+                        return Some(Ok((routes, global_lower_bound)));
+                    }
+                    priced_paths.insert(path.clone());
                 }
                 stack.pop();
                 if let Some(parent) = stack.last() {
@@ -3041,15 +3322,25 @@ fn branch_and_bound_price<const D: usize>(
             (arc, frame.prefix, frame.path_len, frame.remaining)
         };
         let Some(left) = work.checked_sub(1) else {
-            return Some(Err(incomplete(
-                "paired cyclic pricing work budget exhausted",
-            )));
+            return Some(Ok((routes, global_lower_bound)));
         };
         *work = left;
+        if prune_repeated_vertices {
+            let Some(left) = work.checked_sub(path.len()) else {
+                return Some(Ok((routes, global_lower_bound)));
+            };
+            *work = left;
+            let head = graph.arcs[arc].head;
+            if head == graph.source
+                || path
+                    .iter()
+                    .any(|&previous| graph.arcs[previous].head == head)
+            {
+                continue;
+            }
+        }
         let Some(prefix) = crate::core::rounding::add_down(prefix, physical.arc_costs[arc]) else {
-            return Some(Err(incomplete(
-                "paired cyclic pricing prefix arithmetic failed",
-            )));
+            return Some(Ok((routes, global_lower_bound)));
         };
         path.truncate(path_len);
         path.push(arc);

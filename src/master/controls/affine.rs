@@ -61,6 +61,12 @@ impl Expression {
     pub fn coefficient(&self, index: usize) -> Interval {
         self.coefficients[index]
     }
+    pub fn coefficient_count(&self) -> usize {
+        self.coefficients.len()
+    }
+    pub fn constant_interval(&self) -> Interval {
+        self.constant
+    }
     pub fn range(&self, domains: &[Interval]) -> Option<Interval> {
         if domains.len() != self.coefficients.len() {
             return None;
