@@ -213,6 +213,82 @@ fn joint_control_proposals_include_attainable_extremes_of_an_equality_face() {
 }
 
 #[test]
+fn joint_control_projects_one_resource_through_opposing_rows() {
+    let output = root();
+    let mut state = output.snapshot.state.fork_state();
+    let mut work = 1_000_000;
+    let mut iterations = 100_000;
+    let priced = {
+        let oracle = &state.oracles[0];
+        path(
+            oracle,
+            state.shared_offset,
+            &vec![0.; state.rhs.len()],
+            &[0],
+            &mut work,
+            &mut iterations,
+            state.deadline,
+        )
+        .unwrap()
+        .unwrap()
+    };
+    let graph = state.oracles[0].network.graph.clone();
+    let initial = priced
+        .route
+        .as_ref()
+        .unwrap()
+        .clone()
+        .with_paired_controls(graph.as_ref(), sorted(priced.greedy.clone()))
+        .unwrap();
+
+    let gamma_row = state.shared_offset;
+    let upper_row = state.shared_offset + 1;
+    state.shared_rows[0].sense = RowSense::GreaterEqual;
+    state.shared_rows[0].rhs = 4.;
+    state.shared_rows[1].sense = RowSense::LessEqual;
+    state.shared_rows[1].rhs = 6.;
+    state.rhs[gamma_row] = 4.;
+    state.rhs[upper_row] = 6.;
+    state.oracles[0]
+        .activity_rows
+        .retain(|entry| entry.resource == 0);
+
+    let mut one_resource = priced;
+    one_resource.resources.truncate(1);
+    one_resource.domains.truncate(1);
+    one_resource.minimum.truncate(1);
+    one_resource.maximum.truncate(1);
+    one_resource.greedy.truncate(1);
+    let oracle = &state.oracles[0];
+    let proposals = joint_controls(
+        &state,
+        oracle,
+        &[0],
+        &one_resource,
+        &initial,
+        1.,
+        (&mut work, &mut iterations),
+    )
+    .expect("the common interval between opposing rows has attained endpoints");
+    let values: Vec<_> = proposals
+        .into_iter()
+        .filter_map(|controls| {
+            initial
+                .clone()
+                .with_paired_controls(graph.as_ref(), sorted(controls))
+                .ok()?
+                .coupled_values
+                .into_iter()
+                .find(|(resource, _)| *resource == 0)
+                .map(|(_, value)| value)
+        })
+        .collect();
+
+    assert!(values.contains(&4.));
+    assert!(values.contains(&6.));
+}
+
+#[test]
 fn scheduled_repair_checks_caps_and_coverage_after_profile_changes() {
     let output = root();
     let mut state = output.snapshot.state.fork_state();

@@ -243,7 +243,7 @@ fn joint_controls<const D: usize>(
         .into_iter()
         .collect();
     let n = priced.resources.len();
-    if n < 2 || *iterations == 0 || Instant::now() >= state.deadline {
+    if n == 0 || *iterations == 0 || Instant::now() >= state.deadline {
         return None;
     }
     *work = work.checked_sub(n.checked_mul(oracle.activity_rows.len().checked_add(1)?)?)?;
@@ -276,6 +276,11 @@ fn joint_controls<const D: usize>(
             .filter(|(_, a)| *a != 0.)
             .collect();
         constraints.push((state.shared_rows.get(row)?.sense, rhs, coefficients));
+    }
+    // A single paired resource needs joint projection only when multiple rows
+    // constrain it. One-row targets are already proposed by `price` below.
+    if n == 1 && constraints.len() < 2 {
+        return None;
     }
     // A zero-cost feasible point can be an unattainable interior Gamma even
     // when an endpoint of the same equality-constrained face is source-
