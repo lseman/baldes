@@ -11,8 +11,10 @@ use slope_interval::{outcome, SlopeLabel};
 pub(super) struct PreparedSlopePaired {
     pub(super) objective_coefficient: f64,
     initial: SlopeLabel,
+    upper_initial: Option<SlopeFront>,
     initial_minimum: f64,
     arcs: std::sync::Arc<[PreparedSlopeRelationArc]>,
+    upper_arcs: Option<std::sync::Arc<[PreparedSlopeRelationArc]>>,
     sources: std::sync::Arc<[SlopeRelationArc]>,
     backward: std::sync::Arc<[Option<PreparedRelationArc>]>,
     mode: PairedResourceMode,
@@ -40,6 +42,28 @@ fn constant(function: &PreparedSlopeFunction) -> Option<f64> {
         .skip(1)
         .all(|p| p.0 == 0.)
         .then(|| function.pairs()[0].0)
+}
+fn negate_function(function: &PreparedSlopeFunction) -> Result<PreparedSlopeFunction> {
+    PreparedSlopeFunction::from_prepared_pairs(
+        function
+            .pairs()
+            .iter()
+            .map(|&(slope, coordinate)| (-slope, coordinate))
+            .collect(),
+    )
+    .map_err(|error| invalid(error.to_string()))
+}
+fn negate_relation_arc(arc: &SlopeRelationArc) -> Result<SlopeRelationArc> {
+    Ok(SlopeRelationArc {
+        arrival: arc.arrival.clone(),
+        increment: negate_function(&arc.increment)?,
+        lower: negate_function(&arc.upper)?,
+        upper: negate_function(&arc.lower)?,
+        waiting: arc
+            .waiting
+            .checked_neg()
+            .ok_or_else(|| invalid("signed raw paired waiting overflow"))?,
+    })
 }
 // Conversion is advisory. Singleton domains and unrepresentable slopes keep
 // suffix replay as the authoritative feasibility check.
@@ -86,6 +110,25 @@ impl PreparedSlopePaired {
         let Some(witness) = outcome(front.minimum(budget))? else {
             return Err(invalid("empty raw paired initial front"));
         };
+        let upper_initial = negate_function(initial)
+            .and_then(|function| {
+                Ok(SlopeFront::from_prepared(function)
+                    .restrict(base.lower, base.upper, policy, budget))
+            })
+            .ok()
+            .and_then(|front| outcome(front).ok().flatten());
+        let upper_arcs = arcs
+            .iter()
+            .map(negate_relation_arc)
+            .collect::<Result<Vec<_>>>()
+            .and_then(|arcs| {
+                arcs.iter()
+                    .map(|arc| PreparedSlopeRelationArc::new(arc, policy))
+                    .collect::<std::result::Result<Vec<_>, _>>()
+                    .map_err(|error| invalid(error.to_string()))
+            })
+            .ok()
+            .map(std::sync::Arc::from);
         let mut shifts = false;
         if mode != PairedResourceMode::Feasibility {
             let first = arcs
@@ -137,8 +180,10 @@ impl PreparedSlopePaired {
         Ok(Self {
             objective_coefficient: 1.,
             initial: SlopeLabel::root(&front, true),
+            upper_initial,
             initial_minimum: finite(witness.value)?,
             arcs: prepared.into(),
+            upper_arcs,
             sources: arcs.to_vec().into(),
             backward: arcs
                 .iter()
@@ -171,7 +216,11 @@ impl PreparedSlopePaired {
         forward: bool,
         scale: f64,
     ) -> Option<f64> {
-        let scale = scale * self.objective_coefficient;
+        let scale = if self.has_costs() {
+            scale * self.objective_coefficient
+        } else {
+            0.
+        };
         if a == b {
             return Some(0.);
         }
@@ -180,6 +229,15 @@ impl PreparedSlopePaired {
                 (Some(a), Some(b)) if a.covers_above(b) => Some(0.),
                 _ => None,
             };
+        }
+        if scale < 0. {
+            if self.shifts {
+                return None;
+            }
+            let (Some(front_a), Some(front_b)) = (&a.upper_negative, &b.upper_negative) else {
+                return None;
+            };
+            return front_a.covers_below(front_b, self.policy).then_some(0.);
         }
         let (Some(front_a), Some(front_b)) = (&a.front, &b.front) else {
             return None;
@@ -198,12 +256,34 @@ impl PreparedSlopePaired {
     pub(super) fn has_costs(&self) -> bool {
         self.mode != PairedResourceMode::Feasibility
     }
+    pub(super) fn selected_value(&self, label: &SlopeLabel, scale: f64) -> Result<f64> {
+        if self.has_costs() && finite(scale * self.objective_coefficient)? < 0. {
+            let upper = label
+                .upper_negative
+                .as_ref()
+                .ok_or_else(|| invalid("signed raw paired upper frontier is unavailable"))?;
+            let witness = outcome(upper.minimum(FrontierBudget::default()))?
+                .ok_or_else(|| invalid("empty signed raw paired upper frontier"))?;
+            finite(-witness.value)
+        } else {
+            let front = label
+                .front
+                .as_ref()
+                .ok_or_else(|| invalid("missing raw paired front"))?;
+            let witness = outcome(front.minimum(FrontierBudget::default()))?
+                .ok_or_else(|| invalid("empty raw paired front"))?;
+            finite(witness.value)
+        }
+    }
     pub(super) fn root(&self, forward: bool) -> SlopeLabel {
         if forward {
-            self.initial.clone()
+            let mut root = self.initial.clone();
+            root.upper_negative = self.upper_initial.clone();
+            root
         } else {
             SlopeLabel {
                 front: None,
+                upper_negative: None,
                 minimum: 0.,
                 upper: None,
             }
@@ -235,6 +315,7 @@ impl PreparedSlopePaired {
         scale: f64,
     ) -> Result<Option<SlopeLabel>> {
         let scale = finite(scale * self.objective_coefficient)?;
+        let signed = self.has_costs() && scale < 0.;
         if !forward {
             let mut next = old.clone();
             next.upper = self.backward[arc].as_ref().and_then(|prepared| {
@@ -271,15 +352,40 @@ impl PreparedSlopePaired {
         let Some(witness) = outcome(front.minimum(FrontierBudget::default()))? else {
             return Ok(None);
         };
+        let upper_negative = match (&old.upper_negative, self.upper_arcs.as_ref()) {
+            (Some(old), Some(arcs)) => match arcs[arc].extend(old, FrontierBudget::default()) {
+                FrontierOutcome::Complete(front) => Some(front),
+                FrontierOutcome::Empty | FrontierOutcome::Unknown(_) => None,
+            },
+            _ => None,
+        };
+        if signed && upper_negative.is_none() {
+            return Err(crate::incomplete(
+                "signed raw paired upper frontier is unavailable",
+            ));
+        }
+        let selected = if signed {
+            let witness = outcome(
+                upper_negative
+                    .as_ref()
+                    .expect("checked signed envelope")
+                    .minimum(FrontierBudget::default()),
+            )?
+            .ok_or_else(|| invalid("empty signed raw paired upper frontier"))?;
+            -witness.value
+        } else {
+            witness.value
+        };
         let objective = if self.mode == PairedResourceMode::Feasibility {
             0.
         } else {
             self.normalization
-                .charge_selected(self.initial_minimum, witness.value, scale)
+                .charge_selected(self.initial_minimum, selected, scale)
                 .map_err(|error| invalid(error.to_string()))?
         };
         Ok(Some(SlopeLabel {
             front: Some(front),
+            upper_negative,
             minimum: finite(objective)?,
             upper: None,
         }))

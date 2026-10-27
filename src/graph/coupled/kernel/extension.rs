@@ -25,6 +25,7 @@ impl CoupledKernel {
                     } else {
                         slope_interval::SlopeLabel {
                             front: None,
+                            upper_negative: None,
                             minimum: 0.,
                             upper: None,
                         }

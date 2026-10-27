@@ -1,10 +1,15 @@
 //! Prepared paired relations and direction-specific physical-label state.
 use super::*;
-use relation::{BoundedCostFront, PreparedRelationArc, RelationFront, RelationWorkspace};
+use relation::{
+    BoundedCostFront, PreparedRelationArc, RelationArc, RelationFront, RelationWorkspace,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum PairedLabel {
-    Forward(RelationFront),
+    Forward {
+        lower: RelationFront,
+        upper_negative: Option<RelationFront>,
+    },
     /// `upper`: in feasibility mode, the highest dependent value at each base
     /// value from which the suffix stays feasible; None when unknown.
     Backward {
@@ -15,7 +20,16 @@ pub(super) enum PairedLabel {
 impl PairedLabel {
     pub(super) fn forward(&self) -> Option<&RelationFront> {
         match self {
-            Self::Forward(f) => Some(f),
+            Self::Forward { lower, .. } => Some(lower),
+            _ => None,
+        }
+    }
+    /// Negated maximum feasible dependent value, when its advisory recurrence
+    /// stayed representable. Its minimum is the negative of the attainable
+    /// maximum and therefore supports a negative linear objective coefficient.
+    pub(super) fn forward_upper_negative(&self) -> Option<&RelationFront> {
+        match self {
+            Self::Forward { upper_negative, .. } => upper_negative.as_ref(),
             _ => None,
         }
     }
@@ -31,7 +45,9 @@ pub(super) struct PreparedPaired {
     pub(super) objective_coefficient: f64,
     pub(super) normalization: PairedCostNormalization,
     initial: std::sync::Arc<RelationFront>,
+    upper_initial: Option<std::sync::Arc<RelationFront>>,
     arcs: std::sync::Arc<[PreparedRelationArc]>,
+    upper_arcs: Option<std::sync::Arc<[PreparedRelationArc]>>,
     mode: PairedResourceMode,
     exact: bool,
     ceiling: f64,
@@ -46,6 +62,20 @@ impl PreparedPaired {
     ) -> Result<Self> {
         let front = RelationFront::initial(initial, domain)?
             .ok_or_else(|| invalid("empty paired initial frontier"))?;
+        // The signed front is advisory. If negation/preparation overflows or
+        // becomes numerically unsupported, retain the valid ordinary front.
+        let signed = (|| -> Result<_> {
+            let initial = negate_function(initial)?;
+            let initial = RelationFront::initial(&initial, domain)?;
+            let initial = initial.ok_or_else(|| invalid("empty signed paired frontier"))?;
+            let arcs = arcs
+                .iter()
+                .map(negate_relation_arc)
+                .map(|arc| arc.and_then(|arc| PreparedRelationArc::new(&arc)))
+                .collect::<Result<Vec<_>>>()?;
+            Ok((std::sync::Arc::new(initial), std::sync::Arc::from(arcs)))
+        })()
+        .ok();
         let prepared = arcs
             .iter()
             .map(PreparedRelationArc::new)
@@ -65,7 +95,9 @@ impl PreparedPaired {
             objective_coefficient: 1.,
             normalization,
             initial: std::sync::Arc::new(front),
+            upper_initial: signed.as_ref().map(|(initial, _)| initial.clone()),
             arcs: prepared.into(),
+            upper_arcs: signed.map(|(_, arcs)| arcs),
             mode,
             exact,
             ceiling: arcs.first().map_or(0., |a| a.upper.points[0][1]),
@@ -96,7 +128,10 @@ impl PreparedPaired {
     }
     pub(super) fn root(&self, forward: bool) -> PairedLabel {
         if forward {
-            PairedLabel::Forward((*self.initial).clone())
+            PairedLabel::Forward {
+                lower: (*self.initial).clone(),
+                upper_negative: self.upper_initial.as_ref().map(|front| (**front).clone()),
+            }
         } else {
             PairedLabel::Backward {
                 cache: None,
@@ -106,13 +141,23 @@ impl PreparedPaired {
     }
     pub(super) fn objective(&self, state: &PairedLabel, scale: f64) -> Result<f64> {
         let scale = finite(scale * self.objective_coefficient)?;
-        match state.forward() {
-            Some(f) if self.mode != PairedResourceMode::Feasibility && scale != 0. => self
-                .normalization
-                .charge_selected(self.initial.minimum(), f.minimum(), scale)
-                .map_err(|error| invalid(error.to_string())),
-            _ => Ok(0.),
+        if self.mode == PairedResourceMode::Feasibility || scale == 0. {
+            return Ok(0.);
         }
+        let selected = if scale < 0. {
+            -state
+                .forward_upper_negative()
+                .ok_or_else(|| invalid("signed paired upper frontier is unavailable"))?
+                .minimum()
+        } else {
+            state
+                .forward()
+                .ok_or_else(|| invalid("paired forward join expected"))?
+                .minimum()
+        };
+        self.normalization
+            .charge_selected(self.initial.minimum(), selected, scale)
+            .map_err(|error| invalid(error.to_string()))
     }
     pub(super) fn extend(
         &self,
@@ -123,9 +168,27 @@ impl PreparedPaired {
         workspace: &mut RelationWorkspace,
     ) -> Result<Option<PairedLabel>> {
         match (forward, state) {
-            (true, PairedLabel::Forward(front)) => Ok(front
-                .extend_prepared(&self.arcs[arc], workspace)?
-                .map(PairedLabel::Forward)),
+            (
+                true,
+                PairedLabel::Forward {
+                    lower,
+                    upper_negative,
+                },
+            ) => {
+                let Some(lower) = lower.extend_prepared(&self.arcs[arc], workspace)? else {
+                    return Ok(None);
+                };
+                let upper_negative = match (upper_negative, self.upper_arcs.as_ref()) {
+                    (Some(old), Some(arcs)) => {
+                        old.extend_prepared(&arcs[arc], workspace).ok().flatten()
+                    }
+                    _ => None,
+                };
+                Ok(Some(PairedLabel::Forward {
+                    lower,
+                    upper_negative,
+                }))
+            }
             (false, PairedLabel::Backward { cache, upper }) => {
                 let next = if self.exact {
                     if let Some(old) = cache {
@@ -186,7 +249,9 @@ impl PreparedPaired {
         if !self.exact {
             return None;
         }
-        let (PairedLabel::Forward(f), PairedLabel::Backward { cache: Some(b), .. }) = (f, b) else {
+        let (PairedLabel::Forward { lower: f, .. }, PairedLabel::Backward { cache: Some(b), .. }) =
+            (f, b)
+        else {
             return None;
         };
         b.checked_compatible_join(f)
@@ -196,20 +261,56 @@ impl PreparedPaired {
         front: &PairedLabel,
         suffix: &continuation::Continuation,
         workspace: &mut RelationWorkspace,
+        maximize: bool,
     ) -> Result<Option<f64>> {
         let source = front
             .forward()
             .ok_or_else(|| invalid("paired forward join expected"))?;
         let mut current: Option<RelationFront> = None;
+        let mut current_upper = front.forward_upper_negative().cloned();
         for arc in suffix.iter() {
             let input = current.as_ref().unwrap_or(source);
             let Some(next) = input.extend_prepared(&self.arcs[arc], workspace)? else {
                 return Ok(None);
             };
             current = Some(next);
+            current_upper = match (current_upper.as_ref(), self.upper_arcs.as_ref()) {
+                (Some(input), Some(arcs)) => {
+                    input.extend_prepared(&arcs[arc], workspace).ok().flatten()
+                }
+                _ => None,
+            };
+        }
+        if maximize {
+            return current_upper
+                .map(|upper| Some(-upper.minimum()))
+                .ok_or_else(|| invalid("signed paired upper frontier is unavailable"));
         }
         Ok(Some(current.as_ref().unwrap_or(source).minimum()))
     }
+}
+
+fn negate_function(function: &PiecewiseLinearFunction) -> Result<PiecewiseLinearFunction> {
+    PiecewiseLinearFunction::new(
+        function
+            .points
+            .iter()
+            .map(|point| [point[0], -point[1]])
+            .collect(),
+    )
+}
+
+fn negate_relation_arc(arc: &RelationArc) -> Result<RelationArc> {
+    Ok(RelationArc {
+        arrival: arc.arrival.clone(),
+        increment: negate_function(&arc.increment)?,
+        lower: negate_function(&arc.upper)?,
+        upper: negate_function(&arc.lower)?,
+        waiting: arc
+            .waiting
+            .checked_neg()
+            .ok_or_else(|| invalid("signed paired waiting coefficient overflow"))?,
+    })
 }
 
 /// Borrowed subdivision is only an indexing precheck. Whole original pieces
@@ -222,7 +323,9 @@ pub(super) fn domains_may_intersect(
     if policy == bucketing::FrontBucketPolicy::Disabled {
         return true;
     }
-    let (PairedLabel::Forward(f), PairedLabel::Backward { cache: Some(b), .. }) = (f, b) else {
+    let (PairedLabel::Forward { lower: f, .. }, PairedLabel::Backward { cache: Some(b), .. }) =
+        (f, b)
+    else {
         return true;
     };
     bucketing::FrontBucketViews::new(f, policy).any(|view| {

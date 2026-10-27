@@ -155,15 +155,7 @@ impl CoupledKernel {
                 CoupledResource::SlopePaired { .. } => {
                     let (label, prepared) = slopes.next().expect("prepared paired shape");
                     if prepared.has_costs() {
-                        let front = label
-                            .front
-                            .as_ref()
-                            .ok_or_else(|| invalid("missing paired front"))?;
-                        let witness = slope_interval::outcome(
-                            front.minimum(descriptor::FrontierBudget::default()),
-                        )?
-                        .ok_or_else(|| invalid("missing paired minimum"))?;
-                        values.push((resource, finite(witness.value)?));
+                        values.push((resource, prepared.selected_value(label, self.cost_scale)?));
                     }
                 }
                 CoupledResource::PairedPiecewiseLinear { .. } => {

@@ -2,13 +2,44 @@ use super::*;
 
 impl<const D: usize> LabelingEngine<D> {
     pub fn solve(&mut self, g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
-        self.solve_internal(g, controls, false)
+        self.solve_internal(g, controls, false, false)
     }
 
     /// Retain completed routes and statistics on label/deadline exhaustion.
     /// An interrupted result is never exact; arithmetic/state errors propagate.
     pub fn solve_partial(&mut self, g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
-        self.solve_internal(g, controls, true)
+        self.solve_internal(g, controls, true, false)
+    }
+
+    /// Search signed paired objectives only to propose routes. The observed
+    /// minimum and completeness flag are deliberately discarded by this API.
+    pub(crate) fn solve_signed_candidates(
+        &mut self,
+        g: &Graph<D>,
+        controls: &Controls,
+    ) -> Result<PricingResult> {
+        let mut result = match self.solve_internal(g, controls, true, true) {
+            Ok(result) => result,
+            // Raw-slope signed envelopes are not implemented yet. In this
+            // proposal-only search, decline SCC seeds and let source-control
+            // pricing continue; never turn the unsupported frontier into a
+            // pricing certificate.
+            Err(error)
+                if error.kind == crate::core::error::ErrorKind::InvalidArgument
+                    && error.message == "signed raw paired-slope frontier is unavailable" =>
+            {
+                return Ok(PricingResult {
+                    columns: vec![],
+                    minimum_reduced_cost: 0.,
+                    exact: false,
+                    statistics: Default::default(),
+                });
+            }
+            Err(error) => return Err(error),
+        };
+        result.minimum_reduced_cost = 0.;
+        result.exact = false;
+        Ok(result)
     }
 
     fn solve_internal(
@@ -16,9 +47,11 @@ impl<const D: usize> LabelingEngine<D> {
         g: &Graph<D>,
         controls: &Controls,
         allow_partial: bool,
+        allow_signed_candidates: bool,
     ) -> Result<PricingResult> {
         if g.coupled_kernel()
             .is_some_and(|kernel| kernel.has_negative_paired_objectives())
+            && !allow_signed_candidates
         {
             return Err(crate::incomplete(
                 "negative paired objectives require source-control master pricing",

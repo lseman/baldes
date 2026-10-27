@@ -56,7 +56,13 @@ impl CoupledKernel {
             if !paired::domains_may_intersect(left, right, self.front_bucket_policy) {
                 return Ok(None);
             }
-            let joined = match prepared.cached_join(left, right) {
+            let scale = finite(self.cost_scale * prepared.objective_coefficient)?;
+            let cached = if scale >= 0. {
+                prepared.cached_join(left, right)
+            } else {
+                None
+            };
+            let joined = match cached {
                 Some(Some(value)) => value,
                 Some(None) => return Ok(None),
                 None => {
@@ -64,6 +70,7 @@ impl CoupledKernel {
                         left,
                         &b.suffix.as_ref().unwrap().program,
                         &mut workspace.relation,
+                        scale < 0.,
                     )?
                     else {
                         return Ok(None);
@@ -71,12 +78,17 @@ impl CoupledKernel {
                     value
                 }
             };
-            let scale = finite(self.cost_scale * prepared.objective_coefficient)?;
             if scale != 0. {
-                let baseline = left
-                    .forward()
-                    .ok_or_else(|| invalid("paired forward join expected"))?
-                    .minimum();
+                let baseline = if scale < 0. {
+                    -left
+                        .forward_upper_negative()
+                        .ok_or_else(|| invalid("signed paired upper frontier is unavailable"))?
+                        .minimum()
+                } else {
+                    left.forward()
+                        .ok_or_else(|| invalid("paired forward join expected"))?
+                        .minimum()
+                };
                 // Feasibility-only paired relations have no objective.
                 if prepared.has_costs() {
                     front_correction =
@@ -194,6 +206,7 @@ impl CoupledKernel {
             && self.initial.is_empty()
             && !self.paired.is_empty()
             && self.plugins.is_empty()
+            && !self.has_negative_paired_objectives()
         {
             let mut total = 0.;
             let mut known = true;

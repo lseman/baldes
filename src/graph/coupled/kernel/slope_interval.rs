@@ -5,6 +5,9 @@ use descriptor::{FrontierBudget, FrontierOutcome, SlopeFront};
 #[derive(Clone, Debug)]
 pub(super) struct SlopeLabel {
     pub(super) front: Option<SlopeFront>,
+    /// Negated upper envelope for paired raw-slope relations. Its minimum is
+    /// the negative of the largest attainable dependent value.
+    pub(super) upper_negative: Option<SlopeFront>,
     pub(super) minimum: f64,
     pub(super) upper: Option<relation::RelationFront>,
 }
@@ -13,20 +16,24 @@ impl PartialEq for SlopeLabel {
         if self.minimum.to_bits() != other.minimum.to_bits() || self.upper != other.upper {
             return false;
         }
-        match (&self.front, &other.front) {
-            (None, None) => true,
-            (Some(a), Some(b)) => {
-                a.used_tolerant_alignment() == b.used_tolerant_alignment()
-                    && a.components().len() == b.components().len()
-                    && a.components().iter().zip(b.components()).all(|(a, b)| {
-                        a.pairs().len() == b.pairs().len()
-                            && a.pairs().iter().zip(b.pairs()).all(|(a, b)| {
-                                a.0.to_bits() == b.0.to_bits() && a.1.to_bits() == b.1.to_bits()
-                            })
-                    })
-            }
-            _ => false,
+        fronts_equal(&self.front, &other.front)
+            && fronts_equal(&self.upper_negative, &other.upper_negative)
+    }
+}
+fn fronts_equal(a: &Option<SlopeFront>, b: &Option<SlopeFront>) -> bool {
+    match (a, b) {
+        (None, None) => true,
+        (Some(a), Some(b)) => {
+            a.used_tolerant_alignment() == b.used_tolerant_alignment()
+                && a.components().len() == b.components().len()
+                && a.components().iter().zip(b.components()).all(|(a, b)| {
+                    a.pairs().len() == b.pairs().len()
+                        && a.pairs().iter().zip(b.pairs()).all(|(a, b)| {
+                            a.0.to_bits() == b.0.to_bits() && a.1.to_bits() == b.1.to_bits()
+                        })
+                })
         }
+        _ => false,
     }
 }
 /// Shared leaf fronts prepared once per arc, including phase-I domain-only
@@ -160,6 +167,7 @@ impl SlopeLabel {
     pub(super) fn root(front: &SlopeFront, forward: bool) -> Self {
         Self {
             front: forward.then(|| front.clone()),
+            upper_negative: None,
             minimum: 0.,
             upper: None,
         }
@@ -208,6 +216,7 @@ impl SlopeLabel {
         };
         Ok(Some(Self {
             front: Some(front),
+            upper_negative: None,
             minimum: finite(witness.value)?,
             upper: None,
         }))

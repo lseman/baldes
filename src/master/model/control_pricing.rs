@@ -1985,6 +1985,657 @@ pub(super) fn column_bound_using<const D: usize>(
     Some(path(oracle, offset, duals, arcs, work, iterations, deadline)?.map(|p| p.lower))
 }
 
+fn process_path<const D: usize>(
+    state: &State<D>,
+    oracle: &Oracle<D>,
+    duals: &[f64],
+    arcs: &[usize],
+    work: &mut usize,
+    iterations: &mut usize,
+    minimum: &mut f64,
+    routes: &mut Vec<Route>,
+    seen: &mut HashSet<String>,
+) -> Result<()> {
+    let result = path(
+        oracle,
+        state.shared_offset,
+        duals,
+        arcs,
+        work,
+        iterations,
+        state.deadline,
+    )
+    .ok_or_else(|| incomplete("paired source-control pricing control coverage incomplete"))?;
+    let Some(result) = result else {
+        return Ok(());
+    };
+    *minimum = minimum.min(result.lower);
+    let Some(ref route) = result.route else {
+        return Ok(());
+    };
+    // Row boundary proposals enrich the restricted master. They are never
+    // used to assert exhaustive control coverage or source infeasibility.
+    let initial = route
+        .clone()
+        .with_paired_controls(&oracle.network.graph, sorted(result.greedy.clone()))?;
+    let coefficients: BTreeMap<_, _> = entries(oracle, &initial, state.shared_offset)?
+        .into_iter()
+        .collect();
+    let mut quantities = vec![1.];
+    for count in [
+        oracle.network.multiplicity.lower.ceil(),
+        oracle.multiplicity_upper().floor(),
+    ] {
+        if count.is_finite() && (1. ..=9_007_199_254_740_992.).contains(&count) {
+            quantities.push(count);
+        }
+    }
+    quantities.sort_by(f64::total_cmp);
+    quantities.dedup();
+    let mut choices = vec![];
+    for quantity in quantities {
+        if let Some(controls) = joint_controls(
+            state,
+            oracle,
+            arcs,
+            &result,
+            &initial,
+            quantity,
+            (work, iterations),
+        ) {
+            choices.extend(controls);
+        }
+    }
+    choices.extend([
+        result.minimum.clone(),
+        result.maximum.clone(),
+        result.greedy.clone(),
+    ]);
+    for (i, &resource) in result.resources.iter().enumerate() {
+        for c in oracle
+            .activity_rows
+            .iter()
+            .filter(|c| c.resource == resource && c.coefficient != 0.)
+        {
+            let r = state.shared_offset + c.row;
+            let coefficient: f64 = oracle
+                .activity_rows
+                .iter()
+                .filter(|other| other.resource == resource && other.row == c.row)
+                .map(|other| other.coefficient)
+                .sum();
+            let value = initial
+                .coupled_values
+                .iter()
+                .find(|(r, _)| *r == resource)
+                .map(|(_, v)| *v)
+                .unwrap_or(0.);
+            let target =
+                value + (state.rhs[r] - coefficients.get(&r).copied().unwrap_or(0.)) / coefficient;
+            if !target.is_finite() || target < result.domains[i].lo || target > result.domains[i].hi
+            {
+                continue;
+            }
+            if let Some(proposal) = target_control(
+                oracle,
+                arcs,
+                resource,
+                target,
+                work,
+                iterations,
+                state.deadline,
+            ) {
+                if let Some(control) = proposal.control {
+                    let mut selection = result.greedy.clone();
+                    selection[i] = control;
+                    choices.push(selection);
+                }
+            }
+        }
+    }
+    for controls in choices {
+        let candidate = route
+            .clone()
+            .with_paired_controls(&oracle.network.graph, sorted(controls))?;
+        if lifecycle::integer_route_feasible(oracle, &candidate)?
+            && seen.insert(candidate.identity())
+        {
+            routes.push(candidate);
+        }
+    }
+    Ok(())
+}
+
+struct PhysicalSuffixBounds {
+    suffix: Vec<Vec<Option<f64>>>,
+    arc_costs: Vec<f64>,
+    route_constant: f64,
+    paired_lower: f64,
+}
+
+fn row_simple_supported<const D: usize>(oracle: &Oracle<D>) -> bool {
+    oracle
+        .activity_rows
+        .iter()
+        .all(|entry| activity_rows::paired(&oracle.network.graph, entry.resource))
+        && oracle.nonlinear_rows.is_empty()
+        && oracle.knapsack_rows.is_empty()
+        && oracle.presence_rows.is_empty()
+        && oracle.resource_groups.is_empty()
+        && oracle.solver.cuts.cuts.is_empty()
+        && oracle.solver.cuts.knapsack_cuts.is_empty()
+}
+
+fn paired_global_lower_bound<const D: usize>(
+    oracle: &Oracle<D>,
+    offset: usize,
+    duals: &[f64],
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<f64> {
+    let graph = &oracle.network.graph;
+    let kernel = graph.coupled_kernel()?;
+    let mut lower = 0.;
+    for (resource, definition) in kernel.definitions().iter().enumerate() {
+        let (normalization, value_lower, value_upper, cost_mode) = match definition {
+            CoupledResource::PairedPiecewiseLinear {
+                initial,
+                arcs,
+                mode,
+                normalization,
+                ..
+            } => {
+                if *mode == crate::graph::coupled::PairedResourceMode::Feasibility
+                    && !oracle
+                        .activity_rows
+                        .iter()
+                        .any(|entry| entry.resource == resource)
+                {
+                    continue;
+                }
+                let initial_lower = initial
+                    .points
+                    .iter()
+                    .map(|point| point[1])
+                    .fold(f64::INFINITY, f64::min);
+                let initial_upper = initial
+                    .points
+                    .iter()
+                    .map(|point| point[1])
+                    .fold(f64::NEG_INFINITY, f64::max);
+                let mut low = initial_lower;
+                let mut high = initial_upper;
+                for arc in arcs {
+                    low = low.min(
+                        arc.lower
+                            .points
+                            .iter()
+                            .map(|point| point[1])
+                            .fold(f64::INFINITY, f64::min),
+                    );
+                    high = high.max(
+                        arc.upper
+                            .points
+                            .iter()
+                            .map(|point| point[1])
+                            .fold(f64::NEG_INFINITY, f64::max),
+                    );
+                }
+                (
+                    *normalization,
+                    low,
+                    high,
+                    *mode != crate::graph::coupled::PairedResourceMode::Feasibility,
+                )
+            }
+            CoupledResource::SlopePaired { .. } => {
+                // The raw-slope source domain needs its own directed hull.
+                return None;
+            }
+            _ => continue,
+        };
+        if !value_lower.is_finite() || !value_upper.is_finite() || value_lower > value_upper {
+            return None;
+        }
+        let values = Interval {
+            lo: value_lower,
+            hi: value_upper,
+        };
+        let objective_coefficient = if cost_mode {
+            kernel.effective_objective_coefficient(resource)?
+        } else {
+            0.
+        };
+        if objective_coefficient != 0. {
+            let amount = match normalization {
+                crate::graph::coupled::PairedCostNormalization::AbsoluteFinalValue => values,
+                crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum => {
+                    let baseline = kernel.paired_initial_minimum(resource, work, Some(deadline))?;
+                    Interval {
+                        lo: crate::core::rounding::add_down(values.lo, -baseline[1])?,
+                        hi: crate::core::rounding::add_up(values.hi, -baseline[0])?,
+                    }
+                }
+            };
+            lower =
+                crate::core::rounding::add_down(lower, amount.scale(objective_coefficient)?.lo)?;
+        }
+        for entry in oracle
+            .activity_rows
+            .iter()
+            .filter(|entry| entry.resource == resource)
+        {
+            let dual = *duals.get(offset.checked_add(entry.row)?)?;
+            let row_value = values.scale(entry.coefficient)?;
+            lower = crate::core::rounding::add_down(lower, row_value.scale(-dual)?.lo)?;
+        }
+    }
+    Some(lower)
+}
+
+fn suffix_table<const D: usize>(
+    graph: &Graph<D>,
+    arc_costs: &[f64],
+    hops: usize,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<Vec<Vec<Option<f64>>>> {
+    let mut suffix = vec![vec![None; graph.vertices.len()]; hops.checked_add(1)?];
+    *suffix[0].get_mut(graph.sink)? = Some(0.);
+    for remaining in 1..=hops {
+        if Instant::now() >= deadline {
+            return None;
+        }
+        let (before, current) = suffix.split_at_mut(remaining);
+        current[0].clone_from(&before[remaining - 1]);
+        let previous = &before[remaining - 1];
+        let current = &mut current[0];
+        for (index, arc) in graph.arcs.iter().enumerate() {
+            *work = work.checked_sub(1)?;
+            let Some(tail) = previous.get(arc.head).copied().flatten() else {
+                continue;
+            };
+            let candidate = crate::core::rounding::add_down(*arc_costs.get(index)?, tail)?;
+            let value = current.get_mut(arc.tail)?;
+            *value = Some(value.map_or(candidate, |old: f64| old.min(candidate)));
+        }
+    }
+    Some(suffix)
+}
+
+fn physical_suffix_bounds<const D: usize>(
+    oracle: &Oracle<D>,
+    offset: usize,
+    duals: &[f64],
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<PhysicalSuffixBounds> {
+    if !row_simple_supported(oracle) {
+        return None;
+    }
+    let graph = &oracle.network.graph;
+    if graph
+        .coupled_kernel()?
+        .definitions()
+        .iter()
+        .any(|definition| {
+            !matches!(
+                definition,
+                CoupledResource::PairedPiecewiseLinear { .. }
+                    | CoupledResource::SlopePaired {
+                        mode: crate::graph::coupled::PairedResourceMode::Feasibility,
+                        ..
+                    }
+            ) && matches!(
+                definition,
+                CoupledResource::CumulativeCost { .. }
+                    | CoupledResource::CustomResource { .. }
+                    | CoupledResource::IntervalCost { .. }
+                    | CoupledResource::SlopeIntervalCost { .. }
+                    | CoupledResource::PiecewiseLinearCost { .. }
+                    | CoupledResource::EncodedPiecewiseLinearCost { .. }
+                    | CoupledResource::Plugin(_)
+            )
+        })
+    {
+        // This branch has no separate directed lower bound for non-paired
+        // resource charges. Do not omit them from a certificate.
+        return None;
+    }
+    if oracle.network.arc_entries.len() != graph.arcs.len() {
+        return None;
+    }
+    *work = work.checked_sub(
+        graph
+            .vertices
+            .len()
+            .checked_add(graph.arcs.len())?
+            .checked_add(oracle.route_entries.len())?
+            .checked_add(oracle.network.route_entries.len())?,
+    )?;
+    let dual = |row: usize| -> Option<f64> {
+        let value = *duals.get(row)?;
+        value.is_finite().then_some(value)
+    };
+    let mut route_constant = 0.;
+    for &(row, coefficient) in &oracle.route_entries {
+        route_constant = crate::core::rounding::add_down(
+            route_constant,
+            crate::core::rounding::multiply_down(-dual(row)?, coefficient)?,
+        )?;
+    }
+    for &(row, coefficient) in oracle.network.route_entries.iter() {
+        route_constant = crate::core::rounding::add_down(
+            route_constant,
+            crate::core::rounding::multiply_down(-dual(offset.checked_add(row)?)?, coefficient)?,
+        )?;
+    }
+    let mut arc_costs = Vec::with_capacity(graph.arcs.len());
+    for (index, arc) in graph.arcs.iter().enumerate() {
+        let mut cost = arc.cost;
+        for &(row, coefficient) in oracle.network.arc_entries.get(index)? {
+            *work = work.checked_sub(1)?;
+            cost = crate::core::rounding::add_down(
+                cost,
+                crate::core::rounding::multiply_down(
+                    -dual(offset.checked_add(row)?)?,
+                    coefficient,
+                )?,
+            )?;
+        }
+        arc_costs.push(cost);
+    }
+    let paired_lower = paired_global_lower_bound(oracle, offset, duals, work, deadline)?;
+    let suffix = suffix_table(graph, &arc_costs, graph.original_max_arcs(), work, deadline)?;
+    Some(PhysicalSuffixBounds {
+        suffix,
+        arc_costs,
+        route_constant,
+        paired_lower,
+    })
+}
+
+fn signed_scc_seed_paths<const D: usize>(
+    state: &State<D>,
+    oracle: &Oracle<D>,
+    duals: &[f64],
+    deadline: Instant,
+) -> Option<Vec<Vec<usize>>> {
+    let mut graph = oracle.network.graph.as_ref().clone();
+    for (index, arc) in graph.arcs.iter_mut().enumerate() {
+        let mut reduced = arc.cost;
+        for &(row, coefficient) in oracle.network.arc_entries.get(index)? {
+            reduced = crate::core::rounding::add_down(
+                reduced,
+                crate::core::rounding::multiply_down(
+                    -*duals.get(state.shared_offset.checked_add(row)?)?,
+                    coefficient,
+                )?,
+            )?;
+        }
+        arc.reduced_cost = reduced;
+    }
+    let mut adjustments = BTreeMap::<usize, f64>::new();
+    for entry in &oracle.activity_rows {
+        if entry.coefficient == 0. || !activity_rows::paired(&graph, entry.resource) {
+            continue;
+        }
+        let dual = *duals.get(state.shared_offset.checked_add(entry.row)?)?;
+        let adjustment = crate::core::rounding::multiply_down(-dual, entry.coefficient)?;
+        let value = adjustments.entry(entry.resource).or_default();
+        *value = crate::core::rounding::add_down(*value, adjustment)?;
+    }
+    graph
+        .set_coupled_pricing_adjustments(
+            &adjustments
+                .into_iter()
+                .filter(|(_, coefficient)| *coefficient != 0.)
+                .collect::<Vec<_>>(),
+        )
+        .ok()?;
+    let candidates = oracle
+        .solver
+        .signed_candidate_routes(graph, 32, deadline)
+        .ok()?;
+    let positions: HashMap<_, _> = oracle
+        .network
+        .graph
+        .arcs
+        .iter()
+        .enumerate()
+        .map(|(position, arc)| (arc.id, position))
+        .collect();
+    candidates
+        .columns
+        .into_iter()
+        .map(|route| {
+            route
+                .arcs
+                .into_iter()
+                .map(|arc| positions.get(&arc).copied())
+                .collect()
+        })
+        .collect()
+}
+
+fn branch_and_bound_price<const D: usize>(
+    state: &State<D>,
+    index: usize,
+    duals: &[f64],
+    work: &mut usize,
+) -> Option<Result<(Vec<Route>, f64)>> {
+    let oracle = state.oracles.get(index)?;
+    if state
+        .original_variable_costs
+        .iter()
+        .any(|model| model.network == oracle.network.id)
+    {
+        return None;
+    }
+    let physical =
+        physical_suffix_bounds(oracle, state.shared_offset, duals, work, state.deadline)?;
+    let graph = &oracle.network.graph;
+    let hops = physical.suffix.len().checked_sub(1)?;
+    if physical
+        .suffix
+        .get(hops)?
+        .get(graph.source)
+        .copied()
+        .flatten()
+        .is_none()
+    {
+        return Some(Ok((Vec::new(), 0.)));
+    }
+    let mut outgoing = vec![Vec::new(); graph.vertices.len()];
+    for (arc, data) in graph.arcs.iter().enumerate() {
+        let Some(left) = work.checked_sub(1) else {
+            return Some(Err(incomplete(
+                "paired cyclic pricing work budget exhausted",
+            )));
+        };
+        *work = left;
+        outgoing.get_mut(data.tail)?.push(arc);
+    }
+    struct Frame {
+        vertex: usize,
+        remaining: usize,
+        prefix: f64,
+        path_len: usize,
+        next_arc: usize,
+        entered: bool,
+    }
+    let mut stack = vec![Frame {
+        vertex: graph.source,
+        remaining: hops,
+        prefix: 0.,
+        path_len: 0,
+        next_arc: 0,
+        entered: false,
+    }];
+    let mut path = Vec::new();
+    let mut iterations = 100_000;
+    let mut minimum = f64::INFINITY;
+    let mut routes = Vec::new();
+    let mut seen = HashSet::new();
+    // Native SCC label sweeps are useful candidate generators, but their
+    // minima and dominance trajectory are not proof. Re-price every seed
+    // through the source-control model before the bounded-walk proof pass.
+    let seed_started = Instant::now();
+    let seed_deadline = seed_started
+        .checked_add(state.deadline.saturating_duration_since(seed_started) / 4)
+        .unwrap_or(state.deadline)
+        .min(state.deadline);
+    let seed_budget = *work / 4;
+    let mut seed_work = seed_budget;
+    let seed_iterations = iterations / 4;
+    let mut remaining_seed_iterations = seed_iterations;
+    if let Some(candidates) = signed_scc_seed_paths(state, oracle, duals, seed_deadline) {
+        for candidate in candidates {
+            if Instant::now() >= seed_deadline {
+                break;
+            }
+            if candidate.iter().any(|&arc| arc >= graph.arcs.len()) {
+                continue;
+            }
+            if process_path(
+                state,
+                oracle,
+                duals,
+                &candidate,
+                &mut seed_work,
+                &mut remaining_seed_iterations,
+                &mut minimum,
+                &mut routes,
+                &mut seen,
+            )
+            .is_err()
+            {
+                break;
+            }
+        }
+    }
+    *work = work.checked_sub(seed_budget - seed_work)?;
+    iterations = iterations.checked_sub(seed_iterations - remaining_seed_iterations)?;
+    while !stack.is_empty() {
+        if Instant::now() >= state.deadline {
+            return Some(Err(incomplete("paired cyclic pricing time limit exceeded")));
+        }
+        let top = stack.len() - 1;
+        if !stack[top].entered {
+            let Some(left) = work.checked_sub(1) else {
+                return Some(Err(incomplete(
+                    "paired cyclic pricing work budget exhausted",
+                )));
+            };
+            *work = left;
+            let frame = &stack[top];
+            let Some(tail) = physical
+                .suffix
+                .get(frame.remaining)
+                .and_then(|row| row.get(frame.vertex))
+                .copied()
+                .flatten()
+            else {
+                stack.pop();
+                if let Some(parent) = stack.last() {
+                    path.truncate(parent.path_len);
+                }
+                continue;
+            };
+            let Some(prefix_tail) = crate::core::rounding::add_down(frame.prefix, tail) else {
+                return Some(Err(incomplete(
+                    "paired cyclic pricing bound arithmetic failed",
+                )));
+            };
+            let Some(constant) =
+                crate::core::rounding::add_down(physical.route_constant, physical.paired_lower)
+            else {
+                return Some(Err(incomplete(
+                    "paired cyclic pricing bound arithmetic failed",
+                )));
+            };
+            let Some(bound) = crate::core::rounding::add_down(prefix_tail, constant) else {
+                return Some(Err(incomplete(
+                    "paired cyclic pricing bound arithmetic failed",
+                )));
+            };
+            if bound >= 0. {
+                minimum = minimum.min(bound);
+                stack.pop();
+                if let Some(parent) = stack.last() {
+                    path.truncate(parent.path_len);
+                }
+                continue;
+            }
+            if frame.vertex == graph.sink {
+                if let Err(error) = process_path(
+                    state,
+                    oracle,
+                    duals,
+                    &path,
+                    work,
+                    &mut iterations,
+                    &mut minimum,
+                    &mut routes,
+                    &mut seen,
+                ) {
+                    return Some(Err(error));
+                }
+                stack.pop();
+                if let Some(parent) = stack.last() {
+                    path.truncate(parent.path_len);
+                }
+                continue;
+            }
+            if frame.remaining == 0 {
+                stack.pop();
+                if let Some(parent) = stack.last() {
+                    path.truncate(parent.path_len);
+                }
+                continue;
+            }
+            stack[top].entered = true;
+        }
+        let (arc, prefix, path_len, remaining) = {
+            let frame = &mut stack[top];
+            let Some(&arc) = outgoing
+                .get(frame.vertex)
+                .and_then(|arcs| arcs.get(frame.next_arc))
+            else {
+                stack.pop();
+                if let Some(parent) = stack.last() {
+                    path.truncate(parent.path_len);
+                }
+                continue;
+            };
+            frame.next_arc += 1;
+            (arc, frame.prefix, frame.path_len, frame.remaining)
+        };
+        let Some(left) = work.checked_sub(1) else {
+            return Some(Err(incomplete(
+                "paired cyclic pricing work budget exhausted",
+            )));
+        };
+        *work = left;
+        let Some(prefix) = crate::core::rounding::add_down(prefix, physical.arc_costs[arc]) else {
+            return Some(Err(incomplete(
+                "paired cyclic pricing prefix arithmetic failed",
+            )));
+        };
+        path.truncate(path_len);
+        path.push(arc);
+        stack.push(Frame {
+            vertex: graph.arcs[arc].head,
+            remaining: remaining - 1,
+            prefix,
+            path_len: path.len(),
+            next_arc: 0,
+            entered: false,
+        });
+    }
+    Some(Ok((routes, if minimum.is_finite() { minimum } else { 0. })))
+}
+
 pub(super) fn price<const D: usize>(
     state: &State<D>,
     index: usize,
@@ -1993,127 +2644,26 @@ pub(super) fn price<const D: usize>(
     let oracle = &state.oracles[index];
     let mut work = 4_000_000;
     let mut iterations = 100_000;
+    if let Some(result) = branch_and_bound_price(state, index, duals, &mut work) {
+        return result;
+    }
     let mut minimum = f64::INFINITY;
     let mut routes = vec![];
     let mut seen = HashSet::new();
     let mut visitor_error = None;
     let visited =
         bounds::columns::visit_physical_paths(oracle, &mut work, state.deadline, |arcs, work| {
-            let result: Result<()> = (|| {
-                let result = path(
-                    oracle,
-                    state.shared_offset,
-                    duals,
-                    &arcs,
-                    work,
-                    &mut iterations,
-                    state.deadline,
-                )
-                .ok_or_else(|| {
-                    incomplete("paired source-control pricing control coverage incomplete")
-                })?;
-                let Some(result) = result else {
-                    return Ok(());
-                };
-                minimum = minimum.min(result.lower);
-                let Some(ref route) = result.route else {
-                    return Ok(());
-                };
-                // Row boundary proposals enrich the restricted master. They are never
-                // used to assert exhaustive control coverage or source infeasibility.
-                let initial = route
-                    .clone()
-                    .with_paired_controls(&oracle.network.graph, sorted(result.greedy.clone()))?;
-                let coefficients: BTreeMap<_, _> = entries(oracle, &initial, state.shared_offset)?
-                    .into_iter()
-                    .collect();
-                let mut quantities = vec![1.];
-                for count in [
-                    oracle.network.multiplicity.lower.ceil(),
-                    oracle.multiplicity_upper().floor(),
-                ] {
-                    if count.is_finite() && (1. ..=9_007_199_254_740_992.).contains(&count) {
-                        quantities.push(count);
-                    }
-                }
-                quantities.sort_by(f64::total_cmp);
-                quantities.dedup();
-                let mut choices = vec![];
-                for quantity in quantities {
-                    if let Some(controls) = joint_controls(
-                        state,
-                        oracle,
-                        &arcs,
-                        &result,
-                        &initial,
-                        quantity,
-                        (work, &mut iterations),
-                    ) {
-                        choices.extend(controls);
-                    }
-                }
-                choices.extend([
-                    result.minimum.clone(),
-                    result.maximum.clone(),
-                    result.greedy.clone(),
-                ]);
-                for (i, &resource) in result.resources.iter().enumerate() {
-                    for c in oracle
-                        .activity_rows
-                        .iter()
-                        .filter(|c| c.resource == resource && c.coefficient != 0.)
-                    {
-                        let r = state.shared_offset + c.row;
-                        let coefficient: f64 = oracle
-                            .activity_rows
-                            .iter()
-                            .filter(|other| other.resource == resource && other.row == c.row)
-                            .map(|other| other.coefficient)
-                            .sum();
-                        let value = initial
-                            .coupled_values
-                            .iter()
-                            .find(|(r, _)| *r == resource)
-                            .map(|(_, v)| *v)
-                            .unwrap_or(0.);
-                        let target = value
-                            + (state.rhs[r] - coefficients.get(&r).copied().unwrap_or(0.))
-                                / coefficient;
-                        if !target.is_finite()
-                            || target < result.domains[i].lo
-                            || target > result.domains[i].hi
-                        {
-                            continue;
-                        }
-                        if let Some(proposal) = target_control(
-                            oracle,
-                            &arcs,
-                            resource,
-                            target,
-                            work,
-                            &mut iterations,
-                            state.deadline,
-                        ) {
-                            if let Some(control) = proposal.control {
-                                let mut selection = result.greedy.clone();
-                                selection[i] = control;
-                                choices.push(selection);
-                            }
-                        }
-                    }
-                }
-                for controls in choices {
-                    let candidate = route
-                        .clone()
-                        .with_paired_controls(&oracle.network.graph, sorted(controls))?;
-                    if lifecycle::integer_route_feasible(oracle, &candidate)?
-                        && seen.insert(candidate.identity())
-                    {
-                        routes.push(candidate);
-                    }
-                }
-                Ok(())
-            })();
+            let result = process_path(
+                state,
+                oracle,
+                duals,
+                &arcs,
+                work,
+                &mut iterations,
+                &mut minimum,
+                &mut routes,
+                &mut seen,
+            );
             match result {
                 Ok(()) => Ok(()),
                 Err(error) => {

@@ -112,10 +112,6 @@ impl CoupledKernel {
         frozen_fronts: bool,
         vertex: Option<usize>,
     ) -> Option<f64> {
-        if self.has_negative_paired_objectives() {
-            // Minimum fronts do not retain a maximum-control continuation set.
-            return None;
-        }
         if vertex.is_some_and(|vertex| !self.route_domains.contains_vertex(vertex)) {
             return None;
         }
@@ -131,6 +127,14 @@ impl CoupledKernel {
                 .any(|(a, b)| a & b != *b)
         {
             return None;
+        }
+        if self.has_negative_paired_objectives() {
+            self.check_state(a).ok()?;
+            self.check_state(b).ok()?;
+            // The upper-front recurrence is advisory: unsupported arithmetic
+            // leaves it unknown and must not create a dominance relation.
+            // Exact state identity remains safe under any signed continuation.
+            return (a == b).then_some(0.);
         }
         if self.weighted_objective || !self.pricing_activities.is_empty() {
             // Until a joint component proof is available, only identical
