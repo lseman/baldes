@@ -31,7 +31,7 @@ fn target_control<const D: usize>(
     deadline: Instant,
 ) -> Option<ControlOptimization> {
     let mut limits = ControlSearchLimits {
-        max_cells: 4096,
+        max_cells: usize::MAX,
         max_work: *work,
         max_lp_iterations: *iterations,
         deadline: Some(deadline),
@@ -60,7 +60,7 @@ fn domain<const D: usize>(
     deadline: Instant,
 ) -> Option<Option<TerminalDomain>> {
     let mut limits = ControlSearchLimits {
-        max_cells: 4096,
+        max_cells: usize::MAX,
         max_work: *work,
         max_lp_iterations: *iterations,
         deadline: Some(deadline),

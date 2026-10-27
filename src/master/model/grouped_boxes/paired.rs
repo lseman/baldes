@@ -29,7 +29,7 @@ pub(super) fn range<const D: usize>(
     let mut work = 1_000_000;
     let paths = super::relaxed_activity_paths(graph, &mut work, deadline)?;
     let mut limits = ControlSearchLimits {
-        max_cells: 4096,
+        max_cells: usize::MAX,
         max_work: work,
         max_lp_iterations: 100_000,
         deadline: Some(deadline),

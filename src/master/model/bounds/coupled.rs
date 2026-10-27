@@ -21,7 +21,7 @@ pub(super) fn minimum<const D: usize>(
     // Cover n-1 arcs for physical-simple routes or the explicit finite walk
     // bound. An unproved n-1 truncation could omit cheaper repeated walks,
     // particularly when resource objectives have negative costs.
-    let allowance = (*work / 4).min(250_000);
+    let allowance = *work / 4;
     let mut remaining = allowance;
     let relaxed_minimum = kernel.objective_walk_lower_bound(
         graph,
@@ -36,7 +36,7 @@ pub(super) fn minimum<const D: usize>(
             .flatten()
             .map(Some)
     };
-    let allowance = (*work / 4).min(100_000);
+    let allowance = *work / 4;
     if allowance == 0 {
         return fallback();
     }
@@ -45,49 +45,55 @@ pub(super) fn minimum<const D: usize>(
         .resources
         .fill(crate::graph::ResourceKind::Disposable);
     relaxed.set_coupled_resources(&[]).ok()?;
-    let collected = match CompleteResourceRelaxation::collect(
+    // Reserve half of this phase's allowance for certification while the
+    // finite path universe is visited incrementally. The previous collector
+    // retained every physical path and imposed a separate 4,096-path ceiling.
+    let mut certificate_work = work.checked_sub(allowance)?;
+    let mut minimum: Option<f64> = None;
+    let visited = match CompleteResourceRelaxation::visit(
         &relaxed,
         PathDomainLimits {
-            max_paths: 4096,
+            max_paths: allowance,
             max_work: allowance,
             max_stored_arcs: allowance,
             deadline: Some(deadline),
         },
+        |path| {
+            if Instant::now() >= deadline {
+                return Err(crate::enumeration::PathDomainFailure::TimeLimit);
+            }
+            let Some(left) = path
+                .len()
+                .checked_add(1)
+                .and_then(|amount| certificate_work.checked_sub(amount))
+            else {
+                return Err(crate::enumeration::PathDomainFailure::WorkLimit);
+            };
+            certificate_work = left;
+            let Some((feasible, objective)) =
+                kernel.certify_with_budget(path, &mut certificate_work, Some(deadline))
+            else {
+                return Err(crate::enumeration::PathDomainFailure::WorkLimit);
+            };
+            if feasible {
+                if !objective[0].is_finite() {
+                    return Err(crate::enumeration::PathDomainFailure::Arithmetic);
+                }
+                minimum = Some(minimum.map_or(objective[0], |old| old.min(objective[0])));
+            }
+            Ok(())
+        },
     ) {
-        Ok(paths) => paths,
+        Ok(stats) => stats,
         Err(_) => {
-            // Failed collectors expose no partial universe or work counter.
-            *work -= allowance;
+            // A failed visitor exposes no partial traversal counter, so charge
+            // its entire reserved allowance and keep only the independent
+            // route-wide relaxation as a fallback.
+            *work = certificate_work;
             return fallback();
         }
     };
-    *work = work.checked_sub(collected.work_used())?;
-    let mut minimum: Option<f64> = None;
-    for path in collected.paths() {
-        if Instant::now() >= deadline {
-            return None;
-        }
-        let Some(left) = path
-            .arc_positions()
-            .len()
-            .checked_add(1)
-            .and_then(|amount| work.checked_sub(amount))
-        else {
-            return fallback();
-        };
-        *work = left;
-        let Some((feasible, objective)) =
-            kernel.certify_with_budget(path.arc_positions(), work, Some(deadline))
-        else {
-            return fallback();
-        };
-        if feasible {
-            if !objective[0].is_finite() {
-                return fallback();
-            }
-            minimum = Some(minimum.map_or(objective[0], |old| old.min(objective[0])));
-        }
-    }
+    *work = certificate_work.checked_add(allowance.checked_sub(visited.work_used)?)?;
     (Instant::now() < deadline).then_some(minimum)
 }
 

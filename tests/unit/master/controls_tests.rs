@@ -191,6 +191,55 @@ fn paired_control_optimizer_limits_preserve_unknown_and_partial_witnesses() {
 }
 
 #[test]
+fn paired_control_optimizer_visits_more_than_four_thousand_source_cells() {
+    let mut graph = Graph::<2>::new(5, 0).unwrap();
+    let mut arcs = Vec::new();
+    for vertex in 0..4 {
+        graph.add_arc(vertex, vertex + 1, 0.).unwrap();
+        let split_constant = |value| {
+            PiecewiseLinearFunction::new(vec![[0., value], [0.5, value], [1., value]]).unwrap()
+        };
+        arcs.push(PairedResourceArc {
+            arrival: PiecewiseLinearFunction::new(vec![[0., 0.], [0.5, 0.5], [1., 1.]]).unwrap(),
+            increment: split_constant(1.),
+            lower: split_constant(0.),
+            upper: split_constant(100.),
+            waiting: 0,
+        });
+    }
+    graph
+        .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+            initial: PiecewiseLinearFunction::new(vec![[0., 0.], [1., 0.]]).unwrap(),
+            initial_base: Window::new(0., 1.).unwrap(),
+            arcs,
+            mode: PairedResourceMode::Feasibility,
+            normalization: PairedCostNormalization::AbsoluteFinalValue,
+        }])
+        .unwrap();
+
+    let result = optimize_paired_control(
+        &graph,
+        &[0, 1, 2, 3],
+        0,
+        false,
+        None,
+        ControlSearchLimits {
+            max_work: 10_000_000,
+            max_lp_iterations: 100_000,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    // The caller work budget, rather than a hidden 4,096-cell ceiling, stops
+    // this larger Cartesian source partition. Its incumbent remains useful,
+    // but no complete bound may be claimed after budget exhaustion.
+    assert!(!result.complete, "{result:?}");
+    assert!(result.cells > 4_096, "{result:?}");
+    assert!(result.lower_bound.is_none());
+    assert_eq!(result.dependent, Some(4.));
+}
+
+#[test]
 fn paired_control_optimizer_supports_singleton_initial_domains_and_empty_paths() {
     let mut graph = prepared(0, false);
     let mut definitions = graph.coupled_kernel().unwrap().definitions().to_vec();

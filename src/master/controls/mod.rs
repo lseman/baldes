@@ -16,6 +16,8 @@ pub(crate) use properties::integer_program_range;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ControlSearchLimits {
+    /// Explicit source-region limit. The default is unlimited; `max_work`, LP
+    /// iterations and the optional deadline still bound every search.
     pub max_cells: usize,
     pub max_work: usize,
     pub max_lp_iterations: usize,
@@ -24,7 +26,7 @@ pub struct ControlSearchLimits {
 impl Default for ControlSearchLimits {
     fn default() -> Self {
         Self {
-            max_cells: 4096,
+            max_cells: usize::MAX,
             max_work: 1_000_000,
             max_lp_iterations: 10_000,
             deadline: None,
