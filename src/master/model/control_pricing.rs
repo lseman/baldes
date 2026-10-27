@@ -360,7 +360,7 @@ pub(super) fn repair_witness<const D: usize>(
     if !master.solved() || Instant::now() >= state.deadline {
         return Ok(None);
     }
-    let mut groups = BTreeMap::<(i32, Vec<i32>), (f64, bool, Vec<FixedRoute>)>::new();
+    let mut groups = BTreeMap::<(i32, Vec<i32>), (f64, bool, Vec<(usize, f64, FixedRoute)>)>::new();
     let mut masters: Vec<_> = state.master_variables.iter().map(|v| (v.id, 0.)).collect();
     for (column, &value) in master.values().iter().enumerate() {
         let tag = metadata(column);
@@ -397,10 +397,10 @@ pub(super) fn repair_witness<const D: usize>(
         if value <= tolerance {
             continue;
         }
-        let Some(route) = tag
-            .and_then(|tag| usize::try_from(tag).ok())
-            .and_then(|tag| state.routes.get(tag))
-        else {
+        let Some(route_tag) = tag.and_then(|tag| usize::try_from(tag).ok()) else {
+            return Ok(None);
+        };
+        let Some(route) = state.routes.get(route_tag) else {
             return Ok(None);
         };
         let group = groups
@@ -408,22 +408,26 @@ pub(super) fn repair_witness<const D: usize>(
             .or_default();
         group.0 += value;
         group.1 |= (value - value.round()).abs() > tolerance;
-        group.2.push(FixedRoute {
-            route: route.as_ref().clone(),
-            quantity: value.round(),
-        });
+        group.2.push((
+            route_tag,
+            value,
+            FixedRoute {
+                route: route.as_ref().clone(),
+                quantity: value.round(),
+            },
+        ));
     }
     let mut witness = state.fixed_routes.clone();
-    let mut alternatives = vec![];
-    for ((network, arcs), (quantity, fractional, routes)) in groups {
+    let mut alternatives: Vec<Vec<Vec<FixedRoute>>> = vec![];
+    for ((network, arcs), (quantity, fractional, lp_routes)) in groups {
         // Integer-tolerance path counts can still carry a fractional paired
         // control. Reconstruct source controls before trusting their rows.
         if !fractional
-            && routes
+            && lp_routes
                 .iter()
-                .all(|route| route.route.route.coupled_controls.is_empty())
+                .all(|(_, _, route)| route.route.route.coupled_controls.is_empty())
         {
-            witness.extend(routes);
+            witness.extend(lp_routes.into_iter().map(|(_, _, route)| route));
             continue;
         }
         let rounded = quantity.round();
@@ -433,7 +437,7 @@ pub(super) fn repair_witness<const D: usize>(
         {
             return Ok(None);
         }
-        let choices: Vec<_> = state
+        let mut choices: Vec<_> = state
             .routes
             .iter()
             .enumerate()
@@ -445,17 +449,27 @@ pub(super) fn repair_witness<const D: usize>(
                         .universe
                         .as_ref()
                         .map_or(true, |universe| universe.contains(tag))
-                    && enumeration::route_upper(state, *tag).is_some_and(|cap| rounded <= cap)
+                    && enumeration::route_upper(state, *tag).is_some_and(|cap| cap >= 1.)
             })
-            .map(|(_, route)| FixedRoute {
-                route: route.as_ref().clone(),
-                quantity: rounded,
+            .map(|(tag, route)| {
+                let lp_quantity = lp_routes
+                    .iter()
+                    .filter(|(lp_tag, _, _)| *lp_tag == tag)
+                    .map(|(_, value, _)| value)
+                    .sum();
+                (tag, lp_quantity, route.as_ref().clone())
             })
             .collect();
-        if choices.is_empty() || alternatives.len() >= 128 {
+        // Try LP-supported identities first, then other registered points.
+        choices.sort_by(|a, b| (b.1 > 0.).cmp(&(a.1 > 0.)).then_with(|| a.0.cmp(&b.0)));
+        if choices.len() > 256 {
+            choices.truncate(256);
+        }
+        let allocations = identity_allocations(state, &choices, rounded, 128);
+        if allocations.is_empty() || alternatives.len() >= 128 {
             return Ok(None);
         }
-        alternatives.push(choices);
+        alternatives.push(allocations);
     }
     if alternatives.is_empty() {
         return Ok(None);
@@ -470,7 +484,7 @@ pub(super) fn repair_witness<const D: usize>(
             alternatives
                 .iter()
                 .zip(&positions)
-                .map(|(choices, &i)| choices[i].clone()),
+                .flat_map(|(allocations, &i)| allocations[i].clone()),
         );
         if let Some(scheduled) = synchronization::witness(state, &routes)? {
             if scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..]) {
@@ -501,22 +515,143 @@ pub(super) fn repair_witness<const D: usize>(
     ))
 }
 
+/// Enumerate bounded integral allocations of one physical-path count across
+/// registered route identities, respecting each identity's residual cap.
+fn identity_allocations<const D: usize>(
+    state: &State<D>,
+    choices: &[(usize, f64, NetworkRoute)],
+    quantity: f64,
+    limit: usize,
+) -> Vec<Vec<FixedRoute>> {
+    fn visit<const D: usize>(
+        state: &State<D>,
+        choices: &[(usize, f64, NetworkRoute)],
+        index: usize,
+        remaining: f64,
+        selected: &mut Vec<FixedRoute>,
+        allocations: &mut Vec<Vec<FixedRoute>>,
+        visits: &mut usize,
+        limit: usize,
+    ) {
+        if allocations.len() >= limit || *visits >= 100_000 || Instant::now() >= state.deadline {
+            return;
+        }
+        *visits += 1;
+        if remaining == 0. {
+            allocations.push(selected.clone());
+            return;
+        }
+        if index == choices.len() {
+            return;
+        }
+
+        let (tag, preferred, route) = &choices[index];
+        let Some(cap) = enumeration::route_upper(state, *tag) else {
+            return;
+        };
+        let max_count = remaining.min(cap.floor());
+        if max_count <= 0. {
+            visit(
+                state,
+                choices,
+                index + 1,
+                remaining,
+                selected,
+                allocations,
+                visits,
+                limit,
+            );
+            return;
+        }
+
+        // Keep the search near the LP proposal while also exploring cap-boundary
+        // splits such as two copies across two identities capped at one each.
+        let preferred_floor = preferred.floor().clamp(0., max_count);
+        let preferred_ceil = preferred.ceil().clamp(0., max_count);
+        let mut ordered = vec![
+            preferred_floor,
+            preferred_ceil,
+            max_count,
+            max_count - 1.,
+            1.,
+            0.,
+        ];
+        ordered.retain(|value| *value >= 0. && *value <= max_count);
+        let mut seen = Vec::new();
+        ordered.retain(|value| {
+            if seen.contains(value) {
+                false
+            } else {
+                seen.push(*value);
+                true
+            }
+        });
+        for count in ordered {
+            if allocations.len() >= limit || *visits >= 100_000 {
+                break;
+            }
+            if count > 0. {
+                selected.push(FixedRoute {
+                    route: route.clone(),
+                    quantity: count,
+                });
+            }
+            visit(
+                state,
+                choices,
+                index + 1,
+                remaining - count,
+                selected,
+                allocations,
+                visits,
+                limit,
+            );
+            if count > 0. {
+                selected.pop();
+            }
+        }
+    }
+
+    if !quantity.is_finite() || quantity <= 0. || quantity.fract() != 0. || limit == 0 {
+        return Vec::new();
+    }
+    let mut allocations = Vec::new();
+    let mut visits = 0;
+    visit(
+        state,
+        choices,
+        0,
+        quantity,
+        &mut Vec::new(),
+        &mut allocations,
+        &mut visits,
+        limit,
+    );
+    allocations
+}
+
 // If registered points cannot realize the LP's integral physical path counts,
 // solve all shared Gamma rows together, retaining fixed and integral background
 // contributions. Each new terminal target still needs a source trajectory.
 fn joint_witness_targets<const D: usize>(
     state: &State<D>,
     background: &[FixedRoute],
-    alternatives: &[Vec<FixedRoute>],
+    alternatives: &[Vec<Vec<FixedRoute>>],
     masters: &[(i32, f64)],
 ) -> Option<IntegerWitness> {
-    if state.universe.is_some() || Instant::now() >= state.deadline {
+    if Instant::now() >= state.deadline {
         return None;
     }
     let mut work = 4_000_000;
     let mut iterations = 100_000;
     let mut routes = background.to_vec();
-    routes.extend(alternatives.iter().map(|choices| choices[0].clone()));
+    routes.extend(
+        alternatives
+            .iter()
+            .filter_map(|allocations| allocations.first())
+            .flatten()
+            .cloned(),
+    );
     let mut rhs: Vec<_> = state.shared_rows.iter().map(|r| r.rhs).collect();
     for (index, fixed) in routes.iter().enumerate() {
         let oracle = state

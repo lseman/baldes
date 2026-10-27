@@ -192,6 +192,92 @@ fn scheduled_repair_checks_caps_and_coverage_after_profile_changes() {
 }
 
 #[test]
+fn paired_witness_allocations_split_counts_across_capped_identities() {
+    let output = root();
+    let mut state = output.snapshot.state.fork_state();
+    let first = state
+        .routes
+        .iter()
+        .position(|route| route.route.coupled_values == vec![(0, 0.), (1, 0.)])
+        .unwrap();
+    let second = state
+        .routes
+        .iter()
+        .position(|route| route.route.coupled_values == vec![(0, 8.), (1, 8.)])
+        .unwrap();
+    assert_eq!(
+        state.routes[first].route.arcs,
+        state.routes[second].route.arcs
+    );
+    state.route_upper_bounds.insert(first, 1.);
+    state.route_upper_bounds.insert(second, 1.);
+    let choices = [first, second].map(|tag| (tag, 0.5, state.routes[tag].as_ref().clone()));
+
+    let allocations = identity_allocations(&state, &choices, 2., 128);
+
+    assert!(allocations.iter().any(|allocation| {
+        allocation.len() == 2
+            && allocation.iter().all(|route| route.quantity == 1.)
+            && allocation
+                .iter()
+                .any(|route| route.route.route.coupled_values == vec![(0, 0.), (1, 0.)])
+            && allocation
+                .iter()
+                .any(|route| route.route.route.coupled_values == vec![(0, 8.), (1, 8.)])
+    }));
+}
+
+#[test]
+fn paired_witness_repair_recovers_path_count_from_capped_identities() {
+    let output = root();
+    let mut state = output.snapshot.state.fork_state();
+    state.oracles[0].total_multiplicity = Window::new(2., 2.).unwrap();
+    let first = state
+        .routes
+        .iter()
+        .position(|route| route.route.coupled_values == vec![(0, 0.), (1, 0.)])
+        .unwrap();
+    let second = state
+        .routes
+        .iter()
+        .position(|route| route.route.coupled_values == vec![(0, 4.), (1, 4.)])
+        .unwrap();
+    let arcs = state.routes[first].route.arcs.clone();
+    assert_eq!(arcs, state.routes[second].route.arcs);
+    for (tag, route) in state.routes.iter().enumerate() {
+        if route.network == state.routes[first].network && route.route.arcs == arcs {
+            state.route_upper_bounds.insert(tag, 1.);
+        }
+    }
+
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, 2., &[]).unwrap();
+    let tags = [first, second, first, second].map(|tag| tag as i32);
+    for _ in 0..4 {
+        let column = master.add_column(999., &[(0, 1.)]).unwrap();
+        master.set_upper(column, 0.5).unwrap();
+    }
+    assert!(master.solve());
+
+    let witness = repair_witness(&state, &master, |column| tags.get(column).copied(), 1e-7)
+        .unwrap()
+        .expect("the path count of two can use two identities capped at one each");
+
+    assert_eq!(
+        witness.1.iter().map(|route| route.quantity).sum::<f64>(),
+        2.
+    );
+    assert!(witness
+        .1
+        .iter()
+        .any(|route| route.route.route.coupled_values == vec![(0, 0.), (1, 0.)]));
+    assert!(witness
+        .1
+        .iter()
+        .any(|route| route.route.route.coupled_values == vec![(0, 4.), (1, 4.)]));
+}
+
+#[test]
 fn joint_recovery_keeps_fixed_copies_and_signed_master_contributions() {
     use crate::graph::coupled::PairedControl;
     let output = root();
