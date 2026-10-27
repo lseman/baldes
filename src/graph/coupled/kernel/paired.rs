@@ -28,6 +28,8 @@ impl PairedLabel {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct PreparedPaired {
+    pub(super) objective_coefficient: f64,
+    pub(super) normalization: PairedCostNormalization,
     initial: std::sync::Arc<RelationFront>,
     arcs: std::sync::Arc<[PreparedRelationArc]>,
     mode: PairedResourceMode,
@@ -40,6 +42,7 @@ impl PreparedPaired {
         domain: Window,
         arcs: &[PairedResourceArc],
         mode: PairedResourceMode,
+        normalization: PairedCostNormalization,
     ) -> Result<Self> {
         let front = RelationFront::initial(initial, domain)?
             .ok_or_else(|| invalid("empty paired initial frontier"))?;
@@ -59,12 +62,18 @@ impl PreparedPaired {
                 .iter()
                 .all(PreparedRelationArc::exact_cache_eligible);
         Ok(Self {
+            objective_coefficient: 1.,
+            normalization,
             initial: std::sync::Arc::new(front),
             arcs: prepared.into(),
             mode,
             exact,
             ceiling: arcs.first().map_or(0., |a| a.upper.points[0][1]),
         })
+    }
+    #[cfg(feature = "clp")]
+    pub(super) fn initial_minimum(&self) -> f64 {
+        self.initial.minimum()
     }
     pub(super) fn has_costs(&self) -> bool {
         self.mode != PairedResourceMode::Feasibility
@@ -76,8 +85,11 @@ impl PreparedPaired {
         self.mode == PairedResourceMode::CostUnbounded && self.ceiling >= 1e12
     }
     pub(super) fn final_objective(&self, minimum: f64, scale: f64) -> Result<f64> {
+        let scale = finite(scale * self.objective_coefficient)?;
         if self.has_costs() && scale != 0. {
-            finite(scale * finite(minimum - self.initial.minimum())?)
+            self.normalization
+                .charge_selected(self.initial.minimum(), minimum, scale)
+                .map_err(|error| invalid(error.to_string()))
         } else {
             Ok(0.)
         }
@@ -93,10 +105,12 @@ impl PreparedPaired {
         }
     }
     pub(super) fn objective(&self, state: &PairedLabel, scale: f64) -> Result<f64> {
+        let scale = finite(scale * self.objective_coefficient)?;
         match state.forward() {
-            Some(f) if self.mode != PairedResourceMode::Feasibility && scale != 0. => {
-                finite(scale * finite(f.minimum() - self.initial.minimum())?)
-            }
+            Some(f) if self.mode != PairedResourceMode::Feasibility && scale != 0. => self
+                .normalization
+                .charge_selected(self.initial.minimum(), f.minimum(), scale)
+                .map_err(|error| invalid(error.to_string())),
             _ => Ok(0.),
         }
     }

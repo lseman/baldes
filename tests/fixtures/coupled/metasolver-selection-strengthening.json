@@ -1,0 +1,8778 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "scope": "Controlled enabled lower-level resource; registered factory defaults remain unrelaxed",
+  "cases": [
+    {
+      "name": "arc-to-arc",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            1,
+            2
+          ],
+          "weight": 1.0
+        }
+      ],
+      "reference": {
+        "name": "arc-to-arc",
+        "changed": true,
+        "windows": [
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "name": "vertex-to-arc",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            1,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            2,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            1,
+            2
+          ],
+          "weight": 1.0
+        }
+      ],
+      "reference": {
+        "name": "vertex-to-arc",
+        "changed": true,
+        "windows": [
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "name": "arc-to-vertex",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            2,
+            3
+          ],
+          "allowed": [
+            1,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            1,
+            2
+          ],
+          "weight": 1.0
+        }
+      ],
+      "reference": {
+        "name": "arc-to-vertex",
+        "changed": true,
+        "windows": [
+          [
+            [
+              0,
+              1,
+              2
+            ]
+          ]
+        ],
+        "remembered": [
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "name": "vertex-to-vertex",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            1,
+            2,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            1,
+            2
+          ],
+          "weight": 1.0
+        }
+      ],
+      "reference": {
+        "name": "vertex-to-vertex",
+        "changed": true,
+        "windows": [
+          [
+            [
+              0,
+              1,
+              2
+            ]
+          ]
+        ],
+        "remembered": [
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "name": "window-00",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": -1,
+      "limit": -1,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            1,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.4
+        }
+      ],
+      "reference": {
+        "name": "window-00",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-01",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        2,
+        1,
+        3
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            4,
+            1,
+            2,
+            1,
+            1,
+            4
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            7,
+            7,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-01",
+        "changed": true,
+        "windows": [
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ],
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [
+            1,
+            2
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-02",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "cap": 1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            5,
+            7,
+            14,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            1,
+            1,
+            2,
+            2,
+            2,
+            1,
+            2,
+            2,
+            2,
+            1
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            1,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            8
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-02",
+        "changed": true,
+        "windows": [
+          [
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              1,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [],
+          [
+            1,
+            2,
+            3
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-03",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 2,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            1,
+            2
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            3,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            10,
+            11,
+            9
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-03",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-04",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": 4,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            3,
+            2,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-04",
+        "changed": false,
+        "windows": [
+          [],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-05",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        3,
+        2,
+        1,
+        4
+      ],
+      "cap": -1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            11,
+            13,
+            6,
+            13,
+            15,
+            6,
+            7,
+            11,
+            5,
+            10
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            1,
+            1,
+            1,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1,
+            7,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            5,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            3
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-05",
+        "changed": false,
+        "windows": [
+          [],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-06",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            7,
+            3,
+            3
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            13,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.4
+        }
+      ],
+      "reference": {
+        "name": "window-06",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-07",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        2,
+        1,
+        3
+      ],
+      "cap": 1,
+      "limit": 0,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            5,
+            6,
+            5,
+            5,
+            1,
+            2
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            1,
+            8,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            1,
+            3,
+            3,
+            1,
+            1,
+            2
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            5,
+            2,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-07",
+        "changed": true,
+        "windows": [
+          [
+            [
+              0,
+              2,
+              2
+            ],
+            [
+              1,
+              1,
+              2
+            ],
+            [
+              2,
+              2,
+              2
+            ],
+            [
+              3,
+              1,
+              2
+            ]
+          ],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          [
+            2
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            2
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "name": "window-08",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "cap": 2,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            14,
+            10,
+            9,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            4,
+            8
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            3
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            1,
+            7,
+            9
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-08",
+        "changed": false,
+        "windows": [
+          [],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-09",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 4,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            2,
+            2
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            4,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-09",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-10",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": -1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            6,
+            1,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            7,
+            6,
+            5,
+            8,
+            14,
+            9
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-10",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          [],
+          [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              1,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [],
+          [
+            1,
+            2
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-11",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        3,
+        2,
+        1,
+        4
+      ],
+      "cap": 0,
+      "limit": -1,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            6,
+            8,
+            1,
+            10,
+            3,
+            5,
+            1,
+            11,
+            13,
+            6
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            1,
+            1,
+            1,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            5,
+            2,
+            2,
+            2,
+            5,
+            5,
+            7,
+            4,
+            7,
+            6
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            11,
+            12,
+            5,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            5,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            7,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-11",
+        "changed": false,
+        "windows": [
+          [],
+          [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              2,
+              1,
+              1
+            ]
+          ],
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [],
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-12",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.4
+        }
+      ],
+      "reference": {
+        "name": "window-12",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-13",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        2,
+        1,
+        3
+      ],
+      "cap": 2,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            5,
+            1,
+            7,
+            5,
+            3,
+            2
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            11,
+            6,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-13",
+        "changed": true,
+        "windows": [
+          [],
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              0,
+              2,
+              2
+            ]
+          ]
+        ],
+        "remembered": [
+          [
+            2
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-14",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "cap": 4,
+      "limit": 0,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            12,
+            6,
+            2,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            1,
+            2,
+            2,
+            3,
+            3,
+            1,
+            1,
+            3,
+            1,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            6,
+            6,
+            7,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            5,
+            9
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            1,
+            7,
+            9
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            3
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-14",
+        "changed": true,
+        "windows": [
+          [
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          [],
+          []
+        ],
+        "remembered": [
+          [
+            1,
+            3
+          ],
+          [
+            2
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-15",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": -1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            2,
+            1,
+            1
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            3,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            3,
+            14,
+            9
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            2,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-15",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [
+            1
+          ],
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-16",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            6,
+            4,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-16",
+        "changed": false,
+        "windows": [
+          [],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-17",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        3,
+        2,
+        1,
+        4
+      ],
+      "cap": 1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            8,
+            3,
+            3,
+            7,
+            10,
+            3,
+            3,
+            3,
+            7,
+            3
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            1,
+            1,
+            2,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            5,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            7,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-17",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              2
+            ]
+          ],
+          [
+            [
+              1,
+              1,
+              2
+            ]
+          ],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [
+            1
+          ],
+          [
+            1,
+            2,
+            3
+          ]
+        ]
+      }
+    },
+    {
+      "name": "window-18",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 2,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            3,
+            1,
+            1
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            2,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.4
+        }
+      ],
+      "reference": {
+        "name": "window-18",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-19",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        2,
+        1,
+        3
+      ],
+      "cap": 4,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            6,
+            3,
+            1,
+            1,
+            3,
+            4
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            13,
+            12,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            1,
+            3,
+            1,
+            1,
+            2,
+            2
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            1,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-19",
+        "changed": true,
+        "windows": [
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              0,
+              1,
+              1
+            ],
+            [
+              2,
+              2,
+              2
+            ]
+          ],
+          [],
+          [
+            [
+              2,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [
+            1,
+            2
+          ],
+          [],
+          [
+            1,
+            2
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-20",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "cap": -1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            14,
+            2,
+            9,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            3
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-20",
+        "changed": false,
+        "windows": [
+          [],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-21",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 0,
+      "limit": 0,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            1,
+            1,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            6,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-21",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-22",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": 1,
+      "limit": -1,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            4,
+            1,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            3,
+            3,
+            7,
+            3,
+            7,
+            6
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            2,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-22",
+        "changed": false,
+        "windows": [
+          [],
+          [
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-23",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        3,
+        2,
+        1,
+        4
+      ],
+      "cap": 2,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            15,
+            10,
+            1,
+            5,
+            1,
+            7,
+            3,
+            8,
+            9,
+            13
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            2,
+            2,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            3,
+            4,
+            6,
+            4,
+            6,
+            4,
+            7,
+            7,
+            5,
+            5
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            3,
+            12,
+            9,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            5,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            8
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            7,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-23",
+        "changed": true,
+        "windows": [
+          [
+            [
+              2,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              2,
+              1,
+              2
+            ],
+            [
+              3,
+              1,
+              2
+            ]
+          ],
+          [
+            [
+              0,
+              2,
+              2
+            ],
+            [
+              2,
+              1,
+              3
+            ],
+            [
+              3,
+              1,
+              2
+            ]
+          ],
+          []
+        ],
+        "remembered": [
+          [
+            2
+          ],
+          [],
+          [
+            1,
+            2,
+            3
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "name": "window-24",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 4,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            2,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.4
+        }
+      ],
+      "reference": {
+        "name": "window-24",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-25",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        2,
+        1,
+        3
+      ],
+      "cap": -1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            4,
+            2,
+            1,
+            2,
+            1,
+            2
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            8,
+            10,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-25",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ],
+          []
+        ],
+        "remembered": [
+          [
+            1
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-26",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            2,
+            11,
+            6,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            2,
+            1,
+            2,
+            1,
+            1,
+            1,
+            2,
+            1,
+            3,
+            1
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            4,
+            7,
+            3,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            1,
+            7,
+            9
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            0,
+            5,
+            9
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-26",
+        "changed": true,
+        "windows": [
+          [],
+          [],
+          [],
+          [
+            [
+              1,
+              1,
+              1
+            ],
+            [
+              2,
+              1,
+              2
+            ]
+          ]
+        ],
+        "remembered": [
+          [],
+          [
+            1
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-27",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            2,
+            1,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            3,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            9,
+            7,
+            3
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            2,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-27",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-28",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": 2,
+      "limit": 0,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            5,
+            6,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-28",
+        "changed": false,
+        "windows": [
+          [],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-29",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        3,
+        2,
+        1,
+        4
+      ],
+      "cap": 4,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            4,
+            10,
+            12,
+            14,
+            9,
+            11,
+            15,
+            14,
+            12,
+            1
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            2,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            3
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-29",
+        "changed": true,
+        "windows": [
+          [],
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ],
+          []
+        ],
+        "remembered": [
+          [
+            3
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-30",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": -1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            2,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            7,
+            2,
+            2
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            9,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.4
+        }
+      ],
+      "reference": {
+        "name": "window-30",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-31",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        2,
+        1,
+        3
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            7,
+            4,
+            7,
+            5,
+            2,
+            2
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            13,
+            4,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            1,
+            3,
+            2,
+            2,
+            1
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            1,
+            2,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-31",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              0,
+              2,
+              2
+            ],
+            [
+              2,
+              2,
+              2
+            ],
+            [
+              3,
+              1,
+              2
+            ]
+          ],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ],
+          []
+        ],
+        "remembered": [
+          [
+            2
+          ],
+          [],
+          [
+            2
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-32",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "cap": 1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            12,
+            4,
+            10,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1,
+            7,
+            9
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-32",
+        "changed": true,
+        "windows": [
+          [
+            [
+              0,
+              1,
+              2
+            ]
+          ],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          [
+            2,
+            3
+          ]
+        ]
+      }
+    },
+    {
+      "name": "window-33",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 2,
+      "limit": -1,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            1,
+            2
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            1,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-33",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-34",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": 4,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            6,
+            7,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            4,
+            6,
+            15,
+            12,
+            9,
+            13
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            2,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-34",
+        "changed": true,
+        "windows": [
+          [],
+          [],
+          [
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          []
+        ],
+        "remembered": [
+          [],
+          [
+            1
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-35",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        3,
+        2,
+        1,
+        4
+      ],
+      "cap": -1,
+      "limit": 0,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            9,
+            5,
+            10,
+            9,
+            7,
+            8,
+            10,
+            4,
+            13,
+            14
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            1,
+            1,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            3,
+            2,
+            3,
+            5,
+            2,
+            5,
+            4,
+            4,
+            4,
+            7
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            1,
+            10,
+            8,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            4,
+            8
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-35",
+        "changed": true,
+        "windows": [
+          [
+            [
+              2,
+              2,
+              2
+            ],
+            [
+              3,
+              1,
+              2
+            ]
+          ],
+          [
+            [
+              2,
+              1,
+              1
+            ]
+          ],
+          [],
+          [
+            [
+              2,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [],
+          [],
+          [
+            1,
+            2
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-36",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            2,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.4
+        }
+      ],
+      "reference": {
+        "name": "window-36",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-37",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        2,
+        1,
+        3
+      ],
+      "cap": 1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            2,
+            2,
+            5,
+            1,
+            3,
+            5
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            13,
+            15,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-37",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ],
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [
+            1,
+            2
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-38",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "cap": 2,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            4,
+            2,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            2,
+            2,
+            3,
+            1,
+            1,
+            3,
+            2,
+            3,
+            1,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            5,
+            6,
+            5,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            7,
+            9
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            8
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-38",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              0,
+              2,
+              3
+            ],
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          []
+        ],
+        "remembered": [
+          [
+            2,
+            3
+          ],
+          [
+            1
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-39",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 4,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            2,
+            1
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            5,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            7,
+            12,
+            14
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-39",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-40",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": -1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            3,
+            6,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-40",
+        "changed": false,
+        "windows": [
+          [],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-41",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        3,
+        2,
+        1,
+        4
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            3,
+            1,
+            2,
+            8,
+            11,
+            14,
+            1,
+            6,
+            1,
+            14
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            2,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            7,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            3
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-41",
+        "changed": false,
+        "windows": [
+          [],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-42",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 1,
+      "limit": 0,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            3,
+            5,
+            2
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            6,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.4
+        }
+      ],
+      "reference": {
+        "name": "window-42",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-43",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        2,
+        1,
+        3
+      ],
+      "cap": 2,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            7,
+            6,
+            3,
+            2,
+            4,
+            6
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            3,
+            7,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            1,
+            3,
+            3,
+            1,
+            2,
+            1
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            3,
+            7,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-43",
+        "changed": true,
+        "windows": [
+          [
+            [
+              2,
+              1,
+              1
+            ]
+          ],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [],
+          [
+            1
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-44",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "cap": 4,
+      "limit": -1,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            3,
+            12,
+            7,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            5,
+            9
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            7,
+            9
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-44",
+        "changed": false,
+        "windows": [
+          [],
+          [],
+          [],
+          [
+            [
+              0,
+              1,
+              2
+            ]
+          ]
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-45",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": -1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            1,
+            2,
+            1
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-45",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-46",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            3,
+            2,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            7,
+            8,
+            2,
+            6,
+            2,
+            7
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-46",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [
+            2
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-47",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        3,
+        2,
+        1,
+        4
+      ],
+      "cap": 1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            1,
+            10,
+            5,
+            1,
+            10,
+            7,
+            8,
+            11,
+            8,
+            15
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            1,
+            1,
+            1,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            1,
+            2,
+            2,
+            3,
+            4,
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            6,
+            3,
+            15,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            5,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            3
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            7,
+            9
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-47",
+        "changed": true,
+        "windows": [
+          [
+            [
+              2,
+              1,
+              1
+            ]
+          ],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [],
+          [
+            3
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-48",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 2,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.4
+        }
+      ],
+      "reference": {
+        "name": "window-48",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-49",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        2,
+        1,
+        3
+      ],
+      "cap": 4,
+      "limit": 0,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            5,
+            5,
+            7,
+            2,
+            5,
+            1
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            10,
+            5,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-49",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              2
+            ]
+          ],
+          [],
+          []
+        ],
+        "remembered": [
+          [
+            1
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "name": "window-50",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "cap": -1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            8,
+            13,
+            14,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            2,
+            1,
+            1,
+            2,
+            3,
+            3,
+            2,
+            1,
+            1
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            5,
+            5,
+            7,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            5,
+            9
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            8
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            1,
+            8
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            7,
+            9
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-50",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              1,
+              2,
+              2
+            ]
+          ],
+          [
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              1,
+              3,
+              3
+            ]
+          ]
+        ],
+        "remembered": [
+          [],
+          [
+            2,
+            3
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-51",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            2
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            1,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            6,
+            9,
+            3
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            1,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-51",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-52",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": 1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            1,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-52",
+        "changed": false,
+        "windows": [
+          [],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-53",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        3,
+        2,
+        1,
+        4
+      ],
+      "cap": 2,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            5,
+            2,
+            12,
+            10,
+            4,
+            13,
+            15,
+            9,
+            10,
+            7
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            1,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            7,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            3
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-53",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              0,
+              2,
+              2
+            ]
+          ],
+          [],
+          []
+        ],
+        "remembered": [
+          [
+            2
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-54",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 4,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            1,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            4,
+            6,
+            3
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.4
+        }
+      ],
+      "reference": {
+        "name": "window-54",
+        "changed": true,
+        "windows": [
+          [
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          []
+        ],
+        "remembered": [
+          [],
+          [
+            1
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-55",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        2,
+        1,
+        3
+      ],
+      "cap": -1,
+      "limit": -1,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            1,
+            6,
+            5,
+            4,
+            3,
+            4
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            10,
+            6,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            2,
+            3,
+            1,
+            3,
+            1,
+            2
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            6,
+            4,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-55",
+        "changed": false,
+        "windows": [
+          [
+            [
+              2,
+              1,
+              1
+            ]
+          ],
+          [],
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [],
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-56",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "cap": 0,
+      "limit": 0,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            6,
+            12,
+            11,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            8
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            3
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-56",
+        "changed": false,
+        "windows": [
+          [],
+          [],
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-57",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            1,
+            1,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            5,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-57",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-58",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cap": 2,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            3,
+            5,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            9,
+            14,
+            15,
+            8,
+            11,
+            1
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            2,
+            2,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-58",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              1,
+              2,
+              2
+            ]
+          ],
+          []
+        ],
+        "remembered": [
+          [],
+          [
+            2
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-59",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        3,
+        2,
+        1,
+        4
+      ],
+      "cap": 4,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            6,
+            9,
+            13,
+            5,
+            1,
+            10,
+            13,
+            8,
+            8,
+            11
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            1,
+            2,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            2,
+            1,
+            1,
+            4,
+            2,
+            2,
+            5,
+            2,
+            1,
+            5
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            4,
+            3,
+            3,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1,
+            7,
+            9
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            8
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            3
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            7,
+            9
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-59",
+        "changed": true,
+        "windows": [
+          [
+            [
+              1,
+              1,
+              2
+            ],
+            [
+              2,
+              1,
+              1
+            ]
+          ],
+          [
+            [
+              0,
+              1,
+              1
+            ],
+            [
+              2,
+              2,
+              2
+            ],
+            [
+              3,
+              1,
+              2
+            ]
+          ],
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ],
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              2,
+              3,
+              3
+            ],
+            [
+              3,
+              1,
+              2
+            ]
+          ]
+        ],
+        "remembered": [
+          [
+            1
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "name": "window-60",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": -1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            1,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.4
+        }
+      ],
+      "reference": {
+        "name": "window-60",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-61",
+      "vertices": 4,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "mapping": [
+        0,
+        2,
+        1,
+        3
+      ],
+      "cap": 0,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            7,
+            7
+          ],
+          "allowed": [
+            3,
+            4,
+            6,
+            7,
+            5,
+            3
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            7,
+            6,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            2
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            4
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            3,
+            5
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            1,
+            5
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-61",
+        "changed": true,
+        "windows": [
+          [],
+          [],
+          [],
+          [
+            [
+              0,
+              1,
+              1
+            ]
+          ]
+        ],
+        "remembered": [
+          [
+            2
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-62",
+      "vertices": 5,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          0,
+          3
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          1,
+          3
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "cap": 1,
+      "limit": 100,
+      "selection": [
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            14,
+            2,
+            3,
+            15
+          ],
+          "allowed": [
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15,
+            15
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            1,
+            1,
+            3,
+            2,
+            3,
+            2,
+            3,
+            1
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            7,
+            6,
+            7,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7,
+            7
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            2,
+            9
+          ],
+          "weight": 0.2
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            7,
+            9
+          ],
+          "weight": 0.4
+        },
+        {
+          "arcs": [
+            0,
+            6
+          ],
+          "weight": 0.6
+        },
+        {
+          "arcs": [
+            0,
+            4,
+            8
+          ],
+          "weight": 0.8
+        }
+      ],
+      "reference": {
+        "name": "window-62",
+        "changed": true,
+        "windows": [
+          [],
+          [
+            [
+              1,
+              3,
+              3
+            ]
+          ],
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [
+            3
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "name": "window-63",
+      "vertices": 3,
+      "arcs": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "mapping": [
+        0,
+        1,
+        2
+      ],
+      "cap": 2,
+      "limit": 0,
+      "selection": [
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            1,
+            2,
+            1
+          ]
+        },
+        {
+          "values": 3,
+          "vertices": [
+            7,
+            3,
+            7
+          ],
+          "allowed": [
+            7,
+            7,
+            7
+          ]
+        },
+        {
+          "values": 4,
+          "vertices": [
+            15,
+            15,
+            15
+          ],
+          "allowed": [
+            14,
+            4,
+            2
+          ]
+        },
+        {
+          "values": 2,
+          "vertices": [
+            3,
+            3,
+            3
+          ],
+          "allowed": [
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "arcs": [
+            1
+          ],
+          "weight": 0.5
+        },
+        {
+          "arcs": [
+            0,
+            2
+          ],
+          "weight": 0.5
+        }
+      ],
+      "reference": {
+        "name": "window-63",
+        "changed": false,
+        "windows": [
+          [],
+          []
+        ],
+        "remembered": [
+          [],
+          [],
+          [],
+          []
+        ]
+      }
+    }
+  ]
+}

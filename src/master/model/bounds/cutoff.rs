@@ -36,9 +36,18 @@ pub(in crate::master::model) fn cutoff_plan<const D: usize>(
     let base = master_dual_base(state, master, duals, true)?;
     let mut minima = vec![];
     let mut contributions = vec![];
+    let mut joint_bounds = vec![];
     for oracle in &state.oracles {
         if Instant::now() >= deadline {
             return None;
+        }
+        // A residual integer quantity below one must be zero. Its source
+        // control domain needs no walk scan and contributes exactly zero.
+        if oracle.multiplicity_upper() < 1. {
+            minima.push(None);
+            contributions.push(0.);
+            joint_bounds.push(None);
+            continue;
         }
         let graph = &oracle.network.graph;
         // Charge the dense worst-case walk scans before invoking the existing
@@ -49,12 +58,27 @@ pub(in crate::master::model) fn cutoff_plan<const D: usize>(
             .checked_mul(graph.arcs.len())?
             .checked_mul(3)?;
         *work = work.checked_sub(scans.checked_add(graph.vertices.len())?)?;
-        if oracle.multiplicity_upper() == 0. {
-            minima.push(None);
-            contributions.push(0.);
-            continue;
-        }
-        let minimum = network_minimum(oracle, state.shared_offset, duals, work, deadline)?;
+        let (minimum, joint) =
+            if !oracle.activity_rows.is_empty() || super::super::control_pricing::needed(oracle) {
+                let weights = additive_arc_cost_lower_bounds(oracle, state.shared_offset, duals)?;
+                match columns::cutoff_minimum(
+                    oracle,
+                    state.shared_offset,
+                    duals,
+                    &weights,
+                    work,
+                    deadline,
+                )? {
+                    Some(bounds) => (Some(bounds.reduced), Some((weights, bounds.remainder))),
+                    None => (None, None),
+                }
+            } else {
+                (
+                    network_minimum(oracle, state.shared_offset, duals, work, deadline)?,
+                    None,
+                )
+            };
+        joint_bounds.push(joint);
         if minimum.is_none() && oracle.network.multiplicity.lower > 0. {
             return None;
         }
@@ -104,39 +128,44 @@ pub(in crate::master::model) fn cutoff_plan<const D: usize>(
             add(oracle.network.multiplicity.lower, -1.)?.max(0.)
         };
         let other = add(add(prefix[i], suffix[i + 1])?, multiply(minimum, rest)?)?;
-        // The arc collector sees only scalar/dual weights. Include a proved
-        // lower bound on the complete coupled objective in its route constant,
-        // so signed resource charges cannot hide an improving original route.
-        let domain = super::super::resource_groups::residual_domain_graph(oracle).ok()?;
-        let mut constant = coupled::minimum(domain.as_ref(), work, deadline)??;
-        for &(input, row) in &oracle.presence_rows {
-            let dual = duals[state.shared_offset + row];
-            if dual > 0. {
-                // Integer coefficient bounds must not round downward when
-                // converted to binary64. Unsupported magnitudes decline.
-                if oracle.solver.presence_rows()[input]
-                    .row
-                    .maximum_coefficient() as u128
-                    > (1_u128 << 53)
-                {
-                    return None;
-                }
-                constant = subtract_product(
-                    constant,
-                    dual,
-                    oracle.solver.presence_rows()[input]
+        let (weights, constant) = if let Some(joint) = joint_bounds[i].take() {
+            joint
+        } else {
+            // The arc collector sees only scalar/dual weights. Include a proved
+            // lower bound on the complete coupled objective in its route constant,
+            // so signed resource charges cannot hide an improving original route.
+            let domain = super::super::resource_groups::residual_domain_graph(oracle).ok()?;
+            let mut constant = coupled::minimum(domain.as_ref(), work, deadline)??;
+            for &(input, row) in &oracle.presence_rows {
+                let dual = duals[state.shared_offset + row];
+                if dual > 0. {
+                    // Integer coefficient bounds must not round downward when
+                    // converted to binary64. Unsupported magnitudes decline.
+                    if oracle.solver.presence_rows()[input]
                         .row
-                        .maximum_coefficient() as f64,
-                )?;
+                        .maximum_coefficient() as u128
+                        > (1_u128 << 53)
+                    {
+                        return None;
+                    }
+                    constant = subtract_product(
+                        constant,
+                        dual,
+                        oracle.solver.presence_rows()[input]
+                            .row
+                            .maximum_coefficient() as f64,
+                    )?;
+                }
             }
-        }
-        for &(row, a) in &oracle.route_entries {
-            constant = subtract_product(constant, duals[row], a)?;
-        }
-        for &(row, a) in oracle.network.route_entries.iter() {
-            constant = subtract_product(constant, duals[state.shared_offset + row], a)?;
-        }
-        let weights = arc_cost_lower_bounds(oracle, state.shared_offset, duals)?;
+            for &(row, a) in &oracle.route_entries {
+                constant = subtract_product(constant, duals[row], a)?;
+            }
+            for &(row, a) in oracle.network.route_entries.iter() {
+                constant = subtract_product(constant, duals[state.shared_offset + row], a)?;
+            }
+            let weights = arc_cost_lower_bounds(oracle, state.shared_offset, duals)?;
+            (weights, constant)
+        };
         let ceiling = add_up(add_up(incumbent, -other)?, -constant)?;
         plan.push(NetworkCutoff::Cost {
             network,

@@ -23,6 +23,7 @@ fn root() -> Output<2> {
                 },
                 arc_entries: vec![vec![(0, 1.)], vec![]],
                 route_entries: vec![],
+                activity_entries: vec![],
             }],
         },
         options,

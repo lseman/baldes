@@ -30,6 +30,7 @@ fn problem(max_arcs: usize, groups: bool) -> Problem<2> {
             multiplicity: Window::new(0., 1.).unwrap(),
             arc_entries: vec![vec![]; if groups { 5 } else { 4 }],
             route_entries: vec![(0, 1.)],
+            activity_entries: vec![],
         }],
     }
 }
@@ -380,6 +381,7 @@ fn default_simple_contract_and_walk_domain_guards_are_explicit() {
             multiplicity: Window::new(0., 1.).unwrap(),
             arc_entries: vec![vec![(0, 1.)]],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let solved =
@@ -413,6 +415,7 @@ fn integer_mapping_rejects_walk_coefficients_beyond_binary64_exact_integer_range
             priority: 1.,
             networks: vec![MappedNetworkVariable {
                 network: 7,
+                activities: vec![],
                 arcs: vec![(1, 3.)],
                 per_route: 0.,
             }],

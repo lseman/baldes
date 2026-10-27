@@ -147,6 +147,7 @@ fn user_display_names_cannot_collide_with_generated_history_identities() {
         priority: 1.,
         networks: vec![MappedNetworkVariable {
             network: 42,
+            activities: vec![],
             arcs: vec![],
             per_route: 1.,
         }],

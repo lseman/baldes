@@ -43,9 +43,24 @@ impl<T: Any + Debug + Send + Sync + PartialEq> PluginValue for T {
     }
 }
 
-/// A resource that an extension adds to coupled labeling. It adds no
-/// objective. Errors abort pricing; they never prove infeasibility.
+/// A resource that an extension adds to coupled labeling. Errors abort pricing;
+/// they never prove infeasibility. Objective costs require explicit opt-in.
 pub trait CoupledPlugin: Debug + Send + Sync {
+    /// Whether this resource contributes an objective. Cost-bearing plugins
+    /// use equality-only dominance, canonical suffix replay for joins, and no
+    /// generic objective bounds or directed cost certification.
+    fn has_costs(&self) -> bool {
+        false
+    }
+    /// Accumulated resource objective in this directional state. Must be zero
+    /// at both roots, finite at every reachable state, and deterministic.
+    /// Forward replay of a complete route defines its objective. Backward
+    /// objectives are provisional; joins replay the suffix from the prefix.
+    /// Phase-I suppression is applied by the kernel, not the plugin.
+    fn objective(&self, state: &PluginState, forward: bool) -> Result<f64> {
+        let _ = (state, forward);
+        Ok(0.0)
+    }
     /// Check per-arc data against the graph's arc count.
     fn validate(&self, arcs: usize) -> Result<()>;
     /// The state at the source (forward) or the sink (backward).
@@ -69,7 +84,8 @@ pub trait CoupledPlugin: Debug + Send + Sync {
     /// Implementations must establish these claims independently of tolerant
     /// numerical labeling, debit bounded proof work through `work`, respect the
     /// cooperative deadline, and never increase the supplied work allowance.
-    /// A plugin adds no objective, so a valid proof contributes zero cost.
+    /// This feasibility-only proof contributes zero cost. Cost-bearing plugins
+    /// cannot use it to certify their objective.
     ///
     /// The default supplies no proof; adding numerical `extend`/`join` methods
     /// alone never opts an existing plugin into certification.

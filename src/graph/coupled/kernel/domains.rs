@@ -9,6 +9,15 @@ use super::*;
 
 type Domain = Option<Vec<Range>>;
 
+impl RouteDomains {
+    pub(super) fn contains_vertex(&self, vertex: usize) -> bool {
+        vertex < self.vertices
+    }
+    pub(super) fn entry(&self, vertex: usize) -> Option<&[Range]> {
+        self.forward.get(vertex)?.as_deref()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct RouteDomains {
     topology: Vec<(usize, usize)>,

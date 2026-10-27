@@ -15,13 +15,28 @@ pub struct OriginalPricingVariable {
     pub entries: Vec<(usize, f64)>,
     /// Physical arc IDs and association coefficients. The last setter for an
     /// arc replaces its previous coefficient; different variables add.
+    #[serde(default)]
     pub arcs: Vec<(i32, f64)>,
+    /// Intrinsic custom/cumulative activity or a selected absolute paired value
+    /// instead of fixed arc associations. Source paired bindings support signed
+    /// costs, shared rows and independently verified integer branching.
+    /// Its objective coefficient replaces the descriptor's implicit unit cost;
+    /// the JSON network cannot also assign a graph cost to this resource.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accumulated_resource: Option<usize>,
     /// Register the original activity for integer branching. This requires a
     /// proof of integer contribution on every complete graph walk.
     #[serde(default)]
     pub integer: bool,
     #[serde(default)]
     pub priority: f64,
+}
+
+/// Captured intrinsic program and its original physical arc identities.
+#[derive(Clone, Debug)]
+struct ActivitySource {
+    kernel: Arc<crate::graph::coupled::CoupledKernel>,
+    arcs: HashMap<i32, usize>,
 }
 
 /// Retained original identities and expressions, independent of column tags.
@@ -31,6 +46,19 @@ pub struct PricingVariableRegistry {
     branches: Vec<MappedBranchVariable>,
     graph_arcs: HashMap<i32, HashSet<i32>>,
     costs: Arc<Vec<OriginalVariableCosts>>,
+    activity_sources: HashMap<i32, ActivitySource>,
+}
+
+/// A generated/restored column expression for original-variable reporting.
+/// Selected values are required for paired bindings; deterministic activities
+/// can be reconstructed from arcs alone. This is not a pricing certificate.
+#[derive(Clone, Copy, Debug)]
+pub struct OriginalColumn<'a> {
+    pub network: i32,
+    pub arcs: &'a [i32],
+    pub coupled_values: Option<&'a [(usize, f64)]>,
+    pub coupled_controls: Option<&'a [crate::graph::coupled::PairedControl]>,
+    pub quantity: f64,
 }
 
 /// Expand variable costs and shared-row coefficients once, before solving.
@@ -81,6 +109,8 @@ pub fn compile_pricing_variables<const D: usize>(
     let mut seen = HashSet::new();
     let mut branches = vec![];
     let mut graph_arcs = HashMap::new();
+    let mut activity_bindings = HashSet::new();
+    let mut resource_costs = HashMap::<i32, BTreeMap<usize, f64>>::new();
     for variable in &mut variables {
         let &position = positions
             .get(&variable.network)
@@ -107,6 +137,78 @@ pub fn compile_pricing_variables<const D: usize>(
         graph_arcs
             .entry(variable.network)
             .or_insert_with(|| arcs.keys().copied().collect());
+        if let Some(resource) = variable.accumulated_resource {
+            if !variable.arcs.is_empty() || !activity_bindings.insert((variable.network, resource))
+            {
+                return Err(invalid(
+                    "an accumulated resource needs one original variable and no arc associations",
+                ));
+            }
+            let paired = matches!(
+                network
+                    .graph
+                    .coupled_kernel()
+                    .and_then(|kernel| kernel.definitions().get(resource)),
+                Some(
+                    crate::graph::coupled::CoupledResource::SlopePaired {
+                        mode: crate::graph::coupled::PairedResourceMode::CostBounded
+                            | crate::graph::coupled::PairedResourceMode::CostUnbounded,
+                        normalization:
+                            crate::graph::coupled::PairedCostNormalization::AbsoluteFinalValue,
+                        ..
+                    } | crate::graph::coupled::CoupledResource::PairedPiecewiseLinear {
+                        mode: crate::graph::coupled::PairedResourceMode::CostBounded
+                            | crate::graph::coupled::PairedResourceMode::CostUnbounded,
+                        normalization:
+                            crate::graph::coupled::PairedCostNormalization::AbsoluteFinalValue,
+                        ..
+                    }
+                )
+            );
+            if paired {
+                if network.graph.front_program_domain()
+                    && (variable.cost < 0. || variable.integer || !variable.entries.is_empty())
+                {
+                    return Err(invalid("paired rows, integer activities and negative objectives require a source model"));
+                }
+            } else {
+                activity_rows::validate(
+                    &network.graph,
+                    &AccumulatedActivityCoefficients {
+                        network: variable.network,
+                        resource,
+                        coefficient: 1.,
+                    },
+                )?;
+            }
+            if variable.integer {
+                let branch = MappedBranchVariable {
+                    name: format!("X_{}_{}", variable.network, variable.id),
+                    priority: variable.priority,
+                    networks: vec![MappedNetworkVariable {
+                        network: variable.network,
+                        arcs: vec![],
+                        activities: vec![(resource, 1.)],
+                        per_route: 0.,
+                    }],
+                    masters: vec![],
+                };
+                branch.validate(std::iter::once((network.id, &network.graph)), &[])?;
+                branches.push(branch);
+            }
+            for &(row, coefficient) in &variable.entries {
+                network.activity_entries.push(AccumulatedActivityEntry {
+                    row,
+                    resource,
+                    coefficient,
+                });
+            }
+            resource_costs
+                .entry(variable.network)
+                .or_default()
+                .insert(resource, variable.cost);
+            continue;
+        }
         let setters: BTreeMap<_, _> = variable.arcs.iter().copied().collect();
         for (&id, &coefficient) in &setters {
             if !arcs.contains_key(&id) || !coefficient.is_finite() {
@@ -120,6 +222,7 @@ pub fn compile_pricing_variables<const D: usize>(
                 priority: variable.priority,
                 networks: vec![MappedNetworkVariable {
                     network: variable.network,
+                    activities: vec![],
                     arcs: variable.arcs.clone(),
                     per_route: 0.,
                 }],
@@ -144,6 +247,18 @@ pub fn compile_pricing_variables<const D: usize>(
             }
         }
     }
+    for (network, assignments) in resource_costs {
+        let graph = &mut problem.networks[positions[&network]].graph;
+        let kernel = graph.coupled_kernel().unwrap();
+        let mut coefficients: BTreeMap<_, _> = (0..kernel.definitions().len())
+            .filter_map(|resource| {
+                let coefficient = kernel.objective_coefficient(resource).unwrap();
+                (coefficient != 1.).then_some((resource, coefficient))
+            })
+            .collect();
+        coefficients.extend(assignments);
+        graph.set_coupled_objective_coefficients(&coefficients.into_iter().collect::<Vec<_>>())?;
+    }
     problem.validate()?;
     for cost in &mut costs {
         let network = &problem.networks[positions[&cost.network]];
@@ -159,6 +274,30 @@ pub fn compile_pricing_variables<const D: usize>(
         }
     }
     costs.retain(|c| !c.variables.is_empty());
+    let activity_sources = problem
+        .networks
+        .iter()
+        .filter(|network| {
+            variables.iter().any(|variable| {
+                variable.network == network.id && variable.accumulated_resource.is_some()
+            })
+        })
+        .map(|network| {
+            (
+                network.id,
+                ActivitySource {
+                    kernel: Arc::new(network.graph.coupled_kernel().unwrap().clone()),
+                    arcs: network
+                        .graph
+                        .arcs
+                        .iter()
+                        .enumerate()
+                        .map(|(position, arc)| (arc.id, position))
+                        .collect(),
+                },
+            )
+        })
+        .collect();
     Ok((
         problem,
         PricingVariableRegistry {
@@ -166,6 +305,7 @@ pub fn compile_pricing_variables<const D: usize>(
             branches,
             graph_arcs,
             costs: Arc::new(costs),
+            activity_sources,
         },
     ))
 }
@@ -240,20 +380,27 @@ impl PricingVariableRegistry {
         id: i32,
         output: &Output<D>,
     ) -> Result<Bounds> {
-        self.activity_from_paths(
+        self.activity_from_columns(
             network,
             id,
             output
                 .routes
                 .iter()
                 .zip(&output.values)
-                .map(|(r, &q)| (r.network, r.route.arcs.as_slice(), q))
-                .chain(
-                    output
-                        .fixed_routes
-                        .iter()
-                        .map(|f| (f.route.network, f.route.route.arcs.as_slice(), f.quantity)),
-                ),
+                .map(|(r, &q)| OriginalColumn {
+                    network: r.network,
+                    arcs: &r.route.arcs,
+                    coupled_values: Some(&r.route.coupled_values),
+                    coupled_controls: Some(&r.route.coupled_controls),
+                    quantity: q,
+                })
+                .chain(output.fixed_routes.iter().map(|f| OriginalColumn {
+                    network: f.route.network,
+                    arcs: &f.route.route.arcs,
+                    coupled_values: Some(&f.route.route.coupled_values),
+                    coupled_controls: Some(&f.route.route.coupled_controls),
+                    quantity: f.quantity,
+                })),
         )
     }
 
@@ -265,6 +412,28 @@ impl PricingVariableRegistry {
         id: i32,
         paths: impl IntoIterator<Item = (i32, &'a [i32], f64)>,
     ) -> Result<Bounds> {
+        self.activity_from_columns(
+            network,
+            id,
+            paths
+                .into_iter()
+                .map(|(network, arcs, quantity)| OriginalColumn {
+                    network,
+                    arcs,
+                    coupled_values: None,
+                    coupled_controls: None,
+                    quantity,
+                }),
+        )
+    }
+
+    /// Enclose a primal expression using selected column values where needed.
+    pub fn activity_from_columns<'a>(
+        &self,
+        network: i32,
+        id: i32,
+        columns: impl IntoIterator<Item = OriginalColumn<'a>>,
+    ) -> Result<Bounds> {
         let variable = self
             .variables
             .iter()
@@ -273,10 +442,61 @@ impl PricingVariableRegistry {
         let coefficients: HashMap<_, _> = variable.arcs.iter().copied().collect();
         let mut upper = crate::master::numerics::ExactSum::default();
         let mut negative_lower = crate::master::numerics::ExactSum::default();
-        for (_, arcs, quantity) in paths
+        for OriginalColumn {
+            arcs,
+            coupled_values,
+            coupled_controls,
+            quantity,
+            ..
+        } in columns
             .into_iter()
-            .filter(|(n, _, quantity)| *n == network && *quantity != 0.)
+            .filter(|column| column.network == network && column.quantity != 0.)
         {
+            if let Some(resource) = variable.accumulated_resource {
+                let source = &self.activity_sources[&network];
+                let path = arcs
+                    .iter()
+                    .map(|id| {
+                        source.arcs.get(id).copied().ok_or_else(|| {
+                            invalid("original activity uses an unknown physical arc")
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let value = if matches!(
+                    source.kernel.definitions().get(resource),
+                    Some(
+                        crate::graph::coupled::CoupledResource::SlopePaired { .. }
+                            | crate::graph::coupled::CoupledResource::PairedPiecewiseLinear { .. }
+                    )
+                ) {
+                    let selected = coupled_values.ok_or_else(|| {
+                        invalid("paired activity reporting requires selected column values")
+                    })?;
+                    if source
+                        .kernel
+                        .replay_with_controls(&path, coupled_controls.unwrap_or(&[]))?
+                        .as_ref()
+                        .map(|selection| selection.paired_values.as_slice())
+                        != Some(selected)
+                    {
+                        return Err(invalid("paired activity column values do not match the compiled resource program"));
+                    }
+                    selected
+                        .iter()
+                        .find(|(index, _)| *index == resource)
+                        .map(|(_, value)| *value)
+                        .ok_or_else(|| invalid("missing selected paired value"))?
+                } else {
+                    source.kernel.accumulated_activity(resource, &path)?
+                };
+                upper
+                    .product_upper(quantity, value)
+                    .ok_or_else(|| invalid("original activity overflow"))?;
+                negative_lower
+                    .product_upper(-quantity, value)
+                    .ok_or_else(|| invalid("original activity overflow"))?;
+                continue;
+            }
             for arc in arcs {
                 if !self.graph_arcs[&network].contains(arc) {
                     return Err(invalid(

@@ -89,6 +89,9 @@ pub(super) fn infeasible<const D: usize>(
 /// path's cost and scalar lower states together: coordinate minima from other
 /// paths cannot justify the cost of this one. Directed transitions and waiting
 /// on equality axes deliberately overapproximate the original feasible paths.
+/// An independent coupled-resource certificate may reject a complete path;
+/// unknown certificates keep it in the relaxation. Coupled objective costs are
+/// bounded separately by the caller and are never added to these arc weights.
 /// Exhaustion returns unknown, never the minimum of a partially visited domain.
 pub(super) fn dag_minimum<const D: usize>(
     graph: &Graph<D>,
@@ -96,8 +99,8 @@ pub(super) fn dag_minimum<const D: usize>(
     work: &mut usize,
     deadline: Instant,
 ) -> Option<Option<f64>> {
-    if graph.has_coupled_resources()
-        || graph.resources.is_empty()
+    let coupled = graph.coupled_kernel();
+    if (graph.resources.is_empty() && coupled.is_none())
         || weights.len() != graph.arcs.len()
         || weights.iter().any(|c| !c.is_finite())
     {
@@ -115,19 +118,37 @@ pub(super) fn dag_minimum<const D: usize>(
     for (r, value) in initial.iter_mut().enumerate().take(graph.resources.len()) {
         *value = graph.initial[r].unwrap_or(graph.vertices[graph.source].bounds[r].lower);
     }
-    let mut stack = vec![(graph.source, initial, 0.)];
+    let mut stack = vec![(graph.source, initial, 0., coupled.map(|_| Vec::new()))];
     let mut minimum: Option<f64> = None;
-    while let Some((vertex, prefix, cost)) = stack.pop() {
+    while let Some((vertex, prefix, cost, path)) = stack.pop() {
         *work = work.checked_sub(1)?;
         if Instant::now() >= deadline {
             return None;
         }
         if vertex == graph.sink {
+            if let (Some(kernel), Some(path)) = (coupled, path.as_deref()) {
+                let certificate = kernel.certify_with_budget(path, work, Some(deadline));
+                if Instant::now() >= deadline || (certificate.is_none() && *work == 0) {
+                    return None;
+                }
+                if certificate.is_some_and(|(feasible, _)| !feasible) {
+                    continue;
+                }
+            }
             minimum = Some(minimum.map_or(cost, |old| old.min(cost)));
             continue;
         }
         for &p in &outgoing[vertex] {
-            *work = work.checked_sub(graph.resources.len().checked_add(2)?)?;
+            let trace_work = path
+                .as_ref()
+                .map_or(Some(0), |path| path.len().checked_add(1))?;
+            *work = work.checked_sub(
+                graph
+                    .resources
+                    .len()
+                    .checked_add(2)?
+                    .checked_add(trace_work)?,
+            )?;
             let arc = &graph.arcs[p];
             let mut next = prefix;
             let mut allowed = true;
@@ -140,7 +161,12 @@ pub(super) fn dag_minimum<const D: usize>(
                 }
             }
             if allowed {
-                stack.push((arc.head, next, add_down(cost, weights[p])?));
+                let next_path = path.as_ref().map(|path| {
+                    let mut next = path.clone();
+                    next.push(p);
+                    next
+                });
+                stack.push((arc.head, next, add_down(cost, weights[p])?, next_path));
             }
         }
     }

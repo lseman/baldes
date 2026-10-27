@@ -148,10 +148,43 @@ fn tree_metrics(parent: f64, incumbent: f64, children: [f64; 2], normalization: 
     };
     (score, size)
 }
+// The product-score phase keeps the first candidate for equivalent sorted
+// child estimates before applying the next phase's quota. This is a ranking
+// reduction only; no node is pruned by an equivalent trial estimate.
+pub(in crate::master) fn retain_distinct_trials<T>(
+    candidates: &mut Vec<T>,
+    values: impl Fn(&T) -> (f64, [f64; 2]),
+) {
+    let mut retained: Vec<(f64, [f64; 2])> = vec![];
+    candidates.retain(|candidate| {
+        let (candidate_score, mut estimates) = values(candidate);
+        estimates.sort_by(f64::total_cmp);
+        let duplicate = retained.iter().rev().any(|&(score, previous)| {
+            score <= candidate_score + 1e-6
+                && previous.into_iter().zip(estimates).all(|(a, b)| {
+                    if !a.is_finite() || !b.is_finite() {
+                        return false;
+                    }
+                    // Recovered continuous Bound comparisons against a +/-
+                    // precision interval, with relative Double slack.
+                    let lower = a - 1e-6;
+                    let upper = a + 1e-6;
+                    lower - (1e-6 + lower.abs().max(b.abs()) * 1e-10) <= b
+                        && b - (1e-6 + upper.abs().max(b.abs()) * 1e-10) <= upper
+                })
+        });
+        if !duplicate {
+            retained.push((candidate_score, estimates));
+        }
+        !duplicate
+    });
+}
+
 struct Candidate {
     branch: super::candidates::BranchCandidate,
     order: usize,
     score: f64,
+    estimates: [f64; 2],
     bounds: [f64; 2],
     stages: [usize; 2],
 }
@@ -263,6 +296,7 @@ pub(super) fn choose<const D: usize>(
             branch,
             order,
             score: 0.,
+            estimates: [node.bound; 2],
             bounds: [node.bound; 2],
             stages: [0; 2],
         })
@@ -341,13 +375,15 @@ pub(super) fn choose<const D: usize>(
                             output.pricing_calls += result.master.pricing_calls;
                             output.fixing_calls += result.fixing_calls;
                             output.enumerated_routes += result.enumerated_routes;
-                            estimates[side] = result.master.lp.min(1e12);
-                            if result
-                                .master
-                                .artificials
-                                .iter()
-                                .all(|&c| result.values.get(c).copied().unwrap_or(0.) <= 1e-6)
-                            {
+                            let artificial_zero = result.master.artificials.iter().all(|&c| {
+                                result.values.get(c).copied().unwrap_or(0.).abs() <= 1e-6
+                            });
+                            estimates[side] = if artificial_zero {
+                                result.master.lp.min(1e12)
+                            } else {
+                                1e12
+                            };
+                            if artificial_zero {
                                 if result.master.status == Status::Optimal
                                     && !result.master.pruned_by_bound
                                     && phase.pricing_phase_floor == 0
@@ -397,6 +433,7 @@ pub(super) fn choose<const D: usize>(
                     }
                 }
             }
+            candidate.estimates = estimates;
             candidate.score = if phase.tree_depth_score {
                 let (score, size) =
                     tree_metrics(node.bound, output.incumbent.min(1e12), estimates, 1.);
@@ -416,8 +453,15 @@ pub(super) fn choose<const D: usize>(
             candidates.truncate(evaluated);
         }
         candidates.sort_by(|a, b| b.score.total_cmp(&a.score).then(a.order.cmp(&b.order)));
+        if adaptive && evaluated > 0 && !phase.tree_depth_score {
+            retain_distinct_trials(&mut candidates, |c| (c.score, c.estimates));
+        }
     }
     Ok(candidates
         .first()
         .map(|c| (c.branch.clone(), c.bounds, subtree)))
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/master/tree/strong/trial_equivalence_tests.rs"]
+mod trial_equivalence_tests;

@@ -24,11 +24,13 @@ fn variable() -> MappedBranchVariable {
         networks: vec![
             MappedNetworkVariable {
                 network: 7,
+                activities: vec![],
                 arcs: vec![(0, 1.), (2, 1.)],
                 per_route: 0.,
             },
             MappedNetworkVariable {
                 network: 42,
+                activities: vec![],
                 arcs: vec![],
                 per_route: 1.,
             },
@@ -62,6 +64,7 @@ fn mapped_activity_preserves_fractional_and_product_residuals_after_cancellation
         priority: 1.,
         networks: vec![MappedNetworkVariable {
             network: 42,
+            activities: vec![],
             arcs: vec![],
             per_route: 1.,
         }],
@@ -253,6 +256,7 @@ fn native_half_incident_arcs_preserve_integer_route_disjunctions() {
         priority: 1000.,
         networks: vec![MappedNetworkVariable {
             network: 7,
+            activities: vec![],
             arcs: vec![(0, 1.), (6, 1.)],
             per_route: 0.,
         }],

@@ -289,3 +289,112 @@ fn near_slope_machine_pairs_do_not_claim_the_source_control_minimum() {
         Some((true, [-step, -step]))
     );
 }
+
+#[test]
+fn machine_composition_retains_short_remainder_anchors_from_reference_controls() {
+    let fixture =
+        include_str!("../../../../fixtures/coupled/metasolver-composition-boundaries.txt");
+    let mut controls = 0;
+    for line in fixture.lines().filter(|line| !line.starts_with('#')) {
+        let (input, reference) = line.split_once('|').unwrap();
+        let mut input = input.split_whitespace();
+        let name = input.next().unwrap();
+        let outer_count: usize = input.next().unwrap().parse().unwrap();
+        let inner_count: usize = input.next().unwrap().parse().unwrap();
+        let lo: f64 = input.next().unwrap().parse().unwrap();
+        let hi: f64 = input.next().unwrap().parse().unwrap();
+        assert_eq!(input.next(), Some("0"));
+        let mut pairs = |count| {
+            (0..=count)
+                .map(|_| {
+                    (
+                        input.next().unwrap().parse::<f64>().unwrap(),
+                        input.next().unwrap().parse::<f64>().unwrap(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        let outer = pairs(outer_count);
+        let inner = pairs(inner_count);
+        let mut reference = reference.split_whitespace();
+        assert_eq!(reference.next(), Some(name));
+        assert_eq!(reference.next(), Some("1"));
+        let count: usize = reference.next().unwrap().parse().unwrap();
+        assert_eq!(reference.next(), Some("0"));
+        let expected: Vec<_> = (0..=count)
+            .map(|_| {
+                (
+                    u64::from_str_radix(reference.next().unwrap(), 16).unwrap(),
+                    u64::from_str_radix(reference.next().unwrap(), 16).unwrap(),
+                )
+            })
+            .collect();
+        let mut work = 100_000;
+        let actual = compose(&outer, &inner, lo, hi, &mut Machine::new(&mut work, None))
+            .unwrap_or_else(|| panic!("unknown reference control {name}"))
+            .unwrap();
+        assert_eq!(
+            actual
+                .iter()
+                .map(|&(a, b)| (a.to_bits(), b.to_bits()))
+                .collect::<Vec<_>>(),
+            expected,
+            "{name}"
+        );
+        controls += 1;
+    }
+    assert_eq!(controls, 74);
+}
+
+#[test]
+fn short_remainder_paired_certificates_preserve_model_scope_and_work_limits() {
+    let scale = 1.00010001;
+    for end in [1., 1.5] {
+        // The inverse arrival crosses the initial front's knot just before
+        // an inner endpoint. Offset arrival by two so every arrival is later
+        // than departure, satisfying the physical paired-arc precondition.
+        let arrival = function(&[(2., 0.), (1. / scale, scale), (1., scale + end)]);
+        let def = descriptor(
+            function(&[(0., 0.), (1., 1.), (2., 4.)]),
+            vec![SlopeRelationArc {
+                arrival,
+                increment: affine(0., 0., 0., 4.),
+                lower: affine(-100., 2., 0., end + 3.),
+                upper: affine(100., 2., 0., end + 3.),
+                waiting: 10,
+            }],
+            PairedCostNormalization::AbsoluteFinalValue,
+        );
+        assert_eq!(production_value(&def, &[0], 1.), Some((true, [0., 0.])));
+        assert_eq!(machine_value(&def, &[0], 1.), Some((true, [0., 0.])));
+        let mut graph = crate::graph::Graph::<2>::new(2, 0).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph.set_coupled_resources(&[def.clone()]).unwrap();
+        let source_result = graph.coupled_kernel().unwrap().certify(&[0]);
+        let alternate = graph
+            .coupled_kernel()
+            .unwrap()
+            .certify_front_program(&[0], &mut 100_000, None)
+            .unwrap();
+        assert!(alternate.feasible);
+        assert_eq!(alternate.objective, [0., 0.]);
+        assert!(!graph.front_program_domain());
+        assert_eq!(graph.coupled_kernel().unwrap().certify(&[0]), source_result);
+        graph.set_front_program_domain(true).unwrap();
+        assert_eq!(
+            graph.coupled_kernel().unwrap().certify(&[0]),
+            Some((true, [0., 0.]))
+        );
+        assert_eq!(certify(&def, &[0], 1., &mut 0, None), None);
+        assert_eq!(
+            certify(&def, &[0], 1., &mut 100_000, Some(Instant::now())),
+            None
+        );
+        let mut source = def.clone();
+        let CoupledResource::SlopePaired { policy, .. } = &mut source else {
+            unreachable!()
+        };
+        *policy = STRICT;
+        assert_eq!(machine_value(&source, &[0], 1.), None);
+    }
+}

@@ -1,0 +1,1716 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "scope": "Real registered model and actual modern preparation; cumulative registration uses an original C++ method absent from the C wrapper.",
+  "cases": [
+    {
+      "name": "custom-default",
+      "input": {
+        "bcRecRootDb": -18.0,
+        "bcRecRootLpVal": -18.0,
+        "bcRecBestInc": -18.0,
+        "bcRecBestDb": -18.0,
+        "kind": "custom",
+        "associate_cost": true,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0
+      },
+      "prepared": {
+        "kind": "custom",
+        "root_states": [
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          }
+        ],
+        "resources": [
+          {
+            "id": 0,
+            "type": 0,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 1,
+            "type": 1,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 37,
+            "type": 11,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          }
+        ],
+        "original_vertex_data": [
+          {
+            "id": 4,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 3,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 2,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 1,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 0,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          }
+        ],
+        "prepared_arcs": [
+          {
+            "id": 0,
+            "tail": 1,
+            "head": 1
+          },
+          {
+            "id": 1,
+            "tail": 0,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 4
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 4,
+            "tail": 2,
+            "head": 4
+          }
+        ],
+        "original_vertices": 5,
+        "prepared_vertices": 5,
+        "prepared_last_arc": 4,
+        "vertex_mapping": [
+          4,
+          3,
+          0,
+          2,
+          1
+        ],
+        "prepared_arc_ids": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "forward_bound": 0.0,
+        "backward_bound": 0.0,
+        "increments": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          0.0,
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "prepared_resource_id": 37
+      }
+    },
+    {
+      "name": "custom-explicit",
+      "input": {
+        "bcRecRootDb": -18.0,
+        "bcRecRootLpVal": -18.0,
+        "bcRecBestInc": -18.0,
+        "bcRecBestDb": -18.0,
+        "kind": "custom",
+        "associate_cost": true,
+        "constants": [
+          5.0,
+          7.0
+        ],
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0
+      },
+      "prepared": {
+        "kind": "custom",
+        "root_states": [
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          }
+        ],
+        "resources": [
+          {
+            "id": 0,
+            "type": 0,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 1,
+            "type": 1,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 37,
+            "type": 11,
+            "constants": [
+              5.0,
+              7.0
+            ]
+          }
+        ],
+        "original_vertex_data": [
+          {
+            "id": 4,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 3,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 2,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 1,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 0,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          }
+        ],
+        "prepared_arcs": [
+          {
+            "id": 0,
+            "tail": 1,
+            "head": 1
+          },
+          {
+            "id": 1,
+            "tail": 0,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 4
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 4,
+            "tail": 2,
+            "head": 4
+          }
+        ],
+        "original_vertices": 5,
+        "prepared_vertices": 5,
+        "prepared_last_arc": 4,
+        "vertex_mapping": [
+          4,
+          3,
+          0,
+          2,
+          1
+        ],
+        "prepared_arc_ids": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "forward_bound": 5.0,
+        "backward_bound": 7.0,
+        "increments": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          0.0,
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "prepared_resource_id": 37
+      }
+    },
+    {
+      "name": "custom-fractional",
+      "input": {
+        "bcRecRootDb": -18.0,
+        "bcRecRootLpVal": -18.0,
+        "bcRecBestInc": -18.0,
+        "bcRecBestDb": -18.0,
+        "kind": "custom",
+        "associate_cost": true,
+        "constants": [
+          13.25,
+          17.5
+        ],
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 0,
+        "sink": 3,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 97,
+        "dead_arc": 0,
+        "dead_consumption": 1.0
+      },
+      "prepared": {
+        "kind": "custom",
+        "root_states": [
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          }
+        ],
+        "resources": [
+          {
+            "id": 0,
+            "type": 0,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 1,
+            "type": 1,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 97,
+            "type": 11,
+            "constants": [
+              13.25,
+              17.5
+            ]
+          }
+        ],
+        "original_vertex_data": [
+          {
+            "id": 4,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 3,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 2,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 1,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 0,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          }
+        ],
+        "prepared_arcs": [
+          {
+            "id": 0,
+            "tail": 1,
+            "head": 1
+          },
+          {
+            "id": 1,
+            "tail": 0,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 4
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 4,
+            "tail": 2,
+            "head": 4
+          }
+        ],
+        "original_vertices": 5,
+        "prepared_vertices": 5,
+        "prepared_last_arc": 4,
+        "vertex_mapping": [
+          0,
+          3,
+          2,
+          4,
+          1
+        ],
+        "prepared_arc_ids": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "forward_bound": 13.25,
+        "backward_bound": 17.5,
+        "increments": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          0.0,
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "prepared_resource_id": 97
+      }
+    },
+    {
+      "name": "custom-sentinel",
+      "input": {
+        "bcRecRootDb": -18.0,
+        "bcRecRootLpVal": -18.0,
+        "bcRecBestInc": -18.0,
+        "bcRecBestDb": -18.0,
+        "kind": "custom",
+        "associate_cost": true,
+        "constants": [
+          1000000000000.0,
+          1000000000000.0
+        ],
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0
+      },
+      "prepared": {
+        "kind": "custom",
+        "root_states": [
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          }
+        ],
+        "resources": [
+          {
+            "id": 0,
+            "type": 0,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 1,
+            "type": 1,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 37,
+            "type": 11,
+            "constants": [
+              1000000000000.0,
+              1000000000000.0
+            ]
+          }
+        ],
+        "original_vertex_data": [
+          {
+            "id": 4,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 3,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 2,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 1,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 0,
+            "upper": {
+              "1": 8.0,
+              "0": 8.0
+            }
+          }
+        ],
+        "prepared_arcs": [
+          {
+            "id": 0,
+            "tail": 1,
+            "head": 1
+          },
+          {
+            "id": 1,
+            "tail": 0,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 4
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 4,
+            "tail": 2,
+            "head": 4
+          }
+        ],
+        "original_vertices": 5,
+        "prepared_vertices": 5,
+        "prepared_last_arc": 4,
+        "vertex_mapping": [
+          4,
+          3,
+          0,
+          2,
+          1
+        ],
+        "prepared_arc_ids": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "forward_bound": 1000000000000.0,
+        "backward_bound": 1000000000000.0,
+        "increments": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          0.0,
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "prepared_resource_id": 37
+      }
+    },
+    {
+      "name": "cumulative-canonical",
+      "input": {
+        "bcRecRootDb": -13.0,
+        "bcRecRootLpVal": -13.0,
+        "bcRecBestInc": -13.0,
+        "bcRecBestDb": -13.0,
+        "kind": "cumulative",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          5.0,
+          7.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 0,
+        "sink": 3,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0
+      },
+      "prepared": {
+        "kind": "cumulative",
+        "root_states": [
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          }
+        ],
+        "resources": [
+          {
+            "id": 0,
+            "type": 0,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 1,
+            "type": 1,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 37,
+            "type": 10,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          }
+        ],
+        "original_vertex_data": [
+          {
+            "id": 4,
+            "upper": {
+              "37": 99.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 3,
+            "upper": {
+              "37": 13.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 2,
+            "upper": {
+              "37": 7.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 1,
+            "upper": {
+              "37": 5.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 0,
+            "upper": {
+              "37": 17.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          }
+        ],
+        "prepared_arcs": [
+          {
+            "id": 0,
+            "tail": 1,
+            "head": 1
+          },
+          {
+            "id": 1,
+            "tail": 0,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 4
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 4,
+            "tail": 2,
+            "head": 4
+          }
+        ],
+        "original_vertices": 5,
+        "prepared_vertices": 5,
+        "prepared_last_arc": 4,
+        "vertex_mapping": [
+          0,
+          3,
+          2,
+          4,
+          1
+        ],
+        "prepared_arc_ids": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "forward_bound": 13.0,
+        "backward_bound": 17.0,
+        "increments": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          13.0,
+          5.0,
+          0.0,
+          7.0,
+          0.0
+        ],
+        "prepared_resource_id": 37
+      }
+    },
+    {
+      "name": "cumulative-permuted",
+      "input": {
+        "bcRecRootDb": -10.0,
+        "bcRecRootLpVal": -10.0,
+        "bcRecBestInc": -10.0,
+        "bcRecBestDb": -10.0,
+        "kind": "cumulative",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          5.0,
+          7.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0
+      },
+      "prepared": {
+        "kind": "cumulative",
+        "root_states": [
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          }
+        ],
+        "resources": [
+          {
+            "id": 0,
+            "type": 0,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 1,
+            "type": 1,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 37,
+            "type": 10,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          }
+        ],
+        "original_vertex_data": [
+          {
+            "id": 4,
+            "upper": {
+              "37": 99.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 3,
+            "upper": {
+              "37": 7.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 2,
+            "upper": {
+              "37": 17.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 1,
+            "upper": {
+              "37": 5.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 0,
+            "upper": {
+              "37": 13.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          }
+        ],
+        "prepared_arcs": [
+          {
+            "id": 0,
+            "tail": 1,
+            "head": 1
+          },
+          {
+            "id": 1,
+            "tail": 0,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 4
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 4,
+            "tail": 2,
+            "head": 4
+          }
+        ],
+        "original_vertices": 5,
+        "prepared_vertices": 5,
+        "prepared_last_arc": 4,
+        "vertex_mapping": [
+          4,
+          3,
+          0,
+          2,
+          1
+        ],
+        "prepared_arc_ids": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "forward_bound": 13.0,
+        "backward_bound": 17.0,
+        "increments": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          7.0,
+          5.0,
+          0.0,
+          17.0,
+          0.0
+        ],
+        "prepared_resource_id": 37
+      }
+    },
+    {
+      "name": "cumulative-fractional",
+      "input": {
+        "bcRecRootDb": -13.0,
+        "bcRecRootLpVal": -13.0,
+        "bcRecBestInc": -13.0,
+        "bcRecBestDb": -13.0,
+        "kind": "cumulative",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          5.75,
+          7.5
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 0,
+        "sink": 3,
+        "source_upper": 17.5,
+        "sink_upper": 13.25,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0
+      },
+      "prepared": {
+        "kind": "cumulative",
+        "root_states": [
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          }
+        ],
+        "resources": [
+          {
+            "id": 0,
+            "type": 0,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 1,
+            "type": 1,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 37,
+            "type": 10,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          }
+        ],
+        "original_vertex_data": [
+          {
+            "id": 4,
+            "upper": {
+              "37": 99.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 3,
+            "upper": {
+              "37": 13.25,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 2,
+            "upper": {
+              "37": 7.5,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 1,
+            "upper": {
+              "37": 5.75,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 0,
+            "upper": {
+              "37": 17.5,
+              "1": 8.0,
+              "0": 8.0
+            }
+          }
+        ],
+        "prepared_arcs": [
+          {
+            "id": 0,
+            "tail": 1,
+            "head": 1
+          },
+          {
+            "id": 1,
+            "tail": 0,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 4
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 4,
+            "tail": 2,
+            "head": 4
+          }
+        ],
+        "original_vertices": 5,
+        "prepared_vertices": 5,
+        "prepared_last_arc": 4,
+        "vertex_mapping": [
+          0,
+          3,
+          2,
+          4,
+          1
+        ],
+        "prepared_arc_ids": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "forward_bound": 13.25,
+        "backward_bound": 17.5,
+        "increments": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          13.0,
+          5.0,
+          0.0,
+          7.0,
+          0.0
+        ],
+        "prepared_resource_id": 37
+      }
+    },
+    {
+      "name": "cumulative-missing",
+      "input": {
+        "bcRecRootDb": -13.0,
+        "bcRecRootLpVal": -13.0,
+        "bcRecBestInc": -13.0,
+        "bcRecBestDb": -13.0,
+        "kind": "cumulative",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          5.0,
+          7.0
+        ],
+        "omit_endpoint_uppers": true,
+        "source": 0,
+        "sink": 3,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0
+      },
+      "prepared": {
+        "kind": "cumulative",
+        "root_states": [
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          }
+        ],
+        "resources": [
+          {
+            "id": 0,
+            "type": 0,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 1,
+            "type": 1,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 37,
+            "type": 10,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          }
+        ],
+        "original_vertex_data": [
+          {
+            "id": 4,
+            "upper": {
+              "37": 99.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 3,
+            "upper": {
+              "37": 0.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 2,
+            "upper": {
+              "37": 7.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 1,
+            "upper": {
+              "37": 5.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 0,
+            "upper": {
+              "37": 0.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          }
+        ],
+        "prepared_arcs": [
+          {
+            "id": 0,
+            "tail": 1,
+            "head": 1
+          },
+          {
+            "id": 1,
+            "tail": 0,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 4
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 4,
+            "tail": 2,
+            "head": 4
+          }
+        ],
+        "original_vertices": 5,
+        "prepared_vertices": 5,
+        "prepared_last_arc": 4,
+        "vertex_mapping": [
+          0,
+          3,
+          2,
+          4,
+          1
+        ],
+        "prepared_arc_ids": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "forward_bound": 0.0,
+        "backward_bound": 0.0,
+        "increments": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          0.0,
+          5.0,
+          0.0,
+          7.0,
+          0.0
+        ],
+        "prepared_resource_id": 37
+      }
+    },
+    {
+      "name": "cumulative-sentinel",
+      "input": {
+        "bcRecRootDb": -13.0,
+        "bcRecRootLpVal": -13.0,
+        "bcRecBestInc": -13.0,
+        "bcRecBestDb": -13.0,
+        "kind": "cumulative",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          5.0,
+          7.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 0,
+        "sink": 3,
+        "source_upper": 1000000000000.0,
+        "sink_upper": 1000000000000.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0
+      },
+      "prepared": {
+        "kind": "cumulative",
+        "root_states": [
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          }
+        ],
+        "resources": [
+          {
+            "id": 0,
+            "type": 0,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 1,
+            "type": 1,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 37,
+            "type": 10,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          }
+        ],
+        "original_vertex_data": [
+          {
+            "id": 4,
+            "upper": {
+              "37": 99.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 3,
+            "upper": {
+              "37": 1000000000000.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 2,
+            "upper": {
+              "37": 7.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 1,
+            "upper": {
+              "37": 5.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 0,
+            "upper": {
+              "37": 1000000000000.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          }
+        ],
+        "prepared_arcs": [
+          {
+            "id": 0,
+            "tail": 1,
+            "head": 1
+          },
+          {
+            "id": 1,
+            "tail": 0,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 4
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 4,
+            "tail": 2,
+            "head": 4
+          }
+        ],
+        "original_vertices": 5,
+        "prepared_vertices": 5,
+        "prepared_last_arc": 4,
+        "vertex_mapping": [
+          0,
+          3,
+          2,
+          4,
+          1
+        ],
+        "prepared_arc_ids": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "forward_bound": 0.0,
+        "backward_bound": 0.0,
+        "increments": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          0.0,
+          5.0,
+          0.0,
+          7.0,
+          0.0
+        ],
+        "prepared_resource_id": 37
+      }
+    },
+    {
+      "name": "cumulative-sparse-id",
+      "input": {
+        "bcRecRootDb": -13.0,
+        "bcRecRootLpVal": -13.0,
+        "bcRecBestInc": -13.0,
+        "bcRecBestDb": -13.0,
+        "kind": "cumulative",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          5.0,
+          7.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 0,
+        "sink": 3,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 97,
+        "dead_arc": 0,
+        "dead_consumption": 1.0
+      },
+      "prepared": {
+        "kind": "cumulative",
+        "root_states": [
+          {
+            "forward": true,
+            "cost": 0.0,
+            "level": 0.0
+          },
+          {
+            "forward": false,
+            "cost": 0.0,
+            "level": 0.0
+          }
+        ],
+        "resources": [
+          {
+            "id": 0,
+            "type": 0,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 1,
+            "type": 1,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          },
+          {
+            "id": 97,
+            "type": 10,
+            "constants": [
+              0.0,
+              0.0
+            ]
+          }
+        ],
+        "original_vertex_data": [
+          {
+            "id": 4,
+            "upper": {
+              "97": 99.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 3,
+            "upper": {
+              "97": 13.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 2,
+            "upper": {
+              "97": 7.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 1,
+            "upper": {
+              "97": 5.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          },
+          {
+            "id": 0,
+            "upper": {
+              "97": 17.0,
+              "1": 8.0,
+              "0": 8.0
+            }
+          }
+        ],
+        "prepared_arcs": [
+          {
+            "id": 0,
+            "tail": 1,
+            "head": 1
+          },
+          {
+            "id": 1,
+            "tail": 0,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 4
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 4,
+            "tail": 2,
+            "head": 4
+          }
+        ],
+        "original_vertices": 5,
+        "prepared_vertices": 5,
+        "prepared_last_arc": 4,
+        "vertex_mapping": [
+          0,
+          3,
+          2,
+          4,
+          1
+        ],
+        "prepared_arc_ids": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "forward_bound": 13.0,
+        "backward_bound": 17.0,
+        "increments": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ],
+        "weights": [
+          13.0,
+          5.0,
+          0.0,
+          7.0,
+          0.0
+        ],
+        "prepared_resource_id": 97
+      }
+    }
+  ],
+  "cumulative_relabeling_source_optimum": -13.0
+}

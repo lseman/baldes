@@ -9,6 +9,7 @@ pub(in crate::master::model) enum RowKernels {
         composite: bool,
     },
     Resource(Vec<ResourceKnapsackCoefficients>),
+    Accumulated(Vec<AccumulatedActivityCoefficients>),
 }
 
 impl RowKernels {
@@ -60,6 +61,11 @@ impl RowKernels {
                     registered::normalize(&c.cut, &graph)?;
                 }
             }
+            Self::Accumulated(coefficients) => {
+                for c in coefficients {
+                    activity_rows::validate(&network(c.network)?.graph, c)?;
+                }
+            }
             Self::Resource(coefficients) => {
                 if row.sense != RowSense::LessEqual {
                     return Err(invalid("resource knapsack row requires <= sense"));
@@ -89,6 +95,7 @@ impl RowKernels {
                 composite,
             } => install_registered(state, shared, coefficients, *composite),
             Self::Resource(c) => resource_rows::install(state, shared, c),
+            Self::Accumulated(c) => activity_rows::install(state, shared, c),
         }
     }
 }

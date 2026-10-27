@@ -2,6 +2,13 @@ use super::*;
 
 impl<const D: usize> LabelingEngine<D> {
     pub fn solve(&mut self, g: &Graph<D>, controls: &Controls) -> Result<PricingResult> {
+        if g.coupled_kernel()
+            .is_some_and(|kernel| kernel.has_negative_paired_objectives())
+        {
+            return Err(crate::incomplete(
+                "negative paired objectives require source-control master pricing",
+            ));
+        }
         let effective = controls.for_graph(g)?;
         let controls = &effective;
         self.cuts.presence.validate_engine(g.arcs.len())?;
@@ -272,6 +279,13 @@ impl<const D: usize> LabelingEngine<D> {
     }
 
     pub fn continue_after_halfway(&mut self, g: &Graph<D>, controls: &Controls) -> Result<()> {
+        if g.coupled_kernel()
+            .is_some_and(|kernel| kernel.has_negative_paired_objectives())
+        {
+            return Err(crate::incomplete(
+                "negative paired objectives require source-control master pricing",
+            ));
+        }
         if self.full_ready
             && self
                 .last_costs

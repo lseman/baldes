@@ -43,7 +43,7 @@ impl CoupledLabelState {
             reduced: finite(previous.reduced + finite(reduced_increment)?)?,
             original: finite(previous.original + finite(original_increment)?)?,
         };
-        let reduced = finite(costs.reduced + self.resource_objective)?;
+        let reduced = finite(costs.reduced + self.pricing_objective()?)?;
         let original = finite(costs.original + self.resource_objective)?;
         self.accounting = Some(costs);
         Ok((reduced, original))

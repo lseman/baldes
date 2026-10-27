@@ -19,12 +19,13 @@ pub struct ResourceGroupMember {
 
 fn nonnegative_packing<const D: usize>(state: &State<D>, packing_row: usize) -> bool {
     !state.oracles.iter().any(|o| {
-        o.network
-            .arc_entries
-            .iter()
-            .flatten()
-            .chain(o.network.route_entries.iter())
-            .any(|&(r, a)| r == packing_row && a < 0.)
+        o.activity_rows.iter().any(|entry| entry.row == packing_row)
+            || o.network
+                .arc_entries
+                .iter()
+                .flatten()
+                .chain(o.network.route_entries.iter())
+                .any(|&(r, a)| r == packing_row && a < 0.)
     }) && !state.master_variables.iter().any(|v| {
         v.entries.iter().any(|&(r, a)| {
             r == packing_row && ((a > 0. && v.bounds.lower < 0.) || (a < 0. && v.bounds.upper > 0.))

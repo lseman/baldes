@@ -1,4 +1,5 @@
-"""Direct physical-graph resource contracts; execution held during implementation."""
+"""Direct physical-graph resource contracts."""
+import pytest
 from pybaldes import ResourceModel, Solver
 
 
@@ -160,3 +161,25 @@ def test_computed_front_domain_is_an_explicit_installation_choice():
     with pytest.raises(RuntimeError, match="native raw resources"):
         ResourceModel().install(solver, front_program_domain=True)
     assert solver.price(10)[0] == pytest.approx(-17.)
+
+
+@pytest.mark.parametrize("normalization,charge", [
+    ("absolute_final_value", 5.0), ("final_minus_initial_minimum", 3.0),
+])
+def test_control_point_builder_normalization_preserves_nonzero_selected_value(normalization, charge):
+    solver = Solver(2, 0)
+    solver.new_arc(0, 1, -20.0)
+    model = ResourceModel()
+    model.add_paired_piecewise_linear(
+        0.0, 0.0, [(0.0, 2.0), (1.0, 2.0)],
+        arrivals=[[(0.0, 1.0), (1.0, 2.0)]],
+        increments=[[(0.0, 3.0), (1.0, 3.0)]],
+        lowers=[[(1.0, 0.0), (2.0, 0.0)]],
+        uppers=[[(1.0, 100.0), (2.0, 100.0)]], waiting=[0],
+        mode="cost_bounded", normalization=normalization,
+    )
+    model.install(solver)
+    minimum, routes = solver.price(10)
+    assert minimum == -20.0 + charge
+    assert routes[0].original_cost == minimum
+    assert routes[0].coupled_values == [(0, 5.0)]

@@ -159,6 +159,16 @@ subtrees do not enter this average. The default keeps parent estimates.
 `StrongBranchingOptions` exposes the phase and time
 budgets. Disable it with `--no-strong-branching`.
 
+For JSON models using `--network-branching phased`, multiplicity candidates
+keep network registration order within each priority. Priced trials that still
+use artificial variables receive a ranking estimate of `1e12`; their finite
+penalty objective does not determine candidate selection. These estimates do
+not certify a child bound. Between product-score phases, equivalent scored
+child estimates retain one candidate before the next phase's quota is applied.
+Distinct child estimates remain separate even when their product scores agree.
+Disable these trials with
+`--no-mapped-strong-branching`.
+
 Strong round-up diving uses isolated route-fixing trials and depth,
 discrepancy, node, and time limits. Disable it with `--no-diving`.
 Heuristic trial objectives and dive bounds cannot certify the original node.

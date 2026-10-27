@@ -13,6 +13,8 @@ impl<const D: usize> Solver<D> {
     /// calls it after each converged column generation: the statistics form,
     /// then the end-of-round form that applies a pending bucket-step decrease.
     /// Returns the stop-cut-generation flag of the statistics form.
+    /// A failed pending refinement returns an error after consuming the round
+    /// statistics and pending flag, without publishing new configured steps.
     pub fn column_generation_terminated(&mut self, flag3: i32, flag5: i32) -> Result<bool> {
         let enumerated = self.enumeration.is_some();
         // Borrow the geometry and round state independently.
@@ -37,8 +39,7 @@ impl<const D: usize> Solver<D> {
                 self.engine.as_mut()
             };
             if let Some(engine) = engine {
-                // "cannot decrease bucket steps" is reported and ignored.
-                let _ = engine.grid.decrease_steps(&self.graph);
+                engine.grid.decrease_steps(&self.graph)?;
                 for (axis, &slot) in engine.grid.resource_slots.iter().enumerate() {
                     self.bucket_steps[slot] = engine.grid.step[axis];
                 }

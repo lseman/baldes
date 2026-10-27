@@ -39,6 +39,7 @@ fn fixture(rhs: f64, cheap_cap: f64, costs: &[f64]) -> Problem<2> {
             multiplicity: Window::new(0., 10.).unwrap(),
             arc_entries,
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     }
 }
@@ -292,6 +293,7 @@ fn complete_mip_restores_a_retired_route_needed_for_integer_feasibility() {
             multiplicity: Window::new(0., 10.).unwrap(),
             arc_entries,
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let mut configured = options(BoundMode::Certified);

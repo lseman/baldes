@@ -205,11 +205,25 @@ impl<const D: usize> Graph<D> {
     pub fn route_domain(&self) -> RouteDomain {
         self.route_domain
     }
+    /// Change the route domain and refresh installed coupled bound metadata.
+    /// Invalid changes restore the previous domain and resource configuration.
     pub fn set_route_domain(&mut self, domain: RouteDomain) -> Result<()> {
         let old = self.route_domain;
+        if domain == old {
+            return self.validate();
+        }
+        let previous = self.coupled.take();
         self.route_domain = domain;
         if let Err(error) = self.validate() {
             self.route_domain = old;
+            self.coupled = previous;
+            return Err(error);
+        }
+        self.coupled = previous.clone();
+        self.refresh_coupled_bounds();
+        if let Err(error) = self.validate() {
+            self.route_domain = old;
+            self.coupled = previous;
             return Err(error);
         }
         Ok(())
@@ -234,11 +248,14 @@ impl<const D: usize> Graph<D> {
                 || self.is_acyclic())
     }
     pub(crate) fn is_acyclic(&self) -> bool {
+        self.topological_order().is_some()
+    }
+    pub(crate) fn topological_order(&self) -> Option<Vec<usize>> {
         let mut outgoing = vec![Vec::new(); self.vertices.len()];
         let mut indegree = vec![0usize; self.vertices.len()];
         for arc in &self.arcs {
             if arc.tail >= self.vertices.len() || arc.head >= self.vertices.len() {
-                return false;
+                return None;
             }
             outgoing[arc.tail].push(arc.head);
             indegree[arc.head] += 1;
@@ -257,7 +274,7 @@ impl<const D: usize> Graph<D> {
                 }
             }
         }
-        processed == self.vertices.len()
+        (processed == self.vertices.len()).then_some(queue)
     }
     pub(crate) fn has_explicit_elementarity_groups(&self) -> bool {
         self.grouped

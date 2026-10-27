@@ -17,6 +17,7 @@ fn unbounded_relation_shift_pays_for_a_higher_nonconstant_front() {
     };
     graph
         .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+            normalization: crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
             initial: line(0., 0.),
             initial_base: Window::new(0., 2.).unwrap(),
             arcs: vec![arc(line(0., 2.)), arc(line(0., 0.))],
@@ -50,6 +51,7 @@ fn backward_paired_fronts_compare_different_suffix_programs() {
     };
     graph
         .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+            normalization: crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
             initial: line(5., 5.),
             initial_base: Window::new(0., 2.).unwrap(),
             arcs: vec![arc(10.), arc(8.)],
@@ -76,6 +78,7 @@ fn paired_terminal_above_numerical_infinity_retains_suffix_replay() {
     graph.add_arc(0, 1, 0.).unwrap();
     graph
         .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+            normalization: crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
             initial: line(1.5e12),
             initial_base: Window::new(0., 2.).unwrap(),
             arcs: vec![PairedResourceArc {

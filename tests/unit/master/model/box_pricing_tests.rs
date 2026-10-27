@@ -17,6 +17,7 @@ fn positive_network(lower: f64, stabilized: bool) -> Output<2> {
                 multiplicity: Window { lower, upper: 2. },
                 arc_entries: vec![vec![]; 2],
                 route_entries: vec![],
+                activity_entries: vec![],
             }],
         },
         options,
@@ -334,6 +335,7 @@ fn finite_variable_box_balances_negative_arc_costs_without_extra_pricing() {
                     },
                     arc_entries: vec![vec![]; 2],
                     route_entries: vec![],
+                    activity_entries: vec![],
                 }],
             },
             options,
@@ -515,6 +517,7 @@ fn variable_boxes_reject_unknown_or_unproved_inputs_before_zero_budget_returns()
                 },
                 arc_entries: vec![vec![]; 2],
                 route_entries: vec![],
+                activity_entries: vec![],
             }],
         };
         assert!(crate::master::tree::solve(problem, options).is_err());
@@ -537,6 +540,7 @@ fn variable_box_zero_budget_validation_rejects_bad_graph_without_walking_it() {
             },
             arc_entries: vec![vec![]],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let mut options = ModelTreeOptions::default();
@@ -640,6 +644,7 @@ fn an_empty_required_domain_cannot_become_feasible_from_a_box_bound() {
                 },
                 arc_entries: vec![vec![]],
                 route_entries: vec![],
+                activity_entries: vec![],
             }],
         },
         options,

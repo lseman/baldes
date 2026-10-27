@@ -1,0 +1,1835 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "cases": [
+    {
+      "name": "spd-00",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 0.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "deliveries": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 0.0,
+        "pickups": [
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "deliveries": [
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ]
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 0,
+                "pickups": [
+                  0.0,
+                  1.0,
+                  3.0,
+                  2.0,
+                  0.0
+                ],
+                "deliveries": [
+                  0.0,
+                  2.0,
+                  1.0,
+                  1.0,
+                  2.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-01",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 2.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "deliveries": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 2.0,
+        "pickups": [
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "deliveries": [
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ]
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 2,
+                "pickups": [
+                  0.0,
+                  1.0,
+                  3.0,
+                  2.0,
+                  0.0
+                ],
+                "deliveries": [
+                  0.0,
+                  2.0,
+                  1.0,
+                  1.0,
+                  2.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-02",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 3.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "deliveries": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 3.0,
+        "pickups": [
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "deliveries": [
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ]
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 3,
+                "pickups": [
+                  0.0,
+                  1.0,
+                  3.0,
+                  2.0,
+                  0.0
+                ],
+                "deliveries": [
+                  0.0,
+                  2.0,
+                  1.0,
+                  1.0,
+                  2.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-03",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 4.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "deliveries": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -20.0,
+        "bcRecRootLpVal": -20.0,
+        "bcRecBestInc": -20.0,
+        "bcRecBestDb": -20.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 4.0,
+        "pickups": [
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "deliveries": [
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ]
+      },
+      "independent_objective": -20,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 4,
+                "pickups": [
+                  0.0,
+                  1.0,
+                  3.0,
+                  2.0,
+                  0.0
+                ],
+                "deliveries": [
+                  0.0,
+                  2.0,
+                  1.0,
+                  1.0,
+                  2.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-04",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 5.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "deliveries": [
+          0.0,
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -20.0,
+        "bcRecRootLpVal": -20.0,
+        "bcRecBestInc": -20.0,
+        "bcRecBestDb": -20.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 5.0,
+        "pickups": [
+          1.0,
+          3.0,
+          2.0,
+          0.0
+        ],
+        "deliveries": [
+          2.0,
+          1.0,
+          1.0,
+          2.0
+        ]
+      },
+      "independent_objective": -20,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 5,
+                "pickups": [
+                  0.0,
+                  1.0,
+                  3.0,
+                  2.0,
+                  0.0
+                ],
+                "deliveries": [
+                  0.0,
+                  2.0,
+                  1.0,
+                  1.0,
+                  2.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-05",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 0.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          4.0,
+          0.0,
+          0.0,
+          4.0
+        ],
+        "deliveries": [
+          0.0,
+          0.0,
+          4.0,
+          4.0,
+          0.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 0.0,
+        "pickups": [
+          4.0,
+          0.0,
+          0.0,
+          4.0
+        ],
+        "deliveries": [
+          0.0,
+          4.0,
+          4.0,
+          0.0
+        ]
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 0,
+                "pickups": [
+                  0.0,
+                  4.0,
+                  0.0,
+                  0.0,
+                  4.0
+                ],
+                "deliveries": [
+                  0.0,
+                  0.0,
+                  4.0,
+                  4.0,
+                  0.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-06",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 2.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          4.0,
+          0.0,
+          0.0,
+          4.0
+        ],
+        "deliveries": [
+          0.0,
+          0.0,
+          4.0,
+          4.0,
+          0.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 2.0,
+        "pickups": [
+          4.0,
+          0.0,
+          0.0,
+          4.0
+        ],
+        "deliveries": [
+          0.0,
+          4.0,
+          4.0,
+          0.0
+        ]
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 2,
+                "pickups": [
+                  0.0,
+                  4.0,
+                  0.0,
+                  0.0,
+                  4.0
+                ],
+                "deliveries": [
+                  0.0,
+                  0.0,
+                  4.0,
+                  4.0,
+                  0.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-07",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 3.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          4.0,
+          0.0,
+          0.0,
+          4.0
+        ],
+        "deliveries": [
+          0.0,
+          0.0,
+          4.0,
+          4.0,
+          0.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 3.0,
+        "pickups": [
+          4.0,
+          0.0,
+          0.0,
+          4.0
+        ],
+        "deliveries": [
+          0.0,
+          4.0,
+          4.0,
+          0.0
+        ]
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 3,
+                "pickups": [
+                  0.0,
+                  4.0,
+                  0.0,
+                  0.0,
+                  4.0
+                ],
+                "deliveries": [
+                  0.0,
+                  0.0,
+                  4.0,
+                  4.0,
+                  0.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-08",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 4.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          4.0,
+          0.0,
+          0.0,
+          4.0
+        ],
+        "deliveries": [
+          0.0,
+          0.0,
+          4.0,
+          4.0,
+          0.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -20.0,
+        "bcRecRootLpVal": -20.0,
+        "bcRecBestInc": -20.0,
+        "bcRecBestDb": -20.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 4.0,
+        "pickups": [
+          4.0,
+          0.0,
+          0.0,
+          4.0
+        ],
+        "deliveries": [
+          0.0,
+          4.0,
+          4.0,
+          0.0
+        ]
+      },
+      "independent_objective": -20,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 4,
+                "pickups": [
+                  0.0,
+                  4.0,
+                  0.0,
+                  0.0,
+                  4.0
+                ],
+                "deliveries": [
+                  0.0,
+                  0.0,
+                  4.0,
+                  4.0,
+                  0.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-09",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 5.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          4.0,
+          0.0,
+          0.0,
+          4.0
+        ],
+        "deliveries": [
+          0.0,
+          0.0,
+          4.0,
+          4.0,
+          0.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -20.0,
+        "bcRecRootLpVal": -20.0,
+        "bcRecBestInc": -20.0,
+        "bcRecBestDb": -20.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 5.0,
+        "pickups": [
+          4.0,
+          0.0,
+          0.0,
+          4.0
+        ],
+        "deliveries": [
+          0.0,
+          4.0,
+          4.0,
+          0.0
+        ]
+      },
+      "independent_objective": -20,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 5,
+                "pickups": [
+                  0.0,
+                  4.0,
+                  0.0,
+                  0.0,
+                  4.0
+                ],
+                "deliveries": [
+                  0.0,
+                  0.0,
+                  4.0,
+                  4.0,
+                  0.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-10",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 0.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          1.5,
+          0.5,
+          2.5,
+          0.0
+        ],
+        "deliveries": [
+          0.0,
+          1.0,
+          1.0,
+          0.5,
+          2.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 0.0,
+        "pickups": [
+          1.5,
+          0.5,
+          2.5,
+          0.0
+        ],
+        "deliveries": [
+          1.0,
+          1.0,
+          0.5,
+          2.0
+        ]
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 0,
+                "pickups": [
+                  0.0,
+                  1.5,
+                  0.5,
+                  2.5,
+                  0.0
+                ],
+                "deliveries": [
+                  0.0,
+                  1.0,
+                  1.0,
+                  0.5,
+                  2.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-11",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 2.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          1.5,
+          0.5,
+          2.5,
+          0.0
+        ],
+        "deliveries": [
+          0.0,
+          1.0,
+          1.0,
+          0.5,
+          2.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 2.0,
+        "pickups": [
+          1.5,
+          0.5,
+          2.5,
+          0.0
+        ],
+        "deliveries": [
+          1.0,
+          1.0,
+          0.5,
+          2.0
+        ]
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 2,
+                "pickups": [
+                  0.0,
+                  1.5,
+                  0.5,
+                  2.5,
+                  0.0
+                ],
+                "deliveries": [
+                  0.0,
+                  1.0,
+                  1.0,
+                  0.5,
+                  2.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-12",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 3.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          1.5,
+          0.5,
+          2.5,
+          0.0
+        ],
+        "deliveries": [
+          0.0,
+          1.0,
+          1.0,
+          0.5,
+          2.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -20.0,
+        "bcRecRootLpVal": -20.0,
+        "bcRecBestInc": -20.0,
+        "bcRecBestDb": -20.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 3.0,
+        "pickups": [
+          1.5,
+          0.5,
+          2.5,
+          0.0
+        ],
+        "deliveries": [
+          1.0,
+          1.0,
+          0.5,
+          2.0
+        ]
+      },
+      "independent_objective": -20,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 3,
+                "pickups": [
+                  0.0,
+                  1.5,
+                  0.5,
+                  2.5,
+                  0.0
+                ],
+                "deliveries": [
+                  0.0,
+                  1.0,
+                  1.0,
+                  0.5,
+                  2.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-13",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 4.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          1.5,
+          0.5,
+          2.5,
+          0.0
+        ],
+        "deliveries": [
+          0.0,
+          1.0,
+          1.0,
+          0.5,
+          2.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -20.0,
+        "bcRecRootLpVal": -20.0,
+        "bcRecBestInc": -20.0,
+        "bcRecBestDb": -20.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 4.0,
+        "pickups": [
+          1.5,
+          0.5,
+          2.5,
+          0.0
+        ],
+        "deliveries": [
+          1.0,
+          1.0,
+          0.5,
+          2.0
+        ]
+      },
+      "independent_objective": -20,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 4,
+                "pickups": [
+                  0.0,
+                  1.5,
+                  0.5,
+                  2.5,
+                  0.0
+                ],
+                "deliveries": [
+                  0.0,
+                  1.0,
+                  1.0,
+                  0.5,
+                  2.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "spd-14",
+      "prepared": {
+        "entry": "0x61cfe0",
+        "return": 1,
+        "capacity": 5.0,
+        "pickup_id": 1,
+        "delivery_id": 2,
+        "pickups": [
+          0.0,
+          1.5,
+          0.5,
+          2.5,
+          0.0
+        ],
+        "deliveries": [
+          0.0,
+          1.0,
+          1.0,
+          0.5,
+          2.0
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -20.0,
+        "bcRecRootLpVal": -20.0,
+        "bcRecBestInc": -20.0,
+        "bcRecBestDb": -20.0,
+        "kind": "simultaneous_pickup_delivery",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 2,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "capacity": 5.0,
+        "pickups": [
+          1.5,
+          0.5,
+          2.5,
+          0.0
+        ],
+        "deliveries": [
+          1.0,
+          1.0,
+          0.5,
+          2.0
+        ]
+      },
+      "independent_objective": -20,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 2,
+            "sink": 0,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 4,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 1,
+                "cost": -20
+              },
+              {
+                "tail": 1,
+                "head": 0,
+                "cost": 0
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 0,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "simultaneous_pickup_delivery",
+                "capacity": 5,
+                "pickups": [
+                  0.0,
+                  1.5,
+                  0.5,
+                  2.5,
+                  0.0
+                ],
+                "deliveries": [
+                  0.0,
+                  1.0,
+                  1.0,
+                  0.5,
+                  2.0
+                ],
+                "tolerance": 0
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

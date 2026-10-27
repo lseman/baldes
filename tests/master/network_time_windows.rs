@@ -114,6 +114,7 @@ fn problem(inst: &Instance, vehicles: f64) -> Problem<2> {
             multiplicity: Window::new(0., vehicles).unwrap(),
             arc_entries: entries,
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     }
 }
@@ -232,6 +233,7 @@ fn synchronized(
             multiplicity: Window::new(0., 1.).unwrap(),
             arc_entries: vec![vec![], vec![]],
             route_entries: vec![],
+            activity_entries: vec![],
         }
     };
     let mut opts = options(true);

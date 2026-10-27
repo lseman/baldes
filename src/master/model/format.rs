@@ -77,6 +77,10 @@ pub struct PricingNetwork {
     pub resources: Vec<Resource>,
     #[serde(default)]
     pub coupled_resources: Vec<crate::graph::coupled::CoupledResource>,
+    /// Graph-level costs, using each descriptor's declared normalization.
+    /// A resource bound to an original variable gets its cost from that variable.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub coupled_objective_coefficients: Vec<(usize, f64)>,
     /// Explicitly use the computed-front program as the feasibility
     /// domain for FrontAlgebra resources; defaults to source controls.
     #[serde(default)]
@@ -89,6 +93,8 @@ pub struct PricingNetwork {
     pub arcs: Vec<Arc>,
     #[serde(default)]
     pub route_entries: Vec<(usize, f64)>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub activity_entries: Vec<AccumulatedActivityEntry>,
     #[serde(default)]
     pub ng: Option<Vec<Vec<usize>>>,
 }
@@ -108,11 +114,11 @@ fn pricing_collection<'de, D: serde::Deserializer<'de>>(
     #[derive(Deserialize)]
     #[serde(untagged)]
     enum Input {
-        One(PricingNetwork),
+        One(Box<PricingNetwork>),
         Many(Vec<PricingNetwork>),
     }
     Ok(match Input::deserialize(deserializer)? {
-        Input::One(network) => vec![network],
+        Input::One(network) => vec![*network],
         Input::Many(networks) => networks,
     })
 }
@@ -146,6 +152,20 @@ impl Model {
     /// Compile original variable associations exactly once and retain identity.
     pub fn compile<const D: usize>(mut self) -> Result<(Problem<D>, PricingVariableRegistry)> {
         let variables = std::mem::take(&mut self.pricing_variables);
+        for network in &self.networks {
+            if network
+                .coupled_objective_coefficients
+                .iter()
+                .any(|&(resource, _)| {
+                    variables.iter().any(|variable| {
+                        variable.network == network.id
+                            && variable.accumulated_resource == Some(resource)
+                    })
+                })
+            {
+                return Err(invalid("a coupled resource cost must be declared either on its original pricing variable or on the network, not both"));
+            }
+        }
         compile_pricing_variables(self.physical_problem()?, &variables)
     }
     fn physical_problem<const D: usize>(self) -> Result<Problem<D>> {
@@ -221,6 +241,7 @@ impl Model {
             if input.front_program_domain {
                 graph.set_front_program_domain(true)?;
             }
+            graph.set_coupled_objective_coefficients(&input.coupled_objective_coefficients)?;
             graph.validate()?;
             networks.push(Network {
                 id: input.id,
@@ -233,6 +254,7 @@ impl Model {
                 },
                 arc_entries,
                 route_entries: input.route_entries,
+                activity_entries: input.activity_entries,
             });
         }
         let problem = Problem {
@@ -478,6 +500,8 @@ pub struct AddRow {
     pub dynamic: bool,
     pub row: SharedRow,
     pub coefficients: Vec<Coefficients>,
+    #[serde(default)]
+    pub activities: Vec<AccumulatedActivityCoefficients>,
 }
 
 /// The same owned grouped-resource restriction used by Rust, CLI and Python.
@@ -505,6 +529,25 @@ impl ResourceGroupRestriction {
     }
 }
 impl AddRow {
+    /// Apply one owned row request through the common node lifecycle.
+    pub fn apply<const D: usize>(self, node: &NodeSnapshot<D>) -> Result<NodeSnapshot<D>> {
+        let shared = node.state.shared_rows.len();
+        let coefficients = self
+            .coefficients
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<_>>();
+        let mut child = if self.dynamic {
+            node.with_dynamic_row(self.row.row(), &coefficients)?
+        } else {
+            node.with_row(self.row.row(), &coefficients)?
+        };
+        if self.activities.is_empty() {
+            return Ok(child);
+        }
+        super::activity_rows::install(&mut child.state, shared, &self.activities)?;
+        super::nonlinear::refresh_row(child, shared)
+    }
     pub fn from_json(text: &str) -> Result<Self> {
         serde_json::from_str(text).map_err(|e| invalid(format!("network row JSON: {e}")))
     }
@@ -527,8 +570,23 @@ impl From<Coefficients> for RowCoefficients {
     }
 }
 
+/// Encode a descriptor-level source-control search for the shared frontends.
+pub fn control_optimization_json(
+    result: &crate::master::controls::ControlOptimization,
+) -> Result<String> {
+    serde_json::to_string(result)
+        .map_err(|error| invalid(format!("control optimization JSON: {error}")))
+}
+
+/// Decode explicit source controls through the shared model JSON boundary.
+pub fn parse_paired_controls(text: &str) -> Result<Vec<crate::graph::coupled::PairedControl>> {
+    serde_json::from_str(text).map_err(|error| invalid(format!("paired controls JSON: {error}")))
+}
+
 #[derive(Debug, Serialize)]
 pub struct RouteResult {
+    pub coupled_controls: Vec<crate::graph::coupled::PairedControl>,
+    pub coupled_values: Vec<(usize, f64)>,
     pub network: i32,
     /// Stable registry index for fix_route; absent on fixed/tree witnesses.
     pub route_index: Option<usize>,
@@ -542,6 +600,8 @@ pub struct RouteResult {
 impl RouteResult {
     fn new(route: &NetworkRoute, value: f64, index: Option<usize>) -> Self {
         Self {
+            coupled_values: route.route.coupled_values.clone(),
+            coupled_controls: route.route.coupled_controls.clone(),
             network: route.network,
             route_index: index,
             value,
@@ -603,13 +663,19 @@ impl SolveResult {
             .variables()
             .iter()
             .map(|v| {
-                let bounds = registry.activity_from_paths(
+                let bounds = registry.activity_from_columns(
                     v.network,
                     v.id,
                     self.routes
                         .iter()
                         .chain(&self.fixed_routes)
-                        .map(|r| (r.network, r.arcs.as_slice(), r.value)),
+                        .map(|r| OriginalColumn {
+                            network: r.network,
+                            arcs: &r.arcs,
+                            coupled_values: Some(&r.coupled_values),
+                            coupled_controls: Some(&r.coupled_controls),
+                            quantity: r.value,
+                        }),
                 )?;
                 Ok(OriginalVariableResult {
                     network: v.network,

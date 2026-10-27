@@ -1,6 +1,34 @@
 use super::*;
 
 impl BucketGraph {
+    pub(super) fn validate_bucket_geometry(&self, steps: [f64; 2]) -> Result<()> {
+        if steps[..self.dimensions]
+            .iter()
+            .any(|s| !s.is_finite() || *s <= 0.)
+        {
+            return Err(invalid("positive finite bucket step required"));
+        }
+        for v in 0..self.order.len() {
+            let mut total = 1usize;
+            for (r, &step) in steps.iter().enumerate().take(self.dimensions) {
+                if self.lower[v][r] > self.upper[v][r] + 1e-6 {
+                    return Err(invalid("bucket lower exceeds upper bound"));
+                }
+                let cells = (((self.upper[v][r] + 1e-6) - self.lower[v][r]) / step).floor() + 1.;
+                if !cells.is_finite() || cells < 1. || cells > i32::MAX as f64 {
+                    return Err(invalid("bucket count overflow"));
+                }
+                total = total
+                    .checked_mul(cells as usize)
+                    .ok_or_else(|| invalid("bucket count overflow"))?;
+            }
+            if total > i32::MAX as usize {
+                return Err(invalid("bucket count overflow"));
+            }
+        }
+        Ok(())
+    }
+
     pub fn propagate<const D: usize>(
         &self,
         g: &Graph<D>,
@@ -120,12 +148,7 @@ impl BucketGraph {
         &mut self,
         forward: bool,
     ) -> Result<Vec<Vec<Bucket>>> {
-        if self.step[..self.dimensions]
-            .iter()
-            .any(|s| !s.is_finite() || *s <= 0.)
-        {
-            return Err(invalid("positive finite bucket step required"));
-        }
+        self.validate_bucket_geometry(self.step)?;
         let mut rows = vec![];
         let mut corners = vec![];
         for v in 0..self.order.len() {
@@ -133,22 +156,11 @@ impl BucketGraph {
             let up = self.upper[v];
             let mut total = 1usize;
             for r in 0..self.dimensions {
-                if lo[r] > up[r] + 1e-6 {
-                    return Err(invalid("bucket lower exceeds upper bound"));
-                }
                 let cells = (((up[r] + 1e-6) - lo[r]) / self.step[r]).floor() + 1.;
-                if !cells.is_finite() || cells < 1. || cells > i32::MAX as f64 {
-                    return Err(invalid("bucket count overflow"));
-                }
                 if forward {
                     self.stride[v][r] = total;
                 }
-                total = total
-                    .checked_mul(cells as usize)
-                    .ok_or_else(|| invalid("bucket count overflow"))?;
-            }
-            if total > i32::MAX as usize {
-                return Err(invalid("bucket count overflow"));
+                total *= cells as usize;
             }
             let mut row = Vec::with_capacity(total);
             let mut points = Vec::with_capacity(total);

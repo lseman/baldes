@@ -26,6 +26,10 @@ pub(in crate::master::model) fn infer<const D: usize>(state: &State<D>) -> Optio
                 upper_zero[row] = false;
             }
         }
+        for entry in &oracle.activity_rows {
+            lower_zero[entry.row] = false;
+            upper_zero[entry.row] = false;
+        }
         for &(_, row) in oracle
             .nonlinear_rows
             .iter()

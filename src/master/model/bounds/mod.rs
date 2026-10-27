@@ -4,6 +4,7 @@
 use super::*;
 
 use crate::core::rounding::{add_down as add, multiply_down as multiply};
+pub(super) mod columns;
 mod coupled;
 mod cutoff;
 mod presence;
@@ -21,6 +22,27 @@ fn subtract_product(value: f64, a: f64, b: f64) -> Option<f64> {
     add(value, multiply(-a, b)?)
 }
 
+fn additive_arc_cost_lower_bounds<const D: usize>(
+    oracle: &Oracle<D>,
+    offset: usize,
+    duals: &[f64],
+) -> Option<Vec<f64>> {
+    oracle
+        .network
+        .graph
+        .arcs
+        .iter()
+        .zip(oracle.network.arc_entries.iter())
+        .map(|(arc, coefficients)| {
+            let mut weight = arc.cost;
+            for &(row, coefficient) in coefficients {
+                weight = subtract_product(weight, *duals.get(offset + row)?, coefficient)?;
+            }
+            Some(weight)
+        })
+        .collect()
+}
+
 fn arc_cost_lower_bounds<const D: usize>(
     oracle: &Oracle<D>,
     offset: usize,
@@ -33,31 +55,20 @@ fn arc_cost_lower_bounds<const D: usize>(
     {
         return None;
     }
-    let graph = &oracle.network.graph;
-    let mut weights = vec![];
-    for (index, (arc, coefficients)) in graph
-        .arcs
-        .iter()
-        .zip(oracle.network.arc_entries.iter())
-        .enumerate()
-    {
-        let mut weight = arc.cost;
-        for &(row, coefficient) in coefficients {
-            weight = subtract_product(weight, duals[offset + row], coefficient)?;
-        }
+    let mut weights = additive_arc_cost_lower_bounds(oracle, offset, duals)?;
+    for (index, weight) in weights.iter_mut().enumerate() {
         // Registered nonnegative coefficients have a proved per-arc bound
         // on their increments, including vertex and arc-weight carries.
         for &(cut, row) in &oracle.nonlinear_rows {
             let dual = duals[offset + row];
             if dual > 0. {
-                weight = subtract_product(
-                    weight,
+                *weight = subtract_product(
+                    *weight,
                     dual,
                     super::nonlinear::arc_upper(oracle, cut, index),
                 )?;
             }
         }
-        weights.push(weight);
     }
     Some(weights)
 }
@@ -69,6 +80,25 @@ fn network_minimum<const D: usize>(
     resource_work: &mut usize,
     deadline: Instant,
 ) -> Option<Option<f64>> {
+    if super::control_pricing::needed(oracle) || !oracle.activity_rows.is_empty() {
+        return columns::minimum(oracle, offset, duals, resource_work, deadline);
+    }
+    // Pickup/delivery feasibility depends on the whole route's departure load.
+    // Independent arc relaxations cannot prove that all routes exceed capacity.
+    // Reuse the budgeted joint proof, retaining the relaxation when it is unknown.
+    if oracle.network.graph.coupled_kernel().is_some_and(|kernel| {
+        kernel.has_costs()
+            || kernel.definitions().iter().any(|resource| {
+                matches!(
+                    resource,
+                    crate::graph::coupled::CoupledResource::SimultaneousPickupDelivery { .. }
+                )
+            })
+    }) {
+        if let Some(bound) = columns::minimum(oracle, offset, duals, resource_work, deadline) {
+            return Some(bound);
+        }
+    }
     // Resource step rows have nonnegative coefficients and <= sense. Dropping
     // their nonnegative reduced-cost penalty is a valid lower relaxation.
     // A sign-incompatible dual cannot use this argument.
@@ -409,6 +439,11 @@ fn exact_contributions_in_domain<const D: usize>(
                 return Ok(None);
             }
         }
+        if !oracle.activity_rows.is_empty()
+            && columns::exact_activity_entries(oracle, &fixed.route.route, state.deadline).is_none()
+        {
+            return Ok(None);
+        }
         for (row, coefficient) in super::nonlinear::entries(oracle, &fixed.route.route)? {
             if rows[row].product(coefficient, fixed.quantity).is_none() {
                 return Ok(None);
@@ -436,7 +471,12 @@ fn exact_contributions_in_domain<const D: usize>(
                 .iter()
                 .map(|id| oracle.index[id])
                 .collect();
-            let Some((true, cost)) = kernel.certify(&arcs) else {
+            let Some((true, cost)) = kernel.certify_with_controls(
+                &arcs,
+                &fixed.route.route.coupled_controls,
+                &mut 1_000_000,
+                None,
+            ) else {
                 return Ok(None);
             };
             if cost[0] != cost[1] || objective.product(cost[0], fixed.quantity).is_none() {

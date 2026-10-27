@@ -53,6 +53,25 @@ impl State {
     }
 }
 impl CoupledKernel {
+    /// Directed pricing-resource bound on source/sink walks of at most
+    /// `max_arcs` arcs. A larger original walk domain needs its own justified
+    /// hop bound; this method does not establish one.
+    pub fn pricing_objective_walk_lower_bound<const D: usize>(
+        &self,
+        graph: &Graph<D>,
+        max_arcs: usize,
+        work: &mut usize,
+        deadline: Instant,
+    ) -> Option<f64> {
+        let mut lower = self.objective_walk_lower_bound(graph, max_arcs, work, deadline)?;
+        for activity in self.pricing_activities.iter() {
+            lower = crate::core::rounding::add_down(
+                lower,
+                activity.objective_walk_lower_bound(graph, max_arcs, work, deadline)?,
+            )?;
+        }
+        Some(lower)
+    }
     /// Lower bound for resource objective on every source/sink walk of at
     /// most `max_arcs` arcs. The caller must justify that hop limit for its
     /// original domain. Plugins/feasibility restrictions are safely dropped.
@@ -74,6 +93,7 @@ impl CoupledKernel {
         // Numerical slope-front operators need their own directed semantics.
         // Do not reuse their computed minima as original-domain bounds.
         if self.has_machine_cost_contracts()
+            || self.plugins.iter().any(|p| p.0.has_costs())
             || self.paired.iter().any(|p| p.has_costs())
             || self.slope_paired.iter().any(|p| p.has_costs())
         {
@@ -112,16 +132,21 @@ impl CoupledKernel {
                             slot,
                             increment,
                             weight,
+                            cost_coefficient,
                         } => {
                             state.numeric[*slot] =
                                 finite(state.numeric[*slot].add(Range::point(*increment)))?;
-                            let charge =
-                                finite(state.numeric[*slot].multiply(Range::point(*weight)))?;
-                            state.cost = finite(
-                                state
-                                    .cost
-                                    .add(finite(charge.multiply(Range::point(self.cost_scale)))?),
-                            )?;
+                            if *cost_coefficient != 0. {
+                                let charge =
+                                    finite(state.numeric[*slot].multiply(Range::point(*weight)))?;
+                                state.cost = finite(
+                                    state.cost.add(finite(
+                                        charge
+                                            .multiply(Range::point(*cost_coefficient))
+                                            .multiply(Range::point(self.cost_scale)),
+                                    )?),
+                                )?;
+                            }
                         }
                         NumericOperation::Dependent {
                             slot,

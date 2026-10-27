@@ -712,7 +712,8 @@ fn coupled_canonical_join<const D: usize>(
     let kernel = g
         .coupled_kernel()
         .ok_or_else(|| invalid("missing coupled join kernel"))?;
-    let Some(resource) = kernel.join_resource_objective(forward, backward)? else {
+    let Some((resource, original_resource)) = kernel.join_objective_costs(forward, backward)?
+    else {
         return Ok(None);
     };
     let mut reduced = forward
@@ -729,7 +730,7 @@ fn coupled_canonical_join<const D: usize>(
         }
     }
     reduced += resource;
-    original += resource;
+    original += original_resource;
     if !reduced.is_finite() || !original.is_finite() {
         return Err(incomplete("coupled enumeration objective overflow"));
     }

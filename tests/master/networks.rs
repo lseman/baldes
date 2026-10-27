@@ -58,6 +58,7 @@ fn root_and_one_network_adapters_share_raw_pricing_results() {
                     multiplicity: Window::new(0., 2.).unwrap(),
                     arc_entries,
                     route_entries: vec![],
+                    activity_entries: vec![],
                 }],
             },
             options,
@@ -109,6 +110,7 @@ fn one_and_two_network_collections_preserve_quantity_and_shared_row_bounds() {
                 multiplicity: Window::new(0., 2.).unwrap(),
                 arc_entries: vec![vec![(0, 1.)], vec![], vec![(1, 1.)], vec![]],
                 route_entries: vec![],
+                activity_entries: vec![],
             }],
         };
         let networks = (0..2)
@@ -126,6 +128,7 @@ fn one_and_two_network_collections_preserve_quantity_and_shared_row_bounds() {
                     .unwrap(),
                     arc_entries: vec![vec![(row, 1.)], vec![]],
                     route_entries: vec![],
+                    activity_entries: vec![],
                 }
             })
             .collect();
@@ -159,6 +162,7 @@ fn network(id: i32, routes: &[(f64, &[usize])], row_count: usize) -> Network<2> 
         multiplicity: Window::new(0., 3.).unwrap(),
         arc_entries: entries,
         route_entries: vec![],
+        activity_entries: vec![],
     }
 }
 
@@ -235,6 +239,7 @@ fn signed_secondary_disposable_resource_waits_from_a_nonzero_start() {
                 multiplicity: Window::new(0., 1.).unwrap(),
                 arc_entries: vec![vec![], vec![]],
                 route_entries: vec![],
+                activity_entries: vec![],
             }],
         },
         options(),
@@ -696,6 +701,7 @@ fn resource_aware_bounds_certify_bounded_cycles_and_keep_unrestricted_cycles_unk
                 multiplicity: Window::new(0., 1.).unwrap(),
                 arc_entries: vec![vec![]; 4],
                 route_entries: vec![(0, 1.)],
+                activity_entries: vec![],
             }],
         };
         let mut opts = options();
@@ -753,6 +759,7 @@ fn nondefault_resource_dimension_survives_node_forks() {
             multiplicity: Window::new(1., 2.).unwrap(),
             arc_entries: vec![vec![(0, 1.)], vec![]],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let parent = model::solve(problem, options()).unwrap();
@@ -789,6 +796,7 @@ fn rounded_resource_profiles_do_not_authorize_fixed_routes_or_incumbents() {
             multiplicity: Window::new(0., 1.).unwrap(),
             arc_entries: vec![vec![(0, 1.)], vec![]],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let root = model::solve(problem.clone(), options()).unwrap();
@@ -822,6 +830,7 @@ fn nonlinear_network(id: i32, first_row: usize) -> Network<2> {
         multiplicity: Window::new(0., 3.).unwrap(),
         arc_entries,
         route_entries: vec![],
+        activity_entries: vec![],
     }
 }
 
@@ -1092,6 +1101,7 @@ fn rounded_original_coefficients_do_not_justify_automatic_fixing() {
             multiplicity: Window::new(0., 2.).unwrap(),
             arc_entries: vec![vec![(0, 0.9), (0, 0.1)], vec![]],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let root = model::solve(problem, options()).unwrap();
@@ -1667,3 +1677,54 @@ fn certified_signed_resource_dag_closes_the_feasible_path_gap() {
         assert_eq!(output.routes[0].route.nodes, vec![0, 1, 3, 4]);
     }
 }
+
+#[test]
+fn signed_disposable_routes_close_the_registered_model_tree_in_both_bound_modes() {
+    use baldes::master::{
+        model::NetworkPricingSchedule,
+        tree::{ModelTreeOptions, TreeStatus},
+    };
+    // Public registered reference model: root LP1.375, integer optimum2.75.
+    // Negative secondary consumption must not make an integer leaf unknown.
+    let text = include_str!("../fixtures/multi_network_metasolver_signed_tree.json");
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        for schedule in [
+            NetworkPricingSchedule::FullSweep,
+            NetworkPricingSchedule::Cyclic,
+            NetworkPricingSchedule::Sorted,
+            NetworkPricingSchedule::PromisingFirst,
+            NetworkPricingSchedule::UnvisitedFirst,
+        ] {
+            let problem = model::format::Model::from_json(text)
+                .unwrap()
+                .problem::<2>()
+                .unwrap();
+            let mut options = ModelTreeOptions::default();
+            options.node.cg.stabilize = false;
+            options.node.cg.bound_mode = mode;
+            options.node.network_pricing_schedule = schedule;
+            let result = baldes::master::tree::solve(problem, options).unwrap();
+            assert_eq!(
+                result.status,
+                TreeStatus::Optimal,
+                "mode={mode:?} schedule={schedule:?} {result:?}"
+            );
+            assert_eq!(result.incumbent, 2.75);
+            assert_eq!(result.bound, 2.75);
+            assert_eq!(result.open_nodes, 0);
+            assert!(!result.routes.is_empty());
+        }
+    }
+}
+
+#[path = "networks/metasolver_registered.rs"]
+mod metasolver_registered;
+
+#[path = "networks/activities.rs"]
+mod accumulated_activity_rows;
+
+#[path = "networks/original_activities.rs"]
+mod original_accumulated_variables;
+
+#[path = "networks/paired_preparation.rs"]
+mod paired_preparation;

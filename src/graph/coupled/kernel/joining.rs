@@ -2,14 +2,23 @@
 use super::*;
 
 impl CoupledKernel {
-    pub fn join(&self, f: &CoupledLabelState, b: &CoupledLabelState) -> Result<Option<f64>> {
+    pub(super) fn join_original(
+        &self,
+        f: &CoupledLabelState,
+        b: &CoupledLabelState,
+    ) -> Result<Option<f64>> {
         self.check_state(f)?;
         self.check_state(b)?;
         if f.suffix.is_some() || b.suffix.is_none() {
             return Err(invalid("coupled join direction mismatch"));
         }
-        if self.has_slope_fronts() {
-            let Some(total) = self.join_resource_objective(f, b)? else {
+        if self.plugins.iter().any(|p| p.0.has_costs())
+            || self.has_slope_fronts()
+            || self.paired.iter().any(|prepared| {
+                prepared.normalization == PairedCostNormalization::AbsoluteFinalValue
+            })
+        {
+            let Some(total) = self.join_original_objective(f, b)? else {
                 return Ok(None);
             };
             return Ok(Some(finite(
@@ -62,16 +71,16 @@ impl CoupledKernel {
                     value
                 }
             };
-            if self.cost_scale != 0. {
+            let scale = finite(self.cost_scale * prepared.objective_coefficient)?;
+            if scale != 0. {
                 let baseline = left
                     .forward()
                     .ok_or_else(|| invalid("paired forward join expected"))?
                     .minimum();
                 // Feasibility-only paired relations have no objective.
                 if prepared.has_costs() {
-                    front_correction = finite(
-                        front_correction + finite(self.cost_scale * finite(joined - baseline)?)?,
-                    )?;
+                    front_correction =
+                        finite(front_correction + finite(scale * finite(joined - baseline)?)?)?;
                 }
             }
         }
@@ -126,7 +135,7 @@ impl CoupledKernel {
     }
     /// Return the complete joined resource objective directly. Reconstructing
     /// it from two rounded minima plus a correction loses scalar information.
-    pub(crate) fn join_resource_objective(
+    pub(super) fn join_original_objective(
         &self,
         f: &CoupledLabelState,
         b: &CoupledLabelState,

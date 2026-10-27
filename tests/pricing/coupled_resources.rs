@@ -75,6 +75,8 @@ fn paired_prefix_waiting_envelope_matches_original_function_on_fractional_crossi
             };
             graph
                 .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+                    normalization:
+                        baldes::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
                     initial: PiecewiseLinearFunction::new(points.clone()).unwrap(),
                     initial_base: Window::new(0., 8.).unwrap(),
                     arcs: vec![arc(0., 8.), arc(lo, hi)],
@@ -108,6 +110,7 @@ fn unresolved_arrival_rounding_plateau_is_unsupported_instead_of_infeasible() {
     let mut graph = Graph::<2>::new(2, 0).unwrap();
     graph.add_arc(0, 1, 0.).unwrap();
     let installed = graph.set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+        normalization: baldes::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
         initial: pwl(vec![[0., 0.], [1., -1.]]),
         initial_base: Window::new(0., 1.).unwrap(),
         mode: PairedResourceMode::Feasibility,
@@ -142,6 +145,8 @@ fn paired_waiting_cost_matches_independent_control_oracle_at_every_join_split() 
             graph.add_arc(1, 2, -20.).unwrap();
             graph
                 .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+                    normalization:
+                        baldes::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
                     initial: constant(0., 1., 0.),
                     initial_base: Window::new(0., 0.).unwrap(),
                     arcs: vec![
@@ -1326,5 +1331,348 @@ fn zero_charge_interval_suffix_retains_physical_scalar_costs_in_every_search_mod
             .columns
             .iter()
             .all(|route| route.cost == 3. && route.original_cost == 3.));
+    }
+}
+
+#[test]
+fn signed_custom_and_cumulative_states_and_every_join_match_metasolver_observations() {
+    // Regenerate with tests/reference/metasolver_custom.py. Expectations come
+    // from the pinned modern ELF helpers, independently of BALDES arithmetic.
+    let fixture = include_str!("../fixtures/coupled/metasolver-custom-signed-splits.txt");
+    let mut observations = 0;
+    for line in fixture.lines().filter(|line| !line.starts_with('#')) {
+        let row: Vec<f64> = line
+            .split_whitespace()
+            .map(|value| value.parse().unwrap())
+            .collect();
+        assert_eq!(row.len(), 20);
+        let split = row[1] as usize;
+        let increments = row[2..8].to_vec();
+        let weights = row[8..14].to_vec();
+        for definition in [
+            CoupledResource::CustomResource {
+                increments: increments.clone(),
+                weights: weights.clone(),
+                forward_bound: None,
+                backward_bound: None,
+            },
+            CoupledResource::CumulativeCost {
+                initial: 0.,
+                increments: increments.clone(),
+                weights: weights.clone(),
+                sink_upper: None,
+                source_upper: None,
+            },
+        ] {
+            let mut graph = Graph::<2>::new(7, 0).unwrap();
+            for arc in 0..6 {
+                graph.add_arc(arc, arc + 1, 0.).unwrap();
+            }
+            graph.set_coupled_resources(&[definition]).unwrap();
+            let kernel = graph.coupled_kernel().unwrap();
+            let mut forward = kernel.root(true);
+            let mut forward_cost = 0.;
+            for arc in 0..split {
+                let (next, cost) = kernel.extend(&forward, arc, true).unwrap().unwrap();
+                forward = next;
+                forward_cost += cost;
+            }
+            let mut backward = kernel.root(false);
+            let mut backward_cost = 0.;
+            for arc in (split..6).rev() {
+                let (next, cost) = kernel.extend(&backward, arc, false).unwrap().unwrap();
+                backward = next;
+                backward_cost += cost;
+            }
+            let cross = kernel.join(&forward, &backward).unwrap().unwrap();
+            assert_eq!(
+                forward_cost, row[14],
+                "forward seed={} split={split}",
+                row[0]
+            );
+            assert_eq!(forward.numeric_values().unwrap(), &[row[15]]);
+            assert_eq!(
+                backward_cost, row[16],
+                "backward seed={} split={split}",
+                row[0]
+            );
+            assert_eq!(cross, row[18], "join seed={} split={split}", row[0]);
+            assert_eq!(forward_cost + backward_cost + cross, row[19]);
+            assert_eq!(kernel.replay(&[0, 1, 2, 3, 4, 5]).unwrap(), Some(row[19]));
+        }
+        observations += 1;
+    }
+    assert_eq!(observations, 336);
+}
+
+#[test]
+fn signed_resource_pricing_and_enumeration_match_metasolver_path_costs_in_every_direction() {
+    let fixture = include_str!("../fixtures/coupled/metasolver-custom-signed-splits.txt");
+    let paths: Vec<Vec<f64>> = fixture
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .map(|line| {
+            line.split_whitespace()
+                .map(|value| value.parse().unwrap())
+                .collect::<Vec<f64>>()
+        })
+        .filter(|row| row[1] == 6.)
+        .collect();
+    assert_eq!(paths.len(), 48);
+    for pair in paths.chunks_exact(2) {
+        let increments: Vec<_> = pair
+            .iter()
+            .flat_map(|row| row[2..8].iter().copied())
+            .collect();
+        let weights: Vec<_> = pair
+            .iter()
+            .flat_map(|row| row[8..14].iter().copied())
+            .collect();
+        let expected = [pair[0][19] - 256., pair[1][19] - 256.];
+        for definition in [
+            CoupledResource::CustomResource {
+                increments: increments.clone(),
+                weights: weights.clone(),
+                forward_bound: None,
+                backward_bound: None,
+            },
+            CoupledResource::CumulativeCost {
+                initial: 0.,
+                increments: increments.clone(),
+                weights: weights.clone(),
+                sink_upper: None,
+                source_upper: None,
+            },
+        ] {
+            let mut graph = Graph::<2>::new(12, 1).unwrap();
+            for vertex in 0..12 {
+                graph.set_bounds(vertex, 0, 0., 6.).unwrap();
+            }
+            for path in [[0, 1, 2, 3, 4, 5, 11], [0, 6, 7, 8, 9, 10, 11]] {
+                for (index, ends) in path.windows(2).enumerate() {
+                    let arc = graph
+                        .add_arc(ends[0], ends[1], if index == 0 { -256. } else { 0. })
+                        .unwrap();
+                    graph.arc_mut(arc).unwrap().consumption[0] = 1.;
+                }
+            }
+            graph.set_coupled_resources(&[definition]).unwrap();
+            for direction in [0., 1., 2.] {
+                let mut solver = baldes::pricing::Solver::<2>::new(12, 1).unwrap();
+                solver.graph = graph.clone();
+                solver.enumeration_preserve_arc_paths = true;
+                solver
+                    .set_option("BALDESuseBidirectionalSearch", direction)
+                    .unwrap();
+                let result = solver.price_phase(0, 100, false).unwrap();
+                assert!(result.exact);
+                assert_eq!(
+                    result.minimum_reduced_cost,
+                    expected[0].min(expected[1]),
+                    "seed={} direction={direction}",
+                    pair[0][0]
+                );
+                let routes = solver.enumerate(1000.).unwrap();
+                assert_eq!(routes.len(), 2);
+                for route in routes {
+                    let branch = usize::from(route.arcs[0] == graph.arcs[6].id);
+                    assert_eq!(route.arcs.len(), 6);
+                    assert_eq!(route.original_cost, expected[branch]);
+                    assert_eq!(route.cost, expected[branch]);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn directional_cost_bounds_match_retained_metasolver_dominance_controls() {
+    let fixture = include_str!("../fixtures/coupled/metasolver-directional-dominance.txt");
+    let mut comparisons = 0;
+    let mut positive_comparisons = 0;
+    let mut conservative = 0;
+    let mut extra = 0;
+    let mut scoped_forward_gaps = 0;
+    let mut scoped_backward_gaps = 0;
+    for line in fixture.lines().filter(|line| !line.starts_with('#')) {
+        let row: Vec<f64> = line
+            .split_whitespace()
+            .map(|value| value.parse().unwrap())
+            .collect();
+        assert_eq!(row.len(), 13);
+        let forward = row[0] == 1.;
+        let initial = row[1];
+        let signed = row[2] == 1.;
+        let (ai, bi, aw, bw) = (row[4], row[5], row[6], row[7]);
+        let (increments, weights) = if forward {
+            (vec![ai, bi, 0.], vec![aw, bw, 1.])
+        } else {
+            (vec![3., ai, bi], vec![0., aw, bw])
+        };
+        for custom in [false, true] {
+            if custom && initial != 0. {
+                continue; // A custom resource has a fixed zero initial state.
+            }
+            let definition = if custom {
+                CoupledResource::CustomResource {
+                    increments: increments.clone(),
+                    weights: weights.clone(),
+                    forward_bound: Some(3.),
+                    backward_bound: Some(7.),
+                }
+            } else {
+                CoupledResource::CumulativeCost {
+                    initial,
+                    increments: increments.clone(),
+                    weights: weights.clone(),
+                    sink_upper: Some(3.),
+                    source_upper: Some(7.),
+                }
+            };
+            let mut graph = Graph::<2>::new(3, 0).unwrap();
+            for (tail, head) in if forward {
+                [(0, 1), (0, 1), (1, 2)]
+            } else {
+                [(0, 1), (1, 2), (1, 2)]
+            } {
+                graph.add_arc(tail, head, 0.).unwrap();
+            }
+            graph.set_coupled_resources(&[definition]).unwrap();
+            let kernel = graph.coupled_kernel().unwrap();
+            let root = kernel.root(forward);
+            let (a, ac) = kernel
+                .extend(&root, if forward { 0 } else { 1 }, forward)
+                .unwrap()
+                .unwrap();
+            let (b, bc) = kernel
+                .extend(&root, if forward { 1 } else { 2 }, forward)
+                .unwrap()
+                .unwrap();
+            assert_eq!(ac, row[8]);
+            assert_eq!(bc, row[9]);
+            if forward {
+                assert_eq!(a.numeric_values(), Some(&row[10..11]));
+                assert_eq!(b.numeric_values(), Some(&row[11..12]));
+            }
+            let accepted = kernel
+                .dominance_penalty(&a, &b, forward)
+                .is_some_and(|penalty| ac + penalty <= bc);
+            conservative += usize::from(!accepted && row[12] <= 0.);
+            extra += usize::from(accepted && row[12] > 0.);
+            let scoped = kernel
+                .dominance_penalty_at_vertex(&a, &b, forward, 1)
+                .is_some_and(|penalty| ac + penalty <= bc);
+            if row[12] <= 0. {
+                assert!(scoped, "vertex context: {line} custom={custom}");
+                if forward {
+                    scoped_forward_gaps += usize::from(!accepted);
+                } else {
+                    scoped_backward_gaps += usize::from(!accepted);
+                }
+            }
+            if !accepted && row[12] <= 0. && std::env::var_os("BALDES_DOMINANCE_AUDIT").is_some() {
+                let (ca, cb) = if forward {
+                    (
+                        (initial + ai) * aw + (initial + ai),
+                        (initial + bi) * bw + (initial + bi),
+                    )
+                } else {
+                    ((initial + 3. + ai) * aw, (initial + 3. + bi) * bw)
+                };
+                eprintln!("DOMINANCE_REJECTION forward={forward} custom={custom} input={line} completed_a={ca} completed_b={cb}");
+            }
+            if !signed {
+                // The retained reference charge already includes ac-bc.
+                assert_eq!(accepted, row[12] <= 0., "{line} custom={custom}");
+                positive_comparisons += 1;
+            }
+            if accepted || scoped {
+                // Independent literal completion: forward appends weight1;
+                // backward prepends a zero-charge increment3. All values are
+                // small dyadics, so these products/sums are exact binary64.
+                let (completed_a, completed_b) = if forward {
+                    (
+                        (initial + ai) * aw + (initial + ai) * 1.,
+                        (initial + bi) * bw + (initial + bi) * 1.,
+                    )
+                } else {
+                    ((initial + 3. + ai) * aw, (initial + 3. + bi) * bw)
+                };
+                assert!(completed_a <= completed_b, "{line} custom={custom}");
+            }
+            comparisons += 1;
+        }
+    }
+    assert_eq!(comparisons, 768);
+    assert_eq!(positive_comparisons, 384);
+    assert_eq!(extra, 0);
+    assert_eq!(scoped_forward_gaps, 42);
+    assert_eq!(scoped_backward_gaps, 28);
+    eprintln!("vertex context closes {scoped_forward_gaps} forward and {scoped_backward_gaps} backward retained gaps");
+    eprintln!(
+        "directional dominance: {conservative} conservative rejections, {extra} extra acceptances"
+    );
+}
+
+#[cfg(feature = "clp")]
+#[path = "coupled/backward_pairing.rs"]
+mod backward_pairing;
+
+#[test]
+fn signed_dag_numeric_prefix_pays_for_both_future_weight_signs() {
+    let mut graph = Graph::<2>::new(3, 0).unwrap();
+    for (tail, head) in [(0, 1), (0, 1), (1, 2), (1, 2)] {
+        graph.add_arc(tail, head, 0.).unwrap();
+    }
+    graph
+        .set_coupled_resources(&[CoupledResource::CumulativeCost {
+            initial: 100.,
+            increments: vec![-1., 0., 0., 0.],
+            weights: vec![-1., 0., -1., 1.],
+            sink_upper: None,
+            source_upper: None,
+        }])
+        .unwrap();
+    let kernel = graph.coupled_kernel().unwrap();
+    let root = kernel.root(true);
+    let (a, ac) = kernel.extend(&root, 0, true).unwrap().unwrap();
+    let (b, bc) = kernel.extend(&root, 1, true).unwrap().unwrap();
+    assert_eq!((ac, bc), (-99., 0.));
+    assert_eq!(kernel.dominance_penalty(&a, &b, true), Some(0.));
+    for arc in [2, 3] {
+        let (_, da) = kernel.extend(&a, arc, true).unwrap().unwrap();
+        let (_, db) = kernel.extend(&b, arc, true).unwrap().unwrap();
+        assert!(ac + da <= bc + db);
+    }
+    assert_eq!(kernel.dominance_penalty(&b, &a, true), None);
+}
+
+#[test]
+fn integral_backward_signed_suffix_has_zero_compensation_without_rounding_slack() {
+    for initial in [0., 2.] {
+        let mut graph = Graph::<2>::new(3, 0).unwrap();
+        for (tail, head) in [(0, 1), (1, 2), (1, 2)] {
+            graph.add_arc(tail, head, 0.).unwrap();
+        }
+        graph
+            .set_coupled_resources(&[CoupledResource::CumulativeCost {
+                initial,
+                increments: vec![1., 0., 0.],
+                weights: vec![0., -1., 0.],
+                sink_upper: None,
+                source_upper: None,
+            }])
+            .unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let root = kernel.root(false);
+        let (a, ac) = kernel.extend(&root, 1, false).unwrap().unwrap();
+        let (b, bc) = kernel.extend(&root, 2, false).unwrap().unwrap();
+        assert!(ac <= bc);
+        assert_eq!(kernel.dominance_penalty(&a, &b, false), Some(0.));
+        let (prefix, _) = kernel.extend(&kernel.root(true), 0, true).unwrap().unwrap();
+        assert!(
+            kernel.join(&prefix, &a).unwrap().unwrap()
+                <= kernel.join(&prefix, &b).unwrap().unwrap()
+        );
     }
 }

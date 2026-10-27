@@ -199,6 +199,7 @@ get_enumerated(self, index: int) -> Route
 ```python
 cost: float  # read-only property
 original_cost: float  # read-only property
+coupled_values: list[tuple[int, float]]  # selected paired descriptor/value pairs
 nb_nodes: int  # read-only property
 is_certified: bool  # read-only property
 nodes(self) -> list[int]
@@ -298,11 +299,13 @@ PricingNetwork(
     source: int = 0,
     sink: Optional[int] = None,
     route_entries: Tuple[Tuple[int, float], ...] = (),
+    activity_entries: Tuple[Mapping[str, Any], ...] = (),
     ng: Optional[Tuple[Tuple[int, ...], ...]] = None,
     coupled_resources: Tuple[Mapping[str, Any], ...] = (),
     elementary: bool = False,
     front_program_domain: bool = False,
-    route_domain: Mapping[str, Any] = field(default_factory=lambda: {'kind': 'physical_simple'})
+    route_domain: Mapping[str, Any] = field(default_factory=lambda: {'kind': 'physical_simple'}),
+    coupled_objective_coefficients: Tuple[Tuple[int, float], ...] = ()
 )
 ```
 
@@ -336,7 +339,8 @@ NetworkProblem(
 NetworkRowCoefficients(
     network: int,
     arcs: Tuple[float, ...],
-    per_route: float = 0.0
+    per_route: float = 0.0,
+    activities: Tuple[Tuple[int, float], ...] = ()
 )
 ```
 

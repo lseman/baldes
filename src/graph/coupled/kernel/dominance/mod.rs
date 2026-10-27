@@ -72,6 +72,19 @@ impl CoupledKernel {
         self.dominance_penalty_with_frozen_fronts(a, b, forward, false)
     }
 
+    /// Compare states at a shared physical vertex, using its prepared
+    /// continuation envelope when available. Both states must be interpreted
+    /// at that vertex; no per-label topology is stored by the resource kernel.
+    pub fn dominance_penalty_at_vertex(
+        &self,
+        a: &CoupledLabelState,
+        b: &CoupledLabelState,
+        forward: bool,
+        vertex: usize,
+    ) -> Option<f64> {
+        self.dominance_penalty_in_context(a, b, forward, false, Some(vertex))
+    }
+
     /// `frozen_fronts` is a caller-established forward-only proof: every
     /// reachable future interval-resource transition has zero increment and
     /// zero scaled charge, and preserves all of a's current front domains.
@@ -88,6 +101,24 @@ impl CoupledKernel {
         forward: bool,
         frozen_fronts: bool,
     ) -> Option<f64> {
+        self.dominance_penalty_in_context(a, b, forward, frozen_fronts, None)
+    }
+
+    fn dominance_penalty_in_context(
+        &self,
+        a: &CoupledLabelState,
+        b: &CoupledLabelState,
+        forward: bool,
+        frozen_fronts: bool,
+        vertex: Option<usize>,
+    ) -> Option<f64> {
+        if self.has_negative_paired_objectives() {
+            // Minimum fronts do not retain a maximum-control continuation set.
+            return None;
+        }
+        if vertex.is_some_and(|vertex| !self.route_domains.contains_vertex(vertex)) {
+            return None;
+        }
         // Reject cheap direction/discrete/component mismatches before
         // traversing paired front pieces or validating retained suffix rows.
         if a.suffix.is_none() != forward
@@ -101,6 +132,12 @@ impl CoupledKernel {
         {
             return None;
         }
+        if self.weighted_objective || !self.pricing_activities.is_empty() {
+            // Until a joint component proof is available, only identical
+            // coupled/pricing states may dominate. A base-resource penalty
+            // alone cannot pay for a signed activity adjustment.
+            return (a == b).then_some(0.);
+        }
         // Compare every active resource-cost family's independent scalar and
         // resource components before the hot mixed key. Different prefix
         // histories can otherwise round to the same key while their physical
@@ -113,6 +150,9 @@ impl CoupledKernel {
                 // future operations. Common finite additions preserve prefix
                 // cost order; unsupported overflow aborts pricing globally.
                 || a.numeric == b.numeric
+                || (forward && vertex.is_some_and(|vertex| self.numeric_cost_order.preserves_at_vertex(
+                    vertex, &a.numeric, &b.numeric, a.numeric_cost, b.numeric_cost,
+                )))
                 || (forward && self.numeric_cost_order.deploys_unequal()
                     && self.numeric_cost_order.preserves(
                         &a.numeric, &b.numeric, a.numeric_cost, b.numeric_cost,
@@ -237,7 +277,7 @@ impl CoupledKernel {
             if a.bounds != b.bounds && !weaker_bounds(a, b) {
                 return None;
             }
-            return add_up(penalty, self.backward_penalty(a, b)?);
+            return add_up(penalty, self.backward_penalty(a, b, vertex)?);
         }
         if !self.optimization.dependency_order.preserves(
             &a.numeric,
@@ -356,7 +396,13 @@ impl CoupledKernel {
                 .iter()
                 .zip(&b.plugins)
                 .zip(&self.plugins)
-                .all(|((a, b), plugin)| plugin.0.dominates(a, b, forward))
+                .all(|((a, b), plugin)| {
+                    if plugin.0.has_costs() {
+                        a == b
+                    } else {
+                        plugin.0.dominates(a, b, forward)
+                    }
+                })
     }
 
     /// Forward relation fronts dominate by covering and staying below; the
@@ -430,7 +476,7 @@ impl<const D: usize> Graph<D> {
                             .frozen
                             .contains(slot, vertex, front.domain(), kernel.cost_scale)
                     });
-                kernel.dominance_penalty_with_frozen_fronts(a, b, forward, frozen)
+                kernel.dominance_penalty_in_context(a, b, forward, frozen, Some(vertex))
             }
             _ => None,
         }

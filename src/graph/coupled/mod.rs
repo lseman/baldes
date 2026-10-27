@@ -15,10 +15,13 @@ pub use descriptor::{
     SlopeRelationArc,
 };
 pub use encoded::EncodedFunction;
-#[cfg(feature = "clp")]
-pub use kernel::FrontProgramCertificate;
-pub use kernel::{CoupledKernel, CoupledLabelState, CoupledWorkspace};
+pub use kernel::{
+    CoupledKernel, CoupledLabelState, CoupledPathCosts, CoupledPathValues, CoupledWorkspace,
+    PairedControl,
+};
 pub(crate) use kernel::{CoupledPairSummary, CoupledStateBounds};
+#[cfg(feature = "clp")]
+pub use kernel::{FrontProgramCertificate, PairedControlCertificate};
 pub use plugin::{CoupledPlugin, PluginResource, PluginState};
 pub use pwl::PiecewiseLinearFunction;
 
@@ -77,9 +80,10 @@ fn default_load_tolerance() -> f64 {
 )]
 pub enum CoupledResource {
     /// A resource supplied by an extension (for example EVRP charging).
-    /// It adds no objective, cannot be a numeric dependency parent and is
-    /// certified only through its independent opt-in proof callback. Plugins
-    /// are not serialized.
+    /// Objective costs require explicit opt-in; it cannot be a numeric
+    /// dependency parent. Feasibility-only plugins can supply an independent
+    /// proof callback; cost-bearing plugins currently have no directed cost
+    /// certificate. Plugins are not serialized.
     #[cfg_attr(feature = "clp", serde(skip))]
     Plugin(PluginResource),
     /// Numeric base transition retaining its literal function encoding.
@@ -126,14 +130,16 @@ pub enum CoupledResource {
     /// x>=arrival(t), and the next dependent value is at least
     /// max(previous+increment(t)+waiting*(x-arrival(t)),lower(x)), subject to
     /// upper(x). All waiting choices and disconnected feasible domains survive.
-    /// Cost modes minimize the final dependent coordinate minus the minimum
-    /// initial dependent coordinate; an empty path therefore costs zero.
+    /// Cost modes use the explicit dependent objective normalization.
+    /// An empty path costs zero under either convention.
     /// This independent relation cannot be used as a numeric dependency parent.
     PairedPiecewiseLinear {
         initial: PiecewiseLinearFunction,
         initial_base: Window,
         arcs: Vec<PairedResourceArc>,
         mode: PairedResourceMode,
+        #[cfg_attr(feature = "clp", serde(default))]
+        normalization: PairedCostNormalization,
     },
 
     /// Minimize total piecewise-linear charges over one shared free initial
@@ -343,6 +349,7 @@ impl CoupledResource {
                 initial_base,
                 arcs,
                 mode,
+                ..
             } => {
                 initial.validate()?;
                 Window::new(initial_base.lower, initial_base.upper)?;

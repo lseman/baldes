@@ -27,6 +27,7 @@ fn finite_network_batches_replay_native_contributions_and_zero_cost_quantities()
                     },
                     arc_entries: vec![vec![]; 2],
                     route_entries: vec![],
+                    activity_entries: vec![],
                 }
             })
             .collect();

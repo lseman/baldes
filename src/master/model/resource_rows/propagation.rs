@@ -40,7 +40,10 @@ pub(in crate::master::model) fn zero_arcs<const D: usize>(
         if state.shared_rows[row].sense == RowSense::GreaterEqual {
             continue;
         }
-        let mut nonnegative = true;
+        let mut nonnegative = !state
+            .oracles
+            .iter()
+            .any(|oracle| oracle.activity_rows.iter().any(|entry| entry.row == row));
         for oracle in &state.oracles {
             for &(r, a) in oracle
                 .network

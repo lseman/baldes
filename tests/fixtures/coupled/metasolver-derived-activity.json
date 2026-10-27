@@ -1,0 +1,912 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "source_preparation_fixture": "metasolver-preparation-bounds.json",
+  "scope": "Bounded associated-variable objective and shared-row follow-up; registration success is not proof of correct resource repricing.",
+  "cases": [
+    {
+      "name": "custom-unit",
+      "kind": "custom",
+      "activity_values_by_path": [
+        11,
+        2
+      ],
+      "physical_cost_by_path": [
+        -20,
+        -20
+      ],
+      "objective_resource_coefficient": 1,
+      "row": null,
+      "oracle": {
+        "fraction_first_path": "0",
+        "objective": "-18",
+        "objective_float": -18.0,
+        "row_dual": "0",
+        "resource_reduced_coefficient": "1"
+      },
+      "classification": "unit-associated-cost-success",
+      "inferior_exit": 0,
+      "reference_result": {
+        "bcRecRootDb": -18.0,
+        "bcRecRootLpVal": -18.0,
+        "bcRecBestInc": -18.0,
+        "bcRecBestDb": -18.0,
+        "kind": "custom",
+        "associate_cost": true,
+        "constants": [
+          5.0,
+          7.0
+        ],
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "cost_coefficient": 1.0,
+        "activity_lower": null,
+        "arc_row_coefficient": 0.0
+      },
+      "reduced_cost_events": [
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            1.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            1.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            1.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        }
+      ],
+      "command": [
+        "gdb",
+        "-q",
+        "-batch",
+        "-x",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.gdb",
+        "--args",
+        "/usr/bin/python3",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.py",
+        "--cost-coefficient",
+        "1",
+        "--binary",
+        "/home/seman/dev/vrpsolve-re/libbapcod-shared.so",
+        "--output",
+        "internal/audits/metasolver-preparation-bounds-20261027/activity-accepted/custom-unit",
+        "--associate-cost",
+        "--constants",
+        "5",
+        "7"
+      ]
+    },
+    {
+      "name": "custom-cost2",
+      "kind": "custom",
+      "activity_values_by_path": [
+        11,
+        2
+      ],
+      "physical_cost_by_path": [
+        -20,
+        -20
+      ],
+      "objective_resource_coefficient": 2,
+      "row": null,
+      "oracle": {
+        "fraction_first_path": "0",
+        "objective": "-16",
+        "objective_float": -16.0,
+        "row_dual": "0",
+        "resource_reduced_coefficient": "2"
+      },
+      "classification": "nonunit-resource-pricing-cost-mismatch-abort",
+      "inferior_exit": 1,
+      "reference_result": null,
+      "reduced_cost_events": [
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            2.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            2.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            2.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            2.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        }
+      ],
+      "command": [
+        "gdb",
+        "-q",
+        "-batch",
+        "-x",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.gdb",
+        "--args",
+        "/usr/bin/python3",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.py",
+        "--cost-coefficient",
+        "2",
+        "--binary",
+        "/home/seman/dev/vrpsolve-re/libbapcod-shared.so",
+        "--output",
+        "internal/audits/metasolver-preparation-bounds-20261027/activity-accepted/custom-cost2",
+        "--associate-cost",
+        "--constants",
+        "5",
+        "7"
+      ]
+    },
+    {
+      "name": "custom-pure-row",
+      "kind": "custom",
+      "activity_values_by_path": [
+        11,
+        2
+      ],
+      "physical_cost_by_path": [
+        -20,
+        -20
+      ],
+      "objective_resource_coefficient": 1,
+      "row": {
+        "lower": 5,
+        "upper": null,
+        "coefficient_on_resource_activity": 1,
+        "coefficient_on_first_path_arc": 0
+      },
+      "oracle": {
+        "fraction_first_path": "1/3",
+        "objective": "-15",
+        "objective_float": -15.0,
+        "row_dual": "1",
+        "resource_reduced_coefficient": "0"
+      },
+      "classification": "propagated-resource-variable-lower-bound-unsupported",
+      "inferior_exit": 0,
+      "reference_result": {
+        "bcRecRootDb": -1000000000000.0,
+        "bcRecRootLpVal": 1000000000000.0,
+        "bcRecBestInc": 1000000000000.0,
+        "bcRecBestDb": 0.0,
+        "kind": "custom",
+        "associate_cost": true,
+        "constants": [
+          5.0,
+          7.0
+        ],
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "cost_coefficient": 1.0,
+        "activity_lower": 5.0,
+        "arc_row_coefficient": 0.0
+      },
+      "reduced_cost_events": [],
+      "command": [
+        "gdb",
+        "-q",
+        "-batch",
+        "-x",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.gdb",
+        "--args",
+        "/usr/bin/python3",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.py",
+        "--cost-coefficient",
+        "1",
+        "--binary",
+        "/home/seman/dev/vrpsolve-re/libbapcod-shared.so",
+        "--output",
+        "internal/audits/metasolver-preparation-bounds-20261027/activity-accepted/custom-pure-row",
+        "--associate-cost",
+        "--constants",
+        "5",
+        "7",
+        "--activity-lower",
+        "5",
+        "--arc-row-coefficient",
+        "0"
+      ]
+    },
+    {
+      "name": "custom-mixed-row",
+      "kind": "custom",
+      "activity_values_by_path": [
+        11,
+        2
+      ],
+      "physical_cost_by_path": [
+        -20,
+        -20
+      ],
+      "objective_resource_coefficient": 1,
+      "row": {
+        "lower": 5,
+        "upper": null,
+        "coefficient_on_resource_activity": 1,
+        "coefficient_on_first_path_arc": 8
+      },
+      "oracle": {
+        "fraction_first_path": "3/17",
+        "objective": "-279/17",
+        "objective_float": -16.41176470588235,
+        "row_dual": "9/17",
+        "resource_reduced_coefficient": "8/17"
+      },
+      "classification": "unit-resource-pricing-charge-ignores-nonunit-reduced-coefficient",
+      "inferior_exit": 0,
+      "reference_result": {
+        "bcRecRootDb": -15.35294118588235,
+        "bcRecRootLpVal": -15.35294118588235,
+        "bcRecBestInc": -16.411764705882355,
+        "bcRecBestDb": -16.411764705882355,
+        "kind": "custom",
+        "associate_cost": true,
+        "constants": [
+          5.0,
+          7.0
+        ],
+        "interior_uppers": [
+          99.0,
+          99.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 2,
+        "sink": 0,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "cost_coefficient": 1.0,
+        "activity_lower": 5.0,
+        "arc_row_coefficient": 8.0
+      },
+      "reduced_cost_events": [
+        {
+          "variable_reduced_costs": [
+            -980.0,
+            0.0,
+            -20.0,
+            0.0,
+            -119.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -980.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -24.235294117647058,
+            0.0,
+            -20.0,
+            0.0,
+            0.47058823529411753
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -24.23529412,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -24.235294117647058,
+            0.0,
+            -20.0,
+            0.0,
+            0.47058823529411753
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -24.23529412,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -24.235294117647058,
+            0.0,
+            -20.0,
+            0.0,
+            0.47058823529411753
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -24.23529412,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        }
+      ],
+      "command": [
+        "gdb",
+        "-q",
+        "-batch",
+        "-x",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.gdb",
+        "--args",
+        "/usr/bin/python3",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.py",
+        "--cost-coefficient",
+        "1",
+        "--binary",
+        "/home/seman/dev/vrpsolve-re/libbapcod-shared.so",
+        "--output",
+        "internal/audits/metasolver-preparation-bounds-20261027/activity-accepted/custom-mixed-row",
+        "--associate-cost",
+        "--constants",
+        "5",
+        "7",
+        "--activity-lower",
+        "5",
+        "--arc-row-coefficient",
+        "8"
+      ]
+    },
+    {
+      "name": "cumulative-unit",
+      "kind": "cumulative",
+      "activity_values_by_path": [
+        10,
+        7
+      ],
+      "physical_cost_by_path": [
+        -20,
+        -20
+      ],
+      "objective_resource_coefficient": 1,
+      "row": null,
+      "oracle": {
+        "fraction_first_path": "0",
+        "objective": "-13",
+        "objective_float": -13.0,
+        "row_dual": "0",
+        "resource_reduced_coefficient": "1"
+      },
+      "classification": "unit-associated-cost-success",
+      "inferior_exit": 0,
+      "reference_result": {
+        "bcRecRootDb": -13.0,
+        "bcRecRootLpVal": -13.0,
+        "bcRecBestInc": -13.0,
+        "bcRecBestDb": -13.0,
+        "kind": "cumulative",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          5.0,
+          7.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 0,
+        "sink": 3,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "cost_coefficient": 1.0,
+        "activity_lower": null,
+        "arc_row_coefficient": 0.0
+      },
+      "reduced_cost_events": [
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            1.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            1.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            1.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        }
+      ],
+      "command": [
+        "gdb",
+        "-q",
+        "-batch",
+        "-x",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.gdb",
+        "--args",
+        "/usr/bin/python3",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.py",
+        "--cost-coefficient",
+        "1",
+        "--binary",
+        "/home/seman/dev/vrpsolve-re/libbapcod-shared.so",
+        "--output",
+        "internal/audits/metasolver-preparation-bounds-20261027/activity-accepted/cumulative-unit",
+        "--kind",
+        "cumulative",
+        "--source",
+        "0",
+        "--sink",
+        "3",
+        "--interior-uppers",
+        "5",
+        "7"
+      ]
+    },
+    {
+      "name": "cumulative-cost2",
+      "kind": "cumulative",
+      "activity_values_by_path": [
+        10,
+        7
+      ],
+      "physical_cost_by_path": [
+        -20,
+        -20
+      ],
+      "objective_resource_coefficient": 2,
+      "row": null,
+      "oracle": {
+        "fraction_first_path": "0",
+        "objective": "-6",
+        "objective_float": -6.0,
+        "row_dual": "0",
+        "resource_reduced_coefficient": "2"
+      },
+      "classification": "nonunit-resource-pricing-cost-mismatch-abort",
+      "inferior_exit": 1,
+      "reference_result": null,
+      "reduced_cost_events": [
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            2.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            2.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            2.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -20.0,
+            0.0,
+            -20.0,
+            0.0,
+            2.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -20.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        }
+      ],
+      "command": [
+        "gdb",
+        "-q",
+        "-batch",
+        "-x",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.gdb",
+        "--args",
+        "/usr/bin/python3",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.py",
+        "--cost-coefficient",
+        "2",
+        "--binary",
+        "/home/seman/dev/vrpsolve-re/libbapcod-shared.so",
+        "--output",
+        "internal/audits/metasolver-preparation-bounds-20261027/activity-accepted/cumulative-cost2",
+        "--kind",
+        "cumulative",
+        "--source",
+        "0",
+        "--sink",
+        "3",
+        "--interior-uppers",
+        "5",
+        "7"
+      ]
+    },
+    {
+      "name": "cumulative-pure-row",
+      "kind": "cumulative",
+      "activity_values_by_path": [
+        10,
+        7
+      ],
+      "physical_cost_by_path": [
+        -20,
+        -20
+      ],
+      "objective_resource_coefficient": 1,
+      "row": {
+        "lower": 8,
+        "upper": null,
+        "coefficient_on_resource_activity": 1,
+        "coefficient_on_first_path_arc": 0
+      },
+      "oracle": {
+        "fraction_first_path": "1/3",
+        "objective": "-12",
+        "objective_float": -12.0,
+        "row_dual": "1",
+        "resource_reduced_coefficient": "0"
+      },
+      "classification": "propagated-resource-variable-lower-bound-unsupported",
+      "inferior_exit": 0,
+      "reference_result": {
+        "bcRecRootDb": -1000000000000.0,
+        "bcRecRootLpVal": 1000000000000.0,
+        "bcRecBestInc": 1000000000000.0,
+        "bcRecBestDb": 0.0,
+        "kind": "cumulative",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          5.0,
+          7.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 0,
+        "sink": 3,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "cost_coefficient": 1.0,
+        "activity_lower": 8.0,
+        "arc_row_coefficient": 0.0
+      },
+      "reduced_cost_events": [],
+      "command": [
+        "gdb",
+        "-q",
+        "-batch",
+        "-x",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.gdb",
+        "--args",
+        "/usr/bin/python3",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.py",
+        "--cost-coefficient",
+        "1",
+        "--binary",
+        "/home/seman/dev/vrpsolve-re/libbapcod-shared.so",
+        "--output",
+        "internal/audits/metasolver-preparation-bounds-20261027/activity-accepted/cumulative-pure-row",
+        "--kind",
+        "cumulative",
+        "--source",
+        "0",
+        "--sink",
+        "3",
+        "--interior-uppers",
+        "5",
+        "7",
+        "--activity-lower",
+        "8",
+        "--arc-row-coefficient",
+        "0"
+      ]
+    },
+    {
+      "name": "cumulative-mixed-row",
+      "kind": "cumulative",
+      "activity_values_by_path": [
+        10,
+        7
+      ],
+      "physical_cost_by_path": [
+        -20,
+        -20
+      ],
+      "objective_resource_coefficient": 1,
+      "row": {
+        "lower": 8,
+        "upper": null,
+        "coefficient_on_resource_activity": 1,
+        "coefficient_on_first_path_arc": 8
+      },
+      "oracle": {
+        "fraction_first_path": "1/11",
+        "objective": "-140/11",
+        "objective_float": -12.727272727272727,
+        "row_dual": "3/11",
+        "resource_reduced_coefficient": "8/11"
+      },
+      "classification": "unit-resource-pricing-charge-ignores-nonunit-reduced-coefficient",
+      "inferior_exit": 0,
+      "reference_result": {
+        "bcRecRootDb": -10.818181837272729,
+        "bcRecRootLpVal": -10.818181837272729,
+        "bcRecBestInc": -12.727272727272728,
+        "bcRecBestDb": -12.727272727272728,
+        "kind": "cumulative",
+        "associate_cost": false,
+        "constants": null,
+        "interior_uppers": [
+          5.0,
+          7.0
+        ],
+        "omit_endpoint_uppers": false,
+        "source": 0,
+        "sink": 3,
+        "source_upper": 17.0,
+        "sink_upper": 13.0,
+        "resource_id": 37,
+        "dead_arc": 0,
+        "dead_consumption": 1.0,
+        "cost_coefficient": 1.0,
+        "activity_lower": 8.0,
+        "arc_row_coefficient": 8.0
+      },
+      "reduced_cost_events": [
+        {
+          "variable_reduced_costs": [
+            -980.0,
+            0.0,
+            -20.0,
+            0.0,
+            -119.0
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -980.0,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -22.18181818181818,
+            0.0,
+            -20.0,
+            0.0,
+            0.7272727272727274
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -22.18181818,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        },
+        {
+          "variable_reduced_costs": [
+            -22.18181818181818,
+            0.0,
+            -20.0,
+            0.0,
+            0.7272727272727274
+          ],
+          "physical_arc_costs": [
+            0.0,
+            -22.18181818,
+            0.0,
+            -20.0,
+            0.0
+          ]
+        }
+      ],
+      "command": [
+        "gdb",
+        "-q",
+        "-batch",
+        "-x",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.gdb",
+        "--args",
+        "/usr/bin/python3",
+        "/home/seman/dev/baldes/tests/reference/metasolver_preparation_activity.py",
+        "--cost-coefficient",
+        "1",
+        "--binary",
+        "/home/seman/dev/vrpsolve-re/libbapcod-shared.so",
+        "--output",
+        "internal/audits/metasolver-preparation-bounds-20261027/activity-accepted/cumulative-mixed-row",
+        "--kind",
+        "cumulative",
+        "--source",
+        "0",
+        "--sink",
+        "3",
+        "--interior-uppers",
+        "5",
+        "7",
+        "--activity-lower",
+        "8",
+        "--arc-row-coefficient",
+        "8"
+      ]
+    }
+  ]
+}

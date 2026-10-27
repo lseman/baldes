@@ -89,6 +89,8 @@ impl<const D: usize> LabelingEngine<D> {
             .coupled_path_cost(&arcs)?
             .ok_or_else(|| incomplete(RESOURCE_REPLAY_MISMATCH))?;
         Ok(Some(Route {
+            coupled_controls: Vec::new(),
+            coupled_values: g.coupled_paired_values(&arcs)?,
             nodes,
             arcs: arcs.into_iter().map(|i| g.arcs[i].id).collect(),
             cost,

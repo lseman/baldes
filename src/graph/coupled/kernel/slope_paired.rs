@@ -9,6 +9,7 @@ use slope_interval::{outcome, SlopeLabel};
 
 #[derive(Clone, Debug)]
 pub(super) struct PreparedSlopePaired {
+    pub(super) objective_coefficient: f64,
     initial: SlopeLabel,
     initial_minimum: f64,
     arcs: std::sync::Arc<[PreparedSlopeRelationArc]>,
@@ -24,6 +25,7 @@ pub(super) struct PreparedSlopePaired {
 impl PartialEq for PreparedSlopePaired {
     fn eq(&self, b: &Self) -> bool {
         self.initial == b.initial
+            && self.objective_coefficient == b.objective_coefficient
             && self.initial_minimum.to_bits() == b.initial_minimum.to_bits()
             && self.sources == b.sources
             && self.mode == b.mode
@@ -133,6 +135,7 @@ impl PreparedSlopePaired {
             })
             .collect::<Result<Vec<_>>>()?;
         Ok(Self {
+            objective_coefficient: 1.,
             initial: SlopeLabel::root(&front, true),
             initial_minimum: finite(witness.value)?,
             arcs: prepared.into(),
@@ -168,6 +171,7 @@ impl PreparedSlopePaired {
         forward: bool,
         scale: f64,
     ) -> Option<f64> {
+        let scale = scale * self.objective_coefficient;
         if a == b {
             return Some(0.);
         }
@@ -205,6 +209,23 @@ impl PreparedSlopePaired {
             }
         }
     }
+    #[cfg(feature = "clp")]
+    pub(super) fn initial_minimum(&self) -> f64 {
+        self.initial_minimum
+    }
+    pub(super) fn final_objective(&self, value: f64, scale: f64) -> Result<f64> {
+        if !self.has_costs() {
+            return Ok(0.);
+        }
+        self.normalization
+            .charge_selected(
+                self.initial_minimum,
+                value,
+                finite(scale * self.objective_coefficient)?,
+            )
+            .map_err(|error| invalid(error.to_string()))
+    }
+
     pub(super) fn extend(
         &self,
         old: &SlopeLabel,
@@ -213,6 +234,7 @@ impl PreparedSlopePaired {
         first_backward: bool,
         scale: f64,
     ) -> Result<Option<SlopeLabel>> {
+        let scale = finite(scale * self.objective_coefficient)?;
         if !forward {
             let mut next = old.clone();
             next.upper = self.backward[arc].as_ref().and_then(|prepared| {
@@ -253,7 +275,7 @@ impl PreparedSlopePaired {
             0.
         } else {
             self.normalization
-                .charge(self.initial_minimum, witness.value, scale)
+                .charge_selected(self.initial_minimum, witness.value, scale)
                 .map_err(|error| invalid(error.to_string()))?
         };
         Ok(Some(SlopeLabel {

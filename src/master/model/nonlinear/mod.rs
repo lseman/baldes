@@ -35,10 +35,20 @@ pub(super) fn entries<const D: usize>(
     oracle: &Oracle<D>,
     route: &Route,
 ) -> Result<Vec<(usize, f64)>> {
+    let mut result = deterministic_entries(oracle, route)?;
+    result.extend(super::activity_rows::paired_entries(oracle, route)?);
+    Ok(result)
+}
+
+pub(super) fn deterministic_entries<const D: usize>(
+    oracle: &Oracle<D>,
+    route: &Route,
+) -> Result<Vec<(usize, f64)>> {
     if oracle.nonlinear_rows.is_empty()
         && oracle.knapsack_rows.is_empty()
         && oracle.presence_rows.is_empty()
         && oracle.resource_groups.is_empty()
+        && oracle.activity_rows.is_empty()
     {
         return Ok(vec![]);
     }
@@ -74,6 +84,7 @@ pub(super) fn entries<const D: usize>(
     result.extend(super::resource_rows::entries(oracle, route)?);
     result.extend(super::presence_rows::entries(oracle, route)?);
     result.extend(super::resource_groups::entries(oracle, route));
+    result.extend(super::activity_rows::deterministic_entries(oracle, route)?);
     Ok(result)
 }
 
@@ -220,10 +231,12 @@ pub(super) fn refresh_row<const D: usize>(
             .iter()
             .find(|o| o.network.id == route.network)
             .unwrap();
-        Ok(entries(oracle, &route.route)?
-            .into_iter()
-            .find(|&(r, _)| r == shared)
-            .map_or(0., |(_, a)| a))
+        Ok(
+            super::entries(oracle, &route.route, node.state.shared_offset)?
+                .into_iter()
+                .find(|&(r, _)| r == physical)
+                .map_or(0., |(_, a)| a),
+        )
     };
     let mut rhs = node.state.shared_rows[shared].rhs;
     for fixed in &node.state.fixed_routes {
@@ -238,8 +251,11 @@ pub(super) fn refresh_row<const D: usize>(
                 continue;
             }
             let coefficient = value(&node.state.routes[metadata.tag as usize])?;
-            if coefficient != 0. {
+            if coefficient != 0. || metadata.entries.iter().any(|&(row, _)| row == physical) {
                 node.master.set_coefficient(physical, column, coefficient)?;
+            }
+            metadata.entries.retain(|&(row, _)| row != physical);
+            if coefficient != 0. {
                 metadata.entries.push((physical, coefficient));
             }
         }
@@ -249,6 +265,7 @@ pub(super) fn refresh_row<const D: usize>(
             continue;
         }
         let coefficient = value(&node.state.routes[metadata.tag as usize])?;
+        metadata.entries.retain(|&(row, _)| row != physical);
         if coefficient != 0. {
             metadata.entries.push((physical, coefficient));
         }

@@ -355,6 +355,41 @@ pub(super) fn choose_proposals<const D: usize>(
             })
             .then_with(|| a.name.cmp(&b.name))
     });
+    // Multiplicity generators are visited in pricing registration order,
+    // including unequal fractional counts. Keep their priority-family slots
+    // and the ordering of every other generator unchanged.
+    let mut order: Vec<_> = (0..proposals.len()).collect();
+    let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for (index, proposal) in proposals.iter().enumerate() {
+        if matches!(proposal.restriction, Restriction::Multiplicity { .. }) {
+            let first = proposals
+                .iter()
+                .position(|p| p.priority == proposal.priority)
+                .unwrap();
+            groups.entry(first).or_default().push(index);
+        }
+    }
+    for slots in groups.values() {
+        let mut registered = slots.clone();
+        registered.sort_by_key(|&index| match proposals[index].restriction {
+            Restriction::Multiplicity { network } => output
+                .snapshot
+                .state
+                .oracles
+                .iter()
+                .position(|o| o.network.id == network)
+                .unwrap_or(usize::MAX),
+            _ => unreachable!(),
+        });
+        for (&slot, index) in slots.iter().zip(registered) {
+            order[slot] = index;
+        }
+    }
+    let mut slots: Vec<_> = proposals.into_iter().map(Some).collect();
+    let mut proposals: Vec<_> = order
+        .into_iter()
+        .map(|i| slots[i].take().unwrap())
+        .collect();
     let Some(config) = &options.mapped_strong_branching else {
         for proposal in proposals {
             match proposal.children(&output.snapshot) {
@@ -628,9 +663,6 @@ pub(super) fn choose_proposals<const D: usize>(
                             // recorded as exact history.
                             // No LP was attempted in a zero-budget sibling;
                             // CG's default zero objective is not an estimate.
-                            if result.master.iterations > 0 {
-                                estimates[side] = result.master.lp.min(1e12);
-                            }
                             let artificial_zero = result.master.artificials.iter().all(|&c| {
                                 result
                                     .snapshot
@@ -642,6 +674,16 @@ pub(super) fn choose_proposals<const D: usize>(
                                     .abs()
                                     <= 1e-6
                             });
+                            if result.master.iterations > 0 {
+                                // An unresolved artificial solution uses the
+                                // reference's ranking sentinel. Its arbitrary
+                                // penalty magnitude must not choose a generator.
+                                estimates[side] = if artificial_zero {
+                                    result.master.lp.min(1e12)
+                                } else {
+                                    1e12
+                                };
+                            }
                             let observation = if artificial_zero && estimates[side].is_finite() {
                                 if exact && result.master.status == cg::Status::Optimal {
                                     Some(MappedEvaluationKind::ExactPricing)
@@ -736,6 +778,9 @@ pub(super) fn choose_proposals<const D: usize>(
             candidates.truncate(evaluated);
         }
         candidates.sort_by(|a, b| b.score.total_cmp(&a.score).then(a.order.cmp(&b.order)));
+        if evaluated > 0 && !phase.tree_depth_score {
+            strong::retain_distinct_trials(&mut candidates, |c| (c.score, c.estimates));
+        }
     }
     for mut candidate in candidates.into_iter().filter(|c| c.usable) {
         let mut children = if let Some(children) = candidate.children {

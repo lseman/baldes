@@ -5,17 +5,21 @@ impl BucketGraph {
     /// from the physical graph here would silently undo reduced-cost fixing.
     pub fn decrease_steps<const D: usize>(&mut self, g: &Graph<D>) -> Result<()> {
         let old_steps = self.step;
+        let mut steps = old_steps;
         for r in 0..self.dimensions {
-            self.step[r] = if self.dimensions == 1 {
+            steps[r] = if self.dimensions == 1 {
                 (old_steps[r] * 5. + 0.5).floor() / 10.
             } else {
                 (old_steps[r] * 10. / 1.4 + 0.5).floor() / 10.
             };
         }
-        if self.step[..self.dimensions].iter().any(|&s| s <= 0.) {
-            self.step = old_steps;
+        if steps[..self.dimensions].iter().any(|&s| s <= 0.) {
             return Err(invalid("bucket step cannot be refined further"));
         }
+        // Reject invalid geometry before replacing either directional graph or
+        // its shared indexing strides. A failed round must remain reusable.
+        self.validate_bucket_geometry(steps)?;
+        self.step = steps;
         for forward in [true, false] {
             if !forward && !self.bidirectional {
                 continue;

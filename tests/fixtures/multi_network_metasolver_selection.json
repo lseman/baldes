@@ -1,0 +1,89 @@
+{
+  "rows": [],
+  "networks": [
+    {
+      "id": 7,
+      "vertices": 4,
+      "multiplicity": [
+        0,
+        1
+      ],
+      "resources": [
+        {
+          "kind": "disposable",
+          "bounds": [
+            [
+              0.0,
+              4.0
+            ],
+            [
+              0.0,
+              4.0
+            ],
+            [
+              0.0,
+              4.0
+            ],
+            [
+              0.0,
+              4.0
+            ]
+          ]
+        }
+      ],
+      "arcs": [
+        {
+          "tail": 0,
+          "head": 1,
+          "cost": -8.0,
+          "consumption": [
+            1.0
+          ]
+        },
+        {
+          "tail": 1,
+          "head": 2,
+          "cost": -7.0,
+          "consumption": [
+            1.0
+          ]
+        },
+        {
+          "tail": 2,
+          "head": 3,
+          "cost": -5.0,
+          "consumption": [
+            1.0
+          ]
+        },
+        {
+          "tail": 0,
+          "head": 3,
+          "cost": -10.0,
+          "consumption": [
+            1.0
+          ]
+        }
+      ],
+      "coupled_resources": [
+        {
+          "kind": "selection",
+          "initial": 1,
+          "allowed": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "vertices": [
+            1,
+            1,
+            0,
+            1
+          ],
+          "relaxed": false
+        }
+      ]
+    }
+  ]
+}

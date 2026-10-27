@@ -492,3 +492,63 @@ fn inactive_scan_is_opt_in_and_preserves_restricted_snapshot_proof_bounds() {
         );
     }
 }
+
+#[test]
+fn paired_column_values_match_registered_native_values_and_reject_stale_pool_metadata() {
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/coupled/metasolver-paired-preparation.json"
+    )))
+    .unwrap();
+    let mut source = corpus["cases"][0]["model"].clone();
+    for arc in source["networks"][0]["coupled_resources"][0]["arcs"]
+        .as_array_mut()
+        .unwrap()
+    {
+        arc["increment"]["pairs"][0][0] = serde_json::json!(1.);
+        for pair in arc["increment"]["pairs"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .skip(1)
+        {
+            pair[0] = serde_json::json!(0.);
+        }
+    }
+    let problem = format::Model::from_json(&source.to_string())
+        .unwrap()
+        .problem::<2>()
+        .unwrap();
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    let output = solve(problem, options).unwrap();
+    assert_eq!(output.master.lp, -18.);
+    let oracle = &output.snapshot.state.oracles[0];
+    let route = &output
+        .routes
+        .iter()
+        .find(|r| r.route.arcs.len() == 2)
+        .unwrap()
+        .route;
+    // Actual registered native columns map the same constant-increment pair
+    // to dependent value2; the arc variables carry physical cost-20.
+    assert_eq!(route.coupled_values, vec![(0, 2.)]);
+    assert!(compatible_schedule(oracle, route));
+    let domain = crate::master::routing::RoutingContext::set_partitioning(
+        oracle.network.graph.as_ref().clone(),
+        1.,
+    )
+    .unwrap();
+    assert!(crate::master::routing::exact_route_feasible(&domain, route).is_some());
+    let mut stale = route.clone();
+    stale.coupled_values[0].1 = 3.;
+    assert!(!compatible_schedule(oracle, &stale));
+    assert_eq!(
+        crate::master::routing::exact_route_feasibility(&domain, &stale),
+        Some(true)
+    );
+    assert!(crate::master::routing::exact_route_feasible(&domain, &stale).is_none());
+    stale.coupled_values.clear();
+    assert!(!compatible_schedule(oracle, &stale));
+    assert!(crate::master::routing::exact_route_feasible(&domain, &stale).is_none());
+}

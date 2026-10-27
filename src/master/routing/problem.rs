@@ -71,6 +71,7 @@ impl<const D: usize> RoutingContext<D> {
                     },
                     arc_entries,
                     route_entries: vec![],
+                    activity_entries: vec![],
                 }],
             },
             customers,
@@ -229,9 +230,8 @@ impl<const D: usize> RoutingContext<D> {
                 .iter()
                 .map(|id| self.arc_position(*id).unwrap())
                 .collect();
-            cost += self.model.networks[0]
-                .graph
-                .coupled_path_cost(&positions)
+            cost += route
+                .coupled_cost(&self.model.networks[0].graph, &positions)
                 .ok()
                 .flatten()
                 .unwrap_or(f64::INFINITY);
@@ -328,6 +328,8 @@ impl<const D: usize> RoutingContext<D> {
             .collect::<Option<_>>()?;
         cost += g.coupled_path_cost(&positions).ok()??;
         Some(Route {
+            coupled_controls: Vec::new(),
+            coupled_values: g.coupled_paired_values(&positions).ok()?,
             nodes,
             arcs: ids.to_vec(),
             cost,

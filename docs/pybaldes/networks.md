@@ -52,6 +52,11 @@ assert root.status == "Optimal" and root.lp == 3.0
 print(root.routes[0].network, root.routes[0].nodes)
 ```
 
+`NetworkRoute.coupled_values` is an immutable tuple of paired descriptor/value
+pairs retained with the scalar `resource_profile`. Values describe the current
+selected physical dependent state, independently of objective normalization;
+they are not full control trajectories or standalone feasibility certificates.
+
 The only covering route costs 3, contributes one unit to shared row 0, consumes
 one load unit, and uses one copy of network 19's allowed route multiplicity.
 `problem.solve(**options)` delegates to `solve(problem, **options)`.
@@ -64,7 +69,7 @@ Both require Clp.
 | `SharedRow` | `sense`, `rhs`; sense is `"eq"`, `"le"`, or `"ge"` |
 | `PricingResource` | `kind="disposable"`, `initial=None`, `bounds=None`, `time_windows=None` |
 | `PricingArc` | `tail`, `head`, `cost`, `consumption=()`, `bounds=()`, `entries=()` |
-| `PricingNetwork` | `id`, `vertices`, `multiplicity`, `arcs`, `resources=()`, `source=0`, `sink=None`, `route_entries=()`, `ng=None`, `coupled_resources=()`, `elementary=False`, `route_domain=None`, `front_program_domain=False` |
+| `PricingNetwork` | `id`, `vertices`, `multiplicity`, `arcs`, `resources=()`, `source=0`, `sink=None`, `route_entries=()`, `activity_entries=()`, `ng=None`, `coupled_resources=()`, `coupled_objective_coefficients=()`, `elementary=False`, `route_domain=None`, `front_program_domain=False` |
 | `NetworkProblem` | `rows`, scalar/array `networks`, optional `pricing_variables` |
 
 Scalar `kind` accepts `"disposable"` or `"equality"`. Resource `bounds` has one
@@ -81,12 +86,48 @@ fleet multiplicity are different constraints. `sink=None` selects the last
 vertex. `ng` supplies per-vertex neighborhoods; `elementary=True` selects an
 elementary network domain. `coupled_resources` accepts tagged descriptors.
 
+`coupled_objective_coefficients=((resource_index, coefficient), ...)` sets
+graph-level costs using each descriptor's declared normalization. With Clp,
+negative source paired costs support both absolute and final-minus-initial
+normalization. A relative objective subtracts the global initial-front minimum,
+independently of the witness's initial coordinate. Each resource has one cost
+owner: omit its graph coefficient when an original `pricing_variables` entry
+binds that resource. Duplicate indices, unsupported descriptors and nonfinite
+coefficients are rejected by the common graph setter. Omitted resources keep
+coefficient one. The field works for one network and arrays of networks.
+
 The Rust interface additionally supports independent master variables and
 imported-column domains. Those registrations are not fields in the CLI/Python
 network JSON schema. `pricing_variables` registers original pricing-variable
 identities; it does not add arbitrary static master variables. See the
 [shared model guide](../solver/models.md) and [column imports](../solver/column-imports.md)
 for the Rust-only contracts.
+
+An original variable can use `accumulated_resource` instead of `arcs` to bind
+the intrinsic charge of a custom/cumulative coupled descriptor. Its `cost`
+replaces the descriptor's unit objective coefficient; `entries` adds that
+intrinsic activity to shared rows. Reported activity remains independent of the
+objective coefficient. Accumulated registrations support continuous variables,
+integer registrations with complete exact-integer path proofs, and explicit
+original-variable boxes whose envelopes can be certified
+over the complete bounded graph relaxation. Direct network
+`activity_entries` use objects with `resource`, `row` and `coefficient` fields.
+See [original variable compilation](../solver/models.md#original-pricing-variable-compilation-rust)
+for the shared contract.
+
+`accumulated_resource` also accepts cost-bearing paired descriptors (raw slopes or control points) with
+`absolute_final_value` normalization and a finite `cost`. Negative costs require
+a source-domain model and use maximum-control pricing. The reported
+value comes from the selected column, independently of the cost coefficient.
+For this paired binding, `entries` supports signed shared-row coefficients in
+source-domain models. `integer=True` is accepted when a program or complete
+control-domain proof establishes integral terminal activity for every control.
+Continuous ranges with integral endpoints are rejected. Verified
+`original_variable_boxes` enclose all controls, including nonminimum choices;
+they are envelopes, not new model restrictions. Automatic pricing covers finite
+physical paths and independently bounds alternative source controls. Incomplete
+coverage remains explicit. Machine-front integer activities/negative objectives
+and rows remain unsupported.
 
 ## Model JSON
 
@@ -189,9 +230,13 @@ child_result = child.solve(stabilize=False)
 assert parent.solve().lp == root.lp
 ```
 
-`NetworkRowCoefficients(network, arcs, per_route=0.0)` supplies one coefficient
-per physical arc. The constant is charged once per route. These coefficients
-apply to future priced columns as well as existing columns.
+`NetworkRowCoefficients(network, arcs, per_route=0.0, activities=())` supplies
+one coefficient per physical arc and optional `(coupled_descriptor, coefficient)`
+activity terms. The constant is charged once per route. Deterministic activities
+and selected source paired values use the same `with_row` lifecycle, including
+`dynamic=True`. These terms apply to existing and future columns. An existing
+complete universe accepts a paired term only after an all-control invariance
+proof confirms that its retained coefficients remain valid.
 
 `parent.fractional_assignments(tolerance=1e-6)` returns `NetworkAssignment`
 objects with `shared_row`, `network`, and `value`. A candidate can be branched:
@@ -331,3 +376,49 @@ follow from the pricing graph; an unproved envelope raises an error. These
 bounds guide pricing admission without adding a route restriction. Original
 variable costs remain separate during this calculation even if they cancel on
 shared physical arcs. See the [compilation contract](../solver/models.md#original-pricing-variable-compilation-rust).
+
+
+Explicit source choices can be retained for an existing route with
+`node.with_route_controls(route_index, (PairedControl(resource, base), ...))`.
+`base` contains the initial coordinate and one head coordinate per arc. The
+result is a new node; duplicate identities are reused. Controls need independent
+singleton source certificates, and complete/cutoff universes and machine-front
+model domains reject this operation. `route.coupled_controls` is an immutable
+tuple of `PairedControl` objects. Values and costs survive resume, fixing and
+tree solving; original-variable reporting reads the supplied selected value.
+Models without paired rows retain ordinary minimum-front pricing. Paired rows
+use the same master coordinator with bounded source-control generation, including
+reversed reduced weights and row-boundary proposals. Complete enumeration retains invariant terminal values or a certified attained
+endpoint that weakly improves both the objective and every row. Negative costs
+favor maxima, positive costs minima, and zero costs either direction, subject
+to all row signs and inequality senses. Equality rows, opposing requirements,
+identity-specific column caps, and uncertain/unattained bounds remain guarded.
+A new Gamma row may reuse invariant matching values or the same certified
+endpoints when they still favor the objective and every old/new row. Repeated
+terms are checked together; restrictive retained-column caps and fixed-copy
+certificates remain part of the proof. Opposing/equality rows requiring other
+controls cannot widen the projected universe. Negative model costs use the same bounded source-control optimizer;
+machine-front negative models remain unsupported.
+
+
+`node.optimize_route_control(route_index, resource, maximize=False,
+terminal=None, max_cells=4096, max_work=1_000_000,
+max_lp_iterations=10000, time_limit=1.0)` generates a source control on one
+registered path. `terminal=(lower, upper)` restricts its physical dependent
+value. It returns an immutable `ControlOptimization` with `control`, `dependent`,
+`work_used`, `lp_iterations`,
+`lower_bound`, `complete`, `maximize` and `cells`.
+
+```python
+choice = node.optimize_route_control(route_index, 0, terminal=(4.0, 4.0))
+if choice.control is not None:
+    node = node.with_route_controls(route_index, (choice.control,))
+```
+
+Every returned control has an independent source certificate. `complete=True`
+means all regions were bounded/rejected and a feasible control was found, or
+all regions were proved empty. It does not assert a zero primal/dual gap.
+`lower_bound` applies to Gamma, or -Gamma when maximizing. An incomplete result
+can retain a useful feasible control; it cannot assert infeasibility. This is a
+fixed-path descriptor search, not a whole-model pricing certificate. Its limits
+are shared across LP regions. Machine-front models reject the source search.

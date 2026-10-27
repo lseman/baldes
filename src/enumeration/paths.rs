@@ -120,6 +120,13 @@ impl PathStorage {
         knapsack: &crate::cuts::knapsack::KnapsackPricing,
         presence: &crate::cuts::soft_conflicts::PresencePricing,
     ) -> Result<usize> {
+        if g.coupled_kernel()
+            .is_some_and(|kernel| kernel.has_negative_paired_objectives())
+        {
+            return Err(crate::incomplete(
+                "negative paired objectives require source-control master pricing",
+            ));
+        }
         if cutoff.is_nan() {
             return Err(invalid("invalid enumeration inspection cutoff"));
         }
@@ -130,7 +137,7 @@ impl PathStorage {
             for path in row.iter_mut() {
                 path.reduced_cost = path.arcs.iter().map(|&a| g.arcs[a].reduced_cost).sum();
                 path.reduced_cost += g
-                    .coupled_path_cost(&path.arcs)?
+                    .coupled_pricing_path_cost(&path.arcs)?
                     .ok_or_else(|| invalid("enumerated path violates coupled resources"))?;
                 if !cuts.is_empty() || !kpath.is_empty() {
                     vertices.clear();
@@ -250,6 +257,8 @@ impl PathStorage {
             resource_profile.push(q[..g.resources.len()].to_vec());
         }
         Ok(Route {
+            coupled_controls: Vec::new(),
+            coupled_values: g.coupled_paired_values(&path.arcs)?,
             nodes,
             arcs: path.arcs.iter().map(|&a| g.arcs[a].id).collect(),
             cost: path.reduced_cost,

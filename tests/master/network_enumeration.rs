@@ -438,6 +438,7 @@ fn direct_source_sink_routes_are_included_in_complete_coverage() {
             multiplicity: baldes::graph::Window::new(0., 1.).unwrap(),
             arc_entries: vec![vec![]],
             route_entries: vec![(0, 1.)],
+            activity_entries: vec![],
         }],
     };
     let parent = model::solve(model, options()).unwrap();
@@ -470,6 +471,7 @@ fn material_objective_rounding_does_not_publish_a_false_integer_proof() {
             multiplicity: baldes::graph::Window::new(0., 1.).unwrap(),
             arc_entries: vec![vec![(0, 1.)], vec![], vec![]],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let parent = model::solve(model, options()).unwrap();
@@ -638,6 +640,7 @@ fn rounded_up_route_objective_cannot_prove_no_original_improvement() {
             multiplicity: baldes::graph::Window::new(0., 1.).unwrap(),
             arc_entries: vec![vec![(0, 1.)], vec![], vec![]],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let root = model::solve(problem, options()).unwrap();
@@ -684,6 +687,7 @@ fn rounded_route_coefficient_cannot_prove_original_integer_infeasibility() {
             multiplicity: baldes::graph::Window::new(0., 1.).unwrap(),
             arc_entries: vec![vec![(0, 1e16)], vec![(0, 1.5)], vec![(0, -1e16)]],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let mut configured = options();

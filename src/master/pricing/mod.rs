@@ -62,6 +62,9 @@ pub(crate) struct Collected {
     pub best_entries: Option<Vec<(usize, f64)>>,
 }
 pub(crate) struct Retained {
+    /// Independent lower enclosure of the retained domain, including controls
+    /// not represented by a candidate column. Suppresses a guessed subgradient.
+    pub minimum_bound: Option<f64>,
     pub columns: Vec<(cg::Column, f64)>,
     /// Independent route caps describe an explicit finite master. Otherwise
     /// one route pattern is selected with the network multiplicity.
@@ -205,6 +208,13 @@ pub(crate) fn price<const D: usize>(
                                 .ok_or_else(|| invalid("network gradient row"))? -= *cap * a;
                         }
                     }
+                }
+                if let Some(bound) = retained.minimum_bound {
+                    if !bound.is_finite() {
+                        return Err(incomplete("nonfinite retained pricing certificate"));
+                    }
+                    network_minimum = network_minimum.min(bound);
+                    gradient_available = false;
                 }
                 if network_minimum == f64::INFINITY {
                     network_minimum = 0.;

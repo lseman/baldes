@@ -6,13 +6,14 @@ use super::RawFunctionError;
 /// This convention does not change the initial function or any resource
 /// transition. It determines the charge of a nonempty prefix or complete route.
 /// A fresh search root has accumulated charge zero under either convention.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "clp", derive(serde::Deserialize, serde::Serialize))]
 #[cfg_attr(feature = "clp", serde(rename_all = "snake_case"))]
 pub enum PairedCostNormalization {
     /// Charge the terminal dependent value, including the initial value.
     AbsoluteFinalValue,
     /// Charge the terminal value minus the initial front's minimum.
+    #[default]
     FinalMinusInitialMinimum,
 }
 
@@ -34,10 +35,32 @@ impl PairedCostNormalization {
         terminal_minimum: f64,
         scale: f64,
     ) -> Result<f64, RawFunctionError> {
+        self.charge_using(initial_minimum, terminal_minimum, scale, false)
+    }
+
+    /// Charge a particular selected value, not an optimum of a minimum front.
+    /// Signed weights are valid here; optimizing their controls is the caller's
+    /// separate obligation. Minimum-front labeling rejects negative models.
+    pub(crate) fn charge_selected(
+        self,
+        initial: f64,
+        selected: f64,
+        scale: f64,
+    ) -> Result<f64, RawFunctionError> {
+        self.charge_using(initial, selected, scale, true)
+    }
+
+    fn charge_using(
+        self,
+        initial_minimum: f64,
+        terminal_minimum: f64,
+        scale: f64,
+        selected: bool,
+    ) -> Result<f64, RawFunctionError> {
         if !initial_minimum.is_finite() || !terminal_minimum.is_finite() || !scale.is_finite() {
             return Err(RawFunctionError::NonFinite("dependent objective component"));
         }
-        if scale < 0. {
+        if scale < 0. && !selected {
             return Err(RawFunctionError::Unsupported(
                 "negative scales require maximizing the dependent front",
             ));

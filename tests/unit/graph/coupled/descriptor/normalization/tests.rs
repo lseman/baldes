@@ -43,3 +43,17 @@ fn serialized_conventions_remain_explicit_and_distinct() {
         );
     }
 }
+
+#[test]
+fn signed_selected_value_charges_do_not_pretend_to_optimize_a_minimum_front() {
+    let absolute = PairedCostNormalization::AbsoluteFinalValue;
+    let relative = PairedCostNormalization::FinalMinusInitialMinimum;
+    assert_eq!(absolute.charge_selected(5., 8., -2.).unwrap(), -16.);
+    assert_eq!(relative.charge_selected(5., 8., -2.).unwrap(), -6.);
+    assert!(absolute.charge(5., 8., -2.).is_err());
+    assert!(absolute.charge_selected(0., f64::MAX, -2.).is_err());
+    assert_eq!(
+        relative.charge_selected(-f64::MAX, f64::MAX, 0.).unwrap(),
+        0.
+    );
+}

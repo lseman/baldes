@@ -13,6 +13,10 @@ pub struct MappedNetworkVariable {
     pub network: i32,
     #[serde(default)]
     pub arcs: Vec<(i32, f64)>,
+    /// Intrinsic custom/cumulative or selected source paired terms. Each descriptor must have
+    /// a complete exact-integer path proof in this graph domain.
+    #[serde(default)]
+    pub activities: Vec<(usize, f64)>,
     #[serde(default)]
     pub per_route: f64,
 }
@@ -162,6 +166,19 @@ impl MappedBranchVariable {
             }
             networks.push(MappedNetworkVariable {
                 network,
+                activities: {
+                    let mut terms = BTreeMap::<usize, Vec<f64>>::new();
+                    for entry in oracle.activity_rows.iter().filter(|e| e.row == shared_row) {
+                        terms
+                            .entry(entry.resource)
+                            .or_default()
+                            .push(entry.coefficient);
+                    }
+                    terms
+                        .into_iter()
+                        .map(|(r, values)| Ok((r, exact_coefficient(values.into_iter())?)))
+                        .collect::<Result<Vec<_>>>()?
+                },
                 arcs,
                 per_route,
             });
@@ -253,9 +270,25 @@ impl MappedBranchVariable {
                 .iter()
                 .map(|(_, a)| a.abs())
                 .fold(0_f64, f64::max);
-            if contribution.per_route.abs() as u128 + (max_arc.ceil() as u128) * (hops as u128)
-                > 9_007_199_254_740_992u128
-            {
+            let mut magnitude =
+                contribution.per_route.abs() as u128 + (max_arc.ceil() as u128) * (hops as u128);
+            let mut resources = HashSet::new();
+            for &(resource, coefficient) in &contribution.activities {
+                if !resources.insert(resource) || !integer_coefficient(coefficient) {
+                    return Err(invalid(
+                        "mapped activities require distinct descriptors and integer coefficients",
+                    ));
+                }
+                let range = grouped_boxes::integral_activity(graph, resource).ok_or_else(|| {
+                    invalid("mapped activity must be exactly integer on every graph path")
+                })?;
+                let maximum = range.lower.abs().max(range.upper.abs()) as u128;
+                magnitude = magnitude
+                    .checked_add(maximum * coefficient.abs() as u128)
+                    .ok_or_else(|| invalid("mapped activity range overflow"))?;
+                nonzero |= coefficient != 0.;
+            }
+            if magnitude > 9_007_199_254_740_992u128 {
                 return Err(invalid(
                     "mapped walk coefficient exceeds exact integer range at its declared arc limit",
                 ));
@@ -328,15 +361,39 @@ impl MappedBranchVariable {
             return Err(invalid("ordered mapped variable bounds required"));
         }
         let coefficients = self.coefficients(node)?;
+        let activities: Vec<_> = self
+            .networks
+            .iter()
+            .flat_map(|c| {
+                c.activities.iter().map(|&(resource, coefficient)| {
+                    AccumulatedActivityCoefficients {
+                        network: c.network,
+                        resource,
+                        coefficient,
+                    }
+                })
+            })
+            .collect();
         let mut child = node.fork()?;
+        let append = |node: &NodeSnapshot<D>, row| {
+            if activities.is_empty() {
+                node.with_master_row(row, &coefficients, &self.masters)
+            } else {
+                node.with_accumulated_activity_master_row(
+                    row,
+                    &activities,
+                    &coefficients,
+                    &self.masters,
+                )
+            }
+        };
         if bounds.lower == bounds.upper {
-            return child.with_master_row(
+            return append(
+                &child,
                 Row {
                     sense: RowSense::Equal,
                     rhs: bounds.lower,
                 },
-                &coefficients,
-                &self.masters,
             );
         }
         for (sense, rhs) in [
@@ -344,7 +401,7 @@ impl MappedBranchVariable {
             (RowSense::LessEqual, bounds.upper),
         ] {
             if rhs.is_finite() {
-                child = child.with_master_row(Row { sense, rhs }, &coefficients, &self.masters)?;
+                child = append(&child, Row { sense, rhs })?;
             }
         }
         Ok(child)
@@ -352,6 +409,7 @@ impl MappedBranchVariable {
 
     pub(super) fn value<const D: usize>(&self, output: &Output<D>) -> Option<f64> {
         let mut value = crate::master::numerics::ExactSum::default();
+        let mut source_work = 1_000_000;
         for (route, quantity) in output
             .routes
             .iter()
@@ -370,11 +428,46 @@ impl MappedBranchVariable {
                 continue;
             }
             if let Some(c) = self.networks.iter().find(|c| c.network == route.network) {
+                let mut activity_terms = vec![];
+                if !c.activities.is_empty() {
+                    let oracle = output
+                        .snapshot
+                        .state
+                        .oracles
+                        .iter()
+                        .find(|o| o.network.id == c.network)?;
+                    let path: Vec<_> = route
+                        .route
+                        .arcs
+                        .iter()
+                        .map(|id| oracle.index.get(id).copied())
+                        .collect::<Option<_>>()?;
+                    for &(resource, coefficient) in &c.activities {
+                        let activity =
+                            activity_rows::column_value(oracle, &route.route, &path, resource)
+                                .ok()?;
+                        if activity_rows::paired(&oracle.network.graph, resource) {
+                            let proof = activity_rows::certificate_value(
+                                oracle,
+                                &route.route,
+                                resource,
+                                &mut source_work,
+                                output.snapshot.state.deadline,
+                            )?;
+                            if proof != [activity, activity] {
+                                return None;
+                            }
+                        }
+                        activity_terms.push(activity * coefficient);
+                    }
+                }
                 let coefficient =
                     exact_coefficient(
-                        std::iter::once(c.per_route).chain(route.route.arcs.iter().map(|id| {
-                            c.arcs.iter().find(|(a, _)| a == id).map_or(0., |(_, a)| *a)
-                        })),
+                        std::iter::once(c.per_route)
+                            .chain(route.route.arcs.iter().map(|id| {
+                                c.arcs.iter().find(|(a, _)| a == id).map_or(0., |(_, a)| *a)
+                            }))
+                            .chain(activity_terms),
                     )
                     .ok()?;
                 // Route coefficients must remain exact integer values. Large

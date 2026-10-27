@@ -71,19 +71,24 @@ class PricingNetwork:
     source: int = 0
     sink: Optional[int] = None
     route_entries: Tuple[Tuple[int, float], ...] = ()
+    activity_entries: Tuple[Mapping[str, Any], ...] = ()
     ng: Optional[Tuple[Tuple[int, ...], ...]] = None
     coupled_resources: Tuple[Mapping[str, Any], ...] = ()
     elementary: bool = False
     front_program_domain: bool = False
     route_domain: Mapping[str, Any] = field(default_factory=lambda: {"kind": "physical_simple"})
+    coupled_objective_coefficients: Tuple[Tuple[int, float], ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "multiplicity", tuple(self.multiplicity))
         object.__setattr__(self, "arcs", tuple(self.arcs))
         object.__setattr__(self, "resources", tuple(self.resources))
         object.__setattr__(self, "coupled_resources", tuple(dict(r) for r in self.coupled_resources))
+        object.__setattr__(self, "coupled_objective_coefficients",
+                           tuple(tuple(e) for e in self.coupled_objective_coefficients))
         object.__setattr__(self, "route_domain", dict(self.route_domain))
         object.__setattr__(self, "route_entries", tuple(tuple(e) for e in self.route_entries))
+        object.__setattr__(self, "activity_entries", tuple(dict(e) for e in self.activity_entries))
         if self.ng is not None:
             object.__setattr__(self, "ng", tuple(tuple(n) for n in self.ng))
         if not all(isinstance(a, PricingArc) for a in self.arcs):
@@ -167,6 +172,8 @@ class NetworkProblem:
         if not data["pricing_variables"]:
             del data["pricing_variables"]
         for network in data["networks"]:
+            if not network["activity_entries"]:
+                del network["activity_entries"]
             for resource in network["resources"]:
                 if resource["time_windows"] is None:
                     del resource["time_windows"]
@@ -182,9 +189,11 @@ class NetworkRowCoefficients:
     network: int
     arcs: Tuple[float, ...]
     per_route: float = 0.0
+    activities: Tuple[Tuple[int, float], ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "arcs", tuple(self.arcs))
+        object.__setattr__(self, "activities", tuple(tuple(a) for a in self.activities))
 
 
 @dataclass(frozen=True)
@@ -204,6 +213,31 @@ class NetworkAssignment:
 
 
 @dataclass(frozen=True)
+class PairedControl:
+    resource: int
+    base: Tuple[float, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "base", tuple(self.base))
+
+
+@dataclass(frozen=True)
+class ControlOptimization:
+    maximize: bool
+    control: Optional[PairedControl]
+    dependent: Optional[float]
+    lower_bound: Optional[float]
+    complete: bool
+    cells: int
+    work_used: int
+    lp_iterations: int
+
+    def __post_init__(self) -> None:
+        if self.control is not None and not isinstance(self.control, PairedControl):
+            object.__setattr__(self, "control", PairedControl(**self.control))
+
+
+@dataclass(frozen=True)
 class NetworkRoute:
     network: int
     route_index: Optional[int]
@@ -213,11 +247,17 @@ class NetworkRoute:
     arcs: Tuple[int, ...]
     resources: Tuple[float, ...]
     resource_profile: Tuple[Tuple[float, ...], ...]
+    coupled_values: Tuple[Tuple[int, float], ...]
+    coupled_controls: Tuple[PairedControl, ...]
 
     def __post_init__(self) -> None:
         for name in ("nodes", "arcs", "resources"):
             object.__setattr__(self, name, tuple(getattr(self, name)))
         object.__setattr__(self, "resource_profile", tuple(tuple(r) for r in self.resource_profile))
+        object.__setattr__(self, "coupled_values", tuple(tuple(r) for r in self.coupled_values))
+        object.__setattr__(self, "coupled_controls", tuple(
+            control if isinstance(control, PairedControl) else PairedControl(**control)
+            for control in self.coupled_controls))
 
 
 @dataclass(frozen=True)
@@ -246,7 +286,9 @@ class NetworkNode:
         return NetworkNode(self._native.branch_assignment(shared_row, network, assigned))
 
     def with_row(self, row: SharedRow, coefficients: Tuple[NetworkRowCoefficients, ...], *, dynamic: bool = False) -> NetworkNode:
-        data = {"row": asdict(row), "coefficients": [asdict(c) for c in coefficients], "dynamic": dynamic}
+        data = {"row": asdict(row), "coefficients": [dict(network=c.network, arcs=c.arcs, per_route=c.per_route) for c in coefficients],
+                "activities": [dict(network=c.network, resource=resource, coefficient=value)
+                               for c in coefficients for resource, value in c.activities], "dynamic": dynamic}
         return NetworkNode(self._native.with_row(json.dumps(data, allow_nan=False)))
 
     def with_resource_group_branch(
@@ -260,6 +302,22 @@ class NetworkNode:
     def with_synchronized_start(self, id: int, lower: int, upper: int) -> NetworkNode:
         """Fork with an inclusive common integer start domain for one service."""
         return NetworkNode(self._native.with_synchronized_start(id, lower, upper))
+
+    def optimize_route_control(
+        self, route_index: int, resource: int, *, maximize: bool = False,
+        terminal: Optional[Tuple[float, float]] = None, max_cells: int = 4096,
+        max_work: int = 1_000_000, max_lp_iterations: int = 10_000,
+        time_limit: float = 1.0,
+    ) -> ControlOptimization:
+        """Bound a fixed path's paired control search; the bound uses -Gamma when maximizing."""
+        return ControlOptimization(**json.loads(self._native.optimize_route_control(
+            route_index, resource, maximize, terminal, max_cells, max_work,
+            max_lp_iterations, time_limit)))
+
+    def with_route_controls(self, route_index: int, controls: Tuple[PairedControl, ...]) -> NetworkNode:
+        """Retain proved source choices for an existing physical path."""
+        return NetworkNode(self._native.with_route_controls(
+            route_index, json.dumps([asdict(control) for control in controls], allow_nan=False)))
 
     def fix_route(self, route_index: int, quantity: int = 1) -> NetworkNode:
         if isinstance(quantity, bool) or not isinstance(quantity, int):

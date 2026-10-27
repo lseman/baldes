@@ -5,6 +5,7 @@
 use super::super::bounds::Range;
 use super::super::*;
 use crate::core::rounding::add_up;
+mod bounded;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Slot {
@@ -23,6 +24,8 @@ pub(in crate::graph::coupled::kernel) struct NumericCostOrder {
     future: Vec<Option<Range>>,
     nonnegative_charges: bool,
     deploy_unequal: bool,
+    bounded: Option<bounded::BoundedOrder>,
+    vertices: Vec<bounded::BoundedOrder>,
 }
 impl NumericCostOrder {
     pub(in crate::graph::coupled::kernel) fn new(
@@ -113,7 +116,50 @@ impl NumericCostOrder {
             future,
             nonnegative_charges,
             deploy_unequal,
+            bounded: None,
+            vertices: Vec::new(),
         }
+    }
+
+    pub(in crate::graph::coupled::kernel) fn with_horizon(
+        mut self,
+        steps: Option<usize>,
+        definitions: &[CoupledResource],
+    ) -> Self {
+        self.bounded = steps.and_then(|steps| bounded::BoundedOrder::new(steps, definitions));
+        self
+    }
+
+    pub(in crate::graph::coupled::kernel) fn with_graph_context<const D: usize>(
+        mut self,
+        graph: &Graph<D>,
+        definitions: &[CoupledResource],
+    ) -> Self {
+        if !self.nonnegative_charges {
+            self.vertices = self
+                .bounded
+                .as_ref()
+                .and_then(|order| order.scoped(graph, definitions))
+                .unwrap_or_default();
+        }
+        self
+    }
+
+    pub(in crate::graph::coupled::kernel) fn preserves_at_vertex(
+        &self,
+        vertex: usize,
+        a: &[f64],
+        b: &[f64],
+        ac: f64,
+        bc: f64,
+    ) -> bool {
+        ac.is_finite()
+            && bc.is_finite()
+            && ac <= bc
+            && self
+                .vertices
+                .get(vertex)
+                .is_some_and(|order| order.preserves(a, b, ac, bc))
     }
 
     #[inline]
@@ -139,6 +185,14 @@ impl NumericCostOrder {
             || a_cost > b_cost
         {
             return false;
+        }
+        if (!self.nonnegative_charges || a_cost < 0.)
+            && self
+                .bounded
+                .as_ref()
+                .is_some_and(|order| order.preserves(a, b, a_cost, b_cost))
+        {
+            return true;
         }
         if self.nonnegative_charges && a_cost < 0. {
             // This fast path requires a nonnegative prefix as well as future

@@ -6,6 +6,7 @@ mod lattice;
 mod machine;
 mod operators;
 mod paired;
+pub use paired::PairedControlCertificate;
 mod paired_machine;
 use crate::core::rounding::{add_down, add_up, multiply_down};
 use std::time::Instant;
@@ -137,12 +138,112 @@ impl CoupledKernel {
         work: &mut usize,
         deadline: Option<Instant>,
     ) -> Option<(bool, [f64; 2])> {
+        self.certify_with_controls(arcs, &[], work, deadline)
+    }
+
+    /// Certify actual source choices on controlled descriptors and retain the
+    /// ordinary independent proof for every other resource family.
+    pub fn certify_with_controls(
+        &self,
+        arcs: &[usize],
+        controls: &[PairedControl],
+        work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Option<(bool, [f64; 2])> {
+        if !controls.is_empty() {
+            if self.front_program_domain {
+                return None;
+            }
+            debit(work, controls.len(), deadline)?;
+            if controls
+                .windows(2)
+                .any(|pair| pair[0].resource >= pair[1].resource)
+                || controls.iter().any(|control| {
+                    !matches!(
+                        self.definitions.get(control.resource),
+                        Some(
+                            CoupledResource::SlopePaired { .. }
+                                | CoupledResource::PairedPiecewiseLinear { .. }
+                        )
+                    )
+                })
+            {
+                return None;
+            }
+        }
         self.debit_replay(arcs, work, deadline)?;
-        let result = self.certify_inner(arcs, work, deadline);
+        if self.cost_scale != 0.
+            && self.definitions.iter().enumerate().any(|(r, definition)| {
+                self.objective_coefficients[r] < 0.
+                    && matches!(
+                        definition,
+                        CoupledResource::SlopePaired { .. }
+                            | CoupledResource::PairedPiecewiseLinear { .. }
+                    )
+                    && !controls.iter().any(|control| control.resource == r)
+            })
+        {
+            // An unspecified minimum-Gamma choice is not a lower objective
+            // bound when the model coefficient is negative.
+            return None;
+        }
+        let result = self.certify_inner(arcs, work, deadline, controls);
         if deadline.is_some_and(|limit| Instant::now() >= limit) {
             None
         } else {
             result
+        }
+    }
+
+    /// Prove feasibility and enclose one custom/cumulative activity separately
+    /// from the combined objective, regardless of model-cost suppression or
+    /// pricing adjustments. Other descriptor families return Unknown.
+    /// The complete coupled-resource domain is checked first; numerical replay is never
+    /// promoted to a proof. Uses and respects the caller's shared work budget.
+    pub fn certify_accumulated_activity(
+        &self,
+        resource: usize,
+        arcs: &[usize],
+        work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Option<(bool, [f64; 2])> {
+        let (initial, increments, weights) = match self.definitions.get(resource)? {
+            CoupledResource::CustomResource {
+                increments,
+                weights,
+                ..
+            } => (0., increments, weights),
+            CoupledResource::CumulativeCost {
+                initial,
+                increments,
+                weights,
+                ..
+            } => (*initial, increments, weights),
+            _ => return None,
+        };
+        let mut feasibility;
+        let proof = if self.has_negative_paired_objectives() && self.cost_scale != 0. {
+            feasibility = self.clone();
+            feasibility.suppress_costs();
+            &feasibility
+        } else {
+            self
+        };
+        let (feasible, _) = proof.certify_with_budget(arcs, work, deadline)?;
+        if !feasible {
+            return Some((false, [0.; 2]));
+        }
+        debit(work, arcs.len().checked_mul(4)?.checked_add(1)?, deadline)?;
+        let mut level = Interval::point(initial);
+        let mut cost = Interval::point(0.);
+        for &arc in arcs {
+            level = level.add(Interval::point(*increments.get(arc)?))?;
+            cost = cost.add(level.multiply(*weights.get(arc)?)?)?;
+        }
+        if deadline.is_some_and(|limit| Instant::now() >= limit) {
+            None
+        } else {
+            Some((true, [cost.lo, cost.hi]))
         }
     }
 
@@ -192,7 +293,12 @@ impl CoupledKernel {
         arcs: &[usize],
         work: &mut usize,
         deadline: Option<Instant>,
+        controls: &[PairedControl],
     ) -> Option<(bool, [f64; 2])> {
+        // A feasibility-only plugin proof must never erase an objective.
+        if self.plugins.iter().any(|p| p.0.has_costs()) {
+            return None;
+        }
         for plugin in &self.plugins {
             debit(work, arcs.len().checked_add(1)?, deadline)?;
             let before = *work;
@@ -228,7 +334,7 @@ impl CoupledKernel {
             lo: slope_cost[0],
             hi: slope_cost[1],
         })?;
-        let (valid, paired_cost) = self.certify_relations(arcs, work, deadline)?;
+        let (valid, paired_cost) = self.certify_relations(arcs, work, deadline, controls)?;
         if !valid {
             return Some((false, [0.; 2]));
         }
@@ -442,10 +548,11 @@ impl CoupledKernel {
                     } => {
                         let i = self.slots[r]?;
                         numeric[i] = numeric[i].add(Interval::point(*increments.get(arc)?))?;
-                        if self.cost_scale != 0. {
+                        if self.cost_scale != 0. && self.objective_coefficients[r] != 0. {
                             objective = objective.add(
                                 numeric[i]
                                     .multiply(weights[arc])?
+                                    .multiply(self.objective_coefficients[r])?
                                     .multiply(self.cost_scale)?,
                             )?;
                         }

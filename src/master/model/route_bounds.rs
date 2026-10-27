@@ -25,6 +25,27 @@ fn reduced<const D: usize>(
     work: &mut usize,
     deadline: Instant,
 ) -> Option<f64> {
+    if !oracle.activity_rows.is_empty()
+        || oracle
+            .network
+            .graph
+            .coupled_kernel()
+            .is_some_and(|kernel| kernel.has_costs())
+    {
+        let positions = route
+            .arcs
+            .iter()
+            .map(|id| oracle.index.get(id).copied())
+            .collect::<Option<Vec<_>>>()?;
+        return super::bounds::columns::column(
+            oracle,
+            state.shared_offset,
+            duals,
+            &positions,
+            work,
+            deadline,
+        )?;
+    }
     let mut value = 0.;
     if let Some(kernel) = oracle.network.graph.coupled_kernel() {
         let arcs: Vec<_> = route.arcs.iter().map(|id| oracle.index[id]).collect();

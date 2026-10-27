@@ -176,3 +176,82 @@ fn retry_recovers_displaced_valid_paths_and_preserves_physical_exclusions() {
     let engine = s.engine.as_ref().unwrap();
     assert!(!engine.half_ready && !engine.full_ready);
 }
+
+#[test]
+fn disabled_retained_phase_leaves_cached_duals_and_working_state_untouched() {
+    let mut solver = Solver::<2>::new(4, 1).unwrap();
+    solver.enumeration_preserve_arc_paths = true;
+    for (tail, head, cost) in [(0, 1, -4.), (1, 3, 0.), (0, 2, -2.), (2, 3, 0.)] {
+        solver.graph.add_arc(tail, head, cost).unwrap();
+    }
+    let cut = solver.cuts.add_strong_k_path_cut(4, &[1], 1, -3.).unwrap();
+    solver.price_phase(0, 10, false).unwrap();
+    solver.enumerate(100.).unwrap();
+    solver.cuts.cuts[cut].dual = -1.;
+    let before = format!("{solver:?}");
+    assert!(solver.price_phase(usize::MAX, 10, false).is_err());
+    assert_eq!(format!("{solver:?}"), before);
+    for phase in [1, 2] {
+        let result = solver.price_phase(phase, 10, false).unwrap();
+        assert!(!result.exact && result.columns.is_empty());
+        assert_eq!(result.minimum_reduced_cost, 1e12);
+        assert_eq!(format!("{solver:?}"), before);
+    }
+    let refreshed = solver.price_phase(0, 10, false).unwrap();
+    assert!(refreshed.exact);
+    assert_eq!(refreshed.minimum_reduced_cost, -3.);
+}
+
+#[test]
+fn retained_skip_defers_resource_invalidation_but_partial_stores_cannot_skip() {
+    use crate::graph::coupled::CoupledResource;
+    let mut solver = retained_costs(&[-2., -1.]);
+    solver
+        .graph
+        .set_coupled_resources(&[CoupledResource::Selection {
+            initial: 1,
+            allowed: vec![0, 1, 1, 1],
+            vertices: vec![],
+            relaxed: false,
+        }])
+        .unwrap();
+    let before = format!("{solver:?}");
+    let skipped = solver.price_phase(1, 10, false).unwrap();
+    assert!(!skipped.exact && skipped.columns.is_empty());
+    assert_eq!(format!("{solver:?}"), before);
+    let active = solver.price_phase(0, 10, false).unwrap();
+    assert!(active.exact);
+    assert_eq!(active.minimum_reduced_cost, -1.);
+    assert!(solver.enumeration.is_none());
+    solver.enumerate(100.).unwrap();
+    solver.enumeration.as_mut().unwrap().completed = false;
+    let rebuilt = solver.price_phase(1, 10, false).unwrap();
+    assert!(!rebuilt.columns.is_empty());
+    assert!(solver.enumeration.is_none());
+}
+
+#[test]
+fn raw_functor_retained_skip_does_not_require_or_refresh_objective_cache() {
+    let mut solver = retained_costs(&[-2., -1.]);
+    solver.restore_arcs();
+    solver.graph.arcs[0].variables = vec![(0, 1.)];
+    solver.price_phase(0, 10, false).unwrap();
+    solver.enumerate(100.).unwrap();
+    assert!(solver.variable_costs.is_empty() && solver.raw_pricing.is_none());
+    let before = format!("{solver:?}");
+    assert!(solver.price_functor_phase(usize::MAX, 10).is_err());
+    assert_eq!(format!("{solver:?}"), before);
+    for phase in [1, 2] {
+        let skipped = solver.price_functor_phase(phase, 10).unwrap();
+        assert!(!skipped.exact && skipped.columns.is_empty());
+        assert_eq!(skipped.minimum_reduced_cost, 1e12);
+        assert_eq!(format!("{solver:?}"), before);
+    }
+    solver.cache_variable_costs(&[-0.25]).unwrap();
+    let before = format!("{solver:?}");
+    assert!(!solver.price_functor_phase(1, 10).unwrap().exact);
+    assert_eq!(format!("{solver:?}"), before);
+    let active = solver.price_functor_phase(0, 10).unwrap();
+    assert!(active.exact);
+    assert_eq!(active.minimum_reduced_cost, -2.25);
+}

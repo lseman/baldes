@@ -23,6 +23,7 @@ use std::{
 
 mod bounds;
 mod column_pool;
+mod control_pricing;
 mod enumeration;
 pub mod format;
 pub mod imported;
@@ -32,7 +33,9 @@ mod presence_rows;
 mod resource_groups;
 mod synchronization;
 pub use synchronization::{SynchronizedService, SynchronizedServiceMember};
+mod activity_rows;
 mod resource_rows;
+pub use activity_rows::{AccumulatedActivityCoefficients, AccumulatedActivityEntry};
 pub use presence_rows::PresenceCoefficients;
 pub use resource_groups::{ResourceGroupCandidate, ResourceGroupMember};
 pub use resource_rows::ResourceKnapsackCoefficients;
@@ -48,7 +51,7 @@ mod original_costs;
 mod original_variables;
 pub use original_costs::OriginalVariableCosts;
 pub use original_variables::{
-    compile_pricing_variables, OriginalPricingVariable, PricingVariableRegistry,
+    compile_pricing_variables, OriginalColumn, OriginalPricingVariable, PricingVariableRegistry,
 };
 mod grouped_boxes;
 mod variable_boxes;
@@ -83,6 +86,9 @@ pub struct Network<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub arc_entries: Vec<Vec<(usize, f64)>>,
     /// Shared-row coefficients charged once per route.
     pub route_entries: Vec<(usize, f64)>,
+    /// Intrinsic custom/cumulative contributions to shared rows. These are
+    /// model data, retained without an optional pricing registry sidecar.
+    pub activity_entries: Vec<AccumulatedActivityEntry>,
 }
 
 #[derive(Clone, Debug)]
@@ -105,6 +111,19 @@ impl<const D: usize> Problem<D> {
         let mut ids = HashSet::new();
         for network in &self.networks {
             network.graph.validate()?;
+            for entry in &network.activity_entries {
+                if entry.row >= self.rows.len() {
+                    return Err(invalid("unknown activity shared row"));
+                }
+                activity_rows::validate(
+                    &network.graph,
+                    &AccumulatedActivityCoefficients {
+                        network: network.id,
+                        resource: entry.resource,
+                        coefficient: entry.coefficient,
+                    },
+                )?;
+            }
             if network.id < 0
                 || !ids.insert(network.id)
                 || network.arc_entries.len() != network.graph.arcs.len()
@@ -207,6 +226,7 @@ struct Oracle<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     nonlinear_rows: Vec<(usize, usize)>,
     knapsack_rows: Vec<(usize, usize)>,
     presence_rows: Vec<(usize, usize)>,
+    activity_rows: Vec<AccumulatedActivityEntry>,
     resource_groups: Vec<(
         usize,
         crate::master::branching::AccumulatedResourceGroupBranch,
@@ -289,11 +309,11 @@ struct Coordinator<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>(
     bool,
 );
 
-fn entries<const D: usize>(
+fn entries_base<const D: usize>(
     oracle: &Oracle<D>,
     route: &Route,
     offset: usize,
-) -> Result<Vec<(usize, f64)>> {
+) -> Result<BTreeMap<usize, f64>> {
     let mut values = BTreeMap::new();
     for &(row, value) in &oracle.route_entries {
         *values.entry(row).or_insert(0.) += value;
@@ -313,8 +333,22 @@ fn entries<const D: usize>(
     if values.values().any(|value: &f64| !value.is_finite()) {
         return Err(invalid("network route coefficient overflow"));
     }
-    for (row, coefficient) in nonlinear::entries(oracle, route)? {
+    for (row, coefficient) in nonlinear::deterministic_entries(oracle, route)? {
         *values.entry(offset + row).or_insert(0.) += coefficient;
+    }
+    Ok(values)
+}
+fn entries<const D: usize>(
+    oracle: &Oracle<D>,
+    route: &Route,
+    offset: usize,
+) -> Result<Vec<(usize, f64)>> {
+    let mut values = entries_base(oracle, route, offset)?;
+    for (row, coefficient) in activity_rows::paired_entries(oracle, route)? {
+        *values.entry(offset + row).or_insert(0.) += coefficient;
+    }
+    if values.values().any(|value| !value.is_finite()) {
+        return Err(invalid("paired row accumulation overflow"));
     }
     Ok(values
         .into_iter()

@@ -1,0 +1,2565 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "cases": [
+    {
+      "name": "four-equal",
+      "model": {
+        "rows": [
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          }
+        ],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 8,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              3
+            ],
+            "resources": [
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              },
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              }
+            ],
+            "arcs": [
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 6,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 7,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 7,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ],
+                  [
+                    1,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 5,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ],
+                  [
+                    2,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    1,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 5,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 1,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    1,
+                    1.0
+                  ],
+                  [
+                    2,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 0,
+                "head": 6,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    2,
+                    1.0
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "id": 7,
+            "vertices": 8,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              3
+            ],
+            "resources": [
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              },
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              }
+            ],
+            "arcs": [
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 6,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 7,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    3,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 7,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    3,
+                    1.0
+                  ],
+                  [
+                    4,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 5,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    3,
+                    1.0
+                  ],
+                  [
+                    5,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    4,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 5,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 1,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    4,
+                    1.0
+                  ],
+                  [
+                    5,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 0,
+                "head": 6,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    5,
+                    1.0
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "id": 103,
+            "vertices": 8,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              3
+            ],
+            "resources": [
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              },
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              }
+            ],
+            "arcs": [
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 6,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 7,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    6,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 7,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    6,
+                    1.0
+                  ],
+                  [
+                    7,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 5,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    6,
+                    1.0
+                  ],
+                  [
+                    8,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    7,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 5,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 1,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    7,
+                    1.0
+                  ],
+                  [
+                    8,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 0,
+                "head": 6,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    8,
+                    1.0
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "id": 19,
+            "vertices": 8,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              3
+            ],
+            "resources": [
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              },
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              }
+            ],
+            "arcs": [
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 6,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 7,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    9,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 7,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    9,
+                    1.0
+                  ],
+                  [
+                    10,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 5,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    9,
+                    1.0
+                  ],
+                  [
+                    11,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    10,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 5,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 1,
+                "head": 4,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    10,
+                    1.0
+                  ],
+                  [
+                    11,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 0,
+                "head": 6,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    11,
+                    1.0
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "selected_network": 42,
+      "reference_incumbent": 8.0,
+      "reference_processed_nodes": 9,
+      "reference_children_count": 26,
+      "selected_bounds": {
+        "L": 1.0,
+        "G": 2.0
+      },
+      "reference_children": [
+        {
+          "node_id": 1,
+          "network": 42,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 2,
+          "network": 42,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 3,
+          "network": 7,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 4,
+          "network": 7,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 5,
+          "network": 103,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 6,
+          "network": 103,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 7,
+          "network": 19,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 8,
+          "network": 19,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 9,
+          "network": 42,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 10,
+          "network": 42,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 11,
+          "network": 7,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 12,
+          "network": 7,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 13,
+          "network": 103,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 14,
+          "network": 103,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 15,
+          "network": 19,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 16,
+          "network": 19,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 17,
+          "network": 7,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 18,
+          "network": 7,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 19,
+          "network": 103,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 20,
+          "network": 103,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 21,
+          "network": 19,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 22,
+          "network": 19,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 23,
+          "network": 103,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 24,
+          "network": 103,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 25,
+          "network": 19,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 26,
+          "network": 19,
+          "operator": "L",
+          "threshold": 1.0
+        }
+      ]
+    },
+    {
+      "name": "four-unequal",
+      "model": {
+        "rows": [
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          },
+          {
+            "sense": "eq",
+            "rhs": 1.0
+          }
+        ],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 10,
+            "source": 0,
+            "sink": 9,
+            "multiplicity": [
+              0,
+              3
+            ],
+            "resources": [
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              },
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              }
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 1,
+                "head": 9,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    1,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 9,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    2,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 3,
+                "head": 9,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    3,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 4,
+                "head": 9,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 5,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    1,
+                    1.0
+                  ],
+                  [
+                    2,
+                    1.0
+                  ],
+                  [
+                    3,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 5,
+                "head": 9,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 6,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ],
+                  [
+                    2,
+                    1.0
+                  ],
+                  [
+                    3,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 6,
+                "head": 9,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 7,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ],
+                  [
+                    1,
+                    1.0
+                  ],
+                  [
+                    3,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 7,
+                "head": 9,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 8,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    0,
+                    1.0
+                  ],
+                  [
+                    1,
+                    1.0
+                  ],
+                  [
+                    2,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 8,
+                "head": 9,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              }
+            ]
+          },
+          {
+            "id": 7,
+            "vertices": 8,
+            "source": 0,
+            "sink": 7,
+            "multiplicity": [
+              0,
+              3
+            ],
+            "resources": [
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              },
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              }
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    4,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 1,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    5,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    6,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 3,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    4,
+                    1.0
+                  ],
+                  [
+                    5,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 4,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 5,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    5,
+                    1.0
+                  ],
+                  [
+                    6,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 5,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 6,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    4,
+                    1.0
+                  ],
+                  [
+                    6,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 6,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              }
+            ]
+          },
+          {
+            "id": 103,
+            "vertices": 8,
+            "source": 0,
+            "sink": 7,
+            "multiplicity": [
+              0,
+              3
+            ],
+            "resources": [
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              },
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              }
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    7,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 1,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    8,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    9,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 3,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    7,
+                    1.0
+                  ],
+                  [
+                    8,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 4,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 5,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    8,
+                    1.0
+                  ],
+                  [
+                    9,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 5,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 6,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    7,
+                    1.0
+                  ],
+                  [
+                    9,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 6,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              }
+            ]
+          },
+          {
+            "id": 19,
+            "vertices": 8,
+            "source": 0,
+            "sink": 7,
+            "multiplicity": [
+              0,
+              3
+            ],
+            "resources": [
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              },
+              {
+                "kind": "disposable",
+                "bounds": [
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ],
+                  [
+                    0.0,
+                    10.0
+                  ]
+                ]
+              }
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    10,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 1,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    11,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 2,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    12,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 3,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    10,
+                    1.0
+                  ],
+                  [
+                    11,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 4,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 5,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    11,
+                    1.0
+                  ],
+                  [
+                    12,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 5,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              },
+              {
+                "tail": 0,
+                "head": 6,
+                "cost": 1.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": [
+                  [
+                    10,
+                    1.0
+                  ],
+                  [
+                    12,
+                    1.0
+                  ]
+                ]
+              },
+              {
+                "tail": 6,
+                "head": 7,
+                "cost": 0.0,
+                "consumption": [
+                  1.0,
+                  0.0
+                ],
+                "entries": []
+              }
+            ]
+          }
+        ]
+      },
+      "selected_network": 42,
+      "reference_incumbent": 8.0,
+      "reference_processed_nodes": 9,
+      "reference_children_count": 30,
+      "selected_bounds": {
+        "L": 1.0,
+        "G": 2.0
+      },
+      "reference_children": [
+        {
+          "node_id": 1,
+          "network": 42,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 2,
+          "network": 42,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 3,
+          "network": 7,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 4,
+          "network": 7,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 5,
+          "network": 103,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 6,
+          "network": 103,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 7,
+          "network": 19,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 8,
+          "network": 19,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 9,
+          "network": 7,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 10,
+          "network": 7,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 11,
+          "network": 42,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 12,
+          "network": 42,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 13,
+          "network": 42,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 14,
+          "network": 42,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 15,
+          "network": 7,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 16,
+          "network": 7,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 17,
+          "network": 103,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 18,
+          "network": 103,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 19,
+          "network": 19,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 20,
+          "network": 19,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 21,
+          "network": 7,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 22,
+          "network": 7,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 23,
+          "network": 103,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 24,
+          "network": 103,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 25,
+          "network": 19,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 26,
+          "network": 19,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 27,
+          "network": 103,
+          "operator": "L",
+          "threshold": 1.0
+        },
+        {
+          "node_id": 28,
+          "network": 103,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 29,
+          "network": 19,
+          "operator": "G",
+          "threshold": 2.0
+        },
+        {
+          "node_id": 30,
+          "network": 19,
+          "operator": "L",
+          "threshold": 1.0
+        }
+      ]
+    }
+  ]
+}

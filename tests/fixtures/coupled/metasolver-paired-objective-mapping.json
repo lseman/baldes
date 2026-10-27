@@ -1,0 +1,2733 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "cases": [
+    {
+      "dependency": 0,
+      "coefficient": 0,
+      "independent_objective": -20,
+      "reference_root": -18.0,
+      "reference_incumbent": -20.0,
+      "reference_fatal_gap": false,
+      "prepared_sha256": "20a4514dfa5c7a67598f7cf90df7fcdd05bcc9ab9a15fe78501164ca6a853ff8",
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "front_program_domain": false,
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "slope_paired",
+                "initial": {
+                  "pairs": [
+                    [
+                      0.0,
+                      0.0
+                    ],
+                    [
+                      0.0,
+                      7.0
+                    ]
+                  ]
+                },
+                "initial_base": [
+                  0.0,
+                  7.0
+                ],
+                "arcs": [
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  }
+                ],
+                "mode": "cost_bounded",
+                "normalization": "absolute_final_value",
+                "policy": "strict_domain"
+              }
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 0,
+            "accumulated_resource": 0
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 0,
+      "coefficient": 1,
+      "independent_objective": -18,
+      "reference_root": -18.0,
+      "reference_incumbent": -18.0,
+      "reference_fatal_gap": false,
+      "prepared_sha256": "20a4514dfa5c7a67598f7cf90df7fcdd05bcc9ab9a15fe78501164ca6a853ff8",
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "front_program_domain": false,
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "slope_paired",
+                "initial": {
+                  "pairs": [
+                    [
+                      0.0,
+                      0.0
+                    ],
+                    [
+                      0.0,
+                      7.0
+                    ]
+                  ]
+                },
+                "initial_base": [
+                  0.0,
+                  7.0
+                ],
+                "arcs": [
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  }
+                ],
+                "mode": "cost_bounded",
+                "normalization": "absolute_final_value",
+                "policy": "strict_domain"
+              }
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 1,
+            "accumulated_resource": 0
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 0,
+      "coefficient": 2,
+      "independent_objective": -16,
+      "reference_root": null,
+      "reference_incumbent": null,
+      "reference_fatal_gap": true,
+      "prepared_sha256": "20a4514dfa5c7a67598f7cf90df7fcdd05bcc9ab9a15fe78501164ca6a853ff8",
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "front_program_domain": false,
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "slope_paired",
+                "initial": {
+                  "pairs": [
+                    [
+                      0.0,
+                      0.0
+                    ],
+                    [
+                      0.0,
+                      7.0
+                    ]
+                  ]
+                },
+                "initial_base": [
+                  0.0,
+                  7.0
+                ],
+                "arcs": [
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  }
+                ],
+                "mode": "cost_bounded",
+                "normalization": "absolute_final_value",
+                "policy": "strict_domain"
+              }
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 2,
+            "accumulated_resource": 0
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 0,
+      "coefficient": -1,
+      "independent_objective": -22,
+      "reference_root": -18.0,
+      "reference_incumbent": -22.0,
+      "reference_fatal_gap": false,
+      "prepared_sha256": "20a4514dfa5c7a67598f7cf90df7fcdd05bcc9ab9a15fe78501164ca6a853ff8",
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "front_program_domain": false,
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "slope_paired",
+                "initial": {
+                  "pairs": [
+                    [
+                      0.0,
+                      0.0
+                    ],
+                    [
+                      0.0,
+                      7.0
+                    ]
+                  ]
+                },
+                "initial_base": [
+                  0.0,
+                  7.0
+                ],
+                "arcs": [
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  }
+                ],
+                "mode": "cost_bounded",
+                "normalization": "absolute_final_value",
+                "policy": "strict_domain"
+              }
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": -1,
+            "accumulated_resource": 0
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 1,
+      "coefficient": 0,
+      "independent_objective": -20,
+      "reference_root": -18.0,
+      "reference_incumbent": -20.0,
+      "reference_fatal_gap": false,
+      "prepared_sha256": "bd10faa1f44003d9f7e862c14059f9fa55b3a5aa0e2f4ea33b2855d52aae3284",
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "front_program_domain": false,
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "slope_paired",
+                "initial": {
+                  "pairs": [
+                    [
+                      0.0,
+                      0.0
+                    ],
+                    [
+                      0.0,
+                      7.0
+                    ]
+                  ]
+                },
+                "initial_base": [
+                  0.0,
+                  7.0
+                ],
+                "arcs": [
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  }
+                ],
+                "mode": "cost_unbounded",
+                "normalization": "absolute_final_value",
+                "policy": "strict_domain"
+              }
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 0,
+            "accumulated_resource": 0
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 1,
+      "coefficient": 1,
+      "independent_objective": -18,
+      "reference_root": -18.0,
+      "reference_incumbent": -18.0,
+      "reference_fatal_gap": false,
+      "prepared_sha256": "bd10faa1f44003d9f7e862c14059f9fa55b3a5aa0e2f4ea33b2855d52aae3284",
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "front_program_domain": false,
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "slope_paired",
+                "initial": {
+                  "pairs": [
+                    [
+                      0.0,
+                      0.0
+                    ],
+                    [
+                      0.0,
+                      7.0
+                    ]
+                  ]
+                },
+                "initial_base": [
+                  0.0,
+                  7.0
+                ],
+                "arcs": [
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  }
+                ],
+                "mode": "cost_unbounded",
+                "normalization": "absolute_final_value",
+                "policy": "strict_domain"
+              }
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 1,
+            "accumulated_resource": 0
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 1,
+      "coefficient": 2,
+      "independent_objective": -16,
+      "reference_root": null,
+      "reference_incumbent": null,
+      "reference_fatal_gap": true,
+      "prepared_sha256": "bd10faa1f44003d9f7e862c14059f9fa55b3a5aa0e2f4ea33b2855d52aae3284",
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "front_program_domain": false,
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "slope_paired",
+                "initial": {
+                  "pairs": [
+                    [
+                      0.0,
+                      0.0
+                    ],
+                    [
+                      0.0,
+                      7.0
+                    ]
+                  ]
+                },
+                "initial_base": [
+                  0.0,
+                  7.0
+                ],
+                "arcs": [
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  }
+                ],
+                "mode": "cost_unbounded",
+                "normalization": "absolute_final_value",
+                "policy": "strict_domain"
+              }
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": 2,
+            "accumulated_resource": 0
+          }
+        ]
+      }
+    },
+    {
+      "dependency": 1,
+      "coefficient": -1,
+      "independent_objective": -22,
+      "reference_root": -18.0,
+      "reference_incumbent": -22.0,
+      "reference_fatal_gap": false,
+      "prepared_sha256": "bd10faa1f44003d9f7e862c14059f9fa55b3a5aa0e2f4ea33b2855d52aae3284",
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 42,
+            "vertices": 5,
+            "source": 0,
+            "sink": 4,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "front_program_domain": false,
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -20
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": 0
+              },
+              {
+                "tail": 0,
+                "head": 2,
+                "cost": -20
+              },
+              {
+                "tail": 2,
+                "head": 4,
+                "cost": 0
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "slope_paired",
+                "initial": {
+                  "pairs": [
+                    [
+                      0.0,
+                      0.0
+                    ],
+                    [
+                      0.0,
+                      7.0
+                    ]
+                  ]
+                },
+                "initial_base": [
+                  0.0,
+                  7.0
+                ],
+                "arcs": [
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          0.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  },
+                  {
+                    "arrival": {
+                      "pairs": [
+                        [
+                          2.0,
+                          1.0
+                        ],
+                        [
+                          1.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "increment": {
+                      "pairs": [
+                        [
+                          1.0,
+                          1.0
+                        ],
+                        [
+                          0.0,
+                          7.0
+                        ]
+                      ]
+                    },
+                    "lower": {
+                      "pairs": [
+                        [
+                          0.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "upper": {
+                      "pairs": [
+                        [
+                          8.0,
+                          2.0
+                        ],
+                        [
+                          0.0,
+                          8.0
+                        ]
+                      ]
+                    },
+                    "waiting": 0
+                  }
+                ],
+                "mode": "cost_unbounded",
+                "normalization": "absolute_final_value",
+                "policy": "strict_domain"
+              }
+            ]
+          }
+        ],
+        "pricing_variables": [
+          {
+            "network": 42,
+            "id": 901,
+            "cost": -1,
+            "accumulated_resource": 0
+          }
+        ]
+      }
+    }
+  ]
+}

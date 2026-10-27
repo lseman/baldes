@@ -1,6 +1,7 @@
 //! Function-valued lower clamps and upper filters on computed slope fronts.
-//! Crossings are checked, never repaired by a feasibility epsilon. This is
-//! front algebra; its output is not a directed source-program certificate.
+//! Checked crossings and explicitly selected computed-front ordering remain
+//! separate; no feasibility epsilon repairs a boundary. Front-algebra output
+//! is not a directed source-program certificate.
 use super::*;
 use std::{sync::Arc, time::Instant};
 
@@ -50,7 +51,35 @@ impl PreparedClampFilter {
         policy: FrontOperationPolicy,
         budget: FrontierBudget,
     ) -> FrontierOutcome<SlopeFront> {
-        match self.apply_checked(front, policy, budget) {
+        let mut preparation = Work::new(budget);
+        let rounded = if policy == FrontOperationPolicy::FrontAlgebra {
+            match self.rounded_affine_maximum(front, &mut preparation) {
+                Ok(value) => value,
+                Err(reason) => return FrontierOutcome::Unknown(reason),
+            }
+        } else {
+            None
+        };
+        let result = if let Some(function) = rounded {
+            let maximum = SlopeFront::from_prepared(function);
+            self.apply_checked(&maximum, policy, preparation.remaining(), true)
+                .map(|out| {
+                    out.map(|out| {
+                        out.with_provenance(
+                            FrontierProvenance::ClampFilter {
+                                input: front.provenance().clone(),
+                                lower: self.lower.clone(),
+                                upper: self.upper.clone(),
+                                policy,
+                            },
+                            true,
+                        )
+                    })
+                })
+        } else {
+            self.apply_checked(front, policy, preparation.remaining(), false)
+        };
+        match result {
             Ok(Some(front)) => FrontierOutcome::Complete(front),
             Ok(None) => FrontierOutcome::Empty,
             Err(reason) => FrontierOutcome::Unknown(reason),
@@ -61,6 +90,7 @@ impl PreparedClampFilter {
         front: &SlopeFront,
         policy: FrontOperationPolicy,
         budget: FrontierBudget,
+        upper_only: bool,
     ) -> Answer<Option<SlopeFront>> {
         let mut work = Work::new(budget);
         let mut accepted = Vec::new();
@@ -106,7 +136,11 @@ impl PreparedClampFilter {
                     &mut accepted,
                     lo,
                     fs[fi],
-                    self.lower_segments[li],
+                    if upper_only {
+                        fs[fi]
+                    } else {
+                        self.lower_segments[li]
+                    },
                     self.upper_segments[ui],
                     &mut work,
                 )?;
@@ -125,7 +159,11 @@ impl PreparedClampFilter {
                     ui += 1;
                 }
                 let f = fs[fi];
-                let l = self.lower_segments[li];
+                let l = if upper_only {
+                    f
+                } else {
+                    self.lower_segments[li]
+                };
                 let u = self.upper_segments[ui];
                 let end = hi.min(f.hi).min(l.hi).min(u.hi);
                 if end <= x {
@@ -136,7 +174,7 @@ impl PreparedClampFilter {
                 cuts[1] = end;
                 let mut count = 2;
                 for (a, b) in [(f, l), (f, u), (l, u)] {
-                    if let Some(cross) = crossing(a, b, x, end, policy, &mut work)? {
+                    if let Some(cross) = crossing(a, b, x, end, policy, &mut work, true)? {
                         cuts[count] = cross;
                         count += 1;
                     }
@@ -184,6 +222,111 @@ impl PreparedClampFilter {
             FrontierOutcome::Empty => Ok(None),
             FrontierOutcome::Unknown(reason) => Err(reason),
         }
+    }
+
+    /// Recovered maximum helper ordering for an affine input, aligned domains
+    /// and one rounded crossing. Its encoded output is continuous by carrying
+    /// the preceding segment value, rather than reanchoring at the other
+    /// operand's slightly different evaluation of the rounded crossing.
+    /// The subsequent upper filter acts on that computed front.
+    fn rounded_affine_maximum(
+        &self,
+        front: &SlopeFront,
+        work: &mut Work,
+    ) -> Answer<Option<PreparedSlopeFunction>> {
+        if self.constant_bounds
+            || front.components().len() != 1
+            || front.components()[0].pairs().len() != 2
+            || self.upper.pairs().len() != 2
+            || front.components()[0].domain() != self.lower.domain()
+            || self.lower.domain() != self.upper.domain()
+        {
+            return Ok(None);
+        }
+        let f = segments(&front.components()[0]).map_err(FrontierUnknown::Arithmetic)?[0];
+        work.charge(
+            self.lower_segments
+                .len()
+                .checked_mul(8)
+                .ok_or(FrontierUnknown::WorkLimit)?,
+        )?;
+        let mut pieces = Vec::new();
+        let mut crossings = 0usize;
+        let mut rounded = false;
+        let mut stable = true;
+        for (index, &l) in self.lower_segments.iter().enumerate() {
+            let (lo, hi) = (f.lo.max(l.lo), f.hi.min(l.hi));
+            if lo >= hi {
+                continue;
+            }
+            stable &= !near(lo, hi)?;
+            for endpoint in [lo, hi] {
+                let (fv, lv) = (f.at(endpoint)?, l.at(endpoint)?);
+                stable &= fv == lv || !near(fv, lv)?;
+            }
+            let mut cuts = vec![lo, hi];
+            if let Some(x) = crossing(
+                f,
+                l,
+                lo,
+                hi,
+                FrontOperationPolicy::FrontAlgebra,
+                work,
+                false,
+            )? {
+                crossings += 1;
+                rounded |= f.at(x)? != l.at(x)?;
+                stable &= !near(x, lo)? && !near(x, hi)?;
+                cuts.insert(1, x);
+            }
+            for (part, pair) in cuts.windows(2).enumerate() {
+                let mid = finite(finite(pair[0] * 0.5)? + finite(pair[1] * 0.5)?)?;
+                if mid <= pair[0] || mid >= pair[1] {
+                    stable = false;
+                }
+                let (fv, lv) = (f.at(mid)?, l.at(mid)?);
+                stable &= fv == lv && f.slope == l.slope || !near(fv, lv)?;
+                let mut anchor = if cuts.len() == 3 && part == 0 { lo } else { hi };
+                if f.at(anchor)? == l.at(anchor)? {
+                    anchor = lo;
+                }
+                if f.at(anchor)? != l.at(anchor)? {
+                    stable &= (fv >= lv) == (f.at(anchor)? >= l.at(anchor)?);
+                }
+                let (selected, origin) = if fv >= lv {
+                    (f, (0, 0))
+                } else {
+                    (l, (1, index))
+                };
+                pieces.push((selected.slope, pair[1], origin));
+            }
+        }
+        if !rounded {
+            return Ok(None);
+        }
+        if crossings != 1 || !stable {
+            return Err(unsupported("unresolved rounded maximum topology"));
+        }
+        let lo = f.lo;
+        let (fv, lv) = (f.at(lo)?, self.lower_segments[0].at(lo)?);
+        let mut pairs = vec![(if fv >= lv { fv } else { lv }, lo)];
+        let mut previous = None;
+        for (slope, end, origin) in pieces {
+            work.charge(1)?;
+            if previous == Some(origin) {
+                pairs.last_mut().unwrap().1 = end;
+            } else {
+                pairs.push((slope, end));
+                previous = Some(origin);
+            }
+            if pairs.len() > work.budget.max_pairs {
+                return Err(FrontierUnknown::PairLimit);
+            }
+        }
+        work.component(1)?;
+        PreparedSlopeFunction::from_prepared_pairs(pairs)
+            .map(Some)
+            .map_err(FrontierUnknown::Arithmetic)
     }
 }
 /// Clamp the complete front from below, then retain only coordinates meeting
@@ -265,6 +408,7 @@ fn crossing(
     hi: f64,
     policy: FrontOperationPolicy,
     work: &mut Work,
+    require_equal_values: bool,
 ) -> Answer<Option<f64>> {
     work.charge(1)?;
     let al = a.at(lo)?;
@@ -286,14 +430,14 @@ fn crossing(
     let x = match policy {
         FrontOperationPolicy::StrictDomain => finite(lo + finite(finite(bl - al)? / denominator)?)?,
         // Match the expanded-intercept ordering recovered for native bound
-        // crossing arithmetic. If its rounding does not yield a common value,
-        // decline rather than snap a feasibility boundary.
+        // crossing arithmetic. Checked callers still require a common value;
+        // the explicit computed maximum carries encoded continuity separately.
         FrontOperationPolicy::FrontAlgebra => finite(
             finite(finite(bh - finite(hi * b.slope)?)? - finite(ah - finite(hi * a.slope)?)?)?
                 / denominator,
         )?,
     };
-    if x <= lo || x >= hi || a.at(x)? != b.at(x)? {
+    if x <= lo || x >= hi || (require_equal_values && a.at(x)? != b.at(x)?) {
         return Err(unsupported("unverified bound crossing"));
     }
     Ok(Some(x))

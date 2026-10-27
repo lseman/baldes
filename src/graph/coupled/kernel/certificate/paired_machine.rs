@@ -242,7 +242,9 @@ fn compose(
             return None;
         }
         let f0 = match last {
-            Some((x, y)) if x == x0 => y,
+            // A suppressed short inner remainder leaves the preceding output
+            // anchor in place; the next segment continues from that anchor.
+            Some((x, y)) if x == x0 || (x < x0 && m.near(x, x0, NATIVE)?) => y,
             _ => outer.value(y0, m)?,
         };
         if outer_anchor.is_none() {
@@ -253,7 +255,7 @@ fn compose(
                 out.push((f0, x0));
                 last = Some((x0, f0));
             }
-            Some((x, y)) if x == x0 && y == f0 => (),
+            Some((x, y)) if y == f0 && (x == x0 || (x < x0 && m.near(x, x0, NATIVE)?)) => (),
             _ => return None,
         }
         let mut next = match outer_next {
@@ -309,6 +311,13 @@ fn compose(
         outer_next = Some(next);
         let inner_endpoint = !outer.knots.get(next).is_some_and(|p| p.0 == y1);
         emit(&mut out, &mut last, x1, end, inner_endpoint, m)?;
+        // The machine program stops using its retained output coordinate,
+        // rather than advancing into another inner segment near the end.
+        if let Some((x, _)) = last {
+            if m.near(x, hi, NATIVE)? {
+                break;
+            }
+        }
     }
     if out.is_empty() {
         Some(None)
@@ -871,6 +880,100 @@ pub(super) fn certify(
     work: &mut usize,
     deadline: Option<Instant>,
 ) -> Option<(bool, [f64; 2])> {
+    full_certify(definition, path, scale, work, deadline)
+        .or_else(|| left_endpoint_feasible(definition, path, scale, work, deadline))
+}
+
+/// Prove existence, never an objective minimum or infeasibility. Unit FIFO
+/// translations preserve the unique smallest departure/arrival coordinate.
+/// When every next descriptor starts at precisely that coordinate, composition
+/// and addition retain its ordered machine value, waiting contributes zero,
+/// and the closed clamp/filter retains max(value, lower) if it is <= upper.
+/// Crossings elsewhere need not be reconstructed for this feasibility witness.
+fn left_endpoint_feasible(
+    definition: &CoupledResource,
+    path: &[usize],
+    scale: f64,
+    work: &mut usize,
+    deadline: Option<Instant>,
+) -> Option<(bool, [f64; 2])> {
+    let CoupledResource::SlopePaired {
+        initial,
+        initial_base,
+        arcs,
+        mode: PairedResourceMode::Feasibility,
+        policy: NATIVE,
+        ..
+    } = definition
+    else {
+        return None;
+    };
+    if !scale.is_finite() || scale < 0. {
+        return None;
+    }
+    let mut m = Machine::new(work, deadline);
+    let initial = machine::prepare(initial.pairs(), &mut m)?;
+    if initial_base.lower != domain(&initial).0 || initial_base.upper != domain(&initial).1 {
+        return None;
+    }
+    let (mut value, mut coordinate) = initial[0];
+    let integer = |x: f64| x.is_finite() && x.fract() == 0. && x.abs() <= 1_099_511_627_776.;
+    if !integer(coordinate) {
+        return None;
+    }
+    for &index in path {
+        m.take(1)?;
+        let arc = arcs.get(index)?;
+        if arc.waiting < 0 {
+            return None;
+        }
+        let arrival = machine::prepare(arc.arrival.pairs(), &mut m)?;
+        let increment = machine::prepare(arc.increment.pairs(), &mut m)?;
+        let lower = machine::prepare(arc.lower.pairs(), &mut m)?;
+        let upper = machine::prepare(arc.upper.pairs(), &mut m)?;
+        let (head, departure) = arrival[0];
+        if departure != coordinate
+            || increment[0].1 != coordinate
+            || !integer(head)
+            || head < coordinate
+            || arrival.len() < 2
+            || arrival.iter().skip(1).any(|p| p.0 != 1.)
+            || lower[0].1 != head
+            || upper[0].1 != head
+        {
+            return None;
+        }
+        // Do not infer endpoint retention across the native near-coordinate
+        // snapping band or a degenerate function domain.
+        for function in [&arrival, &increment, &lower, &upper] {
+            if function.len() < 2 {
+                return None;
+            }
+            for &(_, end) in function.iter().skip(1) {
+                if near_bounds(function[0].1, end, &mut m)? {
+                    return None;
+                }
+            }
+        }
+        value = add!(m, value, increment[0].0);
+        if value < lower[0].0 {
+            value = lower[0].0;
+        }
+        if value > upper[0].0 {
+            return None;
+        }
+        coordinate = head;
+    }
+    Some((true, [0.; 2]))
+}
+
+fn full_certify(
+    definition: &CoupledResource,
+    path: &[usize],
+    scale: f64,
+    work: &mut usize,
+    deadline: Option<Instant>,
+) -> Option<(bool, [f64; 2])> {
     let CoupledResource::SlopePaired {
         initial,
         initial_base,
@@ -977,3 +1080,7 @@ pub(super) fn certify(
 #[cfg(test)]
 #[path = "../../../../../tests/unit/graph/coupled/kernel/paired_machine_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../../../tests/unit/graph/coupled/kernel/paired_endpoint_tests.rs"]
+mod endpoint_tests;

@@ -113,12 +113,14 @@ fn alternatives() -> Problem<2> {
             },
             arc_entries: vec![vec![]; 4],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     }
 }
 
 fn variable() -> OriginalPricingVariable {
     OriginalPricingVariable {
+        accumulated_resource: None,
         network: 7,
         id: 0,
         cost: -1.,

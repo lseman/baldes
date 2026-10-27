@@ -116,6 +116,7 @@ fn problem(max_routes: f64) -> Problem<2> {
             multiplicity: Window::new(0., max_routes).unwrap(),
             arc_entries: entries,
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     }
 }

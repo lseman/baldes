@@ -2,6 +2,25 @@
 use super::*;
 
 impl CoupledKernel {
+    fn refresh_bounds<const D: usize>(&mut self, graph: &Graph<D>) {
+        self.optimization =
+            PreparedBounds::new(graph, &self.definitions, &self.slots, &self.initial);
+        self.route_domains = domains::RouteDomains::prepare(
+            graph,
+            &self.transitions,
+            &self.optimization.numeric,
+            &self.initial,
+        );
+        self.numeric_cost_order =
+            dominance::NumericCostOrder::new(&self.definitions, &self.slots, self.initial.len())
+                .with_horizon(self.optimization.continuation_hops, &self.definitions)
+                .with_graph_context(graph, &self.definitions);
+        for activity in std::sync::Arc::make_mut(&mut self.pricing_activities) {
+            activity.refresh_bounds(graph);
+        }
+        self.identity = std::sync::Arc::new(());
+    }
+
     pub(crate) fn prepare<const D: usize>(
         g: &Graph<D>,
         definitions: &[CoupledResource],
@@ -27,11 +46,20 @@ impl CoupledKernel {
                 _ => slots.push(None),
             }
         }
-        let numeric_cost_order =
-            dominance::NumericCostOrder::new(definitions, &slots, initial.len());
         let optimization = PreparedBounds::new(g, definitions, &slots, &initial);
-        let transitions =
-            PreparedTransitions::new(definitions, &slots, initial.len(), g.arcs.len(), 1.);
+        let numeric_cost_order =
+            dominance::NumericCostOrder::new(definitions, &slots, initial.len())
+                .with_horizon(optimization.continuation_hops, definitions)
+                .with_graph_context(g, definitions);
+        let objective_coefficients: std::sync::Arc<[f64]> = vec![1.; definitions.len()].into();
+        let transitions = PreparedTransitions::new(
+            definitions,
+            &slots,
+            initial.len(),
+            g.arcs.len(),
+            1.,
+            &objective_coefficients,
+        );
         let route_domains =
             domains::RouteDomains::prepare(g, &transitions, &optimization.numeric, &initial);
         let front_indices: Vec<_> = definitions
@@ -104,11 +132,13 @@ impl CoupledKernel {
                     initial_base,
                     arcs,
                     mode,
+                    normalization,
                 } => Some(paired::PreparedPaired::new(
                     initial,
                     *initial_base,
                     arcs,
                     *mode,
+                    *normalization,
                 )),
                 _ => None,
             })
@@ -130,6 +160,11 @@ impl CoupledKernel {
             slots,
             initial,
             cost_scale: 1.,
+            objective_coefficients,
+            weighted_objective: false,
+            negative_paired_objective: false,
+            pricing_adjustments: Default::default(),
+            pricing_activities: Default::default(),
             front_program_domain: false,
             frozen,
             paired,
@@ -219,7 +254,7 @@ impl CoupledKernel {
                                 | PairedResourceMode::CostBounded,
                             ..
                         }
-                )
+                ) || matches!(r, CoupledResource::Plugin(p) if p.0.has_costs())
             }),
             arc_count: g.arcs.len(),
             optimization,
@@ -296,7 +331,8 @@ impl CoupledKernel {
         Ok(())
     }
     pub fn has_costs(&self) -> bool {
-        self.cost_scale != 0. && self.cost_resource
+        (self.cost_scale != 0. && self.cost_resource)
+            || self.pricing_activities.iter().any(CoupledKernel::has_costs)
     }
     /// Whether a raw resource selects the native machine-front contract.
     ///
@@ -343,6 +379,17 @@ impl CoupledKernel {
     pub(crate) fn suppress_costs(&mut self) {
         self.identity = std::sync::Arc::new(());
         self.cost_scale = 0.;
+        self.pricing_adjustments = Default::default();
+        self.pricing_activities = Default::default();
         self.transitions.suppress_costs(self.initial.len());
+    }
+}
+
+impl<const D: usize> Graph<D> {
+    pub(crate) fn refresh_coupled_bounds(&mut self) {
+        if let Some(mut kernel) = self.coupled.take() {
+            kernel.refresh_bounds(self);
+            self.coupled = Some(kernel);
+        }
     }
 }

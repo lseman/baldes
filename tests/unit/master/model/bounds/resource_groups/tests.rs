@@ -71,7 +71,7 @@ fn acyclic_resource_minima_match_independent_quarter_grid_paths() {
     assert_eq!(compared, 216);
 }
 #[test]
-fn cycles_unsupported_resources_and_budgets_never_return_partial_path_proofs() {
+fn cycles_and_budgets_decline_proofs_but_signed_disposable_dags_are_supported() {
     let mut graph = Graph::<5>::new(3, 5).unwrap();
     for v in 0..3 {
         for r in 0..5 {
@@ -88,7 +88,8 @@ fn cycles_unsupported_resources_and_budgets_never_return_partial_path_proofs() {
     graph.arcs.remove(1);
     graph.arcs[0].consumption[4] = -1.;
     let mut work = 1_000_000;
-    assert_eq!(minimum(&graph, &[0., 0.], &mut work, end), None);
+    // Signed disposable increments wait at the lower window and remain feasible.
+    assert_eq!(minimum(&graph, &[0., 0.], &mut work, end), Some(Some(0.)));
     graph.arcs[0].consumption[4] = 1.;
     let mut work = 0;
     assert_eq!(minimum(&graph, &[0., 0.], &mut work, end), None);

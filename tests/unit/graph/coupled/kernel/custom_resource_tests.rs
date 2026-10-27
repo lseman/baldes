@@ -332,3 +332,78 @@ fn custom_json_round_trip_preserves_kind_constants_and_fixed_initial_state() {
         Some(18.)
     );
 }
+
+#[test]
+fn cumulative_costs_remain_invariant_when_original_vertex_ids_are_permuted() {
+    // Full reference preparation controls retain the counterexample: one
+    // prepared head indexes the original vertex table at the wrong position.
+    // BALDES resource arrays remain in the unchanged physical arc order.
+    for (source, sink, interior) in [(0, 3, [1, 2]), (2, 0, [1, 3])] {
+        let mut graph = Graph::<2>::new(5, 0).unwrap();
+        graph.source = source;
+        graph.sink = sink;
+        graph.add_arc(4, 4, 0.).unwrap();
+        for (tail, head, cost) in [
+            (source, interior[0], -20.),
+            (interior[0], sink, 0.),
+            (source, interior[1], -20.),
+            (interior[1], sink, 0.),
+        ] {
+            graph.add_arc(tail, head, cost).unwrap();
+        }
+        graph
+            .set_coupled_resources(&[CoupledResource::CumulativeCost {
+                initial: 0.,
+                increments: vec![0., 2., 1., 1., 2.],
+                weights: vec![0., 5., 0., 7., 0.],
+                sink_upper: Some(13.),
+                source_upper: Some(17.),
+            }])
+            .unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        assert_eq!(kernel.replay(&[1, 2]).unwrap(), Some(10.));
+        assert_eq!(kernel.replay(&[3, 4]).unwrap(), Some(7.));
+        for direction in [0., 1., 2.] {
+            let mut solver = crate::pricing::Solver::<2>::new(5, 0).unwrap();
+            solver.graph = graph.clone();
+            solver.enumeration_preserve_arc_paths = true;
+            solver
+                .set_option("BALDESuseBidirectionalSearch", direction)
+                .unwrap();
+            let priced = solver.price_phase(0, 8, false).unwrap();
+            assert!(priced.exact);
+            assert_eq!(priced.minimum_reduced_cost, -13.);
+            let mut routes: Vec<_> = solver
+                .enumerate(0.)
+                .unwrap()
+                .into_iter()
+                .map(|route| (route.arcs, route.original_cost))
+                .collect();
+            routes.sort_by(|a, b| a.1.total_cmp(&b.1));
+            assert_eq!(routes, vec![(vec![3, 4], -13.), (vec![1, 2], -10.)]);
+        }
+    }
+}
+
+#[test]
+fn unspecified_custom_constants_do_not_assume_the_reference_zero_defaults_are_bounds() {
+    // Reference registration defaults both constants to zero, without deriving
+    // a bound from its positive future weights. None is not such a promise.
+    let mut graph = Graph::<2>::new(3, 0).unwrap();
+    for (tail, head) in [(0, 1), (0, 1), (1, 2)] {
+        graph.add_arc(tail, head, 0.).unwrap();
+    }
+    graph
+        .set_coupled_resources(&[custom(&[2., 1., 0.], &[0., 0., 1.])])
+        .unwrap();
+    let kernel = graph.coupled_kernel().unwrap();
+    let root = kernel.root(true);
+    let (high, high_cost) = kernel.extend(&root, 0, true).unwrap().unwrap();
+    let (low, low_cost) = kernel.extend(&root, 1, true).unwrap().unwrap();
+    assert_eq!((high_cost, low_cost), (0., 0.));
+    assert!(!kernel
+        .dominance_penalty(&high, &low, true)
+        .is_some_and(|penalty| high_cost + penalty <= low_cost));
+    assert_eq!(kernel.replay(&[0, 2]).unwrap(), Some(2.));
+    assert_eq!(kernel.replay(&[1, 2]).unwrap(), Some(1.));
+}

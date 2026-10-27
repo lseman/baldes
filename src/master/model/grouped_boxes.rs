@@ -1,6 +1,9 @@
 //! Verified envelopes for original variables sharing physical arcs.
 use super::*;
 use crate::{core::rounding::add_down, master::preprocessing::Bounds};
+mod admission;
+mod paired;
+pub(super) use admission::coupled as coupled_admission;
 
 /// A bound on one registered original activity, not a new graph restriction.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -24,6 +27,7 @@ pub struct GroupedVariableBound {
 #[derive(Clone)]
 pub(super) struct PreparedVariable {
     pub arcs: Vec<(usize, f64)>,
+    pub accumulated_resource: Option<usize>,
     pub cost: f64,
     pub entries: Vec<(usize, f64)>,
     pub bounds: Bounds,
@@ -118,6 +122,180 @@ fn walk_range<const D: usize>(
     Some(range[graph.sink])
 }
 
+/// A complete scalar relaxation contains every source-domain path. Coupled
+/// infeasibility can discard a path only with an independent certificate;
+/// ambiguous feasibility or activity arithmetic must decline the envelope.
+fn activity_range<const D: usize>(graph: &Graph<D>, resource: usize) -> Option<Option<Bounds>> {
+    if activity_rows::paired(graph, resource) {
+        return paired::range(graph, resource, false)
+            .or_else(|| paired::integer_program_range(graph, resource).map(Some));
+    }
+    activity_proof(graph, resource, false).or_else(|| {
+        graph.validate().ok()?;
+        integer_program_range(graph, resource).map(Some)
+    })
+}
+
+pub(super) fn integral_activity<const D: usize>(
+    graph: &Graph<D>,
+    resource: usize,
+) -> Option<Bounds> {
+    graph.validate().ok()?;
+    activity_rows::validate(
+        graph,
+        &AccumulatedActivityCoefficients {
+            network: 0,
+            resource,
+            coefficient: 1.,
+        },
+    )
+    .ok()?;
+    if activity_rows::paired(graph, resource) {
+        if let Some(range) = paired::integer_program_range(graph, resource) {
+            return Some(range);
+        }
+        return paired::range(graph, resource, true)?.or(Some(Bounds {
+            lower: 0.,
+            upper: 0.,
+        }));
+    }
+    if let Some(range) = integer_program_range(graph, resource) {
+        return Some(range);
+    }
+    activity_proof(graph, resource, true)?.or(Some(Bounds {
+        lower: 0.,
+        upper: 0.,
+    }))
+}
+
+/// Integer data plus a walk cap prove exact integer arithmetic without visiting
+/// paths. Bound every intermediate level, product and accumulated charge by
+/// 2^53; otherwise retain the complete-path proof rather than trusting rounded
+/// endpoint integrality. Cyclic graphs need an explicit walk cap here.
+fn integer_program_range<const D: usize>(graph: &Graph<D>, resource: usize) -> Option<Bounds> {
+    use crate::graph::coupled::CoupledResource;
+    const EXACT: u128 = 9_007_199_254_740_992;
+    let hops = graph.max_route_arcs().or_else(|| {
+        graph
+            .is_acyclic()
+            .then(|| graph.vertices.len().saturating_sub(1))
+    })? as u128;
+    let (initial, increments, weights) =
+        match graph.coupled_kernel()?.definitions().get(resource)? {
+            CoupledResource::CustomResource {
+                increments,
+                weights,
+                ..
+            } => (0., increments, weights),
+            CoupledResource::CumulativeCost {
+                initial,
+                increments,
+                weights,
+                ..
+            } => (*initial, increments, weights),
+            _ => return None,
+        };
+    let integer = |value: f64| {
+        (value.is_finite() && value.fract() == 0. && value.abs() <= EXACT as f64)
+            .then_some(value.abs() as u128)
+    };
+    let start = integer(initial)?;
+    let increment = increments
+        .iter()
+        .try_fold(0u128, |old, &v| Some(old.max(integer(v)?)))?;
+    let weight = weights
+        .iter()
+        .try_fold(0u128, |old, &v| Some(old.max(integer(v)?)))?;
+    let level = start.checked_add(hops.checked_mul(increment)?)?;
+    let product = level.checked_mul(weight)?;
+    let total = hops.checked_mul(product)?;
+    if level > EXACT || product > EXACT || total > EXACT {
+        return None;
+    }
+    let positive_level = initial >= 0. && increments.iter().all(|&v| v >= 0.);
+    let negative_level = initial <= 0. && increments.iter().all(|&v| v <= 0.);
+    let positive_weight = weights.iter().all(|&v| v >= 0.);
+    let negative_weight = weights.iter().all(|&v| v <= 0.);
+    Some(Bounds {
+        lower: if (positive_level && positive_weight) || (negative_level && negative_weight) {
+            0.
+        } else {
+            -(total as f64)
+        },
+        upper: if (positive_level && negative_weight) || (negative_level && positive_weight) {
+            0.
+        } else {
+            total as f64
+        },
+    })
+}
+
+fn relaxed_activity_paths<const D: usize>(
+    graph: &Graph<D>,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<Vec<Vec<usize>>> {
+    use crate::enumeration::{CompleteResourceRelaxation, PathDomainLimits};
+    let mut relaxed = graph.clone();
+    relaxed
+        .resources
+        .fill(crate::graph::ResourceKind::Disposable);
+    relaxed.set_coupled_resources(&[]).ok()?;
+    let paths = CompleteResourceRelaxation::collect(
+        &relaxed,
+        PathDomainLimits {
+            max_paths: 4096,
+            max_work: (*work / 2).min(250_000),
+            max_stored_arcs: (*work / 2).min(250_000),
+            deadline: Some(deadline),
+        },
+    )
+    .ok()?;
+    *work = work.checked_sub(paths.work_used())?;
+    Some(
+        paths
+            .paths()
+            .iter()
+            .map(|path| path.arc_positions().to_vec())
+            .collect(),
+    )
+}
+
+fn activity_proof<const D: usize>(
+    graph: &Graph<D>,
+    resource: usize,
+    integer: bool,
+) -> Option<Option<Bounds>> {
+    let kernel = graph.coupled_kernel()?;
+    let deadline = Instant::now().checked_add(std::time::Duration::from_secs(1))?;
+    let mut work = 250_000;
+    let paths = relaxed_activity_paths(graph, &mut work, deadline)?;
+    let mut range: Option<Bounds> = None;
+    for path in &paths {
+        let (feasible, [lower, upper]) =
+            kernel.certify_accumulated_activity(resource, path, &mut work, Some(deadline))?;
+        if !feasible {
+            continue;
+        }
+        if integer
+            && (lower != upper
+                || lower.fract() != 0.
+                || lower.abs() > 9_007_199_254_740_992.
+                || kernel.accumulated_activity(resource, path).ok()? != lower)
+        {
+            return None;
+        }
+        match &mut range {
+            Some(old) => {
+                old.lower = old.lower.min(lower);
+                old.upper = old.upper.max(upper);
+            }
+            None => range = Some(Bounds { lower, upper }),
+        }
+    }
+    (Instant::now() < deadline).then_some(range)
+}
+
 /// Preserve original coordinates even when the caller supplies no finite box.
 /// The reference's default orthant is usable only after proving that the graph
 /// activity is nonnegative; signed mappings must not silently acquire bounds.
@@ -135,6 +313,9 @@ pub(super) fn prepare_registered<'a, const D: usize>(
         .collect();
     for model in originals {
         for variable in &model.variables {
+            if variable.accumulated_resource.is_some() {
+                continue;
+            }
             if explicit.contains(&(variable.network, variable.id)) {
                 continue;
             }
@@ -167,6 +348,10 @@ pub(super) fn prepare_registered<'a, const D: usize>(
     Ok(boxes)
 }
 
+#[cfg(test)]
+#[path = "../../../tests/unit/master/model/grouped_activity_box_tests.rs"]
+mod activity_tests;
+
 pub(super) fn prepare<'a, const D: usize>(
     definitions: &[GroupedVariableBound],
     rows: usize,
@@ -183,6 +368,7 @@ pub(super) fn prepare<'a, const D: usize>(
         graph.validate()?;
         let upper = definition.upper.unwrap_or(f64::INFINITY);
         if !seen.insert((variable.network, variable.id))
+            || (variable.accumulated_resource.is_some() && !variable.arcs.is_empty())
             || variable.id < 0
             || !definition.lower.is_finite()
             || upper.is_nan()
@@ -194,6 +380,16 @@ pub(super) fn prepare<'a, const D: usize>(
                 .any(|&(r, a)| r >= rows || !a.is_finite())
         {
             return Err(invalid("invalid grouped-variable box"));
+        }
+        if let Some(resource) = variable.accumulated_resource {
+            activity_rows::validate(
+                graph,
+                &AccumulatedActivityCoefficients {
+                    network: variable.network,
+                    resource,
+                    coefficient: 1.,
+                },
+            )?;
         }
         let positions: HashMap<_, _> = graph
             .arcs
@@ -232,6 +428,17 @@ pub(super) fn prepare<'a, const D: usize>(
             Some(Some(range)) => proof = range,
             Some(None) => empty = true,
             None => {}
+        }
+        if let Some(resource) = variable.accumulated_resource {
+            match activity_range(graph, resource) {
+                Some(Some(range)) => proof = range,
+                Some(None) => empty = true,
+                None => {
+                    return Err(invalid(
+                        "accumulated-variable envelope proof is unavailable",
+                    ))
+                }
+            }
         }
         // Matching scalar resources supply graph-derived envelopes even when
         // cycles prevent an affordable walk expansion. Disposable waiting can
@@ -319,6 +526,7 @@ pub(super) fn prepare<'a, const D: usize>(
                 .enumerate()
                 .filter(|(_, a)| *a != 0.)
                 .collect(),
+            accumulated_resource: variable.accumulated_resource,
             cost: variable.cost,
             entries: variable.entries.clone(),
             bounds: Bounds {

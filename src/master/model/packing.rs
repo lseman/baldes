@@ -109,6 +109,7 @@ impl PackingBranching {
                     priority: self.priority,
                     networks: vec![MappedNetworkVariable {
                         network: registration.network,
+                        activities: vec![],
                         arcs: arcs.into_iter().collect(),
                         per_route: 0.,
                     }],

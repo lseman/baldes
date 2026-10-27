@@ -257,8 +257,10 @@ struct FirstWindow {
 /// The path alternates vertex and arc masks: item 2p is vertex position p and
 /// item 2i+1 is arc i. Scan forward to the first item that empties the
 /// domain, then backward from it to the latest start that still empties it.
-/// An arc item stands at its tail position for the length, while the window
-/// remembers its head as well. Interior windows start from the universe.
+/// Remember vertices between the conflicting items: an initial arc contributes
+/// its head and a final arc contributes its tail. Interior windows start from
+/// the universe. An individually empty arc already rejects the path and needs
+/// no additional vertex memory.
 fn first_violating_window(masks: &ExactMasks<'_>, arcs: &[usize]) -> Option<FirstWindow> {
     let mut vertices = vec![masks.source];
     for &arc in arcs {
@@ -286,9 +288,14 @@ fn first_violating_window(masks: &ExactMasks<'_>, arcs: &[usize]) -> Option<Firs
         domain &= mask(item);
         domain == 0
     })?;
+    let first = start.div_ceil(2);
+    let last = failure / 2;
+    if first > last {
+        return None;
+    }
     Some(FirstWindow {
-        vertices: vertices[start / 2..=failure.div_ceil(2)].to_vec(),
-        length: failure / 2 - start / 2,
+        vertices: vertices[first..=last].to_vec(),
+        length: last - first,
     })
 }
 

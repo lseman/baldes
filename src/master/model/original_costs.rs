@@ -63,6 +63,9 @@ impl OriginalVariableCosts {
             costs.push(row_cost(&entries[saved.compiled_entries.len()..], cost)?);
         }
         for variable in &self.variables {
+            if variable.accumulated_resource.is_some() {
+                continue;
+            }
             let reduced = row_cost(&variable.entries, variable.cost)?;
             let rounded = (reduced * 1e8 + 0.5).floor() / 1e8;
             for &(id, a) in &variable.arcs {

@@ -217,8 +217,21 @@ fn schedule_at<const D: usize>(
         let Some(route) = problem.elementary_route(&fixed.route.route.arcs) else {
             return Ok(None);
         };
+        let route = if fixed.route.route.coupled_controls.is_empty() {
+            route
+        } else {
+            let Ok(route) = route.with_paired_controls(
+                &domains[&fixed.route.network],
+                fixed.route.route.coupled_controls.clone(),
+            ) else {
+                return Ok(None);
+            };
+            route
+        };
         fixed.route.route.resources = route.resources;
         fixed.route.route.resource_profile = route.resource_profile;
+        fixed.route.route.coupled_controls = route.coupled_controls;
+        fixed.route.route.coupled_values = route.coupled_values;
     }
     Ok(Some(scheduled))
 }

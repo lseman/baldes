@@ -94,6 +94,8 @@ fn route(problem: &RoutingContext<2>, customers: &[usize]) -> Route {
         })
         .collect();
     Route {
+        coupled_controls: Vec::new(),
+        coupled_values: Vec::new(),
         nodes,
         arcs,
         cost: 0.,

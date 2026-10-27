@@ -70,22 +70,12 @@ impl NetworkNode {
     }
     fn with_row(&self, row_json: &str) -> PyResult<Self> {
         let input = AddRow::from_json(row_json).map_err(error)?;
-        let coefficients = input
-            .coefficients
-            .into_iter()
-            .map(Into::into)
-            .collect::<Vec<_>>();
         Ok(Self {
             registry: self.registry.clone(),
-            snapshot: if input.dynamic {
-                self.snapshot
-                    .with_dynamic_row(input.row.row(), &coefficients)
-            } else {
-                self.snapshot.with_row(input.row.row(), &coefficients)
-            }
-            .map_err(error)?,
+            snapshot: input.apply(&self.snapshot).map_err(error)?,
         })
     }
+
     fn with_resource_group_branch(&self, restriction_json: &str) -> PyResult<Self> {
         let input = ResourceGroupRestriction::from_json(restriction_json).map_err(error)?;
         Ok(Self {
@@ -99,6 +89,53 @@ impl NetworkNode {
             snapshot: self
                 .snapshot
                 .with_synchronized_start(id, lower, upper)
+                .map_err(error)?,
+        })
+    }
+    #[pyo3(signature=(route_index,resource,maximize,terminal,max_cells,max_work,max_lp_iterations,seconds))]
+    fn optimize_route_control(
+        &self,
+        route_index: usize,
+        resource: usize,
+        maximize: bool,
+        terminal: Option<(f64, f64)>,
+        max_cells: usize,
+        max_work: usize,
+        max_lp_iterations: usize,
+        seconds: f64,
+    ) -> PyResult<String> {
+        let duration = std::time::Duration::try_from_secs_f64(seconds).map_err(error)?;
+        let deadline = Instant::now()
+            .checked_add(duration)
+            .ok_or_else(|| error("control search deadline overflow"))?;
+        let terminal = terminal
+            .map(|(lo, hi)| baldes::Window::new(lo, hi))
+            .transpose()
+            .map_err(error)?;
+        let result = self
+            .snapshot
+            .optimize_route_control(
+                route_index,
+                resource,
+                maximize,
+                terminal,
+                baldes::master::controls::ControlSearchLimits {
+                    max_cells,
+                    max_work,
+                    max_lp_iterations,
+                    deadline: Some(deadline),
+                },
+            )
+            .map_err(error)?;
+        model::format::control_optimization_json(&result).map_err(error)
+    }
+    fn with_route_controls(&self, route_index: usize, controls_json: &str) -> PyResult<Self> {
+        let controls = model::format::parse_paired_controls(controls_json).map_err(error)?;
+        Ok(Self {
+            registry: self.registry.clone(),
+            snapshot: self
+                .snapshot
+                .with_route_controls(route_index, controls)
                 .map_err(error)?,
         })
     }

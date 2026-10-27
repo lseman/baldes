@@ -104,6 +104,7 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
     let shared_rows = problem.rows;
     let mut oracles = vec![];
     for (network, route_entries) in problem.networks.into_iter().zip(network_rows) {
+        let activity_rows = network.activity_entries.clone();
         let mut solver = Solver::new(network.graph.vertices.len(), network.graph.resources.len())?;
         solver.graph = network.graph.clone();
         solver.graph.graph_id = network.id;
@@ -130,6 +131,7 @@ pub(super) fn solve_with_seed_routes<const D: usize>(
             nonlinear_rows: vec![],
             knapsack_rows: vec![],
             presence_rows: vec![],
+            activity_rows,
             resource_groups: vec![],
             synchronized_windows: vec![],
             proved_zero_arcs: vec![],

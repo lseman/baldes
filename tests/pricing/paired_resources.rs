@@ -10,6 +10,7 @@ fn constant(lo: f64, hi: f64, value: f64) -> PiecewiseLinearFunction {
 }
 fn resource(mode: PairedResourceMode) -> CoupledResource {
     CoupledResource::PairedPiecewiseLinear {
+        normalization: baldes::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
         initial: constant(0., 1., 10.),
         initial_base: Window::new(0., 0.).unwrap(),
         arcs: (0..4)
@@ -286,5 +287,132 @@ fn paired_json_round_trip_keeps_modes_functions_waiting_and_domains() {
         let mut malformed: serde_json::Value = serde_json::from_str(&encoded).unwrap();
         malformed["arcs"][0]["unexpected"] = serde_json::json!(true);
         assert!(serde_json::from_value::<CoupledResource>(malformed).is_err());
+    }
+}
+
+#[test]
+fn mixed_resource_cache_updates_failures_and_node_forks_keep_their_own_domains() {
+    for mode in [
+        PairedResourceMode::Feasibility,
+        PairedResourceMode::CostUnbounded,
+        PairedResourceMode::CostBounded,
+    ] {
+        for direction in [0., 1., 2.] {
+            let mut solver = baldes::pricing::Solver::<2>::new(4, 1).unwrap();
+            solver.graph = fixture(mode, -10.);
+            for (position, arc) in solver.graph.arcs.iter_mut().enumerate() {
+                arc.variables = vec![(position, 1.)];
+            }
+            let definitions = vec![
+                resource(mode),
+                CoupledResource::CumulativeCost {
+                    initial: 0.,
+                    increments: vec![2., 1., 1., 2.],
+                    weights: vec![1., 3., 2., 0.],
+                    sink_upper: None,
+                    source_upper: None,
+                },
+                CoupledResource::Selection {
+                    initial: 3,
+                    allowed: vec![1, 1, 2, 2],
+                    vertices: vec![],
+                    relaxed: false,
+                },
+            ];
+            solver.set_coupled_resources(&definitions).unwrap();
+            solver.enumeration_preserve_arc_paths = true;
+            solver
+                .set_option("BALDESuseBidirectionalSearch", direction)
+                .unwrap();
+            let route_cost = |path: &[usize], costs: &[f64]| {
+                let cumulative = if path[0] == 0 { 11. } else { 2. };
+                control_oracle(path, mode) + cumulative - 20.
+                    + path.iter().map(|&a| costs[a]).sum::<f64>()
+            };
+            for costs in [[0.; 4], [-20., 0., 0., 0.], [0., 0., -20., 0.]] {
+                solver.cache_variable_costs(&costs).unwrap();
+                let answer = solver.price_functor_phase(0, 20).unwrap();
+                let expected = route_cost(&[0, 1], &costs).min(route_cost(&[2, 3], &costs));
+                assert!(answer.exact);
+                assert_eq!(answer.minimum_reduced_cost, expected);
+                let expected_routes: BTreeMap<_, _> = [vec![0, 1], vec![2, 3]]
+                    .into_iter()
+                    .map(|path| {
+                        (
+                            path.iter().map(|&p| solver.graph.arcs[p].id).collect(),
+                            route_cost(&path, &costs),
+                        )
+                    })
+                    .collect();
+                check_routes(solver.enumerate(100.).unwrap(), &expected_routes);
+                let previous_costs: Vec<_> =
+                    solver.graph.arcs.iter().map(|a| a.reduced_cost).collect();
+                for bad in [vec![f64::NAN; 4], vec![1.; 3]] {
+                    assert!(solver.cache_variable_costs(&bad).is_err());
+                    assert_eq!(
+                        solver
+                            .graph
+                            .arcs
+                            .iter()
+                            .map(|a| a.reduced_cost)
+                            .collect::<Vec<_>>(),
+                        previous_costs
+                    );
+                    check_routes(
+                        solver.inspect_enumeration(100.).unwrap().unwrap(),
+                        &expected_routes,
+                    );
+                }
+                let mut child = solver.fork_for_node();
+                child.set_forbidden_arcs(vec![0]).unwrap();
+                assert_eq!(
+                    child
+                        .price_functor_phase(0, 20)
+                        .unwrap()
+                        .minimum_reduced_cost,
+                    route_cost(&[2, 3], &costs)
+                );
+                check_routes(
+                    solver.inspect_enumeration(100.).unwrap().unwrap(),
+                    &expected_routes,
+                );
+                child.set_forbidden_arcs(vec![]).unwrap();
+                assert!(child.inspect_enumeration(100.).unwrap().is_none());
+                assert_eq!(
+                    child
+                        .price_functor_phase(0, 20)
+                        .unwrap()
+                        .minimum_reduced_cost,
+                    expected
+                );
+            }
+            // A directly edited resource changes the topology snapshot;
+            // inspection must decline the old completed path domain.
+            let mut changed = definitions.clone();
+            let CoupledResource::Selection { allowed, .. } = &mut changed[2] else {
+                unreachable!()
+            };
+            allowed[2] = 0;
+            solver.graph.set_coupled_resources(&changed).unwrap();
+            assert!(solver.inspect_enumeration(100.).unwrap().is_none());
+            let costs = [0., 0., -20., 0.];
+            assert_eq!(
+                solver
+                    .price_functor_phase(0, 20)
+                    .unwrap()
+                    .minimum_reduced_cost,
+                route_cost(&[0, 1], &costs)
+            );
+            assert_eq!(solver.enumerate(100.).unwrap().len(), 1);
+            solver.graph.set_coupled_resources(&definitions).unwrap();
+            assert!(solver.inspect_enumeration(100.).unwrap().is_none());
+            assert_eq!(
+                solver
+                    .price_functor_phase(0, 20)
+                    .unwrap()
+                    .minimum_reduced_cost,
+                route_cost(&[2, 3], &costs)
+            );
+        }
     }
 }

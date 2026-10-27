@@ -42,16 +42,39 @@ impl<const D: usize> Solver<D> {
     /// Price one phase. `negative_only` filters outputs at the configured zero
     /// threshold; the minimum remains independent of that filter. Retained-path
     /// inspection also keeps its minimum when the output column limit is zero.
+    /// Disabled phases over a completed retained domain return a no-op result
+    /// before refreshing caches; their empty output does not prove convergence.
     pub fn price_phase(
         &mut self,
         index: usize,
         maximum: usize,
         negative_only: bool,
     ) -> Result<PricingResult> {
+        if self
+            .graph
+            .coupled_kernel()
+            .is_some_and(|kernel| kernel.has_negative_paired_objectives())
+        {
+            return Err(incomplete(
+                "negative paired objectives require source-control master pricing",
+            ));
+        }
         let phase = *self
             .phases
             .get(index)
             .ok_or_else(|| invalid("pricing phase out of range"))?;
+        self.discard_incomplete_enumeration();
+        // A disabled retained-path phase is a successful no-op. In particular,
+        // it does not recache changed duals or replace the retained working
+        // state; the next active phase performs those updates.
+        if self.enumeration.is_some() && !phase.exact() {
+            return Ok(PricingResult {
+                columns: vec![],
+                minimum_reduced_cost: 1e12,
+                exact: false,
+                statistics: Default::default(),
+            });
+        }
         if self
             .prepared
             .as_ref()
@@ -59,20 +82,11 @@ impl<const D: usize> Solver<D> {
         {
             self.restore_arcs();
         }
-        self.discard_incomplete_enumeration();
         if self.enumeration.is_some() {
             self.check_presence_universe()?;
         }
         self.refresh_cuts()?;
         if self.enumeration.is_some() {
-            if !phase.exact() {
-                return Ok(PricingResult {
-                    columns: vec![],
-                    minimum_reduced_cost: 1e12,
-                    exact: false,
-                    statistics: Default::default(),
-                });
-            }
             let enumerated_kpath = self.enumerated_kpath_inputs();
             let universe = self.enumeration.as_mut().unwrap();
             universe.paths.inspect_with_presence(

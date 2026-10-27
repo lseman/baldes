@@ -851,3 +851,87 @@ fn bucket_snapshot_eligibility_preserves_hop_limits_and_finite_budgets() {
         }
     }
 }
+
+#[test]
+fn rejected_bucket_refinement_preserves_both_grids_and_indexing() {
+    use baldes::graph::buckets::BucketGraph;
+    for bidirectional in [false, true] {
+        let mut graph = Graph::<2>::new(3, 2).unwrap();
+        for vertex in 0..3 {
+            for resource in 0..2 {
+                graph.set_bounds(vertex, resource, 0., 8.).unwrap();
+            }
+        }
+        graph.add_arc(0, 1, -1.).unwrap();
+        graph.add_arc(1, 2, 0.).unwrap();
+        let original = BucketGraph::prepare(&graph, [4.; 2], 20, bidirectional).unwrap();
+        for failure in 0..3 {
+            let mut grid = original.clone();
+            let last = grid.order.len() - 1;
+            grid.upper[last][1] = match failure {
+                0 => grid.lower[last][1] - 1.,
+                1 => f64::MAX,
+                _ => f64::NAN,
+            };
+            let before = format!("{grid:?}");
+            assert!(grid.decrease_steps(&graph).is_err());
+            assert_eq!(format!("{grid:?}"), before);
+            grid.upper[last][1] = original.upper[last][1];
+            grid.decrease_steps(&graph).unwrap();
+            let mut expected = original.clone();
+            expected.decrease_steps(&graph).unwrap();
+            assert_eq!(format!("{grid:?}"), format!("{expected:?}"));
+        }
+    }
+}
+
+#[test]
+fn failed_round_refinement_reports_error_and_can_be_retried() {
+    let mut solver = baldes::pricing::Solver::<2>::new(3, 1).unwrap();
+    solver.graph = graph(3, 1, &[(0, 1, -1., 1.), (1, 2, 0., 1.)]);
+    solver.bucket_steps[0] = 2.;
+    let first = solver.price_phase(0, 8, false).unwrap();
+    let grid = &mut solver.engine.as_mut().unwrap().grid;
+    let last = grid.order.len() - 1;
+    let upper = grid.upper[last][0];
+    grid.upper[last][0] = grid.lower[last][0] - 1.;
+    let rejected = format!("{grid:?}");
+    solver.round.pending_decrease = true;
+    assert!(solver.column_generation_terminated(0, 0).is_err());
+    assert!(!solver.round.pending_decrease);
+    assert_eq!(solver.bucket_steps[0], 2.);
+    assert_eq!(
+        format!("{:?}", solver.engine.as_ref().unwrap().grid),
+        rejected
+    );
+    solver.engine.as_mut().unwrap().grid.upper[last][0] = upper;
+    solver.round.pending_decrease = true;
+    solver.column_generation_terminated(0, 0).unwrap();
+    assert_eq!(solver.bucket_steps[0], 1.);
+    let retried = solver.price_phase(0, 8, false).unwrap();
+    assert_eq!(retried.minimum_reduced_cost, first.minimum_reduced_cost);
+    assert_eq!(retried.columns[0].arcs, first.columns[0].arcs);
+}
+
+#[test]
+fn raw_objective_round_reports_unrepresentable_refinement_without_losing_search() {
+    let mut solver = baldes::pricing::Solver::<2>::new(3, 1).unwrap();
+    for v in 0..3 {
+        solver.graph.set_bounds(v, 0, 0., 0.02).unwrap();
+    }
+    for (id, (tail, head)) in [(0, 1), (1, 2)].into_iter().enumerate() {
+        let arc = solver.graph.add_arc(tail, head, 0.).unwrap();
+        solver.graph.arc_mut(arc).unwrap().variables = vec![(id, 1.)];
+    }
+    solver.bucket_steps[0] = 0.04;
+    solver.cache_variable_costs(&[-1., 0.]).unwrap();
+    let before = solver.price_functor_phase(0, 8).unwrap();
+    solver.round.pending_decrease = true;
+    let error = solver.column_generation_terminated(0, 0).unwrap_err();
+    assert!(error.to_string().contains("cannot be refined further"));
+    assert_eq!(solver.bucket_steps[0], 0.04);
+    assert!(!solver.round.pending_decrease);
+    let after = solver.price_functor_phase(0, 8).unwrap();
+    assert_eq!(after.minimum_reduced_cost, before.minimum_reduced_cost);
+    assert_eq!(after.columns[0].arcs, before.columns[0].arcs);
+}

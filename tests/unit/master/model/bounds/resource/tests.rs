@@ -260,3 +260,86 @@ fn dag_bound_relaxes_equality_waiting_instead_of_rejecting_a_lower_enclosure() {
     .unwrap();
     assert!(bound <= -2.);
 }
+
+#[test]
+fn dag_bounds_keep_selection_feasibility_with_each_path_cost() {
+    use crate::graph::coupled::CoupledResource;
+    for scalar_resources in [0, 1] {
+        let mut graph = Graph::<2>::new(4, scalar_resources).unwrap();
+        for vertex in 0..4 {
+            if scalar_resources > 0 {
+                graph.set_bounds(vertex, 0, 0., 4.).unwrap();
+            }
+        }
+        for (tail, head, cost) in [(0, 1, -8.), (1, 2, -7.), (2, 3, -5.), (0, 3, -10.)] {
+            let id = graph.add_arc(tail, head, cost).unwrap();
+            if scalar_resources > 0 {
+                graph.arc_mut(id).unwrap().consumption[0] = 1.;
+            }
+        }
+        graph
+            .set_coupled_resources(&[CoupledResource::Selection {
+                initial: 3,
+                allowed: vec![1, 2, 3, 3],
+                vertices: vec![],
+                relaxed: true,
+            }])
+            .unwrap();
+        let weights: Vec<_> = graph.arcs.iter().map(|arc| arc.cost).collect();
+        let deadline = Instant::now() + Duration::from_secs(1);
+        assert_eq!(
+            dag_minimum(&graph, &weights, &mut 100_000, deadline),
+            Some(Some(-10.))
+        );
+        assert!(dag_minimum(&graph, &weights, &mut 1, deadline).is_none());
+        assert!(dag_minimum(&graph, &weights, &mut 100_000, Instant::now()).is_none());
+        graph.arc_mut(3).unwrap().cost = -30.;
+        let weights: Vec<_> = graph.arcs.iter().map(|arc| arc.cost).collect();
+        assert_eq!(
+            dag_minimum(&graph, &weights, &mut 100_000, deadline),
+            Some(Some(-30.))
+        );
+    }
+}
+
+#[test]
+fn coupled_dag_feasibility_unknown_keeps_the_path_and_objective_is_not_double_counted() {
+    use crate::graph::coupled::CoupledResource;
+    let mut graph = Graph::<2>::new(3, 0).unwrap();
+    graph.add_arc(0, 1, -1.).unwrap();
+    graph.add_arc(1, 2, -1.).unwrap();
+    graph
+        .set_coupled_resources(&[CoupledResource::CumulativeCost {
+            initial: 0.,
+            increments: vec![1e308, 1e308],
+            weights: vec![0., 0.],
+            sink_upper: None,
+            source_upper: None,
+        }])
+        .unwrap();
+    assert!(graph.coupled_kernel().unwrap().certify(&[0, 1]).is_none());
+    let deadline = Instant::now() + Duration::from_secs(1);
+    assert_eq!(
+        dag_minimum(&graph, &[-1., -1.], &mut 100_000, deadline),
+        Some(Some(-2.))
+    );
+    graph
+        .set_coupled_resources(&[CoupledResource::CumulativeCost {
+            initial: 0.,
+            increments: vec![1., 1.],
+            weights: vec![-10., -10.],
+            sink_upper: None,
+            source_upper: None,
+        }])
+        .unwrap();
+    // This routine bounds physical arc weights only. The caller separately
+    // adds a resource-objective lower bound; the actual coupled cost is -30.
+    assert_eq!(
+        graph.coupled_kernel().unwrap().certify(&[0, 1]),
+        Some((true, [-30., -30.]))
+    );
+    assert_eq!(
+        dag_minimum(&graph, &[-1., -1.], &mut 100_000, deadline),
+        Some(Some(-2.))
+    );
+}

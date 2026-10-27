@@ -63,6 +63,7 @@ fn adjacent_pair_problem(q: f64) -> (Problem<5>, Vec<ResourceGroupMember>) {
             multiplicity: Window::new(0., 9.).unwrap(),
             arc_entries: entries,
             route_entries: vec![],
+            activity_entries: vec![],
         });
     }
     (
@@ -234,6 +235,7 @@ fn fixture(waiting: bool) -> (Problem<5>, Vec<ResourceGroupMember>) {
             multiplicity: Window::new(0., 3.).unwrap(),
             arc_entries,
             route_entries: vec![],
+            activity_entries: vec![],
         });
     }
     (
@@ -538,6 +540,7 @@ fn exact_feasible_but_unreconstructible_branch_leaves_parent_unchanged() {
             multiplicity: Window::new(0., 1.).unwrap(),
             arc_entries: vec![vec![], vec![], vec![(0, 1.)], vec![]],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let parent = model::solve(problem, options()).unwrap();
@@ -762,6 +765,7 @@ fn public_triangle_group_mapping_survives_actual_shared_tree_descendants() {
             multiplicity: Window::new(0., 9.).unwrap(),
             arc_entries: entries,
             route_entries: vec![],
+            activity_entries: vec![],
         });
     }
     let problem = Problem {
@@ -944,6 +948,7 @@ fn rounded_compatible_profiles_cannot_hide_an_exact_fixed_resource_contradiction
             multiplicity: Window::new(0., 1.).unwrap(),
             arc_entries: vec![vec![], vec![(0, 1.)], vec![]],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let parent = model::solve(problem, options()).unwrap();
@@ -1025,6 +1030,7 @@ fn automatic_shared_resource_candidates_keep_weighted_mass_and_ancestor_windows(
                 multiplicity: Window::new(0., 1.).unwrap(),
                 arc_entries: entries,
                 route_entries: vec![],
+                activity_entries: vec![],
             }],
         };
         let mut configured = options();

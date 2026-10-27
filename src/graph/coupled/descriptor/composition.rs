@@ -408,7 +408,9 @@ fn compose_cached(
         let native = policy == FrontOperationPolicy::FrontAlgebra;
         let f0 = if native {
             match last {
-                Some((x, value)) if x == x0 => value,
+                // A skipped short inner remainder does not advance the
+                // output anchor before the next inner segment starts.
+                Some((x, value)) if x == x0 || (x < x0 && near(x, x0)?) => value,
                 _ => outer.value(y0, policy, work)?,
             }
         } else {
@@ -423,7 +425,7 @@ fn compose_cached(
                 output.push((f0, x0));
                 last = Some((x0, f0));
             }
-            Some((x, y)) if x == x0 && y == f0 => (),
+            Some((x, y)) if y == f0 && (x == x0 || (native && x < x0 && near(x, x0)?)) => (),
             _ => {
                 return Err(unsupported(
                     "composition components do not meet continuously",
@@ -510,6 +512,16 @@ fn compose_cached(
             inner_endpoint,
             work,
         )?;
+        // A tolerance-sized inner remainder emits no endpoint. The next
+        // segment keeps that earlier output anchor; once it is near the
+        // requested end, the helper stops without manufacturing a last piece.
+        if native {
+            if let Some((x, _)) = last {
+                if near(x, hi)? {
+                    break;
+                }
+            }
+        }
     }
     if output.is_empty() {
         Ok(None)

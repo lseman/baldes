@@ -144,6 +144,47 @@ impl Function<'_> {
         }
     }
 
+    // A source-control point can use an exactly verified affine slope. This
+    // proves the real knot interpolant algebraically; it does not claim the
+    // reordered binary64 expression reproduces the numerical evaluator.
+    fn control_point(self, argument: f64, work: &mut Work) -> Option<bounds::Range> {
+        if let Self::Knots(function) = self {
+            work.take(function.points.len())?;
+            let domain = self.domain();
+            if argument < domain.lo || argument > domain.hi {
+                return None;
+            }
+            if let Some(point) = function.points.iter().find(|point| point[0] == argument) {
+                return Some(bounds::Range::point(point[1]));
+            }
+            for pair in function.points.windows(2) {
+                let ([x0, y0], [x1, y1]) = (pair[0], pair[1]);
+                if x0 < argument && argument < x1 {
+                    let dx = bounds::Range::point(x1).subtract(bounds::Range::point(x0));
+                    let dy = bounds::Range::point(y1).subtract(bounds::Range::point(y0));
+                    let slope = (y1 - y0) / (x1 - x0);
+                    let product = bounds::Range::point(slope).multiply(dx);
+                    if dx.lo == dx.hi
+                        && dy.lo == dy.hi
+                        && slope.is_finite()
+                        && product.lo == dy.lo
+                        && product.hi == dy.hi
+                    {
+                        return checked(
+                            bounds::Range::point(y0).add(
+                                bounds::Range::point(argument)
+                                    .subtract(bounds::Range::point(x0))
+                                    .multiply(bounds::Range::point(slope)),
+                            ),
+                        );
+                    }
+                    break;
+                }
+            }
+        }
+        self.range(bounds::Range::point(argument), work)
+    }
+
     // Suggestions only: every proposed control is checked independently by
     // outward replay before it can establish feasibility or an upper bound.
     fn inverse_suggestions(self, target: f64, out: &mut Vec<f64>, work: &mut Work) -> Option<()> {
@@ -213,8 +254,21 @@ impl ArcFunctions<'_> {
         head: bounds::Range,
         work: &mut Work,
     ) -> Option<(bounds::Range, bounds::Range)> {
-        let arrival = self.arrival.range(base, work)?;
-        let increment = self.increment.range(base, work)?;
+        self.extend_using(base, dependent, head, work, |function, argument, work| {
+            function.range(argument, work)
+        })
+    }
+
+    fn extend_using(
+        self,
+        base: bounds::Range,
+        dependent: bounds::Range,
+        head: bounds::Range,
+        work: &mut Work,
+        mut evaluate: impl FnMut(Function<'_>, bounds::Range, &mut Work) -> Option<bounds::Range>,
+    ) -> Option<(bounds::Range, bounds::Range)> {
+        let arrival = evaluate(self.arrival, base, work)?;
+        let increment = evaluate(self.increment, base, work)?;
         let wait = intersect(
             checked(head.subtract(arrival))?,
             bounds::Range {
@@ -228,10 +282,142 @@ impl ArcFunctions<'_> {
                 .add(wait.multiply(bounds::Range::point(f64::from(self.waiting)))),
         )?;
         Some((
-            max(next, self.lower.range(head, work)?),
-            self.upper.range(head, work)?,
+            max(next, evaluate(self.lower, head, work)?),
+            evaluate(self.upper, head, work)?,
         ))
     }
+}
+
+/// Independent source-control feasibility and terminal dependent enclosure.
+/// This is neither an optimum certificate nor a machine-front domain proof.
+/// Other descriptors and physical path/master constraints are checked separately.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PairedControlCertificate {
+    pub feasible: bool,
+    pub dependent: [f64; 2],
+}
+impl PairedControlCertificate {
+    /// Only a singleton enclosure proves this exact selected value. Merely
+    /// lying inside a non-singleton enclosure does not establish attainability.
+    pub fn certifies_value(&self, value: f64) -> bool {
+        self.feasible && value.is_finite() && self.dependent == [value, value]
+    }
+}
+
+// One lowering for both path-optimum and explicit source-control certificates.
+fn source_functions<'a>(
+    definition: &'a CoupledResource,
+    path: &[usize],
+) -> Option<(Function<'a>, Window, Vec<ArcFunctions<'a>>)> {
+    match definition {
+        CoupledResource::PairedPiecewiseLinear {
+            initial,
+            initial_base,
+            arcs,
+            ..
+        } => Some((
+            Function::Knots(initial),
+            *initial_base,
+            path.iter()
+                .map(|&i| {
+                    let a = arcs.get(i)?;
+                    Some(ArcFunctions {
+                        arrival: Function::Knots(&a.arrival),
+                        increment: Function::Knots(&a.increment),
+                        lower: Function::Knots(&a.lower),
+                        upper: Function::Knots(&a.upper),
+                        waiting: a.waiting,
+                    })
+                })
+                .collect::<Option<Vec<_>>>()?,
+        )),
+        CoupledResource::SlopePaired {
+            initial,
+            initial_base,
+            arcs,
+            ..
+        } => Some((
+            Function::Slopes(initial),
+            *initial_base,
+            path.iter()
+                .map(|&i| {
+                    let a = arcs.get(i)?;
+                    Some(ArcFunctions {
+                        arrival: Function::Slopes(&a.arrival),
+                        increment: Function::Slopes(&a.increment),
+                        lower: Function::Slopes(&a.lower),
+                        upper: Function::Slopes(&a.upper),
+                        waiting: a.waiting,
+                    })
+                })
+                .collect::<Option<Vec<_>>>()?,
+        )),
+        _ => None,
+    }
+}
+
+fn control_certificate(
+    definition: &CoupledResource,
+    path: &[usize],
+    base: &[f64],
+    work: &mut Work,
+) -> Option<PairedControlCertificate> {
+    work.take(path.len().checked_mul(5)?.checked_add(1)?)?;
+    let rejected = || {
+        Some(PairedControlCertificate {
+            feasible: false,
+            dependent: [0.; 2],
+        })
+    };
+    let (initial, window, arcs) = source_functions(definition, path)?;
+    let contains = |domain: bounds::Range, value: f64| domain.lo <= value && value <= domain.hi;
+    let Some(domain) = intersect(
+        initial.domain(),
+        bounds::Range {
+            lo: window.lower,
+            hi: window.upper,
+        },
+    ) else {
+        return rejected();
+    };
+    if !contains(domain, base[0]) {
+        return rejected();
+    }
+    let mut dependent = initial.control_point(base[0], work)?;
+    for (arc, choices) in arcs.into_iter().zip(base.windows(2)) {
+        work.take(1)?;
+        let (Some(departure), Some(head)) = (arc.departure(), arc.head()) else {
+            return rejected();
+        };
+        if !contains(departure, choices[0]) || !contains(head, choices[1]) {
+            return rejected();
+        }
+        let start = bounds::Range::point(choices[0]);
+        let end = bounds::Range::point(choices[1]);
+        let arrival = arc.arrival.control_point(choices[0], work)?;
+        if choices[1] < arrival.lo {
+            return rejected();
+        }
+        if choices[1] < arrival.hi {
+            return None;
+        }
+        let (next, upper) =
+            arc.extend_using(start, dependent, end, work, |function, coordinate, work| {
+                function.control_point(coordinate.lo, work)
+            })?;
+        if next.lo > upper.hi {
+            return rejected();
+        }
+        if next.hi > upper.lo {
+            return None;
+        }
+        dependent = next;
+    }
+    work.take(0)?;
+    Some(PairedControlCertificate {
+        feasible: true,
+        dependent: [dependent.lo, dependent.hi],
+    })
 }
 
 fn coordinates(mut values: Vec<f64>, domain: bounds::Range, work: &mut Work) -> Option<Vec<f64>> {
@@ -405,97 +591,287 @@ fn certify(
     Some((true, [cost.lo, cost.hi]))
 }
 
+/// Independently enclose the global initial minimum over the declared base
+/// domain, rather than the initial value chosen by one route witness.
+fn initial_minimum(definition: &CoupledResource, work: &mut Work) -> Option<bounds::Range> {
+    let (initial, window, _) = source_functions(definition, &[])?;
+    let domain = intersect(
+        initial.domain(),
+        bounds::Range {
+            lo: window.lower,
+            hi: window.upper,
+        },
+    )?;
+    let lower = initial.range(domain, work)?.lo;
+    let mut knots = vec![];
+    initial.coordinates(&mut knots, work)?;
+    let mut upper = f64::INFINITY;
+    for x in coordinates(knots, domain, work)? {
+        upper = upper.min(initial.control_point(x, work)?.hi);
+    }
+    checked(bounds::Range {
+        lo: lower,
+        hi: upper,
+    })
+}
+
 impl CoupledKernel {
+    /// Independently replay an explicit source control for one paired resource.
+    /// Universal source terminal enclosure from declared dependent bounds.
+    /// This ignores feasibility restrictions and is not an attainment proof.
+    pub(crate) fn paired_terminal_bounds(
+        &self,
+        resource: usize,
+        path: &[usize],
+        shared_work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Option<[f64; 2]> {
+        if self.front_program_domain {
+            return None;
+        }
+        let allowance = (*shared_work).min(MAX_WORK);
+        let mut work = Work(allowance, deadline);
+        let result = (|| {
+            work.take(path.len().checked_add(1)?)?;
+            let (initial, window, arcs) = source_functions(self.definitions.get(resource)?, path)?;
+            if let Some(last) = arcs.last() {
+                let domain = intersect(last.lower.domain(), last.upper.domain())?;
+                Some([
+                    last.lower.range(domain, &mut work)?.lo,
+                    last.upper.range(domain, &mut work)?.hi,
+                ])
+            } else {
+                let domain = intersect(
+                    initial.domain(),
+                    bounds::Range {
+                        lo: window.lower,
+                        hi: window.upper,
+                    },
+                )?;
+                let range = initial.range(domain, &mut work)?;
+                Some([range.lo, range.hi])
+            }
+        })();
+        *shared_work = shared_work.checked_sub(allowance - work.0)?;
+        result
+    }
+
+    /// Physical arc positions and base coordinates must have valid shapes and
+    /// finite entries; malformed arguments are errors. A certificate with
+    /// feasible == false rejects only this control, never the entire path.
+    /// None means arithmetic ambiguity, exhausted work or expired deadline.
+    ///
+    /// This uses declared source functions under strict domains, even when the
+    /// graph selects machine-front semantics for ordinary pricing. It is not
+    /// an optimized-front certificate and does not certify other resources,
+    /// physical continuity, scalar windows, master rows or a minimum value.
+    /// Objective weights, normalization and phase-I suppression are irrelevant.
+    pub fn certify_paired_control(
+        &self,
+        path: &[usize],
+        control: &PairedControl,
+        shared_work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Result<Option<PairedControlCertificate>> {
+        let definition = self
+            .definitions
+            .get(control.resource)
+            .ok_or_else(|| invalid("unknown paired control descriptor"))?;
+        if !matches!(
+            definition,
+            CoupledResource::PairedPiecewiseLinear { .. } | CoupledResource::SlopePaired { .. }
+        ) || control.base.len()
+            != path
+                .len()
+                .checked_add(1)
+                .ok_or_else(|| invalid("paired control shape overflow"))?
+            || control.base.iter().any(|value| !value.is_finite())
+            || path.iter().any(|&arc| arc >= self.arc_count)
+        {
+            return Err(invalid("paired control requires a paired descriptor, valid arcs and one finite base coordinate per vertex"));
+        }
+        let allowance = (*shared_work).min(MAX_WORK);
+        let mut work = Work(allowance, deadline);
+        let certificate = control_certificate(definition, path, &control.base, &mut work);
+        *shared_work -= allowance - work.0;
+        Ok(certificate)
+    }
+
+    /// Source initial-front minimum, enclosing the numerical normalization
+    /// baseline too. It is independent of the chosen starting control.
+    #[cfg(feature = "clp")]
+    pub(crate) fn paired_initial_minimum(
+        &self,
+        resource: usize,
+        shared_work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Option<[f64; 2]> {
+        let definition = self.definitions.get(resource)?;
+        let allowance = (*shared_work).min(MAX_WORK);
+        let mut work = Work(allowance, deadline);
+        let result = work
+            .take(self.definitions.len())
+            .and_then(|()| initial_minimum(definition, &mut work));
+        *shared_work = shared_work.checked_sub(allowance - work.0)?;
+        let source = result?;
+        let numeric = match definition {
+            CoupledResource::SlopePaired { .. } => {
+                let index = self.definitions[..resource]
+                    .iter()
+                    .filter(|d| matches!(d, CoupledResource::SlopePaired { .. }))
+                    .count();
+                self.slope_paired.get(index)?.initial_minimum()
+            }
+            CoupledResource::PairedPiecewiseLinear { .. } => {
+                let index = self.relation_indices.iter().position(|&r| r == resource)?;
+                self.paired.get(index)?.initial_minimum()
+            }
+            _ => return None,
+        };
+        numeric
+            .is_finite()
+            .then_some([source.lo.min(numeric), source.hi.max(numeric)])
+    }
+
+    fn control_charge(
+        &self,
+        path: &[usize],
+        control: &PairedControl,
+        work: &mut Work,
+    ) -> Option<(bool, Interval)> {
+        let certificate = self
+            .certify_paired_control(path, control, &mut work.0, work.1)
+            .ok()??;
+        if !certificate.feasible {
+            return Some((false, Interval::point(0.)));
+        }
+        let value = certificate.dependent[0];
+        if !certificate.certifies_value(value) {
+            return None;
+        }
+        let definition = self.definitions.get(control.resource)?;
+        let (mode, normalization) = match definition {
+            CoupledResource::SlopePaired {
+                mode,
+                normalization,
+                ..
+            }
+            | CoupledResource::PairedPiecewiseLinear {
+                mode,
+                normalization,
+                ..
+            } => (*mode, *normalization),
+            _ => return None,
+        };
+        let scale = self.cost_scale * self.objective_coefficients[control.resource];
+        if mode == PairedResourceMode::Feasibility || scale == 0. || path.is_empty() {
+            return Some((true, Interval::point(0.)));
+        }
+        let mut dependent = bounds::Range::point(value);
+        if normalization == PairedCostNormalization::FinalMinusInitialMinimum {
+            dependent = checked(dependent.subtract(initial_minimum(definition, work)?))?;
+        }
+        let range = checked(dependent.multiply(bounds::Range::point(scale)))?;
+        Some((
+            true,
+            Interval {
+                lo: range.lo,
+                hi: range.hi,
+            },
+        ))
+    }
+
     pub(super) fn certify_relations(
         &self,
         path: &[usize],
         shared_work: &mut usize,
         deadline: Option<Instant>,
+        controls: &[PairedControl],
     ) -> Option<(bool, [f64; 2])> {
         let allowance = (*shared_work).min(MAX_WORK);
         let mut work = Work(allowance, deadline);
-        let result = self.certify_relations_inner(path, &mut work);
+        let result = self.certify_relations_inner(path, &mut work, controls, None);
         *shared_work = shared_work.checked_sub(allowance - work.0)?;
         result
     }
 
-    fn certify_relations_inner(&self, path: &[usize], work: &mut Work) -> Option<(bool, [f64; 2])> {
+    /// Isolate one paired charge without subtracting already rounded totals.
+    /// Full-path feasibility remains the caller's separate responsibility.
+    #[cfg(feature = "clp")]
+    pub(crate) fn certify_paired_objective_component(
+        &self,
+        path: &[usize],
+        resource: usize,
+        shared_work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Option<(bool, [f64; 2])> {
+        if !matches!(
+            self.definitions.get(resource),
+            Some(
+                CoupledResource::SlopePaired { .. } | CoupledResource::PairedPiecewiseLinear { .. }
+            )
+        ) {
+            return None;
+        }
+        let allowance = (*shared_work).min(MAX_WORK);
+        let mut work = Work(allowance, deadline);
+        let result = self.certify_relations_inner(path, &mut work, &[], Some(resource));
+        *shared_work = shared_work.checked_sub(allowance - work.0)?;
+        result
+    }
+
+    fn certify_relations_inner(
+        &self,
+        path: &[usize],
+        work: &mut Work,
+        controls: &[PairedControl],
+        only: Option<usize>,
+    ) -> Option<(bool, [f64; 2])> {
         work.take(self.definitions.len())?;
         let mut total = Interval::point(0.);
-        for definition in self.definitions.iter() {
+        for (resource, definition) in self.definitions.iter().enumerate() {
+            if only.is_some_and(|index| index != resource) {
+                continue;
+            }
             if !matches!(
                 definition,
                 CoupledResource::PairedPiecewiseLinear { .. } | CoupledResource::SlopePaired { .. }
             ) {
                 continue;
             }
+            if let Some(control) = controls.iter().find(|control| control.resource == resource) {
+                let (valid, cost) = self.control_charge(path, control, work)?;
+                if !valid {
+                    return Some((false, [0.; 2]));
+                }
+                total = total.add(cost)?;
+                continue;
+            }
             work.take(path.len().checked_mul(5)?.checked_add(1)?)?;
-            let (initial, base, mode, normalization, arcs) = match definition {
+            let scale = self.cost_scale * self.objective_coefficients[resource];
+            let (mode, normalization) = match definition {
                 CoupledResource::PairedPiecewiseLinear {
-                    initial,
-                    initial_base,
-                    arcs,
                     mode,
-                } => (
-                    Function::Knots(initial),
-                    *initial_base,
-                    *mode,
-                    descriptor::PairedCostNormalization::FinalMinusInitialMinimum,
-                    path.iter()
-                        .map(|&i| {
-                            let a = arcs.get(i)?;
-                            Some(ArcFunctions {
-                                arrival: Function::Knots(&a.arrival),
-                                increment: Function::Knots(&a.increment),
-                                lower: Function::Knots(&a.lower),
-                                upper: Function::Knots(&a.upper),
-                                waiting: a.waiting,
-                            })
-                        })
-                        .collect::<Option<Vec<_>>>()?,
-                ),
-                CoupledResource::SlopePaired {
-                    initial,
-                    initial_base,
-                    arcs,
+                    normalization,
+                    ..
+                }
+                | CoupledResource::SlopePaired {
                     mode,
                     normalization,
                     policy: FrontOperationPolicy::StrictDomain,
-                } => (
-                    Function::Slopes(initial),
-                    *initial_base,
-                    *mode,
-                    *normalization,
-                    path.iter()
-                        .map(|&i| {
-                            let a = arcs.get(i)?;
-                            Some(ArcFunctions {
-                                arrival: Function::Slopes(&a.arrival),
-                                increment: Function::Slopes(&a.increment),
-                                lower: Function::Slopes(&a.lower),
-                                upper: Function::Slopes(&a.upper),
-                                waiting: a.waiting,
-                            })
-                        })
-                        .collect::<Option<Vec<_>>>()?,
-                ),
+                    ..
+                } => (*mode, *normalization),
                 CoupledResource::SlopePaired { .. } => {
                     let (feasible, cost) = if self.front_program_domain {
                         super::paired_machine::certify(
                             definition,
                             path,
-                            self.cost_scale,
+                            scale,
                             &mut work.0,
                             work.1,
                         )?
                     } else {
-                        operators::front_algebra_pair(
-                            definition,
-                            path,
-                            self.cost_scale,
-                            &mut work.0,
-                            work.1,
-                        )?
+                        operators::front_algebra_pair(definition, path, scale, &mut work.0, work.1)?
                     };
                     if !feasible {
                         return Some((false, [0.; 2]));
@@ -508,15 +884,8 @@ impl CoupledKernel {
                 }
                 _ => continue,
             };
-            let (feasible, cost) = certify(
-                initial,
-                base,
-                &arcs,
-                mode,
-                normalization,
-                self.cost_scale,
-                work,
-            )?;
+            let (initial, base, arcs) = source_functions(definition, path)?;
+            let (feasible, cost) = certify(initial, base, &arcs, mode, normalization, scale, work)?;
             if !feasible {
                 return Some((false, [0.; 2]));
             }
@@ -532,3 +901,7 @@ impl CoupledKernel {
 #[cfg(test)]
 #[path = "../../../../../tests/unit/graph/coupled/kernel/paired_certificate_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../../../tests/unit/graph/coupled/kernel/paired_control_tests.rs"]
+mod control_tests;

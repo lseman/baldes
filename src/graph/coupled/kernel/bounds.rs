@@ -417,7 +417,9 @@ impl CoupledKernel {
         state: Option<&CoupledLabelState>,
         opposite: &CoupledStateBounds,
     ) -> f64 {
-        if !self.front_indices.is_empty()
+        if self.weighted_objective
+            || !self.pricing_activities.is_empty()
+            || !self.front_indices.is_empty()
             || self.has_slope_fronts()
             || !self.relation_indices.is_empty()
             || !self.plugins.is_empty()
@@ -478,11 +480,21 @@ impl CoupledKernel {
             f64::NEG_INFINITY
         }
     }
-    pub(super) fn backward_penalty(&self, a: &Suffix, b: &Suffix) -> Option<f64> {
+    pub(super) fn backward_penalty(
+        &self,
+        a: &Suffix,
+        b: &Suffix,
+        vertex: Option<usize>,
+    ) -> Option<f64> {
         if a.coefficients == b.coefficients {
             return Some(0.);
         }
-        let numeric = &self.optimization.numeric;
+        let numeric = vertex
+            .and_then(|vertex| self.route_domains.entry(vertex))
+            .unwrap_or(&self.optimization.numeric);
+        if let Some(gap) = self.exact_backward_penalty(a, b, numeric) {
+            return Some(gap);
+        }
         let ca: Vec<_> = a.coefficients.iter().copied().map(Range::point).collect();
         let cb: Vec<_> = b.coefficients.iter().copied().map(Range::point).collect();
         let separate = correction(&ca, numeric, &self.initial)
@@ -515,10 +527,85 @@ impl CoupledKernel {
         let gap = separate.min(correlated());
         gap.is_finite().then_some(gap.max(0.))
     }
+
+    fn exact_backward_penalty(&self, a: &Suffix, b: &Suffix, numeric: &[Range]) -> Option<f64> {
+        if !self.optimization.exact_costs
+            || !self.definitions.iter().all(|resource| {
+                matches!(
+                    resource,
+                    CoupledResource::CustomResource { .. } | CoupledResource::CumulativeCost { .. }
+                )
+            })
+        {
+            return None;
+        }
+        let mut magnitude = Range::point(0.);
+        let mut gap = Range::point(0.);
+        for (((&a, &b), x), &initial) in a
+            .coefficients
+            .iter()
+            .zip(&b.coefficients)
+            .zip(numeric)
+            .zip(&self.initial)
+        {
+            if !a.is_finite() || !b.is_finite() || a.fract() != 0. || b.fract() != 0. || !x.finite()
+            {
+                return None;
+            }
+            // exact_costs proves all reachable entry states are integers.
+            // Remove propagation roundoff, not feasible integer states.
+            let x = Range {
+                lo: x.lo.ceil(),
+                hi: x.hi.floor(),
+            };
+            if !x.finite() {
+                return None;
+            }
+            let size = Range::point(x.lo.abs().max(x.hi.abs())).add(Range::point(initial.abs()));
+            magnitude = magnitude.add(
+                Range::point(a.abs())
+                    .add(Range::point(b.abs()))
+                    .multiply(size),
+            );
+            gap = gap.add(
+                Range::point(a)
+                    .subtract(Range::point(b))
+                    .multiply(x.subtract(Range::point(initial))),
+            );
+        }
+        // This absolute bound covers every partial sum in both dots, their
+        // corrections and the difference. Within the integer lattice the
+        // literal dot/subtract program equals the correlated expression.
+        (magnitude.finite() && magnitude.hi <= (1u64 << 53) as f64 && gap.finite())
+            .then_some(gap.hi.max(0.))
+    }
+}
+
+/// One finite continuation horizon for numeric bounds and signed dominance.
+/// NG memory alone does not bound a walk through group-free vertices.
+pub(super) fn completion_hops<const D: usize>(g: &Graph<D>) -> Option<usize> {
+    let simple_hops = g.vertices.len().saturating_sub(1);
+    let elementary_hops = (g.elementary
+        && g.vertices
+            .iter()
+            .enumerate()
+            .all(|(v, x)| v == g.source || v == g.sink || !x.elements.is_empty()))
+    .then_some(simple_hops);
+    let mut hops = [g.max_route_arcs(), elementary_hops]
+        .into_iter()
+        .flatten()
+        .reduce(usize::min);
+    // Only scan the physical topology when cumulative resources need a
+    // finite hop proof and the existing bound could be improved by a DAG.
+    if hops.map_or(true, |bound| bound > simple_hops) && g.is_acyclic() {
+        hops = Some(simple_hops);
+    }
+    hops
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct PreparedBounds {
+    pub continuation_hops: Option<usize>,
     pub numeric: Vec<Range>,
     pub weights: Vec<Range>,
     pub dependency_order: super::dependency_order::DependencyOrder,
@@ -539,23 +626,7 @@ impl PreparedBounds {
                 CoupledResource::CumulativeCost { .. } | CoupledResource::CustomResource { .. }
             )
         });
-        let simple_hops = g.vertices.len().saturating_sub(1);
-        let elementary_hops = (needs_hop_bounds
-            && g.elementary
-            && g.vertices
-                .iter()
-                .enumerate()
-                .all(|(v, x)| v == g.source || v == g.sink || !x.elements.is_empty()))
-        .then_some(simple_hops);
-        let mut hops = [g.max_route_arcs(), elementary_hops]
-            .into_iter()
-            .flatten()
-            .reduce(usize::min);
-        // Only scan the physical topology when cumulative resources need a
-        // finite hop proof and the existing bound could be improved by a DAG.
-        if needs_hop_bounds && hops.map_or(true, |bound| bound > simple_hops) && g.is_acyclic() {
-            hops = Some(simple_hops);
-        }
+        let hops = needs_hop_bounds.then(|| completion_hops(g)).flatten();
         // Use a floating count only when it is exact. Larger route caps retain
         // conservative unbounded domains instead of underestimating a visit
         // count after an integer-to-f64 conversion.
@@ -672,6 +743,7 @@ impl PreparedBounds {
         let dependency_order =
             super::dependency_order::DependencyOrder::prepare(definitions, slots, &numeric);
         Self {
+            continuation_hops: hops,
             numeric,
             weights,
             dependency_order,
@@ -829,3 +901,7 @@ mod pairing_tests;
 #[cfg(test)]
 #[path = "../../../../tests/unit/graph/coupled/kernel/bounds/merge_tests.rs"]
 mod merge_tests;
+
+#[cfg(test)]
+#[path = "../../../../tests/unit/graph/coupled/kernel/bounds/backward_lattice_tests.rs"]
+mod backward_lattice_tests;

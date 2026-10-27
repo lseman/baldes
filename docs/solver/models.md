@@ -703,8 +703,22 @@ whose large scalar cost is offset by a negative resource charge. Full-universe
 column bounds likewise use certified resource-cost lower endpoints. Path and
 certificate work share the attempt's budget and deadline; unavailable replay
 or incomplete coverage leaves the proof unknown. The original integer-route
-domain is physically vertex-simple, and this fallback does not certify arbitrary
-repeated-walk objective programs. It can be too expensive for large networks.
+domain follows its declared physical-simple or finitely bounded-walk contract.
+Repeated-walk source programs still require independent replay and complete
+coverage under that cap. Unbounded cyclic domains remain unsupported. This
+scan can be too expensive for large networks.
+
+Activity rows and signed paired source objectives use a joint whole-column
+bound. A complete bounded path scan encloses each reduced cost, then subtracts
+an upper enclosure of its additive arc weights to obtain a common route
+remainder. Shared objective/activity terms therefore remain correlated in the
+cutoff proof. Collection accepts invariant paired activities or independently
+certified attained endpoints that weakly improve both cost and every row. Signed
+row coefficients and inequality senses must agree with the endpoint direction.
+Equality/opposing rows, identity-specific column caps and uncertain endpoints
+remain guarded.
+A residual network cap below one needs no path scan because its integer route
+quantity must be zero.
 
 PWL paired resources and strict-domain slope pairs have independent directed
 feasibility witnesses. A cost enclosure can remain non-singleton; finite-MIP
@@ -968,6 +982,14 @@ result = problem.solve(
 ```
 
 Each network contribution also accepts sparse `arcs: [[arc_id, coefficient], ...]`;
+`activities: [[descriptor_index, coefficient], ...]` adds intrinsic
+custom/cumulative activities. Activity multipliers must be bounded integers,
+and each descriptor needs a proof of exact integer activity on every path.
+Integer initial levels, increments and weights admit a linear-time program
+proof on DAGs and explicitly bounded walks when all intermediate levels,
+products and accumulated charges stay within the exact integer range (2^53).
+Other cases use directed intrinsic enclosures and numerical replay over a
+complete bounded path scan; incomplete domains are rejected.
 `masters: [[variable_id, coefficient], ...]` adds static integer variables.
 Coefficients must be bounded integers. Names identify generators; they do not
 infer membership. `MappedBranchVariable::from_shared_row` derives selected
@@ -1288,3 +1310,142 @@ activities only when an incumbent is available. Fresh-root and tree compilation
 use the original physical arc IDs; restored tree paths are used for reporting.
 Rust callers needing both the physical problem and registry can use
 `format::Model::compile()`; `problem()` returns only the compiled problem.
+
+For an accumulated custom/cumulative resource, supply
+`accumulated_resource: <descriptor index>` instead of `arcs`:
+
+```json
+{"network": 42, "id": 37, "cost": 2,
+ "accumulated_resource": 1, "entries": [[0, 1]]}
+```
+
+The variable denotes the descriptor's intrinsic accumulated charge on each
+route. Its `cost` replaces that descriptor's implicit unit objective coefficient;
+it does not scale numeric resource states or dependent resource constraints.
+Zero and signed costs retain the intrinsic activity for shared rows and result
+reporting. Each descriptor can have one such original-variable registration.
+The original identity and intrinsic expression survive resumes and tree forks.
+Cost-bearing paired descriptors in either representation can also bind this field when their
+normalization is `absolute_final_value`. Negative original costs require a source
+domain and use independently bounded maximum controls through the same master
+pricing coordinator; model costs and shared-row coefficients remain distinct.
+Their primal activity is read from selected column values through
+`OriginalColumn` / `activity_from_columns`; arc-only reporting is insufficient.
+Source-domain paired registrations support shared `entries`, including signed
+coefficients and row duals that reverse the reduced objective. Pricing covers
+bounded physical paths, bounds terminal controls in each source region and
+retains distinct selected values through the common master coordinator.
+Unfinished path/control coverage is incomplete, never an infeasibility proof.
+Source paired bindings support the integer/envelope contracts below as well.
+Every base control must have integral terminal activity; integer extrema of a
+continuous range are insufficient. Machine-front integer activities, negative
+objectives/rows and unproved boxes remain unsupported.
+Accumulated registrations accept `integer: true` when a program or complete-path
+proof establishes exact integer activity. They register `X_<network>_<id>`
+through the same mapped-variable tree path, including activity branch rows and
+fresh/resumed trees. Unsupported or ambiguous domain proofs are rejected.
+Explicit `original_variable_boxes` are
+verified against a complete bounded scalar-path relaxation with independent
+coupled feasibility and intrinsic activity certificates. Source paired envelopes
+cover all terminal controls, with independent declared-bound tightening of LP
+enclosures. They retain signed
+endpoints and remain independent of master rows and objective coefficients.
+If a complete scan is unavailable, the integer-program proof can supply a
+conservative envelope on a DAG or explicitly bounded walk domain. Source paired
+programs with constant integer increments/clamps and zero waiting also admit
+an inductive terminal-window proof on cycles. A registration proof does not
+establish complete pricing coverage of a cyclic domain. A requested
+box must enclose that entire proved range. Otherwise incomplete scans and
+ambiguous certificates reject the requested envelope.
+Verified envelopes can also supply a coupled admission estimate on DAGs and
+explicitly bounded walks. It combines the original transition-program objective
+bound, conservative physical costs and outward shared-row arithmetic using the
+actual duals. It retains required network quantities and the existing master-gap
+and witness gates. Missing activity envelopes, unsupported nonlinear rows,
+unavailable objective proofs or exhausted budgets fall back to ordinary pricing.
+
+Networks can also supply `activity_entries`, an array of
+`{"resource": 1, "row": 0, "coefficient": 1}` objects, to add intrinsic
+custom/cumulative activity directly to shared rows. These terms add to arc,
+per-route and other activity coefficients. Compilation retains them in the
+physical `Network`, so `Model::problem()` preserves their solving semantics
+even when the reporting registry is discarded. Numerical pricing and bounded
+complete-column certificates account for their dual terms separately from the
+original objective. Certificates return an unresolved bound when their complete
+path scan exceeds its work or path budget.
+
+The same whole-column certificate also covers other coupled objectives when
+their resource interpreter supplies a proof. It keeps each path's physical
+cost, resource charge and shared-row contributions together. Independently
+minimizing those parts can leave a weaker bound because the minima may belong
+to different paths. The joint scan uses half the caller's remaining logical work as its path,
+scan and stored-arc allowance, reserving the rest for source replay. It has no
+separate fixed 4,096-path or 250,000-scan ceiling. An unavailable proof retains
+the existing conservative relaxation. Complete-domain route caps use the same
+column evaluator. Prepared `SlopePaired` models with `front_algebra` operations
+can explicitly select `front_program_domain` for machine-front certificates;
+that choice does not assert an exact-real source-domain proof.
+
+
+For explicit paired source choices, `Route::with_paired_controls` independently
+checks controls and reconstructs their original objective from the recipient
+resource program. `NodeSnapshot::with_route_controls` retains an alternative
+column through the shared route pool. Scalar schedules and selected paired
+values define route identity; equivalent source controls reuse one column. Recipient replay, fixed reductions,
+integer witnesses and original-variable reporting use those stored controls.
+Controlled charges replace ordinary paired charges at the same position in the
+objective sum: numeric/front charges, slope pairs, then control-point pairs.
+Equivalent witnesses therefore preserve both column identity and binary64 cost.
+Correlated reduced-cost bounds follow that order, including independently
+enclosed uncontrolled paired charges and their declared normalization.
+Graph coefficients may also be negative with final-minus-initial
+normalization in a source-domain Clp model. JSON/Python networks expose the
+same setter as `coupled_objective_coefficients`, an array of
+`[resource_index, coefficient]` pairs. A resource bound to an original pricing
+variable obtains its cost from that variable; declaring a graph cost for the
+same resource is rejected. Graph costs on other resources survive variable
+compilation. The source bound subtracts an
+independently enclosed global initial-front minimum before applying the signed
+coefficient. This graph-level objective does not redefine original pricing
+variables or activity rows: their paired bindings still require absolute
+physical terminal values.
+An already complete/cutoff universe cannot be widened; a missing controlled
+identity cannot be fixed by aliasing its minimum-value physical path. Ordinary
+minimum-front pricing is unchanged for models without paired rows. With source
+paired rows, automatic pricing supplies minimum, maximum and row-boundary
+control proposals and an independently bounded reduced cost. A bounded joint
+terminal LP also proposes controls satisfying several paired rows together.
+Registered source points can recover an integer witness from fractional
+control mixtures when physical-path counts are integral; exact whole-model
+replay and column caps decide acceptance. These proposals do not prove coverage
+of varying controls. Enumeration of
+paired rows or negative objectives succeeds when each relevant terminal value
+has a singleton all-control proof on every retained path. This also covers
+fractional invariant values. Checked source controls survive transfer, fixing
+and finite-master replay. A varying resource may also retain an independently
+certified attained endpoint when its objective and all rows agree on a direction:
+negative costs favor maxima, positive costs minima, and zero costs either.
+Increasing Gamma helps positive lower-bound rows and negative upper-bound rows;
+decreasing Gamma reverses those signs. Equality rows, opposing requirements,
+identity-specific column caps and unattained endpoints remain guarded. This
+projection preserves current-model feasibility and optimality, rather than every
+continuous control identity. Source LP row normalization removes a common factor
+only when every quotient is exact; endpoint attainment never uses a tolerance.
+Adding a paired row to a full universe requires invariant matching values or
+proof that its existing endpoints still dominate for all old/new rows and the
+objective. All terms in the pending row are checked together. Retained identity
+caps may block projection, and fixed copies need independent point certificates.
+A cutoff universe cannot be widened. Finite MIP proof outcomes additionally
+require singleton original activity coefficients, including coefficients that
+rounded replay stored as zero.
+
+
+`NodeSnapshot::optimize_route_control` generates a paired source choice on a
+registered physical path, using the common `master::controls` engine. The engine
+compiles exact guarded PWL/clamp region matrices, verifies finite LP bounds and
+independently checks candidate controls. It supports physical minimum/maximum
+and terminal-value restrictions. Complete region coverage and the returned
+primal/dual enclosure are distinct from an exact selector or a whole-model
+pricing certificate. Budget/arithmetic limits remain unknown. Generated controls
+can be retained with `with_route_controls`; paired shared-row pricing uses this
+same optimizer under a shared query budget.

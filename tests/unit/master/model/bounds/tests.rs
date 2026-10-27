@@ -16,6 +16,7 @@ fn rounded_fixed_rhs_cannot_supply_a_new_certificate() {
             multiplicity: Window::new(0., 20.).unwrap(),
             arc_entries: vec![vec![(0, 0.1)], vec![]],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let mut options = Options::default();

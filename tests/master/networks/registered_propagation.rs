@@ -27,6 +27,7 @@ fn problem() -> Problem<2> {
                 multiplicity: Window::new(0., 3.).unwrap(),
                 arc_entries: vec![vec![]; 7],
                 route_entries: vec![(row, 1.)],
+                activity_entries: vec![],
             }
         })
         .collect();

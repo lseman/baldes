@@ -7,6 +7,7 @@ pub(super) enum NumericOperation {
         slot: usize,
         increment: f64,
         weight: f64,
+        cost_coefficient: f64,
     },
     Dependent {
         slot: usize,
@@ -38,8 +39,10 @@ impl NumericOperation {
                 slot,
                 increment,
                 weight,
+                cost_coefficient,
             } => {
                 numeric[slot] = finite(numeric[slot] + increment)?;
+                let scale = finite(scale * cost_coefficient)?;
                 if scale != 0. {
                     *cost = finite(*cost + finite(scale * finite(numeric[slot] * weight)?)?)?;
                 }
@@ -126,10 +129,11 @@ impl ArcTransition {
                     slot,
                     increment,
                     weight,
+                    cost_coefficient,
                 } = *operation
                 {
                     offsets[slot] = finite(offsets[slot] + increment)?;
-                    let w = finite(scale * weight)?;
+                    let w = finite(finite(scale * cost_coefficient)? * weight)?;
                     coefficients[slot] = finite(coefficients[slot] + w)?;
                     constant = finite(constant + finite(w * offsets[slot])?)?;
                 }
@@ -156,9 +160,10 @@ impl ArcTransition {
                     slot: i,
                     increment,
                     weight,
+                    cost_coefficient,
                 } => {
                     offsets[i] = finite(offsets[i] + increment)?;
-                    let w = finite(scale * weight)?;
+                    let w = finite(finite(scale * cost_coefficient)? * weight)?;
                     for (coefficient, &value) in coefficients.iter_mut().zip(&matrix[i]) {
                         *coefficient = finite(*coefficient + finite(w * value)?)?;
                     }
@@ -213,6 +218,9 @@ pub(super) struct PreparedArc {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct PreparedTransitions {
+    /// Original descriptor identity of each ordered numeric operation.
+    /// This order is identical on every arc and is stored only once.
+    pub(super) operation_resources: std::sync::Arc<[usize]>,
     pub(super) arcs: std::sync::Arc<[PreparedArc]>,
     pub(super) deferred: bool,
 }
@@ -223,7 +231,21 @@ impl PreparedTransitions {
         n: usize,
         arcs: usize,
         scale: f64,
+        objective_coefficients: &[f64],
     ) -> Self {
+        let operation_resources = definitions
+            .iter()
+            .enumerate()
+            .filter(|(_, definition)| {
+                definition.is_numeric()
+                    || matches!(
+                        definition,
+                        CoupledResource::PiecewiseLinearCost { .. }
+                            | CoupledResource::EncodedPiecewiseLinearCost { .. }
+                    )
+            })
+            .map(|(resource, _)| resource)
+            .collect::<std::sync::Arc<[usize]>>();
         let deferred = definitions.iter().any(|r| {
             matches!(
                 r,
@@ -282,6 +304,7 @@ impl PreparedTransitions {
                             slot: slots[r].unwrap(),
                             increment: increments[arc],
                             weight: weights[arc],
+                            cost_coefficient: objective_coefficients[r],
                         }),
                         CoupledResource::PiecewiseLinearDependent {
                             parent,
@@ -354,6 +377,7 @@ impl PreparedTransitions {
             })
             .collect::<Vec<_>>();
         Self {
+            operation_resources,
             arcs: arcs.into(),
             deferred,
         }

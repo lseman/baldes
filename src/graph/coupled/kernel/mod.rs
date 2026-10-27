@@ -1,24 +1,30 @@
 //! Direct resource operations shared by physical-graph labels and path replay.
 use super::*;
 mod accounting;
+mod activities;
 pub(super) mod bounds;
 mod bucketing;
 mod budgeted;
 #[cfg(feature = "clp")]
 mod certificate;
+#[cfg(feature = "clp")]
+pub use certificate::PairedControlCertificate;
 mod continuation;
 mod dependency_order;
 mod domains;
 mod dominance;
 mod front;
 mod frozen;
+mod objective;
 mod paired;
+mod pricing;
 pub(super) mod relation;
 mod reversal;
 mod selection;
 mod slope_interval;
 pub(super) mod slope_paired;
 mod storage;
+pub use activities::{CoupledPathCosts, CoupledPathValues, PairedControl};
 use storage::StateValues;
 mod transitions;
 
@@ -65,6 +71,7 @@ pub struct CoupledLabelState {
     slope_relations: Vec<slope_interval::SlopeLabel>,
     relations: Vec<paired::PairedLabel>,
     plugins: Vec<crate::graph::coupled::PluginState>,
+    pricing_activities: Option<Box<[Box<CoupledLabelState>]>>,
     numeric_cost: f64,
     resource_objective: f64,
     accounting: Option<accounting::ScalarCosts>,
@@ -78,6 +85,11 @@ pub struct CoupledKernel {
     slots: Vec<Option<usize>>,
     initial: Vec<f64>,
     cost_scale: f64,
+    objective_coefficients: std::sync::Arc<[f64]>,
+    weighted_objective: bool,
+    negative_paired_objective: bool,
+    pricing_adjustments: std::sync::Arc<[(usize, f64)]>,
+    pricing_activities: std::sync::Arc<[CoupledKernel]>,
     /// Explicit MODEL domain choice, never inferred from a numerical policy.
     front_program_domain: bool,
     selection_initial: Vec<u64>,
@@ -140,7 +152,12 @@ fn combine_load(a: [f64; 3], b: [f64; 3]) -> Result<[f64; 3]> {
 }
 impl CoupledKernel {
     fn check_state(&self, state: &CoupledLabelState) -> Result<()> {
-        if state.plugins.len() != self.plugins.len()
+        if state
+            .pricing_activities
+            .as_ref()
+            .map_or(0, |states| states.len())
+            != self.pricing_activities.len()
+            || state.plugins.len() != self.plugins.len()
             || state.relations.len() != self.relation_indices.len()
             || state.fronts.len() != self.front_indices.len()
             || state.slope_fronts.len() != self.slope_indices.len()
@@ -243,6 +260,9 @@ impl<const D: usize> Graph<D> {
                 Ok(())
             };
         };
+        if enabled && kernel.has_negative_paired_objectives() {
+            return Err(invalid("negative paired objectives require a source model"));
+        }
         if enabled && !kernel.has_machine_front_contracts() {
             return Err(invalid(
                 "native front program domain requires native raw resources",

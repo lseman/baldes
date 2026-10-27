@@ -1032,3 +1032,141 @@ fn solve_normalizes_scalar_and_array_pricing_and_removes_old_command_aliases() {
         assert!(String::from_utf8_lossy(&output.stderr).contains("unknown command"));
     }
 }
+
+#[test]
+fn registered_accumulated_variables_share_cli_object_array_root_and_tree_paths() {
+    let corpus: Value = serde_json::from_str(include_str!(
+        "../fixtures/metasolver_registered_activities.json"
+    ))
+    .unwrap();
+    let directory =
+        std::env::temp_dir().join(format!("baldes-activity-vars-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let mut compared = 0;
+    for case in corpus["cases"].as_array().unwrap() {
+        let activities = case["activity_values_by_path"].as_array().unwrap();
+        let lower = activities
+            .iter()
+            .map(|v| v.as_f64().unwrap())
+            .fold(f64::INFINITY, f64::min);
+        let upper = activities
+            .iter()
+            .map(|v| v.as_f64().unwrap())
+            .fold(f64::NEG_INFINITY, f64::max);
+        let boxes = directory.join("activity-boxes.json");
+        std::fs::write(
+            &boxes,
+            serde_json::to_vec(&serde_json::json!([
+                {"network": 42, "id": 37, "lower": lower, "upper": upper}
+            ]))
+            .unwrap(),
+        )
+        .unwrap();
+        for singular in [false, true] {
+            let mut model = case["model"].clone();
+            model["pricing_variables"][2]["integer"] = true.into();
+            if singular {
+                model["networks"] = model["networks"][0].clone();
+            }
+            let path = directory.join(format!(
+                "{}-{singular}.json",
+                case["name"].as_str().unwrap()
+            ));
+            std::fs::write(&path, serde_json::to_vec(&model).unwrap()).unwrap();
+            for mode in ["numerical", "certified"] {
+                for tree in [false, true] {
+                    let mut cmd = command();
+                    cmd.arg("solve").arg(&path).args([
+                        "--no-stabilization",
+                        "--bound-mode",
+                        mode,
+                        "--json",
+                        "-",
+                    ]);
+                    cmd.arg("--original-variable-boxes").arg(&boxes);
+                    if tree {
+                        cmd.arg("--tree");
+                    }
+                    let run = cmd.output().unwrap();
+                    assert!(
+                        run.status.success(),
+                        "{}",
+                        String::from_utf8_lossy(&run.stderr)
+                    );
+                    let value: Value = serde_json::from_slice(&run.stdout).unwrap();
+                    assert_eq!(value["status"], "Optimal", "{} {value}", case["name"]);
+                    let expected = if tree && !case["row"].is_null() {
+                        if case["kind"] == "custom" {
+                            -9.
+                        } else {
+                            -10.
+                        }
+                    } else {
+                        case["oracle"]["objective_float"].as_f64().unwrap()
+                    };
+                    assert!(
+                        (value[if tree { "incumbent" } else { "lp" }]
+                            .as_f64()
+                            .unwrap()
+                            - expected)
+                            .abs()
+                            < 1e-7
+                    );
+                    let activity = value["original_variables"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .find(|v| v["network"] == 42 && v["id"] == 37)
+                        .unwrap();
+                    let expected_activity = if tree && !case["row"].is_null() {
+                        case["activity_values_by_path"][0].as_f64().unwrap()
+                    } else {
+                        let mut parts = case["oracle"]["fraction_first_path"]
+                            .as_str()
+                            .unwrap()
+                            .split('/');
+                        let theta = parts.next().unwrap().parse::<f64>().unwrap()
+                            / parts
+                                .next()
+                                .map(|p| p.parse::<f64>().unwrap())
+                                .unwrap_or(1.);
+                        theta * case["activity_values_by_path"][0].as_f64().unwrap()
+                            + (1. - theta) * case["activity_values_by_path"][1].as_f64().unwrap()
+                    };
+                    assert!((activity["lower"].as_f64().unwrap() - expected_activity).abs() < 1e-7);
+                    assert!((activity["upper"].as_f64().unwrap() - expected_activity).abs() < 1e-7);
+                    compared += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(compared, 64);
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn graph_relative_objective_coefficients_reach_the_shared_cli_solver() {
+    let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/coupled/negative-relative-network.json");
+    let output = command()
+        .arg("solve")
+        .arg(model)
+        .args([
+            "--no-stabilization",
+            "--bound-mode",
+            "certified",
+            "--json",
+            "-",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["status"], "Optimal");
+    assert!((result["lp"].as_f64().unwrap() + 26.).abs() < 1e-7);
+    assert!((result["bound"].as_f64().unwrap() + 26.).abs() < 1e-7);
+}

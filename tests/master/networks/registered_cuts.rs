@@ -41,6 +41,7 @@ fn gap_network(id: i32, first: usize, parallel: bool) -> Network<2> {
         multiplicity: Window::new(0., 3.).unwrap(),
         arc_entries,
         route_entries: vec![],
+        activity_entries: vec![],
     }
 }
 fn gap_problem(parallel: bool) -> Problem<2> {

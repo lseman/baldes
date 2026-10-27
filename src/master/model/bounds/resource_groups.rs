@@ -87,6 +87,8 @@ pub(super) fn minimum<const D: usize>(
                 .checked_mul(graph.resources.len().checked_mul(8)?.checked_add(4)?)?,
         )?;
         let route = Route {
+            coupled_controls: Vec::new(),
+            coupled_values: Vec::new(),
             nodes: std::iter::once(graph.source as i32)
                 .chain(
                     path.arc_positions()

@@ -2,6 +2,20 @@
 use super::*;
 
 impl<const D: usize> ImportedSnapshot<D> {
+    /// Retain deterministic coupled activity rows across imported-domain rebuilds.
+    pub fn with_accumulated_activity_row(
+        &self,
+        row: Row,
+        routing: &[AccumulatedActivityCoefficients],
+        original: &[(i32, f64)],
+    ) -> Result<Self> {
+        self.with_nonlinear_row(
+            row,
+            nonlinear::RowKernels::Accumulated(routing.to_vec()),
+            original,
+        )
+    }
+
     /// Install registered routing coefficients coupled to original coordinates.
     /// The descriptors and row survive later imported-domain extensions.
     pub fn with_registered_cut_row(
@@ -77,6 +91,9 @@ impl<const D: usize> ImportedSnapshot<D> {
             } => self
                 .node
                 .with_registered_cut_master_row(row.clone(), coefficients, original)?,
+            nonlinear::RowKernels::Accumulated(c) => self
+                .node
+                .with_accumulated_activity_master_row(row.clone(), c, &[], original)?,
             nonlinear::RowKernels::Resource(c) => {
                 self.node
                     .with_resource_knapsack_master_row(row.clone(), c, original)?
@@ -98,6 +115,20 @@ impl<const D: usize> ImportedSnapshot<D> {
 }
 
 impl<const D: usize> MultiImport<D> {
+    /// Retain deterministic coupled activity rows across imported-domain rebuilds.
+    pub fn with_accumulated_activity_row(
+        &self,
+        row: Row,
+        routing: &[AccumulatedActivityCoefficients],
+        original: &[(i32, f64)],
+    ) -> Result<Self> {
+        self.with_nonlinear_row(
+            row,
+            nonlinear::RowKernels::Accumulated(routing.to_vec()),
+            original,
+        )
+    }
+
     /// Retain registered routing kernels through pricing and tree descendants.
     pub fn with_registered_cut_row(
         &self,

@@ -70,6 +70,19 @@ impl<const D: usize> Solver<D> {
     /// can change dominance and discard the raw optimum, so correcting only a
     /// returned cached route cannot establish a global raw pricing bound.
     pub fn price_functor_phase(&mut self, index: usize, maximum: usize) -> Result<PricingResult> {
+        if self
+            .enumeration
+            .as_ref()
+            .is_some_and(|paths| paths.completed)
+        {
+            let phase = self
+                .phases
+                .get(index)
+                .ok_or_else(|| invalid("pricing phase out of range"))?;
+            if !phase.exact() {
+                return self.price_phase(index, maximum, false);
+            }
+        }
         if self.variable_costs.is_empty()
             && self.raw_arc_costs.is_none()
             && self.graph.arcs.iter().any(|arc| !arc.variables.is_empty())

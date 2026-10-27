@@ -23,6 +23,7 @@ fn network(id: i32, lower: f64, upper: f64, count: f64) -> Network<2> {
         multiplicity: Window::new(0., count).unwrap(),
         arc_entries: vec![vec![], vec![]],
         route_entries: vec![],
+        activity_entries: vec![],
     }
 }
 fn service(members: &[(i32, usize)]) -> SynchronizedService {
@@ -241,6 +242,7 @@ fn jointly_inconsistent_jobs_are_not_certified_independently() {
             multiplicity: Window::new(0., 1.).unwrap(),
             arc_entries: vec![vec![]; 3],
             route_entries: vec![],
+            activity_entries: vec![],
         });
     }
     let mut a = service(&[(7, 1), (42, 1)]);

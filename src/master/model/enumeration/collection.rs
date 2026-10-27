@@ -19,6 +19,7 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
     let mut paths_left = options.max_routes;
     let mut work_left = options.max_work;
     let mut arcs_left = options.max_stored_arcs;
+    let mut control_iterations = 100_000;
     let mut routes = vec![];
     let mut counts = vec![];
     for (network_index, oracle) in state.oracles.iter().enumerate() {
@@ -37,6 +38,12 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
             counts.push((oracle.network.id, 0));
             continue;
         }
+        // Replacing a control cannot preserve an identity-specific cap on
+        // that column. Invariant Gamma needs no such dominance argument.
+        let objective_projection = !state
+            .route_upper_bounds
+            .keys()
+            .any(|&tag| state.routes[tag].network == oracle.network.id);
         let domain = super::super::resource_groups::residual_domain_graph(oracle)
             .map_err(|e| e.to_string())?;
         let graph = domain.as_ref();
@@ -133,6 +140,8 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
                 .map(|&a| graph.arcs[a].id)
                 .collect();
             let mut probe = Route {
+                coupled_controls: Vec::new(),
+                coupled_values: Vec::new(),
                 nodes: std::iter::once(graph.source as i32)
                     .chain(
                         path.arc_positions()
@@ -146,6 +155,34 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
                 resources: vec![],
                 resource_profile: vec![],
             };
+            let mut controls_complete = true;
+            if super::super::control_pricing::needed(oracle) {
+                match crate::master::routing::exact_scalar_path_feasibility(&problem, &probe) {
+                    Some(false) => continue,
+                    Some(true) => {}
+                    None => return Err("Arithmetic: exact scalar replay is unknown".into()),
+                }
+            }
+            let positions: Vec<_> = probe.arcs.iter().map(|id| oracle.index[id]).collect();
+            if super::super::control_pricing::needed(oracle) {
+                let controls = super::super::control_pricing::enumeration_controls(
+                    oracle,
+                    &positions,
+                    &mut work_left,
+                    &mut control_iterations,
+                    deadline,
+                    objective_projection,
+                    &state.shared_rows,
+                )
+                .ok_or(
+                    "paired control domain is not proved invariant or objective-dominated; path enumeration is incomplete",
+                )?;
+                let Some(controls) = controls else {
+                    continue;
+                };
+                controls_complete = controls.complete;
+                probe.coupled_controls = controls.controls;
+            }
             match crate::master::routing::exact_route_feasibility_with_budget(
                 &problem,
                 &probe,
@@ -163,31 +200,61 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
             {
                 continue;
             }
+            if !controls_complete {
+                return Err(
+                    "paired control domain is not proved invariant or objective-dominated; path enumeration is incomplete"
+                        .into(),
+                );
+            }
             // Never silently omit an exact-feasible path whose rounded forward
             // schedule cannot be reconstructed by the current scalar kernel.
-            let canonical = problem
+            let mut canonical = problem
                 .elementary_route(&probe.arcs)
                 .ok_or("Arithmetic: canonical resource replay")?;
+            let controlled_cost = if probe.coupled_controls.is_empty() {
+                None
+            } else {
+                let selection = oracle
+                    .network
+                    .graph
+                    .coupled_kernel()
+                    .ok_or("missing control kernel")?
+                    .replay_with_controls_using(
+                        &positions,
+                        &probe.coupled_controls,
+                        &mut work_left,
+                        Some(deadline),
+                    )
+                    .map_err(|e| e.to_string())?
+                    .ok_or("Arithmetic: controlled resource replay")?;
+                canonical.coupled_controls = std::mem::take(&mut probe.coupled_controls);
+                canonical.coupled_values = selection.paired_values;
+                Some(selection.cost)
+            };
             probe.resources = canonical.resources;
             probe.resource_profile = canonical.resource_profile;
+            probe.coupled_controls = canonical.coupled_controls;
+            probe.coupled_values = canonical.coupled_values;
             let mut ids = probe.arcs.clone();
             ids.sort_unstable();
             probe.original_cost = ids
                 .iter()
                 .map(|id| oracle.network.graph.arcs[oracle.index[id]].cost)
                 .sum::<f64>()
-                + oracle
-                    .network
-                    .graph
-                    .coupled_path_cost(
-                        &probe
-                            .arcs
-                            .iter()
-                            .map(|id| oracle.index[id])
-                            .collect::<Vec<_>>(),
-                    )
-                    .map_err(|e| e.to_string())?
-                    .ok_or("infeasible coupled path")?;
+                + match controlled_cost {
+                    Some(cost) => cost,
+                    None => probe
+                        .coupled_cost(
+                            &oracle.network.graph,
+                            &probe
+                                .arcs
+                                .iter()
+                                .map(|id| oracle.index[id])
+                                .collect::<Vec<_>>(),
+                        )
+                        .map_err(|e| e.to_string())?
+                        .ok_or("infeasible coupled path")?,
+                };
             probe.cost = probe.original_cost;
             if !probe.cost.is_finite() {
                 return Err("Arithmetic: route cost".into());

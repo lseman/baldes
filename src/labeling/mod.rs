@@ -60,6 +60,11 @@ impl Controls {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Route {
+    /// Independently certified source choices, separate from minimum-front metadata.
+    pub coupled_controls: Vec<crate::graph::coupled::PairedControl>,
+    /// Descriptor-indexed selected paired dependent values. These accompany
+    /// the scalar schedule; they are not objective charges or certificates.
+    pub coupled_values: Vec<(usize, f64)>,
     pub nodes: Vec<i32>,
     pub arcs: Vec<i32>,
     pub cost: f64,
@@ -70,6 +75,78 @@ pub struct Route {
     pub resource_profile: Vec<Vec<f64>>,
 }
 impl Route {
+    /// Match the minimum-front choice or independently proved source controls.
+    /// Full physical/scalar/other-resource feasibility is checked separately.
+    pub(crate) fn selected_values_match<const D: usize>(
+        &self,
+        graph: &Graph<D>,
+        positions: &[usize],
+    ) -> Result<bool> {
+        if self.coupled_controls.is_empty() {
+            return Ok(graph.coupled_paired_values(positions)? == self.coupled_values);
+        }
+        Ok(graph
+            .coupled_kernel()
+            .ok_or_else(|| invalid("paired controls require a resource kernel"))?
+            .replay_with_controls(positions, &self.coupled_controls)?
+            .is_some_and(|selection| selection.paired_values == self.coupled_values))
+    }
+
+    pub(crate) fn coupled_cost<const D: usize>(
+        &self,
+        graph: &Graph<D>,
+        positions: &[usize],
+    ) -> Result<Option<f64>> {
+        if self.coupled_controls.is_empty() {
+            return graph.coupled_path_cost(positions);
+        }
+        let selection = graph
+            .coupled_kernel()
+            .ok_or_else(|| invalid("paired controls require a resource kernel"))?
+            .replay_with_controls(positions, &self.coupled_controls)?;
+        Ok(selection
+            .filter(|selection| selection.paired_values == self.coupled_values)
+            .map(|selection| selection.cost))
+    }
+
+    /// Assign independently proved source choices to an existing physical route.
+    /// Recompute original cost and selected values for the supplied graph; full
+    /// recipient validation still checks physical/scalar/master constraints.
+    pub fn with_paired_controls<const D: usize>(
+        mut self,
+        graph: &Graph<D>,
+        mut controls: Vec<crate::graph::coupled::PairedControl>,
+    ) -> Result<Self> {
+        controls.sort_by_key(|control| control.resource);
+        let positions = self
+            .arcs
+            .iter()
+            .map(|id| {
+                graph
+                    .arcs
+                    .iter()
+                    .position(|arc| arc.id == *id)
+                    .ok_or_else(|| invalid("unknown controlled route arc"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let selection = graph
+            .coupled_kernel()
+            .ok_or_else(|| invalid("paired controls require a resource kernel"))?
+            .replay_with_controls(&positions, &controls)?
+            .ok_or_else(|| invalid("paired source control is infeasible or uncertified"))?;
+        let mut sorted = positions;
+        sorted.sort_by_key(|&p| graph.arcs[p].id);
+        let cost = sorted.iter().map(|&p| graph.arcs[p].cost).sum::<f64>() + selection.cost;
+        if !cost.is_finite() {
+            return Err(invalid("controlled route cost overflow"));
+        }
+        self.coupled_controls = controls;
+        self.coupled_values = selection.paired_values;
+        self.original_cost = cost;
+        self.cost = cost;
+        Ok(self)
+    }
+
     pub(crate) fn identity(&self) -> String {
         use std::fmt::Write;
         let capacity =
@@ -93,6 +170,10 @@ impl Route {
                 let bits = if value == 0. { 0 } else { value.to_bits() };
                 write!(&mut identity, "{bits:016x},").unwrap();
             }
+        }
+        for &(resource, value) in &self.coupled_values {
+            let bits = if value == 0. { 0 } else { value.to_bits() };
+            write!(&mut identity, "@{resource}:{bits:016x}").unwrap();
         }
         identity
     }
@@ -250,7 +331,11 @@ fn dominates<const D: usize>(g: &Graph<D>, a: &Label<D>, b: &Label<D>, hop_limit
         ResourceKind::Equality => equality_resource_dominates(a.resources[r], b.resources[r]),
     })
 }
-fn reconstruct<const D: usize>(g: &Graph<D>, labels: &[Label<D>], terminal: &Label<D>) -> Route {
+fn reconstruct<const D: usize>(
+    g: &Graph<D>,
+    labels: &[Label<D>],
+    terminal: &Label<D>,
+) -> Result<Route> {
     let mut arcs = vec![];
     let mut resource_profile = vec![];
     let mut next = Some(terminal);
@@ -267,14 +352,16 @@ fn reconstruct<const D: usize>(g: &Graph<D>, labels: &[Label<D>], terminal: &Lab
     for &a in &arcs {
         nodes.push(g.arcs[a].head as i32);
     }
-    Route {
+    Ok(Route {
+        coupled_controls: Vec::new(),
+        coupled_values: g.coupled_paired_values(&arcs)?,
         nodes,
         arcs: arcs.iter().map(|&a| g.arcs[a].id).collect(),
         cost: terminal.cost,
         original_cost: terminal.original_cost,
         resources: terminal.resources[..g.resources.len()].to_vec(),
         resource_profile,
-    }
+    })
 }
 
 /// Complete a label-correcting search or return an error. Budget/time exhaustion
@@ -411,7 +498,7 @@ pub fn reference_price<const D: usize>(g: &Graph<D>, controls: &Controls) -> Res
             if a.head == g.sink {
                 minimum = minimum.min(next.cost);
                 if !controls.negative_only || next.cost < controls.zero_threshold - EPSILON {
-                    let route = reconstruct(g, &labels, &next);
+                    let route = reconstruct(g, &labels, &next)?;
                     // Retain a bounded pool, stable in native (cost, insertion) order.
                     let pos = pool.partition_point(|old| old.cost <= route.cost);
                     if pos < controls.max_columns {

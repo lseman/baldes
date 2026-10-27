@@ -33,6 +33,7 @@ fn mapping(name: &str, network: i32) -> MappedBranchVariable {
         priority: 1.,
         networks: vec![MappedNetworkVariable {
             network,
+            activities: vec![],
             arcs: vec![],
             per_route: 1.,
         }],

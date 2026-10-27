@@ -4,12 +4,13 @@ fn constant(lo: f64, hi: f64, value: f64) -> PiecewiseLinearFunction {
     PiecewiseLinearFunction::new(vec![[lo, value], [hi, value]]).unwrap()
 }
 
-fn graph(mode: PairedResourceMode, waiting: [i32; 2]) -> Graph<2> {
+pub(super) fn graph(mode: PairedResourceMode, waiting: [i32; 2]) -> Graph<2> {
     let mut graph = Graph::<2>::new(3, 0).unwrap();
     graph.add_arc(0, 1, 0.).unwrap();
     graph.add_arc(1, 2, 0.).unwrap();
     graph
         .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+            normalization: crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
             initial: constant(0., 1., 10.),
             initial_base: Window::new(0., 0.).unwrap(),
             arcs: [(3., 8., 2.), (6., 10., 1.)]
@@ -91,6 +92,7 @@ fn piecewise_and_signed_waiting_witnesses_do_not_assume_constant_increments() {
     graph.add_arc(1, 2, 0.).unwrap();
     graph
         .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+            normalization: crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
             initial: PiecewiseLinearFunction::new(vec![[0., 4.], [2., 2.]]).unwrap(),
             initial_base: Window::new(0., 2.).unwrap(),
             arcs: vec![
@@ -206,6 +208,7 @@ fn a_witness_budget_failure_does_not_prove_infeasibility() {
         initial_base,
         arcs,
         mode,
+        ..
     } = definition
     else {
         unreachable!()
@@ -284,6 +287,8 @@ fn every_float_control_in_small_domains_agrees_with_the_certificate() {
             graph.add_arc(0, 1, 0.).unwrap();
             graph
                 .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+                    normalization:
+                        crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
                     initial: PiecewiseLinearFunction::new(initial.clone()).unwrap(),
                     initial_base: Window::new(source(0), source(256)).unwrap(),
                     arcs: vec![PairedResourceArc {
@@ -338,4 +343,69 @@ fn shared_work_and_expired_deadlines_never_publish_a_route_proof() {
     );
     assert_eq!(remaining, 1_000_000);
     assert!(Work(10, Some(expired)).take(1).is_none());
+}
+
+#[test]
+fn weighted_control_point_paired_costs_keep_physical_values_and_cached_join_semantics() {
+    for mode in [
+        PairedResourceMode::CostUnbounded,
+        PairedResourceMode::CostBounded,
+    ] {
+        for normalization in [
+            PairedCostNormalization::FinalMinusInitialMinimum,
+            PairedCostNormalization::AbsoluteFinalValue,
+        ] {
+            for coefficient in [0., 0.5, 1., 2., 1e-308] {
+                let mut graph = graph(mode, [1, 2]);
+                let mut definitions = graph.coupled_kernel().unwrap().definitions().to_vec();
+                if let CoupledResource::PairedPiecewiseLinear {
+                    normalization: saved,
+                    ..
+                } = &mut definitions[0]
+                {
+                    *saved = normalization;
+                }
+                graph.set_coupled_resources(&definitions).unwrap();
+                graph
+                    .set_coupled_objective_coefficients(&[(0, coefficient)])
+                    .unwrap();
+                let kernel = graph.coupled_kernel().unwrap();
+                let expected = (if normalization == PairedCostNormalization::AbsoluteFinalValue {
+                    17.
+                } else {
+                    7.
+                }) * coefficient;
+                assert_eq!(kernel.replay(&[]).unwrap(), Some(0.));
+                assert_eq!(kernel.replay(&[0, 1]).unwrap(), Some(expected));
+                assert_eq!(
+                    kernel.selected_paired_values(&[0, 1]).unwrap(),
+                    Some(vec![(0, 17.)])
+                );
+                let (feasible, bound) = kernel.certify(&[0, 1]).unwrap();
+                assert!(feasible && bound[0] <= expected && expected <= bound[1]);
+                for split in 0..=2 {
+                    let mut f = kernel.root(true);
+                    for arc in 0..split {
+                        f = kernel.extend(&f, arc, true).unwrap().unwrap().0;
+                    }
+                    let mut b = kernel.root(false);
+                    for arc in (split..2).rev() {
+                        b = kernel.extend(&b, arc, false).unwrap().unwrap().0;
+                    }
+                    assert_eq!(
+                        kernel.join_original_objective(&f, &b).unwrap(),
+                        Some(expected)
+                    );
+                    let correction = kernel.join(&f, &b).unwrap().unwrap();
+                    assert_eq!(
+                        f.resource_objective + b.resource_objective + correction,
+                        expected
+                    );
+                }
+            }
+        }
+    }
+    assert!(graph(PairedResourceMode::Feasibility, [1, 2])
+        .set_coupled_objective_coefficients(&[(0, 0.)])
+        .is_err());
 }

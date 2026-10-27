@@ -435,3 +435,121 @@ fn native_near_knots_preserve_segment_advancement_and_endpoint_snaps() {
         ]
     );
 }
+#[test]
+fn short_inner_remainders_preserve_the_composition_anchor_and_stop_coordinate() {
+    let outer = f(&[(0., 0.), (1., 1.), (2., 4.)]);
+    let inner = f(&[(0., 0.), (1.00010001, 1.), (1., 2.)]);
+    for (upper, expected) in [
+        (1., vec![(0, 0), (0x3ff00068de3ade4d, 0x3fefff2e48e8ca4d)]),
+        (
+            1.5,
+            vec![
+                (0, 0),
+                (0x3ff00068de3ade4d, 0x3fefff2e48e8ca4d),
+                (0x40000000055e408a, 0x3ff8000000000000),
+            ],
+        ),
+    ] {
+        let result = complete(compose_increasing(
+            &outer,
+            &inner,
+            0.,
+            upper,
+            FrontOperationPolicy::FrontAlgebra,
+            FrontierBudget::default(),
+        ));
+        assert_eq!(
+            result
+                .pairs()
+                .iter()
+                .map(|&(a, b)| (a.to_bits(), b.to_bits()))
+                .collect::<Vec<_>>(),
+            expected,
+        );
+        let map = match PreparedCompositionMap::new(&inner, FrontierBudget::default()) {
+            FrontierOutcome::Complete(map) => map,
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(
+            complete(map.compose(
+                &outer,
+                0.,
+                upper,
+                FrontOperationPolicy::FrontAlgebra,
+                FrontierBudget::default()
+            ))
+            .pairs(),
+            result.pairs()
+        );
+        // Exact-domain composition still reaches the requested endpoint.
+        let strict = complete(compose_increasing(
+            &outer,
+            &inner,
+            0.,
+            upper,
+            FrontOperationPolicy::StrictDomain,
+            FrontierBudget::default(),
+        ));
+        assert_eq!(strict.domain().1, upper);
+    }
+}
+
+#[test]
+fn composition_matches_retained_finite_and_tolerance_boundary_controls() {
+    for line in
+        include_str!("../../../../../fixtures/coupled/metasolver-composition-boundaries.txt")
+            .lines()
+            .filter(|line| !line.starts_with('#'))
+    {
+        let (input, reference) = line.split_once('|').unwrap();
+        let mut input = input.split_whitespace();
+        let name = input.next().unwrap();
+        let outer_count: usize = input.next().unwrap().parse().unwrap();
+        let inner_count: usize = input.next().unwrap().parse().unwrap();
+        let lo: f64 = input.next().unwrap().parse().unwrap();
+        let hi: f64 = input.next().unwrap().parse().unwrap();
+        assert_eq!(input.next(), Some("0"));
+        let mut pairs = |count| {
+            (0..=count)
+                .map(|_| {
+                    (
+                        input.next().unwrap().parse::<f64>().unwrap(),
+                        input.next().unwrap().parse::<f64>().unwrap(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        let outer = f(&pairs(outer_count));
+        let inner = f(&pairs(inner_count));
+        let mut reference = reference.split_whitespace();
+        assert_eq!(reference.next(), Some(name));
+        assert_eq!(reference.next(), Some("1"));
+        let count: usize = reference.next().unwrap().parse().unwrap();
+        assert_eq!(reference.next(), Some("0"));
+        let expected: Vec<_> = (0..=count)
+            .map(|_| {
+                (
+                    u64::from_str_radix(reference.next().unwrap(), 16).unwrap(),
+                    u64::from_str_radix(reference.next().unwrap(), 16).unwrap(),
+                )
+            })
+            .collect();
+        let actual = complete(compose_increasing(
+            &outer,
+            &inner,
+            lo,
+            hi,
+            FrontOperationPolicy::FrontAlgebra,
+            FrontierBudget::default(),
+        ));
+        assert_eq!(
+            actual
+                .pairs()
+                .iter()
+                .map(|&(a, b)| (a.to_bits(), b.to_bits()))
+                .collect::<Vec<_>>(),
+            expected,
+            "{name}"
+        );
+    }
+}

@@ -240,6 +240,18 @@ pub(super) fn replay_integer_witness<const D: usize>(
     metadata: impl Fn(usize) -> Option<i32>,
     tolerance: f64,
 ) -> Result<Option<IntegerWitness>> {
+    if let Some(witness) = replay_rounded_witness(state, master, &metadata, tolerance)? {
+        return Ok(Some(witness));
+    }
+    control_pricing::repair_witness(state, master, metadata, tolerance)
+}
+
+fn replay_rounded_witness<const D: usize>(
+    state: &State<D>,
+    master: &ClpMaster,
+    metadata: impl Fn(usize) -> Option<i32>,
+    tolerance: f64,
+) -> Result<Option<IntegerWitness>> {
     if !master.solved() {
         return Ok(None);
     }

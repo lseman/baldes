@@ -151,6 +151,7 @@ fn resource_identity_proves_a_cyclic_group_envelope() {
         graph.arc_mut(arc).unwrap().consumption[1] = weight;
     }
     let variable = OriginalPricingVariable {
+        accumulated_resource: None,
         network: 7,
         id: 0,
         cost: -1.,

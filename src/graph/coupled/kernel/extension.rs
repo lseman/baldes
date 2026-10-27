@@ -36,6 +36,12 @@ impl CoupledKernel {
                 .iter()
                 .map(|paired| paired.root(forward))
                 .collect(),
+            pricing_activities: (!self.pricing_activities.is_empty()).then(|| {
+                self.pricing_activities
+                    .iter()
+                    .map(|kernel| kernel.root(forward))
+                    .collect()
+            }),
             numeric_cost: 0.,
             resource_objective: 0.,
             accounting: Some(accounting::ScalarCosts::default()),
@@ -85,6 +91,7 @@ impl CoupledKernel {
                     && a.slope_relations == b.slope_relations
                     && a.relations == b.relations
                     && a.plugins == b.plugins
+                    && a.pricing_activities == b.pricing_activities
                     && a.numeric == b.numeric
                     && a.suffix == b.suffix
                     && a.selection.len() == b.selection.len()
@@ -97,7 +104,8 @@ impl CoupledKernel {
         }
     }
     /// Extend a physical arc using the necessary complete-route filter. The
-    /// returned increment belongs to both reduced and original objectives.
+    /// returned increment belongs to the pricing objective. Pricing-only
+    /// adjustments do not alter the separately tracked original objective.
     /// Arithmetic failure is distinct from infeasibility. Standalone partial
     /// paths can be evaluated separately with `replay` or `replay_state`.
     pub fn extend(
@@ -153,6 +161,7 @@ impl CoupledKernel {
             slope_relations: Vec::with_capacity(state.slope_relations.len()),
             relations: Vec::with_capacity(state.relations.len()),
             plugins: Vec::with_capacity(state.plugins.len()),
+            pricing_activities: None,
             numeric_cost: 0.,
             resource_objective: 0.,
             accounting: None,
@@ -351,25 +360,83 @@ impl CoupledKernel {
             new_cost
         };
         next.numeric_cost = cost;
-        let mut objective = next.numeric_cost;
-        for front in &next.fronts {
+        next.resource_objective = self.final_resource_objective(&next, &[])?;
+        if let Some(states) = &state.pricing_activities {
+            let mut prices = Vec::with_capacity(states.len());
+            for (kernel, previous) in self.pricing_activities.iter().zip(states.iter()) {
+                let Some((value, _)) =
+                    kernel.extend_internal(previous, arc, forward, false, false, workspace)?
+                else {
+                    return Ok(None);
+                };
+                prices.push(value);
+            }
+            next.pricing_activities = Some(prices.into_boxed_slice());
+        }
+        let increment = finite(next.pricing_objective()? - state.pricing_objective()?)?;
+        Ok(Some((Box::new(next), increment)))
+    }
+    pub(super) fn final_resource_objective(
+        &self,
+        state: &CoupledLabelState,
+        selected: &[(usize, f64)],
+    ) -> Result<f64> {
+        let mut objective = state.numeric_cost;
+        for front in &state.fronts {
             objective = finite(objective + front.minimum())?;
         }
-        for front in &next.slope_fronts {
+        for front in &state.slope_fronts {
             objective = finite(objective + front.minimum)?;
         }
-        for front in &next.slope_relations {
-            objective = finite(objective + front.minimum)?;
+        // Controls replace charges in place; they do not reorder arithmetic.
+        if selected.is_empty() {
+            for front in &state.slope_relations {
+                objective = finite(objective + front.minimum)?;
+            }
+        } else {
+            for (((resource, _), prepared), front) in self
+                .definitions
+                .iter()
+                .enumerate()
+                .filter(|(_, d)| matches!(d, CoupledResource::SlopePaired { .. }))
+                .zip(&self.slope_paired)
+                .zip(&state.slope_relations)
+            {
+                let charge = match selected.iter().find(|(index, _)| *index == resource) {
+                    Some((_, value)) => prepared.final_objective(*value, self.cost_scale)?,
+                    None => front.minimum,
+                };
+                objective = finite(objective + charge)?;
+            }
         }
-        for (prepared, label) in self.paired.iter().zip(&next.relations) {
-            objective = finite(objective + prepared.objective(label, self.cost_scale)?)?;
+        for ((&resource, prepared), label) in self
+            .relation_indices
+            .iter()
+            .zip(&self.paired)
+            .zip(&state.relations)
+        {
+            let charge = match selected.iter().find(|(index, _)| *index == resource) {
+                Some((_, value)) => prepared.final_objective(*value, self.cost_scale)?,
+                None => prepared.objective(label, self.cost_scale)?,
+            };
+            objective = finite(objective + charge)?;
         }
-        next.resource_objective = objective;
-        Ok(Some((
-            Box::new(next),
-            finite(objective - state.resource_objective)?,
-        )))
+        if self.cost_scale != 0. {
+            for (plugin, label) in self.plugins.iter().zip(&state.plugins) {
+                if plugin.0.has_costs() {
+                    objective = finite(
+                        objective
+                            + finite(
+                                self.cost_scale
+                                    * finite(plugin.0.objective(label, state.suffix.is_none())?)?,
+                            )?,
+                    )?;
+                }
+            }
+        }
+        Ok(objective)
     }
+
     /// Join at one physical vertex. All arc services are accounted for once.
     pub fn replay(&self, arcs: &[usize]) -> Result<Option<f64>> {
         Ok(self.replay_state(arcs)?.map(|(_, cost)| cost))

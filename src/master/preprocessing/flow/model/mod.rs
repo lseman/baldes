@@ -91,6 +91,16 @@ pub(super) fn apply<const D: usize>(
     let shared_start = constraints.len();
     let mut equalities = vec![];
     for (r, shared) in state.shared_rows.iter().enumerate() {
+        // Signed nonlinear activities have no additive flow envelope here.
+        // Dropping this entire row enlarges the domain; omitting only the
+        // activity term could incorrectly prove infeasibility or fix arcs.
+        if state
+            .oracles
+            .iter()
+            .any(|o| o.activity_rows.iter().any(|entry| entry.row == r))
+        {
+            continue;
+        }
         let nonlinear = state
             .oracles
             .iter()
@@ -174,7 +184,10 @@ pub(super) fn apply<const D: usize>(
     remaining -= link_work;
     report.propagation.work_used = build_work + link_work;
     let resources = state.oracles.iter().any(|o| {
-        !o.knapsack_rows.is_empty() || !o.presence_rows.is_empty() || !o.nonlinear_rows.is_empty()
+        !o.knapsack_rows.is_empty()
+            || !o.presence_rows.is_empty()
+            || !o.nonlinear_rows.is_empty()
+            || !o.activity_rows.is_empty()
     });
     loop {
         if remaining == 0 || Instant::now() >= state.deadline {

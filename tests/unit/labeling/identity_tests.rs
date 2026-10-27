@@ -17,6 +17,8 @@ fn reserved_identity_preserves_arc_and_schedule_encoding() {
             ]],
         ] {
             let route = Route {
+                coupled_controls: Vec::new(),
+                coupled_values: Vec::new(),
                 nodes: vec![],
                 arcs: arcs.clone(),
                 cost: 0.,
@@ -39,4 +41,20 @@ fn reserved_identity_preserves_arc_and_schedule_encoding() {
             assert_eq!(route.identity(), expected);
         }
     }
+}
+
+#[test]
+fn paired_selected_values_distinguish_columns_and_canonicalize_signed_zero() {
+    let route = |value| Route {
+        nodes: vec![0, 1],
+        arcs: vec![0],
+        cost: 1.,
+        original_cost: 1.,
+        resources: vec![],
+        resource_profile: vec![vec![], vec![]],
+        coupled_controls: Vec::new(),
+        coupled_values: vec![(2, value)],
+    };
+    assert_ne!(route(1.).identity(), route(2.).identity());
+    assert_eq!(route(0.).identity(), route(-0.).identity());
 }

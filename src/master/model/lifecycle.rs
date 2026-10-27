@@ -76,6 +76,7 @@ impl<const D: usize> State<D> {
                     nonlinear_rows: o.nonlinear_rows.clone(),
                     knapsack_rows: o.knapsack_rows.clone(),
                     presence_rows: o.presence_rows.clone(),
+                    activity_rows: o.activity_rows.clone(),
                     resource_groups: o.resource_groups.clone(),
                     synchronized_windows: o.synchronized_windows.clone(),
                     proved_zero_arcs: o.proved_zero_arcs.clone(),
@@ -281,6 +282,7 @@ impl<const D: usize> NodeSnapshot<D> {
                 .chain(&o.knapsack_rows)
                 .chain(&o.presence_rows)
                 .any(|&(_, r)| r == shared_row)
+                || o.activity_rows.iter().any(|entry| entry.row == shared_row)
         }) || row.sense != RowSense::Equal
             || row.rhs != 1.
             || !self.state.oracles.iter().any(|o| o.network.id == network)
@@ -407,6 +409,106 @@ impl<const D: usize> NodeSnapshot<D> {
         Ok(candidates)
     }
 
+    /// Generate a paired source control on one registered physical path.
+    /// The returned cell bound applies to this descriptor, not whole-model
+    /// pricing. A partial result can retain a proved feasible candidate.
+    pub fn optimize_route_control(
+        &self,
+        route: usize,
+        resource: usize,
+        maximize: bool,
+        terminal: Option<crate::graph::Window>,
+        limits: crate::master::controls::ControlSearchLimits,
+    ) -> Result<crate::master::controls::ControlOptimization> {
+        let route = self
+            .state
+            .routes
+            .get(route)
+            .ok_or_else(|| invalid("unknown control optimization route"))?;
+        let oracle = self
+            .state
+            .oracles
+            .iter()
+            .find(|oracle| oracle.network.id == route.network)
+            .unwrap();
+        let path = route
+            .route
+            .arcs
+            .iter()
+            .map(|id| {
+                oracle
+                    .index
+                    .get(id)
+                    .copied()
+                    .ok_or_else(|| invalid("unknown control optimization arc"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        crate::master::controls::optimize_paired_control(
+            &oracle.network.graph,
+            &path,
+            resource,
+            maximize,
+            terminal,
+            limits,
+        )
+    }
+
+    /// Retain an independently verified alternative paired control for an
+    /// existing physical route. The shared pool rebuilds costs and identities;
+    /// a complete/cutoff universe cannot be widened by this operation.
+    pub fn with_route_controls(
+        &self,
+        route: usize,
+        controls: Vec<crate::graph::coupled::PairedControl>,
+    ) -> Result<Self> {
+        if self.state.universe.is_some() {
+            return Err(invalid(
+                "cannot add a control outside a complete route universe",
+            ));
+        }
+        let seed = self
+            .state
+            .routes
+            .get(route)
+            .ok_or_else(|| invalid("unknown controlled route"))?;
+        let oracle = self
+            .state
+            .oracles
+            .iter()
+            .find(|oracle| oracle.network.id == seed.network)
+            .unwrap();
+        let controlled = seed
+            .route
+            .clone()
+            .with_paired_controls(&oracle.network.graph, controls)?;
+        if !integer_route_feasible(oracle, &controlled)? {
+            return Err(invalid("controlled route is not original feasible"));
+        }
+        let identity = controlled.identity();
+        if self
+            .state
+            .tags
+            .contains_key(&(seed.network, identity.clone()))
+        {
+            return self.fork();
+        }
+        let pool = column_pool::Pool::from_route(NetworkRoute {
+            network: seed.network,
+            route: controlled,
+        });
+        let mut node = self.fork()?;
+        let deadline = Instant::now()
+            .checked_add(std::time::Duration::from_secs(5))
+            .ok_or_else(|| invalid("control transfer deadline overflow"))?;
+        pool.seed(&mut node, deadline)?;
+        if !node.state.tags.contains_key(&(seed.network, identity)) {
+            return Err(incomplete(
+                "controlled route is outside the recipient pool domain",
+            ));
+        }
+        Ok(node)
+    }
+
     /// Fix additional integer copies of a registered route. Every row (including
     /// cuts and branches), network multiplicity and objective offset is adjusted.
     pub fn fix_route(&self, route: usize, quantity: f64) -> Result<Self> {
@@ -428,7 +530,10 @@ impl<const D: usize> NodeSnapshot<D> {
                 .copied()
                 .find(|&tag| {
                     let candidate = &self.state.routes[tag];
-                    candidate.network == route.network && candidate.route.arcs == route.route.arcs
+                    candidate.network == route.network
+                        && candidate.route.arcs == route.route.arcs
+                        && (route.route.coupled_controls.is_empty()
+                            || candidate.route.identity() == route.route.identity())
                 })
                 .ok_or_else(|| invalid("fixed route absent from the active complete domain"))?;
             let upper = enumeration::route_upper(&self.state, canonical)
@@ -603,10 +708,10 @@ pub(super) fn install_seed_routes<const D: usize>(
             .iter()
             .map(|id| oracle.network.graph.arcs[oracle.index[id]].cost)
             .sum::<f64>()
-            + oracle
-                .network
-                .graph
-                .coupled_path_cost(
+            + seed
+                .route
+                .coupled_cost(
+                    &oracle.network.graph,
                     &seed
                         .route
                         .arcs

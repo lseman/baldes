@@ -57,7 +57,7 @@ fn main() -> baldes::Result<()> {
         rows: vec![],
         networks: vec![Network {
             id: 7, graph, multiplicity: Window::new(0., 1.)?,
-            arc_entries: vec![vec![], vec![]], route_entries: vec![],
+            arc_entries: vec![vec![], vec![]], route_entries: vec![], activity_entries: vec![],
         }],
     };
     let root = model::solve(problem.clone(), model::Options::default())?;

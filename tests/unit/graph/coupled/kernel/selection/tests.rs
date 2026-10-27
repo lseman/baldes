@@ -61,7 +61,7 @@ fn first_window_schedule_caps_length_and_falls_back_to_the_shortest() {
 }
 
 #[test]
-fn first_window_arc_failure_has_zero_length_and_remembers_the_head() {
+fn individually_empty_arc_needs_no_additional_selection_memory() {
     let mut graph = Graph::<2>::new(4, 1).unwrap();
     for (tail, head) in [(0, 1), (1, 2), (2, 3)] {
         graph.add_arc(tail, head, 0.).unwrap();
@@ -75,8 +75,11 @@ fn first_window_arc_failure_has_zero_length_and_remembers_the_head() {
         }])
         .unwrap();
     let mut kernel = graph.coupled_kernel().unwrap().clone();
-    assert!(kernel.strengthen_selection_first_windows(&[0, 1, 2], 0));
-    assert_eq!(remembered(&kernel, 0), vec![1, 2]);
+    assert!(!kernel.strengthen_selection_first_windows(&[0, 1, 2], 0));
+    assert!(remembered(&kernel, 0).is_empty());
+    for split in 0..=3 {
+        assert!(!accepts_split(&kernel, &[0, 1, 2], split));
+    }
 }
 
 #[test]
@@ -335,6 +338,385 @@ fn relaxed_vertex_selection_matches_exact_master_and_never_accepts_improper_incu
                     assert!(kernel.selection_proper(&arcs));
                 }
             }
+        }
+    }
+}
+
+#[test]
+fn packed_word_boundaries_and_directional_forgetting_match_metasolver_observations() {
+    let fixture = include_str!("../../../../../fixtures/coupled/metasolver-selection-packed.txt");
+    let mut observations = 0;
+    let mut largest_word_count = 0;
+    let mut largest_descriptor_count = 0;
+    for line in fixture.lines().filter(|line| !line.starts_with('#')) {
+        let fields: Vec<_> = line.split_whitespace().collect();
+        let forward = fields[1] == "1";
+        let relaxed = fields[2] == "1";
+        let count: usize = fields[3].parse().unwrap();
+        let words: usize = fields[4].parse().unwrap();
+        let success = fields[5] == "1";
+        assert_eq!(fields.len(), 6 + count * 6);
+        let mut graph = Graph::<2>::new(5, 0).unwrap();
+        graph.add_arc(0, 1, 0.).unwrap();
+        graph.add_arc(1, 2, 0.).unwrap();
+        graph.add_arc(2, 4, 0.).unwrap();
+        let target_vertex = if forward { 2 } else { 1 };
+        let prefix_arc = if forward { 0 } else { 2 };
+        let target_arc = 1;
+        let mut before = Vec::new();
+        let mut after = Vec::new();
+        let mut remembered = Vec::new();
+        let definitions: Vec<_> = fields[6..]
+            .chunks_exact(6)
+            .map(|resource| {
+                let width: u32 = resource[0].parse().unwrap();
+                let universe = u64::MAX >> (64 - width);
+                let domain = u64::from_str_radix(resource[1], 16).unwrap();
+                let arc = u64::from_str_radix(resource[2], 16).unwrap();
+                let vertex = u64::from_str_radix(resource[3], 16).unwrap();
+                remembered.push(resource[4] == "1");
+                after.push(u64::from_str_radix(resource[5], 16).unwrap());
+                before.push(domain);
+                let mut allowed = vec![universe; 3];
+                allowed[prefix_arc] = domain;
+                allowed[target_arc] = arc;
+                let mut vertices = vec![universe; 5];
+                vertices[target_vertex] = vertex;
+                CoupledResource::Selection {
+                    initial: universe,
+                    allowed,
+                    vertices,
+                    relaxed,
+                }
+            })
+            .collect();
+        graph.set_coupled_resources(&definitions).unwrap();
+        let mut kernel = graph.coupled_kernel().unwrap().clone();
+        for (resource, &keep) in remembered.iter().enumerate() {
+            let memory = kernel.selection_memory[resource].as_mut().unwrap();
+            memory.remembered.fill(true);
+            memory.remembered[target_vertex] = keep;
+        }
+        let root = kernel.root(forward);
+        let state = kernel
+            .extend(&root, prefix_arc, forward)
+            .unwrap()
+            .unwrap()
+            .0;
+        assert_eq!(
+            state.selection_domains(),
+            before,
+            "{} forward={forward}",
+            fields[0]
+        );
+        let actual = kernel.extend(&state, target_arc, forward).unwrap();
+        assert_eq!(actual.is_some(), success, "{} forward={forward}", fields[0]);
+        if let Some((state, cost)) = actual {
+            assert_eq!(cost, 0.);
+            assert_eq!(
+                state.selection_domains(),
+                after,
+                "{} forward={forward}",
+                fields[0]
+            );
+        }
+        observations += 1;
+        largest_word_count = largest_word_count.max(words);
+        largest_descriptor_count = largest_descriptor_count.max(count);
+    }
+    assert_eq!(observations, 648);
+    assert_eq!(largest_word_count, 16);
+    assert_eq!(largest_descriptor_count, 40);
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn registered_selection_preparation_matches_actual_masks_and_path_domains() {
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../../fixtures/coupled/metasolver-selection-preparation.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        corpus["reference_sha256"],
+        "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6"
+    );
+    let mut prepared_models = 0;
+    let mut rejected_models = 0;
+    let mut transitions = 0;
+    let mut path_splits = 0;
+    for case in corpus["cases"].as_array().unwrap() {
+        if !case["valid"].as_bool().unwrap() {
+            // These exceed the reference's value/packed-storage limits. They
+            // do not imply a matching BALDES descriptor-count restriction.
+            assert_eq!(case["preparation"]["return"], 0);
+            rejected_models += 1;
+            continue;
+        }
+        assert_eq!(case["preparation"]["return"], 1);
+        let state = &case["preparation"]["state"];
+        assert_eq!(state["parameters"]["relaxed"], 0);
+        let mut graph = Graph::<2>::new(case["vertices"].as_u64().unwrap() as usize, 1).unwrap();
+        for vertex in 0..graph.vertices.len() {
+            graph.set_bounds(vertex, 0, 0., 4.).unwrap();
+        }
+        for arc in case["arcs"].as_array().unwrap() {
+            let id = graph
+                .add_arc(
+                    arc["tail"].as_u64().unwrap() as usize,
+                    arc["head"].as_u64().unwrap() as usize,
+                    arc["cost"].as_f64().unwrap(),
+                )
+                .unwrap();
+            graph.arc_mut(id).unwrap().consumption[0] = 1.;
+        }
+        let definitions: Vec<_> = case["selection"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|resource| {
+                let size = resource["values"].as_u64().unwrap();
+                let universe = u64::MAX >> (64 - size);
+                CoupledResource::Selection {
+                    initial: universe,
+                    vertices: resource["vertices"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|m| m.as_u64().unwrap())
+                        .collect(),
+                    allowed: resource["allowed"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|m| m.as_u64().unwrap())
+                        .collect(),
+                    relaxed: false,
+                }
+            })
+            .collect();
+        graph.set_coupled_resources(&definitions).unwrap();
+        let kernel = graph.coupled_kernel().unwrap();
+        let descriptors = state["descriptors"].as_array().unwrap();
+        let mapping: Vec<_> = state["vertex_mapping"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v["original"].as_u64().unwrap() as usize)
+            .collect();
+        let mut slots = Vec::new();
+        for descriptor in descriptors {
+            let resource = case["selection"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .position(|r| r["id"] == descriptor["id"])
+                .unwrap();
+            let word = descriptor["word"].as_u64().unwrap() as usize;
+            let offset = descriptor["offset"].as_u64().unwrap() as u32;
+            let mask = descriptor["mask"].as_u64().unwrap();
+            let memory = kernel.selection_memory[resource].as_ref().unwrap();
+            for (internal, &original) in mapping.iter().enumerate() {
+                let actual =
+                    (state["vertex_masks"][internal][word].as_u64().unwrap() & mask) >> offset;
+                assert_eq!(
+                    memory.masks[original], actual,
+                    "{} resource={resource} vertex={original}",
+                    case["name"]
+                );
+                assert_eq!(
+                    state["forget_masks"][internal][word].as_u64().unwrap() & mask,
+                    0
+                );
+                assert!(memory.remembered[original]);
+            }
+            slots.push((resource, word, offset, mask));
+        }
+        for forward in [true, false] {
+            let root = kernel.root(forward);
+            for arc in state["arcs"].as_array().unwrap() {
+                let physical = arc["id"].as_u64().unwrap() as usize;
+                let arrival = arc[if forward { "head" } else { "tail" }].as_u64().unwrap() as usize;
+                let mut expected = vec![0; slots.len()];
+                for &(resource, word, offset, mask) in &slots {
+                    expected[resource] = ((arc["masks"][word].as_u64().unwrap()
+                        & state["vertex_masks"][arrival][word].as_u64().unwrap())
+                        & mask)
+                        >> offset;
+                }
+                let actual = kernel.extend(&root, physical, forward).unwrap();
+                assert_eq!(
+                    actual.is_some(),
+                    expected.iter().all(|&d| d != 0),
+                    "{} arc={physical} forward={forward}",
+                    case["name"]
+                );
+                if let Some((state, cost)) = actual {
+                    assert_eq!(state.selection_domains(), expected);
+                    assert_eq!(cost, 0.);
+                }
+                transitions += 1;
+            }
+        }
+        let mut optimum: f64 = 0.;
+        for path in [&[0, 1, 2][..], &[3][..]] {
+            let feasible = kernel.selection_proper(path);
+            for split in 0..=path.len() {
+                assert_eq!(
+                    accepts_split(kernel, path, split),
+                    feasible,
+                    "{} split={split}",
+                    case["name"]
+                );
+                path_splits += 1;
+            }
+            if feasible {
+                optimum = optimum.min(path.iter().map(|&a| graph.arcs[a].cost).sum());
+            }
+        }
+        assert_eq!(
+            optimum,
+            case["reference_optimum"].as_f64().unwrap(),
+            "{}",
+            case["name"]
+        );
+        prepared_models += 1;
+    }
+    assert_eq!(prepared_models, 58);
+    assert_eq!(rejected_models, 6);
+    assert_eq!(transitions, 464);
+    assert_eq!(path_splits, 348);
+}
+
+#[test]
+fn selection_first_windows_match_enabled_reference_controls_at_every_join() {
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../../fixtures/coupled/metasolver-selection-strengthening.json"
+    ))
+    .unwrap();
+    let mut splits = 0;
+    for case in corpus["cases"].as_array().unwrap() {
+        let number = |v: &serde_json::Value| v.as_u64().unwrap() as usize;
+        let mut graph = Graph::<2>::new(number(&case["vertices"]), 1).unwrap();
+        for arc in case["arcs"].as_array().unwrap() {
+            graph.add_arc(number(&arc[0]), number(&arc[1]), 0.).unwrap();
+        }
+        let resources: Vec<_> = case["selection"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| {
+                let masks = |key: &str| {
+                    r[key]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|m| m.as_u64().unwrap())
+                        .collect()
+                };
+                CoupledResource::Selection {
+                    initial: (1 << number(&r["values"])) - 1,
+                    allowed: masks("allowed"),
+                    vertices: masks("vertices"),
+                    relaxed: true,
+                }
+            })
+            .collect();
+        graph.set_coupled_resources(&resources).unwrap();
+        let mut kernel = graph.coupled_kernel().unwrap().clone();
+        let paths: Vec<Vec<usize>> = case["paths"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["arcs"].as_array().unwrap().iter().map(number).collect())
+            .collect();
+        for (index, path) in paths.iter().enumerate() {
+            let expected = case["reference"]["windows"][index].as_array().unwrap();
+            let actual: Vec<_> = kernel
+                .selection_masks()
+                .enumerate()
+                .filter_map(|(r, masks)| {
+                    let window = first_violating_window(&masks, path)?;
+                    let vertices: Vec<_> = std::iter::once(0)
+                        .chain(path.iter().map(|&a| graph.arcs[a].head))
+                        .collect();
+                    let first = vertices
+                        .iter()
+                        .position(|v| *v == window.vertices[0])
+                        .unwrap();
+                    Some(serde_json::json!([r, first, first + window.length]))
+                })
+                .collect();
+            assert_eq!(&actual, expected, "{} path={index}", case["name"]);
+        }
+        if case["limit"].as_i64().unwrap() >= 0 {
+            for path in &paths {
+                kernel.strengthen_selection_first_windows(path, case["cap"].as_i64().unwrap());
+            }
+        }
+        for r in 0..resources.len() {
+            let expected: Vec<_> = case["reference"]["remembered"][r]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(number)
+                .collect();
+            assert_eq!(
+                remembered(&kernel, r),
+                expected,
+                "{} resource={r}",
+                case["name"]
+            );
+        }
+        for path in paths {
+            for split in 0..=path.len() {
+                if case["limit"].as_i64().unwrap() >= 0 {
+                    assert_eq!(
+                        accepts_split(&kernel, &path, split),
+                        kernel.selection_proper(&path),
+                        "{} split={split}",
+                        case["name"]
+                    );
+                }
+                splits += 1;
+            }
+        }
+    }
+    assert_eq!(splits, 663);
+}
+
+#[test]
+fn first_window_memory_preserves_endpoint_constraints_at_every_join() {
+    let mut graph = Graph::<2>::new(4, 1).unwrap();
+    for (tail, head) in [(0, 1), (1, 2), (2, 3)] {
+        graph.add_arc(tail, head, 0.).unwrap();
+    }
+    for encoded in 0..3_usize.pow(7) {
+        let mut digits = encoded;
+        let mut mask = || {
+            let value = (digits % 3 + 1) as u64;
+            digits /= 3;
+            value
+        };
+        let vertices = (0..4).map(|_| mask()).collect();
+        let allowed = (0..3).map(|_| mask()).collect();
+        graph
+            .set_coupled_resources(&[CoupledResource::Selection {
+                initial: 3,
+                allowed,
+                vertices,
+                relaxed: true,
+            }])
+            .unwrap();
+        let mut kernel = graph.coupled_kernel().unwrap().clone();
+        let path = [0, 1, 2];
+        let proper = kernel.selection_proper(&path);
+        kernel.strengthen_selection_first_windows(&path, 0);
+        for split in 0..=3 {
+            assert_eq!(
+                accepts_split(&kernel, &path, split),
+                proper,
+                "masks={encoded} split={split}"
+            );
         }
     }
 }

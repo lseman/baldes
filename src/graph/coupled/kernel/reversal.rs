@@ -3,7 +3,8 @@ use super::*;
 
 impl CoupledKernel {
     pub(crate) fn reversal_eligible(&self, reverse: &[usize]) -> bool {
-        if reverse.len() != self.arc_count
+        if !self.pricing_activities.is_empty()
+            || reverse.len() != self.arc_count
             || reverse
                 .iter()
                 .enumerate()

@@ -228,7 +228,7 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
     ) -> Result<crate::master::pricing::Request> {
         use crate::master::pricing::{Envelopes, Request};
         let oracle = &mut self.state.oracles[index];
-        if self.state.universe.is_some() {
+        if self.state.universe.is_some() || control_pricing::needed(oracle) {
             return Ok(Request {
                 phase,
                 exact: true,
@@ -252,6 +252,9 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
                     })
                 }),
         );
+        if !oracle.activity_rows.is_empty() {
+            super::activity_rows::price(oracle, duals, self.state.shared_offset)?;
+        }
         for &(cut, row) in &oracle.nonlinear_rows {
             oracle.solver.cuts.cuts[cut].dual = duals[self.state.shared_offset + row];
         }
@@ -347,6 +350,34 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
         index: usize,
         duals: &[f64],
     ) -> Option<Result<crate::master::pricing::Retained>> {
+        if self.state.universe.is_none() && control_pricing::needed(&self.state.oracles[index]) {
+            return Some((|| {
+                let (routes, minimum) = control_pricing::price(self.state, index, duals)?;
+                self.state.oracles[index].calls += 1;
+                let collected = self.collect(index, routes, 0., duals)?;
+                let upper = self.state.oracles[index].multiplicity_upper();
+                let columns = collected
+                    .columns
+                    .into_iter()
+                    .map(|column| {
+                        let cap = self
+                            .state
+                            .route_upper_bounds
+                            .get(&(column.tag as usize))
+                            .copied()
+                            .unwrap_or(upper)
+                            .min(upper);
+                        (column, cap)
+                    })
+                    .collect();
+                Ok(crate::master::pricing::Retained {
+                    minimum_bound: Some(minimum),
+                    columns,
+                    independent_caps: false,
+                    maximum: usize::MAX,
+                })
+            })());
+        }
         let universe = self.state.universe.as_ref()?;
         Some((|| {
             let oracle = &mut self.state.oracles[index];
@@ -389,6 +420,7 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
                 ));
             }
             Ok(crate::master::pricing::Retained {
+                minimum_bound: None,
                 columns,
                 independent_caps: true,
                 maximum: usize::MAX,
@@ -414,10 +446,9 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
                 .iter()
                 .map(|id| oracle.network.graph.arcs[oracle.index[id]].cost)
                 .sum::<f64>()
-                + oracle
-                    .network
-                    .graph
-                    .coupled_path_cost(
+                + route
+                    .coupled_cost(
+                        &oracle.network.graph,
                         &route
                             .arcs
                             .iter()
@@ -492,7 +523,8 @@ fn additive<const D: usize>(oracle: &Oracle<D>) -> crate::master::pricing::Addit
         supported: oracle.nonlinear_rows.is_empty()
             && oracle.knapsack_rows.is_empty()
             && oracle.presence_rows.is_empty()
-            && oracle.resource_groups.is_empty(),
+            && oracle.resource_groups.is_empty()
+            && oracle.activity_rows.is_empty(),
     }
 }
 fn nonnegative_box<const D: usize>(oracle: &Oracle<D>, offset: f64) -> bool {
@@ -512,6 +544,7 @@ fn finite_variable_box<const D: usize>(
         || !oracle.knapsack_rows.is_empty()
         || !oracle.presence_rows.is_empty()
         || !oracle.resource_groups.is_empty()
+        || !oracle.activity_rows.is_empty()
         || oracle.network.graph.has_coupled_resources()
     {
         return None;
@@ -545,13 +578,21 @@ fn grouped_variable_box<const D: usize>(
     duals: &[f64],
     shared_offset: usize,
 ) -> Option<BoxAdmission> {
+    if oracle.network.graph.has_coupled_resources() {
+        return grouped_boxes::coupled_admission(oracle, groups, duals, shared_offset);
+    }
     if !offset.is_finite()
         || oracle.costs.len() != groups.caps.len()
+        || groups
+            .variables
+            .iter()
+            .any(|v| v.accumulated_resource.is_some())
         || oracle.costs.iter().any(|c| !c.is_finite())
         || !oracle.nonlinear_rows.is_empty()
         || !oracle.knapsack_rows.is_empty()
         || !oracle.presence_rows.is_empty()
         || !oracle.resource_groups.is_empty()
+        || !oracle.activity_rows.is_empty()
         || oracle.network.graph.has_coupled_resources()
     {
         return None;
@@ -649,3 +690,7 @@ fn near_zero_box<const D: usize>(
 #[cfg(test)]
 #[path = "../../../tests/unit/master/model/grouped_box_tests.rs"]
 mod grouped_box_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/unit/master/model/coupled_admission_tests.rs"]
+mod coupled_admission_tests;

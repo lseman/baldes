@@ -1,0 +1,4657 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "cases": [
+    {
+      "name": "fictive-00",
+      "registration": {
+        "fictive": true,
+        "vertices": 4,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 2,
+            "vertices": [
+              3,
+              2,
+              2,
+              3
+            ],
+            "allowed": [
+              3,
+              3,
+              3
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 4,
+        "sink_distance": 3,
+        "midpoint": 1,
+        "distances": [
+          0,
+          2,
+          1,
+          3
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 1,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 2,
+            "tail": 1,
+            "head": 3
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -3.0,
+        "bcRecRootLpVal": -3.0,
+        "bcRecBestInc": -3.0,
+        "bcRecBestDb": -3.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -3,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 4,
+            "source": 0,
+            "sink": 3,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 3,
+                "vertices": [
+                  3,
+                  2,
+                  2,
+                  3
+                ],
+                "allowed": [
+                  3,
+                  3,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-01",
+      "registration": {
+        "fictive": true,
+        "vertices": 4,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 64,
+            "vertices": [
+              18446744073709551615,
+              9223372036854775808,
+              9223372036854775808,
+              18446744073709551615
+            ],
+            "allowed": [
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 4,
+        "sink_distance": 3,
+        "midpoint": 1,
+        "distances": [
+          0,
+          2,
+          1,
+          3
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 1,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 2,
+            "tail": 1,
+            "head": 3
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -3.0,
+        "bcRecRootLpVal": -3.0,
+        "bcRecBestInc": -3.0,
+        "bcRecBestDb": -3.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -3,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 4,
+            "source": 0,
+            "sink": 3,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 18446744073709551615,
+                "vertices": [
+                  18446744073709551615,
+                  9223372036854775808,
+                  9223372036854775808,
+                  18446744073709551615
+                ],
+                "allowed": [
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-02",
+      "registration": {
+        "fictive": true,
+        "vertices": 4,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 2,
+            "vertices": [
+              3,
+              2,
+              1,
+              3
+            ],
+            "allowed": [
+              3,
+              3,
+              3
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 4,
+        "sink_distance": 3,
+        "midpoint": 1,
+        "distances": [
+          0,
+          2,
+          1,
+          3
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 1,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 2,
+            "tail": 1,
+            "head": 3
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 4,
+            "source": 0,
+            "sink": 3,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 3,
+                "vertices": [
+                  3,
+                  2,
+                  1,
+                  3
+                ],
+                "allowed": [
+                  3,
+                  3,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-03",
+      "registration": {
+        "fictive": true,
+        "vertices": 4,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 64,
+            "vertices": [
+              18446744073709551615,
+              9223372036854775808,
+              1,
+              18446744073709551615
+            ],
+            "allowed": [
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 4,
+        "sink_distance": 3,
+        "midpoint": 1,
+        "distances": [
+          0,
+          2,
+          1,
+          3
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 1,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 2,
+            "tail": 1,
+            "head": 3
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 4,
+            "source": 0,
+            "sink": 3,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 18446744073709551615,
+                "vertices": [
+                  18446744073709551615,
+                  9223372036854775808,
+                  1,
+                  18446744073709551615
+                ],
+                "allowed": [
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-04",
+      "registration": {
+        "fictive": true,
+        "vertices": 4,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 0,
+            "head": 3,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 2,
+            "vertices": [
+              3,
+              2,
+              2,
+              3
+            ],
+            "allowed": [
+              3,
+              3,
+              3,
+              3
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 4,
+        "sink_distance": 1,
+        "midpoint": 0,
+        "distances": [
+          0,
+          2,
+          1,
+          1
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 1,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 2,
+            "tail": 1,
+            "head": 3
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 3
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -3.0,
+        "bcRecRootLpVal": -3.0,
+        "bcRecBestInc": -3.0,
+        "bcRecBestDb": -3.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -3,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 4,
+            "source": 0,
+            "sink": 3,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 3,
+                "vertices": [
+                  3,
+                  2,
+                  2,
+                  3
+                ],
+                "allowed": [
+                  3,
+                  3,
+                  3,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-05",
+      "registration": {
+        "fictive": true,
+        "vertices": 4,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 0,
+            "head": 3,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 64,
+            "vertices": [
+              18446744073709551615,
+              9223372036854775808,
+              9223372036854775808,
+              18446744073709551615
+            ],
+            "allowed": [
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 4,
+        "sink_distance": 1,
+        "midpoint": 0,
+        "distances": [
+          0,
+          2,
+          1,
+          1
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 1,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 2,
+            "tail": 1,
+            "head": 3
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 3
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -3.0,
+        "bcRecRootLpVal": -3.0,
+        "bcRecBestInc": -3.0,
+        "bcRecBestDb": -3.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -3,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 4,
+            "source": 0,
+            "sink": 3,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 18446744073709551615,
+                "vertices": [
+                  18446744073709551615,
+                  9223372036854775808,
+                  9223372036854775808,
+                  18446744073709551615
+                ],
+                "allowed": [
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-06",
+      "registration": {
+        "fictive": true,
+        "vertices": 4,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 0,
+            "head": 3,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 2,
+            "vertices": [
+              3,
+              2,
+              1,
+              3
+            ],
+            "allowed": [
+              3,
+              3,
+              3,
+              3
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 4,
+        "sink_distance": 1,
+        "midpoint": 0,
+        "distances": [
+          0,
+          2,
+          1,
+          1
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 1,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 2,
+            "tail": 1,
+            "head": 3
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 3
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -1.0,
+        "bcRecRootLpVal": -1.0,
+        "bcRecBestInc": -1.0,
+        "bcRecBestDb": -1.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -1,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 4,
+            "source": 0,
+            "sink": 3,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 3,
+                "vertices": [
+                  3,
+                  2,
+                  1,
+                  3
+                ],
+                "allowed": [
+                  3,
+                  3,
+                  3,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-07",
+      "registration": {
+        "fictive": true,
+        "vertices": 4,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 0,
+            "head": 3,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 64,
+            "vertices": [
+              18446744073709551615,
+              9223372036854775808,
+              1,
+              18446744073709551615
+            ],
+            "allowed": [
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 4,
+        "sink_distance": 1,
+        "midpoint": 0,
+        "distances": [
+          0,
+          2,
+          1,
+          1
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 2
+          },
+          {
+            "id": 1,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 2,
+            "tail": 1,
+            "head": 3
+          },
+          {
+            "id": 3,
+            "tail": 0,
+            "head": 3
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -1.0,
+        "bcRecRootLpVal": -1.0,
+        "bcRecBestInc": -1.0,
+        "bcRecBestDb": -1.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -1,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 4,
+            "source": 0,
+            "sink": 3,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 0,
+                "head": 3,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 18446744073709551615,
+                "vertices": [
+                  18446744073709551615,
+                  9223372036854775808,
+                  1,
+                  18446744073709551615
+                ],
+                "allowed": [
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-08",
+      "registration": {
+        "fictive": true,
+        "vertices": 6,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 2,
+            "vertices": [
+              3,
+              2,
+              2,
+              3,
+              3,
+              3
+            ],
+            "allowed": [
+              3,
+              3,
+              3,
+              3,
+              3
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 6,
+        "sink_distance": 5,
+        "midpoint": 2,
+        "distances": [
+          0,
+          4,
+          3,
+          2,
+          1,
+          5
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 4
+          },
+          {
+            "id": 1,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 3,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 4,
+            "tail": 1,
+            "head": 5
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -5.0,
+        "bcRecRootLpVal": -5.0,
+        "bcRecBestInc": -5.0,
+        "bcRecBestDb": -5.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -5,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 6,
+            "source": 0,
+            "sink": 5,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 3,
+                "vertices": [
+                  3,
+                  2,
+                  2,
+                  3,
+                  3,
+                  3
+                ],
+                "allowed": [
+                  3,
+                  3,
+                  3,
+                  3,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-09",
+      "registration": {
+        "fictive": true,
+        "vertices": 6,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 64,
+            "vertices": [
+              18446744073709551615,
+              9223372036854775808,
+              9223372036854775808,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ],
+            "allowed": [
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 6,
+        "sink_distance": 5,
+        "midpoint": 2,
+        "distances": [
+          0,
+          4,
+          3,
+          2,
+          1,
+          5
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 4
+          },
+          {
+            "id": 1,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 3,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 4,
+            "tail": 1,
+            "head": 5
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -5.0,
+        "bcRecRootLpVal": -5.0,
+        "bcRecBestInc": -5.0,
+        "bcRecBestDb": -5.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -5,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 6,
+            "source": 0,
+            "sink": 5,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 18446744073709551615,
+                "vertices": [
+                  18446744073709551615,
+                  9223372036854775808,
+                  9223372036854775808,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ],
+                "allowed": [
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-10",
+      "registration": {
+        "fictive": true,
+        "vertices": 6,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 2,
+            "vertices": [
+              3,
+              2,
+              1,
+              3,
+              3,
+              3
+            ],
+            "allowed": [
+              3,
+              3,
+              3,
+              3,
+              3
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 6,
+        "sink_distance": 5,
+        "midpoint": 2,
+        "distances": [
+          0,
+          4,
+          3,
+          2,
+          1,
+          5
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 4
+          },
+          {
+            "id": 1,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 3,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 4,
+            "tail": 1,
+            "head": 5
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 6,
+            "source": 0,
+            "sink": 5,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 3,
+                "vertices": [
+                  3,
+                  2,
+                  1,
+                  3,
+                  3,
+                  3
+                ],
+                "allowed": [
+                  3,
+                  3,
+                  3,
+                  3,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-11",
+      "registration": {
+        "fictive": true,
+        "vertices": 6,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 64,
+            "vertices": [
+              18446744073709551615,
+              9223372036854775808,
+              1,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ],
+            "allowed": [
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 6,
+        "sink_distance": 5,
+        "midpoint": 2,
+        "distances": [
+          0,
+          4,
+          3,
+          2,
+          1,
+          5
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 4
+          },
+          {
+            "id": 1,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 3,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 4,
+            "tail": 1,
+            "head": 5
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 6,
+            "source": 0,
+            "sink": 5,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 18446744073709551615,
+                "vertices": [
+                  18446744073709551615,
+                  9223372036854775808,
+                  1,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ],
+                "allowed": [
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-12",
+      "registration": {
+        "fictive": true,
+        "vertices": 6,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          },
+          {
+            "tail": 0,
+            "head": 5,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 2,
+            "vertices": [
+              3,
+              2,
+              2,
+              3,
+              3,
+              3
+            ],
+            "allowed": [
+              3,
+              3,
+              3,
+              3,
+              3,
+              3
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 6,
+        "sink_distance": 1,
+        "midpoint": 0,
+        "distances": [
+          0,
+          4,
+          3,
+          2,
+          1,
+          1
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 4
+          },
+          {
+            "id": 1,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 3,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 4,
+            "tail": 1,
+            "head": 5
+          },
+          {
+            "id": 5,
+            "tail": 0,
+            "head": 5
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -5.0,
+        "bcRecRootLpVal": -5.0,
+        "bcRecBestInc": -5.0,
+        "bcRecBestDb": -5.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -5,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 6,
+            "source": 0,
+            "sink": 5,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              },
+              {
+                "tail": 0,
+                "head": 5,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 3,
+                "vertices": [
+                  3,
+                  2,
+                  2,
+                  3,
+                  3,
+                  3
+                ],
+                "allowed": [
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-13",
+      "registration": {
+        "fictive": true,
+        "vertices": 6,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          },
+          {
+            "tail": 0,
+            "head": 5,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 64,
+            "vertices": [
+              18446744073709551615,
+              9223372036854775808,
+              9223372036854775808,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ],
+            "allowed": [
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 6,
+        "sink_distance": 1,
+        "midpoint": 0,
+        "distances": [
+          0,
+          4,
+          3,
+          2,
+          1,
+          1
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 4
+          },
+          {
+            "id": 1,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 3,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 4,
+            "tail": 1,
+            "head": 5
+          },
+          {
+            "id": 5,
+            "tail": 0,
+            "head": 5
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -5.0,
+        "bcRecRootLpVal": -5.0,
+        "bcRecBestInc": -5.0,
+        "bcRecBestDb": -5.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -5,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 6,
+            "source": 0,
+            "sink": 5,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              },
+              {
+                "tail": 0,
+                "head": 5,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 18446744073709551615,
+                "vertices": [
+                  18446744073709551615,
+                  9223372036854775808,
+                  9223372036854775808,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ],
+                "allowed": [
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-14",
+      "registration": {
+        "fictive": true,
+        "vertices": 6,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          },
+          {
+            "tail": 0,
+            "head": 5,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 2,
+            "vertices": [
+              3,
+              2,
+              1,
+              3,
+              3,
+              3
+            ],
+            "allowed": [
+              3,
+              3,
+              3,
+              3,
+              3,
+              3
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 6,
+        "sink_distance": 1,
+        "midpoint": 0,
+        "distances": [
+          0,
+          4,
+          3,
+          2,
+          1,
+          1
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 4
+          },
+          {
+            "id": 1,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 3,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 4,
+            "tail": 1,
+            "head": 5
+          },
+          {
+            "id": 5,
+            "tail": 0,
+            "head": 5
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -1.0,
+        "bcRecRootLpVal": -1.0,
+        "bcRecBestInc": -1.0,
+        "bcRecBestDb": -1.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -1,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 6,
+            "source": 0,
+            "sink": 5,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              },
+              {
+                "tail": 0,
+                "head": 5,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 3,
+                "vertices": [
+                  3,
+                  2,
+                  1,
+                  3,
+                  3,
+                  3
+                ],
+                "allowed": [
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-15",
+      "registration": {
+        "fictive": true,
+        "vertices": 6,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          },
+          {
+            "tail": 0,
+            "head": 5,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 64,
+            "vertices": [
+              18446744073709551615,
+              9223372036854775808,
+              1,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ],
+            "allowed": [
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 6,
+        "sink_distance": 1,
+        "midpoint": 0,
+        "distances": [
+          0,
+          4,
+          3,
+          2,
+          1,
+          1
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 4
+          },
+          {
+            "id": 1,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 2,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 3,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 4,
+            "tail": 1,
+            "head": 5
+          },
+          {
+            "id": 5,
+            "tail": 0,
+            "head": 5
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -1.0,
+        "bcRecRootLpVal": -1.0,
+        "bcRecBestInc": -1.0,
+        "bcRecBestDb": -1.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -1,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 6,
+            "source": 0,
+            "sink": 5,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              },
+              {
+                "tail": 0,
+                "head": 5,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 18446744073709551615,
+                "vertices": [
+                  18446744073709551615,
+                  9223372036854775808,
+                  1,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ],
+                "allowed": [
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-16",
+      "registration": {
+        "fictive": true,
+        "vertices": 10,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          },
+          {
+            "tail": 5,
+            "head": 6,
+            "cost": -1
+          },
+          {
+            "tail": 6,
+            "head": 7,
+            "cost": -1
+          },
+          {
+            "tail": 7,
+            "head": 8,
+            "cost": -1
+          },
+          {
+            "tail": 8,
+            "head": 9,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 2,
+            "vertices": [
+              3,
+              2,
+              2,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3
+            ],
+            "allowed": [
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 10,
+        "sink_distance": 9,
+        "midpoint": 4,
+        "distances": [
+          0,
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1,
+          9
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 8
+          },
+          {
+            "id": 1,
+            "tail": 8,
+            "head": 7
+          },
+          {
+            "id": 2,
+            "tail": 7,
+            "head": 6
+          },
+          {
+            "id": 3,
+            "tail": 6,
+            "head": 5
+          },
+          {
+            "id": 4,
+            "tail": 5,
+            "head": 4
+          },
+          {
+            "id": 5,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 6,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 7,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 8,
+            "tail": 1,
+            "head": 9
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -9.0,
+        "bcRecRootLpVal": -9.0,
+        "bcRecBestInc": -9.0,
+        "bcRecBestDb": -9.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -9,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 10,
+            "source": 0,
+            "sink": 9,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              },
+              {
+                "tail": 5,
+                "head": 6,
+                "cost": -1
+              },
+              {
+                "tail": 6,
+                "head": 7,
+                "cost": -1
+              },
+              {
+                "tail": 7,
+                "head": 8,
+                "cost": -1
+              },
+              {
+                "tail": 8,
+                "head": 9,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 3,
+                "vertices": [
+                  3,
+                  2,
+                  2,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3
+                ],
+                "allowed": [
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-17",
+      "registration": {
+        "fictive": true,
+        "vertices": 10,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          },
+          {
+            "tail": 5,
+            "head": 6,
+            "cost": -1
+          },
+          {
+            "tail": 6,
+            "head": 7,
+            "cost": -1
+          },
+          {
+            "tail": 7,
+            "head": 8,
+            "cost": -1
+          },
+          {
+            "tail": 8,
+            "head": 9,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 64,
+            "vertices": [
+              18446744073709551615,
+              9223372036854775808,
+              9223372036854775808,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ],
+            "allowed": [
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 10,
+        "sink_distance": 9,
+        "midpoint": 4,
+        "distances": [
+          0,
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1,
+          9
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 8
+          },
+          {
+            "id": 1,
+            "tail": 8,
+            "head": 7
+          },
+          {
+            "id": 2,
+            "tail": 7,
+            "head": 6
+          },
+          {
+            "id": 3,
+            "tail": 6,
+            "head": 5
+          },
+          {
+            "id": 4,
+            "tail": 5,
+            "head": 4
+          },
+          {
+            "id": 5,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 6,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 7,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 8,
+            "tail": 1,
+            "head": 9
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -9.0,
+        "bcRecRootLpVal": -9.0,
+        "bcRecBestInc": -9.0,
+        "bcRecBestDb": -9.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -9,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 10,
+            "source": 0,
+            "sink": 9,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              },
+              {
+                "tail": 5,
+                "head": 6,
+                "cost": -1
+              },
+              {
+                "tail": 6,
+                "head": 7,
+                "cost": -1
+              },
+              {
+                "tail": 7,
+                "head": 8,
+                "cost": -1
+              },
+              {
+                "tail": 8,
+                "head": 9,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 18446744073709551615,
+                "vertices": [
+                  18446744073709551615,
+                  9223372036854775808,
+                  9223372036854775808,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ],
+                "allowed": [
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-18",
+      "registration": {
+        "fictive": true,
+        "vertices": 10,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          },
+          {
+            "tail": 5,
+            "head": 6,
+            "cost": -1
+          },
+          {
+            "tail": 6,
+            "head": 7,
+            "cost": -1
+          },
+          {
+            "tail": 7,
+            "head": 8,
+            "cost": -1
+          },
+          {
+            "tail": 8,
+            "head": 9,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 2,
+            "vertices": [
+              3,
+              2,
+              1,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3
+            ],
+            "allowed": [
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 10,
+        "sink_distance": 9,
+        "midpoint": 4,
+        "distances": [
+          0,
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1,
+          9
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 8
+          },
+          {
+            "id": 1,
+            "tail": 8,
+            "head": 7
+          },
+          {
+            "id": 2,
+            "tail": 7,
+            "head": 6
+          },
+          {
+            "id": 3,
+            "tail": 6,
+            "head": 5
+          },
+          {
+            "id": 4,
+            "tail": 5,
+            "head": 4
+          },
+          {
+            "id": 5,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 6,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 7,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 8,
+            "tail": 1,
+            "head": 9
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 10,
+            "source": 0,
+            "sink": 9,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              },
+              {
+                "tail": 5,
+                "head": 6,
+                "cost": -1
+              },
+              {
+                "tail": 6,
+                "head": 7,
+                "cost": -1
+              },
+              {
+                "tail": 7,
+                "head": 8,
+                "cost": -1
+              },
+              {
+                "tail": 8,
+                "head": 9,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 3,
+                "vertices": [
+                  3,
+                  2,
+                  1,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3
+                ],
+                "allowed": [
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-19",
+      "registration": {
+        "fictive": true,
+        "vertices": 10,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          },
+          {
+            "tail": 5,
+            "head": 6,
+            "cost": -1
+          },
+          {
+            "tail": 6,
+            "head": 7,
+            "cost": -1
+          },
+          {
+            "tail": 7,
+            "head": 8,
+            "cost": -1
+          },
+          {
+            "tail": 8,
+            "head": 9,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 64,
+            "vertices": [
+              18446744073709551615,
+              9223372036854775808,
+              1,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ],
+            "allowed": [
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 10,
+        "sink_distance": 9,
+        "midpoint": 4,
+        "distances": [
+          0,
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1,
+          9
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 8
+          },
+          {
+            "id": 1,
+            "tail": 8,
+            "head": 7
+          },
+          {
+            "id": 2,
+            "tail": 7,
+            "head": 6
+          },
+          {
+            "id": 3,
+            "tail": 6,
+            "head": 5
+          },
+          {
+            "id": 4,
+            "tail": 5,
+            "head": 4
+          },
+          {
+            "id": 5,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 6,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 7,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 8,
+            "tail": 1,
+            "head": 9
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": 0.0,
+        "bcRecRootLpVal": 0.0,
+        "bcRecBestInc": 0.0,
+        "bcRecBestDb": 0.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": 0,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 10,
+            "source": 0,
+            "sink": 9,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              },
+              {
+                "tail": 5,
+                "head": 6,
+                "cost": -1
+              },
+              {
+                "tail": 6,
+                "head": 7,
+                "cost": -1
+              },
+              {
+                "tail": 7,
+                "head": 8,
+                "cost": -1
+              },
+              {
+                "tail": 8,
+                "head": 9,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 18446744073709551615,
+                "vertices": [
+                  18446744073709551615,
+                  9223372036854775808,
+                  1,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ],
+                "allowed": [
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-20",
+      "registration": {
+        "fictive": true,
+        "vertices": 10,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          },
+          {
+            "tail": 5,
+            "head": 6,
+            "cost": -1
+          },
+          {
+            "tail": 6,
+            "head": 7,
+            "cost": -1
+          },
+          {
+            "tail": 7,
+            "head": 8,
+            "cost": -1
+          },
+          {
+            "tail": 8,
+            "head": 9,
+            "cost": -1
+          },
+          {
+            "tail": 0,
+            "head": 9,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 2,
+            "vertices": [
+              3,
+              2,
+              2,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3
+            ],
+            "allowed": [
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 10,
+        "sink_distance": 1,
+        "midpoint": 0,
+        "distances": [
+          0,
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1,
+          1
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 8
+          },
+          {
+            "id": 1,
+            "tail": 8,
+            "head": 7
+          },
+          {
+            "id": 2,
+            "tail": 7,
+            "head": 6
+          },
+          {
+            "id": 3,
+            "tail": 6,
+            "head": 5
+          },
+          {
+            "id": 4,
+            "tail": 5,
+            "head": 4
+          },
+          {
+            "id": 5,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 6,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 7,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 8,
+            "tail": 1,
+            "head": 9
+          },
+          {
+            "id": 9,
+            "tail": 0,
+            "head": 9
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -9.0,
+        "bcRecRootLpVal": -9.0,
+        "bcRecBestInc": -9.0,
+        "bcRecBestDb": -9.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -9,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 10,
+            "source": 0,
+            "sink": 9,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              },
+              {
+                "tail": 5,
+                "head": 6,
+                "cost": -1
+              },
+              {
+                "tail": 6,
+                "head": 7,
+                "cost": -1
+              },
+              {
+                "tail": 7,
+                "head": 8,
+                "cost": -1
+              },
+              {
+                "tail": 8,
+                "head": 9,
+                "cost": -1
+              },
+              {
+                "tail": 0,
+                "head": 9,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 3,
+                "vertices": [
+                  3,
+                  2,
+                  2,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3
+                ],
+                "allowed": [
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-21",
+      "registration": {
+        "fictive": true,
+        "vertices": 10,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          },
+          {
+            "tail": 5,
+            "head": 6,
+            "cost": -1
+          },
+          {
+            "tail": 6,
+            "head": 7,
+            "cost": -1
+          },
+          {
+            "tail": 7,
+            "head": 8,
+            "cost": -1
+          },
+          {
+            "tail": 8,
+            "head": 9,
+            "cost": -1
+          },
+          {
+            "tail": 0,
+            "head": 9,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 64,
+            "vertices": [
+              18446744073709551615,
+              9223372036854775808,
+              9223372036854775808,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ],
+            "allowed": [
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 10,
+        "sink_distance": 1,
+        "midpoint": 0,
+        "distances": [
+          0,
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1,
+          1
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 8
+          },
+          {
+            "id": 1,
+            "tail": 8,
+            "head": 7
+          },
+          {
+            "id": 2,
+            "tail": 7,
+            "head": 6
+          },
+          {
+            "id": 3,
+            "tail": 6,
+            "head": 5
+          },
+          {
+            "id": 4,
+            "tail": 5,
+            "head": 4
+          },
+          {
+            "id": 5,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 6,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 7,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 8,
+            "tail": 1,
+            "head": 9
+          },
+          {
+            "id": 9,
+            "tail": 0,
+            "head": 9
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -9.0,
+        "bcRecRootLpVal": -9.0,
+        "bcRecBestInc": -9.0,
+        "bcRecBestDb": -9.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -9,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 10,
+            "source": 0,
+            "sink": 9,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              },
+              {
+                "tail": 5,
+                "head": 6,
+                "cost": -1
+              },
+              {
+                "tail": 6,
+                "head": 7,
+                "cost": -1
+              },
+              {
+                "tail": 7,
+                "head": 8,
+                "cost": -1
+              },
+              {
+                "tail": 8,
+                "head": 9,
+                "cost": -1
+              },
+              {
+                "tail": 0,
+                "head": 9,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 18446744073709551615,
+                "vertices": [
+                  18446744073709551615,
+                  9223372036854775808,
+                  9223372036854775808,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ],
+                "allowed": [
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-22",
+      "registration": {
+        "fictive": true,
+        "vertices": 10,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          },
+          {
+            "tail": 5,
+            "head": 6,
+            "cost": -1
+          },
+          {
+            "tail": 6,
+            "head": 7,
+            "cost": -1
+          },
+          {
+            "tail": 7,
+            "head": 8,
+            "cost": -1
+          },
+          {
+            "tail": 8,
+            "head": 9,
+            "cost": -1
+          },
+          {
+            "tail": 0,
+            "head": 9,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 2,
+            "vertices": [
+              3,
+              2,
+              1,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3
+            ],
+            "allowed": [
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3,
+              3
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 10,
+        "sink_distance": 1,
+        "midpoint": 0,
+        "distances": [
+          0,
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1,
+          1
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 8
+          },
+          {
+            "id": 1,
+            "tail": 8,
+            "head": 7
+          },
+          {
+            "id": 2,
+            "tail": 7,
+            "head": 6
+          },
+          {
+            "id": 3,
+            "tail": 6,
+            "head": 5
+          },
+          {
+            "id": 4,
+            "tail": 5,
+            "head": 4
+          },
+          {
+            "id": 5,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 6,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 7,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 8,
+            "tail": 1,
+            "head": 9
+          },
+          {
+            "id": 9,
+            "tail": 0,
+            "head": 9
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -1.0,
+        "bcRecRootLpVal": -1.0,
+        "bcRecBestInc": -1.0,
+        "bcRecBestDb": -1.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -1,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 10,
+            "source": 0,
+            "sink": 9,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              },
+              {
+                "tail": 5,
+                "head": 6,
+                "cost": -1
+              },
+              {
+                "tail": 6,
+                "head": 7,
+                "cost": -1
+              },
+              {
+                "tail": 7,
+                "head": 8,
+                "cost": -1
+              },
+              {
+                "tail": 8,
+                "head": 9,
+                "cost": -1
+              },
+              {
+                "tail": 0,
+                "head": 9,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 3,
+                "vertices": [
+                  3,
+                  2,
+                  1,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3
+                ],
+                "allowed": [
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3,
+                  3
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "fictive-23",
+      "registration": {
+        "fictive": true,
+        "vertices": 10,
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": -1
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": -1
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": -1
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": -1
+          },
+          {
+            "tail": 4,
+            "head": 5,
+            "cost": -1
+          },
+          {
+            "tail": 5,
+            "head": 6,
+            "cost": -1
+          },
+          {
+            "tail": 6,
+            "head": 7,
+            "cost": -1
+          },
+          {
+            "tail": 7,
+            "head": 8,
+            "cost": -1
+          },
+          {
+            "tail": 8,
+            "head": 9,
+            "cost": -1
+          },
+          {
+            "tail": 0,
+            "head": 9,
+            "cost": -1
+          }
+        ],
+        "selection": [
+          {
+            "id": 10,
+            "values": 64,
+            "vertices": [
+              18446744073709551615,
+              9223372036854775808,
+              1,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ],
+            "allowed": [
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615,
+              18446744073709551615
+            ]
+          }
+        ]
+      },
+      "prepared": {
+        "entry": "0x654940",
+        "return": 1,
+        "vertices": 10,
+        "sink_distance": 1,
+        "midpoint": 0,
+        "distances": [
+          0,
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1,
+          1
+        ],
+        "arcs": [
+          {
+            "id": 0,
+            "tail": 0,
+            "head": 8
+          },
+          {
+            "id": 1,
+            "tail": 8,
+            "head": 7
+          },
+          {
+            "id": 2,
+            "tail": 7,
+            "head": 6
+          },
+          {
+            "id": 3,
+            "tail": 6,
+            "head": 5
+          },
+          {
+            "id": 4,
+            "tail": 5,
+            "head": 4
+          },
+          {
+            "id": 5,
+            "tail": 4,
+            "head": 3
+          },
+          {
+            "id": 6,
+            "tail": 3,
+            "head": 2
+          },
+          {
+            "id": 7,
+            "tail": 2,
+            "head": 1
+          },
+          {
+            "id": 8,
+            "tail": 1,
+            "head": 9
+          },
+          {
+            "id": 9,
+            "tail": 0,
+            "head": 9
+          }
+        ]
+      },
+      "reference": {
+        "bcRecRootDb": -1.0,
+        "bcRecRootLpVal": -1.0,
+        "bcRecBestInc": -1.0,
+        "bcRecBestDb": -1.0,
+        "counters": {
+          "bcCountCg": 3,
+          "bcCountCgSpSolverCall": 3,
+          "bcCountNodeProc": 1
+        }
+      },
+      "independent_objective": -1,
+      "model": {
+        "rows": [],
+        "networks": [
+          {
+            "id": 7,
+            "vertices": 10,
+            "source": 0,
+            "sink": 9,
+            "multiplicity": [
+              0,
+              1
+            ],
+            "arcs": [
+              {
+                "tail": 0,
+                "head": 1,
+                "cost": -1
+              },
+              {
+                "tail": 1,
+                "head": 2,
+                "cost": -1
+              },
+              {
+                "tail": 2,
+                "head": 3,
+                "cost": -1
+              },
+              {
+                "tail": 3,
+                "head": 4,
+                "cost": -1
+              },
+              {
+                "tail": 4,
+                "head": 5,
+                "cost": -1
+              },
+              {
+                "tail": 5,
+                "head": 6,
+                "cost": -1
+              },
+              {
+                "tail": 6,
+                "head": 7,
+                "cost": -1
+              },
+              {
+                "tail": 7,
+                "head": 8,
+                "cost": -1
+              },
+              {
+                "tail": 8,
+                "head": 9,
+                "cost": -1
+              },
+              {
+                "tail": 0,
+                "head": 9,
+                "cost": -1
+              }
+            ],
+            "coupled_resources": [
+              {
+                "kind": "selection",
+                "initial": 18446744073709551615,
+                "vertices": [
+                  18446744073709551615,
+                  9223372036854775808,
+                  1,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ],
+                "allowed": [
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615,
+                  18446744073709551615
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

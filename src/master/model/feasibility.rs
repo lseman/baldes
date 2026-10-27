@@ -301,7 +301,7 @@ fn original_cost_for_recovery<const D: usize>(
         .iter()
         .map(|id| oracle.index[id])
         .collect::<Vec<_>>();
-    let Some(coupled) = oracle.network.graph.coupled_path_cost(&path)? else {
+    let Some(coupled) = route.coupled_cost(&oracle.network.graph, &path)? else {
         if report.status == FeasibilityStatus::Feasible {
             report.status = FeasibilityStatus::Stalled;
         }

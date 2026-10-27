@@ -51,6 +51,8 @@ fn chain(consumption: &[f64], upper: f64) -> (RoutingContext<2>, Route) {
     // Profiles and rounded costs are untrusted payloads. Feasibility and
     // objective are reconstructed from physical arcs and original inputs.
     let route = Route {
+        coupled_controls: Vec::new(),
+        coupled_values: Vec::new(),
         nodes: (0..n as i32).collect(),
         arcs: (0..n as i32 - 1).collect(),
         cost: 0.,
@@ -177,4 +179,39 @@ fn fractional_product_upper_preserves_subnormal_remainders_and_cancellation() {
     assert_eq!(exact.upper(), Some(f64::MIN_POSITIVE / 2.));
     exact.product_upper(0., 0.5).unwrap();
     assert_eq!(exact.upper(), Some(f64::MIN_POSITIVE / 2.));
+}
+
+#[test]
+fn signed_disposable_incumbents_apply_exact_waiting_and_upper_windows() {
+    let (mut problem, route) = chain(&[0.5, -0.75, 0.25], 2.);
+    assert_eq!(exact_route_feasibility(&problem, &route), Some(true));
+    assert_eq!(
+        validated_upper(&problem, &[route.clone()], &[0], &[1.]),
+        Some(3.)
+    );
+    problem.model.networks[0]
+        .graph
+        .set_bounds(2, 0, 1., 2.)
+        .unwrap();
+    problem.model.networks[0]
+        .graph
+        .set_bounds(3, 0, 0., 1.)
+        .unwrap();
+    assert_eq!(exact_route_feasibility(&problem, &route), Some(false));
+    problem.model.networks[0].graph.resources[0] = crate::graph::ResourceKind::Equality;
+    assert_eq!(exact_route_feasibility(&problem, &route), Some(false));
+}
+
+#[test]
+fn signed_resource_replay_retains_exact_cancellation_beyond_binary64_profiles() {
+    let (mut problem, route) = chain(&[1., f64::EPSILON / 2., -1.], 2.);
+    problem.model.networks[0]
+        .graph
+        .set_bounds(3, 0, 0., 0.)
+        .unwrap();
+    // A rounded replay loses the half-ulp before subtracting one. The actual
+    // sum is still positive and violates the terminal zero upper bound.
+    assert!(problem.elementary_route(&route.arcs).is_some());
+    assert_eq!(exact_route_feasibility(&problem, &route), Some(false));
+    assert!(validated_upper(&problem, &[route], &[0], &[1.]).is_none());
 }

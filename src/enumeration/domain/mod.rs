@@ -79,8 +79,9 @@ impl<const D: usize> RelaxedResourcePath<D> {
     }
 }
 
-/// A conservative superset of exact-real feasible, physically vertex-simple
-/// source/sink paths for disposable scalar resources. Directed addition keeps
+/// A conservative superset of exact-real feasible source/sink paths in the
+/// declared physical-simple or finitely bounded-walk domain, for disposable
+/// scalar resources. Directed addition keeps
 /// lower resource bounds; a path is rejected only when such a bound exceeds an
 /// upper window. Extra infeasible paths may remain. These bounds are not route
 /// schedules and do not establish backward/tolerant native-domain equivalence.

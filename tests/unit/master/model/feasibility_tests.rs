@@ -23,11 +23,13 @@ fn total() -> MappedBranchVariable {
         networks: vec![
             MappedNetworkVariable {
                 network: 7,
+                activities: vec![],
                 arcs: vec![],
                 per_route: 1.,
             },
             MappedNetworkVariable {
                 network: 42,
+                activities: vec![],
                 arcs: vec![],
                 per_route: 1.,
             },
@@ -376,6 +378,7 @@ fn machine_front_phase_one_preserves_an_explicit_rounded_program_domain() {
             multiplicity: Window::new(0., 1.).unwrap(),
             arc_entries: vec![vec![]],
             route_entries: vec![(0, 1.)],
+            activity_entries: vec![],
         }],
     };
     let output = solve_with_master_variables(problem, vec![], options()).unwrap();
@@ -477,6 +480,7 @@ fn scalar_dag_empty_pricing_domain_closes_the_certified_zero_selection_bound() {
             },
             arc_entries: vec![vec![]; 2],
             route_entries: vec![],
+            activity_entries: vec![],
         }],
     };
     let mut options = Options::default();

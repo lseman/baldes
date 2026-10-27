@@ -3,11 +3,40 @@ use super::*;
 
 /// Exact-real scalar feasibility of a nonempty physically elementary path.
 /// Stored floating resource profiles are not used as feasibility proofs.
+/// Selected paired values match canonical replay or independently proved
+/// source controls. Other resource and physical-path proofs remain separate.
 pub(crate) fn exact_route_feasible<const D: usize>(
     problem: &RoutingContext<D>,
     route: &Route,
 ) -> Option<()> {
-    exact_route_feasibility(problem, route)?.then_some(())
+    let graph = &problem.model.networks[0].graph;
+    if graph.has_coupled_resources()
+        || !route.coupled_values.is_empty()
+        || !route.coupled_controls.is_empty()
+    {
+        let positions = route
+            .arcs
+            .iter()
+            .map(|id| problem.arc_position(*id))
+            .collect::<Option<Vec<_>>>()?;
+        if !route.selected_values_match(graph, &positions).ok()? {
+            return None;
+        }
+    }
+    exact_route_feasibility_using(problem, route, |kernel, arcs| {
+        kernel
+            .certify_with_controls(arcs, &route.coupled_controls, &mut 1_000_000, None)
+            .map(|result| result.0)
+    })?
+    .then_some(())
+}
+
+/// Exact scalar/physical path scope; callers separately certify every coupled resource.
+pub(crate) fn exact_scalar_path_feasibility<const D: usize>(
+    problem: &RoutingContext<D>,
+    route: &Route,
+) -> Option<bool> {
+    exact_route_feasibility_using(problem, route, |_, _| Some(true))
 }
 
 /// Distinguish a proved invalid path from unsupported arithmetic/resource rules.
@@ -33,7 +62,7 @@ pub(crate) fn exact_route_feasibility_with_budget<const D: usize>(
     }
     let result = exact_route_feasibility_using(problem, route, |kernel, arcs| {
         kernel
-            .certify_with_budget(arcs, work, Some(deadline))
+            .certify_with_controls(arcs, &route.coupled_controls, work, Some(deadline))
             .map(|result| result.0)
     });
     if std::time::Instant::now() >= deadline {
@@ -124,9 +153,9 @@ fn exact_route_feasibility_using<const D: usize>(
                 bounds.upper = bounds.upper.min(window.upper);
             }
             let consumption = *arc.consumption.get(r)?;
-            if g.resources[r] == ResourceKind::Disposable && consumption < 0. {
-                return None;
-            }
+            // Signed increments are valid on a supplied finite path. Exact
+            // addition and the lower-window projection below preserve the
+            // earliest feasible state for either sign of the increment.
             value.add(consumption)?;
             #[cfg(feature = "multi-time-windows")]
             if !g.time_windows(arc.head, r).is_empty() {
@@ -217,7 +246,12 @@ pub(super) fn validated_upper<const D: usize>(
                 .iter()
                 .map(|id| problem.arc_position(*id))
                 .collect::<Option<Vec<_>>>()?;
-            let (valid, cost) = kernel.certify(&arcs)?;
+            let (valid, cost) = kernel.certify_with_controls(
+                &arcs,
+                &route.coupled_controls,
+                &mut 1_000_000,
+                None,
+            )?;
             if !valid {
                 return None;
             }
@@ -265,7 +299,12 @@ pub(super) fn validated_upper<const D: usize>(
                 .iter()
                 .map(|id| problem.arc_position(*id))
                 .collect::<Option<Vec<_>>>()?;
-            let (valid, cost) = kernel.certify(&arcs)?;
+            let (valid, cost) = kernel.certify_with_controls(
+                &arcs,
+                &route.coupled_controls,
+                &mut 1_000_000,
+                None,
+            )?;
             if !valid {
                 return None;
             }

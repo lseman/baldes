@@ -47,6 +47,8 @@ fn paired_network_costs_reach_certified_enumeration_fixing_and_integer_solving()
         network
             .graph
             .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+                normalization:
+                    baldes::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
                 initial: constant(0.),
                 initial_base: Window::new(0., 0.).unwrap(),
                 arcs: increments

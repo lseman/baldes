@@ -387,8 +387,8 @@ impl ResourceModel {
     }
     /// Retain a paired base/dependent relation with optional waiting.
     /// Arrival functions give the total base arrival, not its increment.
-    /// Cost modes charge final dependent minimum minus initial minimum.
-    #[pyo3(signature = (initial_lower, initial_upper, initial, arrivals, increments, lowers, uppers, waiting, mode="feasibility"))]
+    /// Cost modes use an explicit normalization, relative by default.
+    #[pyo3(signature = (initial_lower, initial_upper, initial, arrivals, increments, lowers, uppers, waiting, mode="feasibility", normalization="final_minus_initial_minimum"))]
     fn add_paired_piecewise_linear(
         &mut self,
         initial_lower: f64,
@@ -400,6 +400,7 @@ impl ResourceModel {
         uppers: Vec<Vec<(f64, f64)>>,
         waiting: Vec<i32>,
         mode: &str,
+        normalization: &str,
     ) -> PyResult<usize> {
         let resource = run(|| {
             let invalid = |message: &str| baldes::core::error::OrError {
@@ -443,6 +444,13 @@ impl ResourceModel {
                 initial_base: baldes::Window::new(initial_lower, initial_upper)?,
                 arcs,
                 mode,
+                normalization: match normalization {
+                    "absolute_final_value" => PairedCostNormalization::AbsoluteFinalValue,
+                    "final_minus_initial_minimum" => {
+                        PairedCostNormalization::FinalMinusInitialMinimum
+                    }
+                    _ => return Err(invalid("unknown paired cost normalization")),
+                },
             })
         })?;
         Ok(self.push(resource))

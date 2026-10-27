@@ -274,6 +274,7 @@ impl<const D: usize> Networks<D> for RoutingAdapter<'_, D> {
                 columns.push((column, upper));
             }
             Ok(crate::master::pricing::Retained {
+                minimum_bound: None,
                 columns,
                 independent_caps: false,
                 maximum: self.state.solver.controls.max_columns,
