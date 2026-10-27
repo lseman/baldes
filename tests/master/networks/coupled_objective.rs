@@ -35,6 +35,58 @@ fn problem() -> Problem<2> {
 }
 
 #[test]
+fn negative_unbounded_paired_cost_has_a_finite_hop_certificate() {
+    use baldes::graph::coupled::{
+        PairedCostNormalization, PairedResourceArc, PairedResourceMode, PiecewiseLinearFunction,
+    };
+    let constant = |value| PiecewiseLinearFunction::new(vec![[0., value], [10., value]]).unwrap();
+    let mut instance = network(7, &[(0., &[]), (0., &[])], 0);
+    let arrival = PiecewiseLinearFunction::new(vec![[0., 0.], [10., 10.]]).unwrap();
+    let mut increments = [5., 0., 0., 0.].into_iter();
+    instance
+        .graph
+        .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+            normalization: PairedCostNormalization::AbsoluteFinalValue,
+            initial: constant(0.),
+            initial_base: Window::new(0., 10.).unwrap(),
+            arcs: (0..4)
+                .map(|_| PairedResourceArc {
+                    arrival: arrival.clone(),
+                    increment: constant(increments.next().unwrap()),
+                    lower: constant(-100.),
+                    upper: constant(1e12),
+                    waiting: 0,
+                })
+                .collect(),
+            mode: PairedResourceMode::CostUnbounded,
+        }])
+        .unwrap();
+    instance
+        .graph
+        .set_coupled_objective_coefficients(&[(0, -1.)])
+        .unwrap();
+    let root = model::solve(
+        Problem {
+            rows: vec![],
+            networks: vec![instance],
+        },
+        {
+            let mut configured = options();
+            configured.cg.bound_mode = BoundMode::Certified;
+            configured
+        },
+    )
+    .unwrap();
+    optimal(&root, -15.);
+    let best = root
+        .routes
+        .iter()
+        .position(|route| route.route.arcs == [0, 1])
+        .unwrap();
+    assert_eq!(root.values[best], 3.);
+}
+
+#[test]
 fn paired_network_costs_reach_certified_enumeration_fixing_and_integer_solving() {
     use baldes::graph::coupled::{PairedResourceArc, PairedResourceMode, PiecewiseLinearFunction};
     let constant = |value| PiecewiseLinearFunction::new(vec![[0., value], [12., value]]).unwrap();

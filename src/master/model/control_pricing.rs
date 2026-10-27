@@ -2209,6 +2209,7 @@ struct PhysicalSuffixBounds {
 struct PairedTerminalArcCharge {
     arc: usize,
     values: Interval,
+    floor: f64,
     lower: f64,
 }
 
@@ -2218,11 +2219,24 @@ struct PairedTerminalCharge {
     normalization: crate::graph::coupled::PairedCostNormalization,
     objective_coefficient: f64,
     positive_direction: bool,
+    lower_monotone: bool,
+    upper_unbounded: bool,
     baseline: Option<[f64; 2]>,
-    max_growth: f64,
+    max_increment: f64,
+    max_waiting: f64,
     max_lower: f64,
     max_upper: f64,
     terminals: Vec<PairedTerminalArcCharge>,
+}
+
+#[derive(Clone, Copy)]
+struct PairedTerminalUpperEnvelope {
+    terminal: f64,
+    max_increment: f64,
+    max_waiting: f64,
+    max_lower: f64,
+    max_upper: f64,
+    upper_unbounded: bool,
 }
 
 fn row_simple_supported<const D: usize>(oracle: &Oracle<D>) -> bool {
@@ -2264,7 +2278,7 @@ fn paired_bounded_step_envelope(
     arc_index: usize,
     work: &mut usize,
     deadline: Instant,
-) -> Option<(f64, f64, f64)> {
+) -> Option<(f64, f64, f64, f64)> {
     let (arrival, increment, lower, upper, waiting) = match definition {
         CoupledResource::PairedPiecewiseLinear { arcs, mode, .. }
             if *mode == crate::graph::coupled::PairedResourceMode::CostBounded =>
@@ -2308,8 +2322,12 @@ fn paired_bounded_step_envelope(
     };
     let maximum_wait = crate::core::rounding::add_up(max_head, -arrival.lo)?.max(0.);
     let waiting_increase = multiply_upper_nonnegative(f64::from(waiting), maximum_wait)?;
-    let growth = crate::core::rounding::add_up(increment.hi, waiting_increase)?;
-    (growth >= 0. && lower.hi <= upper.hi).then_some((growth, lower.hi, upper.hi))
+    (increment.hi >= 0. && lower.hi <= upper.hi).then_some((
+        increment.hi,
+        waiting_increase,
+        lower.hi,
+        upper.hi,
+    ))
 }
 
 fn multiply_upper_nonnegative(left: f64, right: f64) -> Option<f64> {
@@ -2317,6 +2335,35 @@ fn multiply_upper_nonnegative(left: f64, right: f64) -> Option<f64> {
         return None;
     }
     Some(Interval::point(left).scale(right)?.hi)
+}
+
+fn paired_terminal_ceiling_after_hops(
+    mut ceiling: f64,
+    max_increment: f64,
+    max_waiting: f64,
+    max_lower: f64,
+    max_upper: f64,
+    upper_unbounded: bool,
+    remaining: usize,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<f64> {
+    let mut maximum = ceiling;
+    for _ in 0..remaining {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        ceiling = crate::core::rounding::add_up(ceiling, max_increment)?;
+        ceiling = crate::core::rounding::add_up(ceiling, max_waiting)?.max(max_lower);
+        // The unbounded-shift sentinel is not a terminal cap. A finite upper
+        // function still caps ordinary bounded resources.
+        if !upper_unbounded {
+            ceiling = ceiling.min(max_upper);
+        }
+        maximum = maximum.max(ceiling);
+    }
+    Some(maximum)
 }
 
 /// Direction in which an isolated paired reduced-cost charge moves with
@@ -2459,19 +2506,129 @@ fn coupled_lower_bounds<const D: usize>(
                 ..
             } => {
                 if *mode == crate::graph::coupled::PairedResourceMode::CostUnbounded
-                    && arcs
-                        .first()
-                        .and_then(|arc| arc.upper.points.first())
-                        .is_some_and(|point| point[1] >= 1e12)
+                    && arcs.iter().any(|arc| {
+                        arc.upper
+                            .points
+                            .first()
+                            .is_some_and(|point| point[1] >= 1e12)
+                    })
                 {
-                    // The 1e12 upper value is an infinity sentinel. Its
-                    // terminal control can grow without bound. Its finite
-                    // lower endpoint supports nonnegative objective charges
-                    // and activity-row terms that are individually
-                    // nonnegative for every Gamma >= 0. Other row signs can
-                    // make the reduced charge unbounded below.
+                    // The sentinel enables unbounded shifts. The finite-hop
+                    // envelope deliberately ignores its value as a cap; the
+                    // source-control replay still validates every proposal
+                    // against the declared upper function. Mixed signs and
+                    // non-isolated rows fall back to path pricing.
                     let objective_coefficient = kernel.effective_objective_coefficient(resource)?;
-                    if objective_coefficient < 0. {
+                    let direction = paired_cost_direction(
+                        oracle,
+                        resource,
+                        objective_coefficient,
+                        offset,
+                        duals,
+                        work,
+                        deadline,
+                    )?;
+                    if direction == Some(false) {
+                        let terminal_lower = paired_terminal_lower_bound(
+                            initial,
+                            arcs,
+                            graph.original_max_arcs(),
+                            work,
+                            deadline,
+                        )?;
+                        let upper = paired_terminal_upper_bound(
+                            initial,
+                            arcs,
+                            graph.original_max_arcs(),
+                            work,
+                            deadline,
+                        )?;
+                        debug_assert!(upper.upper_unbounded);
+                        if terminal_lower > upper.terminal {
+                            return None;
+                        }
+                        let baseline = if objective_coefficient != 0.
+                            && *normalization
+                                == crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum
+                        {
+                            Some(kernel.paired_initial_minimum(resource, work, Some(deadline))?)
+                        } else {
+                            None
+                        };
+                        let values = Interval {
+                            lo: terminal_lower,
+                            hi: upper.terminal,
+                        };
+                        let mut terminals = Vec::new();
+                        for (arc_index, arc) in graph.arcs.iter().enumerate() {
+                            if arc.head != graph.sink {
+                                continue;
+                            }
+                            let contribution_work = oracle.activity_rows.len().checked_add(1)?;
+                            *work = work.checked_sub(contribution_work)?;
+                            if Instant::now() >= deadline {
+                                return None;
+                            }
+                            let mut terminal_lower_charge = 0.;
+                            add_paired_arc_contribution(
+                                oracle,
+                                offset,
+                                duals,
+                                resource,
+                                *normalization,
+                                objective_coefficient,
+                                baseline,
+                                values,
+                                &mut terminal_lower_charge,
+                            )?;
+                            paired_arc_lower[arc_index] = crate::core::rounding::add_down(
+                                paired_arc_lower[arc_index],
+                                terminal_lower_charge,
+                            )?;
+                            terminals.push(PairedTerminalArcCharge {
+                                arc: arc_index,
+                                values,
+                                floor: terminal_lower,
+                                lower: terminal_lower_charge,
+                            });
+                        }
+                        if !terminals.is_empty() {
+                            paired_terminal_charges.push(PairedTerminalCharge {
+                                resource,
+                                normalization: *normalization,
+                                objective_coefficient,
+                                positive_direction: false,
+                                lower_monotone: false,
+                                upper_unbounded: upper.upper_unbounded,
+                                baseline,
+                                max_increment: upper.max_increment,
+                                max_waiting: upper.max_waiting,
+                                max_lower: upper.max_lower,
+                                max_upper: upper.max_upper,
+                                terminals,
+                            });
+                        }
+                        continue;
+                    }
+                    if direction.is_none() {
+                        let mut has_effect = objective_coefficient != 0.;
+                        for entry in oracle
+                            .activity_rows
+                            .iter()
+                            .filter(|entry| entry.resource == resource && entry.coefficient != 0.)
+                        {
+                            *work = work.checked_sub(1)?;
+                            if Instant::now() >= deadline {
+                                return None;
+                            }
+                            has_effect |= *duals.get(offset.checked_add(entry.row)?)? != 0.;
+                        }
+                        if has_effect {
+                            return None;
+                        }
+                        continue;
+                    }
+                    if direction != Some(true) {
                         return None;
                     }
                     let terminal_lower = paired_terminal_lower_bound(
@@ -2481,72 +2638,40 @@ fn coupled_lower_bounds<const D: usize>(
                         work,
                         deadline,
                     )?;
-                    let mut contribution = 0.;
-                    if objective_coefficient != 0. {
-                        let baseline = if *normalization
+                    let baseline = if objective_coefficient != 0.
+                        && *normalization
                             == crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum
-                        {
-                            Some(kernel.paired_initial_minimum(resource, work, Some(deadline))?)
-                        } else {
-                            None
-                        };
-                        let mut amount_lower = terminal_lower;
-                        if let Some(baseline) = baseline {
-                            amount_lower =
-                                crate::core::rounding::add_down(amount_lower, -baseline[1])?;
-                        }
-                        contribution = crate::core::rounding::multiply_down(
-                            objective_coefficient,
-                            amount_lower,
-                        )?;
-                    }
-
-                    let mut row_values = BTreeMap::<usize, Interval>::new();
-                    for entry in oracle
-                        .activity_rows
-                        .iter()
-                        .filter(|entry| entry.resource == resource && entry.coefficient != 0.)
                     {
-                        *work = work.checked_sub(1)?;
+                        Some(kernel.paired_initial_minimum(resource, work, Some(deadline))?)
+                    } else {
+                        None
+                    };
+                    let values = Interval::point(terminal_lower);
+                    for (arc_index, arc) in graph.arcs.iter().enumerate() {
+                        if arc.head != graph.sink {
+                            continue;
+                        }
+                        let contribution_work = oracle.activity_rows.len().checked_add(1)?;
+                        *work = work.checked_sub(contribution_work)?;
                         if Instant::now() >= deadline {
                             return None;
                         }
-                        let row_dual = -*duals.get(offset.checked_add(entry.row)?)?;
-                        if row_dual == 0. {
-                            continue;
-                        }
-                        let mut row_terms = 0;
-                        for candidate in &oracle.activity_rows {
-                            *work = work.checked_sub(1)?;
-                            if Instant::now() >= deadline {
-                                return None;
-                            }
-                            if candidate.row == entry.row && candidate.coefficient != 0. {
-                                row_terms += 1;
-                            }
-                        }
-                        if terminal_lower < 0.
-                            || row_terms != 1
-                            || !paired_activity_row_is_isolated(
-                                oracle, offset, entry.row, work, deadline,
-                            )?
-                            || entry.coefficient.is_sign_positive() != row_dual.is_sign_positive()
-                        {
-                            return None;
-                        }
-                        let value = Interval::point(terminal_lower).scale(entry.coefficient)?;
-                        let sum = row_values.entry(entry.row).or_insert(Interval::point(0.));
-                        *sum = sum.add(value)?;
-                    }
-                    for (row, value) in row_values {
-                        let row_dual = -*duals.get(offset.checked_add(row)?)?;
-                        contribution = crate::core::rounding::add_down(
-                            contribution,
-                            value.scale(row_dual)?.lo,
+                        let mut contribution = 0.;
+                        add_paired_arc_contribution(
+                            oracle,
+                            offset,
+                            duals,
+                            resource,
+                            *normalization,
+                            objective_coefficient,
+                            baseline,
+                            values,
+                            &mut contribution,
                         )?;
-                    }
-                    for arc_lower in &mut paired_arc_lower {
-                        *arc_lower = crate::core::rounding::add_down(*arc_lower, contribution)?;
+                        paired_arc_lower[arc_index] = crate::core::rounding::add_down(
+                            paired_arc_lower[arc_index],
+                            contribution,
+                        )?;
                     }
                     continue;
                 }
@@ -2565,6 +2690,7 @@ fn coupled_lower_bounds<const D: usize>(
             }
             CoupledResource::SlopePaired { .. } => {
                 let CoupledResource::SlopePaired {
+                    initial,
                     mode,
                     normalization,
                     arcs,
@@ -2581,8 +2707,132 @@ fn coupled_lower_bounds<const D: usize>(
                         .and_then(|arc| arc.upper.pairs().first())
                         .is_some_and(|pair| pair.0 >= 1e12)
                 {
-                    // Match the raw-slope shift policy: this is an unbounded
-                    // resource, so its declared sentinel is not a cap.
+                    // The sentinel enables shift dominance. Positive charges
+                    // use a finite-hop floor and negative charges use a
+                    // finite-hop ceiling; both bound source replay and include
+                    // endpoint-tolerant waiting. Mixed signs and non-isolated
+                    // rows remain on the exhaustive path visitor.
+                    let objective_coefficient = kernel.effective_objective_coefficient(resource)?;
+                    let direction = paired_cost_direction(
+                        oracle,
+                        resource,
+                        objective_coefficient,
+                        offset,
+                        duals,
+                        work,
+                        deadline,
+                    )?;
+                    if direction == Some(true) {
+                        let terminal_lower = slope_paired_terminal_lower_bound(
+                            initial,
+                            arcs,
+                            graph.original_max_arcs(),
+                            work,
+                            deadline,
+                        )?;
+                        let baseline = if objective_coefficient != 0.
+                            && *normalization
+                                == crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum
+                        {
+                            Some(kernel.paired_initial_minimum(resource, work, Some(deadline))?)
+                        } else {
+                            None
+                        };
+                        let values = Interval::point(terminal_lower);
+                        for (arc_index, paired_arc_lower) in paired_arc_lower.iter_mut().enumerate()
+                        {
+                            if graph.arcs.get(arc_index)?.head != graph.sink {
+                                continue;
+                            }
+                            let contribution_work = oracle.activity_rows.len().checked_add(1)?;
+                            *work = work.checked_sub(contribution_work)?;
+                            if Instant::now() >= deadline {
+                                return None;
+                            }
+                            let mut terminal_lower_charge = 0.;
+                            add_paired_arc_contribution(
+                                oracle,
+                                offset,
+                                duals,
+                                resource,
+                                *normalization,
+                                objective_coefficient,
+                                baseline,
+                                values,
+                                &mut terminal_lower_charge,
+                            )?;
+                            *paired_arc_lower = crate::core::rounding::add_down(
+                                *paired_arc_lower,
+                                terminal_lower_charge,
+                            )?;
+                        }
+                        continue;
+                    }
+                    if direction == Some(false) {
+                        let terminal_upper = slope_paired_terminal_upper_bound(
+                            initial,
+                            arcs,
+                            graph.original_max_arcs(),
+                            work,
+                            deadline,
+                        )?;
+                        let baseline = if objective_coefficient != 0.
+                            && *normalization
+                                == crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum
+                        {
+                            Some(kernel.paired_initial_minimum(resource, work, Some(deadline))?)
+                        } else {
+                            None
+                        };
+                        let values = Interval::point(terminal_upper);
+                        for (arc_index, paired_arc_lower) in paired_arc_lower.iter_mut().enumerate()
+                        {
+                            if graph.arcs.get(arc_index)?.head != graph.sink {
+                                continue;
+                            }
+                            let contribution_work = oracle.activity_rows.len().checked_add(1)?;
+                            *work = work.checked_sub(contribution_work)?;
+                            if Instant::now() >= deadline {
+                                return None;
+                            }
+                            let mut terminal_upper_charge = 0.;
+                            add_paired_arc_contribution(
+                                oracle,
+                                offset,
+                                duals,
+                                resource,
+                                *normalization,
+                                objective_coefficient,
+                                baseline,
+                                values,
+                                &mut terminal_upper_charge,
+                            )?;
+                            *paired_arc_lower = crate::core::rounding::add_down(
+                                *paired_arc_lower,
+                                terminal_upper_charge,
+                            )?;
+                        }
+                        continue;
+                    }
+                    if direction.is_none() {
+                        let mut has_effect = objective_coefficient != 0.;
+                        for entry in oracle
+                            .activity_rows
+                            .iter()
+                            .filter(|entry| entry.resource == resource && entry.coefficient != 0.)
+                        {
+                            *work = work.checked_sub(1)?;
+                            if Instant::now() >= deadline {
+                                return None;
+                            }
+                            has_effect |= *duals.get(offset.checked_add(entry.row)?)? != 0.;
+                        }
+                        if !has_effect {
+                            continue;
+                        }
+                    }
+                    // Mixed signs and non-isolated shared rows need a joint
+                    // row rounding envelope that this relaxation lacks.
                     return None;
                 }
                 if *mode == crate::graph::coupled::PairedResourceMode::Feasibility
@@ -2638,19 +2888,25 @@ fn coupled_lower_bounds<const D: usize>(
             None
         };
         let monotone_cost_bounded = positive_direction.is_some();
-        let mut max_growth = 0.0f64;
+        let mut max_increment = 0.0f64;
+        let mut max_waiting = 0.0f64;
         let mut max_lower = f64::NEG_INFINITY;
         let mut max_upper = f64::INFINITY;
         if monotone_cost_bounded {
             max_upper = f64::NEG_INFINITY;
             for arc_index in 0..graph.arcs.len() {
-                let (growth, lower, upper) =
+                let (increment, waiting, lower, upper) =
                     paired_bounded_step_envelope(definition, arc_index, work, deadline)?;
-                max_growth = max_growth.max(growth);
+                max_increment = max_increment.max(increment);
+                max_waiting = max_waiting.max(waiting);
                 max_lower = max_lower.max(lower);
                 max_upper = max_upper.max(upper);
             }
-            if !max_growth.is_finite() || !max_lower.is_finite() || !max_upper.is_finite() {
+            if !max_increment.is_finite()
+                || !max_waiting.is_finite()
+                || !max_lower.is_finite()
+                || !max_upper.is_finite()
+            {
                 return None;
             }
         }
@@ -2670,6 +2926,11 @@ fn coupled_lower_bounds<const D: usize>(
                         hi: high.hi,
                     };
                     if monotone_cost_bounded && graph.arcs.get(arc_index)?.head == graph.sink {
+                        let contribution_work = oracle.activity_rows.len().checked_add(1)?;
+                        *work = work.checked_sub(contribution_work)?;
+                        if Instant::now() >= deadline {
+                            return None;
+                        }
                         let mut terminal_lower = 0.;
                         add_paired_arc_contribution(
                             oracle,
@@ -2685,8 +2946,12 @@ fn coupled_lower_bounds<const D: usize>(
                         terminal_arcs.push(PairedTerminalArcCharge {
                             arc: arc_index,
                             values,
+                            floor: values.lo,
                             lower: terminal_lower,
                         });
+                        *paired_arc_lower =
+                            crate::core::rounding::add_down(*paired_arc_lower, terminal_lower)?;
+                        continue;
                     }
                     add_paired_arc_contribution(
                         oracle,
@@ -2713,6 +2978,11 @@ fn coupled_lower_bounds<const D: usize>(
                 return None;
             }
             if monotone_cost_bounded && graph.arcs.get(arc_index)?.head == graph.sink {
+                let contribution_work = oracle.activity_rows.len().checked_add(1)?;
+                *work = work.checked_sub(contribution_work)?;
+                if Instant::now() >= deadline {
+                    return None;
+                }
                 let mut terminal_lower = 0.;
                 add_paired_arc_contribution(
                     oracle,
@@ -2728,8 +2998,12 @@ fn coupled_lower_bounds<const D: usize>(
                 terminal_arcs.push(PairedTerminalArcCharge {
                     arc: arc_index,
                     values,
+                    floor: values.lo,
                     lower: terminal_lower,
                 });
+                *paired_arc_lower =
+                    crate::core::rounding::add_down(*paired_arc_lower, terminal_lower)?;
+                continue;
             }
             add_paired_arc_contribution(
                 oracle,
@@ -2749,8 +3023,11 @@ fn coupled_lower_bounds<const D: usize>(
                 normalization,
                 objective_coefficient,
                 positive_direction: positive_direction?,
+                lower_monotone: true,
+                upper_unbounded: false,
                 baseline,
-                max_growth,
+                max_increment,
+                max_waiting,
                 max_lower,
                 max_upper,
                 terminals: terminal_arcs,
@@ -2877,7 +3154,6 @@ fn paired_terminal_lower_bound(
         minimum_waiting_delta = minimum_waiting_delta.min(wait_delta);
     }
 
-    let delta_lower = crate::core::rounding::add_down(increment_lower, minimum_waiting_delta)?;
     let mut current = initial.lo;
     let mut terminal_lower = current;
     for _ in 0..hops {
@@ -2885,11 +3161,233 @@ fn paired_terminal_lower_bound(
         if Instant::now() >= deadline {
             return None;
         }
-        let recurrence = crate::core::rounding::add_down(current, delta_lower)?;
+        let after_increment = crate::core::rounding::add_down(current, increment_lower)?;
+        let recurrence = crate::core::rounding::add_down(after_increment, minimum_waiting_delta)?;
         current = recurrence.max(lower_function_minimum);
         terminal_lower = terminal_lower.min(current);
     }
     terminal_lower.is_finite().then_some(terminal_lower)
+}
+
+/// Lower-bound terminal Gamma for raw-slope paired costs with an unbounded
+/// upper sentinel. Function hulls cover every prepared value, including the
+/// first/last values returned by FrontAlgebra endpoint snapping. The domain
+/// slack below encloses every coordinate accepted by that same near rule.
+fn slope_paired_terminal_lower_bound(
+    initial: &crate::graph::coupled::PreparedSlopeFunction,
+    arcs: &[crate::graph::coupled::SlopeRelationArc],
+    hops: usize,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<f64> {
+    let initial = slope_function_hull(initial, work, deadline)?;
+    let mut increment_lower = f64::INFINITY;
+    let mut lower_function_minimum = f64::INFINITY;
+    let mut minimum_waiting_delta = 0.0f64;
+
+    for arc in arcs {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        let head = intersect_head_domains(
+            slope_domain_with_endpoint_tolerance(&arc.lower)?,
+            slope_domain_with_endpoint_tolerance(&arc.upper)?,
+        )?;
+        let arrival = slope_function_hull(&arc.arrival, work, deadline)?;
+        let increment = slope_function_hull(&arc.increment, work, deadline)?;
+        let lower = slope_function_hull(&arc.lower, work, deadline)?;
+        let head_minus_arrival = Interval {
+            lo: crate::core::rounding::add_down(head.lo, -arrival.hi)?,
+            hi: crate::core::rounding::add_up(head.hi, -arrival.lo)?,
+        };
+        let waiting_delta = Interval::point(f64::from(arc.waiting))
+            .multiply(head_minus_arrival)?
+            .lo;
+        increment_lower = increment_lower.min(increment.lo);
+        lower_function_minimum = lower_function_minimum.min(lower.lo);
+        minimum_waiting_delta = minimum_waiting_delta.min(waiting_delta);
+    }
+
+    let mut current = initial.lo;
+    let mut terminal_lower = current;
+    for _ in 0..hops {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        let after_increment = crate::core::rounding::add_down(current, increment_lower)?;
+        let recurrence = crate::core::rounding::add_down(after_increment, minimum_waiting_delta)?;
+        current = recurrence.max(lower_function_minimum);
+        terminal_lower = terminal_lower.min(current);
+    }
+    terminal_lower.is_finite().then_some(terminal_lower)
+}
+
+/// Upper-bound the minimal source replay recurrence for raw-slope paired
+/// costs with an unbounded upper sentinel. The upper function limits
+/// feasibility, but the sentinel is not a cap on the recurrence; endpoint-
+/// tolerant arrival/head domains remain in the envelope.
+fn slope_paired_terminal_upper_bound(
+    initial: &crate::graph::coupled::PreparedSlopeFunction,
+    arcs: &[crate::graph::coupled::SlopeRelationArc],
+    hops: usize,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<f64> {
+    let initial = slope_function_hull(initial, work, deadline)?;
+    let mut increment_upper = f64::NEG_INFINITY;
+    let mut lower_function_maximum = f64::NEG_INFINITY;
+    let mut maximum_waiting_delta = f64::NEG_INFINITY;
+    for arc in arcs {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        let head = intersect_head_domains(
+            slope_domain_with_endpoint_tolerance(&arc.lower)?,
+            slope_domain_with_endpoint_tolerance(&arc.upper)?,
+        )?;
+        let arrival = slope_function_hull(&arc.arrival, work, deadline)?;
+        let increment = slope_function_hull(&arc.increment, work, deadline)?;
+        let lower = slope_function_hull(&arc.lower, work, deadline)?;
+        let head_minus_arrival = Interval {
+            lo: crate::core::rounding::add_down(head.lo, -arrival.hi)?,
+            hi: crate::core::rounding::add_up(head.hi, -arrival.lo)?,
+        };
+        let waiting_delta = Interval::point(f64::from(arc.waiting))
+            .multiply(head_minus_arrival)?
+            .hi;
+        increment_upper = increment_upper.max(increment.hi);
+        lower_function_maximum = lower_function_maximum.max(lower.hi);
+        maximum_waiting_delta = maximum_waiting_delta.max(waiting_delta);
+    }
+    if !increment_upper.is_finite()
+        || !lower_function_maximum.is_finite()
+        || !maximum_waiting_delta.is_finite()
+    {
+        return None;
+    }
+
+    let mut current = initial.hi;
+    let mut terminal_upper = current;
+    for _ in 0..hops {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        current = crate::core::rounding::add_up(current, increment_upper)?;
+        current = crate::core::rounding::add_up(current, maximum_waiting_delta)?;
+        current = current.max(lower_function_maximum);
+        terminal_upper = terminal_upper.max(current);
+    }
+    terminal_upper.is_finite().then_some(terminal_upper)
+}
+
+/// Expand a raw-slope domain enough to cover the absolute/relative endpoint
+/// snapping used by FrontAlgebra. For relative snapping, if d=|x-b| then
+/// d < r|x+b| <= r(2|b|+d), hence d < 2r|b|/(1-r) <= 4r|b|.
+fn slope_domain_with_endpoint_tolerance(
+    function: &crate::graph::coupled::PreparedSlopeFunction,
+) -> Option<(f64, f64)> {
+    const RELATIVE_PADDING: f64 = 8.881784197001252e-10;
+    const ABSOLUTE_TOLERANCE: f64 = 0.0001;
+
+    let (lower, upper) = slope_domain(function)?;
+    let padding = |endpoint: f64| {
+        multiply_upper_nonnegative(
+            RELATIVE_PADDING,
+            crate::core::rounding::add_up(endpoint.abs(), 1.0)?,
+        )
+        .map(|relative| relative.max(ABSOLUTE_TOLERANCE))
+    };
+    Some((
+        crate::core::rounding::add_down(lower, -padding(lower)?)?,
+        crate::core::rounding::add_up(upper, padding(upper)?)?,
+    ))
+}
+
+/// Upper-bound terminal Gamma through the route's finite hop limit. When any
+/// arc has the 1e12 CostUnbounded marker, ignore upper-value caps in this
+/// relaxation; retain function-domain checks and rely on source replay to
+/// validate candidate controls. Otherwise, the finite upper hulls can cap the
+/// recurrence directly.
+fn paired_terminal_upper_bound(
+    initial: &crate::graph::coupled::PiecewiseLinearFunction,
+    arcs: &[crate::graph::coupled::PairedResourceArc],
+    hops: usize,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<PairedTerminalUpperEnvelope> {
+    let initial = piecewise_value_hull(initial, work, deadline)?;
+    let upper_unbounded = arcs.iter().any(|arc| {
+        arc.upper
+            .points
+            .first()
+            .is_some_and(|point| point[1] >= 1e12)
+    });
+    let mut max_increment = f64::NEG_INFINITY;
+    let mut max_waiting = 0.0f64;
+    let mut max_lower = f64::NEG_INFINITY;
+    let mut max_upper = f64::NEG_INFINITY;
+    let mut valid_arcs = 0usize;
+    for arc in arcs {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        let Some(head) =
+            intersect_head_domains(piecewise_domain(&arc.lower)?, piecewise_domain(&arc.upper)?)
+        else {
+            continue;
+        };
+        let arrival = piecewise_value_hull(&arc.arrival, work, deadline)?;
+        let increment = piecewise_value_hull(&arc.increment, work, deadline)?;
+        let lower = piecewise_value_hull(&arc.lower, work, deadline)?;
+        let upper = piecewise_value_hull(&arc.upper, work, deadline)?;
+        let maximum_wait = crate::core::rounding::add_up(head.hi, -arrival.lo)?.max(0.);
+        let waiting = if arc.waiting > 0 {
+            multiply_upper_nonnegative(f64::from(arc.waiting), maximum_wait)?
+        } else {
+            0.0
+        };
+        max_increment = max_increment.max(increment.hi);
+        max_waiting = max_waiting.max(waiting);
+        max_lower = max_lower.max(lower.hi);
+        max_upper = max_upper.max(upper.hi);
+        valid_arcs += 1;
+    }
+    if valid_arcs == 0
+        || !max_increment.is_finite()
+        || !max_waiting.is_finite()
+        || !max_lower.is_finite()
+        || !max_upper.is_finite()
+    {
+        return None;
+    }
+
+    let mut current = initial.hi;
+    let mut terminal = current;
+    for _ in 0..hops {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        current = crate::core::rounding::add_up(current, max_increment)?;
+        current = crate::core::rounding::add_up(current, max_waiting)?.max(max_lower);
+        if !upper_unbounded {
+            current = current.min(max_upper);
+        }
+        terminal = terminal.max(current);
+    }
+    terminal.is_finite().then_some(PairedTerminalUpperEnvelope {
+        terminal,
+        max_increment,
+        max_waiting,
+        max_lower,
+        max_upper,
+        upper_unbounded,
+    })
 }
 
 /// A sentinel activity term is separable only when no other local column
@@ -3049,6 +3547,21 @@ fn paired_prefix_terminal_correction<const D: usize>(
         else {
             continue;
         };
+        let terminal_ceiling = if charge.positive_direction {
+            None
+        } else {
+            Some(paired_terminal_ceiling_after_hops(
+                domain.dependent_upper,
+                charge.max_increment,
+                charge.max_waiting,
+                charge.max_lower,
+                charge.max_upper,
+                charge.upper_unbounded,
+                remaining,
+                work,
+                deadline,
+            )?)
+        };
         let mut minimum = f64::INFINITY;
         for terminal in &charge.terminals {
             let contribution_work = oracle.activity_rows.len().checked_add(1)?;
@@ -3058,7 +3571,7 @@ fn paired_prefix_terminal_correction<const D: usize>(
             }
             // This terminal arc cannot complete the current state when its
             // upper envelope lies below the prefix's dependent-value floor.
-            if domain.dependent_lower > terminal.values.hi {
+            if charge.lower_monotone && domain.dependent_lower > terminal.values.hi {
                 continue;
             }
             let values = if charge.positive_direction {
@@ -3067,14 +3580,8 @@ fn paired_prefix_terminal_correction<const D: usize>(
                     hi: terminal.values.hi,
                 }
             } else {
-                let hops = u32::try_from(remaining).ok()?;
-                let growth = multiply_upper_nonnegative(charge.max_growth, f64::from(hops))?;
-                let recurrence = crate::core::rounding::add_up(domain.dependent_upper, growth)?;
-                let terminal_upper = recurrence
-                    .max(charge.max_lower)
-                    .min(charge.max_upper)
-                    .min(terminal.values.hi);
-                if terminal_upper < terminal.values.lo {
+                let terminal_upper = terminal_ceiling?.min(terminal.values.hi);
+                if terminal_upper < terminal.floor {
                     continue;
                 }
                 Interval {
@@ -3731,13 +4238,16 @@ fn paired_prefix_roots<const D: usize>(
     let kernel = graph.coupled_kernel()?;
     let mut roots = Vec::new();
     for (resource, definition) in kernel.definitions().iter().enumerate() {
-        let (initial_base, dependent) = match definition {
+        let (base, dependent) = match definition {
             CoupledResource::PairedPiecewiseLinear {
                 initial,
                 initial_base,
                 ..
             } => (
-                *initial_base,
+                Interval {
+                    lo: initial_base.lower,
+                    hi: initial_base.upper,
+                },
                 piecewise_value_range(
                     initial,
                     Interval {
@@ -3754,7 +4264,10 @@ fn paired_prefix_roots<const D: usize>(
                 policy: crate::graph::coupled::FrontOperationPolicy::StrictDomain,
                 ..
             } => (
-                *initial_base,
+                Interval {
+                    lo: initial_base.lower,
+                    hi: initial_base.upper,
+                },
                 slope_value_range(
                     initial,
                     Interval {
@@ -3765,17 +4278,27 @@ fn paired_prefix_roots<const D: usize>(
                     deadline,
                 )?,
             ),
-            // Endpoint-tolerant raw functions may admit departures just
-            // outside the stored domain. Keep them out of this exact filter.
-            CoupledResource::SlopePaired { .. } => continue,
+            CoupledResource::SlopePaired {
+                initial,
+                initial_base,
+                policy: crate::graph::coupled::FrontOperationPolicy::FrontAlgebra,
+                ..
+            } => {
+                let base = intersect_domains(
+                    Interval {
+                        lo: initial_base.lower,
+                        hi: initial_base.upper,
+                    },
+                    slope_domain_with_endpoint_tolerance(initial)?,
+                    slope_domain_with_endpoint_tolerance(initial)?,
+                )?;
+                (base, slope_function_hull(initial, work, deadline)?)
+            }
             _ => continue,
         };
         roots.push(PairedPrefixDomain {
             resource,
-            base: Interval {
-                lo: initial_base.lower,
-                hi: initial_base.upper,
-            },
+            base,
             dependent_lower: dependent.lo,
             dependent_upper: dependent.hi,
         });
@@ -3805,13 +4328,13 @@ fn extend_paired_prefix_domains<const D: usize>(
         }
         let definition = kernel.definitions().get(domain.resource)?;
         let (
-            arrival_at_lower_departure,
-            arrival_function_lower,
-            head,
+            next_base_lower,
+            next_base_upper,
             increment,
             lower,
             upper,
-            waiting,
+            waiting_lower,
+            waiting_upper,
             unbounded_upper,
         ) = match definition {
             CoupledResource::PairedPiecewiseLinear { arcs, mode, .. } => {
@@ -3846,6 +4369,18 @@ fn extend_paired_prefix_domains<const D: usize>(
                 let increment = piecewise_value_range(&arc.increment, departure, work, deadline)?;
                 let lower = piecewise_value_range(&arc.lower, reachable_head, work, deadline)?;
                 let upper = piecewise_value_range(&arc.upper, reachable_head, work, deadline)?;
+                let maximum_wait =
+                    crate::core::rounding::add_up(head.hi, -arrival_at_lower_departure)?.max(0.);
+                let waiting_lower = if arc.waiting < 0 {
+                    crate::core::rounding::multiply_down(f64::from(arc.waiting), maximum_wait)?
+                } else {
+                    0.0
+                };
+                let waiting_upper = if arc.waiting > 0 {
+                    multiply_upper_nonnegative(f64::from(arc.waiting), maximum_wait)?
+                } else {
+                    0.0
+                };
                 let unbounded_upper = *mode
                     == crate::graph::coupled::PairedResourceMode::CostUnbounded
                     && arc
@@ -3855,12 +4390,12 @@ fn extend_paired_prefix_domains<const D: usize>(
                         .is_some_and(|point| point[1] >= 1e12);
                 (
                     arrival_at_lower_departure,
-                    arrival_at_lower_departure,
-                    head,
+                    head.hi,
                     increment,
                     lower,
                     upper,
-                    arc.waiting,
+                    waiting_lower,
+                    waiting_upper,
                     unbounded_upper,
                 )
             }
@@ -3907,46 +4442,104 @@ fn extend_paired_prefix_domains<const D: usize>(
                 let upper = slope_value_range(&arc.upper, reachable_head, work, deadline)?;
                 let unbounded_upper = false;
                 (
-                    arrival_at_lower_departure,
-                    arrival_at_lower_departure,
-                    head,
+                    arrival_at_lower_departure.max(head.lo),
+                    head.hi,
                     increment,
                     lower,
                     upper,
-                    arc.waiting,
+                    {
+                        let maximum_wait =
+                            crate::core::rounding::add_up(head.hi, -arrival_at_lower_departure)?
+                                .max(0.);
+                        if arc.waiting < 0 {
+                            crate::core::rounding::multiply_down(
+                                f64::from(arc.waiting),
+                                maximum_wait,
+                            )?
+                        } else {
+                            0.
+                        }
+                    },
+                    {
+                        let maximum_wait =
+                            crate::core::rounding::add_up(head.hi, -arrival_at_lower_departure)?
+                                .max(0.);
+                        if arc.waiting > 0 {
+                            multiply_upper_nonnegative(f64::from(arc.waiting), maximum_wait)?
+                        } else {
+                            0.
+                        }
+                    },
+                    unbounded_upper,
+                )
+            }
+            CoupledResource::SlopePaired {
+                initial: _,
+                arcs,
+                mode,
+                policy: crate::graph::coupled::FrontOperationPolicy::FrontAlgebra,
+                ..
+            } => {
+                let arc = arcs.get(arc_index)?;
+                let departure = intersect_domains(
+                    domain.base,
+                    slope_domain_with_endpoint_tolerance(&arc.arrival)?,
+                    slope_domain_with_endpoint_tolerance(&arc.increment)?,
+                );
+                let Some(_departure) = departure else {
+                    return Some(None);
+                };
+                let head = intersect_head_domains(
+                    slope_domain_with_endpoint_tolerance(&arc.lower)?,
+                    slope_domain_with_endpoint_tolerance(&arc.upper)?,
+                );
+                let Some(head) = head else {
+                    return Some(None);
+                };
+                // Endpoint snapping can accept a head just below arrival. Do not
+                // impose the strict head >= arrival relation here; use the full
+                // interval difference for a conservative waiting enclosure.
+                let arrival = slope_function_hull(&arc.arrival, work, deadline)?;
+                let increment = slope_function_hull(&arc.increment, work, deadline)?;
+                let lower = slope_function_hull(&arc.lower, work, deadline)?;
+                let upper = slope_function_hull(&arc.upper, work, deadline)?;
+                let head_minus_arrival = Interval {
+                    lo: crate::core::rounding::add_down(head.lo, -arrival.hi)?,
+                    hi: crate::core::rounding::add_up(head.hi, -arrival.lo)?,
+                };
+                let waiting =
+                    Interval::point(f64::from(arc.waiting)).multiply(head_minus_arrival)?;
+                let unbounded_upper = *mode
+                    == crate::graph::coupled::PairedResourceMode::CostUnbounded
+                    && arc
+                        .upper
+                        .pairs()
+                        .first()
+                        .is_some_and(|point| point.0 >= 1e12);
+                (
+                    head.lo,
+                    head.hi,
+                    increment,
+                    lower,
+                    upper,
+                    waiting.lo,
+                    waiting.hi,
                     unbounded_upper,
                 )
             }
             // The root constructor only installs supported paired domains.
             _ => return None,
         };
-        if arrival_at_lower_departure > head.hi {
-            return Some(None);
-        }
-        let maximum_wait = crate::core::rounding::add_up(head.hi, -arrival_function_lower)?;
-        if maximum_wait < 0. {
-            return Some(None);
-        }
-        let waiting_lower = if waiting < 0 {
-            crate::core::rounding::multiply_down(f64::from(waiting), maximum_wait)?
-        } else {
-            0.
-        };
-        let increment_lower = crate::core::rounding::add_down(increment.lo, waiting_lower)?;
-        let recurrence_lower =
-            crate::core::rounding::add_down(domain.dependent_lower, increment_lower)?;
+        let after_increment =
+            crate::core::rounding::add_down(domain.dependent_lower, increment.lo)?;
+        let recurrence_lower = crate::core::rounding::add_down(after_increment, waiting_lower)?;
         let dependent_lower = recurrence_lower.max(lower.lo);
         if !unbounded_upper && dependent_lower > upper.hi {
             return Some(None);
         }
-        let waiting_increase = if waiting > 0 {
-            multiply_upper_nonnegative(f64::from(waiting), maximum_wait.max(0.))?
-        } else {
-            0.
-        };
         let recurrence_upper = crate::core::rounding::add_up(
             crate::core::rounding::add_up(domain.dependent_upper, increment.hi)?,
-            waiting_increase,
+            waiting_upper,
         )?
         .max(lower.hi);
         let dependent_upper = if unbounded_upper {
@@ -3957,8 +4550,8 @@ fn extend_paired_prefix_domains<const D: usize>(
         next.push(PairedPrefixDomain {
             resource: domain.resource,
             base: Interval {
-                lo: arrival_at_lower_departure.max(head.lo),
-                hi: head.hi,
+                lo: next_base_lower,
+                hi: next_base_upper,
             },
             dependent_lower,
             dependent_upper,

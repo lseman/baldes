@@ -95,6 +95,94 @@ fn unbounded_paired_terminal_bound_covers_negative_increments_and_work_limits() 
 }
 
 #[test]
+fn paired_negative_terminal_ceiling_applies_lower_resets_per_hop() {
+    let deadline = Instant::now() + Duration::from_secs(1);
+    let mut work = 8;
+    let ceiling =
+        paired_terminal_ceiling_after_hops(0., 1., 0., 5., 100., false, 2, &mut work, deadline)
+            .unwrap();
+    assert_eq!(ceiling, 6.);
+    assert_eq!(work, 6);
+
+    let mut capped_work = 3;
+    let capped = paired_terminal_ceiling_after_hops(
+        8.,
+        2.,
+        0.,
+        0.,
+        9.,
+        false,
+        3,
+        &mut capped_work,
+        deadline,
+    )
+    .unwrap();
+    assert_eq!(capped, 9.);
+
+    let mut unbounded_work = 2;
+    let unbounded = paired_terminal_ceiling_after_hops(
+        0.,
+        6e11,
+        0.,
+        0.,
+        1e12,
+        true,
+        2,
+        &mut unbounded_work,
+        deadline,
+    )
+    .unwrap();
+    assert_eq!(unbounded, 1.2e12);
+
+    let mut exhausted = 1;
+    assert!(paired_terminal_ceiling_after_hops(
+        0.,
+        1.,
+        0.,
+        5.,
+        100.,
+        false,
+        2,
+        &mut exhausted,
+        deadline,
+    )
+    .is_none());
+}
+
+#[test]
+fn unbounded_paired_terminal_upper_bound_ignores_shift_sentinel_as_a_cap() {
+    let initial = paired_test_function(0., 0., 10., 0.);
+    let arc = crate::graph::coupled::PairedResourceArc {
+        arrival: paired_test_function(0., 0., 10., 10.),
+        increment: paired_test_function(0., 6e11, 10., 6e11),
+        lower: paired_test_function(0., 0., 10., 0.),
+        upper: paired_test_function(0., 1e12, 1e12, 1e12),
+        waiting: 0,
+    };
+    let mut work = 1_000;
+    let bound = paired_terminal_upper_bound(
+        &initial,
+        std::slice::from_ref(&arc),
+        2,
+        &mut work,
+        Instant::now() + Duration::from_secs(1),
+    )
+    .unwrap();
+    assert_eq!(bound.terminal, 1.2e12);
+    assert!(bound.upper_unbounded);
+
+    let mut no_work = 0;
+    assert!(paired_terminal_upper_bound(
+        &initial,
+        std::slice::from_ref(&arc),
+        2,
+        &mut no_work,
+        Instant::now() + Duration::from_secs(1),
+    )
+    .is_none());
+}
+
+#[test]
 fn paired_base_domain_pruning_keeps_hulls_and_proves_empty_departure_domains() {
     use crate::graph::coupled::{
         CoupledResource, PairedCostNormalization, PairedResourceArc, PairedResourceMode,
@@ -129,6 +217,7 @@ fn paired_base_domain_pruning_keeps_hulls_and_proves_empty_departure_domains() {
         resource: 0,
         base: Interval { lo: 2., hi: 4. },
         dependent_lower: 0.,
+        dependent_upper: 0.,
     }];
     let reachable = extend_paired_prefix_domains(&graph, 0, &narrowed, &mut work, deadline)
         .unwrap()
@@ -137,16 +226,60 @@ fn paired_base_domain_pruning_keeps_hulls_and_proves_empty_departure_domains() {
     assert_eq!(reachable[0].base.lo, 2.);
     assert_eq!(reachable[0].base.hi, 10.);
     assert_eq!(reachable[0].dependent_lower, 0.);
+    assert_eq!(reachable[0].dependent_upper, 0.);
 
     let impossible = [PairedPrefixDomain {
         resource: 0,
         base: Interval { lo: 20., hi: 30. },
         dependent_lower: 0.,
+        dependent_upper: 0.,
     }];
     assert!(matches!(
         extend_paired_prefix_domains(&graph, 0, &impossible, &mut work, deadline,),
         Some(None)
     ));
+}
+
+#[test]
+fn front_algebra_paired_prefix_keeps_endpoint_snapped_head_below_arrival() {
+    use crate::graph::coupled::{
+        CoupledResource, FrontOperationPolicy, PairedCostNormalization, PairedResourceMode,
+        PreparedSlopeFunction, SlopeRelationArc,
+    };
+
+    let function =
+        |value| PreparedSlopeFunction::from_prepared_pairs(vec![(value, 0.), (0., 1.)]).unwrap();
+    let mut graph = crate::graph::Graph::<2>::new(2, 0).unwrap();
+    graph.add_arc(0, 1, 0.).unwrap();
+    graph
+        .set_coupled_resources(&[CoupledResource::SlopePaired {
+            initial: function(0.),
+            initial_base: Window::new(0., 1.).unwrap(),
+            arcs: vec![SlopeRelationArc {
+                arrival: PreparedSlopeFunction::from_prepared_pairs(vec![(0.00005, 0.), (1., 1.)])
+                    .unwrap(),
+                increment: function(0.),
+                lower: function(0.),
+                upper: function(10.),
+                waiting: 1,
+            }],
+            mode: PairedResourceMode::Feasibility,
+            normalization: PairedCostNormalization::AbsoluteFinalValue,
+            policy: FrontOperationPolicy::FrontAlgebra,
+        }])
+        .unwrap();
+
+    let deadline = Instant::now() + Duration::from_secs(1);
+    let mut work = 1_000;
+    let roots = paired_prefix_roots(&graph, &mut work, deadline).unwrap();
+    assert_eq!(roots.len(), 1);
+
+    let next = extend_paired_prefix_domains(&graph, 0, &roots, &mut work, deadline)
+        .unwrap()
+        .unwrap();
+    assert_eq!(next.len(), 1);
+    assert!(next[0].base.lo < 0.);
+    assert!(next[0].dependent_lower <= 0.);
 }
 
 fn root() -> Output<2> {
