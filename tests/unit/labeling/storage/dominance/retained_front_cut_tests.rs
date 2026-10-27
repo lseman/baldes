@@ -64,6 +64,20 @@ fn front_cost_margin_cannot_pay_cut_state_tradeoffs_and_words_are_read_once() {
         Some(&right),
         || (&different[..], &words[..]),
     ));
+    let empty: [u32; 0] = [];
+    assert!(LabelStorage::dominates_coupled_slices(
+        &graph,
+        &a,
+        &base,
+        true,
+        1,
+        InsertionTest::Full,
+        false,
+        &[],
+        Some(&left),
+        Some(&right),
+        || (&empty[..], &words[..]),
+    ));
     let reads = std::cell::Cell::new(0);
     assert!(LabelStorage::dominates_coupled_slices(
         &graph,

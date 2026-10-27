@@ -1,5 +1,12 @@
 use super::*;
 
+fn cut_words_equal(a: &[u32], b: &[u32]) -> bool {
+    let shared = a.len().min(b.len());
+    a[..shared] == b[..shared]
+        && a[shared..].iter().all(|&word| word == 0)
+        && b[shared..].iter().all(|&word| word == 0)
+}
+
 impl<const D: usize> LabelStorage<D> {
     #[inline]
     pub fn dominates(
@@ -78,7 +85,7 @@ impl<const D: usize> LabelStorage<D> {
                 return false;
             }
             let pair = words();
-            if pair.0 != pair.1 {
+            if !cut_words_equal(pair.0, pair.1) {
                 return false;
             }
             (Some(pair), None)

@@ -50,7 +50,7 @@ impl<const D: usize> Solver<D> {
         maximum: usize,
         negative_only: bool,
     ) -> Result<PricingResult> {
-        self.price_phase_internal(index, maximum, negative_only, false, false)
+        self.price_phase_internal(index, maximum, negative_only, false)
     }
 
     /// Price with completed columns retained when a label or time limit fires.
@@ -61,45 +61,7 @@ impl<const D: usize> Solver<D> {
         maximum: usize,
         negative_only: bool,
     ) -> Result<PricingResult> {
-        self.price_phase_internal(index, maximum, negative_only, true, false)
-    }
-
-    /// Run the SCC labeler only to propose routes for signed paired source
-    /// pricing. The returned minimum is never a pricing certificate.
-    #[cfg(feature = "clp")]
-    pub(crate) fn signed_candidate_routes(
-        &self,
-        graph: Graph<D>,
-        maximum: usize,
-        deadline: std::time::Instant,
-    ) -> Result<PricingResult> {
-        let mut solver = self.fork_pricing(false);
-        solver.graph = graph;
-        solver.prepared = None;
-        solver.engine = None;
-        solver.enumeration = None;
-        // Match the native paired-label schedule: let SCC propagation reach
-        // its fixed point instead of inheriting a restricted-master phase's
-        // per-bucket label cap. This pass only proposes source-replayed
-        // candidates; signed pricing certification remains in the caller.
-        solver.phases = vec![phases::Phase {
-            check_ng: true,
-            jump_arcs: true,
-            labels_per_bucket: i64::MAX,
-        }];
-        solver.controls.time_limit = solver
-            .controls
-            .time_limit
-            .min(deadline.saturating_duration_since(std::time::Instant::now()));
-        if solver.controls.time_limit.is_zero() {
-            return Ok(PricingResult {
-                columns: vec![],
-                minimum_reduced_cost: 0.,
-                exact: false,
-                statistics: Default::default(),
-            });
-        }
-        solver.price_phase_internal(0, maximum.max(1), false, true, true)
+        self.price_phase_internal(index, maximum, negative_only, true)
     }
 
     fn price_phase_internal(
@@ -108,13 +70,11 @@ impl<const D: usize> Solver<D> {
         maximum: usize,
         negative_only: bool,
         allow_partial: bool,
-        allow_signed_candidates: bool,
     ) -> Result<PricingResult> {
         if self
             .graph
             .coupled_kernel()
             .is_some_and(|kernel| kernel.has_negative_paired_objectives())
-            && !allow_signed_candidates
         {
             return Err(incomplete(
                 "negative paired objectives require source-control master pricing",
@@ -202,9 +162,7 @@ impl<const D: usize> Solver<D> {
         engine.controls = engine_controls;
         self.requires_rollback = false;
         controls.time_limit = call_time_limit.saturating_sub(started.elapsed());
-        let mut answer = if allow_signed_candidates {
-            engine.solve_signed_candidates(&self.graph, &controls)
-        } else if allow_partial {
+        let mut answer = if allow_partial {
             engine.solve_partial(&self.graph, &controls)
         } else {
             engine.solve(&self.graph, &controls)
@@ -226,9 +184,7 @@ impl<const D: usize> Solver<D> {
             match self.new_engine(forward, phase) {
                 Ok(mut retry) => {
                     controls.time_limit = call_time_limit.saturating_sub(started.elapsed());
-                    answer = if allow_signed_candidates {
-                        retry.solve_signed_candidates(&self.graph, &controls)
-                    } else if allow_partial {
+                    answer = if allow_partial {
                         retry.solve_partial(&self.graph, &controls)
                     } else {
                         retry.solve(&self.graph, &controls)
