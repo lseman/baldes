@@ -1,4 +1,5 @@
 use super::*;
+use std::time::Duration;
 
 fn root() -> Output<2> {
     let mut source: serde_json::Value = serde_json::from_str(include_str!(
@@ -231,6 +232,26 @@ fn global_joint_target_objectives_cover_coordinate_extremes() {
 
     assert!(targets.contains(&vec![0., 8.]));
     assert!(targets.contains(&vec![8., 0.]));
+}
+
+#[test]
+fn terminal_vertex_sweep_finds_joint_extrema_missed_by_coordinate_objectives() {
+    let domains = [0.; 3].map(|_| Interval { lo: 0., hi: 1. });
+    let rows = vec![
+        (RowSense::LessEqual, 1., vec![(0, 1.), (1, 1.)]),
+        (RowSense::LessEqual, 1., vec![(1, 1.), (2, 1.)]),
+        (RowSense::LessEqual, 1., vec![(0, 1.), (2, 1.)]),
+    ];
+    let mut work = 100_000;
+    let vertices = terminal_vertices(
+        &domains,
+        &rows,
+        &mut work,
+        Instant::now() + Duration::from_secs(1),
+    );
+    assert!(vertices
+        .iter()
+        .any(|point| { point.iter().all(|value| (*value - 0.5).abs() <= 1e-9) }));
 }
 
 #[test]
