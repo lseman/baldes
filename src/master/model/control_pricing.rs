@@ -294,9 +294,25 @@ fn joint_controls<const D: usize>(
             objectives.push(objective);
         }
     }
+    // Keep the coordinate proposals from consuming the entire path budget;
+    // reserve work both to enumerate joint vertices and to realize their
+    // source controls. Unused reservations return to the caller below.
+    let vertex_enumeration_reserve = *work / 3;
+    let vertex_realization_reserve = *work / 3;
+    *work =
+        work.checked_sub(vertex_enumeration_reserve.checked_add(vertex_realization_reserve)?)?;
     let mut proposals = Vec::with_capacity(objectives.len());
     for objective in objectives {
-        *work = work.checked_sub(n.checked_mul(oracle.activity_rows.len().checked_add(1)?)?)?;
+        let Some(row_work) = oracle.activity_rows.len().checked_add(1) else {
+            break;
+        };
+        let Some(proposal_work) = n.checked_mul(row_work) else {
+            break;
+        };
+        let Some(remaining_work) = work.checked_sub(proposal_work) else {
+            break;
+        };
+        *work = remaining_work;
         let Some(targets) = solve_terminal_targets(
             &priced.domains,
             &constraints,
@@ -336,17 +352,16 @@ fn joint_controls<const D: usize>(
     // pairwise-sum rows). Enumerate bounded terminal-LP vertices as additional
     // witness targets. This is still proposal generation: each coordinate is
     // queried against its source domain and final rows are replayed later.
-    let enumeration_budget = *work / 2;
-    let mut enumeration_work = enumeration_budget;
+    let mut enumeration_work = vertex_enumeration_reserve;
     let vertices = terminal_vertices(
         &priced.domains,
         &constraints,
         &mut enumeration_work,
         state.deadline,
     );
-    *work = work.checked_sub(enumeration_budget - enumeration_work)?;
+    let mut vertex_realization_work = vertex_realization_reserve;
     for vertex in vertices {
-        if *work == 0 || Instant::now() >= state.deadline {
+        if vertex_realization_work == 0 || Instant::now() >= state.deadline {
             break;
         }
         let mut controls = Vec::with_capacity(n);
@@ -362,7 +377,7 @@ fn joint_controls<const D: usize>(
                 path,
                 resource,
                 target,
-                work,
+                &mut vertex_realization_work,
                 iterations,
                 state.deadline,
             ) else {
@@ -379,6 +394,9 @@ fn joint_controls<const D: usize>(
             proposals.push(controls);
         }
     }
+    *work = work
+        .checked_add(enumeration_work)?
+        .checked_add(vertex_realization_work)?;
     (!proposals.is_empty()).then_some(proposals)
 }
 // Both route-local proposals and cross-path witness recovery use the same
@@ -1246,6 +1264,9 @@ fn joint_witness_targets<const D: usize>(
         .map(|((row, rhs), a)| (row.sense, rhs, a))
         .collect();
     let proposal_count = variables.len().checked_mul(2)?.checked_add(2)?;
+    let vertex_enumeration_reserve = work / 3;
+    let vertex_realization_reserve = work / 3;
+    work = work.checked_sub(vertex_enumeration_reserve.checked_add(vertex_realization_reserve)?)?;
     for proposal in 0..proposal_count {
         if Instant::now() >= state.deadline {
             return None;
@@ -1298,12 +1319,11 @@ fn joint_witness_targets<const D: usize>(
     // by any one terminal coordinate. Use the same bounded LP vertex sweep as
     // route-local pricing, while reserving half of the remaining work for
     // source realization and whole-witness validation.
-    let enumeration_budget = work / 2;
-    let mut enumeration_work = enumeration_budget;
+    let mut enumeration_work = vertex_enumeration_reserve;
     let vertices = terminal_vertices(&domains, &rows, &mut enumeration_work, state.deadline);
-    work = work.checked_sub(enumeration_budget - enumeration_work)?;
+    let mut vertex_realization_work = vertex_realization_reserve;
     for vertex in vertices {
-        if Instant::now() >= state.deadline || work == 0 {
+        if Instant::now() >= state.deadline || vertex_realization_work == 0 {
             break;
         }
         let totals: Vec<_> = domains
@@ -1330,7 +1350,7 @@ fn joint_witness_targets<const D: usize>(
                 &variables,
                 &targets,
                 split,
-                (&mut work, &mut iterations),
+                (&mut vertex_realization_work, &mut iterations),
             ) else {
                 continue;
             };
