@@ -11,12 +11,25 @@ use super::Problem;
 use crate::rng::Xoroshiro128Plus;
 use std::time::{Duration, Instant};
 
+mod genetic;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum HeuristicMethod {
+    /// One trajectory of ruin-and-recreate with local search.
+    #[default]
+    IteratedLocalSearch,
+    /// HGS-style population with route-based crossover and diversity control.
+    Genetic,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct HeuristicOptions {
     pub time_limit: Duration,
-    /// Ruin-and-recreate iterations after the first local optimum.
+    /// Ruin-and-recreate iterations, or offspring for the genetic method,
+    /// after the first local optimum.
     pub iterations: usize,
     pub seed: u64,
+    pub method: HeuristicMethod,
 }
 impl Default for HeuristicOptions {
     fn default() -> Self {
@@ -24,6 +37,7 @@ impl Default for HeuristicOptions {
             time_limit: Duration::from_secs(1),
             iterations: 2_000,
             seed: 1,
+            method: HeuristicMethod::default(),
         }
     }
 }
@@ -90,8 +104,14 @@ impl Problem {
         let mut current = search.recreate(Vec::new(), &order)?;
         search.local_search(&mut current);
         let mut best = current.clone();
+        // The genetic method first spends 40% of the time on this trajectory,
+        // which reduces the fleet more reliably, then evolves from its best.
+        let phase_end = match options.method {
+            HeuristicMethod::IteratedLocalSearch => search.deadline,
+            HeuristicMethod::Genetic => Instant::now() + options.time_limit.mul_f64(0.4),
+        };
         for _ in 0..options.iterations {
-            if Instant::now() >= search.deadline {
+            if Instant::now() >= phase_end.min(search.deadline) {
                 break;
             }
             let mut candidate = current.clone();
@@ -107,6 +127,9 @@ impl Problem {
             if search.cost(&current) < search.cost(&best) - 1e-9 {
                 best = current.clone();
             }
+        }
+        if options.method == HeuristicMethod::Genetic {
+            best = genetic::run(&mut search, best, options.iterations);
         }
         let routes: Vec<Vec<usize>> = best.into_iter().map(|r| r.nodes).collect();
         let cost = routes

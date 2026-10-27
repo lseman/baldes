@@ -148,7 +148,16 @@ fn optimum(p: &Problem, all: &[Vec<usize>]) -> f64 {
 }
 
 #[test]
-fn heuristic_returns_valid_partitions_close_to_the_exact_optimum() {
+fn heuristics_return_valid_partitions_close_to_the_exact_optimum() {
+    for method in [
+        HeuristicMethod::IteratedLocalSearch,
+        HeuristicMethod::Genetic,
+    ] {
+        partitions_close_to_optimum(method);
+    }
+}
+
+fn partitions_close_to_optimum(method: HeuristicMethod) {
     let all = paired_routes(4);
     let (mut solved, mut optimal) = (0, 0);
     for seed in 0..30 {
@@ -159,6 +168,7 @@ fn heuristic_returns_valid_partitions_close_to_the_exact_optimum() {
                 time_limit: Duration::from_secs(2),
                 iterations: 200,
                 seed,
+                method,
             };
             let Some(solution) = p.heuristic(options) else {
                 assert!(
@@ -183,5 +193,8 @@ fn heuristic_returns_valid_partitions_close_to_the_exact_optimum() {
         }
     }
     assert!(solved > 40, "{solved}");
-    assert!(optimal * 10 >= solved * 9, "{optimal}/{solved} optimal");
+    assert!(
+        optimal * 10 >= solved * 9,
+        "{method:?}: {optimal}/{solved} optimal"
+    );
 }

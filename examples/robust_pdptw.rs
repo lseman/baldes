@@ -1,8 +1,8 @@
-//! cargo run --release --features clp --example robust_pdptw -- [FILE Γq Γt σq σt SECONDS ROUNDING] [--ng N] [--heuristic]
+//! cargo run --release --features clp --example robust_pdptw -- [FILE Γq Γt σq σt SECONDS ROUNDING] [--ng N] [--heuristic [ils|hgs]] [--seed N]
 #[cfg(feature = "clp")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use baldes::extensions::robust_pd::{
-        DistanceRounding, HeuristicOptions, Instance, Parameters, Problem,
+        DistanceRounding, HeuristicMethod, HeuristicOptions, Instance, Parameters, Problem,
     };
     use baldes::master::tree::ModelTreeOptions;
     use std::time::{Duration, Instant};
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fn solve() -> baldes::Result<()> {
         let mut args: Vec<_> = std::env::args().skip(1).collect();
         if args.iter().any(|a| a == "--help" || a == "-h") {
-            println!("robust_pdptw [FILE Γq Γt σq σt SECONDS ROUNDING] [--ng N] [--heuristic]\nDefaults: instances/RobustPDPTW/AA05.txt 1 1 0.1 0.1 60 hundredth\nROUNDING: hundredth or none. Paper §6.1 demand adjustment enabled.\n--ng N: relax elementarity to NG routes with N requests per neighbourhood.\nWithout it, pricing is elementary.\n--heuristic: run only the robust insertion heuristic for SECONDS.");
+            println!("robust_pdptw [FILE Γq Γt σq σt SECONDS ROUNDING] [--ng N] [--heuristic [ils|hgs]] [--seed N]\nDefaults: instances/RobustPDPTW/AA05.txt 1 1 0.1 0.1 60 hundredth\nROUNDING: hundredth or none. Paper §6.1 demand adjustment enabled.\n--ng N: relax elementarity to NG routes with N requests per neighbourhood.\nWithout it, pricing is elementary.\n--heuristic [ils|hgs]: run only a robust heuristic for SECONDS: iterated\nlocal search (default) or a hybrid genetic search. --seed N: heuristic seed (1).");
             return Ok(());
         }
         let ng_size = match args.iter().position(|a| a == "--ng") {
@@ -33,11 +33,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(_) => return Err(invalid("--ng needs a positive request count")),
             None => None,
         };
-        let heuristic_only = args.iter().any(|a| a == "--heuristic");
-        args.retain(|a| a != "--heuristic");
+        let seed = match args.iter().position(|a| a == "--seed") {
+            Some(i) if i + 1 < args.len() => {
+                let seed: u64 = args[i + 1]
+                    .parse()
+                    .map_err(|_| invalid("--seed needs an integer"))?;
+                args.drain(i..=i + 1);
+                seed
+            }
+            Some(_) => return Err(invalid("--seed needs an integer")),
+            None => 1,
+        };
+        let heuristic = match args.iter().position(|a| a == "--heuristic") {
+            Some(i) => {
+                let method = match args.get(i + 1).map(String::as_str) {
+                    Some("hgs") => Some(HeuristicMethod::Genetic),
+                    Some("ils") => Some(HeuristicMethod::IteratedLocalSearch),
+                    _ => None,
+                };
+                args.drain(i..i + 1 + usize::from(method.is_some()));
+                Some(method.unwrap_or_default())
+            }
+            None => None,
+        };
         if args.len() > 7 || args.iter().any(|a| a.starts_with("--")) {
             return Err(invalid(
-                "expected FILE Γq Γt σq σt SECONDS ROUNDING [--ng N] [--heuristic]",
+                "expected FILE Γq Γt σq σt SECONDS ROUNDING [--ng N] [--heuristic [ils|hgs]] [--seed N]",
             ));
         }
         let number = |i: usize, default: &str| args.get(i).map_or(default.to_owned(), Clone::clone);
@@ -65,56 +86,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let problem = Problem::new(Instance::read(path)?, parameters)?;
         let started = Instant::now();
         // (status, bound, incumbent, nodes, pricing calls, routes with quantities)
-        let (status, bound, incumbent, nodes, pricing_calls, routes) = if heuristic_only {
-            let solution = problem.heuristic(HeuristicOptions {
-                time_limit: Duration::from_secs_f64(seconds),
-                iterations: usize::MAX,
-                seed: 1,
-            });
-            let incumbent = solution.as_ref().map_or(f64::INFINITY, |s| s.cost);
-            let routes = solution.map_or_else(Vec::new, |s| {
-                s.routes.into_iter().map(|r| (1., r)).collect::<Vec<_>>()
-            });
-            (
-                "Heuristic".to_owned(),
-                f64::NEG_INFINITY,
-                incumbent,
-                0,
-                0,
-                routes,
-            )
-        } else {
-            let mut options = ModelTreeOptions {
-                time_limit: Duration::from_secs_f64(seconds),
-                ..Default::default()
+        let (status, bound, incumbent, nodes, pricing_calls, routes) =
+            if let Some(method) = heuristic {
+                let solution = problem.heuristic(HeuristicOptions {
+                    time_limit: Duration::from_secs_f64(seconds),
+                    iterations: usize::MAX,
+                    seed,
+                    method,
+                });
+                let incumbent = solution.as_ref().map_or(f64::INFINITY, |s| s.cost);
+                let routes = solution.map_or_else(Vec::new, |s| {
+                    s.routes.into_iter().map(|r| (1., r)).collect::<Vec<_>>()
+                });
+                (
+                    "Heuristic".to_owned(),
+                    f64::NEG_INFINITY,
+                    incumbent,
+                    0,
+                    0,
+                    routes,
+                )
+            } else {
+                let mut options = ModelTreeOptions {
+                    time_limit: Duration::from_secs_f64(seconds),
+                    ..Default::default()
+                };
+                options.node.cg.time_limit = Duration::from_secs_f64(seconds);
+                options.node.cg.artificial_cost =
+                    (parameters.vehicle_cost + 100_000.) * problem.instance().requests() as f64;
+                let output = baldes::master::tree::solve(problem.master_problem()?, options)?;
+                let routes = output
+                    .routes
+                    .iter()
+                    .map(|fixed| {
+                        let route = fixed
+                            .route
+                            .route
+                            .nodes
+                            .iter()
+                            .map(|v| *v as usize)
+                            .collect();
+                        (fixed.quantity, route)
+                    })
+                    .collect();
+                (
+                    format!("{:?}", output.status),
+                    output.bound,
+                    output.incumbent,
+                    output.nodes,
+                    output.pricing_calls,
+                    routes,
+                )
             };
-            options.node.cg.time_limit = Duration::from_secs_f64(seconds);
-            options.node.cg.artificial_cost =
-                (parameters.vehicle_cost + 100_000.) * problem.instance().requests() as f64;
-            let output = baldes::master::tree::solve(problem.master_problem()?, options)?;
-            let routes = output
-                .routes
-                .iter()
-                .map(|fixed| {
-                    let route = fixed
-                        .route
-                        .route
-                        .nodes
-                        .iter()
-                        .map(|v| *v as usize)
-                        .collect();
-                    (fixed.quantity, route)
-                })
-                .collect();
-            (
-                format!("{:?}", output.status),
-                output.bound,
-                output.incumbent,
-                output.nodes,
-                output.pricing_calls,
-                routes,
-            )
-        };
         println!(
             "instance={path} gamma_q={} gamma_t={} sigma_q={} sigma_t={} ng={}",
             parameters.demand_budget,

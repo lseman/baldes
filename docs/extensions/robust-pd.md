@@ -101,6 +101,18 @@ position and O(1) capacity work. `Problem::replay` verifies every accepted
 route. A unit test compares the cached check with full replay on every
 placement of random instances.
 
+`HeuristicMethod::Genetic` (example: `--heuristic hgs`) is a hybrid. It runs
+the same trajectory for 40% of the time, which reduces the fleet most
+reliably, then seeds an HGS-style population with its best. Offspring come
+from route-based crossover: some routes of one parent, the other parent's
+routes without already covered requests, and cheapest reinsertion of the
+rest. Children are mutated with probability 0.3, half of the time by
+dissolving a whole route, and parents are chosen by binary tournament on
+HGS biased fitness with a broken-pairs distance. On five seeds at 30 s, it
+reduced travel by about 0.1% on 75-request cases with the same fleet, but
+found the smallest fleet less often than the default iterated local search
+on two 40-request cases. `--seed N` sets the heuristic seed.
+
 ## Input conventions
 
 `Instance::read` validates consecutive node ids, signed demand pairs,
