@@ -418,7 +418,8 @@ pub(super) fn repair_witness<const D: usize>(
         ));
     }
     let mut witness = state.fixed_routes.clone();
-    let mut alternatives: Vec<Vec<Vec<FixedRoute>>> = vec![];
+    let mut allocation_groups: Vec<(Vec<(usize, f64, NetworkRoute)>, f64)> = vec![];
+    let mut seed_allocations: Vec<Vec<Vec<FixedRoute>>> = vec![];
     for ((network, arcs), (quantity, fractional, lp_routes)) in groups {
         // Integer-tolerance path counts can still carry a fractional paired
         // control. Reconstruct source controls before trusting their rows.
@@ -444,7 +445,6 @@ pub(super) fn repair_witness<const D: usize>(
             .filter(|(tag, route)| {
                 route.network == network
                     && route.route.arcs == arcs
-                    && !route.route.coupled_controls.is_empty()
                     && state
                         .universe
                         .as_ref()
@@ -461,58 +461,83 @@ pub(super) fn repair_witness<const D: usize>(
             })
             .collect();
         // Try LP-supported identities first, then other registered points.
+        // An empty control list is the registered minimum-front choice, so it
+        // remains a valid identity candidate when a path count is split across
+        // fractional LP columns.
         choices.sort_by(|a, b| (b.1 > 0.).cmp(&(a.1 > 0.)).then_with(|| a.0.cmp(&b.0)));
-        if choices.len() > 256 {
-            choices.truncate(256);
-        }
-        let allocations = identity_allocations(state, &choices, rounded, 128);
-        if allocations.is_empty() || alternatives.len() >= 128 {
+        let seed = identity_allocations(state, &choices, rounded, 1);
+        if seed.is_empty() {
             return Ok(None);
         }
-        alternatives.push(allocations);
+        seed_allocations.push(seed);
+        allocation_groups.push((choices, rounded));
     }
-    if alternatives.is_empty() {
+    if allocation_groups.is_empty() {
         return Ok(None);
     }
-    let mut positions = vec![0; alternatives.len()];
-    for _ in 0..512 {
-        if Instant::now() >= state.deadline {
-            return Ok(None);
-        }
-        let mut routes = witness.clone();
-        routes.extend(
-            alternatives
-                .iter()
-                .zip(&positions)
-                .flat_map(|(allocations, &i)| allocations[i].clone()),
-        );
-        if let Some(scheduled) = synchronization::witness(state, &routes)? {
-            if scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..]) {
-                if let Some(objective) = tree_adapter::validate_routes(state, &scheduled, &masters)?
-                {
-                    return Ok(Some((objective, scheduled, masters)));
-                }
-            }
-        }
-        let mut carry = true;
-        for (i, choices) in positions.iter_mut().zip(&alternatives).rev() {
-            *i += 1;
-            if *i < choices.len() {
-                carry = false;
-                break;
-            }
-            *i = 0;
-        }
-        if carry {
-            break;
-        }
+    let mut routes = witness.clone();
+    let mut search_budget = 100_000;
+    if let Some(result) = search_identity_groups(
+        state,
+        &allocation_groups,
+        0,
+        &mut routes,
+        &masters,
+        &mut search_budget,
+    )? {
+        return Ok(Some(result));
     }
     Ok(joint_witness_targets(
         state,
         &witness,
-        &alternatives,
+        &seed_allocations,
         &masters,
     ))
+}
+
+/// Search registered identity allocations lazily. This avoids a fixed
+/// identity shortlist and materializing the Cartesian product of all groups.
+/// Exhausting the shared visit budget or deadline is inconclusive.
+fn search_identity_groups<const D: usize>(
+    state: &State<D>,
+    groups: &[(Vec<(usize, f64, NetworkRoute)>, f64)],
+    index: usize,
+    routes: &mut Vec<FixedRoute>,
+    masters: &[(i32, f64)],
+    visits_left: &mut usize,
+) -> Result<Option<IntegerWitness>> {
+    if *visits_left == 0 || Instant::now() >= state.deadline {
+        return Ok(None);
+    }
+    if index == groups.len() {
+        *visits_left -= 1;
+        if let Some(scheduled) = synchronization::witness(state, routes)? {
+            if scheduled_identities_allowed(state, &scheduled[state.fixed_routes.len()..]) {
+                if let Some(objective) = tree_adapter::validate_routes(state, &scheduled, masters)?
+                {
+                    return Ok(Some((objective, scheduled, masters.to_vec())));
+                }
+            }
+        }
+        return Ok(None);
+    }
+
+    let (choices, quantity) = &groups[index];
+    let mut found = None;
+    for_each_identity_allocation(
+        state,
+        choices,
+        *quantity,
+        visits_left,
+        &mut |allocation, visits_left| {
+            let old_len = routes.len();
+            routes.extend_from_slice(allocation);
+            found = search_identity_groups(state, groups, index + 1, routes, masters, visits_left)?;
+            routes.truncate(old_len);
+            Ok(found.is_some())
+        },
+    )?;
+    Ok(found)
 }
 
 /// Enumerate bounded integral allocations of one physical-path count across
@@ -641,6 +666,155 @@ fn identity_allocations<const D: usize>(
         limit,
     );
     allocations
+}
+
+/// Stream every bounded allocation to a caller without materializing a large
+/// candidate list. `visits_left` is shared across path groups by the caller.
+fn for_each_identity_allocation<const D: usize>(
+    state: &State<D>,
+    choices: &[(usize, f64, NetworkRoute)],
+    quantity: f64,
+    visits_left: &mut usize,
+    on_allocation: &mut impl FnMut(&[FixedRoute], &mut usize) -> Result<bool>,
+) -> Result<bool> {
+    fn try_count<const D: usize>(
+        state: &State<D>,
+        choices: &[(usize, f64, NetworkRoute)],
+        index: usize,
+        remaining: f64,
+        count: f64,
+        route: &NetworkRoute,
+        selected: &mut Vec<FixedRoute>,
+        visits_left: &mut usize,
+        on_allocation: &mut impl FnMut(&[FixedRoute], &mut usize) -> Result<bool>,
+    ) -> Result<bool> {
+        if count > 0. {
+            selected.push(FixedRoute {
+                route: route.clone(),
+                quantity: count,
+            });
+        }
+        let stop = visit(
+            state,
+            choices,
+            index + 1,
+            remaining - count,
+            selected,
+            visits_left,
+            on_allocation,
+        )?;
+        if count > 0. {
+            selected.pop();
+        }
+        Ok(stop)
+    }
+
+    fn visit<const D: usize>(
+        state: &State<D>,
+        choices: &[(usize, f64, NetworkRoute)],
+        index: usize,
+        remaining: f64,
+        selected: &mut Vec<FixedRoute>,
+        visits_left: &mut usize,
+        on_allocation: &mut impl FnMut(&[FixedRoute], &mut usize) -> Result<bool>,
+    ) -> Result<bool> {
+        if *visits_left == 0 || Instant::now() >= state.deadline {
+            return Ok(false);
+        }
+        *visits_left -= 1;
+        if remaining == 0. {
+            return on_allocation(selected, visits_left);
+        }
+        let Some((_, preferred, route)) = choices.get(index) else {
+            return Ok(false);
+        };
+        let Some(cap) = enumeration::route_upper(state, choices[index].0) else {
+            return Ok(false);
+        };
+        let max_count = remaining.min(cap.floor());
+        if max_count <= 0. {
+            return visit(
+                state,
+                choices,
+                index + 1,
+                remaining,
+                selected,
+                visits_left,
+                on_allocation,
+            );
+        }
+
+        // Preserve LP-near and cap-boundary preference, then enumerate every
+        // remaining integer count until the shared budget or deadline ends.
+        let preferred_floor = preferred.floor().clamp(0., max_count);
+        let preferred_ceil = preferred.ceil().clamp(0., max_count);
+        let mut ordered = vec![
+            preferred_floor,
+            preferred_ceil,
+            max_count,
+            max_count - 1.,
+            1.,
+            0.,
+        ];
+        ordered.retain(|value| *value >= 0. && *value <= max_count);
+        let mut seen = Vec::new();
+        ordered.retain(|value| {
+            if seen.contains(value) {
+                false
+            } else {
+                seen.push(*value);
+                true
+            }
+        });
+        for count in ordered.iter().copied() {
+            if try_count(
+                state,
+                choices,
+                index,
+                remaining,
+                count,
+                route,
+                selected,
+                visits_left,
+                on_allocation,
+            )? {
+                return Ok(true);
+            }
+        }
+        let mut count = 0.;
+        while count <= max_count && *visits_left > 0 && Instant::now() < state.deadline {
+            if !seen.contains(&count)
+                && try_count(
+                    state,
+                    choices,
+                    index,
+                    remaining,
+                    count,
+                    route,
+                    selected,
+                    visits_left,
+                    on_allocation,
+                )?
+            {
+                return Ok(true);
+            }
+            count += 1.;
+        }
+        Ok(false)
+    }
+
+    if !quantity.is_finite() || quantity <= 0. || quantity.fract() != 0. {
+        return Ok(false);
+    }
+    visit(
+        state,
+        choices,
+        0,
+        quantity,
+        &mut Vec::new(),
+        visits_left,
+        on_allocation,
+    )
 }
 
 // If registered points cannot realize the LP's integral physical path counts,

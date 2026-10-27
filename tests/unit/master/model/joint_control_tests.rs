@@ -228,6 +228,42 @@ fn paired_witness_allocations_split_counts_across_capped_identities() {
 }
 
 #[test]
+fn lazy_identity_search_reaches_allocations_beyond_the_old_shortlist() {
+    let output = root();
+    let mut state = output.snapshot.state.fork_state();
+    let template = state.routes[0].as_ref().clone();
+    let mut choices = Vec::new();
+    for index in 0..130 {
+        let tag = state.routes.len();
+        let mut route = template.clone();
+        route.route.coupled_values = vec![(0, index as f64)];
+        state.routes.push(Arc::new(route.clone()));
+        state.route_upper_bounds.insert(tag, 1.);
+        choices.push((tag, 0.5, route));
+    }
+
+    let mut visits_left = 10_000;
+    let mut saw_first_registered_identity = false;
+    let stopped = for_each_identity_allocation(
+        &state,
+        &choices,
+        1.,
+        &mut visits_left,
+        &mut |allocation, _visits_left| {
+            saw_first_registered_identity |= allocation
+                .iter()
+                .any(|route| route.route.route.coupled_values == vec![(0, 0.)]);
+            Ok(saw_first_registered_identity)
+        },
+    )
+    .unwrap();
+
+    assert!(stopped);
+    assert!(saw_first_registered_identity);
+    assert!(visits_left > 0);
+}
+
+#[test]
 fn paired_witness_allocations_search_nonendpoint_integer_splits() {
     let output = root();
     let mut state = output.snapshot.state.fork_state();
@@ -311,6 +347,60 @@ fn paired_witness_repair_recovers_path_count_from_capped_identities() {
         .1
         .iter()
         .any(|route| route.route.route.coupled_values == vec![(0, 4.), (1, 4.)]));
+}
+
+#[test]
+fn paired_witness_repair_can_split_with_the_minimum_front_identity() {
+    let output = root();
+    let mut state = output.snapshot.state.fork_state();
+    state.oracles[0].total_multiplicity = Window::new(2., 2.).unwrap();
+    let maximum = state
+        .routes
+        .iter()
+        .position(|route| route.route.coupled_values == vec![(0, 8.), (1, 8.)])
+        .unwrap();
+    let arcs = state.routes[maximum].route.arcs.clone();
+    let graph = state.oracles[0].network.graph.as_ref().clone();
+    let problem = crate::master::routing::RoutingContext::set_partitioning(graph, 1.).unwrap();
+    let default_route = problem.elementary_route(&arcs).unwrap();
+    assert_eq!(default_route.coupled_values, vec![(0, 0.), (1, 0.)]);
+    let minimum = state.routes.len();
+    state.routes.push(Arc::new(NetworkRoute {
+        network: state.routes[maximum].network,
+        route: default_route,
+    }));
+    assert_eq!(arcs, state.routes[maximum].route.arcs);
+    for (tag, route) in state.routes.iter().enumerate() {
+        if route.network == state.routes[minimum].network && route.route.arcs == arcs {
+            state.route_upper_bounds.insert(tag, 1.);
+        }
+    }
+
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::Equal, 2., &[]).unwrap();
+    let tags = [minimum, maximum, minimum, maximum].map(|tag| tag as i32);
+    for _ in 0..4 {
+        let column = master.add_column(999., &[(0, 1.)]).unwrap();
+        master.set_upper(column, 0.5).unwrap();
+    }
+    assert!(master.solve());
+
+    let witness = repair_witness(&state, &master, |column| tags.get(column).copied(), 1e-7)
+        .unwrap()
+        .expect("the minimum-front route is a valid paired identity candidate");
+
+    assert_eq!(
+        witness.1.iter().map(|route| route.quantity).sum::<f64>(),
+        2.
+    );
+    assert!(witness
+        .1
+        .iter()
+        .any(|route| route.route.route.coupled_controls.is_empty()));
+    assert!(witness
+        .1
+        .iter()
+        .any(|route| !route.route.route.coupled_controls.is_empty()));
 }
 
 #[test]
