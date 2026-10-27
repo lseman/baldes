@@ -1181,35 +1181,18 @@ fn search_joint_witness_seeds<const D: usize>(
     work: &mut usize,
     iterations: &mut usize,
 ) -> Option<IntegerWitness> {
-    if Instant::now() >= state.deadline || *work == 0 || *iterations == 0 {
-        return None;
-    }
-    if index == groups.len() {
-        return joint_witness_targets_for_seed(
-            state, background, selected, masters, work, iterations,
-        );
-    }
-    let (choices, quantity) = &groups[index];
     let mut found = None;
-    for_each_identity_allocation(
+    for_each_joint_witness_seed(
         state,
-        choices,
-        *quantity,
-        state.deadline,
-        &mut |allocation, _| {
-            let old_len = selected.len();
-            selected.extend_from_slice(allocation);
-            found = search_joint_witness_seeds(
-                state,
-                background,
-                groups,
-                index + 1,
-                selected,
-                masters,
-                work,
-                iterations,
+        groups,
+        index,
+        selected,
+        work,
+        iterations,
+        &mut |allocation, work, iterations| {
+            found = joint_witness_targets_for_seed(
+                state, background, allocation, masters, work, iterations,
             );
-            selected.truncate(old_len);
             Ok(found.is_some()
                 || *work == 0
                 || *iterations == 0
@@ -1218,6 +1201,47 @@ fn search_joint_witness_seeds<const D: usize>(
     )
     .ok()?;
     found
+}
+
+/// Visit complete cross-group identity allocations without materializing their
+/// Cartesian product. Callers stop at a witness or shared budget boundary.
+fn for_each_joint_witness_seed<const D: usize>(
+    state: &State<D>,
+    groups: &[(Vec<(usize, f64, NetworkRoute)>, f64)],
+    index: usize,
+    selected: &mut Vec<FixedRoute>,
+    work: &mut usize,
+    iterations: &mut usize,
+    on_seed: &mut impl FnMut(&[FixedRoute], &mut usize, &mut usize) -> Result<bool>,
+) -> Result<bool> {
+    if Instant::now() >= state.deadline || *work == 0 || *iterations == 0 {
+        return Ok(false);
+    }
+    if index == groups.len() {
+        return on_seed(selected, work, iterations);
+    }
+    let (choices, quantity) = &groups[index];
+    for_each_identity_allocation(
+        state,
+        choices,
+        *quantity,
+        state.deadline,
+        &mut |allocation, _| {
+            let old_len = selected.len();
+            selected.extend_from_slice(allocation);
+            let stop = for_each_joint_witness_seed(
+                state,
+                groups,
+                index + 1,
+                selected,
+                work,
+                iterations,
+                on_seed,
+            )?;
+            selected.truncate(old_len);
+            Ok(stop || *work == 0 || *iterations == 0 || Instant::now() >= state.deadline)
+        },
+    )
 }
 
 fn joint_witness_targets_for_seed<const D: usize>(

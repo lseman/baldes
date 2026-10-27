@@ -517,6 +517,61 @@ fn paired_witness_allocations_split_counts_across_capped_identities() {
 }
 
 #[test]
+fn joint_witness_seed_search_reaches_later_identity_allocations() {
+    let output = root();
+    let mut state = output.snapshot.state.fork_state();
+    let first = state
+        .routes
+        .iter()
+        .position(|route| route.route.coupled_values == vec![(0, 0.), (1, 0.)])
+        .unwrap();
+    let second = state
+        .routes
+        .iter()
+        .position(|route| route.route.coupled_values == vec![(0, 8.), (1, 8.)])
+        .unwrap();
+    assert_eq!(
+        state.routes[first].route.arcs,
+        state.routes[second].route.arcs
+    );
+    state.route_upper_bounds.insert(first, 1.);
+    state.route_upper_bounds.insert(second, 1.);
+    let choices = vec![first, second]
+        .into_iter()
+        .map(|tag| {
+            (
+                tag,
+                if tag == first { 1. } else { 0. },
+                state.routes[tag].as_ref().clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let groups = [(choices, 1.)];
+    let mut work = 100;
+    let mut iterations = 100;
+    let mut selected = Vec::new();
+    let mut seen = Vec::new();
+
+    let found = for_each_joint_witness_seed(
+        &state,
+        &groups,
+        0,
+        &mut selected,
+        &mut work,
+        &mut iterations,
+        &mut |seed, _, _| {
+            seen.push(seed[0].route.route.coupled_values.clone());
+            Ok(seed[0].route.route.coupled_values == vec![(0, 8.), (1, 8.)])
+        },
+    )
+    .unwrap();
+
+    assert!(found);
+    assert_eq!(seen.len(), 2);
+    assert_eq!(seen[1], vec![(0, 8.), (1, 8.)]);
+}
+
+#[test]
 fn lazy_identity_search_reaches_allocations_beyond_the_old_shortlist() {
     let output = root();
     let mut state = output.snapshot.state.fork_state();
