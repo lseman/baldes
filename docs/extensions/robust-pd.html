@@ -6,7 +6,7 @@
 <meta name="description" content="Robust pickup and delivery with time windows baldes::extensions::robust_pd models the one-to-one RPDPTW inAbreu, Battarra, Costa and Munari, The robust pickup and delivery problemw">
 <meta name="theme-color" content="#0b0e11">
 <title>Robust pickup and delivery with time windows — BALDES docs</title>
-<link rel="canonical" href="https://laioseman.com/baldes/docs/extensions/robust-pd.html">
+<link rel="canonical" href="https://baldes.laioseman.com/docs/extensions/robust-pd.html">
 <link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../_static/site.css">
 <link rel="stylesheet" href="../_static/docs.css">
@@ -47,7 +47,14 @@ cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"
 <span class="c1"># Deterministic baseline, retaining the paper's nominal-demand adjustment.</span>
 cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,multi-time-windows<span class="w"> </span>--example<span class="w"> </span>robust_pdptw<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>instances/RobustPDPTW/AA05.txt<span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="m">60</span>
+
+<span class="c1"># NG-route relaxation with 8 requests per neighbourhood.</span>
+cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp,multi-time-windows<span class="w"> </span>--example<span class="w"> </span>robust_pdptw<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>instances/RobustPDPTW/AA05.txt<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">0</span>.1<span class="w"> </span><span class="m">0</span>.1<span class="w"> </span><span class="m">60</span><span class="w"> </span>--ng<span class="w"> </span><span class="m">8</span>
 </code></pre></div>
+<p>Pricing is elementary unless <code>--ng N</code> (<code>Parameters::ng_size = Some(N)</code>) is
+given. On 40 benchmark cases with 10–30 requests and 30 s limits,
+elementary pricing proved 32 optimal and NG 8 proved 31, so NG is opt-in.</p>
 <p>The example prints termination status, numerical lower bound, incumbent,
 routes, worst load, and worst return time. It independently replays every
 incumbent route and verifies request coverage and total objective.
@@ -75,11 +82,43 @@ worst service start, including waiting and the preceding node's service.
 Every customer window and the return-depot window must hold. Waiting can
 absorb delays, so summing the largest travel deviations alone is insufficient.</p>
 <p>The physical graph has one vertex per original node. A coupled plugin
-tracks visited and open requests, enforces elementarity, precedence and
-pairing, and checks capacity in both directions. Joins replay the suffix
-against the forward state. Conservative equality dominance compares
-both sets. The shared master has one set-partitioning row per request;
-the pickup contributes its coefficient exactly once.</p>
+tracks a request memory and the open (on-board) requests, enforces
+precedence and pairing, and checks capacity in both directions. Joins
+replay the suffix against the forward state. A label dominates another
+with equal open requests and a memory subset; no delivery is skipped, so
+no triangle inequality is assumed. The weaker subset test on open requests
+is unsound here: under budgeted travel times, a shortcut that skips a
+delivery can be later than the detour. Requests that can no longer be
+picked up and delivered in time join the memory, using shortest nominal
+durations as lower bounds. The shared master has one set-partitioning row
+per request; the pickup contributes its coefficient exactly once.</p>
+<p>With <code>--ng N</code>, memories are NG neighbourhoods: the request and the N−1
+requests with the nearest pickups. A route may then pick up a request again
+after delivering and forgetting it; such a column covers that request twice
+and cannot be integral. The graph declares bounded walks of at most
+2(2n+1) arcs and the plugin certificate applies the same memory, so
+window-fallback branching keeps NG columns instead of stalling.</p>
+<h2 id="heuristic">Heuristic</h2>
+<p><code>Problem::heuristic</code> (example flag <code>--heuristic</code>, using SECONDS as its time
+limit) returns robust-feasible routes without branch-and-price. It builds
+routes by cheapest pair insertion, then applies pair relocation, route
+elimination, and ruin-and-recreate. Each route caches forward worst-case
+starts, the backward thresholds used by pricing joins, and per-position
+on-board load summaries, so a placement check costs O(Γt) time work per
+position and O(1) capacity work. <code>Problem::replay</code> verifies every accepted
+route. A unit test compares the cached check with full replay on every
+placement of random instances.</p>
+<p><code>HeuristicMethod::Genetic</code> (example: <code>--heuristic hgs</code>) is a hybrid. It runs
+the same trajectory for 40% of the time, which reduces the fleet most
+reliably, then seeds an HGS-style population with its best. Offspring come
+from route-based crossover: some routes of one parent, the other parent's
+routes without already covered requests, and cheapest reinsertion of the
+rest. Children are mutated with probability 0.3, half of the time by
+dissolving a whole route, and parents are chosen by binary tournament on
+HGS biased fitness with a broken-pairs distance. On five seeds at 30 s, it
+reduced travel by about 0.1% on 75-request cases with the same fleet, but
+found the smallest fleet less often than the default iterated local search
+on two 40-request cases. <code>--seed N</code> sets the heuristic seed.</p>
 <h2 id="input-conventions">Input conventions</h2>
 <p><code>Instance::read</code> validates consecutive node ids, signed demand pairs,
 finite data, time windows, and zero depot demand/service.
@@ -136,6 +175,6 @@ local ignored <code>internal/robust-pd/</code>; these are investigation artifact
 <nav class="page-turn" aria-label="Adjacent guides"><a href="robust.html"><small>Previous guide</small>Robust vehicle routing <span aria-hidden="true">↗</span></a><a href="ipm.html"><small>Next guide</small>BALDES IPM in Rust <span aria-hidden="true">↗</span></a></nav>
 <footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
 </main>
-<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#model">Model</a><a class="toc-level-2" href="#input-conventions">Input conventions</a><a class="toc-level-2" href="#validation-and-boundaries">Validation and boundaries</a></nav></aside>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#model">Model</a><a class="toc-level-2" href="#heuristic">Heuristic</a><a class="toc-level-2" href="#input-conventions">Input conventions</a><a class="toc-level-2" href="#validation-and-boundaries">Validation and boundaries</a></nav></aside>
 </div>
 </body></html>
