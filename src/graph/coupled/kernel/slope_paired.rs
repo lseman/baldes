@@ -2,7 +2,8 @@
 use super::bounds::Range;
 use super::*;
 use descriptor::{
-    FrontierBudget, PairedCostNormalization, PreparedSlopeRelationArc, SlopeFront, SlopeRelationArc,
+    FrontierBudget, FrontierOutcome, FrontierUnknown, PairedCostNormalization,
+    PreparedSlopeRelationArc, SlopeFront, SlopeRelationArc,
 };
 use relation::{PreparedRelationArc, RelationFront};
 use slope_interval::{outcome, SlopeLabel};
@@ -14,7 +15,7 @@ pub(super) struct PreparedSlopePaired {
     upper_initial: Option<SlopeFront>,
     initial_minimum: f64,
     arcs: std::sync::Arc<[PreparedSlopeRelationArc]>,
-    upper_arcs: Option<std::sync::Arc<[PreparedSlopeRelationArc]>>,
+    upper_arcs: Option<std::sync::Arc<[SlopeFront]>>,
     sources: std::sync::Arc<[SlopeRelationArc]>,
     backward: std::sync::Arc<[Option<PreparedRelationArc>]>,
     mode: PairedResourceMode,
@@ -53,17 +54,33 @@ fn negate_function(function: &PreparedSlopeFunction) -> Result<PreparedSlopeFunc
     )
     .map_err(|error| invalid(error.to_string()))
 }
-fn negate_relation_arc(arc: &SlopeRelationArc) -> Result<SlopeRelationArc> {
-    Ok(SlopeRelationArc {
-        arrival: arc.arrival.clone(),
-        increment: negate_function(&arc.increment)?,
-        lower: negate_function(&arc.upper)?,
-        upper: negate_function(&arc.lower)?,
-        waiting: arc
-            .waiting
-            .checked_neg()
-            .ok_or_else(|| invalid("signed raw paired waiting overflow"))?,
-    })
+fn negated_upper_on(
+    feasible: &SlopeFront,
+    negative_upper: &SlopeFront,
+    policy: FrontOperationPolicy,
+    budget: FrontierBudget,
+) -> FrontierOutcome<SlopeFront> {
+    let zero_components = match feasible
+        .components()
+        .iter()
+        .map(|component| {
+            let (lower, upper) = component.domain();
+            if lower == upper {
+                PreparedSlopeFunction::constant_point(0., lower)
+            } else {
+                PreparedSlopeFunction::from_prepared_pairs(vec![(0., lower), (0., upper)])
+            }
+        })
+        .collect::<std::result::Result<Vec<_>, _>>()
+    {
+        Ok(components) => components,
+        Err(error) => return FrontierOutcome::Unknown(FrontierUnknown::Arithmetic(error)),
+    };
+    match SlopeFront::from_components(zero_components, budget) {
+        FrontierOutcome::Complete(mask) => negative_upper.add(&mask, policy, budget),
+        FrontierOutcome::Empty => FrontierOutcome::Empty,
+        FrontierOutcome::Unknown(reason) => FrontierOutcome::Unknown(reason),
+    }
 }
 // Conversion is advisory. Singleton domains and unrepresentable slopes keep
 // suffix replay as the authoritative feasibility check.
@@ -119,14 +136,8 @@ impl PreparedSlopePaired {
             .and_then(|front| outcome(front).ok().flatten());
         let upper_arcs = arcs
             .iter()
-            .map(negate_relation_arc)
+            .map(|arc| negate_function(&arc.upper).map(SlopeFront::from_prepared))
             .collect::<Result<Vec<_>>>()
-            .and_then(|arcs| {
-                arcs.iter()
-                    .map(|arc| PreparedSlopeRelationArc::new(arc, policy))
-                    .collect::<std::result::Result<Vec<_>, _>>()
-                    .map_err(|error| invalid(error.to_string()))
-            })
             .ok()
             .map(std::sync::Arc::from);
         let mut shifts = false;
@@ -237,7 +248,12 @@ impl PreparedSlopePaired {
             let (Some(front_a), Some(front_b)) = (&a.upper_negative, &b.upper_negative) else {
                 return None;
             };
-            return front_a.covers_below(front_b, self.policy).then_some(0.);
+            let (Some(lower_a), Some(lower_b)) = (&a.front, &b.front) else {
+                return None;
+            };
+            return (lower_a.covers_below(lower_b, self.policy)
+                && front_a.covers_below(front_b, self.policy))
+            .then_some(0.);
         }
         let (Some(front_a), Some(front_b)) = (&a.front, &b.front) else {
             return None;
@@ -258,12 +274,11 @@ impl PreparedSlopePaired {
     }
     pub(super) fn selected_value(&self, label: &SlopeLabel, scale: f64) -> Result<f64> {
         if self.has_costs() && finite(scale * self.objective_coefficient)? < 0. {
-            let upper = label
-                .upper_negative
-                .as_ref()
-                .ok_or_else(|| invalid("signed raw paired upper frontier is unavailable"))?;
+            let upper = label.upper_negative.as_ref().ok_or_else(|| {
+                crate::incomplete("signed raw paired upper frontier is unavailable")
+            })?;
             let witness = outcome(upper.minimum(FrontierBudget::default()))?
-                .ok_or_else(|| invalid("empty signed raw paired upper frontier"))?;
+                .ok_or_else(|| crate::incomplete("empty signed raw paired upper frontier"))?;
             finite(-witness.value)
         } else {
             let front = label
@@ -352,13 +367,12 @@ impl PreparedSlopePaired {
         let Some(witness) = outcome(front.minimum(FrontierBudget::default()))? else {
             return Ok(None);
         };
-        let upper_negative = match (&old.upper_negative, self.upper_arcs.as_ref()) {
-            (Some(old), Some(arcs)) => match arcs[arc].extend(old, FrontierBudget::default()) {
+        let upper_negative = self.upper_arcs.as_ref().and_then(|arcs| {
+            match negated_upper_on(&front, &arcs[arc], self.policy, FrontierBudget::default()) {
                 FrontierOutcome::Complete(front) => Some(front),
                 FrontierOutcome::Empty | FrontierOutcome::Unknown(_) => None,
-            },
-            _ => None,
-        };
+            }
+        });
         if signed && upper_negative.is_none() {
             return Err(crate::incomplete(
                 "signed raw paired upper frontier is unavailable",

@@ -279,6 +279,43 @@ impl RelationFront {
             minimum.min(p.left[1]).min(p.right[1])
         })
     }
+    /// Negated maximum dependent bound on this front's feasible base domain.
+    /// Once the lower recurrence is feasible, any dependent value up to
+    /// `upper(x)` is allowed; negating and replaying the lower recurrence
+    /// would therefore compute the wrong maximum envelope.
+    pub(super) fn negated_upper_on(&self, upper: &PiecewiseLinearFunction) -> Result<Option<Self>> {
+        let mut pieces = Vec::new();
+        for feasible in &self.pieces {
+            let domain = (feasible.left[0], feasible.right[0]);
+            if upper.points.len() == 1 {
+                let x = upper.points[0][0];
+                if domain.0 <= x && x <= domain.1 {
+                    let value = finite(-upper.points[0][1])?;
+                    pieces.push(RelationPiece {
+                        metadata: 0,
+                        left: [x, value],
+                        right: [x, value],
+                        waiting: false,
+                    });
+                }
+                continue;
+            }
+            for segment in upper.points.windows(2) {
+                let lo = domain.0.max(segment[0][0]);
+                let hi = domain.1.min(segment[1][0]);
+                if lo > hi {
+                    continue;
+                }
+                pieces.push(RelationPiece {
+                    metadata: 0,
+                    left: [lo, finite(-evaluate(upper, lo)?)?],
+                    right: [hi, finite(-evaluate(upper, hi)?)?],
+                    waiting: false,
+                });
+            }
+        }
+        Ok((!pieces.is_empty()).then(|| Self::from_pieces(pieces)))
+    }
     /// This forward front is defined wherever `other` is and is no higher
     /// there, comparing values as the reference does: within 1e-4, or a
     /// relative 2.22e-10, counts as equal. Forward extension is monotone in

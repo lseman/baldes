@@ -1,8 +1,6 @@
 //! Prepared paired relations and direction-specific physical-label state.
 use super::*;
-use relation::{
-    BoundedCostFront, PreparedRelationArc, RelationArc, RelationFront, RelationWorkspace,
-};
+use relation::{BoundedCostFront, PreparedRelationArc, RelationFront, RelationWorkspace};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum PairedLabel {
@@ -47,7 +45,7 @@ pub(super) struct PreparedPaired {
     initial: std::sync::Arc<RelationFront>,
     upper_initial: Option<std::sync::Arc<RelationFront>>,
     arcs: std::sync::Arc<[PreparedRelationArc]>,
-    upper_arcs: Option<std::sync::Arc<[PreparedRelationArc]>>,
+    upper_arcs: Option<std::sync::Arc<[PiecewiseLinearFunction]>>,
     mode: PairedResourceMode,
     exact: bool,
     ceiling: f64,
@@ -62,16 +60,16 @@ impl PreparedPaired {
     ) -> Result<Self> {
         let front = RelationFront::initial(initial, domain)?
             .ok_or_else(|| invalid("empty paired initial frontier"))?;
-        // The signed front is advisory. If negation/preparation overflows or
-        // becomes numerically unsupported, retain the valid ordinary front.
+        // The maximum envelope is the negated declared upper bound masked to
+        // each feasible forward domain. Replaying a negated lower recurrence
+        // would reverse an inequality and is not a valid maximum envelope.
         let signed = (|| -> Result<_> {
             let initial = negate_function(initial)?;
             let initial = RelationFront::initial(&initial, domain)?;
             let initial = initial.ok_or_else(|| invalid("empty signed paired frontier"))?;
             let arcs = arcs
                 .iter()
-                .map(negate_relation_arc)
-                .map(|arc| arc.and_then(|arc| PreparedRelationArc::new(&arc)))
+                .map(|arc| negate_function(&arc.upper))
                 .collect::<Result<Vec<_>>>()?;
             Ok((std::sync::Arc::new(initial), std::sync::Arc::from(arcs)))
         })()
@@ -147,7 +145,7 @@ impl PreparedPaired {
         let selected = if scale < 0. {
             -state
                 .forward_upper_negative()
-                .ok_or_else(|| invalid("signed paired upper frontier is unavailable"))?
+                .ok_or_else(|| crate::incomplete("signed paired upper frontier is unavailable"))?
                 .minimum()
         } else {
             state
@@ -178,11 +176,9 @@ impl PreparedPaired {
                 let Some(lower) = lower.extend_prepared(&self.arcs[arc], workspace)? else {
                     return Ok(None);
                 };
-                let upper_negative = match (upper_negative, self.upper_arcs.as_ref()) {
-                    (Some(old), Some(arcs)) => {
-                        old.extend_prepared(&arcs[arc], workspace).ok().flatten()
-                    }
-                    _ => None,
+                let upper_negative = match self.upper_arcs.as_ref() {
+                    Some(arcs) => lower.negated_upper_on(&arcs[arc]).ok().flatten(),
+                    None => upper_negative.clone(),
                 };
                 Ok(Some(PairedLabel::Forward {
                     lower,
@@ -274,17 +270,17 @@ impl PreparedPaired {
                 return Ok(None);
             };
             current = Some(next);
-            current_upper = match (current_upper.as_ref(), self.upper_arcs.as_ref()) {
-                (Some(input), Some(arcs)) => {
-                    input.extend_prepared(&arcs[arc], workspace).ok().flatten()
-                }
-                _ => None,
+            current_upper = match self.upper_arcs.as_ref() {
+                Some(arcs) => current
+                    .as_ref()
+                    .and_then(|lower| lower.negated_upper_on(&arcs[arc]).ok().flatten()),
+                None => None,
             };
         }
         if maximize {
             return current_upper
                 .map(|upper| Some(-upper.minimum()))
-                .ok_or_else(|| invalid("signed paired upper frontier is unavailable"));
+                .ok_or_else(|| crate::incomplete("signed paired upper frontier is unavailable"));
         }
         Ok(Some(current.as_ref().unwrap_or(source).minimum()))
     }
@@ -298,19 +294,6 @@ fn negate_function(function: &PiecewiseLinearFunction) -> Result<PiecewiseLinear
             .map(|point| [point[0], -point[1]])
             .collect(),
     )
-}
-
-fn negate_relation_arc(arc: &RelationArc) -> Result<RelationArc> {
-    Ok(RelationArc {
-        arrival: arc.arrival.clone(),
-        increment: negate_function(&arc.increment)?,
-        lower: negate_function(&arc.upper)?,
-        upper: negate_function(&arc.lower)?,
-        waiting: arc
-            .waiting
-            .checked_neg()
-            .ok_or_else(|| invalid("signed paired waiting coefficient overflow"))?,
-    })
 }
 
 /// Borrowed subdivision is only an indexing precheck. Whole original pieces

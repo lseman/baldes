@@ -131,9 +131,9 @@ impl CoupledKernel {
         if self.has_negative_paired_objectives() {
             self.check_state(a).ok()?;
             self.check_state(b).ok()?;
-            // The upper-front recurrence is advisory: unsupported arithmetic
-            // leaves it unknown and must not create a dominance relation.
-            // Exact state identity remains safe under any signed continuation.
+            // Maximum-envelope comparison remains approximate or unknown for
+            // some front policies. Until directed coverage is available,
+            // signed continuations only dominate identical coupled states.
             return (a == b).then_some(0.);
         }
         if self.weighted_objective || !self.pricing_activities.is_empty() {
