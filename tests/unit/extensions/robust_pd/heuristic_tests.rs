@@ -43,6 +43,7 @@ fn search(p: &Problem) -> Search<'_> {
     let n = p.instance.requests;
     Search {
         problem: p,
+        extensions: IlsExtensions::default(),
         n,
         budget: p.parameters.time_budget.min(2 * n + 1),
         rng: Xoroshiro128Plus::from_seed(7),
@@ -197,4 +198,114 @@ fn partitions_close_to_optimum(method: HeuristicMethod) {
         optimal * 10 >= solved * 9,
         "{method:?}: {optimal}/{solved} optimal"
     );
+}
+
+fn assert_partition(p: &Problem, routes: &[Route]) {
+    let mut covered = vec![0; p.instance.requests];
+    for route in routes {
+        p.replay(&route.nodes).unwrap();
+        for &v in &route.nodes {
+            if (1..=covered.len()).contains(&v) {
+                covered[v - 1] += 1;
+            }
+        }
+    }
+    assert!(covered.iter().all(|&count| count == 1));
+}
+
+#[test]
+fn optional_pair_operations_improve_crossed_routes_without_losing_requests() {
+    let text = "n 4 Q 10 r_mod 2\n0 0 0 0 0 0 10000\n1 1 0 0 1 0 10000\n2 2 0 0 1 0 10000\n3 100 0 0 1 0 10000\n4 101 0 0 1 0 10000\n5 1 0 0 -1 0 10000\n6 2 0 0 -1 0 10000\n7 100 0 0 -1 0 10000\n8 101 0 0 -1 0 10000\n9 0 0 0 0 0 10000\n";
+    let p = Problem::new(
+        Instance::from_text(text).unwrap(),
+        Parameters {
+            demand_budget: 1,
+            time_budget: 2,
+            demand_deviation: 0.3,
+            time_deviation: 0.3,
+            adjust_demands: false,
+            vehicle_cost: 100.,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut s = search(&p);
+    let original = vec![
+        s.build(vec![0, 1, 5, 3, 7, 9]).unwrap(),
+        s.build(vec![0, 4, 8, 2, 6, 9]).unwrap(),
+    ];
+    let before = s.cost(&original);
+    for operation in 0..3 {
+        let mut routes = original.clone();
+        let changed = match operation {
+            0 => s.exchange_pairs(&mut routes),
+            1 => s.exchange_tails(&mut routes),
+            _ => s.ejection_chain(&mut routes),
+        };
+        assert!(changed, "operation={operation}");
+        assert!(s.cost(&routes) < before - 1e-7);
+        assert_partition(&p, &routes);
+    }
+}
+
+#[test]
+fn extended_profiles_preserve_robust_partitions_and_zero_flags_match_baseline() {
+    for seed in 0..8 {
+        for (gq, gt) in [(0, 0), (1, 2), (5, 5)] {
+            let p = instance(4, seed, gq, gt);
+            let profiles = [
+                IlsExtensions::default(),
+                IlsExtensions {
+                    regret_repair: true,
+                    ..Default::default()
+                },
+                IlsExtensions {
+                    critical_removal: true,
+                    ..Default::default()
+                },
+                IlsExtensions {
+                    pair_exchange: true,
+                    ..Default::default()
+                },
+                IlsExtensions {
+                    tail_exchange: true,
+                    ..Default::default()
+                },
+                IlsExtensions {
+                    ejection_chain: true,
+                    ..Default::default()
+                },
+                IlsExtensions::all(),
+            ];
+            let options = HeuristicOptions {
+                time_limit: Duration::from_secs(10),
+                iterations: 12,
+                seed,
+                ..Default::default()
+            };
+            let baseline = p.heuristic(options);
+            for (k, extensions) in profiles.into_iter().enumerate() {
+                let result = p.heuristic(HeuristicOptions {
+                    method: HeuristicMethod::ExtendedIteratedLocalSearch(extensions),
+                    ..options
+                });
+                assert_eq!(result.is_some(), baseline.is_some());
+                if let Some(solution) = result {
+                    let s = search(&p);
+                    let routes: Vec<_> = solution
+                        .routes
+                        .iter()
+                        .map(|r| s.build(r.clone()).unwrap())
+                        .collect();
+                    assert_partition(&p, &routes);
+                    assert!((s.cost(&routes) - solution.cost).abs() < 1e-9);
+                    if k == 0 {
+                        let baseline = baseline.as_ref().unwrap();
+                        assert_eq!(solution.routes, baseline.routes);
+                        assert_eq!(solution.cost, baseline.cost);
+                    }
+                }
+            }
+        }
+    }
 }

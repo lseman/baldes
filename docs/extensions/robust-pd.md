@@ -113,6 +113,39 @@ reduced travel by about 0.1% on 75-request cases with the same fleet, but
 found the smallest fleet less often than the default iterated local search
 on two 40-request cases. `--seed N` sets the heuristic seed.
 
+### Optional ILS operations
+
+`HeuristicMethod::ExtendedIteratedLocalSearch(IlsExtensions)` selects optional
+operations without changing the default ILS. `IlsExtensions::all()` enables
+regret-2 repair across distinct target routes (including a singleton), removal
+at a tight load cut or an attaining worst-time segment, transactional pair
+exchange, non-reversing tail exchange at empty-on-board cuts, and a depth-one
+ejection chain. Every replacement route passes robust replay. Critical removal
+is mixed equally with uniform ruin; within critical removal the load and time
+variants are equally likely. Pair exchanges sample at most 64 request pairs,
+tail exchanges at most 128 cut pairs, and ejection scans at most eight shuffled
+requests against each other. These are bounded neighbourhood scans rather than
+claims of exhaustive local optimality. Ejection requires a feasible source
+removal; pair exchange directly checks final routes without this restriction.
+
+The example accepts `--heuristic extended` or one of `regret`, `critical`,
+`exchange`, `tails`, and `ejection` to enable one extension at a time. The
+existing `--heuristic ils` remains the baseline. For example:
+
+```sh
+cargo run --release --features clp,multi-time-windows --example robust_pdptw -- \
+  instances/RobustPDPTW/AA40.txt 5 5 0.3 0.3 10 hundredth --heuristic extended --seed 1
+python3 scripts/benchmarks/benchmark_robust_ils.py \
+  --output internal/robust-pd/ils-extensions --seconds 2
+```
+
+The benchmark interleaves methods in reproducibly shuffled order for paired
+seeds, records input and executable hashes, and stores every run's output,
+objective, fleet, nominal travel, and elapsed time. The example verifies request
+coverage and route feasibility. Short runs are exploratory; compare multiple
+seeds and longer budgets before selecting a default. The requested limit is
+checked at search boundaries, and construction or a move scan can overrun it.
+
 ## Input conventions
 
 `Instance::read` validates consecutive node ids, signed demand pairs,

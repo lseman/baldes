@@ -10,7 +10,7 @@ use std::path::Path;
 mod heuristic;
 mod physical_graph;
 
-pub use heuristic::{HeuristicMethod, HeuristicOptions, HeuristicSolution};
+pub use heuristic::{HeuristicMethod, HeuristicOptions, HeuristicSolution, IlsExtensions};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Node {

@@ -12,12 +12,43 @@ use crate::rng::Xoroshiro128Plus;
 use std::time::{Duration, Instant};
 
 mod genetic;
+mod operators;
+
+/// Optional ILS operations; the default preserves the original trajectory.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct IlsExtensions {
+    /// Regret-2 repair over distinct receiving routes, including singletons.
+    pub regret_repair: bool,
+    /// Mix uniform ruin with removals at tight load cuts or time segments.
+    pub critical_removal: bool,
+    /// Exchange two complete requests between routes as one transaction.
+    pub pair_exchange: bool,
+    /// Swap tails only at cuts with no open requests.
+    pub tail_exchange: bool,
+    /// Move a request while ejecting and repairing one other request.
+    pub ejection_chain: bool,
+}
+
+impl IlsExtensions {
+    /// Enable every optional operation.
+    pub fn all() -> Self {
+        Self {
+            regret_repair: true,
+            critical_removal: true,
+            pair_exchange: true,
+            tail_exchange: true,
+            ejection_chain: true,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum HeuristicMethod {
     /// One trajectory of ruin-and-recreate with local search.
     #[default]
     IteratedLocalSearch,
+    /// ILS with explicitly selected optional operations.
+    ExtendedIteratedLocalSearch(IlsExtensions),
     /// HGS-style population with route-based crossover and diversity control.
     Genetic,
 }
@@ -75,6 +106,7 @@ struct Insertion {
 
 struct Search<'a> {
     problem: &'a Problem,
+    extensions: IlsExtensions,
     n: usize,
     budget: usize,
     rng: Xoroshiro128Plus,
@@ -88,6 +120,10 @@ impl Problem {
         let n = self.instance.requests;
         let mut search = Search {
             problem: self,
+            extensions: match options.method {
+                HeuristicMethod::ExtendedIteratedLocalSearch(extensions) => extensions,
+                _ => IlsExtensions::default(),
+            },
             n,
             budget: self.parameters.time_budget.min(2 * n + 1),
             rng: Xoroshiro128Plus::from_seed(options.seed),
@@ -107,7 +143,8 @@ impl Problem {
         // The genetic method first spends 40% of the time on this trajectory,
         // which reduces the fleet more reliably, then evolves from its best.
         let phase_end = match options.method {
-            HeuristicMethod::IteratedLocalSearch => search.deadline,
+            HeuristicMethod::IteratedLocalSearch
+            | HeuristicMethod::ExtendedIteratedLocalSearch(_) => search.deadline,
             HeuristicMethod::Genetic => Instant::now() + options.time_limit.mul_f64(0.4),
         };
         for _ in 0..options.iterations {
@@ -376,6 +413,9 @@ impl Search<'_> {
     }
 
     fn recreate(&mut self, mut routes: Vec<Route>, requests: &[usize]) -> Option<Vec<Route>> {
+        if self.extensions.regret_repair {
+            return self.regret_recreate(routes, requests);
+        }
         for &r in requests {
             self.insert(&mut routes, r, true)?;
         }
@@ -388,6 +428,9 @@ impl Search<'_> {
         let count = ((share * self.n as f64).round() as usize).clamp(self.n.min(2), self.n);
         let mut requests: Vec<usize> = (0..self.n).collect();
         self.rng.shuffle(&mut requests);
+        if self.extensions.critical_removal && self.rng.next_f64() < 0.5 {
+            self.critical_order(routes, &mut requests);
+        }
         let mut removed = vec![];
         for r in requests.into_iter().take(count) {
             if self.remove(routes, r).is_some() {
@@ -403,7 +446,16 @@ impl Search<'_> {
             if Instant::now() >= self.deadline {
                 return;
             }
-            let improved = self.eliminate_route(routes) | self.relocate_pairs(routes);
+            let mut improved = self.eliminate_route(routes) | self.relocate_pairs(routes);
+            if self.extensions.pair_exchange && Instant::now() < self.deadline {
+                improved |= self.exchange_pairs(routes);
+            }
+            if self.extensions.tail_exchange && Instant::now() < self.deadline {
+                improved |= self.exchange_tails(routes);
+            }
+            if self.extensions.ejection_chain && Instant::now() < self.deadline {
+                improved |= self.ejection_chain(routes);
+            }
             if !improved {
                 return;
             }
