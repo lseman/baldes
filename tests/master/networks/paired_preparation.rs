@@ -2949,3 +2949,43 @@ fn narrow_dyadic_domains_recover_integral_copy_blocks() {
         }
     }
 }
+
+#[test]
+fn narrow_dyadic_domains_recover_exact_three_copy_gamma_totals() {
+    use baldes::master::tree::{ModelTreeOptions, TreeStatus};
+
+    let source = include_str!("../../fixtures/coupled/dyadic-narrow-interior-model.json");
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let (problem, registry) = model::format::Model::from_json(source)
+            .unwrap()
+            .compile::<2>()
+            .unwrap();
+        let mut options = ModelTreeOptions::default();
+        options.node.cg.stabilize = false;
+        options.node.cg.bound_mode = mode;
+        registry.configure_tree(&mut options).unwrap();
+        let tree = baldes::master::tree::solve(problem, options).unwrap();
+        assert_eq!(tree.status, TreeStatus::Optimal, "{tree:?}");
+        assert_eq!(tree.incumbent, -24.);
+        assert!(tree.bound <= -24. && tree.bound > -24. - 1e-7);
+        let mut quantities = [0., 0.];
+        let mut totals = [0., 0.];
+        let mut controls = [
+            std::collections::BTreeSet::new(),
+            std::collections::BTreeSet::new(),
+        ];
+        for fixed in &tree.routes {
+            let index = usize::from(fixed.route.network == 7);
+            let gamma = fixed.route.route.coupled_values[0].1;
+            assert!((0.125..=0.15625).contains(&gamma));
+            assert!(fixed.quantity > 0. && fixed.quantity.fract() == 0.);
+            quantities[index] += fixed.quantity;
+            totals[index] += fixed.quantity * gamma;
+            controls[index].insert(gamma.to_bits());
+        }
+        assert_eq!(quantities, [3., 3.]);
+        assert!((totals[0] - 0.40625).abs() <= f64::EPSILON);
+        assert!((totals[1] - 0.40625).abs() <= f64::EPSILON);
+        assert!(controls.iter().all(|values| values.len() > 1));
+    }
+}
