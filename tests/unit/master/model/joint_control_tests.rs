@@ -53,6 +53,102 @@ fn bounded_walk_resource_pruning_respects_window_gaps_and_arc_bounds() {
     assert_eq!(extend_bounded_walk_resources(&graph, 0, state), Some(None));
 }
 
+fn paired_test_function(
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+) -> crate::graph::coupled::PiecewiseLinearFunction {
+    crate::graph::coupled::PiecewiseLinearFunction::new(vec![[x0, y0], [x1, y1]]).unwrap()
+}
+
+#[test]
+fn unbounded_paired_terminal_bound_covers_negative_increments_and_work_limits() {
+    let initial = paired_test_function(0., 10., 10., 10.);
+    let arc = crate::graph::coupled::PairedResourceArc {
+        arrival: paired_test_function(0., 0., 10., 10.),
+        increment: paired_test_function(0., -2., 10., -2.),
+        lower: paired_test_function(0., -100., 1e12, -100.),
+        upper: paired_test_function(0., 1e12, 1e12, 1e12),
+        waiting: 0,
+    };
+    let mut work = 10_000;
+    let bound = paired_terminal_lower_bound(
+        &initial,
+        std::slice::from_ref(&arc),
+        2,
+        &mut work,
+        Instant::now() + Duration::from_secs(1),
+    )
+    .unwrap();
+    assert_eq!(bound, 6.);
+
+    let mut no_work = 0;
+    assert!(paired_terminal_lower_bound(
+        &initial,
+        std::slice::from_ref(&arc),
+        2,
+        &mut no_work,
+        Instant::now() + Duration::from_secs(1),
+    )
+    .is_none());
+}
+
+#[test]
+fn paired_base_domain_pruning_keeps_hulls_and_proves_empty_departure_domains() {
+    use crate::graph::coupled::{
+        CoupledResource, PairedCostNormalization, PairedResourceArc, PairedResourceMode,
+    };
+    let mut graph = crate::graph::Graph::<2>::new(2, 0).unwrap();
+    graph.add_arc(0, 1, 0.).unwrap();
+    graph
+        .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
+            initial: paired_test_function(0., 0., 10., 0.),
+            initial_base: Window::new(0., 10.).unwrap(),
+            arcs: vec![PairedResourceArc {
+                arrival: paired_test_function(0., 0., 10., 10.),
+                increment: paired_test_function(0., 0., 10., 0.),
+                lower: paired_test_function(0., 0., 10., 0.),
+                upper: paired_test_function(0., 100., 10., 100.),
+                waiting: 0,
+            }],
+            mode: PairedResourceMode::Feasibility,
+            normalization: PairedCostNormalization::AbsoluteFinalValue,
+        }])
+        .unwrap();
+
+    let deadline = Instant::now() + Duration::from_secs(1);
+    let mut work = 100;
+    let roots = paired_prefix_roots(&graph, &mut work, deadline).unwrap();
+    assert_eq!(roots.len(), 1);
+    assert_eq!(roots[0].resource, 0);
+    assert_eq!(roots[0].base.lo, 0.);
+    assert_eq!(roots[0].base.hi, 10.);
+    assert_eq!(roots[0].dependent_lower, 0.);
+    let narrowed = [PairedPrefixDomain {
+        resource: 0,
+        base: Interval { lo: 2., hi: 4. },
+        dependent_lower: 0.,
+    }];
+    let reachable = extend_paired_prefix_domains(&graph, 0, &narrowed, &mut work, deadline)
+        .unwrap()
+        .unwrap();
+    assert_eq!(reachable.len(), 1);
+    assert_eq!(reachable[0].base.lo, 2.);
+    assert_eq!(reachable[0].base.hi, 10.);
+    assert_eq!(reachable[0].dependent_lower, 0.);
+
+    let impossible = [PairedPrefixDomain {
+        resource: 0,
+        base: Interval { lo: 20., hi: 30. },
+        dependent_lower: 0.,
+    }];
+    assert!(matches!(
+        extend_paired_prefix_domains(&graph, 0, &impossible, &mut work, deadline,),
+        Some(None)
+    ));
+}
+
 fn root() -> Output<2> {
     let mut source: serde_json::Value = serde_json::from_str(include_str!(
         "../../../fixtures/coupled/joint-interior-model.json"
@@ -169,6 +265,7 @@ fn joint_control_targets_share_work_iterations_and_deadlines() {
         &initial,
         1.,
         (&mut 0, &mut iterations),
+        state.deadline,
     )
     .is_none());
     assert!(joint_controls(
@@ -179,6 +276,7 @@ fn joint_control_targets_share_work_iterations_and_deadlines() {
         &initial,
         1.,
         (&mut work, &mut 0),
+        state.deadline,
     )
     .is_none());
     let proposals = joint_controls(
@@ -189,6 +287,7 @@ fn joint_control_targets_share_work_iterations_and_deadlines() {
         &initial,
         1.,
         (&mut work, &mut iterations),
+        state.deadline,
     )
     .unwrap();
     let route = initial
@@ -205,6 +304,7 @@ fn joint_control_targets_share_work_iterations_and_deadlines() {
         &initial,
         1.,
         (&mut work, &mut iterations),
+        state.deadline,
     )
     .is_none());
 }
@@ -248,6 +348,7 @@ fn joint_control_proposals_include_attainable_extremes_of_an_equality_face() {
         &initial,
         1.,
         (&mut work, &mut iterations),
+        state.deadline,
     )
     .expect("bounded LP face should produce source-replayed proposals");
     let values: Vec<_> = proposals
@@ -406,6 +507,7 @@ fn joint_control_recovers_a_three_resource_vertex_missed_by_coordinate_targets()
         &initial,
         1.,
         (&mut work, &mut iterations),
+        state.deadline,
     )
     .expect("the jointly feasible terminal vertex should be proposed");
     let values: Vec<_> = proposals
@@ -477,6 +579,7 @@ fn joint_control_projects_one_resource_through_opposing_rows() {
         &initial,
         1.,
         (&mut work, &mut iterations),
+        state.deadline,
     )
     .expect("the common interval between opposing rows has attained endpoints");
     let values: Vec<_> = proposals
@@ -639,12 +742,14 @@ fn lazy_identity_search_reaches_allocations_beyond_the_old_shortlist() {
     }
 
     let mut saw_first_registered_identity = false;
+    let mut work = usize::MAX;
     let stopped = for_each_identity_allocation(
         &state,
         &choices,
         1.,
         state.deadline,
-        &mut |allocation, _deadline| {
+        &mut work,
+        &mut |allocation, _deadline, _work| {
             saw_first_registered_identity |= allocation
                 .iter()
                 .any(|route| route.route.route.coupled_values == vec![(0, 0.)]);
@@ -672,12 +777,14 @@ fn lazy_identity_search_streams_past_one_hundred_thousand_allocations() {
 
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut allocations_seen = 0;
+    let mut work = usize::MAX;
     let stopped = for_each_identity_allocation(
         &state,
         &choices,
         10.,
         deadline,
-        &mut |_allocation, _deadline| {
+        &mut work,
+        &mut |_allocation, _deadline, _work| {
             allocations_seen += 1;
             Ok(allocations_seen == 100_001)
         },
@@ -686,6 +793,33 @@ fn lazy_identity_search_streams_past_one_hundred_thousand_allocations() {
 
     assert!(stopped);
     assert_eq!(allocations_seen, 100_001);
+}
+
+#[test]
+fn identity_allocation_visit_stops_at_its_shared_work_budget() {
+    let output = root();
+    let state = output.snapshot.state.fork_state();
+    let tag = 0;
+    let choices = [(tag, 0.5, state.routes[tag].as_ref().clone())];
+    let mut work = 2;
+    let mut allocations_seen = 0;
+
+    let stopped = for_each_identity_allocation(
+        &state,
+        &choices,
+        1.,
+        state.deadline,
+        &mut work,
+        &mut |_allocation, _deadline, _work| {
+            allocations_seen += 1;
+            Ok(false)
+        },
+    )
+    .unwrap();
+
+    assert!(stopped);
+    assert_eq!(work, 0);
+    assert!(allocations_seen <= 2);
 }
 
 #[test]

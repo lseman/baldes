@@ -842,6 +842,11 @@ pub(super) fn repair_witness<const D: usize>(
     let mut routes = witness.clone();
     let now = Instant::now();
     let identity_search_deadline = now + state.deadline.saturating_duration_since(now) / 2;
+    let mut recovery_work = 4_000_000;
+    let mut recovery_iterations = 100_000;
+    let joint_work_reserve = recovery_work / 2;
+    let mut identity_work = recovery_work - joint_work_reserve;
+    let identity_work_initial = identity_work;
     if let Some(result) = search_identity_groups(
         state,
         &allocation_groups,
@@ -849,14 +854,18 @@ pub(super) fn repair_witness<const D: usize>(
         &mut routes,
         &masters,
         identity_search_deadline,
+        &mut identity_work,
     )? {
         return Ok(Some(result));
     }
+    recovery_work = recovery_work.saturating_sub(identity_work_initial - identity_work);
     Ok(joint_witness_targets(
         state,
         &witness,
         &allocation_groups,
         &masters,
+        &mut recovery_work,
+        &mut recovery_iterations,
     ))
 }
 
@@ -870,8 +879,9 @@ fn search_identity_groups<const D: usize>(
     routes: &mut Vec<FixedRoute>,
     masters: &[(i32, f64)],
     deadline: Instant,
+    work: &mut usize,
 ) -> Result<Option<IntegerWitness>> {
-    if Instant::now() >= deadline {
+    if Instant::now() >= deadline || *work == 0 {
         return Ok(None);
     }
     if index == groups.len() {
@@ -893,10 +903,12 @@ fn search_identity_groups<const D: usize>(
         choices,
         *quantity,
         deadline,
-        &mut |allocation, deadline| {
+        work,
+        &mut |allocation, deadline, work| {
             let old_len = routes.len();
             routes.extend_from_slice(allocation);
-            found = search_identity_groups(state, groups, index + 1, routes, masters, deadline)?;
+            found =
+                search_identity_groups(state, groups, index + 1, routes, masters, deadline, work)?;
             routes.truncate(old_len);
             Ok(found.is_some())
         },
@@ -1032,14 +1044,15 @@ fn identity_allocations<const D: usize>(
     allocations
 }
 
-/// Stream every bounded allocation to a caller without materializing a large
-/// candidate list. A phase deadline bounds recursion across path groups.
+/// Stream bounded allocations under the shared work budget and phase deadline;
+/// no Cartesian candidate list is materialized.
 fn for_each_identity_allocation<const D: usize>(
     state: &State<D>,
     choices: &[(usize, f64, NetworkRoute)],
     quantity: f64,
     deadline: Instant,
-    on_allocation: &mut impl FnMut(&[FixedRoute], Instant) -> Result<bool>,
+    work: &mut usize,
+    on_allocation: &mut impl FnMut(&[FixedRoute], Instant, &mut usize) -> Result<bool>,
 ) -> Result<bool> {
     fn try_count<const D: usize>(
         state: &State<D>,
@@ -1050,7 +1063,8 @@ fn for_each_identity_allocation<const D: usize>(
         route: &NetworkRoute,
         selected: &mut Vec<FixedRoute>,
         deadline: Instant,
-        on_allocation: &mut impl FnMut(&[FixedRoute], Instant) -> Result<bool>,
+        work: &mut usize,
+        on_allocation: &mut impl FnMut(&[FixedRoute], Instant, &mut usize) -> Result<bool>,
     ) -> Result<bool> {
         if count > 0. {
             selected.push(FixedRoute {
@@ -1065,6 +1079,7 @@ fn for_each_identity_allocation<const D: usize>(
             remaining - count,
             selected,
             deadline,
+            work,
             on_allocation,
         )?;
         if count > 0. {
@@ -1080,13 +1095,18 @@ fn for_each_identity_allocation<const D: usize>(
         remaining: f64,
         selected: &mut Vec<FixedRoute>,
         deadline: Instant,
-        on_allocation: &mut impl FnMut(&[FixedRoute], Instant) -> Result<bool>,
+        work: &mut usize,
+        on_allocation: &mut impl FnMut(&[FixedRoute], Instant, &mut usize) -> Result<bool>,
     ) -> Result<bool> {
+        let Some(remaining_work) = work.checked_sub(1) else {
+            return Ok(true);
+        };
+        *work = remaining_work;
         if Instant::now() >= deadline {
             return Ok(false);
         }
         if remaining == 0. {
-            return on_allocation(selected, deadline);
+            return on_allocation(selected, deadline, work);
         }
         let Some((_, preferred, route)) = choices.get(index) else {
             return Ok(false);
@@ -1103,6 +1123,7 @@ fn for_each_identity_allocation<const D: usize>(
                 remaining,
                 selected,
                 deadline,
+                work,
                 on_allocation,
             );
         }
@@ -1139,6 +1160,7 @@ fn for_each_identity_allocation<const D: usize>(
                 route,
                 selected,
                 deadline,
+                work,
                 on_allocation,
             )? {
                 return Ok(true);
@@ -1156,6 +1178,7 @@ fn for_each_identity_allocation<const D: usize>(
                     route,
                     selected,
                     deadline,
+                    work,
                     on_allocation,
                 )?
             {
@@ -1176,6 +1199,7 @@ fn for_each_identity_allocation<const D: usize>(
         quantity,
         &mut Vec::new(),
         deadline,
+        work,
         on_allocation,
     )
 }
@@ -1188,12 +1212,12 @@ fn joint_witness_targets<const D: usize>(
     background: &[FixedRoute],
     allocation_groups: &[(Vec<(usize, f64, NetworkRoute)>, f64)],
     masters: &[(i32, f64)],
+    work: &mut usize,
+    iterations: &mut usize,
 ) -> Option<IntegerWitness> {
     if Instant::now() >= state.deadline {
         return None;
     }
-    let mut work = 4_000_000;
-    let mut iterations = 100_000;
     let mut seed = Vec::new();
     search_joint_witness_seeds(
         state,
@@ -1202,8 +1226,8 @@ fn joint_witness_targets<const D: usize>(
         0,
         &mut seed,
         masters,
-        &mut work,
-        &mut iterations,
+        work,
+        iterations,
     )
 }
 
@@ -1264,7 +1288,8 @@ fn for_each_joint_witness_seed<const D: usize>(
         choices,
         *quantity,
         state.deadline,
-        &mut |allocation, _| {
+        work,
+        &mut |allocation, _, work| {
             let old_len = selected.len();
             selected.extend_from_slice(allocation);
             let stop = for_each_joint_witness_seed(
@@ -2177,6 +2202,27 @@ struct PhysicalSuffixBounds {
     arc_costs: Vec<f64>,
     route_constant: f64,
     other_coupled_lower: f64,
+    paired_terminal_charges: Vec<PairedTerminalCharge>,
+}
+
+#[derive(Clone)]
+struct PairedTerminalArcCharge {
+    arc: usize,
+    values: Interval,
+    lower: f64,
+}
+
+#[derive(Clone)]
+struct PairedTerminalCharge {
+    resource: usize,
+    normalization: crate::graph::coupled::PairedCostNormalization,
+    objective_coefficient: f64,
+    positive_direction: bool,
+    baseline: Option<[f64; 2]>,
+    max_growth: f64,
+    max_lower: f64,
+    max_upper: f64,
+    terminals: Vec<PairedTerminalArcCharge>,
 }
 
 fn row_simple_supported<const D: usize>(oracle: &Oracle<D>) -> bool {
@@ -2210,17 +2256,131 @@ fn row_simple_supported<const D: usize>(oracle: &Oracle<D>) -> bool {
     })
 }
 
+/// Route-independent upper envelope for one CostBounded paired transition.
+/// It encloses the largest possible increase in Gamma and the largest lower
+/// and upper function values over every valid input coordinate.
+fn paired_bounded_step_envelope(
+    definition: &CoupledResource,
+    arc_index: usize,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<(f64, f64, f64)> {
+    let (arrival, increment, lower, upper, waiting) = match definition {
+        CoupledResource::PairedPiecewiseLinear { arcs, mode, .. }
+            if *mode == crate::graph::coupled::PairedResourceMode::CostBounded =>
+        {
+            let arc = arcs.get(arc_index)?;
+            (
+                piecewise_value_hull(&arc.arrival, work, deadline)?,
+                piecewise_value_hull(&arc.increment, work, deadline)?,
+                piecewise_value_hull(&arc.lower, work, deadline)?,
+                piecewise_value_hull(&arc.upper, work, deadline)?,
+                arc.waiting,
+            )
+        }
+        CoupledResource::SlopePaired {
+            arcs,
+            mode,
+            policy: crate::graph::coupled::FrontOperationPolicy::StrictDomain,
+            ..
+        } if *mode == crate::graph::coupled::PairedResourceMode::CostBounded => {
+            let arc = arcs.get(arc_index)?;
+            (
+                slope_function_hull(&arc.arrival, work, deadline)?,
+                slope_function_hull(&arc.increment, work, deadline)?,
+                slope_function_hull(&arc.lower, work, deadline)?,
+                slope_function_hull(&arc.upper, work, deadline)?,
+                arc.waiting,
+            )
+        }
+        _ => return None,
+    };
+    let max_head = match definition {
+        CoupledResource::PairedPiecewiseLinear { arcs, .. } => {
+            let arc = arcs.get(arc_index)?;
+            intersect_head_domains(piecewise_domain(&arc.lower)?, piecewise_domain(&arc.upper)?)?.hi
+        }
+        CoupledResource::SlopePaired { arcs, .. } => {
+            let arc = arcs.get(arc_index)?;
+            intersect_head_domains(slope_domain(&arc.lower)?, slope_domain(&arc.upper)?)?.hi
+        }
+        _ => return None,
+    };
+    let maximum_wait = crate::core::rounding::add_up(max_head, -arrival.lo)?.max(0.);
+    let waiting_increase = multiply_upper_nonnegative(f64::from(waiting), maximum_wait)?;
+    let growth = crate::core::rounding::add_up(increment.hi, waiting_increase)?;
+    (growth >= 0. && lower.hi <= upper.hi).then_some((growth, lower.hi, upper.hi))
+}
+
+fn multiply_upper_nonnegative(left: f64, right: f64) -> Option<f64> {
+    if !left.is_finite() || !right.is_finite() || left < 0. || right < 0. {
+        return None;
+    }
+    Some(Interval::point(left).scale(right)?.hi)
+}
+
+/// Direction in which an isolated paired reduced-cost charge moves with
+/// Gamma. Every nonzero objective and activity-row term must have the same
+/// sign; otherwise endpoint tightening is not valid for their sum.
+fn paired_cost_direction<const D: usize>(
+    oracle: &Oracle<D>,
+    resource: usize,
+    objective_coefficient: f64,
+    offset: usize,
+    duals: &[f64],
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<Option<bool>> {
+    let mut direction = (objective_coefficient != 0.).then_some(objective_coefficient > 0.);
+    for entry in oracle
+        .activity_rows
+        .iter()
+        .filter(|entry| entry.resource == resource && entry.coefficient != 0.)
+    {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        let row_dual = -*duals.get(offset.checked_add(entry.row)?)?;
+        if row_dual == 0. {
+            continue;
+        }
+        let mut row_terms = 0usize;
+        for candidate in &oracle.activity_rows {
+            *work = work.checked_sub(1)?;
+            if Instant::now() >= deadline {
+                return None;
+            }
+            if candidate.row == entry.row && candidate.coefficient != 0. {
+                row_terms += 1;
+            }
+        }
+        if row_terms != 1
+            || !paired_activity_row_is_isolated(oracle, offset, entry.row, work, deadline)?
+        {
+            return Some(None);
+        }
+        let positive = entry.coefficient.is_sign_positive() == row_dual.is_sign_positive();
+        if direction.is_some_and(|existing| existing != positive) {
+            return Some(None);
+        }
+        direction = Some(positive);
+    }
+    Some(direction)
+}
+
 fn coupled_lower_bounds<const D: usize>(
     oracle: &Oracle<D>,
     offset: usize,
     duals: &[f64],
     work: &mut usize,
     deadline: Instant,
-) -> Option<(f64, Vec<f64>)> {
+) -> Option<(f64, Vec<f64>, Vec<PairedTerminalCharge>)> {
     let graph = &oracle.network.graph;
     let kernel = graph.coupled_kernel()?;
     let mut lower = 0.;
     let mut paired_arc_lower = vec![0.; graph.arcs.len()];
+    let mut paired_terminal_charges = Vec::new();
     for (resource, definition) in kernel.definitions().iter().enumerate() {
         let accumulated = match definition {
             CoupledResource::CumulativeCost {
@@ -2292,6 +2452,7 @@ fn coupled_lower_bounds<const D: usize>(
         }
         let (normalization, cost_mode) = match definition {
             CoupledResource::PairedPiecewiseLinear {
+                initial,
                 mode,
                 normalization,
                 arcs,
@@ -2303,9 +2464,91 @@ fn coupled_lower_bounds<const D: usize>(
                         .and_then(|arc| arc.upper.points.first())
                         .is_some_and(|point| point[1] >= 1e12)
                 {
-                    // This descriptor uses 1e12 as infinity; the state may
-                    // grow beyond the stored upper function.
-                    return None;
+                    // The 1e12 upper value is an infinity sentinel. Its
+                    // terminal control can grow without bound. Its finite
+                    // lower endpoint supports nonnegative objective charges
+                    // and activity-row terms that are individually
+                    // nonnegative for every Gamma >= 0. Other row signs can
+                    // make the reduced charge unbounded below.
+                    let objective_coefficient = kernel.effective_objective_coefficient(resource)?;
+                    if objective_coefficient < 0. {
+                        return None;
+                    }
+                    let terminal_lower = paired_terminal_lower_bound(
+                        initial,
+                        arcs,
+                        graph.original_max_arcs(),
+                        work,
+                        deadline,
+                    )?;
+                    let mut contribution = 0.;
+                    if objective_coefficient != 0. {
+                        let baseline = if *normalization
+                            == crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum
+                        {
+                            Some(kernel.paired_initial_minimum(resource, work, Some(deadline))?)
+                        } else {
+                            None
+                        };
+                        let mut amount_lower = terminal_lower;
+                        if let Some(baseline) = baseline {
+                            amount_lower =
+                                crate::core::rounding::add_down(amount_lower, -baseline[1])?;
+                        }
+                        contribution = crate::core::rounding::multiply_down(
+                            objective_coefficient,
+                            amount_lower,
+                        )?;
+                    }
+
+                    let mut row_values = BTreeMap::<usize, Interval>::new();
+                    for entry in oracle
+                        .activity_rows
+                        .iter()
+                        .filter(|entry| entry.resource == resource && entry.coefficient != 0.)
+                    {
+                        *work = work.checked_sub(1)?;
+                        if Instant::now() >= deadline {
+                            return None;
+                        }
+                        let row_dual = -*duals.get(offset.checked_add(entry.row)?)?;
+                        if row_dual == 0. {
+                            continue;
+                        }
+                        let mut row_terms = 0;
+                        for candidate in &oracle.activity_rows {
+                            *work = work.checked_sub(1)?;
+                            if Instant::now() >= deadline {
+                                return None;
+                            }
+                            if candidate.row == entry.row && candidate.coefficient != 0. {
+                                row_terms += 1;
+                            }
+                        }
+                        if terminal_lower < 0.
+                            || row_terms != 1
+                            || !paired_activity_row_is_isolated(
+                                oracle, offset, entry.row, work, deadline,
+                            )?
+                            || entry.coefficient.is_sign_positive() != row_dual.is_sign_positive()
+                        {
+                            return None;
+                        }
+                        let value = Interval::point(terminal_lower).scale(entry.coefficient)?;
+                        let sum = row_values.entry(entry.row).or_insert(Interval::point(0.));
+                        *sum = sum.add(value)?;
+                    }
+                    for (row, value) in row_values {
+                        let row_dual = -*duals.get(offset.checked_add(row)?)?;
+                        contribution = crate::core::rounding::add_down(
+                            contribution,
+                            value.scale(row_dual)?.lo,
+                        )?;
+                    }
+                    for arc_lower in &mut paired_arc_lower {
+                        *arc_lower = crate::core::rounding::add_down(*arc_lower, contribution)?;
+                    }
+                    continue;
                 }
                 if *mode == crate::graph::coupled::PairedResourceMode::Feasibility
                     && !oracle
@@ -2370,6 +2613,48 @@ fn coupled_lower_bounds<const D: usize>(
         } else {
             None
         };
+        let is_bounded = matches!(
+            definition,
+            CoupledResource::PairedPiecewiseLinear {
+                mode: crate::graph::coupled::PairedResourceMode::CostBounded,
+                ..
+            } | CoupledResource::SlopePaired {
+                mode: crate::graph::coupled::PairedResourceMode::CostBounded,
+                policy: crate::graph::coupled::FrontOperationPolicy::StrictDomain,
+                ..
+            }
+        );
+        let positive_direction = if is_bounded {
+            paired_cost_direction(
+                oracle,
+                resource,
+                objective_coefficient,
+                offset,
+                duals,
+                work,
+                deadline,
+            )?
+        } else {
+            None
+        };
+        let monotone_cost_bounded = positive_direction.is_some();
+        let mut max_growth = 0.0f64;
+        let mut max_lower = f64::NEG_INFINITY;
+        let mut max_upper = f64::INFINITY;
+        if monotone_cost_bounded {
+            max_upper = f64::NEG_INFINITY;
+            for arc_index in 0..graph.arcs.len() {
+                let (growth, lower, upper) =
+                    paired_bounded_step_envelope(definition, arc_index, work, deadline)?;
+                max_growth = max_growth.max(growth);
+                max_lower = max_lower.max(lower);
+                max_upper = max_upper.max(upper);
+            }
+            if !max_growth.is_finite() || !max_lower.is_finite() || !max_upper.is_finite() {
+                return None;
+            }
+        }
+        let mut terminal_arcs = Vec::new();
         for (arc_index, paired_arc_lower) in paired_arc_lower.iter_mut().enumerate() {
             let (lower_function, upper_function) = match definition {
                 CoupledResource::PairedPiecewiseLinear { arcs, .. } => {
@@ -2384,6 +2669,25 @@ fn coupled_lower_bounds<const D: usize>(
                         lo: low.lo,
                         hi: high.hi,
                     };
+                    if monotone_cost_bounded && graph.arcs.get(arc_index)?.head == graph.sink {
+                        let mut terminal_lower = 0.;
+                        add_paired_arc_contribution(
+                            oracle,
+                            offset,
+                            duals,
+                            resource,
+                            normalization,
+                            objective_coefficient,
+                            baseline,
+                            values,
+                            &mut terminal_lower,
+                        )?;
+                        terminal_arcs.push(PairedTerminalArcCharge {
+                            arc: arc_index,
+                            values,
+                            lower: terminal_lower,
+                        });
+                    }
                     add_paired_arc_contribution(
                         oracle,
                         offset,
@@ -2408,6 +2712,25 @@ fn coupled_lower_bounds<const D: usize>(
             if values.lo > values.hi {
                 return None;
             }
+            if monotone_cost_bounded && graph.arcs.get(arc_index)?.head == graph.sink {
+                let mut terminal_lower = 0.;
+                add_paired_arc_contribution(
+                    oracle,
+                    offset,
+                    duals,
+                    resource,
+                    normalization,
+                    objective_coefficient,
+                    baseline,
+                    values,
+                    &mut terminal_lower,
+                )?;
+                terminal_arcs.push(PairedTerminalArcCharge {
+                    arc: arc_index,
+                    values,
+                    lower: terminal_lower,
+                });
+            }
             add_paired_arc_contribution(
                 oracle,
                 offset,
@@ -2419,6 +2742,19 @@ fn coupled_lower_bounds<const D: usize>(
                 values,
                 paired_arc_lower,
             )?;
+        }
+        if monotone_cost_bounded && !terminal_arcs.is_empty() {
+            paired_terminal_charges.push(PairedTerminalCharge {
+                resource,
+                normalization,
+                objective_coefficient,
+                positive_direction: positive_direction?,
+                baseline,
+                max_growth,
+                max_lower,
+                max_upper,
+                terminals: terminal_arcs,
+            });
         }
     }
     let hops = graph.original_max_arcs();
@@ -2495,7 +2831,132 @@ fn coupled_lower_bounds<const D: usize>(
     for &(row, _) in &oracle.resource_groups {
         add_master_row_lower(offset, duals, row, Interval { lo: 0., hi: 1. }, &mut lower)?;
     }
-    Some((lower, paired_arc_lower))
+    Some((lower, paired_arc_lower, paired_terminal_charges))
+}
+
+/// Lower-bound every terminal value reachable through at most `hops` paired
+/// transitions when the cost-mode upper function is the unbounded sentinel.
+/// The transition's feasible value is at least both the increment/waiting
+/// recurrence and the lower function. Relaxing each over its complete encoded
+/// domain gives a route-independent recurrence; Unknown arithmetic keeps the
+/// caller on exhaustive path pricing.
+fn paired_terminal_lower_bound(
+    initial: &crate::graph::coupled::PiecewiseLinearFunction,
+    arcs: &[crate::graph::coupled::PairedResourceArc],
+    hops: usize,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<f64> {
+    let initial = piecewise_value_hull(initial, work, deadline)?;
+    let mut increment_lower = f64::INFINITY;
+    let mut lower_function_minimum = f64::INFINITY;
+    let mut minimum_waiting_delta = 0.0f64;
+
+    for arc in arcs {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        let arrival = piecewise_value_hull(&arc.arrival, work, deadline)?;
+        let increment = piecewise_value_hull(&arc.increment, work, deadline)?;
+        let lower = piecewise_value_hull(&arc.lower, work, deadline)?;
+        let lower_head = arc.lower.points.last()?.first().copied()?;
+        let upper_head = arc.upper.points.last()?.first().copied()?;
+        let maximum_head = lower_head.max(upper_head);
+        let maximum_wait = crate::core::rounding::add_up(maximum_head, -arrival.lo)?;
+        if maximum_wait < 0. {
+            return None;
+        }
+        let wait_delta = if arc.waiting < 0 {
+            crate::core::rounding::multiply_down(f64::from(arc.waiting), maximum_wait)?
+        } else {
+            0.0
+        };
+        increment_lower = increment_lower.min(increment.lo);
+        lower_function_minimum = lower_function_minimum.min(lower.lo);
+        minimum_waiting_delta = minimum_waiting_delta.min(wait_delta);
+    }
+
+    let delta_lower = crate::core::rounding::add_down(increment_lower, minimum_waiting_delta)?;
+    let mut current = initial.lo;
+    let mut terminal_lower = current;
+    for _ in 0..hops {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        let recurrence = crate::core::rounding::add_down(current, delta_lower)?;
+        current = recurrence.max(lower_function_minimum);
+        terminal_lower = terminal_lower.min(current);
+    }
+    terminal_lower.is_finite().then_some(terminal_lower)
+}
+
+/// A sentinel activity term is separable only when no other local column
+/// coefficient is accumulated into the same master row. The row's source sum
+/// is rounded before its dual multiplication, so combining it with route,
+/// arc, cut, or another activity term needs a joint rounding envelope.
+fn paired_activity_row_is_isolated<const D: usize>(
+    oracle: &Oracle<D>,
+    offset: usize,
+    row: usize,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<bool> {
+    let global_row = offset.checked_add(row)?;
+    for &(candidate_row, coefficient) in &oracle.route_entries {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        if candidate_row == global_row && coefficient != 0. {
+            return Some(false);
+        }
+    }
+    for &(candidate_row, coefficient) in oracle.network.route_entries.iter() {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        if candidate_row == row && coefficient != 0. {
+            return Some(false);
+        }
+    }
+    for entries in oracle.network.arc_entries.iter() {
+        for &(candidate_row, coefficient) in entries {
+            *work = work.checked_sub(1)?;
+            if Instant::now() >= deadline {
+                return None;
+            }
+            if candidate_row == row && coefficient != 0. {
+                return Some(false);
+            }
+        }
+    }
+    for &(_, candidate_row) in oracle
+        .nonlinear_rows
+        .iter()
+        .chain(&oracle.knapsack_rows)
+        .chain(&oracle.presence_rows)
+    {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        if candidate_row == row {
+            return Some(false);
+        }
+    }
+    for &(candidate_row, _) in &oracle.resource_groups {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        if candidate_row == row {
+            return Some(false);
+        }
+    }
+    Some(true)
 }
 
 fn add_master_row_lower(
@@ -2562,6 +3023,91 @@ fn add_paired_arc_contribution<const D: usize>(
     }
     *lower = crate::core::rounding::add_down(*lower, reduced.range(&domains)?.lo)?;
     Some(())
+}
+
+/// Tighten a monotone CostBounded paired reduced-cost charge. Its dependent
+/// value floor/ceiling applies to every continuation; the negative direction
+/// also uses the remaining-hop growth envelope. Taking the minimum improvement
+/// across feasible sink arcs keeps the correction valid when reachability is
+/// unresolved.
+fn paired_prefix_terminal_correction<const D: usize>(
+    graph: &crate::graph::Graph<D>,
+    charges: &[PairedTerminalCharge],
+    domains: &[PairedPrefixDomain],
+    oracle: &Oracle<D>,
+    offset: usize,
+    duals: &[f64],
+    remaining: usize,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<f64> {
+    let mut total = 0.;
+    for charge in charges {
+        let Some(domain) = domains
+            .iter()
+            .find(|domain| domain.resource == charge.resource)
+        else {
+            continue;
+        };
+        let mut minimum = f64::INFINITY;
+        for terminal in &charge.terminals {
+            let contribution_work = oracle.activity_rows.len().checked_add(1)?;
+            *work = work.checked_sub(contribution_work)?;
+            if Instant::now() >= deadline || graph.arcs.get(terminal.arc)?.head != graph.sink {
+                return None;
+            }
+            // This terminal arc cannot complete the current state when its
+            // upper envelope lies below the prefix's dependent-value floor.
+            if domain.dependent_lower > terminal.values.hi {
+                continue;
+            }
+            let values = if charge.positive_direction {
+                Interval {
+                    lo: terminal.values.lo.max(domain.dependent_lower),
+                    hi: terminal.values.hi,
+                }
+            } else {
+                let hops = u32::try_from(remaining).ok()?;
+                let growth = multiply_upper_nonnegative(charge.max_growth, f64::from(hops))?;
+                let recurrence = crate::core::rounding::add_up(domain.dependent_upper, growth)?;
+                let terminal_upper = recurrence
+                    .max(charge.max_lower)
+                    .min(charge.max_upper)
+                    .min(terminal.values.hi);
+                if terminal_upper < terminal.values.lo {
+                    continue;
+                }
+                Interval {
+                    lo: terminal.values.lo,
+                    hi: terminal_upper,
+                }
+            };
+            let mut tightened = 0.;
+            add_paired_arc_contribution(
+                oracle,
+                offset,
+                duals,
+                charge.resource,
+                charge.normalization,
+                charge.objective_coefficient,
+                charge.baseline,
+                values,
+                &mut tightened,
+            )?;
+            let delta = crate::core::rounding::add_down(tightened, -terminal.lower)?;
+            if delta < 0. {
+                // Arithmetic did not prove a nonnegative improvement; skip
+                // this resource's refinement while retaining the base bound.
+                minimum = 0.;
+                break;
+            }
+            minimum = minimum.min(delta);
+        }
+        if minimum.is_finite() {
+            total = crate::core::rounding::add_down(total, minimum)?;
+        }
+    }
+    Some(total)
 }
 
 /// Directed enclosure of every value on a prepared raw-slope function.
@@ -2878,7 +3424,7 @@ fn physical_suffix_bounds<const D: usize>(
         }
         costs
     };
-    let (other_coupled_lower, paired_arc_lower) =
+    let (other_coupled_lower, paired_arc_lower, paired_terminal_charges) =
         coupled_lower_bounds(oracle, offset, duals, work, deadline)?;
     let hops = graph.original_max_arcs();
     // A paired objective or activity is charged once at the terminal state.
@@ -2902,6 +3448,7 @@ fn physical_suffix_bounds<const D: usize>(
         arc_costs,
         route_constant,
         other_coupled_lower,
+        paired_terminal_charges,
     })
 }
 
@@ -3168,6 +3715,408 @@ fn extend_bounded_walk_resources<const D: usize>(
     ))
 }
 
+#[derive(Clone, Copy)]
+struct PairedPrefixDomain {
+    resource: usize,
+    base: Interval,
+    dependent_lower: f64,
+    dependent_upper: f64,
+}
+
+fn paired_prefix_roots<const D: usize>(
+    graph: &crate::graph::Graph<D>,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<Vec<PairedPrefixDomain>> {
+    let kernel = graph.coupled_kernel()?;
+    let mut roots = Vec::new();
+    for (resource, definition) in kernel.definitions().iter().enumerate() {
+        let (initial_base, dependent) = match definition {
+            CoupledResource::PairedPiecewiseLinear {
+                initial,
+                initial_base,
+                ..
+            } => (
+                *initial_base,
+                piecewise_value_range(
+                    initial,
+                    Interval {
+                        lo: initial_base.lower,
+                        hi: initial_base.upper,
+                    },
+                    work,
+                    deadline,
+                )?,
+            ),
+            CoupledResource::SlopePaired {
+                initial,
+                initial_base,
+                policy: crate::graph::coupled::FrontOperationPolicy::StrictDomain,
+                ..
+            } => (
+                *initial_base,
+                slope_value_range(
+                    initial,
+                    Interval {
+                        lo: initial_base.lower,
+                        hi: initial_base.upper,
+                    },
+                    work,
+                    deadline,
+                )?,
+            ),
+            // Endpoint-tolerant raw functions may admit departures just
+            // outside the stored domain. Keep them out of this exact filter.
+            CoupledResource::SlopePaired { .. } => continue,
+            _ => continue,
+        };
+        roots.push(PairedPrefixDomain {
+            resource,
+            base: Interval {
+                lo: initial_base.lower,
+                hi: initial_base.upper,
+            },
+            dependent_lower: dependent.lo,
+            dependent_upper: dependent.hi,
+        });
+    }
+    Some(roots)
+}
+
+/// Overapproximate the paired base values and lower-bound dependent values
+/// reachable after one arc. The recurrence is necessary for every source
+/// control: Gamma' >= max(Gamma + increment + waiting, lower), Gamma' <=
+/// upper. Function hulls relax base/Gamma correlations; an empty relaxed
+/// intersection therefore proves infeasibility. Failed arithmetic disables
+/// only this branch's filter.
+fn extend_paired_prefix_domains<const D: usize>(
+    graph: &crate::graph::Graph<D>,
+    arc_index: usize,
+    current: &[PairedPrefixDomain],
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<Option<Vec<PairedPrefixDomain>>> {
+    let kernel = graph.coupled_kernel()?;
+    let mut next = Vec::with_capacity(current.len());
+    for &domain in current {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        let definition = kernel.definitions().get(domain.resource)?;
+        let (
+            arrival_at_lower_departure,
+            arrival_function_lower,
+            head,
+            increment,
+            lower,
+            upper,
+            waiting,
+            unbounded_upper,
+        ) = match definition {
+            CoupledResource::PairedPiecewiseLinear { arcs, mode, .. } => {
+                let arc = arcs.get(arc_index)?;
+                let departure = intersect_domains(
+                    domain.base,
+                    piecewise_domain(&arc.arrival)?,
+                    piecewise_domain(&arc.increment)?,
+                );
+                let Some(departure) = departure else {
+                    return Some(None);
+                };
+                let head = intersect_head_domains(
+                    piecewise_domain(&arc.lower)?,
+                    piecewise_domain(&arc.upper)?,
+                );
+                let Some(head) = head else {
+                    return Some(None);
+                };
+                let Some(arrival_at_lower_departure) =
+                    piecewise_eval_validated(&arc.arrival, departure.lo)
+                else {
+                    return None;
+                };
+                let reachable_head = Interval {
+                    lo: arrival_at_lower_departure.max(head.lo),
+                    hi: head.hi,
+                };
+                if reachable_head.lo > reachable_head.hi {
+                    return Some(None);
+                }
+                let increment = piecewise_value_range(&arc.increment, departure, work, deadline)?;
+                let lower = piecewise_value_range(&arc.lower, reachable_head, work, deadline)?;
+                let upper = piecewise_value_range(&arc.upper, reachable_head, work, deadline)?;
+                let unbounded_upper = *mode
+                    == crate::graph::coupled::PairedResourceMode::CostUnbounded
+                    && arc
+                        .upper
+                        .points
+                        .first()
+                        .is_some_and(|point| point[1] >= 1e12);
+                (
+                    arrival_at_lower_departure,
+                    arrival_at_lower_departure,
+                    head,
+                    increment,
+                    lower,
+                    upper,
+                    arc.waiting,
+                    unbounded_upper,
+                )
+            }
+            CoupledResource::SlopePaired {
+                arcs,
+                policy: crate::graph::coupled::FrontOperationPolicy::StrictDomain,
+                ..
+            } => {
+                let arc = arcs.get(arc_index)?;
+                let departure = intersect_domains(
+                    domain.base,
+                    slope_domain(&arc.arrival)?,
+                    slope_domain(&arc.increment)?,
+                );
+                let Some(departure) = departure else {
+                    return Some(None);
+                };
+                let head =
+                    intersect_head_domains(slope_domain(&arc.lower)?, slope_domain(&arc.upper)?);
+                let Some(head) = head else {
+                    return Some(None);
+                };
+                let Some(arrival_at_lower_departure) = slope_value_range(
+                    &arc.arrival,
+                    Interval {
+                        lo: departure.lo,
+                        hi: departure.lo,
+                    },
+                    work,
+                    deadline,
+                )
+                .map(|range| range.lo) else {
+                    return None;
+                };
+                let reachable_head = Interval {
+                    lo: arrival_at_lower_departure.max(head.lo),
+                    hi: head.hi,
+                };
+                if reachable_head.lo > reachable_head.hi {
+                    return Some(None);
+                }
+                let increment = slope_value_range(&arc.increment, departure, work, deadline)?;
+                let lower = slope_value_range(&arc.lower, reachable_head, work, deadline)?;
+                let upper = slope_value_range(&arc.upper, reachable_head, work, deadline)?;
+                let unbounded_upper = false;
+                (
+                    arrival_at_lower_departure,
+                    arrival_at_lower_departure,
+                    head,
+                    increment,
+                    lower,
+                    upper,
+                    arc.waiting,
+                    unbounded_upper,
+                )
+            }
+            // The root constructor only installs supported paired domains.
+            _ => return None,
+        };
+        if arrival_at_lower_departure > head.hi {
+            return Some(None);
+        }
+        let maximum_wait = crate::core::rounding::add_up(head.hi, -arrival_function_lower)?;
+        if maximum_wait < 0. {
+            return Some(None);
+        }
+        let waiting_lower = if waiting < 0 {
+            crate::core::rounding::multiply_down(f64::from(waiting), maximum_wait)?
+        } else {
+            0.
+        };
+        let increment_lower = crate::core::rounding::add_down(increment.lo, waiting_lower)?;
+        let recurrence_lower =
+            crate::core::rounding::add_down(domain.dependent_lower, increment_lower)?;
+        let dependent_lower = recurrence_lower.max(lower.lo);
+        if !unbounded_upper && dependent_lower > upper.hi {
+            return Some(None);
+        }
+        let waiting_increase = if waiting > 0 {
+            multiply_upper_nonnegative(f64::from(waiting), maximum_wait.max(0.))?
+        } else {
+            0.
+        };
+        let recurrence_upper = crate::core::rounding::add_up(
+            crate::core::rounding::add_up(domain.dependent_upper, increment.hi)?,
+            waiting_increase,
+        )?
+        .max(lower.hi);
+        let dependent_upper = if unbounded_upper {
+            recurrence_upper
+        } else {
+            recurrence_upper.min(upper.hi)
+        };
+        next.push(PairedPrefixDomain {
+            resource: domain.resource,
+            base: Interval {
+                lo: arrival_at_lower_departure.max(head.lo),
+                hi: head.hi,
+            },
+            dependent_lower,
+            dependent_upper,
+        });
+    }
+    Some(Some(next))
+}
+
+fn intersect_domains(current: Interval, first: (f64, f64), second: (f64, f64)) -> Option<Interval> {
+    let lower = current.lo.max(first.0).max(second.0);
+    let upper = current.hi.min(first.1).min(second.1);
+    (lower <= upper).then_some(Interval {
+        lo: lower,
+        hi: upper,
+    })
+}
+
+fn intersect_head_domains(first: (f64, f64), second: (f64, f64)) -> Option<Interval> {
+    let lower = first.0.max(second.0);
+    let upper = first.1.min(second.1);
+    (lower <= upper).then_some(Interval {
+        lo: lower,
+        hi: upper,
+    })
+}
+
+fn piecewise_domain(
+    function: &crate::graph::coupled::PiecewiseLinearFunction,
+) -> Option<(f64, f64)> {
+    Some((
+        function.points.first()?.first().copied()?,
+        function.points.last()?.first().copied()?,
+    ))
+}
+
+fn piecewise_eval_validated(
+    function: &crate::graph::coupled::PiecewiseLinearFunction,
+    argument: f64,
+) -> Option<f64> {
+    let points = &function.points;
+    let first = points.first()?;
+    let last = points.last()?;
+    if !argument.is_finite() || argument < first[0] || argument > last[0] {
+        return None;
+    }
+    let upper = points.partition_point(|point| point[0] < argument);
+    let point = points.get(upper)?;
+    if point[0] == argument {
+        return Some(point[1]);
+    }
+    let left = points.get(upper.checked_sub(1)?)?;
+    let span = argument - left[0];
+    let width = point[0] - left[0];
+    let rise = point[1] - left[1];
+    if !span.is_finite() || !width.is_finite() || !rise.is_finite() {
+        return None;
+    }
+    let fraction = span / width;
+    let scaled = fraction * rise;
+    let value = left[1] + scaled;
+    (fraction.is_finite() && scaled.is_finite() && value.is_finite())
+        .then(|| value.clamp(left[1].min(point[1]), left[1].max(point[1])))
+}
+
+/// Exact hull of the validated knot evaluator on a closed subdomain. The
+/// evaluator is monotone on each segment and clamps rounded interpolation to
+/// its segment endpoints, so extrema occur at the query endpoints or knots.
+fn piecewise_value_range(
+    function: &crate::graph::coupled::PiecewiseLinearFunction,
+    domain: Interval,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<Interval> {
+    let (lower, upper) = piecewise_domain(function)?;
+    if domain.lo < lower || domain.hi > upper || domain.lo > domain.hi {
+        return None;
+    }
+    *work = work.checked_sub(2)?;
+    if Instant::now() >= deadline {
+        return None;
+    }
+    let mut lo = piecewise_eval_validated(function, domain.lo)?;
+    let mut hi = piecewise_eval_validated(function, domain.hi)?;
+    if lo > hi {
+        std::mem::swap(&mut lo, &mut hi);
+    }
+    for point in &function.points {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        if domain.lo <= point[0] && point[0] <= domain.hi {
+            lo = lo.min(point[1]);
+            hi = hi.max(point[1]);
+        }
+    }
+    Some(Interval { lo, hi })
+}
+
+/// Directed hull of a prepared raw-slope evaluator over a subdomain. The
+/// function is affine between stored coordinates; interval replay preserves
+/// each sequential segment operation and encloses rounded endpoint values.
+fn slope_value_range(
+    function: &crate::graph::coupled::PreparedSlopeFunction,
+    domain: Interval,
+    work: &mut usize,
+    deadline: Instant,
+) -> Option<Interval> {
+    let pairs = function.pairs();
+    let &(initial, start) = pairs.first()?;
+    let end = pairs.last()?.1;
+    if domain.lo < start || domain.hi > end || domain.lo > domain.hi {
+        return None;
+    }
+    if pairs.len() == 1 {
+        return (domain.lo == start && domain.hi == start).then_some(Interval::point(initial));
+    }
+    let mut value = Interval::point(initial);
+    let mut previous = start;
+    let mut hull = Interval {
+        lo: f64::INFINITY,
+        hi: f64::NEG_INFINITY,
+    };
+    for &(slope, segment_end) in pairs.iter().skip(1) {
+        *work = work.checked_sub(1)?;
+        if Instant::now() >= deadline {
+            return None;
+        }
+        let clipped_lo = domain.lo.max(previous);
+        let clipped_hi = domain.hi.min(segment_end);
+        if clipped_lo <= clipped_hi {
+            let lo_span = clipped_lo - previous;
+            let hi_span = clipped_hi - previous;
+            if !lo_span.is_finite() || !hi_span.is_finite() {
+                return None;
+            }
+            let lo_value = value.add(Interval::point(slope).multiply(Interval::point(lo_span))?)?;
+            let hi_value = value.add(Interval::point(slope).multiply(Interval::point(hi_span))?)?;
+            hull.lo = hull.lo.min(lo_value.lo).min(hi_value.lo);
+            hull.hi = hull.hi.max(lo_value.hi).max(hi_value.hi);
+            if domain.hi <= segment_end {
+                break;
+            }
+        }
+        let span = segment_end - previous;
+        if !span.is_finite() || span <= 0. {
+            return None;
+        }
+        value = value.add(Interval::point(slope).multiply(Interval::point(span))?)?;
+        previous = segment_end;
+    }
+    (hull.lo.is_finite() && hull.hi.is_finite()).then_some(hull)
+}
+
+fn slope_domain(function: &crate::graph::coupled::PreparedSlopeFunction) -> Option<(f64, f64)> {
+    Some(function.domain())
+}
+
 fn branch_and_bound_price<const D: usize>(
     state: &State<D>,
     index: usize,
@@ -3248,6 +4197,7 @@ fn branch_and_bound_price<const D: usize>(
         remaining: usize,
         prefix: f64,
         resources: crate::graph::ResourceValues<D>,
+        paired_base_domains: Option<Vec<PairedPrefixDomain>>,
         path_len: usize,
         next_arc: usize,
         entered: bool,
@@ -3257,6 +4207,7 @@ fn branch_and_bound_price<const D: usize>(
         remaining: hops,
         prefix: 0.,
         resources: initial_resources,
+        paired_base_domains: paired_prefix_roots(graph, work, state.deadline),
         path_len: 0,
         next_arc: 0,
         entered: false,
@@ -3363,9 +4314,28 @@ fn branch_and_bound_price<const D: usize>(
             ) else {
                 return Some(Ok((routes, global_lower_bound)));
             };
-            let Some(bound) = crate::core::rounding::add_down(prefix_tail, constant) else {
+            let Some(mut bound) = crate::core::rounding::add_down(prefix_tail, constant) else {
                 return Some(Ok((routes, global_lower_bound)));
             };
+            if let Some(domains) = frame.paired_base_domains.as_deref() {
+                let Some(correction) = paired_prefix_terminal_correction(
+                    graph,
+                    &physical.paired_terminal_charges,
+                    domains,
+                    oracle,
+                    state.shared_offset,
+                    duals,
+                    frame.remaining,
+                    work,
+                    state.deadline,
+                ) else {
+                    return Some(Ok((routes, global_lower_bound)));
+                };
+                let Some(refined) = crate::core::rounding::add_down(bound, correction) else {
+                    return Some(Ok((routes, global_lower_bound)));
+                };
+                bound = refined;
+            }
             if bound >= 0. {
                 minimum = minimum.min(bound);
                 pop_frame(&mut stack, &mut path, &mut visited_vertices);
@@ -3400,7 +4370,7 @@ fn branch_and_bound_price<const D: usize>(
             }
             stack[top].entered = true;
         }
-        let (arc, prefix, resources, path_len, remaining) = {
+        let (arc, prefix, resources, paired_base_domains, path_len, remaining) = {
             let frame = &mut stack[top];
             let Some(&arc) = outgoing
                 .get(frame.vertex)
@@ -3414,6 +4384,7 @@ fn branch_and_bound_price<const D: usize>(
                 arc,
                 frame.prefix,
                 frame.resources,
+                frame.paired_base_domains.clone(),
                 frame.path_len,
                 frame.remaining,
             )
@@ -3439,6 +4410,18 @@ fn branch_and_bound_price<const D: usize>(
         let Some(next_resources) = next_resources else {
             continue;
         };
+        let paired_base_domains = match paired_base_domains {
+            Some(current) => {
+                match extend_paired_prefix_domains(graph, arc, &current, work, state.deadline) {
+                    Some(Some(next)) => Some(next),
+                    Some(None) => continue,
+                    // Numerical uncertainty is not infeasibility. Disable only
+                    // paired-base pruning below this prefix.
+                    None => None,
+                }
+            }
+            None => None,
+        };
         let Some(prefix) = crate::core::rounding::add_down(prefix, physical.arc_costs[arc]) else {
             return Some(Ok((routes, global_lower_bound)));
         };
@@ -3452,6 +4435,7 @@ fn branch_and_bound_price<const D: usize>(
             remaining: remaining - 1,
             prefix,
             resources: next_resources,
+            paired_base_domains,
             path_len: path.len(),
             next_arc: 0,
             entered: false,
