@@ -2989,3 +2989,54 @@ fn narrow_dyadic_domains_recover_exact_three_copy_gamma_totals() {
         assert!(controls.iter().all(|values| values.len() > 1));
     }
 }
+
+#[test]
+fn narrow_fractional_domains_recover_exact_three_copy_gamma_totals() {
+    use baldes::master::tree::{ModelTreeOptions, TreeStatus};
+
+    let mut source: serde_json::Value = serde_json::from_str(include_str!(
+        "../../fixtures/coupled/dyadic-narrow-interior-model.json"
+    ))
+    .unwrap();
+    let expected_gamma = 1.0333333333333333_f64 - 1.;
+    let expected_total = expected_gamma * 3.;
+    source["rows"][0]["rhs"] = (expected_total * 2.).into();
+    for network in source["networks"].as_array_mut().unwrap() {
+        network["coupled_resources"][0]["initial_base"]["lower"] = 1.03.into();
+        network["coupled_resources"][0]["initial_base"]["upper"] = 1.04.into();
+    }
+    let source = source.to_string();
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let (problem, registry) = model::format::Model::from_json(&source)
+            .unwrap()
+            .compile::<2>()
+            .unwrap();
+        let mut options = ModelTreeOptions::default();
+        options.node.cg.stabilize = false;
+        options.node.cg.bound_mode = mode;
+        registry.configure_tree(&mut options).unwrap();
+        let tree = baldes::master::tree::solve(problem, options).unwrap();
+        assert_eq!(tree.status, TreeStatus::Optimal, "{tree:?}");
+        assert_eq!(tree.incumbent, -24.);
+        let mut quantities = [0., 0.];
+        let mut totals = [0., 0.];
+        let mut controls = [
+            std::collections::BTreeSet::new(),
+            std::collections::BTreeSet::new(),
+        ];
+        for fixed in &tree.routes {
+            let index = usize::from(fixed.route.network == 7);
+            let gamma = fixed.route.route.coupled_values[0].1;
+            assert!((0.03..=0.04).contains(&gamma));
+            quantities[index] += fixed.quantity;
+            totals[index] += fixed.quantity * gamma;
+            controls[index].insert(gamma.to_bits());
+        }
+        assert_eq!(quantities, [3., 3.]);
+        assert_eq!(totals, [expected_total, expected_total]);
+        assert!(controls
+            .iter()
+            .flatten()
+            .any(|&bits| f64::from_bits(bits) == expected_gamma));
+    }
+}

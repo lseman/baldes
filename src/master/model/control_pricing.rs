@@ -416,7 +416,13 @@ pub(super) fn repair_witness<const D: usize>(
     let mut witness = state.fixed_routes.clone();
     let mut alternatives = vec![];
     for ((network, arcs), (quantity, fractional, routes)) in groups {
-        if !fractional {
+        // Integer-tolerance path counts can still carry a fractional paired
+        // control. Reconstruct source controls before trusting their rows.
+        if !fractional
+            && routes
+                .iter()
+                .all(|route| route.route.route.coupled_controls.is_empty())
+        {
             witness.extend(routes);
             continue;
         }
