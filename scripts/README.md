@@ -17,6 +17,26 @@ into `target/baldes-build`. No prebuilt executable is needed in this directory.
 | `python3 scripts/setup/get_instances.py` | Download and extract CVRPLIB instance sets into `instances/`; requires `7z`. Use `--dry-run` to list downloads. |
 | `python3 scripts/setup/gurobi_downloader` | Download and verify a stable Gurobi Linux release into `external/`. Use `--help` for version, platform, and destination options. |
 
+## Synthetic stochastic-demand instances
+
+`python3 scripts/generate_stochastic_instances.py` creates 440 NEW symmetric
+CVRPSD instances using the generation rules of Salavati-Khoshghalb et al.
+The output is `instances/stochastic/generated_salavati_style/` (ignored by Git),
+with seeds, SHA-256 manifest, CSV index, and source/rounding metadata. These are
+synthetic replications of the experimental design, not recovered published
+benchmark files. `--help` lists options. Run
+`python3 scripts/tests/test_generate_stochastic_instances.py` for checks.
+
+The `stochastic_instance` example (`features=clp`) validates a generated JSON
+file through the actual BALDES constructors; add `--solve` to run numerical
+branch-and-price. Use `ng-memory-31` for the 19/29-customer cases and
+`ng-memory-63` for the complete grid.
+
+The paper's BC-Theta comparison is implemented in
+`benchmarks/stochastic_branch_cut.py` using gurobipy. The paired runner is
+`benchmarks/compare_stochastic.py`. See `docs/benchmarks/stochastic.md` for the
+implemented equations, separation differences, licensing and fair timing scope.
+
 ## Benchmarks
 
 Requires a built solver with the appropriate backend/features. JavaScript

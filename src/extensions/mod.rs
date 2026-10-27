@@ -14,3 +14,5 @@ pub mod pstep;
 pub mod robust;
 /// One-to-one robust pickup and delivery with time windows.
 pub mod robust_pd;
+/// Stochastic demands with replenishment recourse and a tiny exact baseline.
+pub mod stochastic;

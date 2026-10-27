@@ -47,9 +47,15 @@ impl<T: Any + Debug + Send + Sync + PartialEq> PluginValue for T {
 /// they never prove infeasibility. Objective costs require explicit opt-in.
 pub trait CoupledPlugin: Debug + Send + Sync {
     /// Whether this resource contributes an objective. Cost-bearing plugins
-    /// use equality-only dominance, canonical suffix replay for joins, and no
+    /// default to equality dominance, canonical suffix replay for joins, and no
     /// generic objective bounds or directed cost certification.
     fn has_costs(&self) -> bool {
+        false
+    }
+    /// Opt into `dominates` for objective-bearing states. The implementation
+    /// must also guarantee a no-greater objective after every common feasible
+    /// completion, independently of the scalar arc objective. Default: equality.
+    fn supports_cost_dominance(&self) -> bool {
         false
     }
     /// Accumulated resource objective in this directional state. Must be zero

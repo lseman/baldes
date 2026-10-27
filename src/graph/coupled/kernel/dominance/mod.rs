@@ -397,7 +397,7 @@ impl CoupledKernel {
                 .zip(&b.plugins)
                 .zip(&self.plugins)
                 .all(|((a, b), plugin)| {
-                    if plugin.0.has_costs() {
+                    if plugin.0.has_costs() && !plugin.0.supports_cost_dominance() {
                         a == b
                     } else {
                         plugin.0.dominates(a, b, forward)

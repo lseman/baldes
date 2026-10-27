@@ -252,3 +252,16 @@ path = "tests/pricing/pstep_vrptw.rs"
 name = "synchronization"
 path = "tests/master/synchronization.rs"
 required-features = ["clp"]
+
+[[test]]
+name = "stochastic"
+path = "tests/extensions/stochastic.rs"
+
+[[test]]
+name = "stochastic_pricing"
+path = "tests/extensions/stochastic_pricing.rs"
+
+[[example]]
+name = "stochastic_instance"
+path = "examples/stochastic_instance.rs"
+required-features = ["clp"]
