@@ -32,6 +32,22 @@ pub fn parse_solution(text: &str) -> Result<Vec<Vec<usize>>, String> {
 /// Check coverage, fleet, capacity, service-start windows and depot return;
 /// return the recomputed distance. No rounding is applied to the total.
 pub fn validate_plan(instance: &Instance, routes: &[Vec<usize>]) -> Result<f64, String> {
+    validate_plan_with_fleet(instance, routes, true)
+}
+
+/// Replay all constraints except the fleet bound while repairing a clustered plan.
+pub(super) fn validate_plan_relaxed_fleet(
+    instance: &Instance,
+    routes: &[Vec<usize>],
+) -> Result<f64, String> {
+    validate_plan_with_fleet(instance, routes, false)
+}
+
+fn validate_plan_with_fleet(
+    instance: &Instance,
+    routes: &[Vec<usize>],
+    enforce_fleet: bool,
+) -> Result<f64, String> {
     if instance.customers.len() < 2 || routes.is_empty() {
         return Err("a solution needs customers and routes".into());
     }
@@ -56,7 +72,9 @@ pub fn validate_plan(instance: &Instance, routes: &[Vec<usize>]) -> Result<f64, 
     {
         return Err("invalid instance data or distance matrix dimensions".into());
     }
-    if instance.vehicles > 0 && routes.iter().filter(|r| !r.is_empty()).count() > instance.vehicles
+    if enforce_fleet
+        && instance.vehicles > 0
+        && routes.iter().filter(|r| !r.is_empty()).count() > instance.vehicles
     {
         return Err("solution exceeds the available fleet".into());
     }

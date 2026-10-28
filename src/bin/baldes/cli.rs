@@ -509,7 +509,8 @@ fn solve_routing(kind: String, file: String, args: Vec<String>) -> Result<(), St
     }
     if (hgs_extension.get_bks
         || hgs_extension.initial_solution.is_some()
-        || hgs_extension.intensify)
+        || hgs_extension.intensify
+        || hgs_extension.dri)
         && !rounding_specified
     {
         rounding = None;

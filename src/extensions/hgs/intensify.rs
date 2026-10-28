@@ -29,6 +29,8 @@ pub struct IntensifyOptions {
     /// Jobs selected from each solution snapshot; 0 selects `workers`. Set a
     /// fixed width when comparing serial and parallel execution of equal work.
     pub batch_size: usize,
+    /// Rank nearby routes using the paper's spatial-temporal-demand score.
+    pub std_similarity: bool,
     /// Maximum routes selected per round (at least two).
     pub max_routes: usize,
     /// Maximum selected customers. A single oversized seed route is skipped.
@@ -52,6 +54,7 @@ impl Default for IntensifyOptions {
             rounds: 1000,
             workers: 1,
             batch_size: 0,
+            std_similarity: false,
             max_routes: 8,
             max_customers: 300,
             subproblem: HgsOptions {
@@ -191,9 +194,13 @@ fn select_routes(
                     .flat_map(|k| {
                         let a = route[k * route.len() / route.len().min(4)];
                         plan.routes[i].iter().map(move |&b| {
-                            instance
-                                .distance(a, b, instance.rounding)
-                                .min(instance.distance(b, a, instance.rounding))
+                            if options.std_similarity {
+                                std_dissimilarity(instance, a, b)
+                            } else {
+                                instance
+                                    .distance(a, b, instance.rounding)
+                                    .min(instance.distance(b, a, instance.rounding))
+                            }
                         })
                     })
                     .fold(f64::INFINITY, f64::min);
@@ -217,6 +224,28 @@ fn select_routes(
     }
     selected.sort_unstable();
     selected
+}
+
+// Equations 11–14, using travel cost as the spatial metric. Unconstrained
+// instances use the limiting temporal factor of one.
+pub(super) fn std_dissimilarity(instance: &Instance, a: usize, b: usize) -> f64 {
+    let depot = &instance.customers[0];
+    let horizon = depot.due - depot.ready;
+    let directed = |i: usize, j: usize| {
+        let from = &instance.customers[i];
+        let to = &instance.customers[j];
+        let distance = instance.distance(i, j, instance.rounding);
+        let temporal =
+            if horizon.is_finite() && horizon > 0.0 && from.due.is_finite() && to.due.is_finite() {
+                let flexibility = to.due - (from.ready + from.service + distance);
+                let waiting = (to.ready - (from.due + from.service + distance)).max(0.0);
+                2.0 - (flexibility - waiting) / horizon
+            } else {
+                1.0
+            };
+        distance * (temporal + (from.demand + to.demand) / instance.capacity)
+    };
+    directed(a, b).min(directed(b, a))
 }
 
 fn subproblem(

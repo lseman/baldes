@@ -693,6 +693,14 @@ fn hgs_extension_flags_reject_conflicts_before_network_access() {
         ),
         (vec!["solve", "missing.txt", "--get-bks"], "require hgs"),
         (
+            vec!["hgs", "missing.txt", "--dri", "--intensify"],
+            "conflicts",
+        ),
+        (
+            vec!["hgs", "missing.txt", "--dri", "--threshold", "0.1"],
+            "require --intensify",
+        ),
+        (
             vec![
                 "hgs",
                 "missing.txt",
@@ -715,6 +723,53 @@ fn hgs_extension_flags_reject_conflicts_before_network_access() {
     assert!(output.status.success());
     let help = String::from_utf8_lossy(&output.stdout);
     assert!(help.contains("--get-bks") && help.contains("--intensify"));
+}
+
+#[test]
+fn hgs_dri_clusters_a_small_instance_and_writes_a_feasible_result() {
+    let directory = std::env::temp_dir().join(format!("baldes-cli-dri-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let instance_path = directory.join("tiny.txt");
+    let output_path = directory.join("best.sol");
+    std::fs::write(&instance_path, "tiny\nVEHICLE\nNUMBER CAPACITY\n4 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000 0\n1 1 0 1 0 1000 0\n2 2 0 1 0 1000 0\n3 9 0 1 0 1000 0\n4 10 0 1 0 1000 0\n").unwrap();
+    let output = command()
+        .arg("hgs")
+        .arg(&instance_path)
+        .args([
+            "--dri",
+            "--workers",
+            "2",
+            "--subproblem-customers",
+            "2",
+            "--time",
+            "2",
+            "--population-size",
+            "3",
+            "--nb-iter",
+            "10",
+            "--json",
+            "-",
+        ])
+        .arg("--solution-output")
+        .arg(&output_path)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let plan = baldes::extensions::hgs::solution::parse_solution(
+        &std::fs::read_to_string(&output_path).unwrap(),
+    )
+    .unwrap();
+    let instance = baldes::inputs::Instance::read(&instance_path).unwrap();
+    assert_eq!(
+        baldes::extensions::hgs::solution::validate_plan(&instance, &plan).unwrap(),
+        report["cost"].as_f64().unwrap()
+    );
+    std::fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]

@@ -36,6 +36,13 @@ Route indices are BALDES customer indices, starting at 1, with depot 0 omitted.
 ordinary HGS for up to 10% of the search time (at most five seconds); providing
 a BKS avoids full-instance HGS setup on large instances. Its steps are:
 
+`--std-similarity` optionally ranks route neighbors using the spatial–temporal–
+demand formula in equations 11–14 of Kerscher and Minner, using the instance's
+travel distance as spatial cost. Infinite time windows use a neutral temporal
+factor. This changes route selection; it does not implement the paper's customer
+clustering or its cross-cluster improvement phase.
+The separate [`--dri` customer-clustering mode](hgs-dri.md) provides those phases.
+
 1. Choose a random anchor route and nearby routes, measured by minimum distance
    from up to four anchor customers. Every fifth round chooses random neighbors.
    Neighborhoods expand from two routes during stagnation, bounded by
@@ -141,6 +148,22 @@ generation counts match before reporting speedup. It records binary and seed
 hashes and refuses comparisons that did not complete the round budget. It uses
 an existing local seed, keeping downloading outside the measured runs.
 
+On October 28, 2026, the command above with 300 non-improving HGS iterations,
+population 12 and seed 7 completed 24 subproblem solves on `XL-n2121-k186` using
+an AMD Ryzen 9 9950X (16 cores, 32 logical CPUs). Three repetitions per worker
+count, using the release CLI, gave these median wall times:
+
+| Workers | Seconds | Speedup over one worker |
+| --- | --- | --- |
+| 1 | 1.2601 | 1.00× |
+| 2 | 0.7202 | 1.75× |
+| 4 | 0.3838 | 3.28× |
+
+All runs produced identical routes, cost (283,097), and generation counts. This
+measures execution speed on a fixed search workload, not an improvement to the
+published BKS or a claim about time-to-improvement. Local raw measurements and
+binary/seed hashes are in `results/hgs-intensify-workers-20261028.json`.
+
 No HGS GPU option is exposed. BALDES's existing `cuda` feature accelerates
 p-step pricing, whose short-path enumeration is a different algorithm from HGS
 local search and genetic population management. Enabling it does not accelerate
@@ -149,3 +172,21 @@ evaluation, CPU/GPU agreement on capacity/time-window feasibility and rounding,
 and a measured improvement in total solve time including transfers. No GPU
 speedup is claimed. Independent CPU subproblems are the implemented parallel
 backend; a GPU backend remains a separate, evidence-dependent extension.
+
+## Validation
+
+```sh
+cargo fmt -p baldes --check
+cargo clippy -p baldes --features clp --bin baldes --offline
+cargo test -p baldes --features clp --offline --lib extensions::hgs::intensify
+cargo test -p baldes --features clp --offline --test hgs_driver --test hgs_e2e --test cli hgs
+python3 -m unittest discover -s scripts/tests -p test_get_bks.py
+```
+
+These checks passed: 12 algorithm unit tests, 12 focused CLI/HGS integration
+tests and three downloader tests. Clippy reports existing repository warnings.
+Live `--get-bks --intensify` smoke runs preserved feasible BKSs for both
+`XL-n2121-k186` and `C101`. The default-feature library test build was also
+attempted; unrelated coupled-kernel/robust-PD tests require unavailable
+feature-gated APIs and serde_json, so the successful library validation used
+`clp` as shown above.

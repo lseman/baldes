@@ -305,6 +305,26 @@ fn parallel_selection_excludes_already_assigned_routes() {
 }
 
 #[test]
+fn std_similarity_penalizes_temporal_incompatibility_and_demand() {
+    let mut data = instance();
+    data.capacity = 10.0;
+    for c in &mut data.customers {
+        c.due = 100.0;
+    }
+    let compatible = std_dissimilarity(&data, 1, 2);
+    data.customers[2].ready = 80.0;
+    data.customers[1].due = 10.0;
+    assert!(std_dissimilarity(&data, 1, 2) > compatible);
+    let previous = std_dissimilarity(&data, 1, 2);
+    data.customers[2].demand = 5.0;
+    assert!(std_dissimilarity(&data, 1, 2) > previous);
+    assert_eq!(
+        std_dissimilarity(&data, 1, 2),
+        std_dissimilarity(&data, 2, 1)
+    );
+}
+
+#[test]
 fn queued_jobs_respect_deadlines_and_zero_workers_are_rejected() {
     let mut jobs = independent_jobs();
     for job in &mut jobs {
