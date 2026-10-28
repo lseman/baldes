@@ -207,6 +207,7 @@ impl CoupledKernel {
         if !forward
             && a.suffix.as_ref()?.program != b.suffix.as_ref()?.program
             && !self.backward_programs_free(a, b)
+            && !self.backward_programs_equivalent(a, b)
         {
             return None;
         }
@@ -394,23 +395,64 @@ impl CoupledKernel {
     }
 
     /// Backward labels with different suffix arc programs may still compare
-    /// when nothing else replays the program at a join: no deferred numeric
-    /// transitions or plugins, and only feasibility paired relations (including
-    /// slope relations), whose known upper fronts carry the comparison.
+    /// when every replay-dependent relation has a sufficient suffix summary:
+    /// a feasibility upper front or an exact bounded-cost transfer. Other
+    /// resources retain the common-program restriction.
     fn backward_programs_free(&self, a: &CoupledLabelState, b: &CoupledLabelState) -> bool {
         !self.transitions.deferred
             && self.plugins.is_empty()
             && self.slope_indices.is_empty()
-            && self.slope_paired.iter().all(|p| !p.has_costs())
+            && self
+                .slope_paired
+                .iter()
+                .zip(&a.slope_relations)
+                .zip(&b.slope_relations)
+                .all(|((prepared, a), b)| {
+                    !prepared.has_costs() || (a.bounded_cost.is_some() && b.bounded_cost.is_some())
+                })
             && a.slope_relations
                 .iter()
                 .chain(&b.slope_relations)
-                .all(|label| label.upper.is_some())
-            && self.paired.iter().all(|p| !p.has_costs())
+                .all(|label| label.upper.is_some() || label.bounded_cost.is_some())
+            && self
+                .paired
+                .iter()
+                .zip(&a.relations)
+                .zip(&b.relations)
+                .all(|((prepared, a), b)| {
+                    !prepared.has_costs()
+                        || (a.backward_cost().is_some() && b.backward_cost().is_some())
+                })
             && a.relations
                 .iter()
                 .chain(&b.relations)
-                .all(|label| label.backward_upper().is_some())
+                .all(|label| label.backward_upper().is_some() || label.backward_cost().is_some())
+    }
+
+    /// Different physical paths can execute exactly the same paired program.
+    /// Comparing the ordered source operators proves identical replay without
+    /// requiring a numerical adjoint. Keep every other replaying family out of
+    /// this proof; their aggregate backward states alone are not sufficient.
+    fn backward_programs_equivalent(&self, a: &CoupledLabelState, b: &CoupledLabelState) -> bool {
+        if !self.initial.is_empty()
+            || !self.selection_initial.is_empty()
+            || !self.load_capacities.is_empty()
+            || !self.budgeted.is_empty()
+            || !self.front_indices.is_empty()
+            || !self.slope_indices.is_empty()
+            || !self.plugins.is_empty()
+        {
+            return false;
+        }
+        let (Some(a), Some(b)) = (&a.suffix, &b.suffix) else {
+            return false;
+        };
+        a.program.equivalent_by(&b.program, |a, b| {
+            a < self.arc_count
+                && b < self.arc_count
+                && self.paired.iter().all(|p| p.same_arc_operation(a, b))
+                && self.slope_paired.iter().all(|p| p.same_arc_operation(a, b))
+        })
     }
 
     /// Paired slope relations: forward fronts cover and stay below, with the
@@ -473,8 +515,9 @@ impl CoupledKernel {
     /// since its own objective term is then no higher as well. In
     /// cost-unbounded mode without upper bounds a front may exceed the other
     /// by delta and pay scale * (delta + min_b - min_a) (the reference's
-    /// max(a - b) cost charge). Backward labels retain only the arc program,
-    /// so they must match exactly. Returns the penalty.
+    /// max(a - b) cost charge). Backward labels compare feasibility upper
+    /// fronts or exact bounded-cost transfers; unknown transfers retain the
+    /// common-program restriction. Returns the penalty.
     fn relations_dominate(
         &self,
         a: &CoupledLabelState,
@@ -491,11 +534,10 @@ impl CoupledKernel {
                 continue;
             }
             if !forward {
-                // Feasibility relations keep a backward upper front.
-                match (left.backward_upper(), right.backward_upper()) {
-                    (Some(a), Some(b)) if a.covers_above(b) => continue,
-                    _ => return None,
+                if prepared.backward_dominates(left, right, self.cost_scale) {
+                    continue;
                 }
+                return None;
             }
             let upper_left = left.forward_upper_negative();
             let upper_right = right.forward_upper_negative();

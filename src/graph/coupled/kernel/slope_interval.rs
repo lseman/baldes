@@ -10,10 +10,16 @@ pub(super) struct SlopeLabel {
     pub(super) upper_negative: Option<SlopeFront>,
     pub(super) minimum: f64,
     pub(super) upper: Option<relation::RelationFront>,
+    /// Exact bounded paired suffix transfer, independent of the forward raw
+    /// frontier. Interval-cost labels never install this cache.
+    pub(super) bounded_cost: Option<Box<relation::BoundedCostFront>>,
 }
 impl PartialEq for SlopeLabel {
     fn eq(&self, other: &Self) -> bool {
-        if self.minimum.to_bits() != other.minimum.to_bits() || self.upper != other.upper {
+        if self.minimum.to_bits() != other.minimum.to_bits()
+            || self.upper != other.upper
+            || self.bounded_cost != other.bounded_cost
+        {
             return false;
         }
         fronts_equal(&self.front, &other.front)
@@ -170,6 +176,7 @@ impl SlopeLabel {
             upper_negative: None,
             minimum: 0.,
             upper: None,
+            bounded_cost: None,
         }
     }
     pub(super) fn extend(
@@ -219,6 +226,7 @@ impl SlopeLabel {
             upper_negative: None,
             minimum: finite(witness.value)?,
             upper: None,
+            bounded_cost: None,
         }))
     }
 }

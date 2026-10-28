@@ -10,6 +10,56 @@ pub(in crate::graph::coupled::kernel) struct BoundedCostFront {
     exact: bool,
 }
 impl BoundedCostFront {
+    /// Start the backward recurrence at the shared dependent ceiling, then
+    /// prepend the terminal physical arc. Unknown arithmetic keeps replay.
+    pub(in crate::graph::coupled::kernel) fn from_terminal_arc(
+        arc: &PreparedRelationArc,
+        ceiling: f64,
+    ) -> Option<Self> {
+        let source = arc.arc();
+        let lower = source.lower.prepared_domain();
+        let upper = source.upper.prepared_domain();
+        Self::terminal(
+            Window {
+                lower: lower.lower.max(upper.lower),
+                upper: lower.upper.min(upper.upper),
+            },
+            ceiling,
+        )
+        .ok()?
+        .checked_prepend(arc)
+    }
+
+    /// Both suffixes have the same terminal ceiling. A larger admitted entry
+    /// front preserves feasibility and decreases `ceiling + entry - upper`
+    /// for every common prefix. Require the exact cache contract and directed
+    /// containment; no scalar-cost compensation or comparison epsilon is used.
+    pub(in crate::graph::coupled::kernel) fn dominates(&self, other: &Self) -> bool {
+        self.exact
+            && other.exact
+            && self.ceiling.to_bits() == other.ceiling.to_bits()
+            && self.upper.covers_above_strict(&other.upper)
+    }
+
+    /// Minimum incremental suffix charge, before objective scaling. The
+    /// backward state stores admitted entry values, so its cost key is the
+    /// terminal ceiling minus the largest admitted entry. This excludes the
+    /// forward initial-value normalization, which is charged only once.
+    pub(in crate::graph::coupled::kernel) fn minimum_additional(&self) -> Option<f64> {
+        if !self.exact {
+            return None;
+        }
+        let maximum = self
+            .upper
+            .pieces()
+            .iter()
+            .flat_map(|piece| [piece.left[1], piece.right[1]])
+            .max_by(f64::total_cmp)?;
+        let lo = crate::core::rounding::add_down(self.ceiling, -maximum)?;
+        let hi = crate::core::rounding::add_up(self.ceiling, -maximum)?;
+        (lo == hi && lo >= 0.).then_some(lo)
+    }
+
     pub(in crate::graph::coupled::kernel) fn terminal(
         domain: Window,
         ceiling: f64,

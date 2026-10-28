@@ -5,7 +5,7 @@ use descriptor::{
     FrontierBudget, FrontierOutcome, FrontierUnknown, PairedCostNormalization,
     PreparedSlopeRelationArc, SlopeFront, SlopeRelationArc,
 };
-use relation::{PreparedRelationArc, RelationFront};
+use relation::{BoundedCostFront, PreparedRelationArc, RelationFront};
 use slope_interval::{outcome, SlopeLabel};
 
 #[derive(Clone, Debug)]
@@ -18,6 +18,8 @@ pub(super) struct PreparedSlopePaired {
     upper_arcs: Option<std::sync::Arc<[SlopeFront]>>,
     sources: std::sync::Arc<[SlopeRelationArc]>,
     backward: std::sync::Arc<[Option<PreparedRelationArc>]>,
+    exact_cost: bool,
+    ceiling: f64,
     mode: PairedResourceMode,
     normalization: PairedCostNormalization,
     policy: FrontOperationPolicy,
@@ -188,6 +190,35 @@ impl PreparedSlopePaired {
                     .map_err(|error| invalid(error.to_string()))
             })
             .collect::<Result<Vec<_>>>()?;
+        let backward: std::sync::Arc<[Option<PreparedRelationArc>]> = arcs
+            .iter()
+            .map(|arc| {
+                (policy == FrontOperationPolicy::StrictDomain)
+                    .then(|| backward_arc(arc))
+                    .flatten()
+            })
+            .collect::<Vec<_>>()
+            .into();
+        let integer = |x: f64| x.is_finite() && x.fract() == 0. && x.abs() <= 1_099_511_627_776.;
+        // The raw/knot conversion preserves every stored segment slope. Only
+        // the existing exact translation/positive-increment contract may use
+        // the converted cache for cost dominance; general raw programs replay.
+        let exact_cost = mode == PairedResourceMode::CostBounded
+            && integer(base.lower)
+            && integer(base.upper)
+            && constant(initial).is_some_and(integer)
+            && initial
+                .pairs()
+                .iter()
+                .all(|pair| integer(pair.0) && integer(pair.1))
+            && backward.iter().all(|arc| {
+                arc.as_ref()
+                    .is_some_and(PreparedRelationArc::exact_cache_eligible)
+            });
+        let ceiling = arcs
+            .first()
+            .and_then(|arc| constant(&arc.upper))
+            .unwrap_or(0.);
         Ok(Self {
             objective_coefficient: 1.,
             initial: SlopeLabel::root(&front, true),
@@ -196,16 +227,9 @@ impl PreparedSlopePaired {
             arcs: prepared.into(),
             upper_arcs,
             sources: arcs.to_vec().into(),
-            backward: arcs
-                .iter()
-                .map(|arc| {
-                    (mode == PairedResourceMode::Feasibility
-                        && policy == FrontOperationPolicy::StrictDomain)
-                        .then(|| backward_arc(arc))
-                        .flatten()
-                })
-                .collect::<Vec<_>>()
-                .into(),
+            backward,
+            exact_cost,
+            ceiling,
             mode,
             normalization,
             policy,
@@ -213,8 +237,9 @@ impl PreparedSlopePaired {
         })
     }
     /// Forward fronts cover and stay below under this resource's policy.
-    /// Backward feasibility uppers cover and stay above; unknowns require
-    /// replay. A shifting resource's forward front may instead exceed by
+    /// Backward feasibility uppers cover and stay above; exact bounded-cost
+    /// transfers additionally preserve the incremental suffix objective.
+    /// Unknowns require replay. A shifting forward front may instead exceed by
     /// delta: every future step is max(value + increment, lower), which keeps
     /// the pointwise gap, so a's terminal minimum exceeds b's by at most delta.
     /// The objective is scale times that minimum plus a common baseline, so
@@ -236,6 +261,14 @@ impl PreparedSlopePaired {
             return Some(0.);
         }
         if !forward {
+            if self.has_costs() {
+                return (scale.is_finite() && scale >= 0.)
+                    .then_some(())
+                    .and_then(|()| match (&a.bounded_cost, &b.bounded_cost) {
+                        (Some(a), Some(b)) if a.dominates(b) => Some(0.),
+                        _ => None,
+                    });
+            }
             return match (&a.upper, &b.upper) {
                 (Some(a), Some(b)) if a.covers_above(b) => Some(0.),
                 _ => None,
@@ -272,6 +305,19 @@ impl PreparedSlopePaired {
     pub(super) fn has_costs(&self) -> bool {
         self.mode != PairedResourceMode::Feasibility
     }
+    pub(super) fn same_arc_operation(&self, a: usize, b: usize) -> bool {
+        let (a, b) = (&self.sources[a], &self.sources[b]);
+        a.waiting == b.waiting
+            && [&a.arrival, &a.increment, &a.lower, &a.upper]
+                .into_iter()
+                .zip([&b.arrival, &b.increment, &b.lower, &b.upper])
+                .all(|(a, b)| {
+                    a.pairs().len() == b.pairs().len()
+                        && a.pairs().iter().zip(b.pairs()).all(|(a, b)| {
+                            a.0.to_bits() == b.0.to_bits() && a.1.to_bits() == b.1.to_bits()
+                        })
+                })
+    }
     pub(super) fn uses_strict_front_policy(&self) -> bool {
         self.policy == FrontOperationPolicy::StrictDomain
     }
@@ -304,6 +350,7 @@ impl PreparedSlopePaired {
                 upper_negative: None,
                 minimum: 0.,
                 upper: None,
+                bounded_cost: None,
             }
         }
     }
@@ -336,28 +383,59 @@ impl PreparedSlopePaired {
         let signed = self.has_costs() && scale < 0.;
         if !forward {
             let mut next = old.clone();
-            next.upper = self.backward[arc].as_ref().and_then(|prepared| {
-                let root;
-                let upper = if let Some(upper) = old.upper.as_ref() {
-                    upper
-                } else if first_backward {
-                    let arc = prepared.arc();
-                    let lo = arc.lower.prepared_domain();
-                    let hi = arc.upper.prepared_domain();
-                    let (lower, upper) = (lo.lower.max(hi.lower), lo.upper.min(hi.upper));
-                    if lower > upper || arc.upper.points.iter().any(|p| p[1] > 1e12) {
-                        return None;
+            next.bounded_cost = (if self.exact_cost {
+                self.backward[arc].as_ref().and_then(|prepared| {
+                    if let Some(old) = &old.bounded_cost {
+                        old.checked_prepend(prepared)
+                    } else if first_backward {
+                        BoundedCostFront::from_terminal_arc(prepared, self.ceiling)
+                    } else {
+                        None
                     }
-                    root = RelationFront::unbounded_upper(lower, upper);
-                    &root
-                } else {
-                    return None;
-                };
-                upper
-                    .extend_backward_upper_prepared(prepared)
-                    .ok()
-                    .flatten()
-            });
+                })
+            } else {
+                None
+            })
+            .map(Box::new);
+            // Backward bounded cost is an incremental suffix key, so do not
+            // apply the forward final-minus-initial normalization here.
+            next.minimum = if scale > 0. {
+                finite(
+                    scale
+                        * next
+                            .bounded_cost
+                            .as_ref()
+                            .and_then(|cache| cache.minimum_additional())
+                            .unwrap_or(0.),
+                )?
+            } else {
+                0.
+            };
+            next.upper = (self.mode == PairedResourceMode::Feasibility)
+                .then(|| self.backward[arc].as_ref())
+                .flatten()
+                .and_then(|prepared| {
+                    let root;
+                    let upper = if let Some(upper) = old.upper.as_ref() {
+                        upper
+                    } else if first_backward {
+                        let arc = prepared.arc();
+                        let lo = arc.lower.prepared_domain();
+                        let hi = arc.upper.prepared_domain();
+                        let (lower, upper) = (lo.lower.max(hi.lower), lo.upper.min(hi.upper));
+                        if lower > upper || arc.upper.points.iter().any(|p| p[1] > 1e12) {
+                            return None;
+                        }
+                        root = RelationFront::unbounded_upper(lower, upper);
+                        &root
+                    } else {
+                        return None;
+                    };
+                    upper
+                        .extend_backward_upper_prepared(prepared)
+                        .ok()
+                        .flatten()
+                });
             return Ok(Some(next));
         }
         let front = old
@@ -405,12 +483,14 @@ impl PreparedSlopePaired {
             upper_negative,
             minimum: finite(objective)?,
             upper: None,
+            bounded_cost: None,
         }))
     }
 }
 impl CoupledLabelState {
     /// Computed forward paired slope fronts. Backward states retain the operator
-    /// arc program plus an advisory feasibility upper front when available.
+    /// arc program plus a feasibility upper or exact bounded-cost transfer
+    /// when available; they expose no invented forward frontier.
     pub fn slope_relation_fronts(&self) -> impl Iterator<Item = Option<&SlopeFront>> {
         self.slope_relations
             .iter()

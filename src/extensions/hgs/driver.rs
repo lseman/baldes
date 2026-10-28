@@ -55,7 +55,18 @@ pub fn run_hgs(
     instance: &Instance,
     options: &HgsOptions,
 ) -> std::result::Result<HgsResult, String> {
-    run(instance, options, false)
+    run(instance, options, false, &[])
+}
+
+/// Populate HGS with validated complete route plans before generating other
+/// individuals. Customer indices exclude depot 0. Seeds remain eligible as
+/// the best result even when initialization consumes the search budget.
+pub fn run_hgs_seeded(
+    instance: &Instance,
+    options: &HgsOptions,
+    seeds: &[Vec<Vec<usize>>],
+) -> std::result::Result<HgsResult, String> {
+    run(instance, options, false, seeds)
 }
 
 /// Run HGS and retain all distinct routes passed through population insertion,
@@ -64,13 +75,14 @@ pub fn run_hgs_collecting_routes(
     instance: &Instance,
     options: &HgsOptions,
 ) -> std::result::Result<HgsResult, String> {
-    run(instance, options, true)
+    run(instance, options, true, &[])
 }
 
 fn run(
     instance: &Instance,
     options: &HgsOptions,
     collect: bool,
+    seeds: &[Vec<Vec<usize>>],
 ) -> std::result::Result<HgsResult, String> {
     if !options.time_limit.is_finite()
         || options.time_limit < 0.
@@ -84,7 +96,16 @@ fn run(
     if instance.customers.len() < 2 {
         return Err("HGS needs at least one customer".into());
     }
+    for seed in seeds {
+        super::solution::validate_plan(instance, seed)?;
+    }
     let mut params = Params::from_instance(instance);
+    if seeds
+        .iter()
+        .any(|seed| seed.iter().filter(|r| !r.is_empty()).count() > params.nb_vehicles as usize)
+    {
+        return Err("seed exceeds the HGS fleet; set instance.vehicles explicitly".into());
+    }
     params.config.time_limit = options.time_limit;
     params.config.nb_iter = options.nb_iter as i32;
     params.config.minimum_population_size = options.population_size as i32;
@@ -128,6 +149,18 @@ fn run(
     let mut population = Population::new(&params);
     if collect {
         population.collected_routes = Some(Default::default());
+    }
+    for seed in seeds {
+        let mut individual = super::Individual::new_empty(&params);
+        let mut routes: Vec<_> = seed.iter().filter(|r| !r.is_empty()).cloned().collect();
+        routes.resize(params.nb_vehicles as usize, Vec::new());
+        individual.chrom_t = routes.iter().flatten().copied().collect();
+        individual.chrom_r = routes;
+        individual.evaluate_complete_cost();
+        population.add_individual(&individual, true);
+        if !params.is_time_limit_exceeded() {
+            population.do_hgs_local_search_and_add_individual(&mut individual, &mut local_search);
+        }
     }
     population.generate_population(&mut split, &mut local_search);
     Genetic::new(&params, &mut split, &mut local_search)

@@ -35,6 +35,32 @@ impl Continuation {
             Some(step.arc)
         })
     }
+    /// Preserve operation order and length while allowing the resource owner
+    /// to identify equal operators on different physical arcs. Shared tails
+    /// need no repeated comparison.
+    pub(super) fn equivalent_by(
+        &self,
+        other: &Self,
+        mut same: impl FnMut(usize, usize) -> bool,
+    ) -> bool {
+        let (mut a, mut b) = (&self.0, &other.0);
+        loop {
+            match (a, b) {
+                (None, None) => return true,
+                (Some(left), Some(right)) => {
+                    if Arc::ptr_eq(left, right) {
+                        return true;
+                    }
+                    if left.arc != right.arc && !same(left.arc, right.arc) {
+                        return false;
+                    }
+                    a = &left.next;
+                    b = &right.next;
+                }
+                _ => return false,
+            }
+        }
+    }
 }
 impl PartialEq for Continuation {
     fn eq(&self, other: &Self) -> bool {

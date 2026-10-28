@@ -37,6 +37,12 @@ impl PairedLabel {
             _ => None,
         }
     }
+    pub(super) fn backward_cost(&self) -> Option<&BoundedCostFront> {
+        match self {
+            Self::Backward { cache, .. } => cache.as_ref(),
+            _ => None,
+        }
+    }
 }
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct PreparedPaired {
@@ -108,6 +114,35 @@ impl PreparedPaired {
     pub(super) fn has_costs(&self) -> bool {
         self.mode != PairedResourceMode::Feasibility
     }
+    pub(super) fn same_arc_operation(&self, a: usize, b: usize) -> bool {
+        let (a, b) = (self.arcs[a].arc(), self.arcs[b].arc());
+        a.waiting == b.waiting
+            && [&a.arrival, &a.increment, &a.lower, &a.upper]
+                .into_iter()
+                .zip([&b.arrival, &b.increment, &b.lower, &b.upper])
+                .all(|(a, b)| {
+                    a.points.len() == b.points.len()
+                        && a.points.iter().zip(&b.points).all(|(a, b)| {
+                            a[0].to_bits() == b[0].to_bits() && a[1].to_bits() == b[1].to_bits()
+                        })
+                })
+    }
+
+    pub(super) fn backward_dominates(&self, a: &PairedLabel, b: &PairedLabel, scale: f64) -> bool {
+        if self.mode == PairedResourceMode::Feasibility {
+            return match (a.backward_upper(), b.backward_upper()) {
+                (Some(a), Some(b)) => a.covers_above(b),
+                _ => false,
+            };
+        }
+        let scale = scale * self.objective_coefficient;
+        scale.is_finite()
+            && scale >= 0.
+            && match (a.backward_cost(), b.backward_cost()) {
+                (Some(a), Some(b)) => a.dominates(b),
+                _ => false,
+            }
+    }
     /// Cost-unbounded mode with no reachable upper bound (the reference's
     /// 1e12 infinity): every future step is max(value, lower), which grows
     /// by at most a common shift, so a higher front can pay its excess.
@@ -139,13 +174,24 @@ impl PreparedPaired {
     }
     pub(super) fn objective(&self, state: &PairedLabel, scale: f64) -> Result<f64> {
         let scale = finite(scale * self.objective_coefficient)?;
-        // A backward label retains a suffix program, not an attained value.
-        // Charge it only when replaying the suffix from a forward frontier.
-        if self.mode == PairedResourceMode::Feasibility
-            || scale == 0.
-            || matches!(state, PairedLabel::Backward { .. })
-        {
+        if self.mode == PairedResourceMode::Feasibility || scale == 0. {
             return Ok(0.);
+        }
+        // An exact bounded suffix carries a minimum incremental charge, not
+        // an attained terminal value. Its key needs no initial normalization;
+        // the full join still computes the canonical complete objective.
+        if let PairedLabel::Backward { cache, .. } = state {
+            return if scale > 0. {
+                finite(
+                    scale
+                        * cache
+                            .as_ref()
+                            .and_then(|c| c.minimum_additional())
+                            .unwrap_or(0.),
+                )
+            } else {
+                Ok(0.)
+            };
         }
         let selected = if scale < 0. {
             -state
@@ -195,16 +241,7 @@ impl PreparedPaired {
                     if let Some(old) = cache {
                         old.checked_prepend(&self.arcs[arc])
                     } else if first_backward {
-                        let a = self.arcs[arc].arc();
-                        let lo = a.lower.prepared_domain();
-                        let hi = a.upper.prepared_domain();
-                        let domain = Window {
-                            lower: lo.lower.max(hi.lower),
-                            upper: lo.upper.min(hi.upper),
-                        };
-                        BoundedCostFront::terminal(domain, self.ceiling)
-                            .ok()
-                            .and_then(|root| root.checked_prepend(&self.arcs[arc]))
+                        BoundedCostFront::from_terminal_arc(&self.arcs[arc], self.ceiling)
                     } else {
                         None
                     }

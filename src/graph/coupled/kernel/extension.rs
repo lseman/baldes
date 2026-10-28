@@ -28,6 +28,7 @@ impl CoupledKernel {
                             upper_negative: None,
                             minimum: 0.,
                             upper: None,
+                            bounded_cost: None,
                         }
                     }
                 })

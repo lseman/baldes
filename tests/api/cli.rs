@@ -623,6 +623,101 @@ fn hgs_respects_time_windows() {
 }
 
 #[test]
+fn hgs_opt_in_intensification_seeds_and_checkpoints_the_best_solution() {
+    let directory =
+        std::env::temp_dir().join(format!("baldes-cli-intensify-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let instance = directory.join("tiny.txt");
+    let seed = directory.join("seed.sol");
+    let best = directory.join("best.sol");
+    std::fs::write(&instance, "tiny\nVEHICLE\nNUMBER CAPACITY\n2 2\nCUSTOMER\nCUST NO. X Y DEMAND READY DUE SERVICE\n0 0 0 0 0 1000 0\n1 1 0 1 0 1000 0\n2 2 0 1 0 1000 0\n3 9 0 1 0 1000 0\n4 10 0 1 0 1000 0\n").unwrap();
+    std::fs::write(&seed, "Route #1: 1 3\nRoute #2: 2 4\nCost 38\n").unwrap();
+    let output = command()
+        .arg("hgs")
+        .arg(&instance)
+        .arg("--initial-solution")
+        .arg(&seed)
+        .args([
+            "--intensify",
+            "--workers",
+            "2",
+            "--batch-size",
+            "2",
+            "--objective",
+            "distance",
+            "--time",
+            "2",
+            "--intensify-rounds",
+            "4",
+            "--subproblem-time",
+            "0.05",
+            "--population-size",
+            "3",
+            "--nb-iter",
+            "10",
+            "--json",
+            "-",
+        ])
+        .arg("--solution-output")
+        .arg(&best)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["cost"].as_f64(), Some(24.0));
+    let plan =
+        baldes::extensions::hgs::solution::parse_solution(&std::fs::read_to_string(&best).unwrap())
+            .unwrap();
+    let instance = baldes::inputs::Instance::read(&instance).unwrap();
+    assert_eq!(
+        baldes::extensions::hgs::solution::validate_plan(&instance, &plan).unwrap(),
+        24.0
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn hgs_extension_flags_reject_conflicts_before_network_access() {
+    for (args, expected) in [
+        (
+            vec!["hgs", "missing.txt", "--threshold", "0.01"],
+            "require --intensify",
+        ),
+        (
+            vec!["hgs", "missing.txt", "--workers", "2"],
+            "require --intensify",
+        ),
+        (vec!["solve", "missing.txt", "--get-bks"], "require hgs"),
+        (
+            vec![
+                "hgs",
+                "missing.txt",
+                "--get-bks",
+                "--initial-solution",
+                "seed.sol",
+            ],
+            "conflicts",
+        ),
+    ] {
+        let output = command().args(args).output().unwrap();
+        assert!(!output.status.success());
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let output = command().args(["hgs", "--help"]).output().unwrap();
+    assert!(output.status.success());
+    let help = String::from_utf8_lossy(&output.stdout);
+    assert!(help.contains("--get-bks") && help.contains("--intensify"));
+}
+
+#[test]
 fn tree_and_kohl_controls_reach_integer_solve_and_reject_cvrp_time_resource() {
     let json =
         std::env::temp_dir().join(format!("baldes-tree-controls-{}.json", std::process::id()));

@@ -469,6 +469,26 @@ impl RelationFront {
         self.signed_excess(other, -1.)
             .is_some_and(|excess| excess <= 0.)
     }
+    /// Upper-front containment without the numerical front tolerance. Negation
+    /// preserves the domains, so the lower-front proof checks the same covered
+    /// argument intervals rather than reversing domain containment.
+    pub(in crate::graph::coupled) fn covers_above_strict(&self, other: &Self) -> bool {
+        let negate = |front: &Self| {
+            Self::from_pieces(
+                front
+                    .pieces
+                    .iter()
+                    .map(|piece| RelationPiece {
+                        metadata: 0,
+                        left: [piece.left[0], -piece.left[1]],
+                        right: [piece.right[0], -piece.right[1]],
+                        waiting: piece.waiting,
+                    })
+                    .collect(),
+            )
+        };
+        negate(self).covers_below_strict(&negate(other))
+    }
     /// The backward root: any dependent value up to the reference's 1e12
     /// infinity over the head domain; the adjoint applies the arc bounds.
     pub(in crate::graph::coupled) fn unbounded_upper(lower: f64, upper: f64) -> Self {

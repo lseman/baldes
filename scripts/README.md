@@ -15,7 +15,13 @@ into `target/baldes-build`. No prebuilt executable is needed in this directory.
 | Command | Purpose |
 | --- | --- |
 | `python3 scripts/setup/get_instances.py` | Download and extract CVRPLIB instance sets into `instances/`; requires `7z`. Use `--dry-run` to list downloads. |
+| `python3 scripts/setup/get_bks.py C101` | Download the current public CVRPLib BKS to `C101.sol`; accepts names or paths such as `instances/X-n101-k25.vrp`. Use `--problem cvrp` or `--problem vrptw` to restrict lookup, `-o FILE` for an output path, and `--force` to replace a file. Requires only Python's standard library and internet access. |
 | `python3 scripts/setup/gurobi_downloader` | Download and verify a stable Gurobi Linux release into `external/`. Use `--help` for version, platform, and destination options. |
+
+The solver can fetch a BKS itself with `baldes hgs INSTANCE --get-bks`; add
+`--intensify` to re-solve route subsets with threshold acceptance and elite
+restarts, and `--workers N` for concurrent disjoint subproblems. See
+[HGS intensification](../docs/extensions/hgs-intensify.md).
 
 ## Synthetic stochastic-demand instances
 
@@ -54,6 +60,7 @@ prepare these paths before running. Runs can take several minutes.
 | `benchmark_pstep_pricing.mjs` | `[BINARY] [OUTPUT]`: compare bucket and enumeration pricing backends. |
 | `benchmark_ce.mjs` | `name=/path/to/binary [...]`: compare column-elimination solves. |
 | `benchmark_ce_lp_threads.mjs` | `MODEL.mps [OUTPUT] [THREAD_COUNTS]`: compare HiGHS simplex/HiPO thread counts on an exported LP; requires the `highs` executable. |
+| `benchmark_hgs_intensify.py` | `BINARY INSTANCE SEED.sol --workers 1 2 4 --output FILE`: compare HGS workers with fixed batches and iteration budgets; checks identical routes and generation counts before reporting speedup. |
 | `benchmark_robust.py` | `--output DIR [--jobs 4] [--time 60]`: run the 1,320-case Table 7 solver grid and independently replay robust incumbents. Uses `instances/Solomon/` and a Clp binary; see [robust routing](../docs/extensions/robust.md). |
 
 For example:

@@ -12,7 +12,10 @@ pub(super) fn run() -> Result<(), String> {
     let command = args.next().ok_or(ROUTING_HELP)?;
     match command.as_str() {
         "-h" | "--help" => {
-            println!("{ROUTING_HELP}\n\n{NETWORK_HELP}");
+            println!(
+                "{ROUTING_HELP}\n\n{}\n\n{NETWORK_HELP}",
+                super::hgs_cli::HELP
+            );
             Ok(())
         }
         "pstep" => pstep_cli::run(args.collect()),
@@ -20,7 +23,10 @@ pub(super) fn run() -> Result<(), String> {
         "solve" | "hgs" => {
             let file = args.next().ok_or(ROUTING_HELP)?;
             if file == "--help" || file == "-h" {
-                println!("{ROUTING_HELP}\n\n{NETWORK_HELP}");
+                println!(
+                    "{ROUTING_HELP}\n\n{}\n\n{NETWORK_HELP}",
+                    super::hgs_cli::HELP
+                );
                 return Ok(());
             }
             if file.starts_with('-') {
@@ -244,6 +250,8 @@ fn solve_routing(kind: String, file: String, args: Vec<String>) -> Result<(), St
     let mut two_path = false;
     let mut tree_options = baldes::master::tree::TreeOptions::default();
     let mut rounding = Some(Rounding::Tenth);
+    let mut rounding_specified = false;
+    let mut hgs_extension = super::hgs_cli::ExtensionOptions::default();
     let mut hgs_pop_size: Option<u32> = None;
     let mut hgs_nb_iter: Option<u32> = None;
     let mut hgs_seed = 0;
@@ -254,9 +262,13 @@ fn solve_routing(kind: String, file: String, args: Vec<String>) -> Result<(), St
         if common.parse(&arg, &mut args)? {
             continue;
         }
+        if hgs_extension.parse(&arg, &mut args)? {
+            continue;
+        }
         match arg.as_str() {
             "--help" | "-h" => {
                 println!("{ROUTING_HELP}");
+                println!("\n{}", super::hgs_cli::HELP);
                 return Ok(());
             }
             "--ignore-time-windows" => {
@@ -382,6 +394,7 @@ fn solve_routing(kind: String, file: String, args: Vec<String>) -> Result<(), St
                     .get_or_insert_with(Default::default);
             }
             "--rounding" => {
+                rounding_specified = true;
                 rounding = Some(
                     Rounding::parse(&args.next().ok_or("missing rounding")?)
                         .map_err(|e| e.to_string())?,
@@ -490,6 +503,17 @@ fn solve_routing(kind: String, file: String, args: Vec<String>) -> Result<(), St
         }
     }
     common.apply_routing(&mut options);
+    hgs_extension.validate()?;
+    if hgs_extension.active() && kind != "hgs" {
+        return Err("BKS seeding and intensification options require hgs".into());
+    }
+    if (hgs_extension.get_bks
+        || hgs_extension.initial_solution.is_some()
+        || hgs_extension.intensify)
+        && !rounding_specified
+    {
+        rounding = None;
+    }
     let tree = common.tree;
     let node_limit = common.nodes.unwrap_or(10000);
     let json_path = common.json;
@@ -525,9 +549,12 @@ fn solve_routing(kind: String, file: String, args: Vec<String>) -> Result<(), St
         if fenchel {
             return Err("--fenchel-cuts requires solve".into());
         }
-        use baldes::extensions::hgs::{run_hgs, HgsOptions};
+        use baldes::extensions::hgs::HgsOptions;
         if let Some(rounding) = rounding {
             instance.rounding = rounding;
+        } else if hgs_extension.get_bks && instance.has_time_windows() {
+            // Current CVRPLib Solomon/Homberger BKSs use truncated tenths.
+            instance.rounding = Rounding::Tenth;
         }
         let time_limit = if options.cg.time_limit.as_secs_f64() > 0.0 {
             options.cg.time_limit.as_secs_f64()
@@ -542,7 +569,7 @@ fn solve_routing(kind: String, file: String, args: Vec<String>) -> Result<(), St
             verbose: options.cg.log_interval.is_some(),
         };
         let started = std::time::Instant::now();
-        let result = run_hgs(&instance, &opts).map_err(|e| e.to_string())?;
+        let result = hgs_extension.run(&instance, &opts)?;
         let elapsed = started.elapsed().as_secs_f64();
         if let Some(path) = json_path {
             fn number(v: f64) -> String {

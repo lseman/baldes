@@ -26,14 +26,16 @@ pub mod circle_sector;
 pub mod driver;
 pub mod genetic;
 pub mod individual;
+pub mod intensify;
 pub mod local_search;
 pub mod matrix;
 pub mod params;
 pub mod population;
+pub mod solution;
 pub mod split;
 
 pub use circle_sector::CircleSector;
-pub use driver::{run_hgs, HgsOptions, HgsResult};
+pub use driver::{run_hgs, run_hgs_seeded, HgsOptions, HgsResult};
 pub use genetic::Genetic;
 pub use individual::{Individual, SortableF64};
 pub use matrix::Matrix;
