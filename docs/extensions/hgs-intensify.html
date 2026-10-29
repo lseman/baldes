@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="BKS-seeded HGS intensification The hgs command has optional BKS seeding and route-decomposition search.Ordinary baldes hgs INSTANCE retains its existing behavior. Build the CLI wit">
+<meta name="theme-color" content="#0b0e11">
+<title>BKS-seeded HGS intensification — BALDES docs</title>
+<link rel="canonical" href="https://baldes.laioseman.com/docs/extensions/hgs-intensify.html">
+<link rel="icon" href="../_static/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../_static/site.css">
+<link rel="stylesheet" href="../_static/docs.css">
+<link rel="stylesheet" href="../_static/syntax.css">
+<script src="../_static/app.js" defer></script>
+<script src="../_static/docs.js" defer></script>
+</head>
+<body class="landing-dark docs-body" data-docs-root="../">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header docs-header"><a class="brand" href="../../"><img src="../_static/mark.svg" width="32" height="40" alt="">BALDES <span class="version">2.0</span></a>
+<nav aria-label="Main"><a href="../../">Home</a><a href="../index.html" aria-current="true">Documentation</a><a href="https://github.com/lseman/baldes">GitHub ↗</a></nav></header>
+<div class="docs-layout">
+<aside class="docs-sidebar">
+<details class="guide-menu" open><summary>Documentation</summary><nav aria-label="Guides"><div class="nav-group"><p class="nav-group-title">Overview</p><a href="../index.html">Overview</a></div><div class="nav-group"><p class="nav-group-title">Getting started</p><a href="../guides/first-solve.html">Your first solve</a><a href="../guides/solve.html">Unified solve interface</a><a href="../guides/build.html">Configuring and building BALDES</a><a href="../guides/architecture.html">Solver architecture and ownership</a><a href="../guides/source-layout.html">Source layout</a><a href="../guides/cli.html">Command-line usage</a><a href="../guides/concepts.html">Solver concepts and interface choices</a><a href="../guides/documentation.html">Maintaining the documentation</a><a href="../guides/python.html">Python: pyBaldes</a><a href="../guides/releases.html">Python wheels and releases</a></div><div class="nav-group"><p class="nav-group-title">PyBaldes · Python</p><a href="../pybaldes/index.html">pyBaldes documentation</a><a href="../pybaldes/networks.html">Shared-master network models</a><a href="../pybaldes/installation.html">Install pyBaldes</a><a href="../pybaldes/quickstart.html">pyBaldes quickstart</a><a href="../pybaldes/routing.html">Routing inputs and options</a><a href="../pybaldes/pricing.html">Stateful pricing with Solver</a><a href="../pybaldes/resources.html">Coupled resources and function encodings</a><a href="../pybaldes/results.html">Results, bounds, and exactness</a><a href="../pybaldes/api.html">pyBaldes API reference</a><a href="../pybaldes/troubleshooting.html">pyBaldes troubleshooting and reproducibility</a></div><div class="nav-group"><p class="nav-group-title">The solver</p><a href="../solver/models.html">Network models and shared masters</a><a href="../solver/column-imports.html">Finite column imports</a><a href="../solver/tree.html">Branch-and-price tree and node lifecycle</a><a href="../solver/feasibility.html">Routing feasibility recovery</a><a href="../solver/branching.html">Routing branching</a><a href="../solver/cuts.html">Routing cuts</a><a href="../solver/stabilization.html">Dual-price stabilization</a><a href="../solver/enumerated-mip.html">Enumerated node MIP with HiGHS</a><a href="../solver/deluxing.html">DeLuxing column fixing</a></div><div class="nav-group"><p class="nav-group-title">Reference</p><a href="../reference/algorithms.html">Algorithms and references</a><a href="../reference/options.html">BALDES pricing options</a><a href="../reference/resources.html">Scalar resources</a><a href="../reference/simd.html">SIMD dispatch</a></div><div class="nav-group"><p class="nav-group-title">Extensions</p><a href="coupled-resources.html">Coupled resources</a><a href="multi-time-windows.html">Multiple time windows</a><a href="pstep.html">P-step CVRP and VRPTW extension</a><a href="evrp.html">EVRP implementation status</a><a href="robust.html">Robust vehicle routing</a><a href="robust-pd.html">Robust pickup and delivery with time windows</a><a href="ipm.html">BALDES IPM in Rust</a><a href="ce.html">Column elimination</a><a href="hgs-dri.html">Customer decomposition for HGS</a><a href="hgs-intensify.html" aria-current="page">BKS-seeded HGS intensification</a><a href="stochastic.html">Stochastic demands and replenishment recourse</a></div><div class="nav-group"><p class="nav-group-title">Benchmarks</p><a href="../benchmarks/root.html">Root benchmarks</a><a href="../benchmarks/rank-one-three-row.html">Parallel three-row rank-one separation</a><a href="../benchmarks/rank-one-local-search.html">Parallel four- and five-row rank-one local search</a><a href="../benchmarks/ipm-factorization.html">IPM factorization: cached assembly and lower-triangle updates</a><a href="../benchmarks/stochastic.html">Stochastic branch-and-cut versus branch-and-price</a></div></nav></details>
+<a class="source-link" href="https://github.com/lseman/baldes/blob/main/docs/extensions/hgs-intensify.md">View Markdown source ↗</a>
+</aside>
+<main id="content" class="doc-main" tabindex="-1">
+<div class="doc-toolbar"><span class="eyebrow">DOCS <span aria-hidden="true">/</span> Extensions</span><form class="doc-search" role="search" action="../index.html" method="get"><label for="docs-search">Search guides</label><input id="docs-search" type="search" name="q" placeholder="Search guides…" autocomplete="off" aria-controls="search-results"><span class="search-shortcut" aria-hidden="true">⌘ K / Ctrl K</span><span id="search-status" class="sr-only" role="status"></span></form></div>
+<section id="search-results" class="search-results" aria-label="Search results" hidden></section>
+<noscript><p class="notice">Browse the guides with the navigation. Search needs JavaScript.</p></noscript>
+<article class="prose"><h1 id="bks-seeded-hgs-intensification">BKS-seeded HGS intensification</h1>
+<p>The <code>hgs</code> command has optional BKS seeding and route-decomposition search.
+Ordinary <code>baldes hgs INSTANCE</code> retains its existing behavior. Build the CLI with
+<code>cargo build --release --features clp --bin baldes</code>.</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh"><span class="c1"># Fetch the published BKS, populate HGS with it, then run ordinary HGS.</span>
+target/release/baldes<span class="w"> </span>hgs<span class="w"> </span>instances/cvrplib/A-n32-k5.vrp<span class="w"> </span>--get-bks<span class="w"> </span>--time<span class="w"> </span><span class="m">30</span>
+
+<span class="c1"># Download the BKS and repeatedly intensify bounded subsets of its routes.</span>
+target/release/baldes<span class="w"> </span>hgs<span class="w"> </span>instances/cvrplib/A-n32-k5.vrp<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--get-bks<span class="w"> </span>--intensify<span class="w"> </span>--time<span class="w"> </span><span class="m">300</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--workers<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--subproblem-routes<span class="w"> </span><span class="m">8</span><span class="w"> </span>--subproblem-customers<span class="w"> </span><span class="m">300</span><span class="w"> </span>--subproblem-time<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--threshold<span class="w"> </span><span class="m">0</span>.001<span class="w"> </span>--elite-size<span class="w"> </span><span class="m">8</span><span class="w"> </span>--restart-after<span class="w"> </span><span class="m">30</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--solution-output<span class="w"> </span>/tmp/A-n32-k5-best.sol
+
+<span class="c1"># Reuse a local VRPTW seed, without accessing the network.</span>
+target/release/baldes<span class="w"> </span>hgs<span class="w"> </span>instances/Solomon/C101.txt<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--initial-solution<span class="w"> </span>/tmp/C101.sol<span class="w"> </span>--intensify<span class="w"> </span>--time<span class="w"> </span><span class="m">60</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--rounding<span class="w"> </span>tenth<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--solution-output<span class="w"> </span>/tmp/C101-best.sol<span class="w"> </span>--seed<span class="w"> </span><span class="m">7</span>
+</code></pre></div>
+<p><code>--get-bks</code> uses the bundled standard-library Python downloader and requires
+Python 3 plus internet access. It finds the instance name in the current CVRPLib
+CVRP/VRPTW catalogs and downloads its public route file. Lookup and download
+errors stop the command. <code>--initial-solution FILE</code> supplies the same route format
+locally and conflicts with <code>--get-bks</code>. Seeds must cover every customer exactly
+once and be feasible for the selected metric, capacity, windows, and fleet.
+Consequently, a full-instance BKS cannot seed a <code>--customers</code> truncated instance.
+Route indices are BALDES customer indices, starting at 1, with depot 0 omitted.</p>
+<p><code>--intensify</code> enables the outer search. Without an explicit seed, it first runs
+ordinary HGS for up to 10% of the search time (at most five seconds); providing
+a BKS avoids full-instance HGS setup on large instances. Its steps are:</p>
+<p><code>--std-similarity</code> optionally ranks route neighbors using the spatial–temporal–
+demand formula in equations 11–14 of Kerscher and Minner, using the instance's
+travel distance as spatial cost. Infinite time windows use a neutral temporal
+factor. This changes route selection; it does not implement the paper's customer
+clustering or its cross-cluster improvement phase.
+The separate <a href="hgs-dri.html"><code>--dri</code> customer-clustering mode</a> provides those phases.</p>
+<p><code>--barycenter</code> instead ranks neighbors by Euclidean distance between the mean
+customer coordinates of each route. It cannot be combined with
+<code>--std-similarity</code>. It uses coordinates even for explicit distance matrices, so
+it is useful only when those coordinates carry meaningful spatial information.
+Every fifth round still selects random neighbors, as in the default selector.</p>
+<ol>
+<li>Choose a random anchor route and nearby routes, measured by minimum distance
+from up to four anchor customers. Every fifth round chooses random neighbors.
+Neighborhoods expand from two routes during stagnation, bounded by
+<code>--subproblem-routes</code> and <code>--subproblem-customers</code>. Oversized routes are skipped.</li>
+<li>Build a sub-instance with the same depot, capacity, windows, service times,
+rounding, and explicit matrix entries. Seed its HGS population with the
+selected routes before generating other individuals. On alternating rounds,
+try a feasible random customer swap before seeding to escape the current plan.</li>
+<li>Solve with HGS, map customer indices back, and splice the new routes into the
+untouched routes. Independently replay the entire proposal before using it.</li>
+<li>Accept proposals within <code>--threshold</code> times the current distance, cooling
+linearly to zero over <code>--restart-after</code> stalled rounds. Save strict improvements
+separately, so a temporary deterioration never replaces the best solution.</li>
+<li>Maintain a bounded elite pool using differing directed arcs for diversity,
+ignoring route order. Restart from a randomly selected elite after stagnation.</li>
+</ol>
+<p><code>--workers N</code> enables CPU parallelism with one HGS population and random generator
+per worker. Each batch selects disjoint groups of <strong>complete routes</strong> from the
+same solution snapshot. Results are collected in job order, mapped back and
+merged once, then the combined proposal is replayed against the full original
+instance. A failed/infeasible subproblem leaves its original routes intact.
+Arbitrary fragments of one route are not optimized independently: their boundary
+loads and arrival times would couple the subproblems.</p>
+<p>By default <code>--batch-size 0</code> selects up to <code>workers</code> jobs per snapshot. Set a fixed
+positive batch size to keep decomposition and search decisions identical across
+worker counts. For example, <code>--batch-size 4 --workers 1</code> solves those four jobs
+serially, while <code>--batch-size 4 --workers 4</code> solves them concurrently. Fewer jobs
+are dispatched when there are insufficient unassigned routes. <code>--intensify-rounds</code>
+counts subproblem jobs; acceptance and best-plan updates happen once per batch.
+Fixed seeds, batch size, and iteration budgets give reproducible results without
+per-job wall-time limits. Changing automatic batch width changes the search
+trajectory as well as throughput. Memory grows with simultaneous subproblems,
+approximately <code>workers × subproblem_customers²</code> for their distance structures.</p>
+<p><code>--objective auto</code> uses distance for the current CVRPLib CVRP and VRPTW sets,
+matching their published conventions. <code>--objective distance</code> and
+<code>--objective vehicles-distance</code> select the objective explicitly.
+The latter rejects increases in vehicle count regardless of threshold and tries
+a reduced-fleet subproblem every fourth round. Inner HGS minimizes distance under
+the selected fleet cap; it is not itself a lexicographic solver.</p>
+<p>Search is bounded by <code>--time</code> (default 60 seconds) and <code>--intensify-rounds</code>
+(default 1000). Each subproblem uses <code>--subproblem-time</code> and the ordinary HGS
+<code>--nb-iter</code>, <code>--population-size</code>, and <code>--seed</code> controls. Time limits are cooperative:
+a local-search operation or HGS setup can overrun a deadline. BKS downloading
+precedes the search budget. The initial plan and each strict improvement are
+atomically checkpointed when <code>--solution-output FILE</code> is supplied; this explicitly
+replaces that file. Parent directories must already exist. <code>--json</code> retains the
+existing HGS result schema; <code>generations</code> counts inner genetic generations, and
+the intensification summary (including batch and worker counts) is written to stderr.
+<code>--subproblem-time 0</code> uses the iteration budget within each job. The outer deadline
+is checked before dispatch and before a queued job begins; an executing fixed-work
+job can overrun it. Positive per-job limits are reduced to the remaining budget.</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--threshold</code></td>
+<td>0.001</td>
+<td>Initial allowed relative distance deterioration</td>
+</tr>
+<tr>
+<td><code>--workers</code></td>
+<td>1</td>
+<td>Independent CPU HGS workers</td>
+</tr>
+<tr>
+<td><code>--batch-size</code></td>
+<td>0</td>
+<td>Jobs selected per snapshot; 0 uses worker count</td>
+</tr>
+<tr>
+<td><code>--elite-size</code></td>
+<td>8</td>
+<td>Maximum elite plans</td>
+</tr>
+<tr>
+<td><code>--elite-diversity</code></td>
+<td>0.05</td>
+<td>Minimum directed-arc Jaccard distance</td>
+</tr>
+<tr>
+<td><code>--restart-after</code></td>
+<td>30</td>
+<td>Stalled rounds before restart</td>
+</tr>
+<tr>
+<td><code>--subproblem-routes</code></td>
+<td>8</td>
+<td>Maximum routes per subproblem</td>
+</tr>
+<tr>
+<td><code>--subproblem-customers</code></td>
+<td>300</td>
+<td>Maximum customers per subproblem</td>
+</tr>
+<tr>
+<td><code>--subproblem-time</code></td>
+<td>2</td>
+<td>Seconds per HGS solve</td>
+</tr>
+</tbody>
+</table></div>
+<p>Decomposition controls require <code>--intensify</code>; seeding and extension flags require
+the <code>hgs</code> command. Seeded and intensified runs default to the instance's distance
+convention (CVRPLib integers for EUC_2D; unrounded for local Solomon files).
+With <code>--get-bks</code>, VRPTW instead uses truncated tenths, as specified by the current
+CVRPLib Solomon/Homberger catalogs. <code>--rounding</code> is an explicit override. File
+<code>Cost</code> metadata is ignored and totals are recomputed.
+Current HGS capacity/demand storage requires integral demands and capacity fitting
+32-bit integers; the intensifier rejects incompatible inputs.</p>
+<p>The Rust APIs are <code>run_hgs_seeded</code>, <code>intensify</code>, and <code>intensify_with_callback</code> under
+<code>baldes::extensions::hgs</code>; network access belongs to the CLI only. The callback
+receives the initial plan and each strict improvement, and may fail to stop search
+when a checkpoint cannot be saved. A zero API time limit selects fixed-work search.</p>
+<p>The design is inspired by the route-subset HGS, threshold acceptance, elite-pool,
+and decompose-and-intensify descriptions in the
+<a href="https://galgos.inf.puc-rio.br/cvrplib/index.php/en/updates/">CVRPLib updates</a>.
+Those short reports do not specify complete algorithms or parameter values;
+this implementation makes its own choices as documented above. It includes no
+MIP subsolver, so it does not claim to reproduce the reported matheuristic or its
+BKS improvements. Benchmark evidence is needed before making performance claims.</p>
+<h2 id="parallel-benchmarks-and-gpu-boundary">Parallel benchmarks and GPU boundary</h2>
+<p>Use fixed batches and fixed-work inner solves to compare the same computation:</p>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">python3<span class="w"> </span>scripts/benchmarks/benchmark_hgs_intensify.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>target/release/baldes<span class="w"> </span>instances/XL/XL-n2121-k186.vrp<span class="w"> </span>/tmp/XL-n2121-k186.sol<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--workers<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="m">4</span><span class="w"> </span>--batch-size<span class="w"> </span><span class="m">4</span><span class="w"> </span>--rounds<span class="w"> </span><span class="m">24</span><span class="w"> </span>--repeats<span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>results/hgs-workers.json
+</code></pre></div>
+<p>The runner alternates worker-count order and checks that costs, routes, and
+generation counts match before reporting speedup. It records binary and seed
+hashes and refuses comparisons that did not complete the round budget. It uses
+an existing local seed, keeping downloading outside the measured runs.</p>
+<p>On October 28, 2026, the command above with 300 non-improving HGS iterations,
+population 12 and seed 7 completed 24 subproblem solves on <code>XL-n2121-k186</code> using
+an AMD Ryzen 9 9950X (16 cores, 32 logical CPUs). Three repetitions per worker
+count, using the release CLI, gave these median wall times:</p>
+<div class="table-scroll" role="region" aria-label="Data table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Workers</th>
+<th>Seconds</th>
+<th>Speedup over one worker</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1.2601</td>
+<td>1.00×</td>
+</tr>
+<tr>
+<td>2</td>
+<td>0.7202</td>
+<td>1.75×</td>
+</tr>
+<tr>
+<td>4</td>
+<td>0.3838</td>
+<td>3.28×</td>
+</tr>
+</tbody>
+</table></div>
+<p>All runs produced identical routes, cost (283,097), and generation counts. This
+measures execution speed on a fixed search workload, not an improvement to the
+published BKS or a claim about time-to-improvement. Local raw measurements and
+binary/seed hashes are in <code>results/hgs-intensify-workers-20261028.json</code>.</p>
+<p>No HGS GPU option is exposed. BALDES's existing <code>cuda</code> feature accelerates
+p-step pricing, whose short-path enumeration is a different algorithm from HGS
+local search and genetic population management. Enabling it does not accelerate
+this extension. A useful HGS GPU backend would need batched candidate-move
+evaluation, CPU/GPU agreement on capacity/time-window feasibility and rounding,
+and a measured improvement in total solve time including transfers. No GPU
+speedup is claimed. Independent CPU subproblems are the implemented parallel
+backend; a GPU backend remains a separate, evidence-dependent extension.</p>
+<h2 id="validation">Validation</h2>
+<div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>fmt<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--check
+cargo<span class="w"> </span>clippy<span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--offline
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--offline<span class="w"> </span>--lib<span class="w"> </span>extensions::hgs::intensify
+cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-p<span class="w"> </span>baldes<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--offline<span class="w"> </span>--test<span class="w"> </span>hgs_driver<span class="w"> </span>--test<span class="w"> </span>hgs_e2e<span class="w"> </span>--test<span class="w"> </span>cli<span class="w"> </span>hgs
+python3<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>scripts/tests<span class="w"> </span>-p<span class="w"> </span>test_get_bks.py
+</code></pre></div>
+<p>These checks passed: 12 algorithm unit tests, 12 focused CLI/HGS integration
+tests and three downloader tests. Clippy reports existing repository warnings.
+Live <code>--get-bks --intensify</code> smoke runs preserved feasible BKSs for both
+<code>XL-n2121-k186</code> and <code>C101</code>. The default-feature library test build was also
+attempted; unrelated coupled-kernel/robust-PD tests require unavailable
+feature-gated APIs and serde_json, so the successful library validation used
+<code>clp</code> as shown above.</p>
+</article>
+<nav class="page-turn" aria-label="Adjacent guides"><a href="hgs-dri.html"><small>Previous guide</small>Customer decomposition for HGS <span aria-hidden="true">↗</span></a><a href="stochastic.html"><small>Next guide</small>Stochastic demands and replenishment recourse <span aria-hidden="true">↗</span></a></nav>
+<footer class="doc-footer">BALDES · Rust tools for vehicle routing · <a href="https://github.com/lseman/baldes/blob/main/LICENSE">MIT license</a></footer>
+</main>
+<aside class="doc-toc"><nav aria-label="On this page"><p class="eyebrow">ON THIS PAGE</p><a class="toc-level-2" href="#parallel-benchmarks-and-gpu-boundary">Parallel benchmarks and GPU boundary</a><a class="toc-level-2" href="#validation">Validation</a></nav></aside>
+</div>
+</body></html>
