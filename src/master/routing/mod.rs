@@ -42,6 +42,7 @@ mod partial;
 #[path = "../preprocessing/routing.rs"]
 mod preprocessing_adapter;
 mod problem;
+mod recourse;
 pub use cg::BoundMode;
 use controller::RootController;
 use options::RootKPathSeparator;
@@ -51,6 +52,7 @@ pub use options::{
 };
 pub use partial::{inherit_fixed_routes, FixedRoute};
 pub use problem::{RoutingContext, Row};
+pub use recourse::RouteRecourse;
 
 #[derive(Debug)]
 pub struct RootOutput<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
@@ -118,6 +120,9 @@ struct CutState {
     relaxation_priority: f64,
     /// Master columns to delete after a relaxation strengthening.
     removed_columns: Vec<usize>,
+    /// Theta optimality cuts and their rows (route recourse only).
+    theta_cuts: Vec<recourse::ThetaCut>,
+    theta_rows: Vec<Option<usize>>,
 }
 use crate::master::formulation::PendingRows;
 /// Root separator priorities: capacity cuts, then rank-one cuts.

@@ -15,6 +15,7 @@ pub(super) struct Context<'a, const D: usize = { crate::DEFAULT_RESOURCE_DIMENSI
     pub(super) coupled_costs: bool,
     pub(super) coupled_completion: &'a [CoupledCompletion; 2],
     pub(super) resource_error: &'a AtomicBool,
+    pub(super) load_completion: Option<&'a super::load_completion::LoadCompletion>,
 }
 impl<'a, const D: usize> Context<'a, D> {
     pub(super) fn has_cuts(&self) -> bool {

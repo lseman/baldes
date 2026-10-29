@@ -27,8 +27,10 @@ impl PartialEq for SlopeLabel {
             _ => return false,
         }
         if self.minimum.to_bits() != other.minimum.to_bits()
-            || (self.bounded_cost.is_none() && other.bounded_cost.is_none()
-                && self.raw_upper.as_ref().map(|a| a.depth) != other.raw_upper.as_ref().map(|b| b.depth))
+            || (self.bounded_cost.is_none()
+                && other.bounded_cost.is_none()
+                && self.raw_upper.as_ref().map(|a| a.depth)
+                    != other.raw_upper.as_ref().map(|b| b.depth))
             || self.upper != other.upper
             || self.bounded_cost != other.bounded_cost
         {

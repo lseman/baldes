@@ -65,6 +65,8 @@ impl<const D: usize> LabelingEngine<D> {
             self.root(g, false)?;
         }
         let started = Instant::now();
+        self.load_completion = self.prepare_load_completion(g, started, controls.time_limit);
+        let completion_setup = started.elapsed().as_secs_f64();
         if controls.time_limit.is_zero() {
             return Err(incomplete("pricing hard time limit exceeded"));
         }
@@ -284,6 +286,22 @@ impl<const D: usize> LabelingEngine<D> {
         if self.resource_error.load(Ordering::Relaxed) {
             return Err(incomplete("coupled resource arithmetic or state failure"));
         }
+        if self.statistics.completion_pruned > 0 {
+            minimum = minimum.min(self.controls.load_completion_threshold);
+            // Pruned pricing labels cannot serve as full-domain fixing or
+            // enumeration completion labels at a larger incumbent cutoff.
+            self.half_ready = false;
+            self.full_ready = false;
+        }
+        if std::env::var_os("BALDES_DEBUG_COMPLETION").is_some() && self.load_completion.is_some() {
+            eprintln!(
+                "load completion: setup={completion_setup:.6} pruned={} generated={} expanded={}",
+                self.statistics.completion_pruned,
+                self.statistics.generated,
+                self.statistics.expanded
+            );
+        }
+        self.load_completion = None;
         Ok(PricingResult {
             columns,
             minimum_reduced_cost: minimum,

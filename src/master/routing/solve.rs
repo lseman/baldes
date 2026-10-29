@@ -55,7 +55,7 @@ pub(crate) fn inherit_with_history<const D: usize>(
     solve_seeded(problem, options, Some((parent, master, warm)))
 }
 pub(super) fn solve_seeded<const D: usize>(
-    problem: RoutingContext<D>,
+    mut problem: RoutingContext<D>,
     mut options: RootOptions,
     seed: Option<(&NodeSnapshot<D>, ClpMaster, cg::WarmStart)>,
 ) -> Result<RootOutput<D>> {
@@ -91,6 +91,17 @@ pub(super) fn solve_seeded<const D: usize>(
         ));
     }
 
+    // Enumerated routes would be selected by their arc costs alone; with
+    // route recourse a node may only close through Theta-cut separation.
+    // Standalone reduced-cost fixing remains available.
+    if problem.recourse.is_some() {
+        options.enumerate = false;
+        // Certificates rebuild the master from route columns alone and would
+        // omit the Theta variables.
+        if options.bound_mode == BoundMode::Certified {
+            return Err(invalid("certified bounds do not support route recourse"));
+        }
+    }
     options.cg.bound_mode = options.bound_mode;
     options.cg.node_depth = options.node_depth;
     options.master_solver.ensure_available()?;
@@ -164,7 +175,15 @@ pub(super) fn solve_seeded<const D: usize>(
         backend.configure(&mut master)?;
         (Some(saved), master)
     } else {
-        let built = crate::master::formulation::build_model(&problem.model, &backend)?;
+        let mut built = crate::master::formulation::build_model(&problem.model, &backend)?;
+        // Theta variables precede every route and artificial column, so their
+        // indices survive column cleanup and are inherited by forked nodes.
+        if let Some(recourse) = problem.recourse.as_mut() {
+            recourse.columns = vec![None; problem.model.networks[0].graph.vertices.len()];
+            for &customer in &problem.customers {
+                recourse.columns[customer] = Some(built.master.add_column(1., &[])?);
+            }
+        }
         (None, built.master)
     };
     let log_context = if options.cg.log_interval.is_some() {
@@ -442,6 +461,8 @@ pub(super) fn solve_seeded<const D: usize>(
             level: f64::INFINITY,
             relaxation_priority: options.relaxation_improvement_priority as f64,
             removed_columns: vec![],
+            theta_cuts: vec![],
+            theta_rows: vec![],
         },
         fixing_calls: 0,
         enumerated_routes: 0,

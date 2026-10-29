@@ -167,6 +167,8 @@ pub struct RootOptions {
     /// infinity). This scalar is not independently validated as a route witness.
     /// It must bound the original arc-cost sum, including rounding error.
     pub incumbent: f64,
+    /// Retain and inspect a complete route universe. Reduced-cost bucket-arc
+    /// fixing remains enabled independently by BALDESapplyReducedCostFixing.
     pub enumerate: bool,
     pub round_reduced_costs: bool,
     pub cuts: CutOptions,

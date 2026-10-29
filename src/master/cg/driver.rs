@@ -975,6 +975,9 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     return finish(out, loaded, cut_artificials, pool, smoothing);
                 }
             }
+            if !positive && !converged {
+                controller.fix_pricing(master, &raw)?;
+            }
             if !positive && controller.request_enumeration_checkpoint(master)? {
                 out.enumeration_requested = true;
                 return finish(out, loaded, cut_artificials, pool, smoothing);
@@ -1047,6 +1050,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 controller.store_pricing_checkpoint(master, checkpoint)?;
             }
             let mut stop_cuts = !controller.separates() || out.cut_rounds >= options.max_cut_rounds;
+            let required = controller.requires_separation(master, &out.column_tags)?;
             if !stop_cuts && separated_once {
                 let denominator = (0.1 * lp_at_separation.abs()).max(1e-9);
                 let gain = (out.lp - lp_at_separation) / denominator;
@@ -1059,6 +1063,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     stop_cuts = true;
                 }
             }
+            stop_cuts &= !required;
             lp_at_separation = out.lp;
             if !stop_cuts {
                 let mut rows_remapped = false;

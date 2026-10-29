@@ -2,6 +2,39 @@
 use super::*;
 
 impl Search<'_> {
+    /// Group requests by pickup/delivery proximity and time-window proximity.
+    pub(super) fn related_order(&self, requests: &mut [usize]) {
+        let Some(&anchor) = requests.first() else {
+            return;
+        };
+        let score = |r: usize| {
+            let mut value = 0.0;
+            for offset in [1, self.n + 1] {
+                let (a, b) = (anchor + offset, r + offset);
+                let (aw, bw) = (self.window(a), self.window(b));
+                value += self.travel(a, b) + (aw.0 - bw.0).abs() + (aw.1 - bw.1).abs();
+            }
+            value
+        };
+        requests.sort_by(|&a, &b| score(a).total_cmp(&score(b)));
+    }
+
+    /// Rank by marginal travel saving; removal itself still verifies feasibility.
+    pub(super) fn expensive_order(&self, routes: &[Route], requests: &mut [usize]) {
+        let mut savings = vec![f64::NEG_INFINITY; self.n];
+        for route in routes {
+            for &p in route.nodes.iter().filter(|&&v| (1..=self.n).contains(&v)) {
+                let nodes = self.without_pair(route, p - 1);
+                let travel: f64 = nodes
+                    .windows(2)
+                    .map(|arc| self.travel(arc[0], arc[1]))
+                    .sum();
+                savings[p - 1] = route.travel - travel;
+            }
+        }
+        requests.sort_by(|&a, &b| savings[b].total_cmp(&savings[a]));
+    }
+
     /// Regret-2 across distinct receiving routes, including a singleton.
     pub(super) fn regret_recreate(
         &mut self,

@@ -25,7 +25,7 @@ def main():
     parser.add_argument("--seconds", type=float, default=1.0)
     parser.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
     parser.add_argument("--instances", nargs="+", default=["AA40", "BB40", "AA75", "BB75"])
-    parser.add_argument("--methods", nargs="+", default=["ils", "regret", "critical", "exchange", "tails", "ejection", "extended"])
+    parser.add_argument("--methods", nargs="+", default=["ils", "regret", "critical", "related", "expensive", "exchange", "tails", "ejection", "extended"])
     args = parser.parse_args()
     binary = args.binary.resolve()
     args.output.mkdir(parents=True, exist_ok=True)

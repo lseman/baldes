@@ -16,6 +16,8 @@ pub struct RoutingContext<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS 
     /// Logical base/branch row -> physical master row. Branches appended
     /// after inherited cuts stay valid when those cuts are retired.
     pub(super) row_map: RefCell<Vec<usize>>,
+    /// Route excess imposed by Theta optimality cuts; None for ordinary routing.
+    pub(super) recourse: Option<super::recourse::Recourse>,
 }
 impl<const D: usize> RoutingContext<D> {
     /// Cover each nonterminal vertex and bound the number of vehicle routes.
@@ -79,6 +81,7 @@ impl<const D: usize> RoutingContext<D> {
             branch_constraints: vec![],
             arc_index,
             row_map,
+            recourse: None,
         })
     }
     pub fn arc_position(&self, id: i32) -> Option<usize> {

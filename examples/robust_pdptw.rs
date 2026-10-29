@@ -1,4 +1,4 @@
-//! cargo run --release --features clp --example robust_pdptw -- [FILE Γq Γt σq σt SECONDS ROUNDING] [--ng N] [--heuristic [ils|hgs|extended|regret|critical|exchange|tails|ejection]] [--seed N]
+//! cargo run --release --features clp --example robust_pdptw -- [FILE Γq Γt σq σt SECONDS ROUNDING] [--ng N] [--heuristic [ils|hgs|extended|regret|critical|related|expensive|exchange|tails|ejection]] [--seed N]
 #[cfg(feature = "clp")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use baldes::extensions::robust_pd::{
@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fn solve() -> baldes::Result<()> {
         let mut args: Vec<_> = std::env::args().skip(1).collect();
         if args.iter().any(|a| a == "--help" || a == "-h") {
-            println!("robust_pdptw [FILE Γq Γt σq σt SECONDS ROUNDING] [--ng N] [--heuristic [ils|hgs|extended|regret|critical|exchange|tails|ejection]] [--seed N]\nDefaults: instances/RobustPDPTW/AA05.txt 1 1 0.1 0.1 60 hundredth\nROUNDING: hundredth or none. Paper §6.1 demand adjustment enabled.\n--ng N: relax elementarity to NG routes with N requests per neighbourhood.\nWithout it, pricing is elementary.\n--heuristic [ils|hgs|extended|regret|critical|exchange|tails|ejection]: run only a robust heuristic for SECONDS: iterated\nlocal search (default) or a hybrid genetic search.\nextended enables all optional ILS operations; regret, critical, exchange,\ntails, and ejection enable one operation each. --seed N: heuristic seed (1).");
+            println!("robust_pdptw [FILE Γq Γt σq σt SECONDS ROUNDING] [--ng N] [--heuristic [ils|hgs|extended|regret|critical|related|expensive|exchange|tails|ejection]] [--seed N]\nDefaults: instances/RobustPDPTW/AA05.txt 1 1 0.1 0.1 60 hundredth\nROUNDING: hundredth or none. Paper §6.1 demand adjustment enabled.\n--ng N: relax elementarity to NG routes with N requests per neighbourhood.\nWithout it, pricing is elementary.\n--heuristic [ils|hgs|extended|regret|critical|related|expensive|exchange|tails|ejection]: run only a robust heuristic for SECONDS: iterated\nlocal search (default) or a hybrid genetic search.\nextended enables all optional ILS operations; regret, critical, exchange,\nrelated, expensive, tails, and ejection enable one operation each. --seed N: heuristic seed (1).");
             return Ok(());
         }
         let ng_size = match args.iter().position(|a| a == "--ng") {
@@ -64,6 +64,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             ..Default::default()
                         },
                     )),
+                    Some("related") => Some(HeuristicMethod::ExtendedIteratedLocalSearch(
+                        IlsExtensions {
+                            related_removal: true,
+                            ..Default::default()
+                        },
+                    )),
+                    Some("expensive") => Some(HeuristicMethod::ExtendedIteratedLocalSearch(
+                        IlsExtensions {
+                            expensive_removal: true,
+                            ..Default::default()
+                        },
+                    )),
                     Some("exchange") => Some(HeuristicMethod::ExtendedIteratedLocalSearch(
                         IlsExtensions {
                             pair_exchange: true,
@@ -92,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         if args.len() > 7 || args.iter().any(|a| a.starts_with("--")) {
             return Err(invalid(
-                "expected FILE Γq Γt σq σt SECONDS ROUNDING [--ng N] [--heuristic [ils|hgs|extended|regret|critical|exchange|tails|ejection]] [--seed N]",
+                "expected FILE Γq Γt σq σt SECONDS ROUNDING [--ng N] [--heuristic [ils|hgs|extended|regret|critical|related|expensive|exchange|tails|ejection]] [--seed N]",
             ));
         }
         let number = |i: usize, default: &str| args.get(i).map_or(default.to_owned(), Clone::clone);

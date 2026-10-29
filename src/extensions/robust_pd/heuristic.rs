@@ -21,6 +21,10 @@ pub struct IlsExtensions {
     pub regret_repair: bool,
     /// Mix uniform ruin with removals at tight load cuts or time segments.
     pub critical_removal: bool,
+    /// Remove requests close to a randomly chosen request in space and time.
+    pub related_removal: bool,
+    /// Prefer requests whose removal saves the most route travel.
+    pub expensive_removal: bool,
     /// Exchange two complete requests between routes as one transaction.
     pub pair_exchange: bool,
     /// Swap tails only at cuts with no open requests.
@@ -35,6 +39,8 @@ impl IlsExtensions {
         Self {
             regret_repair: true,
             critical_removal: true,
+            related_removal: true,
+            expensive_removal: true,
             pair_exchange: true,
             tail_exchange: true,
             ejection_chain: true,
@@ -428,8 +434,23 @@ impl Search<'_> {
         let count = ((share * self.n as f64).round() as usize).clamp(self.n.min(2), self.n);
         let mut requests: Vec<usize> = (0..self.n).collect();
         self.rng.shuffle(&mut requests);
-        if self.extensions.critical_removal && self.rng.next_f64() < 0.5 {
-            self.critical_order(routes, &mut requests);
+        let mut strategies = Vec::new();
+        if self.extensions.critical_removal {
+            strategies.push(0);
+        }
+        if self.extensions.related_removal {
+            strategies.push(1);
+        }
+        if self.extensions.expensive_removal {
+            strategies.push(2);
+        }
+        if !strategies.is_empty() && self.rng.next_f64() < 0.5 {
+            let choice = (self.rng.next_f64() * strategies.len() as f64) as usize;
+            match strategies[choice.min(strategies.len() - 1)] {
+                0 => self.critical_order(routes, &mut requests),
+                1 => self.related_order(&mut requests),
+                _ => self.expensive_order(routes, &mut requests),
+            }
         }
         let mut removed = vec![];
         for r in requests.into_iter().take(count) {

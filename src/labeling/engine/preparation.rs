@@ -45,6 +45,7 @@ impl<const D: usize> LabelingEngine<D> {
             coupled_present: self.coupled_present,
             coupled_identity: self.coupled_identity.clone(),
             coupled_completion: std::array::from_fn(|_| Default::default()),
+            load_completion: None,
             resource_error: AtomicBool::new(false),
         }
     }
@@ -111,6 +112,7 @@ impl<const D: usize> LabelingEngine<D> {
             coupled_present: g.has_coupled_resources(),
             coupled_identity: g.coupled_kernel().map(|k| k.cache_identity().clone()),
             coupled_completion: std::array::from_fn(|_| Default::default()),
+            load_completion: None,
             resource_error: AtomicBool::new(false),
         })
     }

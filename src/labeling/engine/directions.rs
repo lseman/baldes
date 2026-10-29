@@ -16,6 +16,7 @@ impl<const D: usize> LabelingEngine<D> {
             coupled_costs: self.coupled_costs,
             coupled_completion: &self.coupled_completion,
             resource_error: &self.resource_error,
+            load_completion: self.load_completion.as_ref(),
         }
     }
 
@@ -68,6 +69,7 @@ impl<const D: usize> LabelingEngine<D> {
             coupled_costs: self.coupled_costs,
             coupled_completion: &self.coupled_completion,
             resource_error: &self.resource_error,
+            load_completion: self.load_completion.as_ref(),
         };
         let (storage, other, scratch) = if forward {
             (&mut self.forward, &self.backward, &mut self.forward_scratch)
@@ -166,6 +168,7 @@ impl<const D: usize> LabelingEngine<D> {
             coupled_costs: self.coupled_costs,
             coupled_completion: &self.coupled_completion,
             resource_error: &self.resource_error,
+            load_completion: self.load_completion.as_ref(),
         };
         let vertices = self.extension_checks.len();
         let mut statistics = Statistics::default();

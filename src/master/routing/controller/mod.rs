@@ -4,6 +4,7 @@ mod capacity;
 mod checkpoint;
 mod enumeration;
 mod feasibility;
+mod fixing;
 mod knapsack;
 mod kpath;
 mod pool;
@@ -11,6 +12,7 @@ mod progress;
 mod rank_one;
 mod relaxation;
 mod separation;
+mod theta;
 
 pub(super) use checkpoint::PricingCheckpoint;
 #[cfg(test)]
@@ -40,6 +42,15 @@ impl<const D: usize> Controller<ClpMaster> for RootController<D> {
     ) -> Result<Option<cg::FeasibilityRecovery>> {
         self.recover_phase_one(master, warm, remaining, iterations, tolerance, bound_mode)
     }
+    fn fix_pricing(&mut self, master: &ClpMaster, duals: &[f64]) -> Result<()> {
+        // Enumeration retains its existing combined fixing pass. A standalone
+        // pass uses the current dual bound, never a stronger historical bound.
+        let bound = self
+            .pricing_bound(master, duals)?
+            .unwrap_or(f64::NEG_INFINITY);
+        self.fix_without_enumeration(duals, bound)
+    }
+
     fn begin_enumeration_transaction(&mut self, bound: f64) -> Result<bool> {
         self.begin_enumeration(bound)
     }
@@ -286,6 +297,11 @@ impl<const D: usize> Controller<ClpMaster> for RootController<D> {
     fn separates(&self) -> bool {
         !self.state.borrow().cut.separators().is_empty()
             || self.problem.model.networks[0].graph.selection_relaxed()
+            || self.problem.recourse.is_some()
+    }
+
+    fn requires_separation(&self, master: &ClpMaster, tags: &[i32]) -> Result<bool> {
+        self.requires_theta(master, tags)
     }
 
     fn separate(&mut self, master: &mut ClpMaster, tags: &[i32]) -> Result<usize> {

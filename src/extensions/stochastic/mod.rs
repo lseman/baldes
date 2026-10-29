@@ -9,9 +9,11 @@
 
 use crate::{invalid, Result};
 
+mod bounds;
 mod master;
 mod ng;
 mod pricing;
+mod search;
 pub use ng::NgPricingResult;
 mod tree;
 mod warm_start;
@@ -22,6 +24,7 @@ pub use master::{
 pub use pricing::{ArcBranch, PricedRoute, PricingOptions, PricingResult, PricingStatus};
 pub use tree::{Solution, SolveOptions, SolveResult, SolveStatus};
 pub use warm_start::{HgsWarmStart, HgsWarmStartSummary};
+mod theta;
 mod tiny;
 pub use tiny::{ExactSolution, TinyOptions};
 
@@ -200,29 +203,29 @@ impl Problem {
         policy: Policy,
     ) -> Result<()> {
         let demand = &self.demands[j - 1];
-        let refill = self.costs[i][0] + self.costs[0][j] - self.costs[i][j]
-            + demand
-                .outcomes
-                .iter()
-                .map(|&(d, p)| p * next[self.capacity - d])
-                .sum::<f64>();
-        for (q, value) in current.iter_mut().enumerate() {
-            let direct: f64 = demand
-                .outcomes
-                .iter()
-                .map(|&(d, p)| {
-                    if d > q {
-                        p * (self.costs[j][0] + self.costs[0][j] + next[self.capacity - (d - q)])
-                    } else {
-                        p * next[q - d]
-                    }
-                })
-                .sum();
-            *value = match policy {
-                Policy::Classical if q == 0 => refill,
-                Policy::Classical => direct,
-                Policy::OptimalRestocking => refill.min(direct),
-            };
+        let capacity = self.capacity;
+        let failure = self.costs[j][0] + self.costs[0][j];
+        let mut refill = self.costs[i][0] + self.costs[0][j] - self.costs[i][j];
+        current.fill(0.);
+        // Accumulate the direct expectation one outcome at a time, so each
+        // pass is a contiguous slice operation over residual loads.
+        for &(d, p) in &demand.outcomes {
+            refill += p * next[capacity - d];
+            let (short, served) = current.split_at_mut(d);
+            for (value, &after) in served.iter_mut().zip(&next[..=capacity - d]) {
+                *value += p * after;
+            }
+            for (value, &after) in short.iter_mut().zip(&next[capacity - d..]) {
+                *value += p * (failure + after);
+            }
+        }
+        match policy {
+            Policy::Classical => current[0] = refill,
+            Policy::OptimalRestocking => {
+                for value in current.iter_mut() {
+                    *value = value.min(refill);
+                }
+            }
         }
         if current.iter().any(|v| !v.is_finite()) {
             return Err(invalid("stochastic continuation cost overflow"));

@@ -443,3 +443,117 @@ fn enumeration_rollback_restores_pricing_registry_windows_and_pending_metadata()
     assert!(!controller.begin_enumeration_transaction(2.).unwrap());
     assert!(controller.enumeration_checkpoint.is_none());
 }
+
+#[test]
+fn standalone_fixing_removes_expensive_bucket_arcs_and_honors_its_gates() {
+    let mut graph = Graph::<2>::new(4, 1).unwrap();
+    for v in 0..4 {
+        graph.set_bounds(v, 0, 0., 10.).unwrap();
+    }
+    for (u, v, cost) in [
+        (0, 1, 1.),
+        (1, 2, 1.),
+        (2, 3, 1.),
+        (0, 2, 100.),
+        (2, 1, 100.),
+        (1, 3, 100.),
+    ] {
+        graph.add_arc(u, v, cost).unwrap();
+    }
+    let mut options = RootOptions::default();
+    options.capture_state = true;
+    options.enumerate = false;
+    let root = super::super::solve(
+        RoutingContext::set_partitioning(graph, 1.).unwrap(),
+        options,
+    )
+    .unwrap();
+    let snapshot = root.snapshot.unwrap();
+    let mut solver = snapshot.pricing.fork_for_node();
+    solver.price_phase(0, 20, false).unwrap();
+    let arc_count = |solver: &Solver<2>| {
+        solver
+            .engine
+            .as_ref()
+            .unwrap()
+            .grid
+            .forward
+            .buckets
+            .iter()
+            .flatten()
+            .map(|b| b.arcs.len())
+            .sum::<usize>()
+    };
+    let before = arc_count(&solver);
+    let state = Rc::new(RefCell::new(State {
+        solver,
+        routes: snapshot.routes.clone(),
+        route_tags: Default::default(),
+        incumbent: f64::INFINITY,
+        enumerate: false,
+        rounded: true,
+        pricing: adapter::RootPricing::default(),
+        previous_fixing_gap: f64::INFINITY,
+        deadline: None,
+        pricing_seconds: 0.,
+        cut: snapshot.cut.clone(),
+        fixing_calls: 0,
+        enumerated_routes: 0,
+    }));
+    let mut controller = RootController {
+        problem: Rc::new(snapshot.problem.clone()),
+        state: state.clone(),
+        checkpoint: None,
+        enumeration_checkpoint: None,
+        certificate_search: Default::default(),
+    };
+    controller.fix_without_enumeration(&root.duals, 3.).unwrap();
+    assert_eq!(state.borrow().fixing_calls, 0, "no incumbent");
+    state.borrow_mut().incumbent = 4.;
+    controller
+        .fix_without_enumeration(&root.duals, f64::NEG_INFINITY)
+        .unwrap();
+    assert_eq!(state.borrow().fixing_calls, 0, "no current bound");
+    state
+        .borrow_mut()
+        .solver
+        .options
+        .set("BALDESapplyReducedCostFixing", 0.)
+        .unwrap();
+    controller.fix_without_enumeration(&root.duals, 3.).unwrap();
+    assert_eq!(state.borrow().fixing_calls, 0, "explicitly disabled");
+    state
+        .borrow_mut()
+        .solver
+        .options
+        .set("BALDESapplyReducedCostFixing", 1.)
+        .unwrap();
+    // Exhaust completion's label budget without changing live exclusions.
+    let saved_max = state.borrow().solver.controls.max_labels;
+    state.borrow_mut().solver.controls.max_labels = 1;
+    {
+        let mut live = state.borrow_mut();
+        let engine = live.solver.engine.as_mut().unwrap();
+        engine.half_ready = false;
+        engine.full_ready = false;
+    }
+    state.borrow_mut().solver.graph.arcs[0].reduced_cost += 0.25;
+    let old_cost = state.borrow().solver.graph.arcs[0].reduced_cost;
+    controller.fix_without_enumeration(&root.duals, 3.).unwrap();
+    assert_eq!(state.borrow().fixing_calls, 1);
+    assert_eq!(state.borrow().solver.graph.arcs[0].reduced_cost, old_cost);
+    assert_eq!(arc_count(&state.borrow().solver), before);
+    state.borrow_mut().solver.controls.max_labels = saved_max;
+    state.borrow_mut().previous_fixing_gap = f64::INFINITY;
+    controller.fix_without_enumeration(&root.duals, 3.).unwrap();
+    assert_eq!(state.borrow().fixing_calls, 2);
+    assert!(arc_count(&state.borrow().solver) < before);
+    assert!(state.borrow().solver.enumeration.is_none());
+    let result = state.borrow_mut().solver.price_phase(0, 20, false).unwrap();
+    assert!(result
+        .columns
+        .iter()
+        .any(|r| (r.original_cost - 3.).abs() < 1e-7));
+    controller.fix_without_enumeration(&root.duals, 3.).unwrap();
+    assert_eq!(state.borrow().fixing_calls, 2, "unchanged gap is throttled");
+}

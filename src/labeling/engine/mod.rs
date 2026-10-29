@@ -41,6 +41,11 @@ pub struct EngineControls<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS 
     pub direction_flags: u8,
     pub sink_concatenation: bool,
     pub use_symmetric_execution: bool,
+    /// Optional nonnegative disposable resource for additive walk completion
+    /// bounds in exact phases. Pricing may omit routes at or above the threshold and returns
+    /// a conservative minimum capped at that threshold when pruning occurs.
+    pub load_completion_resource: Option<usize>,
+    pub load_completion_threshold: f64,
 }
 impl<const D: usize> Default for EngineControls<D> {
     fn default() -> Self {
@@ -55,6 +60,8 @@ impl<const D: usize> Default for EngineControls<D> {
             direction_flags: 1,
             sink_concatenation: true,
             use_symmetric_execution: true,
+            load_completion_resource: None,
+            load_completion_threshold: 0.,
         }
     }
 }
@@ -100,6 +107,7 @@ pub struct LabelingEngine<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS 
     coupled_present: bool,
     coupled_identity: Option<std::sync::Arc<()>>,
     coupled_completion: [CoupledCompletion; 2],
+    load_completion: Option<load_completion::LoadCompletion>,
     resource_error: AtomicBool,
 }
 /// Replays a sweep's terminal candidates into the pool, in recorded order.
@@ -134,3 +142,5 @@ mod sweep;
 use context::Context;
 
 mod directions;
+
+mod load_completion;

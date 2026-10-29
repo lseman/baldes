@@ -233,13 +233,15 @@ pub(super) fn validated_upper<const D: usize>(
         .map(|_| ExactSum::default())
         .collect();
     let mut objective = ExactSum::default();
-    for (&tag, &value) in tags.iter().zip(values) {
+    for (column, (&tag, &value)) in tags.iter().zip(values).enumerate() {
         let quantity = value.round();
-        if quantity == 0. {
+        // Theta variables only bound recourse; routes pay their own below.
+        if quantity == 0. || (tag < 0 && problem.is_theta_column(column)) {
             continue;
         }
         let route = routes.get(usize::try_from(tag).ok()?)?;
         exact_route_feasible(problem, route)?;
+        objective.product(problem.route_excess(route).ok()?, quantity)?;
         if let Some(kernel) = problem.model.networks[0].graph.coupled_kernel() {
             let arcs = route
                 .arcs
@@ -293,6 +295,7 @@ pub(super) fn validated_upper<const D: usize>(
             return None;
         }
         exact_route_feasible(problem, route)?;
+        objective.product(problem.route_excess(route).ok()?, f64::from(*quantity))?;
         if let Some(kernel) = problem.model.networks[0].graph.coupled_kernel() {
             let arcs = route
                 .arcs

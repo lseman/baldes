@@ -159,6 +159,9 @@ impl<const D: usize> RootController<D> {
         for row in &mut state.cut.capacity_rows {
             *row = row.and_then(|r| rows[r]);
         }
+        for row in &mut state.cut.theta_rows {
+            *row = row.and_then(|r| rows[r]);
+        }
         for entries in &mut state.cut.capacity_arc_entries {
             *entries = entries
                 .iter()

@@ -128,6 +128,13 @@ pub trait Controller<M> {
     ) -> Result<Option<FeasibilityRecovery>> {
         Ok(None)
     }
+    /// Optional reduced-cost fixing without changing the master or enumerating
+    /// columns. Called after accurate exact pricing, without improving columns
+    /// or positive artificials. Fixings must use a bound valid at `duals` and
+    /// be atomic on error; this callback supplies no new convergence proof.
+    fn fix_pricing(&mut self, _master: &M, _duals: &[f64]) -> Result<()> {
+        Ok(())
+    }
     /// Save every controller/pricing field that enumeration, regeneration,
     /// column remapping and retained-pool synchronization can change.
     /// False declines the optional handoff.
@@ -208,6 +215,12 @@ pub trait Controller<M> {
     /// Whether a separator is installed.
     fn separates(&self) -> bool {
         false
+    }
+    /// Whether the current master solution violates a cut needed for
+    /// correctness (not merely bound strength). Separation then continues
+    /// regardless of cut-round limits and tailing off.
+    fn requires_separation(&self, _master: &M, _tags: &[i32]) -> Result<bool> {
+        Ok(false)
     }
     /// Adds a cut family once pricing has converged on an exact phase;
     /// returns how many rows were added (or changed). Zero ends the rounds.

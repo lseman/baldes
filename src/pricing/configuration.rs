@@ -107,6 +107,17 @@ impl<const D: usize> Solver<D> {
                 .options
                 .get("BALDESuseBidirectionalSearch")
                 .unwrap_or(2.) as i32,
+            load_completion_resource: {
+                let r = self
+                    .options
+                    .get("BALDESloadCompletionResource")
+                    .unwrap_or(-1.);
+                (r >= 0.).then_some(r as usize)
+            },
+            load_completion_threshold: self
+                .options
+                .get("BALDESloadCompletionThreshold")
+                .unwrap_or(0.),
             dominance_mode: self.dominance_mode,
             steps: self.bucket_steps,
             target_buckets: self

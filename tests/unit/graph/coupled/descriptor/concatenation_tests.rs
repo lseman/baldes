@@ -24,12 +24,19 @@ fn joined_label_cost_order_and_ng_rejection_match_recorded_binary_outputs() {
             case["backward_cost"].as_f64().unwrap(),
             case["additional_cost"].as_f64().unwrap(),
             1,
-            if case["overlap"].as_bool().unwrap() { 1 } else { 2 },
+            if case["overlap"].as_bool().unwrap() {
+                1
+            } else {
+                2
+            },
         ) else {
             panic!("recorded label join should have finite outputs: {case}");
         };
         assert_eq!(joined.compatible, case["accepted"].as_bool().unwrap());
-        assert_eq!(joined.dependent_cost, case["dependent_cost"].as_f64().unwrap());
+        assert_eq!(
+            joined.dependent_cost,
+            case["dependent_cost"].as_f64().unwrap()
+        );
         let expected = u64::from_str_radix(case["cost_bits"].as_str().unwrap(), 16).unwrap();
         assert_eq!(joined.reduced_cost.to_bits(), expected, "{case}");
     }
@@ -37,10 +44,18 @@ fn joined_label_cost_order_and_ng_rejection_match_recorded_binary_outputs() {
 
 #[test]
 fn label_join_cost_keeps_nonfinite_arithmetic_unknown() {
-    let selection = MachineConcatenation { coordinate: 0., dependent: Some(7.) };
-    for costs in [(f64::MAX, f64::MAX, 0.), (0., 0., f64::INFINITY),
-                  (f64::NAN, 0., 0.)] {
-        assert!(matches!(selection.join_labels(costs.0, costs.1, costs.2, 0, 0),
-                         FrontierOutcome::Unknown(FrontierUnknown::Arithmetic(_))));
+    let selection = MachineConcatenation {
+        coordinate: 0.,
+        dependent: Some(7.),
+    };
+    for costs in [
+        (f64::MAX, f64::MAX, 0.),
+        (0., 0., f64::INFINITY),
+        (f64::NAN, 0., 0.),
+    ] {
+        assert!(matches!(
+            selection.join_labels(costs.0, costs.1, costs.2, 0, 0),
+            FrontierOutcome::Unknown(FrontierUnknown::Arithmetic(_))
+        ));
     }
 }
