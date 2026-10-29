@@ -5042,7 +5042,8 @@ fn branch_and_bound_price<const D: usize>(
     let mut paired_arc_hulls = HashMap::new();
     // Exact paired prefix states can recur on cyclic bounded walks. Cache
     // only completed extensions, never arithmetic or budget uncertainty.
-    type PrefixKey = (usize, Vec<(usize, u64, u64, u64, u64)>);
+    type PrefixEntry = (usize, u64, u64, u64, u64);
+    type PrefixKey = (usize, usize, [PrefixEntry; 8]);
     let mut paired_extensions: HashMap<PrefixKey, Option<Vec<PairedPrefixDomain>>> = HashMap::new();
     // A bounded walk may revisit an arc with exactly the same scalar state.
     // The graph is immutable for this pricing call, so scalar projection is
@@ -5310,21 +5311,17 @@ fn branch_and_bound_price<const D: usize>(
             Some(current) => {
                 let key = (!vertex_simple_domain && !current.is_empty() && current.len() <= 8)
                     .then(|| {
-                        (
-                            arc,
-                            current
-                                .iter()
-                                .map(|domain| {
-                                    (
-                                        domain.resource,
-                                        domain.base.lo.to_bits(),
-                                        domain.base.hi.to_bits(),
-                                        domain.dependent_lower.to_bits(),
-                                        domain.dependent_upper.to_bits(),
-                                    )
-                                })
-                                .collect(),
-                        )
+                        let mut entries = [(0, 0, 0, 0, 0); 8];
+                        for (entry, domain) in entries.iter_mut().zip(current) {
+                            *entry = (
+                                domain.resource,
+                                domain.base.lo.to_bits(),
+                                domain.base.hi.to_bits(),
+                                domain.dependent_lower.to_bits(),
+                                domain.dependent_upper.to_bits(),
+                            );
+                        }
+                        (arc, current.len(), entries)
                     });
                 let cached = key.as_ref().and_then(|key| paired_extensions.get(key));
                 let extension = if let Some(cached) = cached {

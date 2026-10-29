@@ -172,7 +172,7 @@ impl<const D: usize> State<D> {
                 });
             }
         }
-        let rhs = self.pricing.rhs.clone();
+        let rhs = std::mem::take(&mut self.pricing.rhs);
         let context = Context {
             phase,
             duals,
@@ -194,6 +194,7 @@ impl<const D: usize> State<D> {
             context,
         );
         self.pricing.scheduler = scheduler;
+        self.pricing.rhs = rhs;
         self.pricing_seconds += started.elapsed().as_secs_f64();
         let batch = result?;
         self.pricing.correction = batch.correction;

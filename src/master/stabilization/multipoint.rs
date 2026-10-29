@@ -79,8 +79,16 @@ pub fn add_support_planes<M: LpMaster>(
     outer_columns: &[(usize, usize, usize)],
     samples: &[Vec<f64>],
 ) -> Result<()> {
-    if samples.is_empty()
-        || samples.iter().any(|s| {
+    add_support_plane_refs(private, outer_columns, samples.iter().map(Vec::as_slice))
+}
+
+pub(super) fn add_support_plane_refs<'a, M: LpMaster>(
+    private: &mut M,
+    outer_columns: &[(usize, usize, usize)],
+    samples: impl Iterator<Item = &'a [f64]> + Clone,
+) -> Result<()> {
+    if samples.clone().next().is_none()
+        || samples.clone().any(|s| {
             s.iter().any(|x| !x.is_finite()) || outer_columns.iter().any(|&(r, _, _)| r >= s.len())
         })
     {

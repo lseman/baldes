@@ -118,7 +118,7 @@ impl<const D: usize> Controller<ClpMaster> for RootController<D> {
     ) -> Result<()> {
         {
             let mut state = self.state.borrow_mut();
-            state.pricing.rhs = master.rhs.clone();
+            state.pricing.rhs.clone_from(&master.rhs);
             state.pricing.master = (master.solved()
                 && master.objective().is_finite()
                 && master.objective_offset.is_finite())

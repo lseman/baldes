@@ -727,7 +727,15 @@ impl ProximalState {
             0
         };
         if parameters.multi_point {
-            self.register_point(&self.center.clone(), false);
+            if !self
+                .samples
+                .iter()
+                .any(|sample| sample.point == self.center)
+            {
+                let center = std::mem::take(&mut self.center);
+                self.register_point(&center, false);
+                self.center = center;
+            }
             super::multipoint::retain_planes(&mut self.samples, self.max_points)?;
         }
         // Backends may decline independent copies. Raw pricing preserves the
@@ -783,8 +791,11 @@ impl ProximalState {
             }
         }
         if parameters.multi_point {
-            let samples: Vec<_> = self.samples.iter().map(|s| s.point.clone()).collect();
-            super::multipoint::add_support_planes(&mut private, &outer_columns, &samples)?;
+            super::multipoint::add_support_plane_refs(
+                &mut private,
+                &outer_columns,
+                self.samples.iter().map(|sample| sample.point.as_slice()),
+            )?;
         }
         if private.solve_with_time_limit(remaining)? != LpSolveOutcome::Optimal {
             return Ok(raw.to_vec());

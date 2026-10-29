@@ -22,7 +22,7 @@ fn violation_key(violation: f64) -> f64 {
     (0.5 - violation * 100000000.0).floor() / 100000000.0
 }
 
-pub struct TupleSeparation {
+pub struct TupleSeparation<'a> {
     column_ids: Vec<i32>,
     num_packing_sets: i32,
     violation_tolerance: f64,
@@ -39,12 +39,12 @@ pub struct TupleSeparation {
     quadruples: HashMap<Vec<i32>, f64>,
     quintuples: HashMap<Vec<i32>, f64>,
     /// Columns of the current separate call (all of them).
-    columns: Vec<ColumnInfo>,
+    columns: &'a [ColumnInfo],
 }
 
-impl TupleSeparation {
+impl<'a> TupleSeparation<'a> {
     /// One- and two-row sums, triplets, quadruples and quintuples.
-    pub fn new(parent: &Separation, columns: &[ColumnInfo], column_ids: &[i32]) -> Self {
+    pub fn new(parent: &Separation, columns: &'a [ColumnInfo], column_ids: &[i32]) -> Self {
         let n = parent.num_packing_sets;
         let mut s = Self {
             column_ids: column_ids.to_vec(),
@@ -62,7 +62,7 @@ impl TupleSeparation {
             triplets: HashMap::new(),
             quadruples: HashMap::new(),
             quintuples: HashMap::new(),
-            columns: columns.to_vec(),
+            columns,
         };
         if !s.skip_subcut_checks {
             s.three_row_subsets = parent.permutations_5rows.clone();
@@ -167,25 +167,26 @@ impl TupleSeparation {
         }
         s
     }
-    fn lookup(set: &HashMap<Vec<i32>, f64>, mut ids: Vec<i32>, sort_ids: bool) -> f64 {
+    fn get3(&self, a: i32, b: i32, c: i32, sort_ids: bool) -> f64 {
+        let mut ids = [a, b, c];
         if sort_ids {
             ids.sort();
         }
-        set.get(&ids).copied().unwrap_or(0.0)
-    }
-    fn get3(&self, a: i32, b: i32, c: i32, sort_ids: bool) -> f64 {
-        Self::lookup(&self.triplets, vec![a, b, c], sort_ids)
+        self.triplets.get(ids.as_slice()).copied().unwrap_or(0.0)
     }
     fn get4(&self, a: i32, b: i32, c: i32, d: i32) -> f64 {
-        Self::lookup(&self.quadruples, vec![a, b, c, d], false)
+        self.quadruples
+            .get([a, b, c, d].as_slice())
+            .copied()
+            .unwrap_or(0.0)
     }
     fn get5(&self, ids: &[i32]) -> f64 {
-        Self::lookup(&self.quintuples, ids.to_vec(), false)
+        self.quintuples.get(ids).copied().unwrap_or(0.0)
     }
     /// Whether a 3-row sub-cut is violated (all columns).
     fn three_rows_violated(&self, ids: &[i32]) -> bool {
         let mut sums = vec![0.0f64; self.three_row_subsets.len()];
-        for col in &self.columns {
+        for col in self.columns {
             let cnt = &col.packing_set_count;
             for (t, p) in self.three_row_subsets.iter().enumerate() {
                 let c = (cnt[ids[p[0] as usize] as usize] != 0) as i32
@@ -339,11 +340,11 @@ impl TupleSeparation {
     pub fn four_rows_pack(&mut self, parent: &mut Separation, cuts: &mut CandidateSet) {
         self.prepare_four_rows();
         let mut generated = HashSet::new();
-        for t in self.selected.clone() {
+        for t in &self.selected {
             let mut best_row = -1;
             let mut best_violation = 0.0f64;
             for l in 0..self.num_packing_sets {
-                if !self.is_neighbor(&t, l) {
+                if !self.is_neighbor(t, l) {
                     continue;
                 }
                 let (a, b, c) = (t.ids[0], t.ids[1], t.ids[2]);
@@ -424,9 +425,8 @@ impl TupleSeparation {
             _ => return,
         }
         let mut generated = HashSet::new();
-        let selected = self.selected.clone();
-        for (i, t1) in selected.iter().enumerate() {
-            for t2 in &selected[i + 1..] {
+        for (i, t1) in self.selected.iter().enumerate() {
+            for t2 in &self.selected[i + 1..] {
                 let common: usize = t1
                     .ids
                     .iter()

@@ -567,18 +567,18 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 {
                     proximal_state.begin_iteration(&raw, &ordinary, stage, parameters)?;
                 }
-                proximal_state.pricing_point(
+                std::borrow::Cow::Owned(proximal_state.pricing_point(
                     master,
                     &raw,
                     stage,
                     parameters,
                     &excluded,
                     options.time_limit.saturating_sub(started.elapsed()),
-                )?
+                )?)
             } else if stabilize {
-                smoothing.pricing.clone()
+                std::borrow::Cow::Owned(smoothing.pricing.clone())
             } else {
-                raw.clone()
+                std::borrow::Cow::Borrowed(raw.as_slice())
             };
             let mut pending = vec![];
             loop {
@@ -686,7 +686,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                     // penalties. Complete ordinary pricing at the original LP
                     // dual before consuming any no-column result.
                     if fresh == 0 && current != raw {
-                        current = raw.clone();
+                        current = std::borrow::Cow::Borrowed(raw.as_slice());
                         continue;
                     }
                     break;
@@ -738,7 +738,7 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 if !again {
                     break;
                 }
-                current = smoothing.pricing.clone();
+                current = std::borrow::Cow::Owned(smoothing.pricing.clone());
             }
             if stabilize {
                 smoothing.after_iteration();

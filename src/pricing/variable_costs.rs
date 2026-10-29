@@ -14,7 +14,9 @@ impl<const D: usize> Solver<D> {
             arc.reduced_cost = cost;
         }
         self.variable_costs.clear();
-        self.raw_arc_costs = Some(raw.to_vec());
+        let raw_costs = self.raw_arc_costs.get_or_insert_with(Vec::new);
+        raw_costs.clear();
+        raw_costs.extend_from_slice(raw);
         Ok(())
     }
     /// MP retains a one-to-one raw physical variable representation, while its
