@@ -1333,63 +1333,6 @@ impl PreparedSlopePaired {
         }
     }
 
-    /// Recompute the exact sidecar-backed path from the same root as pricing.
-    /// This returns machine states, not a source-domain certificate.
-    pub(super) fn machine_replay_certificate(
-        &self,
-        path: &[usize],
-        budget: FrontierBudget,
-    ) -> FrontierOutcome<MachinePathHistory> {
-        let started = std::time::Instant::now();
-        let Some(inputs) = self.machine_inputs.as_deref() else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                "paired machine inputs unavailable",
-            ));
-        };
-        if path
-            .iter()
-            .any(|&arc| arc >= inputs.len() || arc >= self.arcs.len())
-        {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                "paired machine path arc is out of range",
-            ));
-        }
-        let root_budget = FrontierBudget {
-            max_operations: budget.max_operations / 2,
-            ..budget
-        };
-        let root = match self.machine_root(root_budget) {
-            FrontierOutcome::Complete(root) => root,
-            FrontierOutcome::Empty => {
-                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                    "paired machine root empty",
-                ))
-            }
-            FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
-        };
-        let remaining_time = budget
-            .max_elapsed
-            .map(|limit| limit.saturating_sub(started.elapsed()));
-        if remaining_time.is_some_and(|remaining| remaining.is_zero()) {
-            return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
-        }
-        let steps: Vec<_> = path
-            .iter()
-            .map(|&arc| (arc, &self.arcs[arc], inputs[arc].continuation_inputs()))
-            .collect();
-        PreparedSlopeRelationArc::machine_replay_path(
-            &root,
-            &steps,
-            self.machine_mode(),
-            path.len().saturating_add(1),
-            FrontierBudget {
-                max_operations: budget.max_operations - root_budget.max_operations,
-                max_elapsed: remaining_time,
-                ..budget
-            },
-        )
-    }
-
     fn extend_machine(
         &self,
         old: &SlopeLabel,

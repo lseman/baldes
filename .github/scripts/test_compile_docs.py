@@ -146,6 +146,13 @@ class DocumentationBuild(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing heading"):
             self.compile()
 
+    def test_internal_links_fail_even_when_target_exists(self):
+        (self.root / "internal").mkdir()
+        (self.root / "internal" / "notes.md").write_text("# Local notes\n")
+        (self.source / "README.md").write_text("# Overview\n[Notes](../internal/notes.md)\n")
+        with self.assertRaisesRegex(ValueError, "link to internal files is not allowed"):
+            self.compile()
+
     def test_rebuild_removes_stale_generated_pages(self):
         extra = self.source / "old.md"
         extra.write_text("# Retired guide\n")

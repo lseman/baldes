@@ -20,6 +20,8 @@ pub struct Genetic<'a, 'p> {
     local_search: &'a mut HGSLocalSearch<'p>,
     /// Reused offspring buffers: SREX writes 0 and 1, OX writes 2 and 3.
     candidate_offsprings: Vec<Individual<'p>>,
+    /// Membership scratch reused by both order crossovers.
+    ox_used: Vec<bool>,
 }
 
 impl<'a, 'p> Genetic<'a, 'p> {
@@ -37,6 +39,7 @@ impl<'a, 'p> Genetic<'a, 'p> {
             split,
             local_search,
             candidate_offsprings,
+            ox_used: vec![false; params.nb_clients as usize + 1],
         }
     }
 
@@ -157,6 +160,7 @@ impl<'a, 'p> Genetic<'a, 'p> {
                 &second.chrom_t,
                 start,
                 end,
+                &mut self.ox_used,
             );
             self.split
                 .general_split(child, self.params.nb_vehicles as usize);
@@ -178,11 +182,12 @@ impl<'a, 'p> Genetic<'a, 'p> {
         p2: &[usize],
         start: usize,
         end: usize,
+        used: &mut [bool],
     ) {
         let n = p1.len();
         child.clear();
         child.resize(n, 0);
-        let mut used = vec![false; n + 1];
+        used.fill(false);
         let mut i = start;
         loop {
             child[i] = p1[i];
@@ -293,19 +298,19 @@ impl<'a, 'p> Genetic<'a, 'p> {
             let index_a = (start_a + r) % n_routes_a;
             let route_b = &routes_b[(start_b + r) % n_routes_b];
             child0.chrom_r[index_a].clone_from(route_b);
-            child1.chrom_r[index_a] = route_b
-                .iter()
-                .copied()
-                .filter(|c| !b_not_a.contains(c))
-                .collect();
+            child1.chrom_r[index_a].clear();
+            child1.chrom_r[index_a]
+                .extend(route_b.iter().copied().filter(|c| !b_not_a.contains(c)));
         }
         for r in n_moved..n_routes_a {
             let index_a = (start_a + r) % n_routes_a;
-            child0.chrom_r[index_a] = routes_a[index_a]
-                .iter()
-                .copied()
-                .filter(|c| !b_not_a.contains(c))
-                .collect();
+            child0.chrom_r[index_a].clear();
+            child0.chrom_r[index_a].extend(
+                routes_a[index_a]
+                    .iter()
+                    .copied()
+                    .filter(|c| !b_not_a.contains(c)),
+            );
             child1.chrom_r[index_a].clone_from(&routes_a[index_a]);
         }
         for r in n_routes_a..nb_vehicles {

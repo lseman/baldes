@@ -68,6 +68,13 @@ impl<'p> HGSLocalSearch<'p> {
                 return false;
             }
 
+            // A candidate cannot improve if its distance and load cost alone
+            // exceed the current route penalty, even with zero time warp.
+            let load_pen = self.penalty_excess_load(self.routes[r_u].load);
+            if cost_supp_u + cost_supp_v + (load_pen - self.routes[r_u].penalty) > MY_EPSILON {
+                return false;
+            }
+
             let route_u_tw = if self.nodes[u].position < self.nodes[v].position {
                 let seg_tw = self.get_route_segment_tw_data(x, v);
                 let p1 =
@@ -177,6 +184,13 @@ impl<'p> HGSLocalSearch<'p> {
 
             let ux_tw =
                 TimeWindowData::merge(&self.nodes[u].tw_data, &self.nodes[x].tw_data, self.params);
+            // A candidate cannot improve if its distance and load cost alone
+            // exceed the current route penalty, even with zero time warp.
+            let load_pen = self.penalty_excess_load(self.routes[r_u].load);
+            if cost_supp_u + cost_supp_v + (load_pen - self.routes[r_u].penalty) > MY_EPSILON {
+                return false;
+            }
+
             let route_u_tw = if self.nodes[u].position < self.nodes[v].position {
                 let seg_tw = self.get_route_segment_tw_data(x_next, v);
                 let p1 =
@@ -285,6 +299,13 @@ impl<'p> HGSLocalSearch<'p> {
 
             let xu_tw =
                 TimeWindowData::merge(&self.nodes[x].tw_data, &self.nodes[u].tw_data, self.params);
+            // A candidate cannot improve if its distance and load cost alone
+            // exceed the current route penalty, even with zero time warp.
+            let load_pen = self.penalty_excess_load(self.routes[r_u].load);
+            if cost_supp_u + cost_supp_v + (load_pen - self.routes[r_u].penalty) > MY_EPSILON {
+                return false;
+            }
+
             let route_u_tw = if self.nodes[u].position < self.nodes[v].position {
                 let seg_tw = self.get_route_segment_tw_data(x_next, v);
                 let p1 =

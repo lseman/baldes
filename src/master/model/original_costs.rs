@@ -20,6 +20,7 @@ pub struct OriginalVariableCosts {
 }
 
 impl OriginalVariableCosts {
+    #[cfg(any(feature = "multi-time-windows", test))]
     pub(super) fn copy_arcs(&mut self, copies: impl Iterator<Item = (i32, i32)>) {
         let copies: Vec<_> = copies.collect();
         for &(copy, original) in &copies {

@@ -61,6 +61,7 @@ prepare these paths before running. Runs can take several minutes.
 | `benchmark_ce.mjs` | `name=/path/to/binary [...]`: compare column-elimination solves. |
 | `benchmark_ce_lp_threads.mjs` | `MODEL.mps [OUTPUT] [THREAD_COUNTS]`: compare HiGHS simplex/HiPO thread counts on an exported LP; requires the `highs` executable. |
 | `benchmark_hgs_intensify.py` | `BINARY INSTANCE SEED.sol --workers 1 2 4 --output FILE`: compare HGS workers with fixed batches and iteration budgets; checks identical routes and generation counts before reporting speedup. |
+| `search_hgs_bks.py` | `INSTANCE [INSTANCE ...] --output DIR`: download current CVRPLib solutions and run seeded intensification with multiple random seeds. |
 | `benchmark_robust.py` | `--output DIR [--jobs 4] [--time 60]`: run the 1,320-case Table 7 solver grid and independently replay robust incumbents. Uses `instances/Solomon/` and a Clp binary; see [robust routing](../docs/extensions/robust.md). |
 
 For example:
@@ -68,7 +69,16 @@ For example:
 ```sh
 node scripts/benchmarks/benchmark_solvers.mjs before=/tmp/baldes-before after=./target/release/baldes
 node scripts/benchmarks/benchmark_pstep.mjs ./target/release/baldes --grid
+python3 scripts/benchmarks/search_hgs_bks.py instances/XL/XL-n3334-k934.vrp instances/XL/XL-n5288-k1246.vrp --output results/hgs-search --time 300 --workers 4 --seeds 41 43 47 --std-similarity
 ```
+
+The HGS search runs one instance and seed at a time, using workers for its
+subproblems. It creates a new output directory with individual `.sol`, JSON and
+log files plus `summary.json`; it never overwrites an existing directory. Each
+run downloads its own current BKS through `--get-bks` and compares the final
+cost with the solver's recomputed seed cost. Candidate improvements are not
+automatically submitted or independently certified. Per-run logs retain the
+solver's validation and search details. See `--help` for search parameters.
 
 Routing comparisons require Linux `taskset`; `BALDES_PROFILE_OUT`,
 `BALDES_PROFILE_CASES`, `BALDES_PROFILE_RUNS`, and `BALDES_PROFILE_CPUS`

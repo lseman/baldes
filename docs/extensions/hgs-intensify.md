@@ -43,6 +43,12 @@ factor. This changes route selection; it does not implement the paper's customer
 clustering or its cross-cluster improvement phase.
 The separate [`--dri` customer-clustering mode](hgs-dri.md) provides those phases.
 
+`--barycenter` instead ranks neighbors by Euclidean distance between the mean
+customer coordinates of each route. It cannot be combined with
+`--std-similarity`. It uses coordinates even for explicit distance matrices, so
+it is useful only when those coordinates carry meaningful spatial information.
+Every fifth round still selects random neighbors, as in the default selector.
+
 1. Choose a random anchor route and nearby routes, measured by minimum distance
    from up to four anchor customers. Every fifth round chooses random neighbors.
    Neighborhoods expand from two routes during stagnation, bounded by

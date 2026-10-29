@@ -203,6 +203,8 @@ def rewrite_link(url: str, page: Page, pages: dict[Path, Page], root: Path,
     if parts.scheme or parts.netloc:
         return url
     target = (page.source.parent / unquote(parts.path)).resolve() if parts.path else page.source
+    if target.is_relative_to(root / "internal"):
+        raise ValueError(f"{page.source}: link to internal files is not allowed: {url!r}")
     linked_page = pages.get(target)
     if linked_page:
         if parts.fragment and unquote(parts.fragment) not in {h[2] for h in linked_page.headings}:

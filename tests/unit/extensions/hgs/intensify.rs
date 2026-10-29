@@ -43,6 +43,28 @@ fn options() -> IntensifyOptions {
 }
 
 #[test]
+fn barycenter_selects_nearest_route_and_respects_customer_limit() {
+    let data = instance();
+    let plan = Plan::new(vec![vec![1], vec![2], vec![3], vec![4]], 0.0);
+    let opts = IntensifyOptions {
+        barycenter: true,
+        max_customers: 2,
+        ..options()
+    };
+    let mut rng = Xoroshiro128Plus::new(7);
+    let selected = select_routes(&data, &plan, &opts, 0, 0, &mut rng, &BTreeSet::new());
+    assert!(
+        selected == vec![0, 1] || selected == vec![2, 3],
+        "{selected:?}"
+    );
+    let result = intensify(&data, &plan.routes, &opts).unwrap();
+    assert_eq!(
+        validate_plan(&data, &result.routes).unwrap(),
+        result.best_cost
+    );
+}
+
+#[test]
 fn seeded_subproblem_search_improves_and_checkpoints_complete_plans() {
     let instance = instance();
     let seed = vec![vec![1, 3], vec![2, 4]];

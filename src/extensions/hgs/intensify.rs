@@ -31,6 +31,8 @@ pub struct IntensifyOptions {
     pub batch_size: usize,
     /// Rank nearby routes using the paper's spatial-temporal-demand score.
     pub std_similarity: bool,
+    /// Rank route neighbors by Euclidean distance between customer barycenters.
+    pub barycenter: bool,
     /// Maximum routes selected per round (at least two).
     pub max_routes: usize,
     /// Maximum selected customers. A single oversized seed route is skipped.
@@ -55,6 +57,7 @@ impl Default for IntensifyOptions {
             workers: 1,
             batch_size: 0,
             std_similarity: false,
+            barycenter: false,
             max_routes: 8,
             max_customers: 300,
             subproblem: HgsOptions {
@@ -164,7 +167,7 @@ fn add_elite(pool: &mut Vec<Plan>, candidate: &Plan, options: &IntensifyOptions)
 }
 
 /// Pick an anchor route randomly, then nearby routes by minimum cross-route
-/// distance from up to four anchor customers. Every fifth round uses random
+/// distance from up to four anchor customers or route barycenters. Every fifth round uses random
 /// neighbors; stalled phases expand the number of routes selected.
 fn select_routes(
     instance: &Instance,
@@ -190,20 +193,32 @@ fn select_routes(
         let mut ranked: Vec<_> = neighbors
             .into_iter()
             .map(|i| {
-                let distance = (0..route.len().min(4))
-                    .flat_map(|k| {
-                        let a = route[k * route.len() / route.len().min(4)];
-                        plan.routes[i].iter().map(move |&b| {
-                            if options.std_similarity {
-                                std_dissimilarity(instance, a, b)
-                            } else {
-                                instance
-                                    .distance(a, b, instance.rounding)
-                                    .min(instance.distance(b, a, instance.rounding))
-                            }
+                let distance = if options.barycenter {
+                    let center = |r: &[usize]| {
+                        let (x, y) = r.iter().fold((0.0, 0.0), |(x, y), &c| {
+                            (x + instance.customers[c].x, y + instance.customers[c].y)
+                        });
+                        (x / r.len() as f64, y / r.len() as f64)
+                    };
+                    let (ax, ay) = center(route);
+                    let (bx, by) = center(&plan.routes[i]);
+                    (ax - bx).hypot(ay - by)
+                } else {
+                    (0..route.len().min(4))
+                        .flat_map(|k| {
+                            let a = route[k * route.len() / route.len().min(4)];
+                            plan.routes[i].iter().map(move |&b| {
+                                if options.std_similarity {
+                                    std_dissimilarity(instance, a, b)
+                                } else {
+                                    instance
+                                        .distance(a, b, instance.rounding)
+                                        .min(instance.distance(b, a, instance.rounding))
+                                }
+                            })
                         })
-                    })
-                    .fold(f64::INFINITY, f64::min);
+                        .fold(f64::INFINITY, f64::min)
+                };
                 (i, distance)
             })
             .collect();

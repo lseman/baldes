@@ -987,7 +987,7 @@ mod tests {
             assert_eq!(Config::parse(&c.text()).unwrap(), c);
             assert!(args(&c, "build")
                 .windows(2)
-                .any(|w| w == ["--features", feature]));
+                .any(|w| w[0] == "--features" && w[1].split(',').any(|f| f == feature)));
             c.target = "aarch64-unknown-linux-gnu".into();
             assert!(c.validate().is_err());
         }
@@ -1012,6 +1012,8 @@ mod tests {
                 "--profile",
                 "release",
                 "--no-default-features",
+                "--features",
+                "ryan-foster-master,accumulated-resource-master",
                 "--locked"
             ]
         );
@@ -1043,7 +1045,11 @@ mod tests {
         };
         assert_eq!(Config::parse(&c.text()).unwrap(), c);
         let a = args(&c, "test");
-        assert!(a.windows(2).any(|w| w == ["--features", "clp,highs"]));
+        assert!(a.windows(2).any(|w| w
+            == [
+                "--features",
+                "clp,highs,ryan-foster-master,accumulated-resource-master"
+            ]));
         assert!(a.windows(2).any(|w| w == ["--profile", "dev"]));
         assert!(a.contains(&"--offline".into()));
         assert!(!a.contains(&"--locked".into()));
@@ -1067,9 +1073,11 @@ mod tests {
             .unwrap();
         assert_eq!(Config::parse(&c.text()).unwrap(), c);
         for action in ["build", "check", "test", "clippy"] {
-            assert!(args(&c, action)
-                .windows(2)
-                .any(|w| w == ["--features", "clp,highs,gurobi"]));
+            assert!(args(&c, action).windows(2).any(|w| w
+                == [
+                    "--features",
+                    "clp,highs,gurobi,ryan-foster-master,accumulated-resource-master"
+                ]));
             assert_eq!(
                 c.cargo(action).unwrap().vars.get(OsStr::new("GUROBI_HOME")),
                 Some(&OsString::from(&c.gurobi_home))
@@ -1095,7 +1103,7 @@ mod tests {
         // The standalone Gurobi library does not require Clp.
         assert!(args(&Config::parse("CONFIG_GUROBI=y").unwrap(), "build")
             .windows(2)
-            .any(|w| w == ["--features", "gurobi"]));
+            .any(|w| w[0] == "--features" && w[1].split(',').any(|f| f == "gurobi")));
     }
 
     #[test]

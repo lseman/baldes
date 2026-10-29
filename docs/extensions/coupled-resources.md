@@ -439,9 +439,9 @@ Its two required physical routes contribute paired costs 7 and 5.
 Waiting coefficients represent signed 32-bit runtime values. In the retained
 modern MetaSolver artifact, registration stores a binary64 coefficient, then
 both directional extension wrappers truncate it toward zero to that integer
-type. BALDES exposes the integer runtime parameter directly. The optional
-[registered factory controls](../../internal/reference/README.md#registered-paired-factory-preparation)
-include nonlinear functions and cases where this conversion changes the optimum.
+type. BALDES exposes the integer runtime parameter directly. Retained comparison
+fixtures include nonlinear functions and cases where this conversion changes
+the optimum.
 
 For `FrontAlgebra`, aligned affine fronts can retain a single rounded crossing
 with a nonconstant lower bound using the observed encoded-continuity ordering.

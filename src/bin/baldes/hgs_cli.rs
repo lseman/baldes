@@ -19,6 +19,7 @@ pub const HELP: &str = "HGS extensions (all opt-in):
   --dri-iterations N        Maximum medoid updates (default: 5)
   --dri-routing-fraction X  Fraction of remaining time for cluster routing (default: 0.8)
   --std-similarity          Rank route neighbors using spatial, temporal and demand similarity
+  --barycenter             Rank route neighbors by customer-coordinate barycenters
   --workers N               Independent subproblem workers (default: 1; requires --intensify or --dri)
   --batch-size N            Jobs per solution snapshot (default: 0 = workers)
   --solution-output FILE    Checkpoint the best plan as a CVRPLib .sol file (replaces FILE)
@@ -78,6 +79,11 @@ impl ExtensionOptions {
             "--dri" => self.dri = true,
             "--std-similarity" => {
                 self.config.std_similarity = true;
+                self.controls = true;
+                self.route_controls = true;
+            }
+            "--barycenter" => {
+                self.config.barycenter = true;
                 self.controls = true;
                 self.route_controls = true;
             }
@@ -192,6 +198,9 @@ impl ExtensionOptions {
     }
 
     pub fn validate(&self) -> Result<(), String> {
+        if self.config.barycenter && self.config.std_similarity {
+            return Err("--barycenter conflicts with --std-similarity".into());
+        }
         if self.get_bks && self.initial_solution.is_some() {
             return Err("--get-bks conflicts with --initial-solution".into());
         }

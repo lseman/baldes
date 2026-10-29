@@ -398,10 +398,7 @@ fn phased_fallback_selection<const D: usize>(
     })
 }
 
-fn solve<const D: usize>(
-    start: Start<D>,
-    mut options: ModelTreeOptions,
-) -> Result<ModelTreeOutput> {
+fn solve<const D: usize>(start: Start<D>, options: ModelTreeOptions) -> Result<ModelTreeOutput> {
     let Some(resource) = options.time_window_selection else {
         return solve_split(start, options, &[]);
     };
@@ -419,6 +416,7 @@ fn solve<const D: usize>(
     }
     #[cfg(feature = "multi-time-windows")]
     {
+        let mut options = options;
         problem.validate()?;
         let windows = time_windows::split(&mut problem, resource)?;
         for variable in &mut options.mapped_variables {

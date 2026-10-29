@@ -3020,9 +3020,8 @@ fn coupled_lower_bounds<const D: usize>(
         let mut max_increment = 0.0f64;
         let mut max_waiting = 0.0f64;
         let mut max_lower = f64::NEG_INFINITY;
-        let mut max_upper = f64::INFINITY;
         if monotone_cost_bounded {
-            max_upper = f64::NEG_INFINITY;
+            let mut max_upper = f64::NEG_INFINITY;
             let mut terminal_arcs = Vec::new();
             let mut terminal_contributions = HashMap::new();
             for arc_index in 0..graph.arcs.len() {
