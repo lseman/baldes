@@ -14,6 +14,7 @@ pub(super) struct RootPricing {
     admission: bool,
     pub attempts: usize,
     pub oracle_calls: usize,
+    pub node_depth: usize,
     multiplicity: f64,
 }
 impl Default for RootPricing {
@@ -33,6 +34,7 @@ impl RootPricing {
             admission: !options.stabilize && options.proximal.is_none(),
             attempts: 0,
             oracle_calls: 0,
+            node_depth: options.node_depth,
             multiplicity: options.multiplicity,
         }
     }

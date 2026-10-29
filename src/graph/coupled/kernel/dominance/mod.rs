@@ -144,7 +144,9 @@ impl CoupledKernel {
             // Native tolerance is never used as a proof rule.
             return self.signed_paired_fronts_dominate(a, b, forward);
         }
-        if self.weighted_objective || !self.pricing_activities.is_empty() {
+        if (self.weighted_objective && (forward || !self.nonnegative_paired_weights_only))
+            || !self.pricing_activities.is_empty()
+        {
             // Until a joint component proof is available, only identical
             // coupled/pricing states may dominate. A base-resource penalty
             // alone cannot pay for a signed activity adjustment.
@@ -290,7 +292,14 @@ impl CoupledKernel {
             if a.bounds != b.bounds && !weaker_bounds(a, b) {
                 return None;
             }
-            return add_up(penalty, self.backward_penalty(a, b, vertex)?);
+            // Preserve any paired continuation compensation as well as the
+            // independent numeric suffix penalty. Current backward paired
+            // proofs normally return zero, but a future nonzero directed
+            // bound must never disappear at this merge.
+            return add_up(
+                add_up(penalty, relation_penalty)?,
+                self.backward_penalty(a, b, vertex)?,
+            );
         }
         if !self.optimization.dependency_order.preserves(
             &a.numeric,
@@ -397,47 +406,53 @@ impl CoupledKernel {
     /// Backward labels with different suffix arc programs may still compare
     /// when every replay-dependent relation has a sufficient suffix summary:
     /// a feasibility upper front or an exact bounded-cost transfer. Other
-    /// resources retain the common-program restriction.
+    /// resources retain the common-program restriction. Cost transfers also
+    /// need a global proof that reachable prefix values lie on a bounded exact lattice;
+    /// numerical adjoints alone cannot compare fractional-prefix rounding.
     fn backward_programs_free(&self, a: &CoupledLabelState, b: &CoupledLabelState) -> bool {
         !self.transitions.deferred
             && self.plugins.is_empty()
             && self.slope_indices.is_empty()
+            && a.slope_relations.len() == self.slope_paired.len()
+            && b.slope_relations.len() == self.slope_paired.len()
             && self
                 .slope_paired
                 .iter()
-                .zip(&a.slope_relations)
-                .zip(&b.slope_relations)
-                .all(|((prepared, a), b)| {
-                    !prepared.has_costs() || (a.bounded_cost.is_some() && b.bounded_cost.is_some())
+                .zip(a.slope_relations.iter().zip(&b.slope_relations))
+                .all(|(prepared, (a, b))| {
+                    if prepared.has_costs() {
+                        prepared.monotone_constant_suffix_dominates(a, b) || (prepared.has_exact_cost_continuations()
+                            && a.bounded_cost.is_some()
+                            && b.bounded_cost.is_some())
+                    } else {
+                        a.upper.is_some() && b.upper.is_some()
+                    }
                 })
-            && a.slope_relations
-                .iter()
-                .chain(&b.slope_relations)
-                .all(|label| label.upper.is_some() || label.bounded_cost.is_some())
+            && a.relations.len() == self.paired.len()
+            && b.relations.len() == self.paired.len()
             && self
                 .paired
                 .iter()
-                .zip(&a.relations)
-                .zip(&b.relations)
-                .all(|((prepared, a), b)| {
-                    !prepared.has_costs()
-                        || (a.backward_cost().is_some() && b.backward_cost().is_some())
+                .zip(a.relations.iter().zip(&b.relations))
+                .all(|(prepared, (a, b))| {
+                    if prepared.has_costs() {
+                        prepared.has_exact_cost_continuations()
+                            && a.backward_cost().is_some()
+                            && b.backward_cost().is_some()
+                    } else {
+                        a.backward_upper().is_some() && b.backward_upper().is_some()
+                    }
                 })
-            && a.relations
-                .iter()
-                .chain(&b.relations)
-                .all(|label| label.backward_upper().is_some() || label.backward_cost().is_some())
     }
 
     /// Different physical paths can execute exactly the same paired program.
     /// Comparing the ordered source operators proves identical replay without
-    /// requiring a numerical adjoint. Keep every other replaying family out of
-    /// this proof; their aggregate backward states alone are not sufficient.
+    /// requiring a numerical adjoint. Numeric transitions with exact backward
+    /// summaries, selection, loads and budgets are checked independently by
+    /// the surrounding dominance path. Deferred numeric replay, interval
+    /// fronts and plugins still require matching physical programs.
     fn backward_programs_equivalent(&self, a: &CoupledLabelState, b: &CoupledLabelState) -> bool {
-        if !self.initial.is_empty()
-            || !self.selection_initial.is_empty()
-            || !self.load_capacities.is_empty()
-            || !self.budgeted.is_empty()
+        if self.transitions.deferred
             || !self.front_indices.is_empty()
             || !self.slope_indices.is_empty()
             || !self.plugins.is_empty()
@@ -479,7 +494,7 @@ impl CoupledKernel {
                 continue;
             }
             let charged = prepared.has_costs() && self.cost_scale != 0.;
-            if charged && !(tracked_order && self.cost_scale > 0.) {
+            if charged && forward && !(tracked_order && self.cost_scale > 0.) {
                 return None;
             }
             let gap = prepared.penalty(left, right, forward, self.cost_scale)?;

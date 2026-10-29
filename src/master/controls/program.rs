@@ -183,6 +183,61 @@ pub(super) fn repair_arrivals(
     Some(base)
 }
 
+/// One advisory control using the full function domains, without selecting an
+/// LP region. It may miss controls behind nonmonotone dependent bounds; failure
+/// is unknown and the caller must independently certify the complete proposal.
+pub(super) fn earliest_base_proposal(program: &Program, budget: &mut Budget) -> Option<Vec<f64>> {
+    let n = program.waiting.len();
+    budget.take(n.checked_mul(8)?.checked_add(4)?)?;
+    let mut bounds = vec![
+        Bounds {
+            lower: f64::NEG_INFINITY,
+            upper: f64::INFINITY,
+        };
+        n.checked_add(1)?
+    ];
+    let domain = |function: &[Segment]| -> Option<(f64, f64)> {
+        Some((function.first()?.lo, function.last()?.hi))
+    };
+    let (lo, hi) = domain(&program.functions[0])?;
+    restrict(
+        &mut bounds[0],
+        lo.max(program.initial.lower),
+        hi.min(program.initial.upper),
+    );
+    for i in 0..n {
+        for function in &program.functions[1 + 4 * i..3 + 4 * i] {
+            let (lo, hi) = domain(function)?;
+            restrict(&mut bounds[i], lo, hi);
+        }
+        for function in &program.functions[3 + 4 * i..5 + 4 * i] {
+            let (lo, hi) = domain(function)?;
+            restrict(&mut bounds[i + 1], lo, hi);
+        }
+    }
+    if bounds
+        .iter()
+        .any(|b| !b.lower.is_finite() || !b.upper.is_finite() || b.lower > b.upper)
+    {
+        return None;
+    }
+    let mut base = Vec::with_capacity(bounds.len());
+    base.push(bounds[0].lower);
+    for i in 0..n {
+        let arrival = &program.functions[1 + 4 * i];
+        budget.take(arrival.len().checked_add(2)?)?;
+        let segment = arrival
+            .iter()
+            .find(|s| s.lo <= base[i] && base[i] <= s.hi)?;
+        let head = segment.image(base[i])?.1.max(bounds[i + 1].lower);
+        if !head.is_finite() || head > bounds[i + 1].upper {
+            return None;
+        }
+        base.push(head);
+    }
+    Some(base)
+}
+
 pub(super) struct Cell {
     pub(super) bounds: Vec<Bounds>,
     pub(super) rows: Vec<Constraint>,

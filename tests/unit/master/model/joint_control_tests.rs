@@ -2,6 +2,45 @@ use super::*;
 use std::time::Duration;
 
 #[test]
+fn cyclic_suffix_bounds_reuse_stable_rows_for_large_hop_caps() {
+    let mut graph = crate::graph::Graph::<2>::new(3, 0).unwrap();
+    graph.add_arc(0, 1, 0.).unwrap();
+    graph.add_arc(1, 1, 0.).unwrap();
+    graph.add_arc(1, 2, 0.).unwrap();
+    let mut work = 64;
+    let suffix = suffix_table(
+        &graph,
+        &[0., 1., 0.],
+        1_000_000,
+        &mut work,
+        Instant::now() + Duration::from_secs(1),
+    )
+    .unwrap();
+    assert!(suffix.stable);
+    assert!(suffix.rows.len() < 10);
+    assert_eq!(suffix.len(), 1_000_001);
+    assert_eq!(suffix.get(1_000_000), suffix.rows.last());
+    assert!(suffix.get(1_000_001).is_none());
+    assert!(suffix.get(1_000_000).unwrap()[graph.source].is_some());
+}
+
+#[test]
+fn cyclic_suffix_bounds_keep_distinct_rows_for_improving_cycles() {
+    let mut graph = crate::graph::Graph::<2>::new(3, 0).unwrap();
+    graph.add_arc(0, 1, 0.).unwrap();
+    graph.add_arc(1, 1, 0.).unwrap();
+    graph.add_arc(1, 2, 0.).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(1);
+    let mut work = 128;
+    let suffix = suffix_table(&graph, &[0., -1., 0.], 8, &mut work, deadline).unwrap();
+    assert!(!suffix.stable);
+    assert_eq!(suffix.rows.len(), 9);
+    assert_eq!(suffix.get(2).unwrap()[graph.source], Some(0.));
+    assert_eq!(suffix.get(8).unwrap()[graph.source], Some(-6.));
+    assert!(suffix.get(9).is_none());
+}
+
+#[test]
 fn reduced_cost_interval_touching_zero_enumerates_paired_endpoints() {
     assert!(sign_ambiguous(Interval { lo: -1., hi: 0. }));
     assert!(sign_ambiguous(Interval { lo: -1., hi: 1. }));
@@ -95,6 +134,42 @@ fn unbounded_paired_terminal_bound_covers_negative_increments_and_work_limits() 
 }
 
 #[test]
+fn paired_terminal_lower_bound_stops_when_monotone_recurrence_rises() {
+    let initial = paired_test_function(0., 10., 10., 10.);
+    let arc = crate::graph::coupled::PairedResourceArc {
+        arrival: paired_test_function(0., 0., 10., 10.),
+        increment: paired_test_function(0., 2., 10., 2.),
+        lower: paired_test_function(0., -100., 1e12, -100.),
+        upper: paired_test_function(0., 1e12, 1e12, 1e12),
+        waiting: 0,
+    };
+    let mut work = 100;
+    let bound = paired_terminal_lower_bound(
+        &initial,
+        &[arc],
+        1_000_000,
+        &mut work,
+        Instant::now() + Duration::from_secs(1),
+    );
+    assert_eq!(bound, Some(10.));
+    assert!(work > 0);
+}
+
+#[test]
+fn paired_terminal_lower_bound_zero_hops_does_not_scan_arcs() {
+    let initial = paired_test_function(0., 10., 10., 10.);
+    let mut work = 8;
+    let bound = paired_terminal_lower_bound(
+        &initial,
+        &[],
+        0,
+        &mut work,
+        Instant::now() + Duration::from_secs(1),
+    );
+    assert_eq!(bound, Some(10.));
+}
+
+#[test]
 fn paired_negative_terminal_ceiling_applies_lower_resets_per_hop() {
     let deadline = Instant::now() + Duration::from_secs(1);
     let mut work = 8;
@@ -147,6 +222,47 @@ fn paired_negative_terminal_ceiling_applies_lower_resets_per_hop() {
         deadline,
     )
     .is_none());
+}
+
+#[test]
+fn paired_terminal_ceiling_stops_when_monotone_recurrence_falls() {
+    let mut work = 2;
+    let result = paired_terminal_ceiling_after_hops(
+        10.,
+        -1.,
+        0.,
+        -100.,
+        100.,
+        false,
+        1_000_000,
+        &mut work,
+        Instant::now() + Duration::from_secs(1),
+    );
+    assert_eq!(result, Some(10.));
+    assert_eq!(work, 1);
+}
+
+#[test]
+fn paired_terminal_upper_bound_stops_when_monotone_recurrence_falls() {
+    let initial = paired_test_function(0., 10., 10., 10.);
+    let arc = crate::graph::coupled::PairedResourceArc {
+        arrival: paired_test_function(0., 0., 10., 10.),
+        increment: paired_test_function(0., -1., 10., -1.),
+        lower: paired_test_function(0., -100., 10., -100.),
+        upper: paired_test_function(0., 100., 10., 100.),
+        waiting: 0,
+    };
+    let mut work = 100;
+    let bound = paired_terminal_upper_bound(
+        &initial,
+        &[arc],
+        1_000_000,
+        &mut work,
+        Instant::now() + Duration::from_secs(1),
+    )
+    .unwrap();
+    assert_eq!(bound.terminal, 10.);
+    assert!(work > 0);
 }
 
 #[test]
@@ -207,6 +323,7 @@ fn paired_base_domain_pruning_keeps_hulls_and_proves_empty_departure_domains() {
 
     let deadline = Instant::now() + Duration::from_secs(1);
     let mut work = 100;
+    let mut hulls = HashMap::new();
     let roots = paired_prefix_roots(&graph, &mut work, deadline).unwrap();
     assert_eq!(roots.len(), 1);
     assert_eq!(roots[0].resource, 0);
@@ -219,9 +336,10 @@ fn paired_base_domain_pruning_keeps_hulls_and_proves_empty_departure_domains() {
         dependent_lower: 0.,
         dependent_upper: 0.,
     }];
-    let reachable = extend_paired_prefix_domains(&graph, 0, &narrowed, &mut work, deadline)
-        .unwrap()
-        .unwrap();
+    let reachable =
+        extend_paired_prefix_domains(&graph, 0, &narrowed, &mut hulls, &mut work, deadline)
+            .unwrap()
+            .unwrap();
     assert_eq!(reachable.len(), 1);
     assert_eq!(reachable[0].base.lo, 2.);
     assert_eq!(reachable[0].base.hi, 10.);
@@ -235,7 +353,7 @@ fn paired_base_domain_pruning_keeps_hulls_and_proves_empty_departure_domains() {
         dependent_upper: 0.,
     }];
     assert!(matches!(
-        extend_paired_prefix_domains(&graph, 0, &impossible, &mut work, deadline,),
+        extend_paired_prefix_domains(&graph, 0, &impossible, &mut hulls, &mut work, deadline,),
         Some(None)
     ));
 }
@@ -271,15 +389,45 @@ fn front_algebra_paired_prefix_keeps_endpoint_snapped_head_below_arrival() {
 
     let deadline = Instant::now() + Duration::from_secs(1);
     let mut work = 1_000;
+    let mut hulls = HashMap::new();
     let roots = paired_prefix_roots(&graph, &mut work, deadline).unwrap();
     assert_eq!(roots.len(), 1);
 
-    let next = extend_paired_prefix_domains(&graph, 0, &roots, &mut work, deadline)
+    let next = extend_paired_prefix_domains(&graph, 0, &roots, &mut hulls, &mut work, deadline)
         .unwrap()
         .unwrap();
     assert_eq!(next.len(), 1);
     assert!(next[0].base.lo < 0.);
     assert!(next[0].dependent_lower <= 0.);
+    assert_eq!(hulls.len(), 1);
+    let cached = extend_paired_prefix_domains(&graph, 0, &roots, &mut hulls, &mut work, deadline)
+        .unwrap()
+        .unwrap();
+    assert_eq!(cached[0].base.lo.to_bits(), next[0].base.lo.to_bits());
+    assert_eq!(cached[0].base.hi.to_bits(), next[0].base.hi.to_bits());
+    assert_eq!(
+        cached[0].dependent_lower.to_bits(),
+        next[0].dependent_lower.to_bits()
+    );
+    assert_eq!(
+        cached[0].dependent_upper.to_bits(),
+        next[0].dependent_upper.to_bits()
+    );
+    let mut exhausted = 0;
+    assert!(
+        extend_paired_prefix_domains(&graph, 0, &roots, &mut hulls, &mut exhausted, deadline,)
+            .is_none()
+    );
+    let mut work = 1_000;
+    assert!(extend_paired_prefix_domains(
+        &graph,
+        0,
+        &roots,
+        &mut hulls,
+        &mut work,
+        Instant::now() - Duration::from_millis(1),
+    )
+    .is_none());
 }
 
 fn root() -> Output<2> {

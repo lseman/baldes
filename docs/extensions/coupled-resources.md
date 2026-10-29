@@ -440,7 +440,7 @@ Waiting coefficients represent signed 32-bit runtime values. In the retained
 modern MetaSolver artifact, registration stores a binary64 coefficient, then
 both directional extension wrappers truncate it toward zero to that integer
 type. BALDES exposes the integer runtime parameter directly. The optional
-[registered factory controls](../../tests/reference/README.md#registered-paired-factory-preparation)
+[registered factory controls](../../internal/reference/README.md#registered-paired-factory-preparation)
 include nonlinear functions and cases where this conversion changes the optimum.
 
 For `FrontAlgebra`, aligned affine fronts can retain a single rounded crossing
@@ -458,6 +458,34 @@ lowers, uppers, waiting, mode="feasibility", policy="strict_domain",
 normalization="absolute_final_value")`. All functions must be `EncodedFunction`
 slope encodings with leaf policies matching the operation policy, as for
 `SlopeIntervalCost`. The existing knot builder retains its stated delta cost.
+
+Rust callers using `front_algebra` can supply per-arc accumulated-base waiting
+windows with `Graph::set_paired_waiting_windows`. Supply one finite ordered
+window per physical arc, already intersected with its destination vertex's
+base-resource window. The bounds are distinct from the domains of the
+dependent lower and upper functions. Reinstall them after replacing the
+resource definitions or changing graph topology. The recovered zero-length
+waiting path remains limited to the supported bound and provenance cases.
+When a physical scalar resource represents that base coordinate,
+`Graph::set_paired_waiting_windows_from_resource` constructs the intersection
+from the destination and arc bounds. It rejects empty or disconnected
+multi-time windows and uses finite `-1e12`/`1e12` defaults for absent arc bounds.
+For the modern CLI/Python network model, supply
+`paired_waiting_base_resources` as `(coupled_resource_index,
+scalar_resource_index)` pairs instead. For example, JSON accepts
+`"paired_waiting_base_resources": [[0, 1]]` and Python accepts
+`paired_waiting_base_resources=((0, 1),)`. The field defaults to empty;
+duplicate paired indices are rejected.
+
+Backward raw paired labels also retain a numerical upper front when the
+prepared adjoint can compute one. Rust callers can inspect these fronts with
+`CoupledLabelState::slope_relation_backward_fronts`; an absent front means the
+adjoint was unavailable or empty. The adjoint applies the dependent bounds,
+reverse waiting envelope, base map and dependent increment using the raw slope
+representation. Its result is advisory: it does not certify source-control
+feasibility or replace ordered suffix replay when joining labels.
+`slope_relation_backward_outcomes_with_budget` can recompute the outcomes with
+a caller-supplied work and time budget instead of reusing a cached unknown.
 
 For a nonempty raw cost route, `absolute_final_value` charges the final dependent
 minimum, including the initial value. The alternate

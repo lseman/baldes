@@ -38,11 +38,118 @@ fn functor_round_refines_the_grid_used_by_the_raw_search() {
     solver.round.pending_decrease = true;
     solver.column_generation_terminated(0, 0).unwrap();
     assert_eq!(solver.pricing_engine().unwrap().grid.step[0], 1.);
+    let engine = solver.pricing_engine().unwrap();
+    assert!(engine.forward.labels.is_empty());
+    assert!(engine.backward.labels.is_empty());
+    assert!(!engine.half_ready && !engine.full_ready);
+    assert_eq!(
+        engine
+            .forward
+            .buckets
+            .iter()
+            .map(Vec::len)
+            .collect::<Vec<_>>(),
+        engine
+            .grid
+            .forward
+            .buckets
+            .iter()
+            .map(Vec::len)
+            .collect::<Vec<_>>()
+    );
     assert_eq!(solver.bucket_steps[0], 1.);
     assert!(solver.round.times.is_empty());
     assert!(!solver.round.pending_decrease);
     solver.price_functor_phase(0, 8).unwrap();
     assert_eq!(solver.pricing_engine().unwrap().grid.step[0], 1.);
+}
+
+#[test]
+fn restored_parent_and_siblings_keep_independent_bucket_refinement_versions() {
+    use crate::graph::coupled::{
+        CoupledResource, FrontOperationPolicy, PairedCostNormalization, PairedResourceMode,
+        PreparedSlopeFunction, SlopeRelationArc,
+    };
+    for paired in [false, true] {
+        let mut parent = model();
+        if paired {
+            let function = |value, slope| {
+                PreparedSlopeFunction::from_prepared_pairs(vec![(value, 0.), (slope, 10.)]).unwrap()
+            };
+            parent
+                .graph
+                .set_coupled_resources(&[CoupledResource::SlopePaired {
+                    initial: function(0., 0.),
+                    initial_base: crate::graph::Window::new(0., 10.).unwrap(),
+                    arcs: vec![
+                        SlopeRelationArc {
+                            arrival: function(0., 1.),
+                            increment: function(0.5, 0.),
+                            lower: function(0., 0.),
+                            upper: function(100., 0.),
+                            waiting: 0,
+                        };
+                        parent.graph.arcs.len()
+                    ],
+                    mode: PairedResourceMode::CostUnbounded,
+                    normalization: PairedCostNormalization::AbsoluteFinalValue,
+                    policy: FrontOperationPolicy::StrictDomain,
+                }])
+                .unwrap();
+        }
+        parent.bucket_steps[0] = 2.;
+        parent.cache_variable_costs(&[1e-9]).unwrap();
+        let baseline = parent
+            .price_functor_phase(0, 8)
+            .unwrap()
+            .minimum_reduced_cost;
+        assert_eq!(baseline, if paired { 1.05 } else { 0.05 });
+        let saved = parent.fork_for_node();
+        let parent_version = parent.pricing_engine().unwrap().grid.version;
+        let mut child = saved.fork_for_node();
+        for expected_step in [1., 0.5] {
+            assert_eq!(
+                child
+                    .price_functor_phase(0, 8)
+                    .unwrap()
+                    .minimum_reduced_cost,
+                baseline
+            );
+            let previous_version = child.pricing_engine().unwrap().grid.version;
+            child.round.pending_decrease = true;
+            child.column_generation_terminated(0, 0).unwrap();
+            let engine = child.pricing_engine().unwrap();
+            assert_eq!(engine.grid.step[0], expected_step);
+            assert_eq!(engine.grid.version, previous_version + 1);
+            assert!(engine.forward.labels.is_empty() && engine.backward.labels.is_empty());
+            assert!(!engine.half_ready && !engine.full_ready);
+        }
+        assert_eq!(child.pricing_engine().unwrap().grid.step[0], 0.5);
+        assert_eq!(
+            parent.pricing_engine().unwrap().grid.version,
+            parent_version
+        );
+        assert_eq!(parent.pricing_engine().unwrap().grid.step[0], 2.);
+        assert_eq!(saved.bucket_steps[0], 2.);
+        // Every restore clones the saved geometry/configuration and rebuilds
+        // labels at its own costs; it cannot copy child bucket IDs into the parent.
+        for _ in 0..2 {
+            let mut sibling = saved.fork_for_node();
+            assert_eq!(
+                sibling
+                    .price_functor_phase(0, 8)
+                    .unwrap()
+                    .minimum_reduced_cost,
+                baseline
+            );
+            assert_eq!(sibling.pricing_engine().unwrap().grid.step[0], 2.);
+            assert_eq!(
+                sibling.pricing_engine().unwrap().grid.version,
+                parent_version
+            );
+            assert_eq!(sibling.bucket_steps[0], 2.);
+        }
+    }
 }
 
 #[test]

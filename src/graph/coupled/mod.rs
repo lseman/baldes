@@ -16,8 +16,9 @@ pub use descriptor::{
 };
 pub use encoded::EncodedFunction;
 pub use kernel::{
-    CoupledKernel, CoupledLabelState, CoupledPathCosts, CoupledPathValues, CoupledWorkspace,
-    PairedControl,
+    BoundMachinePathHistory, CoupledKernel, CoupledLabelState, CoupledPathCosts, CoupledPathValues,
+    CoupledWorkspace, MachineArcPreparationInput, PairedControl, PreparedMachineArc,
+    PreparedMachineBackwardInputs,
 };
 pub(crate) use kernel::{CoupledPairSummary, CoupledStateBounds};
 #[cfg(feature = "clp")]

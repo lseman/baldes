@@ -17,6 +17,7 @@ fn compatible_join_keeps_cross_combinations_of_endpoint_singletons() {
     ]);
     let b = BoundedCostFront {
         exact: true,
+        unit: 1.,
         ceiling: 10.,
         upper: RelationFront::from_pieces(vec![
             RelationPiece {

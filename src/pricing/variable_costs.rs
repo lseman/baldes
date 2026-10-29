@@ -91,7 +91,15 @@ impl<const D: usize> Solver<D> {
         }
         let started = std::time::Instant::now();
         let budget = self.pricing_time_limit()?;
-        if self.variable_costs.is_empty() && self.raw_arc_costs.is_none() {
+        let exact_phase = self
+            .phases
+            .get(index)
+            .ok_or_else(|| invalid("pricing phase out of range"))?
+            .exact();
+        if self.variable_costs.is_empty()
+            && self.raw_arc_costs.is_none()
+            && (!exact_phase || (self.cuts.cuts.is_empty() && self.cuts.knapsack_cuts.is_empty()))
+        {
             return self.price_phase(index, maximum, false);
         }
         // The returned columns and bound belong to the raw objective. Running
@@ -132,8 +140,12 @@ impl<const D: usize> Solver<D> {
             raw.knapsack_resource_indices
                 .clone_from(&self.knapsack_resource_indices);
             raw.knapsack_exact_coefficients = self.knapsack_exact_coefficients;
-            raw.exact_cut_duals = self.exact_cut_duals;
         }
+        // A raw-objective bound must also use true row prices and exact
+        // knapsack coefficients. Filtering or rounding can discard the route
+        // attaining the bound. refresh_cuts detects these mode changes.
+        raw.exact_cut_duals = self.exact_cut_duals || exact_phase;
+        raw.knapsack_exact_coefficients = self.knapsack_exact_coefficients || exact_phase;
         debug_assert!(raw.enumeration.is_none() && raw.raw_pricing.is_none());
         if self
             .raw_arc_costs
@@ -143,10 +155,16 @@ impl<const D: usize> Solver<D> {
             return Err(invalid("raw arc cost domain"));
         }
         for (position, arc) in raw.graph.arcs.iter_mut().enumerate() {
-            let mut cost = self
-                .raw_arc_costs
-                .as_ref()
-                .map_or(arc.cost, |v| v[position]);
+            let mut cost = self.raw_arc_costs.as_ref().map_or_else(
+                || {
+                    if self.variable_costs.is_empty() {
+                        self.graph.arcs[position].reduced_cost
+                    } else {
+                        arc.cost
+                    }
+                },
+                |v| v[position],
+            );
             if self.raw_arc_costs.is_none() {
                 for &(id, coefficient) in &arc.variables {
                     cost += self

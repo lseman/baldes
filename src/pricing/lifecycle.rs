@@ -40,6 +40,16 @@ impl<const D: usize> Solver<D> {
             };
             if let Some(engine) = engine {
                 engine.grid.decrease_steps(&self.graph)?;
+                // Bucket identities changed. Retained completion labels must
+                // be reset before any caller can inspect or reuse the engine.
+                engine
+                    .forward
+                    .reset(engine.grid.forward.buckets.iter().map(Vec::len));
+                engine
+                    .backward
+                    .reset(engine.grid.backward.buckets.iter().map(Vec::len));
+                engine.half_ready = false;
+                engine.full_ready = false;
                 for (axis, &slot) in engine.grid.resource_slots.iter().enumerate() {
                     self.bucket_steps[slot] = engine.grid.step[axis];
                 }

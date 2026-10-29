@@ -1,0 +1,43 @@
+{
+  "rank_one": {
+    "support": [
+      0,
+      1,
+      2
+    ],
+    "pricing_value": 1.0,
+    "phases": [
+      2,
+      1,
+      0
+    ],
+    "numerators": [
+      1,
+      1,
+      1
+    ],
+    "denominator": 2
+  },
+  "strong_k_path": {
+    "support": [
+      0,
+      1,
+      2
+    ],
+    "pricing_value": -1.0,
+    "phases": [
+      2,
+      1,
+      0
+    ],
+    "rhs": 2.0
+  },
+  "binary_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "paired_control": {
+    "base_upper": 2.5,
+    "base_arrival": "departure plus customer demand",
+    "dependent_increment": 0,
+    "initial_dependent": 0,
+    "mode": "cost_unbounded"
+  }
+}

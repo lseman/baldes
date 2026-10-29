@@ -1,6 +1,8 @@
 //! Prepared paired relations and direction-specific physical-label state.
 use super::*;
-use relation::{BoundedCostFront, PreparedRelationArc, RelationFront, RelationWorkspace};
+use relation::{
+    BoundedCostFront, PreparedCostLattice, PreparedRelationArc, RelationFront, RelationWorkspace,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum PairedLabel {
@@ -51,9 +53,12 @@ pub(super) struct PreparedPaired {
     initial: std::sync::Arc<RelationFront>,
     upper_initial: Option<std::sync::Arc<RelationFront>>,
     arcs: std::sync::Arc<[PreparedRelationArc]>,
+    operator_classes: std::sync::Arc<[usize]>,
     upper_arcs: Option<std::sync::Arc<[PiecewiseLinearFunction]>>,
     mode: PairedResourceMode,
     exact: bool,
+    integral_costs: bool,
+    cost_lattice: Option<std::sync::Arc<PreparedCostLattice>>,
     ceiling: f64,
 }
 impl PreparedPaired {
@@ -84,54 +89,87 @@ impl PreparedPaired {
             .iter()
             .map(PreparedRelationArc::new)
             .collect::<Result<Vec<_>>>()?;
+        let operator_classes = continuation::operator_classes(arcs.iter().map(|arc| {
+            let mut key = vec![arc.waiting as i64 as u64];
+            for function in [&arc.arrival, &arc.increment, &arc.lower, &arc.upper] {
+                key.push(function.points.len() as u64);
+                for point in &function.points {
+                    key.push(point[0].to_bits());
+                    key.push(point[1].to_bits());
+                }
+            }
+            key
+        }));
         let integer = |x: f64| x.is_finite() && x.fract() == 0. && x.abs() <= 1_099_511_627_776.;
-        let exact = mode == PairedResourceMode::CostBounded
+        // A cost-unbounded declaration can satisfy the same restricted
+        // nonnegative-increment cache contract. In that case its
+        // declared shared upper bound is still a valid terminal ceiling and
+        // the exact suffix transfer applies. Keep replay for every other
+        // unbounded program, including negative increments or waiting.
+        let exact = mode != PairedResourceMode::Feasibility
             && integer(domain.lower)
             && integer(domain.upper)
             && initial
                 .points
                 .iter()
                 .all(|p| integer(p[0]) && integer(p[1]) && p[1] == initial.points[0][1])
+            && arcs
+                .first()
+                .is_some_and(|arc| initial.points[0][1] >= arc.lower.points[0][1])
             && prepared
                 .iter()
                 .all(PreparedRelationArc::exact_cache_eligible);
+        let integral_costs = exact
+            && arcs.first().is_some_and(|first| {
+                arcs.iter().all(|arc| {
+                    arc.waiting == 0
+                        && arc.lower.points[0][1].to_bits() == first.lower.points[0][1].to_bits()
+                        && arc.upper.points[0][1].to_bits() == first.upper.points[0][1].to_bits()
+                })
+            });
+        let cost_lattice = if mode != PairedResourceMode::Feasibility
+            && !integral_costs
+            && initial
+                .points
+                .iter()
+                .all(|p| p[1].to_bits() == initial.points[0][1].to_bits())
+        {
+            PreparedCostLattice::new(initial.points[0][1], &prepared).map(std::sync::Arc::new)
+        } else {
+            None
+        };
         Ok(Self {
             objective_coefficient: 1.,
             normalization,
             initial: std::sync::Arc::new(front),
             upper_initial: signed.as_ref().map(|(initial, _)| initial.clone()),
             arcs: prepared.into(),
+            operator_classes,
             upper_arcs: signed.map(|(_, arcs)| arcs),
             mode,
             exact,
+            integral_costs,
+            cost_lattice,
             ceiling: arcs.first().map_or(0., |a| a.upper.points[0][1]),
         })
     }
-    #[cfg(feature = "clp")]
     pub(super) fn initial_minimum(&self) -> f64 {
         self.initial.minimum()
     }
     pub(super) fn has_costs(&self) -> bool {
         self.mode != PairedResourceMode::Feasibility
     }
+    pub(super) fn has_exact_cost_continuations(&self) -> bool {
+        self.integral_costs || self.cost_lattice.is_some()
+    }
     pub(super) fn same_arc_operation(&self, a: usize, b: usize) -> bool {
-        let (a, b) = (self.arcs[a].arc(), self.arcs[b].arc());
-        a.waiting == b.waiting
-            && [&a.arrival, &a.increment, &a.lower, &a.upper]
-                .into_iter()
-                .zip([&b.arrival, &b.increment, &b.lower, &b.upper])
-                .all(|(a, b)| {
-                    a.points.len() == b.points.len()
-                        && a.points.iter().zip(&b.points).all(|(a, b)| {
-                            a[0].to_bits() == b[0].to_bits() && a[1].to_bits() == b[1].to_bits()
-                        })
-                })
+        self.operator_classes[a] == self.operator_classes[b]
     }
 
     pub(super) fn backward_dominates(&self, a: &PairedLabel, b: &PairedLabel, scale: f64) -> bool {
         if self.mode == PairedResourceMode::Feasibility {
             return match (a.backward_upper(), b.backward_upper()) {
-                (Some(a), Some(b)) => a.covers_above(b),
+                (Some(a), Some(b)) => a.covers_above_strict(b),
                 _ => false,
             };
         }
@@ -139,7 +177,13 @@ impl PreparedPaired {
         scale.is_finite()
             && scale >= 0.
             && match (a.backward_cost(), b.backward_cost()) {
-                (Some(a), Some(b)) => a.dominates(b),
+                (Some(a), Some(b)) => {
+                    if self.has_exact_cost_continuations() {
+                        a.dominates_exact_lattice(b)
+                    } else {
+                        a.dominates(b)
+                    }
+                }
                 _ => false,
             }
     }
@@ -177,21 +221,11 @@ impl PreparedPaired {
         if self.mode == PairedResourceMode::Feasibility || scale == 0. {
             return Ok(0.);
         }
-        // An exact bounded suffix carries a minimum incremental charge, not
-        // an attained terminal value. Its key needs no initial normalization;
-        // the full join still computes the canonical complete objective.
-        if let PairedLabel::Backward { cache, .. } = state {
-            return if scale > 0. {
-                finite(
-                    scale
-                        * cache
-                            .as_ref()
-                            .and_then(|c| c.minimum_additional())
-                            .unwrap_or(0.),
-                )
-            } else {
-                Ok(0.)
-            };
+        // A numerical suffix minimum need not bound the literal increment for
+        // every fractional prefix after repeated binary64 additions. Keep it
+        // out of the key until that input-domain contract is certified.
+        if let PairedLabel::Backward { .. } = state {
+            return Ok(0.);
         }
         let selected = if scale < 0. {
             -state
@@ -237,7 +271,9 @@ impl PreparedPaired {
                 }))
             }
             (false, PairedLabel::Backward { cache, upper }) => {
-                let next = if self.exact {
+                let next = if let Some(lattice) = &self.cost_lattice {
+                    lattice.prepend(cache.as_ref(), arc, first_backward)
+                } else if self.exact {
                     if let Some(old) = cache {
                         old.checked_prepend(&self.arcs[arc])
                     } else if first_backward {
@@ -284,7 +320,7 @@ impl PreparedPaired {
     /// A proven restricted-cache result or unknown. General numerical
     /// nonintersection never deletes a route; ordered replay remains fallback.
     pub(super) fn cached_join(&self, f: &PairedLabel, b: &PairedLabel) -> Option<Option<f64>> {
-        if !self.exact {
+        if !self.exact && self.cost_lattice.is_none() {
             return None;
         }
         let (PairedLabel::Forward { lower: f, .. }, PairedLabel::Backward { cache: Some(b), .. }) =

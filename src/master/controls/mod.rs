@@ -102,6 +102,67 @@ pub(crate) fn terminal_domain<const D: usize>(
     let Some(minimum) = low.control else {
         return Some(None);
     };
+    // These optional proofs must not consume the remaining maximum-search
+    // budget on an ineligible path. A unique base control is sufficient even
+    // for nonconstant source functions, but its value still needs an exact
+    // source certificate: a complete LP query may retain an enclosure gap.
+    let allowance = limits.max_work / 8;
+    let mut proof_work = allowance;
+    let mut singleton = None;
+    if let Some(Some(control)) =
+        properties::forced_control(graph, resource, path, &mut proof_work, limits.deadline)
+    {
+        if control.resource == minimum.resource
+            && control.base.len() == minimum.base.len()
+            && control
+                .base
+                .iter()
+                .zip(&minimum.base)
+                .all(|(a, b)| a.to_bits() == b.to_bits())
+        {
+            if let Ok(Some(certificate)) = graph.coupled_kernel()?.certify_paired_control(
+                path,
+                &control,
+                &mut proof_work,
+                limits.deadline,
+            ) {
+                let value = certificate.dependent[0];
+                if certificate.certifies_value(value) {
+                    singleton = Some(value);
+                }
+            }
+        }
+    }
+    limits.max_work -= allowance - proof_work;
+    if limits.deadline.is_some_and(|end| Instant::now() >= end) {
+        return None;
+    }
+    if let Some(value) = singleton {
+        return Some(Some(TerminalDomain {
+            lower: value,
+            upper: value,
+            minimum: minimum.clone(),
+            maximum: minimum,
+        }));
+    }
+    let allowance = limits.max_work / 16;
+    let mut proof_work = allowance;
+    let invariant =
+        properties::invariant_value(graph, resource, path, &mut proof_work, limits.deadline);
+    limits.max_work -= allowance - proof_work;
+    if let Some(value) = invariant {
+        if low
+            .dependent
+            .is_some_and(|observed| observed.to_bits() == value.to_bits())
+        {
+            return Some(Some(TerminalDomain {
+                lower: value,
+                upper: value,
+                minimum: minimum.clone(),
+                maximum: minimum,
+            }));
+        }
+    }
     let high = query(graph, path, resource, true, None, limits)?;
     if !high.complete {
         return None;
@@ -118,9 +179,7 @@ pub(crate) fn terminal_domain<const D: usize>(
         lower = lower.max(terminal[0]);
         upper = upper.min(terminal[1]);
     }
-    if let Some(value) =
-        properties::invariant_value(graph, resource, path, &mut limits.max_work, limits.deadline)
-    {
+    if let Some(value) = invariant {
         lower = lower.max(value);
         upper = upper.min(value);
     }
@@ -226,11 +285,107 @@ pub fn optimize_paired_control<const D: usize>(
         deadline: limits.deadline,
     };
     let mut output = ControlOptimization::unknown(maximize);
+    // Domain intersections can force the complete control independently of
+    // affine region compilation. In particular, an exact source point can
+    // remain certifiable when a region's scaled coefficients are unsupported.
+    let allowance = budget.work / 16;
+    let mut proof_work = allowance;
+    let forced =
+        properties::forced_control(graph, resource, path, &mut proof_work, budget.deadline);
+    budget.work -= allowance - proof_work;
+    if let Some(control) = forced {
+        let mut decided = control.is_none();
+        if let Some(control) = control {
+            let allowance = budget.work / 8;
+            let mut proof_work = allowance;
+            let certificate =
+                kernel.certify_paired_control(path, &control, &mut proof_work, budget.deadline)?;
+            budget.work -= allowance - proof_work;
+            if let Some(certificate) = certificate {
+                if !certificate.feasible {
+                    decided = true;
+                } else {
+                    let value = certificate.dependent[0];
+                    if certificate.certifies_value(value) {
+                        decided = true;
+                        if terminal
+                            .is_none_or(|window| window.lower <= value && value <= window.upper)
+                        {
+                            output.control = Some(control);
+                            output.dependent = Some(value);
+                            output.lower_bound = Some(if maximize { -value } else { value });
+                        }
+                    }
+                }
+            }
+        }
+        if decided && budget.take(0).is_some() {
+            output.complete = true;
+            output.work_used = limits.max_work - budget.work;
+            return Ok(output);
+        }
+    }
+    // A whole-program invariant bounds every unvisited source region as
+    // well. Spend only a small part of the shared budget discovering it;
+    // nonconstant programs retain their ordinary cell search and budget.
+    let allowance = budget.work / 16;
+    let mut proof_work = allowance;
+    let invariant = if allowance != 0 {
+        properties::invariant_value(graph, resource, path, &mut proof_work, budget.deadline)
+    } else {
+        None
+    };
+    budget.work -= allowance - proof_work;
+    if invariant.is_some_and(|value| {
+        terminal.is_some_and(|window| value < window.lower || value > window.upper)
+    }) && budget.take(0).is_some()
+    {
+        output.complete = true;
+        output.work_used = limits.max_work - budget.work;
+        return Ok(output);
+    }
     let Some(program) = program(definition, path, &mut budget) else {
         output.work_used = limits.max_work - budget.work;
         output.lp_iterations = limits.max_lp_iterations - budget.iterations;
         return Ok(output);
     };
+    if let Some(invariant) = invariant {
+        let allowance = budget.work / 8;
+        let mut proposal_budget = Budget {
+            work: allowance,
+            iterations: 0,
+            deadline: budget.deadline,
+        };
+        let mut witness = None;
+        if let Some(base) = program::earliest_base_proposal(&program, &mut proposal_budget) {
+            let control = PairedControl { resource, base };
+            if let Some(certificate) = kernel.certify_paired_control(
+                path,
+                &control,
+                &mut proposal_budget.work,
+                proposal_budget.deadline,
+            )? {
+                let value = certificate.dependent[0];
+                if certificate.certifies_value(value)
+                    && value.to_bits() == invariant.to_bits()
+                    && terminal.is_none_or(|window| window.lower <= value && value <= window.upper)
+                {
+                    witness = Some((control, value));
+                }
+            }
+        }
+        budget.work -= allowance - proposal_budget.work;
+        if let Some((control, value)) = witness {
+            if budget.take(0).is_some() {
+                output.control = Some(control);
+                output.dependent = Some(value);
+                output.lower_bound = Some(if maximize { -value } else { value });
+                output.complete = true;
+                output.work_used = limits.max_work - budget.work;
+                return Ok(output);
+            }
+        }
+    }
     let radices = program.radices();
     let mut choices = vec![0; radices.len()];
     let mut covered = true;
@@ -280,6 +435,21 @@ pub fn optimize_paired_control<const D: usize>(
                                 best = objective;
                                 output.dependent = Some(value);
                                 output.control = Some(control);
+                                if invariant
+                                    .is_some_and(|invariant| invariant.to_bits() == value.to_bits())
+                                    && budget.take(0).is_some()
+                                {
+                                    // The source certificate proves attainment;
+                                    // the invariant supplies the matching bound
+                                    // for every remaining region, for either
+                                    // objective direction and any accepted target.
+                                    output.complete = true;
+                                    output.lower_bound = Some(objective);
+                                    output.work_used = limits.max_work - budget.work;
+                                    output.lp_iterations =
+                                        limits.max_lp_iterations - budget.iterations;
+                                    return Ok(output);
+                                }
                             }
                         }
                     }

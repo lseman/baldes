@@ -23,22 +23,18 @@ pub(super) fn minimum<const D: usize>(
     // particularly when resource objectives have negative costs.
     let allowance = *work / 4;
     let mut remaining = allowance;
-    let relaxed_minimum = kernel.objective_walk_lower_bound(
-        graph,
-        graph.original_max_arcs(),
-        &mut remaining,
-        deadline,
-    );
+    let relaxed_minimum =
+        kernel.objective_walk_bound(graph, graph.original_max_arcs(), &mut remaining, deadline);
     *work -= allowance - remaining;
-    let fallback = || {
-        (Instant::now() < deadline)
-            .then_some(relaxed_minimum)
-            .flatten()
-            .map(Some)
-    };
+    // This caller needs a universal lower enclosure, not an attained minimum.
+    // Keep a successful polynomial proof instead of enumerating the same
+    // cyclic path domain merely to tighten it before pricing can begin.
+    if let Some(bound) = relaxed_minimum {
+        return (bound.is_none_or(f64::is_finite) && Instant::now() < deadline).then_some(bound);
+    }
     let allowance = *work / 4;
     if allowance == 0 {
-        return fallback();
+        return None;
     }
     let mut relaxed = graph.clone();
     relaxed
@@ -87,10 +83,10 @@ pub(super) fn minimum<const D: usize>(
         Ok(stats) => stats,
         Err(_) => {
             // A failed visitor exposes no partial traversal counter, so charge
-            // its entire reserved allowance and keep only the independent
-            // route-wide relaxation as a fallback.
+            // its entire reserved allowance. The polynomial proof above was
+            // unavailable, so a partial visitor cannot supply a bound.
             *work = certificate_work;
-            return fallback();
+            return None;
         }
     };
     *work = certificate_work.checked_add(allowance.checked_sub(visited.work_used)?)?;

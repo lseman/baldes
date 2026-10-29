@@ -8,7 +8,7 @@
 use super::*;
 mod backward;
 mod prepared;
-pub(super) use backward::BoundedCostFront;
+pub(super) use backward::{BoundedCostFront, PreparedCostLattice};
 pub(super) use prepared::{PreparedRelationArc, RelationWorkspace};
 
 // Explicit numerical work limit: exceeding this returns unsupported arithmetic
@@ -78,6 +78,18 @@ impl PartialEq for RelationPiece {
     }
 }
 impl RelationPiece {
+    pub(super) fn constant(domain: Window, value: f64) -> Option<Self> {
+        (domain.lower.is_finite()
+            && domain.upper.is_finite()
+            && domain.lower <= domain.upper
+            && value.is_finite())
+        .then_some(Self {
+            metadata: 0,
+            left: [domain.lower, value],
+            right: [domain.upper, value],
+            waiting: false,
+        })
+    }
     fn value(&self, x: f64) -> Result<f64> {
         if x == self.left[0] {
             return Ok(self.left[1]);
@@ -223,7 +235,7 @@ impl RelationFront {
                     || (dx > 0. && integer(dx) && integer(dy) && dy % dx == 0. && integer(dy / dx)))
         })
     }
-    fn from_pieces(mut pieces: Vec<RelationPiece>) -> Self {
+    pub(super) fn from_pieces(mut pieces: Vec<RelationPiece>) -> Self {
         let integer = |x: f64| x.is_finite() && x.fract() == 0. && x.abs() <= 1_099_511_627_776.;
         let mut minimum = f64::INFINITY;
         let mut minimum_index = None;
@@ -473,6 +485,12 @@ impl RelationFront {
     /// preserves the domains, so the lower-front proof checks the same covered
     /// argument intervals rather than reversing domain containment.
     pub(in crate::graph::coupled) fn covers_above_strict(&self, other: &Self) -> bool {
+        // A directed whole-piece bound can establish containment without
+        // allocating reflected fronts. If it is too coarse or a piece spans
+        // multiple covering segments, retain the existing subdivision proof.
+        if self.coarse_upper_excess(other).is_some_and(|gap| gap <= 0.) {
+            return true;
+        }
         let negate = |front: &Self| {
             Self::from_pieces(
                 front
@@ -488,6 +506,35 @@ impl RelationFront {
             )
         };
         negate(self).covers_below_strict(&negate(other))
+    }
+    /// Directed upper bound on max(other - self), over other's domain.
+    /// Each other piece must be covered by a single self piece. Independent
+    /// interval hulls can overestimate the difference, so failure or a
+    /// positive result is not evidence against containment.
+    fn coarse_upper_excess(&self, other: &Self) -> Option<f64> {
+        let mut work = MAX_ENVELOPE_PAIRS;
+        let mut maximum = f64::NEG_INFINITY;
+        for right in &other.pieces {
+            let (lo, hi) = (right.left[0], right.right[0]);
+            let right_values = strict_piece_value_range(right, lo, hi)?;
+            let mut best: Option<f64> = None;
+            for left in &self.pieces {
+                work = work.checked_sub(1)?;
+                if left.left[0] > lo || left.right[0] < hi {
+                    continue;
+                }
+                let Some(left_values) = strict_piece_value_range(left, lo, hi) else {
+                    continue;
+                };
+                let Some(gap) = crate::core::rounding::add_up(right_values.hi, -left_values.lo)
+                else {
+                    continue;
+                };
+                best = Some(best.map_or(gap, |old| old.min(gap)));
+            }
+            maximum = maximum.max(best?);
+        }
+        maximum.is_finite().then_some(maximum)
     }
     /// The backward root: any dependent value up to the reference's 1e12
     /// infinity over the head domain; the adjoint applies the arc bounds.

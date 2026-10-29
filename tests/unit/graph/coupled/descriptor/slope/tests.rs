@@ -1,6 +1,124 @@
 use super::*;
 
 #[test]
+fn machine_truncation_preserves_near_knot_scan_order_and_one_sided_windows() {
+    // Static vector-truncator evidence: REA
+    // ev_6f512e19d40c4389f120392c4fd0b76ee90eaf56b60fe097f5ef1448d9b86f91;
+    // ELF 6068e0-606941 consumes near lower knots, 6069f3-606a19
+    // reanchors, and 606a24-606b59 copies the selected slopes.
+    let function =
+        PreparedSlopeFunction::from_prepared_pairs(vec![(2., 0.), (3., 1.), (-2., 2.), (4., 3.)])
+            .unwrap();
+    assert_eq!(
+        function.machine_truncate(0., 1.5).unwrap().pairs(),
+        &[(2., 0.), (3., 1.), (-2., 1.5)]
+    );
+    assert_eq!(
+        function.machine_truncate(1.5, 4.).unwrap().pairs(),
+        &[(4., 1.5), (-2., 2.), (4., 3.)]
+    );
+    assert_eq!(
+        function.machine_truncate(1., 2.).unwrap().pairs(),
+        &[(5., 1.), (-2., 2.)]
+    );
+    let lower = 0.99999;
+    let anchor = 5. + (lower - 1.) * -2.;
+    assert_eq!(
+        function.machine_truncate(lower, 2.5).unwrap().pairs(),
+        &[(anchor, lower), (-2., 2.), (4., 2.5)]
+    );
+    // A near upper knot retains the preceding active slope at the requested
+    // coordinate. It is not a point-evaluated clip of the next segment.
+    assert_eq!(
+        function.machine_truncate(0.5, 1.00001).unwrap().pairs(),
+        &[(3.5, 0.5), (3., 1.00001)]
+    );
+    assert_eq!(
+        function.machine_truncate(0.5, 0.50001).unwrap().pairs(),
+        &[(3.5, 0.5)]
+    );
+    let exhausted = function.machine_truncate(2.99999, 4.).unwrap();
+    assert_eq!(exhausted.pairs(), &[(7., 2.99999), (0., 2.99999)]);
+    assert!(exhausted.is_machine_zero_length());
+    assert!(function.machine_truncate(4., 5.).is_err());
+    assert!(function.machine_truncate(-2., -1.).is_err());
+    assert!(function.machine_truncate(2., 1.).is_err());
+}
+
+#[test]
+fn machine_truncation_retains_covering_bits_and_duplicate_segment_shapes() {
+    let machine =
+        PreparedSlopeFunction::from_machine_pairs(vec![(2., -0.0), (3., 0.0), (4., 1.)]).unwrap();
+    let covered = machine.machine_truncate(-1., 2.).unwrap();
+    for (original, retained) in machine.pairs().iter().zip(covered.pairs()) {
+        assert_eq!(original.0.to_bits(), retained.0.to_bits());
+        assert_eq!(original.1.to_bits(), retained.1.to_bits());
+    }
+    let clipped = machine.machine_truncate(-1., 0.5).unwrap();
+    assert_eq!(clipped.pairs(), &[(2., -0.0), (3., 0.0), (4., 0.5)]);
+    assert!(clipped.has_internal_zero_length());
+    let point = PreparedSlopeFunction::from_machine_pairs(vec![(5., 2.), (3., 2.)]).unwrap();
+    let covered = point.machine_truncate(1.99999, 2.00001).unwrap();
+    assert_eq!(covered.pairs(), point.pairs());
+    assert!(covered.is_machine_zero_length());
+}
+
+#[test]
+fn vector_and_fixed_truncation_keep_their_distinct_short_and_upper_contracts() {
+    // The fixed-array helper (REA
+    // ev_cead0cf252057112ad1de41b9391ad5c894e82fdb776de22b0e0597bc9686f55)
+    // does not cap the requested upper coordinate before copying segments.
+    // ELF 723298-7232ec also forces one zero-width output segment when no
+    // ordinary segment survives. The vector helper can retain just a point.
+    let function =
+        PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 1.), (2., 1.00001)])
+            .unwrap();
+    assert_eq!(
+        function.machine_truncate(0.5, 2.).unwrap().pairs(),
+        &[(0.5, 0.5), (1., 1.00001)]
+    );
+    assert_eq!(
+        function.machine_truncate_fixed(0.5, 2.).unwrap().pairs(),
+        &[(0.5, 0.5), (1., 1.), (2., 1.00001)]
+    );
+    let vector = function.machine_truncate(0.5, 0.50001).unwrap();
+    let fixed = function.machine_truncate_fixed(0.5, 0.50001).unwrap();
+    assert_eq!(vector.pairs(), &[(0.5, 0.5)]);
+    assert!(!vector.is_machine_zero_length());
+    assert_eq!(fixed.pairs(), &[(0.5, 0.5), (0., 0.5)]);
+    assert!(fixed.is_machine_zero_length());
+}
+
+#[test]
+fn machine_pairs_preserve_zero_width_coordinate_bits_without_relaxing_source_input() {
+    let pairs = vec![(2., -0.0), (3., 0.0), (4., 1.)];
+    assert!(PreparedSlopeFunction::from_prepared_pairs(pairs.clone()).is_err());
+    let machine = PreparedSlopeFunction::from_machine_pairs(pairs).unwrap();
+    assert!(machine.is_machine_zero_length());
+    assert!(machine.has_internal_zero_length());
+    assert_eq!(machine.pairs()[0].1.to_bits(), (-0.0f64).to_bits());
+    assert_eq!(machine.pairs()[1].1.to_bits(), 0.0f64.to_bits());
+    assert!(PreparedSlopeFunction::from_machine_pairs(vec![(1., 0.), (2., 0.), (3., 0.)]).is_err());
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn machine_function_wire_round_trips_zero_width_but_source_decoder_rejects_it() {
+    #[derive(serde::Deserialize)]
+    struct Machine(
+        #[serde(deserialize_with = "super::deserialize_machine_function")] PreparedSlopeFunction,
+    );
+    let machine = PreparedSlopeFunction::from_machine_pairs(vec![(1., -0.0), (2., 0.0)]).unwrap();
+    let wire = serde_json::to_string(&machine).unwrap();
+    assert!(!wire.contains("machine_zero_length"));
+    assert!(!wire.contains("machine_internal_zero_length"));
+    assert!(serde_json::from_str::<PreparedSlopeFunction>(&wire).is_err());
+    let decoded: Machine = serde_json::from_str(&wire).unwrap();
+    assert_eq!(decoded.0.pairs()[0].1.to_bits(), (-0.0f64).to_bits());
+    assert_eq!(decoded.0.pairs()[1].1.to_bits(), 0.0f64.to_bits());
+}
+
+#[test]
 fn native_prepared_slope_values_and_left_knot_are_preserved() {
     let function =
         PreparedSlopeFunction::from_prepared_pairs(vec![(2., 0.), (3., 5.), (-1., 10.)]).unwrap();

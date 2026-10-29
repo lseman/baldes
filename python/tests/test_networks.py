@@ -14,6 +14,17 @@ pytestmark = pytest.mark.skipif(not has_clp, reason="Clp build required")
 FIXTURE = Path(__file__).resolve().parents[2] / "examples/networks/triangle.json"
 
 
+def test_backward_machine_terminal_bounds_round_trip():
+    network = PricingNetwork(
+        7, 2, (0, 1), (PricingArc(0, 1, 0),),
+        paired_machine_terminal_bounds=((0, (1., 3.)),),
+    )
+    model = NetworkProblem((), (network,))
+    payload = json.loads(model.to_json())
+    assert payload["networks"][0]["paired_machine_terminal_bounds"] == [[0, [1., 3.]]]
+    assert NetworkProblem.from_json(model.to_json()) == model
+
+
 def triangle():
     return NetworkProblem.from_file(FIXTURE)
 

@@ -1267,6 +1267,67 @@ fn paired_objective_mapping_corrects_all_eight_retained_modern_registrations() {
 }
 
 #[test]
+fn nonconstant_source_pricing_matches_unit_reference_and_signed_control_oracles() {
+    let base: serde_json::Value = serde_json::from_str(include_str!(
+        "../../fixtures/coupled/metasolver-nonconstant-source-model.json"
+    ))
+    .unwrap();
+    // A least-waiting two-arc path has base x,x+1,x+2 and Gamma=3+2*x,
+    // bounded above by 8. Witnesses x=0,2.5,.5 attain the three optima;
+    // free waiting also permits other schedules with the same final Gamma.
+    for (coefficient, upper, expected, gamma) in [
+        (1., None, -17., 3.),
+        (-1., None, -28., 8.),
+        (-1., Some(4.), -24., 4.),
+    ] {
+        for mode in [BoundMode::Numerical, BoundMode::Certified] {
+            for knots in [false, true] {
+                let mut source = base.clone();
+                source["pricing_variables"][0]["cost"] = coefficient.into();
+                if let Some(upper) = upper {
+                    source["rows"] = serde_json::json!([{"sense":"le","rhs":upper}]);
+                    source["networks"][0]["activity_entries"] = serde_json::json!([[0, 0, 1.]]);
+                }
+                if knots {
+                    source["networks"][0] =
+                        control_point_source_model(source["networks"][0].clone());
+                }
+                let (problem, registry) = model::format::Model::from_json(&source.to_string())
+                    .unwrap()
+                    .compile::<2>()
+                    .unwrap();
+                let mut options = Options::default();
+                options.cg.stabilize = false;
+                options.cg.bound_mode = mode;
+                registry.configure_pricing(&mut options);
+                let root = model::solve(problem, options).unwrap();
+                assert_eq!(root.master.status, Status::Optimal);
+                assert!((root.master.lp - expected).abs() < 1e-7, "{root:?}");
+                assert!(
+                    root.master.bound <= expected + 1e-10 && expected - root.master.bound < 1e-7
+                );
+                let activity = registry.activity(42, 901, &root).unwrap();
+                assert_eq!((activity.lower, activity.upper), (gamma, gamma));
+                if coefficient == -1. && upper.is_none() {
+                    for (route, value) in root
+                        .routes
+                        .iter()
+                        .zip(&root.values)
+                        .filter(|(_, value)| **value > 0.)
+                    {
+                        assert!(*value > 0.);
+                        let base = &route.route.coupled_controls[0].base;
+                        assert!(base[1] >= base[0] + 1. && base[2] >= base[1] + 1.);
+                        assert_eq!(2. + base[0] + base[1], 8.);
+                        assert_eq!(route.route.coupled_values, vec![(0, 8.)]);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn paired_variable_boxes_cover_all_controls_including_negative_objectives() {
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
         "../../fixtures/coupled/metasolver-paired-preparation.json"
@@ -2174,6 +2235,47 @@ fn explicit_graph_costs_survive_variable_compilation_and_reject_duplicate_owners
 }
 
 #[test]
+fn source_control_cycle_ignores_dead_negative_branch_and_retains_bounded_optimum() {
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(
+        "../../fixtures/coupled/metasolver-paired-objective-mapping.json"
+    ))
+    .unwrap();
+    let mut source = corpus["cases"][0]["model"].clone();
+    source["pricing_variables"] = serde_json::json!([]);
+    let network = &mut source["networks"][0];
+    network["vertices"] = 4.into();
+    network["sink"] = 3.into();
+    network["elementary"] = false.into();
+    network["route_domain"] = serde_json::json!({"kind":"bounded_walks","max_arcs":4});
+    network["arcs"] = serde_json::json!([
+        {"tail":0,"head":1,"cost":-20.},
+        {"tail":1,"head":1,"cost":0.},
+        {"tail":1,"head":3,"cost":0.},
+        {"tail":1,"head":2,"cost":-100.},
+        {"tail":2,"head":2,"cost":-100.}
+    ]);
+    let arc = network["coupled_resources"][0]["arcs"][0].clone();
+    network["coupled_resources"][0]["arcs"] =
+        serde_json::json!([arc.clone(), arc.clone(), arc.clone(), arc.clone(), arc]);
+    network["coupled_objective_coefficients"] = serde_json::json!([[0, -1.]]);
+    let problem = model::format::Model::from_json(&source.to_string())
+        .unwrap()
+        .problem::<2>()
+        .unwrap();
+    let mut options = Options::default();
+    options.cg.stabilize = false;
+    options.cg.bound_mode = BoundMode::Certified;
+    let root = model::solve(problem, options).unwrap();
+    assert_eq!(root.master.status, Status::Optimal, "{:#?}", root.master);
+    assert!((root.master.lp + 24.).abs() < 1e-7);
+    assert!(root.master.bound <= -24. + 1e-10 && -24. - root.master.bound < 1e-7);
+    assert!(root
+        .routes
+        .iter()
+        .any(|route| route.route.arcs.len() == 4 && route.route.coupled_values == [(0, 4.)]));
+}
+
+#[test]
 fn source_controls_cover_repeated_vertices_up_to_the_declared_walk_cap() {
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
         "../../fixtures/coupled/metasolver-paired-objective-mapping.json"
@@ -2666,16 +2768,46 @@ fn joint_paired_rows_recover_interior_integer_witnesses_in_the_shared_pricing_pa
                         let expected = -10. * quantity + if shape == 2 { 2. } else { 0. };
                         assert_eq!(solved.incumbent, expected);
                         assert!(solved.bound <= expected && solved.bound > expected - 1e-8);
-                        assert_eq!(solved.routes.len(), if shape == 2 { 2 } else { 1 });
-                        let primary = solved
+                        // Integer copies may use distinct controls at the same
+                        // optimum. The shared rows constrain their weighted
+                        // totals, not a homogeneous per-copy control.
+                        let primary: Vec<_> = solved
                             .routes
                             .iter()
-                            .find(|r| r.route.network == 42)
-                            .unwrap();
-                        assert_eq!(primary.quantity, quantity);
+                            .filter(|r| r.route.network == 42)
+                            .collect();
+                        assert_eq!(primary.iter().map(|r| r.quantity).sum::<f64>(), quantity);
+                        for resource in 0..2 {
+                            let total: f64 = primary
+                                .iter()
+                                .map(|r| {
+                                    r.quantity
+                                        * r.route
+                                            .route
+                                            .coupled_values
+                                            .iter()
+                                            .find(|(index, _)| *index == resource)
+                                            .unwrap()
+                                            .1
+                                })
+                                .sum();
+                            assert_eq!(total, 4.);
+                        }
+                        if quantity == 1. {
+                            assert_eq!(primary.len(), 1);
+                            assert_eq!(
+                                primary[0].route.route.coupled_values,
+                                vec![(0, 4.), (1, 4.)]
+                            );
+                        }
                         assert_eq!(
-                            primary.route.route.coupled_values,
-                            vec![(0, 4. / quantity), (1, 4. / quantity)]
+                            solved
+                                .routes
+                                .iter()
+                                .filter(|r| r.route.network == 7)
+                                .map(|r| r.quantity)
+                                .sum::<f64>(),
+                            if shape == 2 { 1. } else { 0. }
                         );
                     }
                 }
@@ -2755,16 +2887,35 @@ fn repaired_paired_witnesses_return_the_joint_schedule_across_snapshots() {
                             if start.is_some() { 8. } else { 5. }
                         );
                     }
-                    let primary = result
+                    let primary: Vec<_> = result
                         .routes
                         .iter()
-                        .find(|r| r.route.network == 42)
-                        .unwrap();
-                    assert_eq!(
-                        primary.route.route.coupled_values,
-                        vec![(0, 4. / quantity), (1, 4. / quantity)]
-                    );
-                    assert_eq!(primary.quantity, quantity);
+                        .filter(|r| r.route.network == 42)
+                        .collect();
+                    assert_eq!(primary.iter().map(|r| r.quantity).sum::<f64>(), quantity);
+                    for resource in 0..2 {
+                        let total: f64 = primary
+                            .iter()
+                            .map(|r| {
+                                r.quantity
+                                    * r.route
+                                        .route
+                                        .coupled_values
+                                        .iter()
+                                        .find(|(index, _)| *index == resource)
+                                        .unwrap()
+                                        .1
+                            })
+                            .sum();
+                        assert_eq!(total, 4.);
+                    }
+                    if quantity == 1. {
+                        assert_eq!(primary.len(), 1);
+                        assert_eq!(
+                            primary[0].route.route.coupled_values,
+                            vec![(0, 4.), (1, 4.)]
+                        );
+                    }
                 }
                 // The narrowed child must not rewrite the parent's cached profiles.
                 assert_eq!(
@@ -3034,9 +3185,264 @@ fn narrow_fractional_domains_recover_exact_three_copy_gamma_totals() {
         }
         assert_eq!(quantities, [3., 3.]);
         assert_eq!(totals, [expected_total, expected_total]);
-        assert!(controls
+        // Exact weighted totals above are the contract; an optimal mixture
+        // need not contain the homogeneous three-copy control itself.
+        assert!(controls.iter().all(|values| !values.is_empty()));
+    }
+}
+
+#[test]
+fn paired_cyclic_pricing_keeps_convexity_duals_on_the_network_row() {
+    let source = include_str!("../../fixtures/coupled/paired-cyclic-pricing-model.json");
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let problem = model::format::Model::from_json(source)
+            .unwrap()
+            .problem::<2>()
+            .unwrap();
+        let mut options = Options::default();
+        options.cg.stabilize = false;
+        options.cg.artificial_cost = 100.;
+        options.cg.bound_mode = mode;
+        let root = model::solve(problem, options).unwrap();
+        assert_eq!(root.master.status, Status::Optimal);
+        // Independent oracle: the direct two-arc path costs -20+1+1.
+        assert_eq!(root.master.lp, -18.);
+        assert!((root.master.bound + 18.).abs() < 1e-8);
+        assert_eq!(root.duals, vec![-18.]);
+        assert_eq!(root.master.pricing_calls, 3);
+    }
+}
+
+#[test]
+fn source_control_cycles_match_hop_oracles_and_large_stable_shared_row_bounds() {
+    let base: serde_json::Value = serde_json::from_str(include_str!(
+        "../../fixtures/coupled/paired-cyclic-pricing-model.json"
+    ))
+    .unwrap();
+    for dependent_increment in [0.5, 1.] {
+        for cap in [4, 8, 16, 32, 64, 1_000_000] {
+            for shared_row in [false, true] {
+                if cap > 64 && !shared_row {
+                    continue;
+                }
+                let mut input = base.clone();
+                let network = &mut input["networks"][0];
+                network["front_program_domain"] = false.into();
+                network["route_domain"] =
+                    serde_json::json!({"kind":"bounded_walks","max_arcs":cap});
+                network["resources"][0]["bounds"] = serde_json::json!(vec![[0, cap]; 5]);
+                network["coupled_objective_coefficients"] =
+                    serde_json::json!([[0, if shared_row { 1. } else { -1. }]]);
+                for arc in network["arcs"].as_array_mut().unwrap() {
+                    arc["consumption"] = serde_json::json!([1.]);
+                }
+                let paired = &mut network["coupled_resources"][0];
+                paired["policy"] = "strict_domain".into();
+                paired["initial_base"]["upper"] = cap.into();
+                paired["initial"]["pairs"] = serde_json::json!([[0, 0], [0, cap]]);
+                for arc in paired["arcs"].as_array_mut().unwrap() {
+                    arc["arrival"]["pairs"] = serde_json::json!([[1, 0], [1, cap]]);
+                    arc["increment"]["pairs"] =
+                        serde_json::json!([[dependent_increment, 0], [0, cap]]);
+                    arc["lower"]["pairs"] = serde_json::json!([[0, 0], [0, cap]]);
+                    arc["upper"]["pairs"] = serde_json::json!([[cap, 0], [0, cap]]);
+                }
+                if shared_row {
+                    network["activity_entries"] = serde_json::json!([[0, 0, 1.]]);
+                    input["rows"] = serde_json::json!([{"sense":"le","rhs":cap}]);
+                }
+                for mode in [BoundMode::Numerical, BoundMode::Certified] {
+                    let problem = model::format::Model::from_json(&input.to_string())
+                        .unwrap()
+                        .problem::<2>()
+                        .unwrap();
+                    let mut options = Options::default();
+                    options.cg.stabilize = false;
+                    options.cg.artificial_cost = 100.;
+                    options.cg.bound_mode = mode;
+                    let root = model::solve(problem, options).unwrap();
+                    // Every arc adds one base unit and a fixed dependent increment. The two
+                    // starts permit every length 2..=cap, all with physical cost
+                    // -20. Hence positive charges select 2 and negative ones cap.
+                    let hops = if shared_row { 2 } else { cap };
+                    let expected =
+                        -20. + dependent_increment * if shared_row { 2. } else { -(cap as f64) };
+                    assert_eq!(
+                        root.master.status,
+                        Status::Optimal,
+                        "cap={cap} shared={shared_row} {mode:?}"
+                    );
+                    assert_eq!(root.master.lp, expected);
+                    assert!(root.master.bound <= expected);
+                    assert!(expected - root.master.bound < 1e-7);
+                    let selected: Vec<_> = root
+                        .routes
+                        .iter()
+                        .zip(&root.values)
+                        .filter(|(_, value)| **value > 0.)
+                        .collect();
+                    assert_eq!(selected.len(), 1);
+                    assert_eq!(*selected[0].1, 1.);
+                    assert_eq!(selected[0].0.route.arcs.len(), hops as usize);
+                    assert_eq!(
+                        selected[0].0.route.coupled_values,
+                        vec![(0, hops as f64 * dependent_increment)]
+                    );
+                    assert_eq!(
+                        selected[0].0.route.coupled_controls[0].base,
+                        (0..=hops).map(|value| value as f64).collect::<Vec<_>>()
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn cyclic_source_controls_price_an_active_shared_row_against_a_two_column_lp_oracle() {
+    let source = include_str!("../../fixtures/coupled/paired-cyclic-active-row-model.json");
+    for mode in [BoundMode::Numerical, BoundMode::Certified] {
+        let problem = model::format::Model::from_json(source)
+            .unwrap()
+            .problem::<2>()
+            .unwrap();
+        let mut options = Options::default();
+        options.cg.stabilize = false;
+        options.cg.artificial_cost = 100.;
+        options.cg.bound_mode = mode;
+        let root = model::solve(problem, options).unwrap();
+        // Longer routes increase both cost and the <= row activity and are
+        // dominated. For the two shortest starts the exact LP is
+        // min -17*x-18*y, x+y<=1, -x+2*y<=0, x,y>=0.
+        // Its optimum is x=2/3, y=1/3, objective -52/3.
+        assert_eq!(root.master.status, Status::Optimal);
+        assert!((root.master.lp + 52. / 3.).abs() < 1e-10);
+        assert!((root.master.bound + 52. / 3.).abs() < 1e-7);
+        assert!((root.duals[1] + 1. / 3.).abs() < 1e-10);
+        let mut quantities = [0., 0.];
+        let mut activity = 0.;
+        for (route, &value) in root
+            .routes
             .iter()
-            .flatten()
-            .any(|&bits| f64::from_bits(bits) == expected_gamma));
+            .zip(&root.values)
+            .filter(|(_, value)| **value > 0.)
+        {
+            let first = route.route.arcs[0];
+            assert!(first == 1 || first == 3);
+            quantities[usize::from(first == 3)] += value;
+            let gamma = route.route.coupled_values[0].1;
+            assert_eq!(gamma, if first == 1 { 3. } else { 2. });
+            activity += value * (gamma - if first == 1 { 4. } else { 0. });
+        }
+        assert!((quantities[0] - 2. / 3.).abs() < 1e-10);
+        assert!((quantities[1] - 1. / 3.).abs() < 1e-10);
+        assert!(activity.abs() < 1e-10);
+    }
+}
+
+#[test]
+fn source_control_bound_specialization_preserves_fractional_costs_and_active_lower_floors() {
+    let base: serde_json::Value = serde_json::from_str(include_str!(
+        "../../fixtures/coupled/paired-cyclic-pricing-model.json"
+    ))
+    .unwrap();
+    for (coefficient, lower, gamma) in [(-0.5, 0., 4.), (-1., 5., 8.)] {
+        let mut input = base.clone();
+        let network = &mut input["networks"][0];
+        network["front_program_domain"] = false.into();
+        network["route_domain"] = serde_json::json!({"kind":"bounded_walks","max_arcs":4});
+        network["resources"][0]["bounds"] = serde_json::json!(vec![[0, 4]; 5]);
+        network["coupled_objective_coefficients"] = serde_json::json!([[0, coefficient]]);
+        for arc in network["arcs"].as_array_mut().unwrap() {
+            arc["consumption"] = serde_json::json!([1.]);
+        }
+        let paired = &mut network["coupled_resources"][0];
+        paired["policy"] = "strict_domain".into();
+        for arc in paired["arcs"].as_array_mut().unwrap() {
+            arc["arrival"]["pairs"] = serde_json::json!([[1, 0], [1, 8]]);
+            arc["lower"]["pairs"] = serde_json::json!([[lower, 0], [0, 8]]);
+        }
+        let problem = model::format::Model::from_json(&input.to_string())
+            .unwrap()
+            .problem::<2>()
+            .unwrap();
+        let mut options = Options::default();
+        options.cg.stabilize = false;
+        options.cg.bound_mode = BoundMode::Certified;
+        let root = model::solve(problem, options).unwrap();
+        let expected = -20. + coefficient * gamma;
+        assert_eq!(root.master.status, Status::Optimal);
+        assert_eq!(root.master.lp, expected);
+        assert!(root.master.bound <= expected);
+        assert!(expected - root.master.bound < 1e-7);
+        for (route, _) in root
+            .routes
+            .iter()
+            .zip(&root.values)
+            .filter(|(_, value)| **value > 0.)
+        {
+            assert_eq!(route.route.arcs.len(), 4);
+            assert_eq!(route.route.coupled_values, vec![(0, gamma)]);
+        }
+    }
+}
+
+#[test]
+fn constant_source_bounds_preserve_knot_and_slope_objective_normalizations() {
+    let base: serde_json::Value = serde_json::from_str(include_str!(
+        "../../fixtures/coupled/paired-cyclic-pricing-model.json"
+    ))
+    .unwrap();
+    for knots in [false, true] {
+        for relative in [false, true] {
+            let mut input = base.clone();
+            let network = &mut input["networks"][0];
+            network["front_program_domain"] = false.into();
+            network["route_domain"] = serde_json::json!({"kind":"bounded_walks","max_arcs":8});
+            network["coupled_objective_coefficients"] = serde_json::json!([[0, -2.]]);
+            for arc in network["arcs"].as_array_mut().unwrap() {
+                arc["consumption"] = serde_json::json!([1.]);
+            }
+            let paired = &mut network["coupled_resources"][0];
+            paired["policy"] = "strict_domain".into();
+            paired["initial"]["pairs"] = serde_json::json!([[5, 0], [0, 8]]);
+            paired["normalization"] = if relative {
+                "final_minus_initial_minimum"
+            } else {
+                "absolute_final_value"
+            }
+            .into();
+            for arc in paired["arcs"].as_array_mut().unwrap() {
+                arc["arrival"]["pairs"] = serde_json::json!([[1, 0], [1, 8]]);
+                arc["upper"]["pairs"] = serde_json::json!([[13, 0], [0, 8]]);
+            }
+            if knots {
+                input["networks"][0] = control_point_source_model(input["networks"][0].clone());
+            }
+            let problem = model::format::Model::from_json(&input.to_string())
+                .unwrap()
+                .problem::<2>()
+                .unwrap();
+            let mut options = Options::default();
+            options.cg.stabilize = false;
+            options.cg.bound_mode = BoundMode::Certified;
+            let root = model::solve(problem, options).unwrap();
+            // All feasible paths have Gamma=5+h; h<=8. The negative weight
+            // selects h=8, with the initial five removed only in relative mode.
+            let expected = if relative { -36. } else { -46. };
+            assert_eq!(root.master.status, Status::Optimal);
+            assert_eq!(root.master.lp, expected);
+            assert!(root.master.bound <= expected);
+            assert!(expected - root.master.bound < 1e-7);
+            for (route, _) in root
+                .routes
+                .iter()
+                .zip(&root.values)
+                .filter(|(_, value)| **value > 0.)
+            {
+                assert_eq!(route.route.arcs.len(), 8);
+                assert_eq!(route.route.coupled_values, vec![(0, 13.)]);
+            }
+        }
     }
 }

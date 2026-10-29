@@ -61,6 +61,13 @@ class PricingNetwork:
 
     front_program_domain=True selects the computed front program
     for FrontAlgebra resources; the default retains source feasibility.
+    paired_waiting_base_resources maps slope-paired resource indices to scalar
+    resource indices whose vertex and arc bounds define waiting windows.
+    paired_machine_inputs stores exact prepared machine operands by coupled
+    resource and physical arc order; it does not activate machine pricing.
+    paired_machine_roots supplies the separately prepared dependent root vector.
+    paired_machine_terminal_bounds supplies the terminal base window for a
+    backward machine root, keyed by coupled resource index.
     """
 
     id: int
@@ -78,6 +85,10 @@ class PricingNetwork:
     front_program_domain: bool = False
     route_domain: Mapping[str, Any] = field(default_factory=lambda: {"kind": "physical_simple"})
     coupled_objective_coefficients: Tuple[Tuple[int, float], ...] = ()
+    paired_waiting_base_resources: Tuple[Tuple[int, int], ...] = ()
+    paired_machine_inputs: Tuple[Tuple[int, Tuple[Mapping[str, Any], ...]], ...] = ()
+    paired_machine_roots: Tuple[Tuple[int, Mapping[str, Any]], ...] = ()
+    paired_machine_terminal_bounds: Tuple[Tuple[int, Tuple[float, float]], ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "multiplicity", tuple(self.multiplicity))
@@ -86,6 +97,18 @@ class PricingNetwork:
         object.__setattr__(self, "coupled_resources", tuple(dict(r) for r in self.coupled_resources))
         object.__setattr__(self, "coupled_objective_coefficients",
                            tuple(tuple(e) for e in self.coupled_objective_coefficients))
+        object.__setattr__(self, "paired_waiting_base_resources",
+                           tuple(tuple(e) for e in self.paired_waiting_base_resources))
+        object.__setattr__(self, "paired_machine_inputs", tuple(
+            (resource, tuple(dict(arc) for arc in arcs))
+            for resource, arcs in self.paired_machine_inputs
+        ))
+        object.__setattr__(self, "paired_machine_roots", tuple(
+            (resource, dict(root)) for resource, root in self.paired_machine_roots
+        ))
+        object.__setattr__(self, "paired_machine_terminal_bounds", tuple(
+            (resource, tuple(bounds)) for resource, bounds in self.paired_machine_terminal_bounds
+        ))
         object.__setattr__(self, "route_domain", dict(self.route_domain))
         object.__setattr__(self, "route_entries", tuple(tuple(e) for e in self.route_entries))
         object.__setattr__(self, "activity_entries", tuple(dict(e) for e in self.activity_entries))
@@ -174,6 +197,14 @@ class NetworkProblem:
         for network in data["networks"]:
             if not network["activity_entries"]:
                 del network["activity_entries"]
+            if not network["paired_waiting_base_resources"]:
+                del network["paired_waiting_base_resources"]
+            if not network["paired_machine_inputs"]:
+                del network["paired_machine_inputs"]
+            if not network["paired_machine_roots"]:
+                del network["paired_machine_roots"]
+            if not network["paired_machine_terminal_bounds"]:
+                del network["paired_machine_terminal_bounds"]
             for resource in network["resources"]:
                 if resource["time_windows"] is None:
                     del resource["time_windows"]

@@ -13,6 +13,7 @@ use std::{
 };
 
 type Result<T> = std::result::Result<T, FrontierUnknown>;
+mod machine;
 
 struct Work {
     budget: FrontierBudget,
@@ -84,6 +85,9 @@ pub fn inverse_increasing(
     budget: FrontierBudget,
 ) -> FrontierOutcome<PreparedSlopeFunction> {
     finish((|| {
+        if function.is_machine_zero_length() {
+            return Err(unsupported("machine zero-length segment inversion"));
+        }
         let mut work = Work::new(budget);
         work.pairs(function.pairs().len())?;
         work.charge(function.pairs().len())?;
@@ -110,12 +114,323 @@ pub fn inverse_increasing(
     })())
 }
 
+/// Literal vector inversion used by machine arc initialization. Unlike source
+/// inversion, this retains representable collapsed endpoint coordinates. A
+/// nonfinite reciprocal or an unrepresentable array remains unknown.
+pub fn machine_inverse(
+    function: &PreparedSlopeFunction,
+    budget: FrontierBudget,
+) -> FrontierOutcome<PreparedSlopeFunction> {
+    finish((|| {
+        let mut work = Work::new(budget);
+        work.pairs(function.pairs().len())?;
+        work.charge(function.pairs().len().saturating_mul(6))?;
+        let (mut value, mut coordinate) = function.pairs()[0];
+        let mut output = Vec::with_capacity(function.pairs().len());
+        output.push((coordinate, value));
+        for &(slope, end) in &function.pairs()[1..] {
+            work.charge(0)?;
+            let span = checked(end - coordinate, "machine inverse span")?;
+            let product = checked(span * slope, "machine inverse multiplication")?;
+            value = checked(value + product, "machine inverse endpoint")?;
+            let reciprocal = checked(1. / slope, "machine inverse reciprocal")?;
+            output.push((reciprocal, value));
+            coordinate = end;
+        }
+        let result = PreparedSlopeFunction::from_machine_pairs(output)
+            .map_err(FrontierUnknown::Arithmetic)?;
+        work.charge(0)?;
+        Ok(Some(result))
+    })())
+}
+
+/// The three distinct machine-program vectors prepared for one paired arc.
+/// These are intermediate arrays, not a source-control feasibility certificate.
+#[derive(Clone, Debug)]
+pub struct MachinePreparedInputs {
+    pub forward: PreparedSlopeFunction,
+    pub inverse: PreparedSlopeFunction,
+    pub sum: PreparedSlopeFunction,
+}
+
+/// Bounded machine values computed while initializing one paired arc.
+/// These values are not source-domain feasibility or pricing certificates.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MachineInitialLimits {
+    /// The prepared forward lookup at the tail lower bound.
+    pub forward_at_tail_lower: f64,
+    /// The corrected first scalar used by forward continuation.
+    pub tail_limit: f64,
+    /// The corrected mapped upper value retained by the initializer.
+    pub mapped_upper: f64,
+}
+
+/// Prepared arc vectors and finite initialization limits. These are machine
+/// program inputs, not a source-control or pricing certificate.
+#[derive(Clone, Debug)]
+pub struct MachineArcPreparation {
+    pub inputs: MachinePreparedInputs,
+    pub limits: MachineInitialLimits,
+}
+
+/// Prepare machine vectors from explicitly supplied, already prepared inputs
+/// and compute the reference initializer's bounded limit branch. This does not
+/// infer truncation, dependent map entries, resource identity, or graph bounds.
+/// Both stages share one elapsed deadline and conservatively split work.
+pub fn prepare_machine_arc(
+    truncated: &PreparedSlopeFunction,
+    dependent: &PreparedSlopeFunction,
+    tail_lower: f64,
+    tail_upper: f64,
+    head_upper: f64,
+    budget: FrontierBudget,
+) -> FrontierOutcome<MachineArcPreparation> {
+    let started = Instant::now();
+    let per_stage = budget.max_operations / 2;
+    if per_stage == 0 {
+        return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
+    }
+    let stage_budget = || -> Result<FrontierBudget> {
+        let remaining = budget
+            .max_elapsed
+            .map(|limit| limit.saturating_sub(started.elapsed()));
+        if remaining.is_some_and(|limit| limit.is_zero()) {
+            return Err(FrontierUnknown::Deadline);
+        }
+        Ok(FrontierBudget {
+            max_operations: per_stage,
+            max_elapsed: remaining,
+            ..budget
+        })
+    };
+    let first_budget = match stage_budget() {
+        Ok(value) => value,
+        Err(reason) => return FrontierOutcome::Unknown(reason),
+    };
+    let inputs = match prepare_machine_inputs(truncated, dependent, first_budget) {
+        FrontierOutcome::Complete(value) => value,
+        FrontierOutcome::Empty => {
+            return FrontierOutcome::Unknown(unsupported("machine arc preparation empty"));
+        }
+        FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
+    };
+    let second_budget = match stage_budget() {
+        Ok(value) => value,
+        Err(reason) => return FrontierOutcome::Unknown(reason),
+    };
+    let limits = match machine_initial_limits(
+        &inputs.forward,
+        &inputs.inverse,
+        tail_lower,
+        tail_upper,
+        head_upper,
+        second_budget,
+    ) {
+        FrontierOutcome::Complete(value) => value,
+        FrontierOutcome::Empty => {
+            return FrontierOutcome::Unknown(unsupported("machine arc limits empty"));
+        }
+        FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
+    };
+    if budget
+        .max_elapsed
+        .is_some_and(|limit| started.elapsed() >= limit)
+    {
+        return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
+    }
+    FrontierOutcome::Complete(MachineArcPreparation { inputs, limits })
+}
+
+/// Compute the recovered finite initial-limit branch using separately
+/// prepared forward and inverse vectors. Lookup sentinel `1e12` is treated
+/// exactly like an out-of-domain return, including a genuine value of `1e12`.
+/// Unknown includes the reference's diagnostic branches and does not assert
+/// source infeasibility. This does not install inputs or invoke pricing.
+pub fn machine_initial_limits(
+    forward: &PreparedSlopeFunction,
+    inverse: &PreparedSlopeFunction,
+    tail_lower: f64,
+    tail_upper: f64,
+    head_upper: f64,
+    budget: FrontierBudget,
+) -> FrontierOutcome<MachineInitialLimits> {
+    let result = (|| {
+        if !tail_lower.is_finite() || !tail_upper.is_finite() || !head_upper.is_finite() {
+            return Err(unsupported("machine initial limit inputs"));
+        }
+        let mut work = Work::new(budget);
+        work.pairs(forward.pairs().len())?;
+        work.pairs(inverse.pairs().len())?;
+        // Reserve both forward lookups, the inverse lookup and branch work.
+        let operations = forward
+            .pairs()
+            .len()
+            .checked_mul(2)
+            .and_then(|n| n.checked_add(inverse.pairs().len()))
+            .and_then(|n| n.checked_add(4))
+            .ok_or(FrontierUnknown::WorkLimit)?;
+        work.charge(operations)?;
+        let lookup = |function: &PreparedSlopeFunction, coordinate: f64| -> Result<Option<f64>> {
+            function
+                .machine_value_and_segment(coordinate)
+                .map(|value| value.map(|(value, _)| value).filter(|&value| value != 1e12))
+                .map_err(FrontierUnknown::Arithmetic)
+        };
+        let first = lookup(forward, tail_lower)?
+            .ok_or_else(|| unsupported("machine initial lower lookup sentinel"))?;
+        let inverse_upper = lookup(inverse, head_upper)?;
+        let forward_upper = lookup(forward, tail_upper)?;
+        // MINSD takes its second operand on equality, including signed zero.
+        let min_second = |first: f64, second: f64| {
+            if first < second {
+                first
+            } else {
+                second
+            }
+        };
+        let (tail_limit, mapped_upper) = match (inverse_upper, forward_upper) {
+            (Some(z), Some(y)) => (min_second(tail_upper, z), min_second(head_upper, y)),
+            (None, Some(y)) => (tail_upper, y),
+            (Some(z), None) => (z, head_upper),
+            (None, None) => return Err(unsupported("machine initial upper lookup sentinels")),
+        };
+        work.charge(0)?;
+        Ok(MachineInitialLimits {
+            forward_at_tail_lower: first,
+            tail_limit,
+            mapped_upper,
+        })
+    })();
+    match result {
+        Ok(limits) => FrontierOutcome::Complete(limits),
+        Err(reason) => FrontierOutcome::Unknown(reason),
+    }
+}
+
+/// Prepare the recovered finite machine vectors from an already truncated
+/// base vector and an already prepared dependent vector. This does not perform
+/// the reference's truncation, map lookup or graph initialization. Its bounded
+/// inverse and composition operations can return unknown for machine behavior
+/// that the prepared representation cannot express.
+pub fn prepare_machine_inputs(
+    truncated: &PreparedSlopeFunction,
+    dependent: &PreparedSlopeFunction,
+    budget: FrontierBudget,
+) -> FrontierOutcome<MachinePreparedInputs> {
+    let started = Instant::now();
+    let per_stage = budget.max_operations / 4;
+    let forward_work = match truncated.pairs().len().checked_mul(2) {
+        Some(value) => value,
+        None => return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit),
+    };
+    if per_stage < forward_work {
+        return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
+    }
+    if budget.max_components == 0 {
+        return FrontierOutcome::Unknown(FrontierUnknown::ComponentLimit);
+    }
+    if truncated.pairs().len() > budget.max_pairs || dependent.pairs().len() > budget.max_pairs {
+        return FrontierOutcome::Unknown(FrontierUnknown::PairLimit);
+    }
+    let remaining = || -> std::result::Result<FrontierBudget, FrontierUnknown> {
+        let remaining = budget
+            .max_elapsed
+            .map(|limit| limit.saturating_sub(started.elapsed()));
+        if remaining.is_some_and(|limit| limit.is_zero()) {
+            return Err(FrontierUnknown::Deadline);
+        }
+        Ok(FrontierBudget {
+            max_operations: per_stage,
+            max_elapsed: remaining,
+            ..budget
+        })
+    };
+    if let Err(reason) = remaining() {
+        return FrontierOutcome::Unknown(reason);
+    }
+    let forward = match truncated.machine_forward_from_truncated() {
+        Ok(value) => value,
+        Err(error) => return FrontierOutcome::Unknown(FrontierUnknown::Arithmetic(error)),
+    };
+    let inverse_budget = match remaining() {
+        Ok(value) => value,
+        Err(reason) => return FrontierOutcome::Unknown(reason),
+    };
+    let inverse = match machine_inverse(&forward, inverse_budget) {
+        FrontierOutcome::Complete(value) => value,
+        FrontierOutcome::Empty => {
+            return FrontierOutcome::Unknown(unsupported("machine inverse preparation empty"))
+        }
+        FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
+    };
+    let (lower, upper) = inverse.domain();
+    let composition_budget = match remaining() {
+        Ok(value) => value,
+        Err(reason) => return FrontierOutcome::Unknown(reason),
+    };
+    let sum = match compose_increasing(
+        dependent,
+        &inverse,
+        lower,
+        upper,
+        FrontOperationPolicy::FrontAlgebra,
+        composition_budget,
+    ) {
+        FrontierOutcome::Complete(value) => value,
+        FrontierOutcome::Empty => {
+            return FrontierOutcome::Unknown(unsupported("machine sum preparation empty"))
+        }
+        FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
+    };
+    // The initializer checks the composed fixed array before consuming it.
+    // Its first segment is exempt from coordinate-separation checks; later
+    // coordinates must strictly increase outside the machine tolerance band.
+    if !(2..=12).contains(&sum.pairs().len()) || sum.pairs()[0].0 == 1e12 {
+        return FrontierOutcome::Unknown(unsupported("machine prepared sum output check"));
+    }
+    let check_budget = match remaining() {
+        Ok(value) => value,
+        Err(reason) => return FrontierOutcome::Unknown(reason),
+    };
+    let mut work = Work::new(check_budget);
+    if let Err(reason) = work.charge(sum.pairs().len().saturating_mul(6)) {
+        return FrontierOutcome::Unknown(reason);
+    }
+    for index in 2..sum.pairs().len() {
+        let current = sum.pairs()[index].1;
+        let previous = sum.pairs()[index - 1].1;
+        match near(current, previous) {
+            Ok(false) if current > previous => {}
+            Ok(_) => {
+                return FrontierOutcome::Unknown(unsupported(
+                    "machine prepared sum consecutive coordinates",
+                ))
+            }
+            Err(reason) => return FrontierOutcome::Unknown(reason),
+        }
+        if let Err(reason) = work.charge(0) {
+            return FrontierOutcome::Unknown(reason);
+        }
+    }
+    if let Err(reason) = remaining() {
+        return FrontierOutcome::Unknown(reason);
+    }
+    FrontierOutcome::Complete(MachinePreparedInputs {
+        forward,
+        inverse,
+        sum,
+    })
+}
+
 struct Cached<'a> {
     function: &'a PreparedSlopeFunction,
     knots: Cow<'a, [(f64, f64)]>, // coordinate, ordered accumulated value
 }
 impl<'a> Cached<'a> {
     fn new(function: &'a PreparedSlopeFunction, increasing: bool, work: &mut Work) -> Result<Self> {
+        if function.is_machine_zero_length() {
+            return Err(unsupported("machine zero-length segment composition"));
+        }
         work.pairs(function.pairs().len())?;
         work.charge(function.pairs().len())?;
         let (mut y, mut x) = function.pairs()[0];
@@ -182,10 +497,11 @@ fn near(a: f64, b: f64) -> Result<bool> {
         )?)
 }
 
-/// Construct `outer(inner(x))`, intersecting the requested interval with both
-/// function domains. The inner map must be strictly increasing (or a point).
-/// Output slopes use ordered endpoint secants, rather than slope products.
-/// Unrecovered native near-coordinate/slope cases return Unknown explicitly.
+/// Construct `outer(inner(x))` using the selected domain policy.
+/// Strict composition intersects both domains and requires an increasing inner
+/// map. Front algebra follows the ordered machine scan, including constant and
+/// degenerate inner maps. Output slopes use ordered endpoint secants.
+/// Raw front arithmetic is not a strict source-function certificate.
 pub fn compose_increasing(
     outer: &PreparedSlopeFunction,
     inner: &PreparedSlopeFunction,
@@ -250,6 +566,15 @@ impl PreparedCompositionMap {
         budget: FrontierBudget,
     ) -> FrontierOutcome<PreparedSlopeFunction> {
         let mut work = Work::new(budget);
+        if policy == FrontOperationPolicy::FrontAlgebra && !allow_outer_clipping {
+            return finish(machine::compose(
+                outer,
+                &self.function,
+                lower,
+                upper,
+                &mut work,
+            ));
+        }
         if let Err(reason) = work.pairs(self.knots.len()) {
             return FrontierOutcome::Unknown(reason);
         }
@@ -278,8 +603,46 @@ fn compose_checked(
     budget: FrontierBudget,
 ) -> Result<Option<PreparedSlopeFunction>> {
     let mut work = Work::new(budget);
+    if policy == FrontOperationPolicy::FrontAlgebra {
+        return machine::compose(outer, inner, lower, upper, &mut work);
+    }
     let inner = Cached::new(inner, true, &mut work)?;
     compose_cached(outer, &inner, lower, upper, policy, false, &mut work)
+}
+
+/// The short-interval branch performs only two lookups. In particular, it
+/// never walks or divides a zero-length segment retained by machine output.
+fn short_composition(
+    outer: &PreparedSlopeFunction,
+    inner: &PreparedSlopeFunction,
+    lower: f64,
+    upper: f64,
+    work: &mut Work,
+) -> Result<PreparedSlopeFunction> {
+    work.pairs(inner.pairs().len())?;
+    work.pairs(outer.pairs().len())?;
+    work.charge(inner.pairs().len() + outer.pairs().len())?;
+    let inner_value = inner
+        .evaluate(lower, super::EvaluationPolicy::EndpointTolerance)
+        .map_err(FrontierUnknown::Arithmetic)?
+        .ok_or_else(|| unsupported("native short inner evaluation outside domain"))?;
+    if inner_value == 1e12 {
+        return Err(unsupported("native composition inner sentinel"));
+    }
+    let value = outer
+        .evaluate(inner_value, super::EvaluationPolicy::EndpointTolerance)
+        .map_err(FrontierUnknown::Arithmetic)?
+        .ok_or_else(|| unsupported("native short outer evaluation outside domain"))?;
+    if value == 1e12 {
+        return Err(unsupported("native composition outer sentinel"));
+    }
+    work.pairs(2)?;
+    if lower == upper {
+        PreparedSlopeFunction::machine_zero_length(value, 0., lower, upper)
+            .map_err(FrontierUnknown::Arithmetic)
+    } else {
+        prepared(vec![(value, lower), (0., upper)])
+    }
 }
 fn compose_cached(
     outer: &PreparedSlopeFunction,
@@ -293,14 +656,76 @@ fn compose_cached(
     if !lower.is_finite() || !upper.is_finite() || lower > upper {
         return Err(unsupported("composition needs a finite ordered interval"));
     }
+    // The machine helper selects this branch from the requested endpoints,
+    // before clipping either endpoint to the inner domain.
+    if policy == FrontOperationPolicy::FrontAlgebra && near(lower, upper)? {
+        return short_composition(outer, inner.function, lower, upper, work).map(Some);
+    }
     let outer = Cached::new(outer, false, work)?;
     if policy == FrontOperationPolicy::FrontAlgebra
-        && lower < inner.function.domain().0
-        && near(lower, inner.function.domain().0)?
+        && inner.knots.len() == 1
+        && near(lower, inner.knots[0].0)?
+        && (upper >= inner.knots[0].0 || near(upper, inner.knots[0].0)?)
     {
-        return Err(unsupported("native snapped composition start"));
+        // A point map exhausts its segment stream immediately after the
+        // initial lookup. The long-interval branch retains the requested
+        // start coordinate; it does not extend a constant to the requested
+        // end or move the point to the inner domain's coordinate.
+        work.charge(outer.function.pairs().len())?;
+        let value = outer
+            .function
+            .evaluate(inner.knots[0].1, super::EvaluationPolicy::EndpointTolerance)
+            .map_err(FrontierUnknown::Arithmetic)?
+            .ok_or_else(|| unsupported("machine point composition outside outer domain"))?;
+        if value == 1e12 {
+            return Err(unsupported("native composition outer sentinel"));
+        }
+        work.pairs(1)?;
+        return Ok(Some(prepared(vec![(value, lower)])?));
     }
-    let lo = lower.max(inner.function.domain().0);
+    if policy == FrontOperationPolicy::FrontAlgebra
+        && inner.knots.len() > 1
+        && upper >= inner.function.domain().1
+        && lower > inner.knots[inner.knots.len() - 2].0
+        && near(lower, inner.function.domain().1)?
+        && !near(lower, inner.function.domain().0)?
+    {
+        work.charge(inner.function.pairs().len() + outer.function.pairs().len())?;
+        let inner_value = inner
+            .function
+            .evaluate(lower, super::EvaluationPolicy::EndpointTolerance)
+            .map_err(FrontierUnknown::Arithmetic)?
+            .ok_or_else(|| unsupported("native snapped upper inner evaluation"))?;
+        // On this long path the reference passes the inner value through to
+        // the outer helper, including a literal 1e12; only the outer result is
+        // treated as a sentinel here.
+        let value = outer
+            .function
+            .evaluate(inner_value, super::EvaluationPolicy::EndpointTolerance)
+            .map_err(FrontierUnknown::Arithmetic)?
+            .ok_or_else(|| unsupported("native snapped upper outer evaluation"))?;
+        if value == 1e12 {
+            return Err(unsupported("native composition outer sentinel"));
+        }
+        work.pairs(1)?;
+        return Ok(Some(prepared(vec![(value, lower)])?));
+    }
+    let snapped_start = policy == FrontOperationPolicy::FrontAlgebra
+        && lower < inner.function.domain().0
+        && near(lower, inner.function.domain().0)?;
+    if snapped_start
+        && (inner.knots.len() == 1
+            || (upper < inner.function.domain().0 && !near(upper, inner.function.domain().0)?))
+    {
+        return Err(unsupported("native near-disjoint composition interval"));
+    }
+    // The front-algebra helper preserves the requested coordinate while
+    // taking the first inner value as the anchor for a near-lower start.
+    let lo = if snapped_start {
+        lower
+    } else {
+        lower.max(inner.function.domain().0)
+    };
     let hi = upper.min(inner.function.domain().1);
     if lo > hi {
         if policy == FrontOperationPolicy::FrontAlgebra && near(lo, hi)? {
@@ -308,28 +733,10 @@ fn compose_cached(
         }
         return Ok(None);
     }
-    // The native helper treats a tolerance-sized interval as a constant
-    // front evaluated at its requested start, rather than fitting a secant.
-    // Keep exact domain intersection above: tolerance must not invent a domain.
+    // A clipped short interval does not imply that the requested interval
+    // took the native short branch; its remaining path is not yet recovered.
     if policy == FrontOperationPolicy::FrontAlgebra && near(lo, hi)? {
-        work.charge(inner.function.pairs().len() + outer.function.pairs().len())?;
-        let inner_value = inner
-            .function
-            .evaluate(lo, super::EvaluationPolicy::EndpointTolerance)
-            .map_err(FrontierUnknown::Arithmetic)?
-            .ok_or_else(|| unsupported("native singleton inner evaluation outside domain"))?;
-        let value = outer
-            .function
-            .evaluate(inner_value, super::EvaluationPolicy::EndpointTolerance)
-            .map_err(FrontierUnknown::Arithmetic)?
-            .ok_or_else(|| unsupported("native singleton outer evaluation outside domain"))?;
-        let pairs = if lo == hi {
-            vec![(value, lo)]
-        } else {
-            vec![(value, lo), (0., hi)]
-        };
-        work.pairs(pairs.len())?;
-        return Ok(Some(prepared(pairs)?));
+        return Err(unsupported("native clipped short composition interval"));
     }
     let (outer_lo, outer_hi) = outer.function.domain();
     if inner.knots.len() == 1 {
@@ -354,7 +761,11 @@ fn compose_cached(
         let (gx, gy) = inner.knots[index - 1];
         let (ge, _) = inner.knots[index];
         let slope = inner.function.pairs()[index].0;
-        let mut x0 = gx.max(lo);
+        let mut x0 = if snapped_start && index == 1 {
+            lo
+        } else {
+            gx.max(lo)
+        };
         let mut x1 = ge.min(hi);
         if x0 > x1 {
             continue;
@@ -416,6 +827,9 @@ fn compose_cached(
         } else {
             outer.value(y0, policy, work)?
         };
+        if native && last.is_none() && f0 == 1e12 {
+            return Err(unsupported("native composition outer sentinel"));
+        }
         if native && outer_anchor.is_none() {
             outer_anchor = Some((y0, f0));
         }

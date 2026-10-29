@@ -1,3 +1,4 @@
+use super::super::PreparedSlopeRelationArc;
 use super::*;
 
 fn function(pairs: &[(f64, f64)]) -> PreparedSlopeFunction {
@@ -8,6 +9,145 @@ fn complete<T: std::fmt::Debug>(outcome: FrontierOutcome<T>) -> T {
         FrontierOutcome::Complete(value) => value,
         other => panic!("unexpected {other:?}"),
     }
+}
+
+#[test]
+fn machine_reduction_merges_near_slopes_across_ordinary_front() {
+    let front =
+        SlopeFront::from_prepared(function(&[(1., 0.), (2., 1.), (2.00005, 2.), (-1., 3.)]));
+    let reduced = complete(front.machine_reduce_for_continuation(FrontierBudget::default()));
+    assert_eq!(
+        reduced.components()[0].pairs(),
+        &[(1., 0.), (2., 2.), (-1., 3.)]
+    );
+    assert!(matches!(
+        reduced.provenance.as_ref(),
+        FrontierProvenance::MachineReduction { merged: true, .. }
+    ));
+}
+
+#[test]
+fn backward_machine_root_uses_sink_upper_maximum_and_literal_fields() {
+    let upper = [
+        function(&[(2., 0.), (3., 1.), (-1., 2.)]),
+        function(&[(4., 0.), (0., 2.)]),
+    ];
+    let root = complete(MachineRootState::from_backward_inputs(
+        &[&upper[0], &upper[1]],
+        1.,
+        4.,
+        FrontierBudget::default(),
+    ));
+    assert_eq!(root.front().components()[0].pairs(), &[(5., 1.), (0., 4.)]);
+    assert_eq!(root.waiting_bits(), 0);
+    assert_eq!(root.predecessor(), 1e12);
+    assert_eq!(root.key(), 5.);
+    let empty = complete(MachineRootState::from_backward_inputs(
+        &[],
+        1.,
+        4.,
+        FrontierBudget::default(),
+    ));
+    assert_eq!(empty.key(), -1e12);
+    let signed = function(&[(-0.0, 0.), (0., 1.)]);
+    let signed_root = complete(MachineRootState::from_backward_inputs(
+        &[&signed],
+        0.,
+        1.,
+        FrontierBudget::default(),
+    ));
+    assert_eq!(signed_root.key().to_bits(), (-0.0f64).to_bits());
+}
+
+#[test]
+fn backward_machine_key_scans_interior_endpoints_and_preserves_mode_sentinel() {
+    let front = SlopeFront::from_prepared(function(&[(2., 0.), (3., 1.), (-1., 2.)]));
+    let budget = FrontierBudget::default();
+    assert_eq!(complete(front.machine_backward_key(5, 10., budget)), 5.);
+    assert_eq!(complete(front.machine_backward_key(4, 10., budget)), 1e12);
+    assert!(matches!(
+        front.machine_backward_key(
+            5,
+            10.,
+            FrontierBudget {
+                max_pairs: 2,
+                ..budget
+            },
+        ),
+        FrontierOutcome::Unknown(FrontierUnknown::PairLimit)
+    ));
+}
+
+#[test]
+fn duplicate_waiting_carries_the_direct_predecessor_and_respects_budget() {
+    let function =
+        PreparedSlopeFunction::from_machine_pairs(vec![(2., 1.), (3., 1.), (4., 3.)]).unwrap();
+    let state = MachineForwardState {
+        front: SlopeFront::from_prepared(function),
+        waiting_bits: 1 << 2,
+        predecessor: None,
+        key: 0.,
+    };
+    let budget = FrontierBudget::default();
+    assert_eq!(
+        complete(state.machine_internal_duplicate_predecessor_at(1., budget)),
+        1.
+    );
+    assert_eq!(
+        complete(state.machine_internal_duplicate_predecessor_at(2., budget)),
+        1.
+    );
+    assert!(matches!(
+        state.machine_internal_duplicate_predecessor_at(
+            2.,
+            FrontierBudget {
+                max_operations: 10,
+                ..budget
+            },
+        ),
+        FrontierOutcome::Unknown(FrontierUnknown::WorkLimit)
+    ));
+}
+
+#[test]
+fn machine_history_backtracks_through_a_multisegment_inverse() {
+    let budget = FrontierBudget::default();
+    let root = complete(MachineRootState::from_prepared(
+        &function(&[(0., 0.), (0., 3.)]),
+        budget,
+    ));
+    let history = complete(MachinePathHistory::from_root(&root, 2, budget));
+    let state = MachineForwardState {
+        front: SlopeFront::from_prepared(function(&[(0., 0.), (0., 3.)])),
+        waiting_bits: 0,
+        predecessor: None,
+        key: 0.,
+    };
+    let history = MachinePathHistory {
+        head: Arc::new(MachinePathNode {
+            previous: Some(history.head.clone()),
+            snapshot: MachinePathSnapshot::Forward { arc: 7, state },
+        }),
+        len: 2,
+        max_states: 2,
+    };
+    let inverse = function(&[(0., 0.), (0.5, 1.), (0.5, 3.)]);
+    let coordinates = complete(PreparedSlopeRelationArc::machine_backtrack_coordinates(
+        &history,
+        2.,
+        &[(7, &inverse)],
+        budget,
+    ));
+    assert_eq!(coordinates, vec![1., 2.]);
+    assert!(matches!(
+        PreparedSlopeRelationArc::machine_backtrack_coordinates(
+            &history,
+            2.,
+            &[(8, &inverse)],
+            budget,
+        ),
+        FrontierOutcome::Unknown(_)
+    ));
 }
 
 #[test]
@@ -222,4 +362,94 @@ fn restriction_retains_gaps_and_translation_collapse_is_unknown() {
         ),
         FrontierOutcome::Unknown(FrontierUnknown::WorkLimit)
     ));
+}
+
+#[test]
+fn machine_dependent_bounds_match_reference_crossings_and_waiting_bits() {
+    // Observed by internal/reference/metasolver_paired_operators.py, ELF 71f320.
+    for (pairs, bound, bits, expected, expected_bits) in [
+        (
+            vec![(0., 0.), (2., 1.), (0., 3.)],
+            1.,
+            2,
+            vec![(1., 0.), (0., 0.5), (2., 1.), (0., 3.)],
+            6,
+        ),
+        (
+            vec![(2., 0.), (0., 1.), (2., 3.)],
+            3.,
+            4,
+            vec![(3., 0.), (0., 1.5), (2., 3.)],
+            6,
+        ),
+        (
+            vec![(2., 0.), (0., 1.), (0., 3.)],
+            1.,
+            6,
+            vec![(2., 0.), (0., 3.)],
+            2,
+        ),
+    ] {
+        let envelope = MachineWaitingEnvelope {
+            function: function(&pairs),
+            waiting_bits: bits,
+            predecessor: Some(0.),
+        };
+        let actual = complete(envelope.apply_lower_bound(
+            &function(&[(bound, 0.), (0., 3.)]),
+            FrontierBudget::default(),
+        ));
+        assert_eq!(actual.function().pairs(), expected);
+        assert_eq!(actual.waiting_bits(), expected_bits);
+        assert_eq!(actual.predecessor(), Some(0.));
+    }
+    // The upper filter clips its connected retained region; its caller keeps
+    // the existing bits and predecessor rather than remapping them.
+    for (pairs, expected) in [
+        (vec![(0., 0.), (2., 2.)], vec![(0., 0.), (2., 0.5)]),
+        (vec![(2., 0.), (-2., 2.)], vec![(1., 0.5), (-2., 2.)]),
+    ] {
+        let envelope = MachineWaitingEnvelope {
+            function: function(&pairs),
+            waiting_bits: 2,
+            predecessor: Some(0.),
+        };
+        let actual = complete(
+            envelope.apply_upper_bound(&function(&[(1., 0.), (0., 2.)]), FrontierBudget::default()),
+        );
+        assert_eq!(actual.function().pairs(), expected);
+        assert_eq!(actual.waiting_bits(), 2);
+    }
+}
+
+#[test]
+fn forward_machine_mixed_scan_matches_reference_without_source_equivalence() {
+    let input = function(&[(2., 0.), (2., 1.), (-2., 3.), (2., 4.)]);
+    let front = SlopeFront::from_prepared(input.clone());
+    let actual = complete(front.machine_waiting(0., 4., 1, FrontierBudget::default()));
+    // Reference full forward extension ELF 720890 with identity mapping,
+    // zero increment and nonbinding dependent bounds produces this same scan.
+    assert_eq!(actual.function().pairs(), &[(2., 0.), (-2., 3.), (1., 4.)]);
+    assert_eq!(actual.waiting_bits(), 4);
+    assert_eq!(actual.predecessor(), None);
+    // Independent piecewise-linear waiting oracle: a linear objective on
+    // each source segment attains its minimum at an endpoint.
+    let source_minimum = [0., 1., 3.]
+        .into_iter()
+        .map(|x| {
+            input
+                .evaluate(x, EvaluationPolicy::StrictDomain)
+                .unwrap()
+                .unwrap()
+                + (3. - x)
+        })
+        .fold(f64::INFINITY, f64::min);
+    assert_eq!(source_minimum, 0.);
+    assert_eq!(
+        actual
+            .function()
+            .evaluate(3., EvaluationPolicy::StrictDomain)
+            .unwrap(),
+        Some(-4.)
+    );
 }

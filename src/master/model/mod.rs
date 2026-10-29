@@ -307,6 +307,7 @@ struct Coordinator<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>(
     Rc<RefCell<State<D>>>,
     bool,
     bool,
+    Option<f64>,
 );
 
 fn entries_base<const D: usize>(

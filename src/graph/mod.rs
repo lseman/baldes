@@ -477,7 +477,8 @@ impl<const D: usize> Graph<D> {
         }
         Ok(())
     }
-    pub(crate) fn validate(&self) -> Result<()> {
+    /// Check the physical graph and any prepared coupled resources before use.
+    pub fn validate(&self) -> Result<()> {
         if let RouteDomain::BoundedWalks { max_arcs } = self.route_domain {
             if max_arcs == 0
                 || (self.elementary && !self.grouped)

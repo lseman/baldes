@@ -7,8 +7,12 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
         &mut self,
         master: &ClpMaster,
         tags: &[i32],
-        _artificials: &[usize],
+        artificials: &[usize],
     ) -> Result<()> {
+        self.3 = artificials.iter().try_fold(f64::INFINITY, |minimum, &index| {
+            let cost = *master.costs().get(index)?;
+            (cost.is_finite() && cost > 0.).then_some(minimum.min(cost))
+        });
         let mut state = self.0.borrow_mut();
         let objective = master.objective();
         state.pricing_master =
@@ -85,6 +89,26 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
     fn column_upper_bound(&self, tag: i32) -> Option<f64> {
         let state = self.0.borrow();
         if tag >= 0 {
+            // Ordinary generated columns share the network multiplicity row.
+            // Its auxiliary violation must cost at least as much as every
+            // uncapped column can improve the objective; otherwise preserve
+            // the cap until penalties have increased enough.
+            // Repeating that limit on every column is redundant and can move
+            // the convexity dual onto bound-active columns, leaving pricing
+            // with an artificially weak network offset. Explicit restrictions
+            // and finite retained-universe boxes still need their own caps.
+            let covered = self.3.is_some_and(|penalty| {
+                penalty == f64::INFINITY || state.routes.get(tag as usize).is_some_and(|route| {
+                    crate::core::rounding::add_down(route.route.original_cost, penalty)
+                        .is_some_and(|sum| sum >= 0.)
+                })
+            });
+            if covered && state.master_variables.is_empty() && state.shared_rows.is_empty()
+                && state.variable_boxes.is_empty() && state.grouped_variable_boxes.is_empty()
+                && state.synchronized_services.is_empty() && state.universe.is_none()
+                && !state.route_upper_bounds.contains_key(&(tag as usize)) {
+                return None;
+            }
             enumeration::route_upper(&state, tag as usize).filter(|u| u.is_finite())
         } else if let Some((index, sign)) = master_variables::decode(tag) {
             state
@@ -258,6 +282,25 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
         for &(cut, row) in &oracle.nonlinear_rows {
             oracle.solver.cuts.cuts[cut].dual = duals[self.state.shared_offset + row];
         }
+        if !oracle.nonlinear_rows.is_empty() {
+            // Modern rank-one retrieval filters and orders raw prices before
+            // rounding. Keep k-path rows in registry order, as the routing
+            // adapter does. Exact pricing uses separate raw cut inputs.
+            let registry = &mut oracle.solver.cuts;
+            let mut order: Vec<usize> = (0..registry.cuts.len())
+                .filter(|&index| {
+                    !registry.retired.contains(&index)
+                        && !registry.cuts[index].visit_once
+                        && registry.cuts[index].dual.abs() > 1e-6
+                })
+                .collect();
+            crate::cuts::shared::stdsort::stable_sort(&mut order, |&a, &b| {
+                let (va, vb) = (-registry.cuts[a].dual, -registry.cuts[b].dual);
+                va > vb + 1e-6 || (!(vb - 1e-6 > va) && a < b)
+            });
+            registry.pricing_order = order;
+            registry.round_duals = true;
+        }
         for &(cut, row) in &oracle.knapsack_rows {
             oracle.solver.cuts.knapsack_cuts[cut].dual = duals[self.state.shared_offset + row];
         }
@@ -331,6 +374,9 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
         } else {
             Envelopes::default()
         };
+        // Pricing omits the route-constant dual contribution from arc costs.
+        // Its zero threshold therefore has the opposite sign to that offset.
+        oracle.solver.controls.zero_threshold = -offset;
         Ok(Request {
             phase,
             exact: oracle.solver.phases[phase].exact(),

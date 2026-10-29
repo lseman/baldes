@@ -36,6 +36,11 @@ impl PreparedClampFilter {
         lower: &PreparedSlopeFunction,
         upper: &PreparedSlopeFunction,
     ) -> Result<Self, RawFunctionError> {
+        if lower.is_machine_zero_length() || upper.is_machine_zero_length() {
+            return Err(RawFunctionError::Unsupported(
+                "machine zero-length segment as bound",
+            ));
+        }
         Ok(Self {
             lower: Arc::new(lower.clone()),
             upper: Arc::new(upper.clone()),
@@ -51,6 +56,11 @@ impl PreparedClampFilter {
         policy: FrontOperationPolicy,
         budget: FrontierBudget,
     ) -> FrontierOutcome<SlopeFront> {
+        if front.has_machine_zero_length() {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "machine zero-length segment bound filtering",
+            ));
+        }
         let mut preparation = Work::new(budget);
         let rounded = if policy == FrontOperationPolicy::FrontAlgebra {
             match self.rounded_affine_maximum(front, &mut preparation) {

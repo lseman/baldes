@@ -13,20 +13,32 @@ pub(super) struct SlopeLabel {
     /// Exact bounded paired suffix transfer, independent of the forward raw
     /// frontier. Interval-cost labels never install this cache.
     pub(super) bounded_cost: Option<Box<relation::BoundedCostFront>>,
+    /// General raw adjoint for backward diagnostics and future certified
+    /// consumers. It cannot replace ordered source/machine replay at a join.
+    pub(super) raw_upper: Option<std::sync::Arc<slope_paired::RawAdjoint>>,
+    /// Explicit machine-program path state; never a source feasibility proof.
+    pub(super) machine_history: Option<std::sync::Arc<descriptor::MachinePathHistory>>,
 }
 impl PartialEq for SlopeLabel {
     fn eq(&self, other: &Self) -> bool {
+        match (&self.machine_history, &other.machine_history) {
+            (None, None) => {}
+            (Some(a), Some(b)) if std::sync::Arc::ptr_eq(a, b) => {}
+            _ => return false,
+        }
         if self.minimum.to_bits() != other.minimum.to_bits()
+            || (self.bounded_cost.is_none() && other.bounded_cost.is_none()
+                && self.raw_upper.as_ref().map(|a| a.depth) != other.raw_upper.as_ref().map(|b| b.depth))
             || self.upper != other.upper
             || self.bounded_cost != other.bounded_cost
         {
             return false;
         }
-        fronts_equal(&self.front, &other.front)
-            && fronts_equal(&self.upper_negative, &other.upper_negative)
+        fronts_equal(self.front.as_ref(), other.front.as_ref())
+            && fronts_equal(self.upper_negative.as_ref(), other.upper_negative.as_ref())
     }
 }
-fn fronts_equal(a: &Option<SlopeFront>, b: &Option<SlopeFront>) -> bool {
+fn fronts_equal(a: Option<&SlopeFront>, b: Option<&SlopeFront>) -> bool {
     match (a, b) {
         (None, None) => true,
         (Some(a), Some(b)) => {
@@ -177,6 +189,8 @@ impl SlopeLabel {
             minimum: 0.,
             upper: None,
             bounded_cost: None,
+            raw_upper: None,
+            machine_history: None,
         }
     }
     pub(super) fn extend(
@@ -227,6 +241,8 @@ impl SlopeLabel {
             minimum: finite(witness.value)?,
             upper: None,
             bounded_cost: None,
+            raw_upper: None,
+            machine_history: None,
         }))
     }
 }

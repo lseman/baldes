@@ -14,9 +14,7 @@ impl CoupledKernel {
         }
         if self.plugins.iter().any(|p| p.0.has_costs())
             || self.has_slope_fronts()
-            || self.paired.iter().any(|prepared| {
-                prepared.normalization == PairedCostNormalization::AbsoluteFinalValue
-            })
+            || self.paired.iter().any(|prepared| prepared.has_costs())
         {
             let Some(total) = self.join_original_objective(f, b)? else {
                 return Ok(None);
@@ -62,7 +60,7 @@ impl CoupledKernel {
             } else {
                 None
             };
-            let joined = match cached {
+            match cached {
                 Some(Some(value)) => value,
                 Some(None) => return Ok(None),
                 None => {
@@ -78,23 +76,6 @@ impl CoupledKernel {
                     value
                 }
             };
-            if scale != 0. {
-                let baseline = if scale < 0. {
-                    -left
-                        .forward_upper_negative()
-                        .ok_or_else(|| invalid("signed paired upper frontier is unavailable"))?
-                        .minimum()
-                } else {
-                    left.forward()
-                        .ok_or_else(|| invalid("paired forward join expected"))?
-                        .minimum()
-                };
-                // Feasibility-only paired relations have no objective.
-                if prepared.has_costs() {
-                    front_correction =
-                        finite(front_correction + finite(scale * finite(joined - baseline)?)?)?;
-                }
-            }
         }
         let suffix = b.suffix.as_ref().unwrap();
         for (front, plugin) in f.plugins.iter().zip(&self.plugins) {
@@ -202,16 +183,41 @@ impl CoupledKernel {
         // In the restricted exact bounded-cost specialization the cached
         // final dependent minimum is already canonical; avoid suffix replay.
         if self.front_indices.is_empty()
-            && !self.has_slope_fronts()
+            && self.slope_indices.is_empty()
             && self.initial.is_empty()
-            && !self.paired.is_empty()
+            && (!self.paired.is_empty() || !self.slope_paired.is_empty())
             && self.plugins.is_empty()
             && !self.has_negative_paired_objectives()
         {
             let mut total = 0.;
             let mut known = true;
+            // Match final_resource_objective's family order. The cache owns
+            // its exact dependent-unit conversion; raw machine programs and
+            // nonconstant source prefixes retain full suffix replay.
+            for ((left, right), prepared) in f
+                .slope_relations
+                .iter()
+                .zip(&b.slope_relations)
+                .zip(&self.slope_paired)
+            {
+                match prepared.cached_join(left, right) {
+                    Some(Some(final_minimum)) => {
+                        total = finite(
+                            total + prepared.final_objective(final_minimum, self.cost_scale)?,
+                        )?;
+                    }
+                    Some(None) => return Ok(None),
+                    None => {
+                        known = false;
+                        break;
+                    }
+                }
+            }
             for ((left, right), prepared) in f.relations.iter().zip(&b.relations).zip(&self.paired)
             {
+                if !known {
+                    break;
+                }
                 match prepared.cached_join(left, right) {
                     Some(Some(final_minimum)) => {
                         total = finite(

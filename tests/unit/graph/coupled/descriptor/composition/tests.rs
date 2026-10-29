@@ -9,6 +9,157 @@ fn complete(result: FrontierOutcome<PreparedSlopeFunction>) -> PreparedSlopeFunc
         other => panic!("unexpected {other:?}"),
     }
 }
+
+#[test]
+fn machine_point_inner_long_interval_retains_requested_start_and_no_segment() {
+    // Static reference branch: ELF 649853 initializes inner segment id 1;
+    // 6498ed-64990a stores the initial pair and skips the stream for size 1.
+    // REA ev_7b76290689145ad474cf1a87289746495fd1c35128c387dc2c3e41fc6524bcf5.
+    // This fixture is not an executed reference observation.
+    let outer = f(&[(1., 0.), (2., 4.)]);
+    let inner = f(&[(2., 1.)]);
+    for lower in [1., 0.99999, 1.00001] {
+        let actual = complete(compose_increasing(
+            &outer,
+            &inner,
+            lower,
+            2.,
+            FrontOperationPolicy::FrontAlgebra,
+            FrontierBudget::default(),
+        ));
+        assert_eq!(actual.pairs(), &[(5., lower)]);
+        assert!(!actual.is_machine_zero_length());
+    }
+    let strict = complete(compose_increasing(
+        &outer,
+        &inner,
+        0.99999,
+        2.,
+        FrontOperationPolicy::StrictDomain,
+        FrontierBudget::default(),
+    ));
+    assert_eq!(strict.pairs(), &[(5., 1.)]);
+    assert!(matches!(
+        compose_increasing(
+            &outer,
+            &inner,
+            1.00001,
+            2.,
+            FrontOperationPolicy::StrictDomain,
+            FrontierBudget::default(),
+        ),
+        FrontierOutcome::Empty
+    ));
+    assert!(matches!(
+        compose_increasing(
+            &f(&[(1e12, 2.)]),
+            &inner,
+            1.,
+            2.,
+            FrontOperationPolicy::FrontAlgebra,
+            FrontierBudget::default(),
+        ),
+        FrontierOutcome::Unknown(_)
+    ));
+    assert!(matches!(
+        compose_increasing(
+            &outer,
+            &inner,
+            1.,
+            2.,
+            FrontOperationPolicy::FrontAlgebra,
+            FrontierBudget {
+                max_pairs: 0,
+                ..FrontierBudget::default()
+            },
+        ),
+        FrontierOutcome::Unknown(FrontierUnknown::PairLimit)
+    ));
+}
+
+#[test]
+fn short_machine_composition_consumes_retained_zero_length_segments_by_lookup() {
+    // The recovered short branch at ELF 649757-6497bf performs the two
+    // lookups before any segment-stream operations. Its duplicate output at
+    // 649ae0 is preserved across another short composition.
+    let budget = FrontierBudget::default();
+    let identity = f(&[(0., 0.), (1., 4.)]);
+    let duplicate = complete(compose_increasing(
+        &identity,
+        &identity,
+        1.,
+        1.,
+        FrontOperationPolicy::FrontAlgebra,
+        budget,
+    ));
+    assert!(duplicate.is_machine_zero_length());
+    for (outer, inner) in [
+        (&identity, &duplicate),
+        (&duplicate, &identity),
+        (&duplicate, &duplicate),
+    ] {
+        let output = complete(compose_increasing(
+            outer,
+            inner,
+            1.,
+            1.,
+            FrontOperationPolicy::FrontAlgebra,
+            budget,
+        ));
+        assert_eq!(output.pairs(), &[(1., 1.), (0., 1.)]);
+        assert!(output.is_machine_zero_length());
+        let short = complete(compose_increasing(
+            outer,
+            inner,
+            1.,
+            1.00001,
+            FrontOperationPolicy::FrontAlgebra,
+            budget,
+        ));
+        assert_eq!(short.pairs(), &[(1., 1.), (0., 1.00001)]);
+        assert!(!short.is_machine_zero_length());
+        assert!(matches!(
+            compose_increasing(
+                outer,
+                inner,
+                1.,
+                1.,
+                FrontOperationPolicy::StrictDomain,
+                budget,
+            ),
+            FrontierOutcome::Unknown(_)
+        ));
+        let long = compose_increasing(
+            outer,
+            inner,
+            1.,
+            2.,
+            FrontOperationPolicy::FrontAlgebra,
+            budget,
+        );
+        if !outer.is_machine_zero_length() {
+            // A zero-width vector exhausts after the initial lookup; the
+            // pinned helper returns this finite point on its long branch.
+            assert_eq!(complete(long).pairs(), &[(1., 1.)]);
+        } else {
+            // The native duplicate outer can instead produce a NaN secant.
+            assert!(matches!(long, FrontierOutcome::Unknown(_)));
+        }
+    }
+    let prepared = match PreparedCompositionMap::new(&identity, budget) {
+        FrontierOutcome::Complete(map) => map,
+        other => panic!("unexpected prepared map: {other:?}"),
+    };
+    let output = complete(prepared.compose(
+        &duplicate,
+        1.,
+        1.,
+        FrontOperationPolicy::FrontAlgebra,
+        budget,
+    ));
+    assert_eq!(output.pairs(), &[(1., 1.), (0., 1.)]);
+    assert!(output.is_machine_zero_length());
+}
 #[test]
 fn native_affine_and_outer_knot_secants() {
     let budget = FrontierBudget::default();
@@ -193,9 +344,7 @@ fn native_exhausted_outer_domain_is_unknown_while_strict_composition_clips() {
                     FrontOperationPolicy::FrontAlgebra,
                     FrontierBudget::default()
                 ),
-                FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                    "native composition image outside outer domain"
-                ))
+                FrontierOutcome::Unknown(FrontierUnknown::Unsupported(_))
             ));
             let clipped = complete(compose_increasing(
                 &outer,
@@ -358,17 +507,20 @@ fn native_constant_short_front_does_not_change_strict_composition() {
         ),
         FrontierOutcome::Unknown(FrontierUnknown::PairLimit)
     ));
-    assert!(matches!(
-        compose_increasing(
-            &outer,
-            &inner,
-            -0.00001,
-            1.,
-            FrontOperationPolicy::FrontAlgebra,
-            FrontierBudget::default()
-        ),
-        FrontierOutcome::Unknown(_)
+    // Pinned reference composition at ELF 649680: the requested near-start
+    // coordinate is retained, and the secant rounds above six.
+    let near_start = complete(compose_increasing(
+        &outer,
+        &inner,
+        -0.00001,
+        1.,
+        FrontOperationPolicy::FrontAlgebra,
+        FrontierBudget::default(),
     ));
+    assert_eq!(
+        near_start.pairs(),
+        &[(5., -0.00001), (6.000000000000001, 1.)]
+    );
 }
 #[test]
 fn native_near_knots_preserve_segment_advancement_and_endpoint_snaps() {
@@ -552,4 +704,91 @@ fn composition_matches_retained_finite_and_tolerance_boundary_controls() {
             "{name}"
         );
     }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn machine_composition_endpoint_and_degenerate_branches_match_recorded_binary_bits() {
+    let fixtures: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../../fixtures/coupled/metasolver-composition-operators.json"
+    ))
+    .unwrap();
+    for fixture in fixtures.as_array().unwrap() {
+        let function = |key: &str| {
+            let pairs: Vec<(f64, f64)> = serde_json::from_value(fixture[key].clone()).unwrap();
+            PreparedSlopeFunction::from_machine_pairs(pairs).unwrap()
+        };
+        let result = compose_increasing(
+            &function("outer"),
+            &function("inner"),
+            fixture["lower"].as_f64().unwrap(),
+            fixture["upper"].as_f64().unwrap(),
+            FrontOperationPolicy::FrontAlgebra,
+            FrontierBudget::default(),
+        );
+        if fixture["status"] == true && fixture["finite"] == true {
+            let output = complete(result);
+            let expected: Vec<(u64, u64)> = fixture["output_bits"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|pair| {
+                    (
+                        u64::from_str_radix(pair[0].as_str().unwrap(), 16).unwrap(),
+                        u64::from_str_radix(pair[1].as_str().unwrap(), 16).unwrap(),
+                    )
+                })
+                .collect();
+            let actual: Vec<_> = output
+                .pairs()
+                .iter()
+                .map(|pair| (pair.0.to_bits(), pair.1.to_bits()))
+                .collect();
+            assert_eq!(actual, expected, "{fixture}");
+        } else {
+            assert!(
+                matches!(result, FrontierOutcome::Unknown(_)),
+                "{fixture}: {result:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn machine_near_knot_composition_is_not_a_strict_source_function_certificate() {
+    let outer = f(&[(1., 0.), (2., 0.0001)]);
+    let inner = f(&[(0., 0.), (1., 0.00005)]);
+    let raw = complete(compose_increasing(
+        &outer,
+        &inner,
+        0.,
+        1.,
+        FrontOperationPolicy::FrontAlgebra,
+        FrontierBudget::default(),
+    ));
+    let strict = complete(compose_increasing(
+        &outer,
+        &inner,
+        0.,
+        1.,
+        FrontOperationPolicy::StrictDomain,
+        FrontierBudget::default(),
+    ));
+    let source = 1. + 2. * 0.00005;
+    assert_eq!(
+        strict
+            .evaluate(0.00005, EvaluationPolicy::StrictDomain)
+            .unwrap(),
+        Some(source)
+    );
+    assert_eq!(
+        raw.evaluate(0.00005, EvaluationPolicy::StrictDomain)
+            .unwrap(),
+        Some(1.0002)
+    );
+    assert_ne!(
+        Some(source),
+        raw.evaluate(0.00005, EvaluationPolicy::StrictDomain)
+            .unwrap()
+    );
 }

@@ -1,7 +1,100 @@
 //! Properties of source controls, independent of master rows and objectives.
 use super::affine::Interval;
-use crate::graph::coupled::{CoupledResource, PiecewiseLinearFunction, PreparedSlopeFunction};
-use crate::graph::Graph;
+use crate::graph::coupled::{
+    CoupledResource, PairedControl, PiecewiseLinearFunction, PreparedSlopeFunction,
+};
+use crate::graph::{Graph, Window};
+
+/// Some(None) proves the declared base domains disjoint. Some(Some(control))
+/// proves every possible source control has these coordinates, but does not
+/// prove its transition/terminal feasibility. None leaves the ordinary search.
+pub(super) fn forced_control<const D: usize>(
+    graph: &Graph<D>,
+    resource: usize,
+    path: &[usize],
+    work: &mut usize,
+    deadline: Option<std::time::Instant>,
+) -> Option<Option<PairedControl>> {
+    if graph.front_program_domain() || deadline.is_some_and(|end| std::time::Instant::now() >= end)
+    {
+        return None;
+    }
+    *work = work.checked_sub(path.len().checked_mul(8)?.checked_add(4)?)?;
+    let definition = graph.coupled_kernel()?.definitions().get(resource)?;
+    let slope_domain = |function: &PreparedSlopeFunction| {
+        let (lower, upper) = function.domain();
+        Window { lower, upper }
+    };
+    let (initial, initial_base) = match definition {
+        CoupledResource::PairedPiecewiseLinear {
+            initial,
+            initial_base,
+            ..
+        } => (initial.prepared_domain(), *initial_base),
+        CoupledResource::SlopePaired {
+            initial,
+            initial_base,
+            ..
+        } => (slope_domain(initial), *initial_base),
+        _ => return None,
+    };
+    let mut bounds = vec![
+        Window {
+            lower: f64::NEG_INFINITY,
+            upper: f64::INFINITY
+        };
+        path.len().checked_add(1)?
+    ];
+    let restrict = |bound: &mut Window, domain: Window| {
+        bound.lower = bound.lower.max(domain.lower);
+        bound.upper = bound.upper.min(domain.upper);
+    };
+    restrict(&mut bounds[0], initial);
+    restrict(&mut bounds[0], initial_base);
+    for (position, &index) in path.iter().enumerate() {
+        let domains = match definition {
+            CoupledResource::PairedPiecewiseLinear { arcs, .. } => {
+                let arc = arcs.get(index)?;
+                [
+                    arc.arrival.prepared_domain(),
+                    arc.increment.prepared_domain(),
+                    arc.lower.prepared_domain(),
+                    arc.upper.prepared_domain(),
+                ]
+            }
+            CoupledResource::SlopePaired { arcs, .. } => {
+                let arc = arcs.get(index)?;
+                [
+                    slope_domain(&arc.arrival),
+                    slope_domain(&arc.increment),
+                    slope_domain(&arc.lower),
+                    slope_domain(&arc.upper),
+                ]
+            }
+            _ => return None,
+        };
+        restrict(&mut bounds[position], domains[0]);
+        restrict(&mut bounds[position], domains[1]);
+        restrict(&mut bounds[position + 1], domains[2]);
+        restrict(&mut bounds[position + 1], domains[3]);
+    }
+    if deadline.is_some_and(|end| std::time::Instant::now() >= end) {
+        return None;
+    }
+    if bounds.iter().any(|bound| bound.lower > bound.upper) {
+        return Some(None);
+    }
+    if bounds
+        .iter()
+        .any(|bound| !bound.lower.is_finite() || bound.lower != bound.upper)
+    {
+        return None;
+    }
+    Some(Some(PairedControl {
+        resource,
+        base: bounds.into_iter().map(|bound| bound.lower).collect(),
+    }))
+}
 
 fn slope_constant(function: &PreparedSlopeFunction) -> Option<f64> {
     let pairs = function.pairs();
@@ -121,6 +214,7 @@ pub(crate) fn invariant_value<const D: usize>(
     {
         return None;
     }
+    *work = work.checked_sub(path.len().checked_add(1)?)?;
     let definition = graph.coupled_kernel()?.definitions().get(resource)?;
     let (mut value, steps): (f64, Vec<(f64, f64)>) = match definition {
         CoupledResource::SlopePaired { initial, arcs, .. } => {

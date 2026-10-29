@@ -1,5 +1,71 @@
 use super::*;
 
+#[test]
+fn round_completion_passes_node_depth_to_bucket_refinement() {
+    for depth in [0, 1] {
+        let mut graph = Graph::<2>::new(3, 1).unwrap();
+        for vertex in 0..3 {
+            graph.set_bounds(vertex, 0, 0., 10.).unwrap();
+        }
+        graph.add_arc(0, 1, 1.).unwrap();
+        graph.add_arc(1, 2, 1.).unwrap();
+        let mut options = RootOptions::default();
+        options.capture_state = true;
+        options.enumerate = false;
+        let root = super::super::solve(
+            RoutingContext::set_partitioning(graph, 1.).unwrap(),
+            options,
+        )
+        .unwrap();
+        let snapshot = root.snapshot.unwrap();
+        let mut solver = snapshot.pricing.fork_for_node();
+        solver.restore_arcs();
+        solver.bucket_steps[0] = 2.;
+        solver.set_option("BALDESdynamicBucketSteps", 1.).unwrap();
+        solver
+            .set_option("BALDESdynBuckStepAdjustRatioThreshold", 0.)
+            .unwrap();
+        solver
+            .set_option("BALDESdynBuckStepAdjustNumBuckArcsThreshold", 1_000_000.)
+            .unwrap();
+        solver.price_phase(0, 10, false).unwrap();
+        solver.round.times.clear();
+        solver.round.dominance_ratios.clear();
+        solver.round.collect(1., 1, 1, true);
+        let mut cg_options = cg::Options::default();
+        cg_options.node_depth = depth;
+        let state = Rc::new(RefCell::new(State {
+            solver,
+            routes: snapshot.routes.clone(),
+            route_tags: Default::default(),
+            incumbent: snapshot.incumbent,
+            enumerate: false,
+            rounded: true,
+            pricing: adapter::RootPricing::new(&cg_options),
+            previous_fixing_gap: f64::INFINITY,
+            deadline: None,
+            pricing_seconds: 0.,
+            cut: snapshot.cut.clone(),
+            fixing_calls: 0,
+            enumerated_routes: 0,
+        }));
+        let mut controller = RootController {
+            problem: Rc::new(snapshot.problem.clone()),
+            state: state.clone(),
+            checkpoint: None,
+            enumeration_checkpoint: None,
+            certificate_search: Default::default(),
+        };
+        let mut master = snapshot.master.try_clone().unwrap();
+        controller.separate_round(&mut master, &[]).unwrap();
+        assert_eq!(
+            state.borrow().solver.bucket_steps[0],
+            if depth == 0 { 1. } else { 2. }
+        );
+        assert!(state.borrow().solver.round.times.is_empty());
+    }
+}
+
 fn column(tag: i32) -> Column {
     Column {
         tag,

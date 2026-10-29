@@ -245,6 +245,14 @@ impl<const D: usize> RootController<D> {
                         &phase_master,
                         &proof_cache,
                     )
+                    .or_else(|| {
+                        super::super::certificate::zero_objective_lower_bound(
+                            &phase_problem,
+                            &phase_master,
+                            &duals,
+                            deadline,
+                        )
+                    })
                     .is_some_and(|bound| bound > tolerance);
                     if report.certified_infeasible {
                         report.status = FeasibilityStatus::Infeasible;
@@ -274,6 +282,14 @@ impl<const D: usize> RootController<D> {
                                 &phase_master,
                                 &proof_cache,
                             )
+                            .or_else(|| {
+                                super::super::certificate::zero_objective_lower_bound(
+                                    &phase_problem,
+                                    &phase_master,
+                                    &duals,
+                                    deadline,
+                                )
+                            })
                             .is_some_and(|bound| bound > tolerance)
                         },
                     )

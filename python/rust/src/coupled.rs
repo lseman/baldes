@@ -3,7 +3,8 @@ use super::{run, Solver};
 use baldes::graph::coupled::{
     descriptor::{PairedCostNormalization, RawAffine, SlopeRelationArc},
     CoupledResource, EncodedFunction as FunctionDefinition, EvaluationPolicy, FrontOperationPolicy,
-    PairedResourceArc, PairedResourceMode, PiecewiseLinearFunction, PreparedSlopeFunction,
+    PairedResourceArc, PairedResourceMode, PiecewiseLinearFunction, PreparedMachineArc,
+    PreparedMachineBackwardInputs, PreparedSlopeFunction,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -82,6 +83,72 @@ fn wire_pairs(value: &Bound<'_, PyAny>) -> PyResult<Vec<(f64, f64)>> {
         .into_iter()
         .map(|[first, second]| (first, second))
         .collect())
+}
+
+fn prepared_machine_function(
+    dictionary: &Bound<'_, PyDict>,
+    name: &str,
+) -> PyResult<PreparedSlopeFunction> {
+    let value = required_field(dictionary, name)?;
+    let function = value.cast::<PyDict>()?;
+    exact_fields(function, &["pairs"])?;
+    PreparedSlopeFunction::from_machine_pairs(wire_pairs(&required_field(function, "pairs")?)?)
+        .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+fn prepared_machine_arc(dictionary: &Bound<'_, PyDict>) -> PyResult<PreparedMachineArc> {
+    let mut fields = vec![
+        "tail_limit",
+        "head_limit",
+        "waiting_lower",
+        "waiting_upper",
+        "waiting_rate",
+        "forward_mapping",
+        "inverse",
+        "sum_vector",
+        "dependent_lower",
+        "dependent_upper",
+    ];
+    if dictionary.contains("backward")? {
+        fields.push("backward");
+    }
+    exact_fields(dictionary, &fields)?;
+    let backward = match dictionary.get_item("backward")? {
+        Some(value) if !value.is_none() => {
+            let data = value.cast::<PyDict>()?;
+            exact_fields(
+                data,
+                &[
+                    "tail_lower",
+                    "tail_upper",
+                    "forward_at_tail_lower",
+                    "mapped_upper",
+                    "dependent",
+                ],
+            )?;
+            Some(PreparedMachineBackwardInputs {
+                tail_lower: required_field(data, "tail_lower")?.extract()?,
+                tail_upper: required_field(data, "tail_upper")?.extract()?,
+                forward_at_tail_lower: required_field(data, "forward_at_tail_lower")?.extract()?,
+                mapped_upper: required_field(data, "mapped_upper")?.extract()?,
+                dependent: prepared_machine_function(data, "dependent")?,
+            })
+        }
+        _ => None,
+    };
+    Ok(PreparedMachineArc {
+        tail_limit: required_field(dictionary, "tail_limit")?.extract()?,
+        head_limit: required_field(dictionary, "head_limit")?.extract()?,
+        waiting_lower: required_field(dictionary, "waiting_lower")?.extract()?,
+        waiting_upper: required_field(dictionary, "waiting_upper")?.extract()?,
+        waiting_rate: required_field(dictionary, "waiting_rate")?.extract()?,
+        forward_mapping: prepared_machine_function(dictionary, "forward_mapping")?,
+        inverse: prepared_machine_function(dictionary, "inverse")?,
+        sum_vector: prepared_machine_function(dictionary, "sum_vector")?,
+        dependent_lower: prepared_machine_function(dictionary, "dependent_lower")?,
+        dependent_upper: prepared_machine_function(dictionary, "dependent_upper")?,
+        backward,
+    })
 }
 
 #[pymethods]
@@ -206,6 +273,10 @@ impl EncodedFunction {
 #[pyclass(module = "pybaldes._core")]
 pub struct ResourceModel {
     resources: Vec<CoupledResource>,
+    paired_waiting_base_resources: Vec<(usize, usize)>,
+    paired_machine_inputs: Vec<(usize, Vec<PreparedMachineArc>)>,
+    paired_machine_roots: Vec<(usize, PreparedSlopeFunction)>,
+    paired_machine_terminal_bounds: Vec<(usize, baldes::graph::Window)>,
 }
 impl ResourceModel {
     fn push(&mut self, resource: CoupledResource) -> usize {
@@ -220,8 +291,126 @@ impl ResourceModel {
     fn new() -> Self {
         Self {
             resources: Vec::new(),
+            paired_waiting_base_resources: Vec::new(),
+            paired_machine_inputs: Vec::new(),
+            paired_machine_roots: Vec::new(),
+            paired_machine_terminal_bounds: Vec::new(),
         }
     }
+    /// Map a slope-paired resource to its physical scalar base resource for
+    /// waiting windows. Pass None to remove the mapping. Changes take effect
+    /// on the next install; the physical resource is validated then.
+    fn set_paired_waiting_base_resource(
+        &mut self,
+        resource: usize,
+        base_resource: Option<usize>,
+    ) -> PyResult<()> {
+        match self.resources.get(resource) {
+            Some(CoupledResource::SlopePaired {
+                policy: FrontOperationPolicy::FrontAlgebra,
+                ..
+            }) => {}
+            _ => return Err(PyValueError::new_err(
+                "waiting base resource requires a slope-paired resource with front_algebra policy",
+            )),
+        }
+        self.paired_waiting_base_resources
+            .retain(|&(id, _)| id != resource);
+        if let Some(base_resource) = base_resource {
+            self.paired_waiting_base_resources
+                .push((resource, base_resource));
+        }
+        Ok(())
+    }
+    /// Store exact prepared machine inputs in physical-arc insertion order.
+    /// Pass None to remove them. Graph validation occurs on the next install;
+    /// storing these inputs does not by itself enable machine pricing.
+    fn set_paired_machine_inputs(
+        &mut self,
+        py: Python<'_>,
+        resource: usize,
+        arcs: Option<Vec<Py<PyDict>>>,
+    ) -> PyResult<()> {
+        match self.resources.get(resource) {
+            Some(CoupledResource::SlopePaired {
+                policy: FrontOperationPolicy::FrontAlgebra,
+                ..
+            }) => {}
+            _ => {
+                return Err(PyValueError::new_err(
+                    "machine inputs require a slope-paired resource with front_algebra policy",
+                ))
+            }
+        }
+        let parsed = arcs
+            .map(|values| {
+                values
+                    .iter()
+                    .map(|value| prepared_machine_arc(value.bind(py)))
+                    .collect::<PyResult<Vec<_>>>()
+            })
+            .transpose()?;
+        self.paired_machine_inputs.retain(|(id, _)| *id != resource);
+        if let Some(parsed) = parsed {
+            self.paired_machine_inputs.push((resource, parsed));
+        }
+        Ok(())
+    }
+    /// Store a prepared dependent vector for the machine root.
+    fn set_paired_machine_root(
+        &mut self,
+        py: Python<'_>,
+        resource: usize,
+        root: Option<Py<PyDict>>,
+    ) -> PyResult<()> {
+        if !matches!(
+            self.resources.get(resource),
+            Some(CoupledResource::SlopePaired {
+                policy: FrontOperationPolicy::FrontAlgebra,
+                ..
+            })
+        ) {
+            return Err(PyValueError::new_err(
+                "machine root requires a slope-paired resource with front_algebra policy",
+            ));
+        }
+        let parsed = root
+            .map(|value| {
+                let function = value.bind(py);
+                exact_fields(function, &["pairs"])?;
+                PreparedSlopeFunction::from_machine_pairs(wire_pairs(&required_field(
+                    function, "pairs",
+                )?)?)
+                .map_err(|error| PyValueError::new_err(error.to_string()))
+            })
+            .transpose()?;
+        self.paired_machine_roots.retain(|(id, _)| *id != resource);
+        if let Some(parsed) = parsed {
+            self.paired_machine_roots.push((resource, parsed));
+        }
+        Ok(())
+    }
+    /// Set the terminal base window used to prepare a backward machine root.
+    /// Pass None to remove it; changes take effect on the next install.
+    fn set_paired_machine_terminal_bounds(
+        &mut self,
+        resource: usize,
+        bounds: Option<(f64, f64)>,
+    ) -> PyResult<()> {
+        let window = bounds
+            .map(|(lower, upper)| {
+                baldes::graph::Window::new(lower, upper)
+                    .map_err(|error| PyValueError::new_err(error.message))
+            })
+            .transpose()?;
+        self.paired_machine_terminal_bounds
+            .retain(|(id, _)| *id != resource);
+        if let Some(window) = window {
+            self.paired_machine_terminal_bounds.push((resource, window));
+        }
+        Ok(())
+    }
+
     /// Install resource kernels on this solver's physical graph in place.
     /// Existing options remain; labels, fixing and enumeration are invalidated.
     /// front_program_domain selects a computed native-program model;
@@ -230,16 +419,40 @@ impl ResourceModel {
     fn install(&self, solver: &mut Solver, front_program_domain: bool) -> PyResult<()> {
         run(|| {
             let solver = solver.solver.get_mut().unwrap();
+            // Validate all resource and window changes before publishing them.
+            let mut checked = solver.graph.clone();
+            checked.set_coupled_resources(&self.resources)?;
+            for &(resource, base_resource) in &self.paired_waiting_base_resources {
+                checked.set_paired_waiting_windows_from_resource(resource, base_resource)?;
+            }
+            for (resource, arcs) in &self.paired_machine_inputs {
+                checked.set_paired_machine_inputs(*resource, Some(arcs))?;
+            }
+            for (resource, root) in &self.paired_machine_roots {
+                checked.set_paired_machine_root(*resource, Some(root))?;
+            }
+            for &(resource, bounds) in &self.paired_machine_terminal_bounds {
+                use baldes::graph::coupled::descriptor::{FrontierBudget, FrontierOutcome};
+                match checked.install_paired_machine_backward_root(
+                    resource,
+                    bounds,
+                    FrontierBudget::default(),
+                ) {
+                    FrontierOutcome::Complete(()) => {}
+                    other => {
+                        return Err(baldes::core::error::OrError {
+                            kind: baldes::core::error::ErrorKind::InvalidArgument,
+                            message: format!("paired machine backward root unavailable: {other:?}"),
+                        })
+                    }
+                }
+            }
             if front_program_domain {
-                // Validate the modelling choice before replacing live resources.
-                let mut checked = solver.graph.clone();
-                checked.set_coupled_resources(&self.resources)?;
                 checked.set_front_program_domain(true)?;
             }
-            solver.set_coupled_resources(&self.resources)?;
-            if front_program_domain {
-                solver.graph.set_front_program_domain(true)?;
-            }
+            checked.validate()?;
+            solver.graph = checked;
+            solver.restore_arcs();
             Ok(())
         })
     }

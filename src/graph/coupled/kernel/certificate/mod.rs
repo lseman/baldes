@@ -6,6 +6,7 @@ mod lattice;
 mod machine;
 mod operators;
 mod paired;
+pub(super) use paired::PairedArcBounds;
 pub use paired::PairedControlCertificate;
 mod paired_machine;
 use crate::core::rounding::{add_down, add_up, multiply_down};

@@ -87,13 +87,12 @@ fn network_minimum<const D: usize>(
     // Independent arc relaxations cannot prove that all routes exceed capacity.
     // Reuse the budgeted joint proof, retaining the relaxation when it is unknown.
     if oracle.network.graph.coupled_kernel().is_some_and(|kernel| {
-        kernel.has_costs()
-            || kernel.definitions().iter().any(|resource| {
-                matches!(
-                    resource,
-                    crate::graph::coupled::CoupledResource::SimultaneousPickupDelivery { .. }
-                )
-            })
+        kernel.has_costs() || kernel.definitions().iter().any(|resource| {
+            matches!(
+                resource,
+                crate::graph::coupled::CoupledResource::SimultaneousPickupDelivery { .. }
+            )
+        })
     }) {
         if let Some(bound) = columns::minimum(oracle, offset, duals, resource_work, deadline) {
             return Some(bound);

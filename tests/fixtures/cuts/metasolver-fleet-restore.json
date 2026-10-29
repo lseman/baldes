@@ -1,0 +1,216 @@
+{
+  "name": "fractional-pair-restore",
+  "tree": true,
+  "resource_ids": {
+    "7": [
+      0
+    ]
+  },
+  "model": {
+    "rows": [
+      {
+        "sense": "eq",
+        "rhs": 1.0
+      },
+      {
+        "sense": "eq",
+        "rhs": 1.0
+      },
+      {
+        "sense": "eq",
+        "rhs": 1.0
+      }
+    ],
+    "networks": [
+      {
+        "id": 7,
+        "vertices": 5,
+        "source": 0,
+        "sink": 4,
+        "multiplicity": [
+          0,
+          3
+        ],
+        "arcs": [
+          {
+            "tail": 0,
+            "head": 1,
+            "cost": 1.0,
+            "consumption": [
+              1.0
+            ],
+            "entries": [
+              [
+                0,
+                1.0
+              ]
+            ]
+          },
+          {
+            "tail": 1,
+            "head": 4,
+            "cost": 0.0,
+            "consumption": [
+              0.0
+            ]
+          },
+          {
+            "tail": 1,
+            "head": 2,
+            "cost": 0.125,
+            "consumption": [
+              1.0
+            ],
+            "entries": [
+              [
+                1,
+                1.0
+              ]
+            ]
+          },
+          {
+            "tail": 1,
+            "head": 3,
+            "cost": 0.25,
+            "consumption": [
+              1.0
+            ],
+            "entries": [
+              [
+                2,
+                1.0
+              ]
+            ]
+          },
+          {
+            "tail": 0,
+            "head": 2,
+            "cost": 1.0,
+            "consumption": [
+              1.0
+            ],
+            "entries": [
+              [
+                1,
+                1.0
+              ]
+            ]
+          },
+          {
+            "tail": 2,
+            "head": 4,
+            "cost": 0.0,
+            "consumption": [
+              0.0
+            ]
+          },
+          {
+            "tail": 2,
+            "head": 1,
+            "cost": 0.125,
+            "consumption": [
+              1.0
+            ],
+            "entries": [
+              [
+                0,
+                1.0
+              ]
+            ]
+          },
+          {
+            "tail": 2,
+            "head": 3,
+            "cost": 0.375,
+            "consumption": [
+              1.0
+            ],
+            "entries": [
+              [
+                2,
+                1.0
+              ]
+            ]
+          },
+          {
+            "tail": 0,
+            "head": 3,
+            "cost": 1.0,
+            "consumption": [
+              1.0
+            ],
+            "entries": [
+              [
+                2,
+                1.0
+              ]
+            ]
+          },
+          {
+            "tail": 3,
+            "head": 4,
+            "cost": 0.0,
+            "consumption": [
+              0.0
+            ]
+          },
+          {
+            "tail": 3,
+            "head": 1,
+            "cost": 0.25,
+            "consumption": [
+              1.0
+            ],
+            "entries": [
+              [
+                0,
+                1.0
+              ]
+            ]
+          },
+          {
+            "tail": 3,
+            "head": 2,
+            "cost": 0.375,
+            "consumption": [
+              1.0
+            ],
+            "entries": [
+              [
+                1,
+                1.0
+              ]
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "kind": "disposable",
+            "bounds": [
+              [
+                0.0,
+                2.0
+              ],
+              [
+                0.0,
+                2.0
+              ],
+              [
+                0.0,
+                2.0
+              ],
+              [
+                0.0,
+                2.0
+              ],
+              [
+                0.0,
+                2.0
+              ]
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

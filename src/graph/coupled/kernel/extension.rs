@@ -29,6 +29,8 @@ impl CoupledKernel {
                             minimum: 0.,
                             upper: None,
                             bounded_cost: None,
+                            raw_upper: None,
+                            machine_history: None,
                         }
                     }
                 })
@@ -36,7 +38,7 @@ impl CoupledKernel {
             slope_relations: self
                 .slope_paired
                 .iter()
-                .map(|paired| paired.root(forward))
+                .map(|paired| paired.root(forward, self.front_program_domain))
                 .collect(),
             pricing_activities: (!self.pricing_activities.is_empty()).then(|| {
                 self.pricing_activities
@@ -266,6 +268,7 @@ impl CoupledKernel {
                     .as_ref()
                     .is_some_and(|s| s.program.iter().next().is_none()),
                 self.cost_scale,
+                self.front_program_domain,
             )?
             else {
                 return Ok(None);

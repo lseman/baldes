@@ -69,7 +69,7 @@ Both require Clp.
 | `SharedRow` | `sense`, `rhs`; sense is `"eq"`, `"le"`, or `"ge"` |
 | `PricingResource` | `kind="disposable"`, `initial=None`, `bounds=None`, `time_windows=None` |
 | `PricingArc` | `tail`, `head`, `cost`, `consumption=()`, `bounds=()`, `entries=()` |
-| `PricingNetwork` | `id`, `vertices`, `multiplicity`, `arcs`, `resources=()`, `source=0`, `sink=None`, `route_entries=()`, `activity_entries=()`, `ng=None`, `coupled_resources=()`, `coupled_objective_coefficients=()`, `elementary=False`, `route_domain=None`, `front_program_domain=False` |
+| `PricingNetwork` | `id`, `vertices`, `multiplicity`, `arcs`, `resources=()`, `source=0`, `sink=None`, `route_entries=()`, `activity_entries=()`, `ng=None`, `coupled_resources=()`, `coupled_objective_coefficients=()`, `paired_waiting_base_resources=()`, `paired_machine_inputs=()`, `paired_machine_roots=()`, `paired_machine_terminal_bounds=()`, `elementary=False`, `route_domain=None`, `front_program_domain=False` |
 | `NetworkProblem` | `rows`, scalar/array `networks`, optional `pricing_variables` |
 
 Scalar `kind` accepts `"disposable"` or `"equality"`. Resource `bounds` has one
@@ -85,6 +85,40 @@ bounds the sum of route variables in that network. Shared coverage rows and
 fleet multiplicity are different constraints. `sink=None` selects the last
 vertex. `ng` supplies per-vertex neighborhoods; `elementary=True` selects an
 elementary network domain. `coupled_resources` accepts tagged descriptors.
+
+`paired_waiting_base_resources=((coupled_index, scalar_index), ...)` opts a
+`slope_paired` resource into waiting windows derived from the corresponding
+scalar resource. Each physical arc's window intersects its head vertex bounds
+with the arc bounds; absent arc bounds use -1e12 and 1e12. Indices refer to
+`coupled_resources` and `resources`, respectively. Duplicate coupled indices,
+invalid indices, empty intersections, and scalar resources with multi-time
+windows are rejected. The equivalent CLI JSON field uses arrays of pairs,
+for example `"paired_waiting_base_resources": [[0, 1]]`. An omitted or empty
+field leaves the paired resource's existing waiting behavior unchanged.
+
+`paired_machine_inputs=((coupled_index, arc_inputs), ...)` attaches exact
+prepared machine operands to a `slope_paired` resource using `front_algebra`.
+`arc_inputs` contains one mapping per physical arc in insertion order. Each
+mapping supplies finite `tail_limit`, `head_limit`, `waiting_lower`,
+`waiting_upper`, integer `waiting_rate`, and `forward_mapping`, `inverse`,
+`sum_vector`, `dependent_lower`, and `dependent_upper` functions. Encode each
+function as `{"pairs": [[value, coordinate], [slope, end], ...]}`. The
+machine decoder also accepts a zero-width two-pair vector and a three-pair
+vector with a zero-width first segment. The waiting limits must be ordered. Resource
+indices must be unique and each arc vector must match the graph's arc count.
+An arc may also include a `backward` mapping with `tail_lower`, `tail_upper`,
+`forward_at_tail_lower`, `mapped_upper`, and `dependent` (a prepared function
+in the same `pairs` format). These are the separate operands needed by the
+backward recurrence, which remains incomplete.
+These inputs invalidate prepared pricing state when changed. When
+`front_program_domain` is enabled, the incomplete machine path uses them and
+also requires `paired_machine_roots=((coupled_index, {"pairs": [...]}), ...)`
+with the separately prepared dependent root vector. The equivalent JSON field is
+an array of `[coupled_index, arc_inputs]` pairs. An omitted field defaults to
+empty. To initialize backward machine labels, supply
+`paired_machine_terminal_bounds=((coupled_index, (lower, upper)), ...)` with
+the prepared terminal base window. The associated arc operands must already
+be supplied in `paired_machine_inputs`.
 
 `coupled_objective_coefficients=((resource_index, coefficient), ...)` sets
 graph-level costs using each descriptor's declared normalization. With Clp,

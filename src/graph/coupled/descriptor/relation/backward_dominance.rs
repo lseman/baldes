@@ -1,0 +1,232 @@
+//! Ordered machine-front comparison, independent of source pruning proofs.
+use super::*;
+
+impl PreparedSlopeRelationArc {
+    /// Ordered feasibility-only machine comparison. Endpoint tolerance and
+    /// the asymmetric interior-start check are literal machine behavior;
+    /// acceptance does not establish strict source-domain containment.
+    pub fn machine_backward_feasibility_dominance(
+        left: &PreparedSlopeFunction,
+        right: &PreparedSlopeFunction,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<()> {
+        let started = Instant::now();
+        let calculate = || -> Result<bool, FrontierUnknown> {
+            let (a, b) = (left.pairs(), right.pairs());
+            if a.len() < 2 || b.len() < 2 || a.len() > 12 || b.len() > 12 {
+                return Err(FrontierUnknown::Unsupported(
+                    "backward feasibility comparison geometry",
+                ));
+            }
+            if budget.max_components == 0 {
+                return Err(FrontierUnknown::ComponentLimit);
+            }
+            if a.len() + b.len() > budget.max_pairs {
+                return Err(FrontierUnknown::PairLimit);
+            }
+            if (a.len() + b.len()) * 40 > budget.max_operations {
+                return Err(FrontierUnknown::WorkLimit);
+            }
+            let mut av = a[0].0;
+            let mut bv = b[0].0;
+            let (mut i, mut j) = (1, 1);
+            let accepts =
+                |x: f64, y: f64| -> Result<bool, FrontierUnknown> { Ok(near(x, y)? || x >= y) };
+            if near(a[0].1, b[0].1)? {
+                if !accepts(av, bv)? {
+                    return Ok(false);
+                }
+            } else {
+                while a
+                    .get(i)
+                    .ok_or(FrontierUnknown::Unsupported(
+                        "backward feasibility exhausted domain",
+                    ))?
+                    .1
+                    < b[0].1
+                {
+                    av = value(av, a[i].0, finite(a[i].1 - a[i - 1].1)?)?;
+                    i += 1;
+                }
+                if near(a[i].1, b[0].1)? {
+                    av = value(av, a[i].0, finite(a[i].1 - a[i - 1].1)?)?;
+                    i += 1;
+                    if !accepts(av, bv)? {
+                        return Ok(false);
+                    }
+                } else {
+                    let interpolated = value(av, a[i].0, finite(b[0].1 - a[i - 1].1)?)?;
+                    // This branch reverses the value comparison in the binary.
+                    if !accepts(bv, interpolated)? {
+                        return Ok(false);
+                    }
+                }
+            }
+            while j < b.len() {
+                if budget
+                    .max_elapsed
+                    .is_some_and(|limit| started.elapsed() >= limit)
+                {
+                    return Err(FrontierUnknown::Deadline);
+                }
+                let ap = a.get(i).ok_or(FrontierUnknown::Unsupported(
+                    "backward feasibility exhausted domain",
+                ))?;
+                let bp = b[j];
+                let (x, y);
+                if near(ap.1, bp.1)? {
+                    bv = value(bv, bp.0, finite(bp.1 - b[j - 1].1)?)?;
+                    av = value(av, ap.0, finite(ap.1 - a[i - 1].1)?)?;
+                    (x, y) = (av, bv);
+                    i += 1;
+                    j += 1;
+                } else if ap.1 < bp.1 {
+                    y = value(bv, bp.0, finite(ap.1 - b[j - 1].1)?)?;
+                    av = value(av, ap.0, finite(ap.1 - a[i - 1].1)?)?;
+                    x = av;
+                    i += 1;
+                } else {
+                    x = value(av, ap.0, finite(bp.1 - a[i - 1].1)?)?;
+                    bv = value(bv, bp.0, finite(bp.1 - b[j - 1].1)?)?;
+                    y = bv;
+                    j += 1;
+                }
+                if !accepts(x, y)? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        };
+        match calculate() {
+            Ok(_)
+                if budget
+                    .max_elapsed
+                    .is_some_and(|limit| started.elapsed() >= limit) =>
+            {
+                FrontierOutcome::Unknown(FrontierUnknown::Deadline)
+            }
+            Ok(true) => FrontierOutcome::Complete(()),
+            Ok(false) => FrontierOutcome::Empty,
+            Err(reason) => FrontierOutcome::Unknown(reason),
+        }
+    }
+
+    /// Compare backward cost fronts and return the updated signed accumulator.
+    /// `Empty` means rejection; unsupported geometry/arithmetic returns unknown.
+    /// This literal machine operation is not a source feasibility certificate.
+    pub fn machine_backward_cost_dominance(
+        left: &PreparedSlopeFunction,
+        right: &PreparedSlopeFunction,
+        mode: i32,
+        accumulated: f64,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<f64> {
+        let started = Instant::now();
+        let calculate = || -> Result<Option<f64>, FrontierUnknown> {
+            if mode != 5 && mode != 6 {
+                return Err(FrontierUnknown::Unsupported(
+                    "backward cost comparison mode",
+                ));
+            }
+            let a = left.pairs();
+            let b = right.pairs();
+            if a.len() < 2 || b.len() < 2 || a.len() > 12 || b.len() > 12 {
+                return Err(FrontierUnknown::Unsupported(
+                    "backward cost comparison geometry",
+                ));
+            }
+            if budget.max_components == 0 {
+                return Err(FrontierUnknown::ComponentLimit);
+            }
+            if a.len() + b.len() > budget.max_pairs {
+                return Err(FrontierUnknown::PairLimit);
+            }
+            if (a.len() + b.len()) * 32 > budget.max_operations {
+                return Err(FrontierUnknown::WorkLimit);
+            }
+            let finite = |x: f64| {
+                x.is_finite()
+                    .then_some(x)
+                    .ok_or(FrontierUnknown::Unsupported(
+                        "backward cost comparison arithmetic",
+                    ))
+            };
+            finite(accumulated)?;
+            let (mut av, mut bv) = (a[0].0, b[0].0);
+            let (mut i, mut j) = (1, 1);
+            let mut gap;
+            if near(a[0].1, b[0].1)? {
+                gap = finite(bv - av)?;
+            } else {
+                while a
+                    .get(i)
+                    .ok_or(FrontierUnknown::Unsupported(
+                        "backward cost comparison exhausted domain",
+                    ))?
+                    .1
+                    < b[0].1
+                {
+                    av = finite(av + finite(finite(a[i].1 - a[i - 1].1)? * a[i].0)?)?;
+                    i += 1;
+                }
+                if near(a[i].1, b[0].1)? {
+                    av = finite(av + finite(finite(a[i].1 - a[i - 1].1)? * a[i].0)?)?;
+                    i += 1;
+                    gap = finite(bv - av)?;
+                } else {
+                    gap =
+                        finite(bv - finite(finite(finite(b[0].1 - a[i - 1].1)? * a[i].0)? + av)?)?;
+                }
+            }
+            while j < b.len() {
+                if budget
+                    .max_elapsed
+                    .is_some_and(|limit| started.elapsed() >= limit)
+                {
+                    return Err(FrontierUnknown::Deadline);
+                }
+                let ap = a.get(i).ok_or(FrontierUnknown::Unsupported(
+                    "backward cost comparison exhausted domain",
+                ))?;
+                let bp = b[j];
+                let candidate;
+                if near(ap.1, bp.1)? {
+                    av = finite(av + finite(finite(ap.1 - a[i - 1].1)? * ap.0)?)?;
+                    bv = finite(bv + finite(finite(bp.1 - b[j - 1].1)? * bp.0)?)?;
+                    candidate = finite(bv - av)?;
+                    i += 1;
+                    j += 1;
+                } else if bp.1 <= ap.1 {
+                    bv = finite(bv + finite(finite(bp.1 - b[j - 1].1)? * bp.0)?)?;
+                    candidate =
+                        finite(bv - finite(finite(finite(bp.1 - a[i - 1].1)? * ap.0)? + av)?)?;
+                    j += 1;
+                } else {
+                    av = finite(av + finite(finite(ap.1 - a[i - 1].1)? * ap.0)?)?;
+                    candidate =
+                        finite(finite(finite(finite(ap.1 - b[j - 1].1)? * bp.0)? + bv)? - av)?;
+                    i += 1;
+                }
+                if candidate > gap {
+                    gap = candidate;
+                }
+            }
+            if mode == 6 && !near(gap, 0.)? && gap > 0. {
+                return Ok(None);
+            }
+            Ok(Some(finite(gap + accumulated)?))
+        };
+        match calculate() {
+            Ok(Some(value))
+                if !budget
+                    .max_elapsed
+                    .is_some_and(|limit| started.elapsed() >= limit) =>
+            {
+                FrontierOutcome::Complete(value)
+            }
+            Ok(Some(_)) => FrontierOutcome::Unknown(FrontierUnknown::Deadline),
+            Ok(None) => FrontierOutcome::Empty,
+            Err(reason) => FrontierOutcome::Unknown(reason),
+        }
+    }
+}

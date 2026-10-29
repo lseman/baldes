@@ -43,8 +43,10 @@ impl<const D: usize> RootController<D> {
                 return Ok(1);
             }
         }
-        // Every converged column generation, round 0 included, reports to the
-        let stop = state.solver.column_generation_terminated(0, 0)?;
+        // Every converged column generation, round 0 included, reports its
+        // node depth. Bucket-step adjustment is a root-only decision.
+        let depth = i32::try_from(state.pricing.node_depth).unwrap_or(i32::MAX);
+        let stop = state.solver.column_generation_terminated(0, depth)?;
         if state.cut.rounds == 0 {
             state.cut.lp_before_cuts = value;
         } else {

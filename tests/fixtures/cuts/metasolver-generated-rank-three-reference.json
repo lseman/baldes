@@ -1,0 +1,21 @@
+{
+  "binary_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "support": [
+    0,
+    1,
+    2
+  ],
+  "numerators": [
+    1,
+    1,
+    1
+  ],
+  "denominator": 2,
+  "pricing_value": 1.0,
+  "pricing_value_bits_le": "000000000000f03f",
+  "phases": [
+    2,
+    1,
+    0
+  ]
+}

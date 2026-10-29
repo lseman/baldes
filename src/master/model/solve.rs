@@ -348,6 +348,7 @@ pub(super) fn run<const D: usize>(
         state.clone(),
         options.enumeration.is_some(),
         options.search_inactive_columns,
+        None,
     );
     let gap = (options.cg.gap_absolute, options.cg.gap_relative);
     let started = Instant::now();

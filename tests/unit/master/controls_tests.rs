@@ -191,7 +191,7 @@ fn paired_control_optimizer_limits_preserve_unknown_and_partial_witnesses() {
 }
 
 #[test]
-fn paired_control_optimizer_visits_more_than_four_thousand_source_cells() {
+fn paired_control_optimizer_certifies_invariant_without_expanding_large_partition() {
     let mut graph = Graph::<2>::new(5, 0).unwrap();
     let mut arcs = Vec::new();
     for vertex in 0..4 {
@@ -230,13 +230,15 @@ fn paired_control_optimizer_visits_more_than_four_thousand_source_cells() {
         },
     )
     .unwrap();
-    // The caller work budget, rather than a hidden 4,096-cell ceiling, stops
-    // this larger Cartesian source partition. Its incumbent remains useful,
-    // but no complete bound may be claimed after budget exhaustion.
-    assert!(!result.complete, "{result:?}");
-    assert!(result.cells > 4_096, "{result:?}");
-    assert!(result.lower_bound.is_none());
+    // Four constant +1 transitions with zero waiting keep every feasible
+    // control at dependent value four. The independent invariant certificate
+    // avoids expanding this fixture's former large Cartesian partition.
+    assert!(result.complete, "{result:?}");
+    assert_eq!(result.cells, 0);
+    assert_eq!(result.lp_iterations, 0);
+    assert_eq!(result.lower_bound, Some(4.));
     assert_eq!(result.dependent, Some(4.));
+    assert!(result.work_used < 1_000, "{result:?}");
 }
 
 #[test]

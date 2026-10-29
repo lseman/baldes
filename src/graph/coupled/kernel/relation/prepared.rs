@@ -74,6 +74,43 @@ impl PreparedRelationArc {
     pub(in crate::graph::coupled::kernel) fn exact_cache_eligible(&self) -> bool {
         self.exact
     }
+    /// A nonzero waiting charge can be folded only when both controls are
+    /// forced and every literal base/waiting operation is an exact bounded
+    /// integer operation. Otherwise a continuous waiting choice must survive.
+    pub(in crate::graph::coupled::kernel) fn fixed_waiting_charge(&self) -> Option<f64> {
+        let arc = self.arc();
+        if arc.waiting == 0 {
+            return Some(0.);
+        }
+        if arc.waiting < 0 {
+            return None;
+        }
+        let arrival = arc.arrival.prepared_domain();
+        let increment = arc.increment.prepared_domain();
+        let departure = arrival.lower.max(increment.lower);
+        if departure != arrival.upper.min(increment.upper) {
+            return None;
+        }
+        let lower = arc.lower.prepared_domain();
+        let upper = arc.upper.prepared_domain();
+        let head = lower.lower.max(upper.lower);
+        if head != lower.upper.min(upper.upper) {
+            return None;
+        }
+        let integer = |x: f64| x.is_finite() && x.fract() == 0. && x.abs() <= 1_099_511_627_776.;
+        let actual_arrival = evaluate(&arc.arrival, departure).ok()?;
+        let shift = arc.arrival.points[0][1] - arc.arrival.points[0][0];
+        if !integer(departure)
+            || !integer(head)
+            || !integer(actual_arrival)
+            || actual_arrival.to_bits() != (departure + shift).to_bits()
+        {
+            return None;
+        }
+        let wait = head - actual_arrival;
+        let charge = f64::from(arc.waiting) * wait;
+        (wait >= 0. && integer(wait) && integer(charge)).then_some(charge)
+    }
     fn exact_arc_eligible(a: &RelationArc) -> bool {
         let integer = |x: f64| x.is_finite() && x.fract() == 0. && x.abs() <= 1_099_511_627_776.;
         let shift = a.arrival.points[0][1] - a.arrival.points[0][0];
@@ -85,7 +122,7 @@ impl PreparedRelationArc {
                 .iter()
                 .all(|p| integer(p[0]) && integer(p[1]) && p[1] - p[0] == shift)
             && a.increment.points.iter().all(|p| {
-                integer(p[0]) && integer(p[1]) && p[1] == a.increment.points[0][1] && p[1] > 0.
+                integer(p[0]) && integer(p[1]) && p[1] == a.increment.points[0][1] && p[1] >= 0.
             })
             && [&a.lower, &a.upper].iter().all(|f| {
                 f.points

@@ -5,6 +5,8 @@ use crate::enumeration::PathDomainLimits;
 use crate::master::certificates::{Column as ProofColumn, FiniteMaster};
 use crate::master::clp::ClpSolveOutcome;
 use std::time::{Duration, Instant};
+mod phase_one;
+pub(super) use phase_one::zero_objective_lower_bound;
 
 /// Scoped to one immutable original problem, never inherited by child nodes.
 /// A deterministic domain failure cannot be repaired by new duals or cuts.

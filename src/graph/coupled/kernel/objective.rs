@@ -72,6 +72,23 @@ impl<const D: usize> Graph<D> {
         let mut kernel = original.clone();
         kernel.identity = std::sync::Arc::new(());
         kernel.weighted_objective = values.iter().any(|&value| value != 1.);
+        // Backward paired summaries prove a componentwise final-value order.
+        // Multiplication by the same finite nonnegative coefficient preserves
+        // that order even when the product rounds. Arbitrarily weighted
+        // numeric transition programs still require their existing proof.
+        kernel.nonnegative_paired_weights_only =
+            values
+                .iter()
+                .zip(kernel.definitions.iter())
+                .all(|(&value, definition)| {
+                    value == 1.
+                        || (value >= 0.
+                            && matches!(
+                                definition,
+                                CoupledResource::PairedPiecewiseLinear { .. }
+                                    | CoupledResource::SlopePaired { .. }
+                            ))
+                });
         kernel.negative_paired_objective =
             original
                 .definitions

@@ -12,6 +12,37 @@ const MAX_WORK: usize = 100_000;
 const MAX_STATES: usize = 512;
 const MAX_COORDINATES: usize = 256;
 
+/// A source-encoding relaxation of one paired transition. Base-coordinate
+/// correlations are forgotten, but every admitted dependent value is enclosed.
+#[derive(Clone, Copy)]
+pub(in crate::graph::coupled::kernel) struct PairedArcBounds {
+    increment: bounds::Range,
+    waiting_charge: bounds::Range,
+    lower: f64,
+    upper: f64,
+}
+
+impl PairedArcBounds {
+    pub(in crate::graph::coupled::kernel) fn apply(
+        self,
+        previous: bounds::Range,
+    ) -> Option<Option<bounds::Range>> {
+        let value = checked(checked(previous.add(self.increment))?.add(self.waiting_charge))?;
+        // The source relation may select a larger dependent value. Its
+        // declared upper bound, rather than this relaxed minimum's upper
+        // endpoint, therefore bounds that side of the enclosure.
+        let lower = value.lo.max(self.lower);
+        if lower > self.upper {
+            return Some(None);
+        }
+        checked(bounds::Range {
+            lo: lower,
+            hi: self.upper,
+        })
+        .map(Some)
+    }
+}
+
 #[derive(Clone, Copy)]
 enum Function<'a> {
     Knots(&'a PiecewiseLinearFunction),
@@ -616,6 +647,54 @@ fn initial_minimum(definition: &CoupledResource, work: &mut Work) -> Option<boun
 }
 
 impl CoupledKernel {
+    /// Independent source bounds for reuse over all visits to a physical arc.
+    /// None remains unknown; it never certifies an empty walk domain.
+    pub(in crate::graph::coupled::kernel) fn paired_arc_source_bounds(
+        &self,
+        resource: usize,
+        arc: usize,
+        shared_work: &mut usize,
+        deadline: Option<Instant>,
+    ) -> Option<PairedArcBounds> {
+        if self.front_program_domain {
+            return None;
+        }
+        let allowance = (*shared_work).min(MAX_WORK);
+        let mut work = Work(allowance, deadline);
+        let result = (|| {
+            work.take(1)?;
+            let (_, _, arcs) = source_functions(self.definitions.get(resource)?, &[arc])?;
+            let arc = arcs.first()?;
+            let departure = intersect(arc.arrival.domain(), arc.increment.domain())?;
+            let head = intersect(arc.lower.domain(), arc.upper.domain())?;
+            let arrival = arc.arrival.range(departure, &mut work)?;
+            let increment = arc.increment.range(departure, &mut work)?;
+            let lower = arc.lower.range(head, &mut work)?.lo;
+            let upper = arc.upper.range(head, &mut work)?.hi;
+            let maximum_wait =
+                checked(bounds::Range::point(head.hi).subtract(bounds::Range::point(arrival.lo)))?
+                    .hi;
+            if maximum_wait < 0. || lower > upper {
+                return None;
+            }
+            let waiting_charge = checked(
+                bounds::Range {
+                    lo: 0.,
+                    hi: maximum_wait,
+                }
+                .multiply(bounds::Range::point(f64::from(arc.waiting))),
+            )?;
+            Some(PairedArcBounds {
+                increment,
+                waiting_charge,
+                lower,
+                upper,
+            })
+        })();
+        *shared_work = shared_work.checked_sub(allowance - work.0)?;
+        result
+    }
+
     /// Independently replay an explicit source control for one paired resource.
     /// Universal source terminal enclosure from declared dependent bounds.
     /// This ignores feasibility restrictions and is not an attainment proof.
@@ -699,7 +778,6 @@ impl CoupledKernel {
 
     /// Source initial-front minimum, enclosing the numerical normalization
     /// baseline too. It is independent of the chosen starting control.
-    #[cfg(feature = "clp")]
     pub(crate) fn paired_initial_minimum(
         &self,
         resource: usize,
@@ -838,6 +916,27 @@ impl CoupledKernel {
                 CoupledResource::PairedPiecewiseLinear { .. } | CoupledResource::SlopePaired { .. }
             ) {
                 continue;
+            }
+            // A sidecar-driven machine label executes the supplied prepared
+            // program, not the source arc descriptors interpreted below. Until
+            // the independent verifier can replay those exact operands, do
+            // not certify a different program through either the explicit
+            // control path or the source-front fallback.
+            if self.front_program_domain
+                && matches!(definition, CoupledResource::SlopePaired { .. })
+            {
+                work.take(resource)?;
+                let paired_index = self.definitions[..resource]
+                    .iter()
+                    .filter(|item| matches!(item, CoupledResource::SlopePaired { .. }))
+                    .count();
+                if self
+                    .slope_paired
+                    .get(paired_index)?
+                    .has_machine_program_input()
+                {
+                    return None;
+                }
             }
             if let Some(control) = controls.iter().find(|control| control.resource == resource) {
                 let (valid, cost) = self.control_charge(path, control, work)?;

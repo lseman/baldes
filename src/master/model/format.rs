@@ -77,6 +77,24 @@ pub struct PricingNetwork {
     pub resources: Vec<Resource>,
     #[serde(default)]
     pub coupled_resources: Vec<crate::graph::coupled::CoupledResource>,
+    /// Pairs of (slope-paired coupled resource index, scalar base resource index).
+    /// The scalar vertex and arc bounds determine per-arc waiting windows.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub paired_waiting_base_resources: Vec<(usize, usize)>,
+    /// Exact prepared machine operands, keyed by coupled resource index.
+    /// Each vector uses the original physical arc insertion order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub paired_machine_inputs: Vec<(usize, Vec<crate::graph::coupled::PreparedMachineArc>)>,
+    /// Prepared dependent root vectors, keyed by coupled resource index.
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "deserialize_machine_roots"
+    )]
+    pub paired_machine_roots: Vec<(usize, crate::graph::coupled::PreparedSlopeFunction)>,
+    /// Explicit terminal base bounds for backward machine roots.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub paired_machine_terminal_bounds: Vec<(usize, [f64; 2])>,
     /// Graph-level costs, using each descriptor's declared normalization.
     /// A resource bound to an original variable gets its cost from that variable.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -97,6 +115,23 @@ pub struct PricingNetwork {
     pub activity_entries: Vec<AccumulatedActivityEntry>,
     #[serde(default)]
     pub ng: Option<Vec<Vec<usize>>>,
+}
+
+fn deserialize_machine_roots<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Vec<(usize, crate::graph::coupled::PreparedSlopeFunction)>, D::Error> {
+    #[derive(serde::Deserialize)]
+    struct MachineFunction(
+        #[serde(
+            deserialize_with = "crate::graph::coupled::descriptor::deserialize_machine_function"
+        )]
+        crate::graph::coupled::PreparedSlopeFunction,
+    );
+    let roots = <Vec<(usize, MachineFunction)> as serde::Deserialize>::deserialize(deserializer)?;
+    Ok(roots
+        .into_iter()
+        .map(|(index, root)| (index, root.0))
+        .collect())
 }
 
 fn multiplicity_bounds<'de, D: serde::Deserializer<'de>>(
@@ -238,6 +273,60 @@ impl Model {
             graph.elementary = input.elementary;
             graph.set_route_domain(input.route_domain)?;
             graph.set_coupled_resources(&input.coupled_resources)?;
+            for (index, &(resource, base)) in input.paired_waiting_base_resources.iter().enumerate()
+            {
+                if input.paired_waiting_base_resources[..index]
+                    .iter()
+                    .any(|&(previous, _)| previous == resource)
+                {
+                    return Err(invalid("duplicate paired waiting resource mapping"));
+                }
+                graph.set_paired_waiting_windows_from_resource(resource, base)?;
+            }
+            for (index, (resource, inputs)) in input.paired_machine_inputs.iter().enumerate() {
+                if input.paired_machine_inputs[..index]
+                    .iter()
+                    .any(|(previous, _)| previous == resource)
+                {
+                    return Err(invalid("duplicate paired machine input mapping"));
+                }
+                graph.set_paired_machine_inputs(*resource, Some(inputs))?;
+            }
+            for (index, (resource, root)) in input.paired_machine_roots.iter().enumerate() {
+                if input.paired_machine_roots[..index]
+                    .iter()
+                    .any(|(previous, _)| previous == resource)
+                {
+                    return Err(invalid("duplicate paired machine root mapping"));
+                }
+                graph.set_paired_machine_root(*resource, Some(root))?;
+            }
+            for (index, &(resource, bounds)) in
+                input.paired_machine_terminal_bounds.iter().enumerate()
+            {
+                if input.paired_machine_terminal_bounds[..index]
+                    .iter()
+                    .any(|(previous, _)| *previous == resource)
+                {
+                    return Err(invalid("duplicate paired machine terminal bounds"));
+                }
+                let bounds = crate::graph::Window::new(bounds[0], bounds[1])?;
+                match graph.install_paired_machine_backward_root(
+                    resource,
+                    bounds,
+                    crate::graph::coupled::descriptor::FrontierBudget::default(),
+                ) {
+                    crate::graph::coupled::descriptor::FrontierOutcome::Complete(()) => {}
+                    crate::graph::coupled::descriptor::FrontierOutcome::Empty => {
+                        return Err(invalid("paired machine backward root is empty"));
+                    }
+                    crate::graph::coupled::descriptor::FrontierOutcome::Unknown(reason) => {
+                        return Err(invalid(format!(
+                            "paired machine backward root unavailable: {reason:?}"
+                        )));
+                    }
+                }
+            }
             if input.front_program_domain {
                 graph.set_front_program_domain(true)?;
             }

@@ -162,6 +162,7 @@ impl CoupledKernel {
             cost_scale: 1.,
             objective_coefficients,
             weighted_objective: false,
+            nonnegative_paired_weights_only: true,
             negative_paired_objective: false,
             pricing_adjustments: Default::default(),
             pricing_activities: Default::default(),
@@ -321,12 +322,26 @@ impl CoupledKernel {
         for (index, definition) in self.definitions.iter().enumerate() {
             definition.validate(g, index, &self.definitions)?;
         }
+        if self.front_program_domain
+            && self
+                .slope_paired
+                .iter()
+                .any(|paired| !paired.machine_program_inputs_complete())
+        {
+            return Err(invalid(
+                "paired machine pricing requires both prepared root and arc inputs",
+            ));
+        }
         let optimization = PreparedBounds::new(g, &self.definitions, &self.slots, &self.initial);
         if self.arc_count != g.arcs.len()
             || self.optimization != optimization
             || !self.route_domains.matches(g)
+            || self
+                .slope_paired
+                .iter()
+                .any(|paired| !paired.machine_topology_matches(g))
         {
-            return Err(invalid("reinstall coupled resources after changing elementarity or physical graph topology"));
+            return Err(invalid("reinstall coupled resources or machine inputs after changing elementarity or physical graph topology"));
         }
         Ok(())
     }

@@ -1336,7 +1336,7 @@ fn zero_charge_interval_suffix_retains_physical_scalar_costs_in_every_search_mod
 
 #[test]
 fn signed_custom_and_cumulative_states_and_every_join_match_metasolver_observations() {
-    // Regenerate with tests/reference/metasolver_custom.py. Expectations come
+    // Regenerate with internal/reference/metasolver_custom.py. Expectations come
     // from the pinned modern ELF helpers, independently of BALDES arithmetic.
     let fixture = include_str!("../fixtures/coupled/metasolver-custom-signed-splits.txt");
     let mut observations = 0;

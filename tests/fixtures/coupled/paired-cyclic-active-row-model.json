@@ -1,0 +1,394 @@
+{
+  "rows": [
+    {
+      "sense": "le",
+      "rhs": 0
+    }
+  ],
+  "networks": [
+    {
+      "id": 42,
+      "vertices": 5,
+      "source": 0,
+      "sink": 4,
+      "multiplicity": [
+        0,
+        1
+      ],
+      "front_program_domain": false,
+      "arcs": [
+        {
+          "tail": 2,
+          "head": 3,
+          "cost": 0,
+          "consumption": [
+            1
+          ]
+        },
+        {
+          "tail": 0,
+          "head": 3,
+          "cost": -20,
+          "consumption": [
+            1
+          ],
+          "entries": [
+            [
+              0,
+              -4
+            ]
+          ]
+        },
+        {
+          "tail": 3,
+          "head": 2,
+          "cost": 0,
+          "consumption": [
+            1
+          ]
+        },
+        {
+          "tail": 0,
+          "head": 2,
+          "cost": -20,
+          "consumption": [
+            1
+          ]
+        },
+        {
+          "tail": 2,
+          "head": 4,
+          "cost": 0,
+          "consumption": [
+            1
+          ]
+        }
+      ],
+      "coupled_resources": [
+        {
+          "kind": "slope_paired",
+          "initial": {
+            "pairs": [
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                8
+              ]
+            ]
+          },
+          "initial_base": {
+            "lower": 0.0,
+            "upper": 8
+          },
+          "arcs": [
+            {
+              "arrival": {
+                "pairs": [
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    1,
+                    8
+                  ]
+                ]
+              },
+              "increment": {
+                "pairs": [
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "lower": {
+                "pairs": [
+                  [
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "upper": {
+                "pairs": [
+                  [
+                    8,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "waiting": 0
+            },
+            {
+              "arrival": {
+                "pairs": [
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    1,
+                    8
+                  ]
+                ]
+              },
+              "increment": {
+                "pairs": [
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "lower": {
+                "pairs": [
+                  [
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "upper": {
+                "pairs": [
+                  [
+                    8,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "waiting": 0
+            },
+            {
+              "arrival": {
+                "pairs": [
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    1,
+                    8
+                  ]
+                ]
+              },
+              "increment": {
+                "pairs": [
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "lower": {
+                "pairs": [
+                  [
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "upper": {
+                "pairs": [
+                  [
+                    8,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "waiting": 0
+            },
+            {
+              "arrival": {
+                "pairs": [
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    1,
+                    8
+                  ]
+                ]
+              },
+              "increment": {
+                "pairs": [
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "lower": {
+                "pairs": [
+                  [
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "upper": {
+                "pairs": [
+                  [
+                    8,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "waiting": 0
+            },
+            {
+              "arrival": {
+                "pairs": [
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    1,
+                    8
+                  ]
+                ]
+              },
+              "increment": {
+                "pairs": [
+                  [
+                    1,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "lower": {
+                "pairs": [
+                  [
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "upper": {
+                "pairs": [
+                  [
+                    8,
+                    0
+                  ],
+                  [
+                    0,
+                    8
+                  ]
+                ]
+              },
+              "waiting": 0
+            }
+          ],
+          "mode": "cost_unbounded",
+          "normalization": "absolute_final_value",
+          "policy": "strict_domain"
+        }
+      ],
+      "resources": [
+        {
+          "initial": 0,
+          "bounds": [
+            [
+              0,
+              8
+            ],
+            [
+              0,
+              8
+            ],
+            [
+              0,
+              8
+            ],
+            [
+              0,
+              8
+            ],
+            [
+              0,
+              8
+            ]
+          ]
+        }
+      ],
+      "route_domain": {
+        "kind": "bounded_walks",
+        "max_arcs": 8
+      },
+      "coupled_objective_coefficients": [
+        [
+          0,
+          1
+        ]
+      ],
+      "activity_entries": [
+        [
+          0,
+          0,
+          1
+        ]
+      ]
+    }
+  ]
+}

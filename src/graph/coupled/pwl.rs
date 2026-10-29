@@ -34,7 +34,7 @@ impl PiecewiseLinearFunction {
         self.validate()?;
         Ok(self.prepared_domain())
     }
-    pub(super) fn prepared_domain(&self) -> Window {
+    pub(crate) fn prepared_domain(&self) -> Window {
         Window {
             lower: self.points[0][0],
             upper: self.points[self.points.len() - 1][0],

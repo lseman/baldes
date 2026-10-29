@@ -3,9 +3,25 @@
 //! piecewise regions when several dependencies are composed.
 use std::sync::Arc;
 
+/// Canonical classes for complete encoded operators. Hashing indexes the
+/// candidates only: full key equality resolves every collision. The temporary
+/// keys are dropped after preparation; hot suffix comparisons retain one ID
+/// per physical arc and preserve their original operation order.
+pub(super) fn operator_classes(keys: impl IntoIterator<Item = Vec<u64>>) -> Arc<[usize]> {
+    let mut classes = std::collections::HashMap::new();
+    let mut result = Vec::new();
+    for (arc, key) in keys.into_iter().enumerate() {
+        let class = *classes.entry(key).or_insert(arc);
+        result.push(class);
+    }
+    result.into()
+}
+
 struct Step {
     arc: usize,
     next: Option<Arc<Step>>,
+    length: usize,
+    fingerprint: u64,
 }
 impl Drop for Step {
     fn drop(&mut self) {
@@ -21,10 +37,26 @@ impl Drop for Step {
 #[derive(Clone, Default)]
 pub(super) struct Continuation(Option<Arc<Step>>);
 impl Continuation {
+    pub(super) fn len(&self) -> usize {
+        self.0.as_ref().map_or(0, |step| step.length)
+    }
     pub(super) fn prepend(&self, arc: usize) -> Self {
+        let length = self
+            .0
+            .as_ref()
+            .map_or(1, |step| step.length.saturating_add(1));
+        let tail = self
+            .0
+            .as_ref()
+            .map_or(0x9e3779b97f4a7c15, |step| step.fingerprint);
+        let fingerprint = tail.rotate_left(11)
+            ^ (arc as u64).wrapping_mul(0x100000001b3)
+            ^ (length as u64).rotate_left(29);
         Self(Some(Arc::new(Step {
             arc,
             next: self.0.clone(),
+            length,
+            fingerprint,
         })))
     }
     pub(super) fn iter(&self) -> impl Iterator<Item = usize> + '_ {
@@ -43,6 +75,11 @@ impl Continuation {
         other: &Self,
         mut same: impl FnMut(usize, usize) -> bool,
     ) -> bool {
+        // Operator equivalence may identify different physical arc IDs, so
+        // only length can reject here; physical fingerprints cannot.
+        if self.0.as_ref().map(|step| step.length) != other.0.as_ref().map(|step| step.length) {
+            return false;
+        }
         let (mut a, mut b) = (&self.0, &other.0);
         loop {
             match (a, b) {
@@ -64,6 +101,13 @@ impl Continuation {
 }
 impl PartialEq for Continuation {
     fn eq(&self, other: &Self) -> bool {
+        // A mismatch is decisive. Matching fingerprints still require the
+        // exact ordered comparison below, including after any hash collision.
+        if self.0.as_ref().map(|step| (step.length, step.fingerprint))
+            != other.0.as_ref().map(|step| (step.length, step.fingerprint))
+        {
+            return false;
+        }
         let (mut a, mut b) = (&self.0, &other.0);
         loop {
             match (a, b) {
