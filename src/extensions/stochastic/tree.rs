@@ -4,8 +4,10 @@ use super::{
     ArcBranch, ColumnGenerationOptions, ColumnGenerationStatus, Master, Policy, Problem,
     RouteEvaluation,
 };
+use crate::cuts::capacity::CapacityCut;
 use crate::master::LpMaster;
 use crate::{invalid, Result};
+use rayon::prelude::*;
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
@@ -17,6 +19,8 @@ pub struct SolveOptions {
     pub integrality_tolerance: f64,
     /// Optional mean-demand HGS search, charged to the solve time limit.
     pub hgs_warm_start: Option<super::HgsWarmStart>,
+    /// Nodes evaluated concurrently; 0 uses the ambient rayon thread count.
+    pub threads: usize,
 }
 impl Default for SolveOptions {
     fn default() -> Self {
@@ -26,6 +30,7 @@ impl Default for SolveOptions {
             time_limit: Duration::from_secs(3600),
             integrality_tolerance: 1e-7,
             hgs_warm_start: None,
+            threads: 0,
         }
     }
 }
@@ -63,6 +68,31 @@ pub struct SolveResult {
 struct Node {
     branches: Vec<ArcBranch>,
     lower: f64,
+}
+enum NodeDisposition {
+    Infeasible,
+    Closed(f64),
+    Branch {
+        lower: f64,
+        from: usize,
+        to: usize,
+    },
+    /// Stops the search; the node is reopened with `lower`.
+    Unfinished {
+        lower: f64,
+        status: SolveStatus,
+    },
+}
+struct NodeOutcome {
+    disposition: NodeDisposition,
+    columns: Vec<Vec<usize>>,
+    /// Every capacity cut of the node master; all are globally valid.
+    cuts: Vec<CapacityCut>,
+    /// Routes of every Theta cut of the node master; all are globally valid.
+    /// Incumbent found at this node, if better than the one it started from.
+    solution: Option<Solution>,
+    pricing_calls: usize,
+    generated_labels: usize,
 }
 
 impl Problem {
@@ -380,8 +410,296 @@ impl Problem {
         (bound - 1e-9 * (1. + bound.abs())).max(0.)
     }
 
-    /// Solve using a factory for fresh, empty LP backends. Each node performs
-    /// complete two-phase column generation before it may be bounded/pruned.
+    /// Run complete two-phase column generation at one node on a fresh LP.
+    /// The pool and incumbent are read-only snapshots; the returned columns
+    /// and any improved incumbent are merged by the caller.
+    #[allow(clippy::too_many_arguments)]
+    fn evaluate_node<M: LpMaster>(
+        &self,
+        policy: Policy,
+        vehicles: usize,
+        options: &SolveOptions,
+        node: &Node,
+        shared_pool: &BTreeSet<Vec<usize>>,
+        cuts: &[CapacityCut],
+        incumbent: &Option<Solution>,
+        started: Instant,
+        factory: &(impl Fn() -> Result<M> + Sync),
+    ) -> Result<NodeOutcome> {
+        let mut master = Master::new(
+            self.clone(),
+            policy,
+            vehicles,
+            node.branches.clone(),
+            factory()?,
+        )?;
+        for cut in cuts {
+            master.add_capacity_cut(cut.clone())?;
+        }
+        for route in shared_pool {
+            if node
+                .branches
+                .iter()
+                .any(|b| !b.required && route_uses(route, *b))
+            {
+                continue;
+            }
+            master.add_route(route)?;
+        }
+        let mut pool = shared_pool.clone();
+        let mut solution = incumbent.clone();
+        let initial_cost = solution.as_ref().map_or(f64::INFINITY, |s| s.total_cost);
+        let mut cg = options.column_generation;
+        cg.cutoff = solution.as_ref().map(|s| s.total_cost);
+        cg.time_limit = cg
+            .time_limit
+            .min(options.time_limit.saturating_sub(started.elapsed()));
+        let mut observed_columns = 0;
+        let answer = master.optimize_with_observer(cg, |columns, snapshot| {
+            if cg.ng_size > 0
+                && self.demands.len() > cg.ng_size
+                && snapshot.phase == super::MasterPhase::ExpectedCost
+                && columns.len() > observed_columns
+            {
+                for column in &columns[observed_columns..] {
+                    pool.insert(column.customers.clone());
+                }
+                observed_columns = columns.len();
+                let remaining = options.time_limit.saturating_sub(started.elapsed());
+                self.improve_from_pool(
+                    policy,
+                    vehicles,
+                    &pool,
+                    &mut solution,
+                    Instant::now() + remaining.min(Duration::from_millis(8)),
+                )?;
+            }
+            Ok(())
+        })?;
+        // A feasible integer restricted LP solution is an incumbent even
+        // if pricing stopped; only its optimality still needs a full bound.
+        if let Some(snapshot) = answer.snapshot.as_ref().filter(|s| {
+            s.phase == super::MasterPhase::ExpectedCost && s.artificial_usage <= cg.lp_tolerance
+        }) {
+            let mut covered = vec![0usize; self.demands.len()];
+            let mut routes = vec![];
+            let mut evaluations = vec![];
+            let mut valid = true;
+            for (column, &x) in master.columns().iter().zip(&snapshot.route_values) {
+                if (x - x.round()).abs() > options.integrality_tolerance
+                    || !(0. ..=1.).contains(&x.round())
+                {
+                    valid = false;
+                    break;
+                }
+                if x.round() == 1. {
+                    for &j in &column.customers {
+                        covered[j - 1] += 1;
+                    }
+                    evaluations.push(self.evaluate_route(&column.customers, policy)?);
+                    routes.push(column.customers.clone());
+                }
+            }
+            valid &= covered.iter().all(|&v| v == 1) && routes.len() <= vehicles;
+            let total_cost: f64 = evaluations.iter().map(|e| e.total_cost).sum();
+            if valid
+                && total_cost.is_finite()
+                && solution
+                    .as_ref()
+                    .map_or(true, |s| total_cost < s.total_cost)
+            {
+                solution = Some(Solution {
+                    routes,
+                    evaluations,
+                    total_cost,
+                });
+            }
+        }
+        let disposition = self.node_disposition(
+            policy,
+            vehicles,
+            options,
+            node,
+            &master,
+            &answer,
+            &mut solution,
+            started,
+        )?;
+        Ok(NodeOutcome {
+            disposition,
+            columns: master
+                .columns()
+                .iter()
+                .map(|c| c.customers.clone())
+                .collect(),
+            cuts: master.capacity_cuts().to_vec(),
+            solution: solution.filter(|s| s.total_cost < initial_cost),
+            pricing_calls: answer.pricing_calls,
+            generated_labels: answer.generated_labels,
+        })
+    }
+
+    /// Classify a solved node: closed, integral, branched on its most
+    /// fractional free arc, or unfinished with a valid inherited bound.
+    #[allow(clippy::too_many_arguments)]
+    fn node_disposition<M: LpMaster>(
+        &self,
+        policy: Policy,
+        vehicles: usize,
+        options: &SolveOptions,
+        node: &Node,
+        master: &Master<M>,
+        answer: &super::ColumnGenerationResult,
+        solution: &mut Option<Solution>,
+        started: Instant,
+    ) -> Result<NodeDisposition> {
+        let cg = options.column_generation;
+        if answer.status == ColumnGenerationStatus::Infeasible {
+            return Ok(NodeDisposition::Infeasible);
+        }
+        if answer.status == ColumnGenerationStatus::BoundCutoff {
+            let lower = answer
+                .lower_bound
+                .ok_or_else(|| invalid("missing stochastic cutoff bound"))?;
+            return Ok(NodeDisposition::Closed(lower.max(node.lower)));
+        }
+        if let (ColumnGenerationStatus::PricingIncomplete(_), Some(snapshot)) =
+            (answer.status, answer.snapshot.as_ref())
+        {
+            // Pricing stopped at its work limit before time ran out. The
+            // node keeps its valid bound; its children fix one arc each and
+            // price smaller problems. It is never closed on this bound.
+            let lower = answer.lower_bound.unwrap_or(node.lower).max(node.lower);
+            if started.elapsed() < options.time_limit
+                && snapshot.phase == super::MasterPhase::ExpectedCost
+                && snapshot.artificial_usage <= cg.lp_tolerance
+            {
+                if let Some((from, to)) = self.branching_arc(master, snapshot, node, options) {
+                    return Ok(NodeDisposition::Branch { lower, from, to });
+                }
+            }
+        }
+        if answer.status != ColumnGenerationStatus::Converged {
+            return Ok(NodeDisposition::Unfinished {
+                lower: answer.lower_bound.unwrap_or(node.lower).max(node.lower),
+                status: if started.elapsed() >= options.time_limit {
+                    SolveStatus::TimeLimit
+                } else {
+                    SolveStatus::NodeIncomplete(answer.status)
+                },
+            });
+        }
+        let snapshot = answer
+            .snapshot
+            .as_ref()
+            .ok_or_else(|| invalid("missing stochastic node snapshot"))?;
+        let lower = answer
+            .lower_bound
+            .ok_or_else(|| invalid("missing stochastic node lower bound"))?
+            .max(node.lower);
+        if solution.as_ref().is_some_and(|s| lower >= s.total_cost) {
+            return Ok(NodeDisposition::Closed(lower));
+        }
+        let numerical = NodeDisposition::Unfinished {
+            lower,
+            status: SolveStatus::NumericalFailure,
+        };
+        let integral = snapshot
+            .route_values
+            .iter()
+            .all(|x| (*x - x.round()).abs() <= options.integrality_tolerance);
+        if integral {
+            let mut routes = vec![];
+            let mut evaluations = vec![];
+            let mut covered = vec![false; self.demands.len()];
+            let mut valid = true;
+            let mut cost = 0.;
+            for (column, &x) in master.columns().iter().zip(&snapshot.route_values) {
+                if x.round() == 0. {
+                    continue;
+                }
+                if x.round() != 1. {
+                    valid = false;
+                    break;
+                }
+                for &j in &column.customers {
+                    if covered[j - 1] {
+                        valid = false;
+                    }
+                    covered[j - 1] = true;
+                }
+                let evaluation = self.evaluate_route(&column.customers, policy)?;
+                cost += evaluation.total_cost;
+                routes.push(column.customers.clone());
+                evaluations.push(evaluation);
+            }
+            valid &= covered.iter().all(|&v| v) && routes.len() <= vehicles && cost.is_finite();
+            for b in &node.branches {
+                valid &=
+                    routes.iter().filter(|r| route_uses(r, *b)).count() == usize::from(b.required);
+            }
+            // Integrality tolerances cannot close a genuine LP/integer gap.
+            let gap_tolerance = cg.lp_tolerance * (1. + cost.abs())
+                + self.demands.len() as f64 * cg.reduced_cost_tolerance;
+            valid &= lower <= cost + gap_tolerance && cost - lower <= 2. * gap_tolerance;
+            if !valid {
+                return Ok(numerical);
+            }
+            if solution.as_ref().map_or(true, |s| cost < s.total_cost) {
+                *solution = Some(Solution {
+                    routes,
+                    evaluations,
+                    total_cost: cost,
+                });
+            }
+            return Ok(NodeDisposition::Closed(lower));
+        }
+        Ok(match self.branching_arc(master, snapshot, node, options) {
+            Some((from, to)) => NodeDisposition::Branch { lower, from, to },
+            None => numerical,
+        })
+    }
+
+    /// The free arc whose LP flow is closest to one half.
+    fn branching_arc<M: LpMaster>(
+        &self,
+        master: &Master<M>,
+        snapshot: &super::MasterSnapshot,
+        node: &Node,
+        options: &SolveOptions,
+    ) -> Option<(usize, usize)> {
+        let n = self.demands.len();
+        let mut flow = vec![vec![0.; n + 1]; n + 1];
+        for (column, &x) in master.columns().iter().zip(&snapshot.route_values) {
+            let mut i = 0;
+            for j in column.customers.iter().copied().chain(std::iter::once(0)) {
+                flow[i][j] += x;
+                i = j;
+            }
+        }
+        let mut chosen = None;
+        let mut distance = f64::INFINITY;
+        for (i, row) in flow.iter().enumerate() {
+            for (j, &x) in row.iter().enumerate() {
+                if i == j
+                    || x <= options.integrality_tolerance
+                    || x >= 1. - options.integrality_tolerance
+                    || node.branches.iter().any(|b| b.from == i && b.to == j)
+                {
+                    continue;
+                }
+                if (x - 0.5).abs() < distance {
+                    distance = (x - 0.5).abs();
+                    chosen = Some((i, j));
+                }
+            }
+        }
+        chosen
+    }
+
+    /// Solve using a factory for fresh, empty LP backends. A node is pruned
+    /// only by a full-master bound; a node whose pricing hit its work limit
+    /// is branched with the bound it reached and is never closed by it.
     /// Branches split a fractional directed arc flow into zero and one.
     /// No restricted-pool integer solve is used as an optimality argument.
     pub fn solve_with<M: LpMaster>(
@@ -389,7 +707,7 @@ impl Problem {
         policy: Policy,
         vehicles: usize,
         options: SolveOptions,
-        mut factory: impl FnMut() -> Result<M>,
+        factory: impl Fn() -> Result<M> + Sync,
     ) -> Result<SolveResult> {
         options.column_generation.validate()?;
         if !options.integrality_tolerance.is_finite()
@@ -443,6 +761,21 @@ impl Problem {
                 result.hgs_warm_start = Some(summary);
             }
         }
+        let threads = if options.threads == 0 {
+            rayon::current_num_threads()
+        } else {
+            options.threads
+        };
+        let workers = (threads > 1)
+            .then(|| {
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(threads)
+                    .thread_name(|i| format!("baldes-stochastic-tree-{i}"))
+                    .build()
+                    .map_err(|e| invalid(format!("stochastic tree worker pool: {e}")))
+            })
+            .transpose()?;
+        let mut cuts: Vec<CapacityCut> = vec![];
         let mut closed_lower = f64::INFINITY;
         while !pending.is_empty() {
             if started.elapsed() >= options.time_limit {
@@ -453,239 +786,93 @@ impl Problem {
                 result.status = SolveStatus::NodeLimit;
                 break;
             }
-            let node = pending.pop().expect("nonempty node stack");
-            if result
+            // Best bound first; among equal bounds, prefer deeper nodes.
+            pending.sort_by(|a, b| {
+                b.lower
+                    .total_cmp(&a.lower)
+                    .then(a.branches.len().cmp(&b.branches.len()))
+            });
+            let incumbent = result
                 .solution
                 .as_ref()
-                .is_some_and(|s| node.lower >= s.total_cost)
-            {
-                closed_lower = closed_lower.min(node.lower);
-                continue;
-            }
-            let mut master = Master::new(
-                self.clone(),
-                policy,
-                vehicles,
-                node.branches.clone(),
-                factory()?,
-            )?;
-            for route in &pool {
-                if node
-                    .branches
-                    .iter()
-                    .any(|b| !b.required && route_uses(route, *b))
-                {
+                .map_or(f64::INFINITY, |s| s.total_cost);
+            let mut batch = vec![];
+            while batch.len() < threads.min(options.max_nodes - result.nodes) {
+                let Some(node) = pending.pop() else {
+                    break;
+                };
+                if node.lower >= incumbent {
+                    closed_lower = closed_lower.min(node.lower);
                     continue;
                 }
-                master.add_route(route)?;
+                batch.push(node);
             }
-            let mut cg = options.column_generation;
-            cg.time_limit = cg
-                .time_limit
-                .min(options.time_limit.saturating_sub(started.elapsed()));
-            let mut observed_columns = 0;
-            let answer = master.optimize_with_observer(cg, |columns, snapshot| {
-                if cg.ng_size > 0
-                    && self.demands.len() > cg.ng_size
-                    && snapshot.phase == super::MasterPhase::ExpectedCost
-                    && columns.len() > observed_columns
-                {
-                    for column in &columns[observed_columns..] {
-                        pool.insert(column.customers.clone());
-                    }
-                    observed_columns = columns.len();
-                    let remaining = options.time_limit.saturating_sub(started.elapsed());
-                    self.improve_from_pool(
-                        policy,
-                        vehicles,
-                        &pool,
-                        &mut result.solution,
-                        Instant::now() + remaining.min(Duration::from_millis(8)),
-                    )?;
+            // Workers read one pool and incumbent snapshot; the coordinator
+            // alone merges columns, incumbents and node outcomes.
+            let outcomes: Vec<_> = {
+                let (pool, cuts, incumbent) = (&pool, &cuts, &result.solution);
+                let evaluate = |node: &Node| {
+                    self.evaluate_node(
+                        policy, vehicles, &options, node, pool, cuts, incumbent, started, &factory,
+                    )
+                };
+                match &workers {
+                    Some(workers) => workers.install(|| batch.par_iter().map(evaluate).collect()),
+                    None => batch.iter().map(evaluate).collect(),
                 }
-                Ok(())
-            })?;
-            result.nodes += 1;
-            result.pricing_calls += answer.pricing_calls;
-            result.generated_labels = result
-                .generated_labels
-                .saturating_add(answer.generated_labels);
-            for column in master.columns() {
-                pool.insert(column.customers.clone());
-            }
-            // A feasible integer restricted LP solution is an incumbent even
-            // if pricing stopped; only its optimality still needs a full bound.
-            if let Some(snapshot) = answer.snapshot.as_ref().filter(|s| {
-                s.phase == super::MasterPhase::ExpectedCost && s.artificial_usage <= cg.lp_tolerance
-            }) {
-                let mut covered = vec![0usize; self.demands.len()];
-                let mut routes = vec![];
-                let mut evaluations = vec![];
-                let mut valid = true;
-                for (column, &x) in master.columns().iter().zip(&snapshot.route_values) {
-                    if (x - x.round()).abs() > options.integrality_tolerance
-                        || !(0. ..=1.).contains(&x.round())
-                    {
-                        valid = false;
-                        break;
-                    }
-                    if x.round() == 1. {
-                        for &j in &column.customers {
-                            covered[j - 1] += 1;
-                        }
-                        evaluations.push(self.evaluate_route(&column.customers, policy)?);
-                        routes.push(column.customers.clone());
+            };
+            let mut stop = None;
+            for (node, outcome) in batch.into_iter().zip(outcomes) {
+                let outcome = outcome?;
+                result.nodes += 1;
+                result.pricing_calls += outcome.pricing_calls;
+                result.generated_labels = result
+                    .generated_labels
+                    .saturating_add(outcome.generated_labels);
+                pool.extend(outcome.columns);
+                for cut in outcome.cuts {
+                    if !cuts.iter().any(|c| c.customers == cut.customers) {
+                        cuts.push(cut);
                     }
                 }
-                valid &= covered.iter().all(|&v| v == 1) && routes.len() <= vehicles;
-                let total_cost: f64 = evaluations.iter().map(|e| e.total_cost).sum();
-                if valid
-                    && total_cost.is_finite()
-                    && result
+
+                if let Some(solution) = outcome.solution {
+                    if result
                         .solution
                         .as_ref()
-                        .map_or(true, |s| total_cost < s.total_cost)
-                {
-                    result.solution = Some(Solution {
-                        routes,
-                        evaluations,
-                        total_cost,
-                    });
+                        .map_or(true, |s| solution.total_cost < s.total_cost)
+                    {
+                        result.solution = Some(solution);
+                    }
+                }
+                match outcome.disposition {
+                    NodeDisposition::Infeasible => {}
+                    NodeDisposition::Closed(lower) => closed_lower = closed_lower.min(lower),
+                    NodeDisposition::Branch { lower, from, to } => {
+                        for required in [false, true] {
+                            let mut branches = node.branches.clone();
+                            branches.push(ArcBranch { from, to, required });
+                            pending.push(Node { branches, lower });
+                        }
+                    }
+                    NodeDisposition::Unfinished { lower, status } => {
+                        stop.get_or_insert(status);
+                        pending.push(Node { lower, ..node });
+                    }
                 }
             }
-            // Reserve at most a small slice for primal work after this node.
+            // Reserve at most a small slice for primal work after this batch.
             let remaining = options.time_limit.saturating_sub(started.elapsed());
-            let heuristic_deadline = Instant::now() + remaining.min(Duration::from_millis(20));
             self.improve_from_pool(
                 policy,
                 vehicles,
                 &pool,
                 &mut result.solution,
-                heuristic_deadline,
+                Instant::now() + remaining.min(Duration::from_millis(20)),
             )?;
-            if answer.status == ColumnGenerationStatus::Infeasible {
-                continue;
-            }
-            if answer.status != ColumnGenerationStatus::Converged {
-                result.status = if started.elapsed() >= options.time_limit {
-                    SolveStatus::TimeLimit
-                } else {
-                    SolveStatus::NodeIncomplete(answer.status)
-                };
-                pending.push(Node {
-                    lower: answer.lower_bound.unwrap_or(node.lower).max(node.lower),
-                    ..node
-                });
+            if let Some(status) = stop {
+                result.status = status;
                 break;
-            }
-            let snapshot = answer
-                .snapshot
-                .as_ref()
-                .ok_or_else(|| invalid("missing stochastic node snapshot"))?;
-            let lower = answer
-                .lower_bound
-                .ok_or_else(|| invalid("missing stochastic node lower bound"))?
-                .max(node.lower);
-            if result
-                .solution
-                .as_ref()
-                .is_some_and(|s| lower >= s.total_cost)
-            {
-                closed_lower = closed_lower.min(lower);
-                continue;
-            }
-            let integral = snapshot
-                .route_values
-                .iter()
-                .all(|x| (*x - x.round()).abs() <= options.integrality_tolerance);
-            if integral {
-                let mut routes = vec![];
-                let mut evaluations = vec![];
-                let mut covered = vec![false; self.demands.len()];
-                let mut valid = true;
-                let mut cost = 0.;
-                for (column, &x) in master.columns().iter().zip(&snapshot.route_values) {
-                    if x.round() == 0. {
-                        continue;
-                    }
-                    if x.round() != 1. {
-                        valid = false;
-                        break;
-                    }
-                    for &j in &column.customers {
-                        if covered[j - 1] {
-                            valid = false;
-                        }
-                        covered[j - 1] = true;
-                    }
-                    let evaluation = self.evaluate_route(&column.customers, policy)?;
-                    cost += evaluation.total_cost;
-                    routes.push(column.customers.clone());
-                    evaluations.push(evaluation);
-                }
-                valid &= covered.iter().all(|&v| v) && routes.len() <= vehicles && cost.is_finite();
-                for b in &node.branches {
-                    valid &= routes.iter().filter(|r| route_uses(r, *b)).count()
-                        == usize::from(b.required);
-                }
-                // Integrality tolerances cannot close a genuine LP/integer gap.
-                let gap_tolerance = cg.lp_tolerance * (1. + cost.abs())
-                    + self.demands.len() as f64 * cg.reduced_cost_tolerance;
-                valid &= lower <= cost + gap_tolerance && cost - lower <= 2. * gap_tolerance;
-                if !valid {
-                    result.status = SolveStatus::NumericalFailure;
-                    pending.push(Node { lower, ..node });
-                    break;
-                }
-                if result
-                    .solution
-                    .as_ref()
-                    .map_or(true, |s| cost < s.total_cost)
-                {
-                    result.solution = Some(Solution {
-                        routes,
-                        evaluations,
-                        total_cost: cost,
-                    });
-                }
-                closed_lower = closed_lower.min(lower);
-                continue;
-            }
-            let n = self.demands.len();
-            let mut flow = vec![vec![0.; n + 1]; n + 1];
-            for (column, &x) in master.columns().iter().zip(&snapshot.route_values) {
-                let mut i = 0;
-                for j in column.customers.iter().copied().chain(std::iter::once(0)) {
-                    flow[i][j] += x;
-                    i = j;
-                }
-            }
-            let mut chosen = None;
-            let mut distance = f64::INFINITY;
-            for (i, row) in flow.iter().enumerate() {
-                for (j, &x) in row.iter().enumerate() {
-                    if i == j
-                        || x <= options.integrality_tolerance
-                        || x >= 1. - options.integrality_tolerance
-                        || node.branches.iter().any(|b| b.from == i && b.to == j)
-                    {
-                        continue;
-                    }
-                    if (x - 0.5).abs() < distance {
-                        distance = (x - 0.5).abs();
-                        chosen = Some((i, j));
-                    }
-                }
-            }
-            let Some((from, to)) = chosen else {
-                result.status = SolveStatus::NumericalFailure;
-                pending.push(Node { lower, ..node });
-                break;
-            };
-            for required in [false, true] {
-                let mut branches = node.branches.clone();
-                branches.push(ArcBranch { from, to, required });
-                pending.push(Node { branches, lower });
             }
         }
         if pending.is_empty() {

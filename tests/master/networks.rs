@@ -1191,20 +1191,20 @@ mod presence_row_tests;
 #[path = "networks/master_only.rs"]
 mod master_only_tests;
 
-#[path = "networks/imported.rs"]
+#[path = "networks/imported/model.rs"]
 mod imported_tests;
 
-#[path = "networks/imported_extension.rs"]
+#[path = "networks/imported/extension.rs"]
 mod imported_extension_tests;
 
 #[cfg(feature = "highs")]
-#[path = "networks/imported_oracle.rs"]
+#[path = "networks/imported/oracle.rs"]
 mod imported_oracle_tests;
 
-#[path = "networks/imported_multiple.rs"]
+#[path = "networks/imported/multiple.rs"]
 mod imported_multiple_tests;
 
-#[path = "networks/imported_tree.rs"]
+#[path = "networks/imported/tree.rs"]
 mod imported_tree_tests;
 
 #[path = "networks/bound_domains.rs"]
@@ -1216,7 +1216,7 @@ mod oracle_reply_tests;
 #[path = "networks/generic_domains.rs"]
 mod generic_domain_oracle_tests;
 
-#[path = "networks/imported_nonlinear.rs"]
+#[path = "networks/imported/nonlinear.rs"]
 mod imported_nonlinear_tests;
 
 #[path = "networks/resource_fractional.rs"]
@@ -1726,5 +1726,5 @@ mod accumulated_activity_rows;
 #[path = "networks/original_activities.rs"]
 mod original_accumulated_variables;
 
-#[path = "networks/paired_preparation.rs"]
-mod paired_preparation;
+#[path = "networks/paired/mod.rs"]
+mod paired;

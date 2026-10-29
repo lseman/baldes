@@ -43,6 +43,12 @@ impl<const D: usize> RootController<D> {
                 return Ok(1);
             }
         }
+        // Integral routes must pay their exact recourse before the node may
+        // stop: Theta cuts precede every stopping and tailing-off test.
+        let theta = self.separate_theta(state, master, tags)?;
+        if theta > 0 {
+            return Ok(theta);
+        }
         // Every converged column generation, round 0 included, reports its
         // node depth. Bucket-step adjustment is a root-only decision.
         let depth = i32::try_from(state.pricing.node_depth).unwrap_or(i32::MAX);

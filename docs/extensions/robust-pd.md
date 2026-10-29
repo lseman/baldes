@@ -128,8 +128,14 @@ requests against each other. These are bounded neighbourhood scans rather than
 claims of exhaustive local optimality. Ejection requires a feasible source
 removal; pair exchange directly checks final routes without this restriction.
 
+Two further ruin strategies remove related requests, ranked by pickup and
+delivery travel proximity and time-window differences, or expensive requests,
+ranked by their marginal route travel saving. Both mix with uniform ruin;
+when several directed removal strategies are enabled, one is chosen uniformly
+for each directed ruin. Removal and repair still verify robust feasibility.
+
 The example accepts `--heuristic extended` or one of `regret`, `critical`,
-`exchange`, `tails`, and `ejection` to enable one extension at a time. The
+`related`, `expensive`, `exchange`, `tails`, and `ejection` to enable one extension at a time. The
 existing `--heuristic ils` remains the baseline. For example:
 
 ```sh

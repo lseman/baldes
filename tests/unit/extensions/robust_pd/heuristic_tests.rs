@@ -264,6 +264,14 @@ fn extended_profiles_preserve_robust_partitions_and_zero_flags_match_baseline() 
                     ..Default::default()
                 },
                 IlsExtensions {
+                    related_removal: true,
+                    ..Default::default()
+                },
+                IlsExtensions {
+                    expensive_removal: true,
+                    ..Default::default()
+                },
+                IlsExtensions {
                     pair_exchange: true,
                     ..Default::default()
                 },

@@ -935,3 +935,5 @@ fn raw_objective_round_reports_unrepresentable_refinement_without_losing_search(
     assert_eq!(after.minimum_reduced_cost, before.minimum_reduced_cost);
     assert_eq!(after.columns[0].arcs, before.columns[0].arcs);
 }
+
+mod load_completion;

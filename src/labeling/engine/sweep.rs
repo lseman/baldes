@@ -444,6 +444,16 @@ impl<'a, const D: usize> Sweep<'a, D> {
                             let Some((mut label, resources)) = extension else {
                                 continue;
                             };
+                            if self.ctx.load_completion.is_some_and(|bound| {
+                                bound.rejects(
+                                    &label,
+                                    forward,
+                                    self.ctx.controls.load_completion_threshold,
+                                )
+                            }) {
+                                self.statistics.completion_pruned += 1;
+                                continue;
+                            }
                             let terminal = label.vertex == if forward { g.sink } else { g.source };
                             if terminal {
                                 if BRANCHING && !self.ctx.branching.accepts(&label.branch_state) {

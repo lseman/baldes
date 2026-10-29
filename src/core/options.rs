@@ -283,6 +283,14 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         default: 1.0,
         support: OptionSupport::Implemented("src/pricing/universe.rs"),
     },
+    OptionInfo {
+        name: "BALDESloadCompletionResource", kind: OptionKind::Int, default: -1.,
+        support: OptionSupport::Implemented("src/labeling/engine/load_completion.rs"),
+    },
+    OptionInfo {
+        name: "BALDESloadCompletionThreshold", kind: OptionKind::Double, default: 0.,
+        support: OptionSupport::Implemented("src/labeling/engine/load_completion.rs"),
+    },
 ];
 
 #[derive(Clone, Debug)]

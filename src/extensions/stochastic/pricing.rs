@@ -1,8 +1,14 @@
 //! Stochastic recourse on BALDES's physical graph and ordinary pricing engine.
+use super::bounds::{LoadWalkBounds, SubsetWalkBounds};
 use super::{Policy, Problem, RouteEvaluation};
 use crate::graph::coupled::{CoupledPlugin, CoupledResource, PluginResource, PluginState};
 use crate::{invalid, Graph, Result};
+use rayon::prelude::*;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+/// `2^M` walk tables are built per exact pricing call.
+const MAX_COMPLETION_SUBSET_SIZE: usize = 8;
 
 #[derive(Clone, Copy, Debug)]
 pub struct PricingOptions {
@@ -10,6 +16,24 @@ pub struct PricingOptions {
     pub max_columns: usize,
     pub time_limit: Duration,
     pub bidirectional: bool,
+    /// `Some(t)` with `t <= 0` prunes reverse Bellman labels whose completion
+    /// bound (suffix reduced cost, cheapest continuation value and a
+    /// load-indexed prefix walk bound) is at least `t`. A Complete result then
+    /// certifies only that no route has reduced cost below `t`:
+    /// `minimum_reduced_cost` is the observed minimum capped at `t`, a lower
+    /// bound on the true minimum. Ignored by the bidirectional adapter.
+    pub completion_threshold: Option<f64>,
+    /// Size of the customer set `M` whose subsets get restricted completion
+    /// walk tables (`2^M` tables); zero keeps the unrestricted bound only.
+    pub completion_subset_size: usize,
+    /// Add the elementary knapsack completion bound to reverse pruning.
+    pub completion_knapsack: bool,
+    /// NG prepricing replays routes at `relaxed_route_cost` (travel plus
+    /// per-customer recourse lower bounds) instead of exact expected cost.
+    pub relaxed_route_costs: bool,
+    /// Run NG pricing with BALDES bidirectional bucket labeling (forward and
+    /// backward sweeps on two threads) instead of one forward sweep.
+    pub ng_bidirectional: bool,
 }
 impl Default for PricingOptions {
     fn default() -> Self {
@@ -18,6 +42,11 @@ impl Default for PricingOptions {
             max_columns: 30,
             time_limit: Duration::from_secs(60),
             bidirectional: false,
+            completion_threshold: None,
+            completion_subset_size: 4,
+            completion_knapsack: true,
+            relaxed_route_costs: false,
+            ng_bidirectional: false,
         }
     }
 }
@@ -71,16 +100,28 @@ struct RecourseResource {
     arcs: Vec<(usize, usize)>,
     enabled: bool,
     reversed: bool,
+    /// Reduced cost of each graph arc, aligned with `arcs`.
+    reduced: Vec<f64>,
+    /// Prefix bounds and threshold for completion pruning of reverse labels.
+    prefixes: Option<(Arc<SubsetWalkBounds>, f64)>,
 }
 #[derive(Clone, Debug, PartialEq)]
 enum State {
     // For optimal recourse a forward prefix must retain its decision history:
     // decisions depend on the as-yet unknown continuation. Re-evaluate the
     // prefix Bellman program when extended; unequal histories never dominate.
-    Forward { route: Vec<usize>, cost: f64 },
+    Forward {
+        route: Vec<usize>,
+        cost: f64,
+    },
     // Expected continuation cost for every remaining load at the current node.
     Backward(Vec<f64>),
-    Continuation { visited: u64, values: Vec<f64> },
+    // `reduced` repeats the label's arc reduced cost for completion bounds.
+    Continuation {
+        visited: u64,
+        values: Vec<f64>,
+        reduced: f64,
+    },
 }
 impl CoupledPlugin for RecourseResource {
     fn supports_cost_dominance(&self) -> bool {
@@ -92,10 +133,12 @@ impl CoupledPlugin for RecourseResource {
                 Some(State::Continuation {
                     visited: a,
                     values: av,
+                    ..
                 }),
                 Some(State::Continuation {
                     visited: b,
                     values: bv,
+                    ..
                 }),
                 true,
             ) => {
@@ -132,6 +175,7 @@ impl CoupledPlugin for RecourseResource {
             return PluginState::new(State::Continuation {
                 visited: 0,
                 values: vec![0.; self.problem.capacity + 1],
+                reduced: 0.,
             });
         }
         PluginState::new(if forward {
@@ -158,6 +202,7 @@ impl CoupledPlugin for RecourseResource {
                 Some(State::Continuation {
                     visited,
                     values: next,
+                    reduced,
                 }),
                 true,
             ) => {
@@ -182,14 +227,52 @@ impl CoupledPlugin for RecourseResource {
                 if mean > self.problem.capacity as f64 {
                     return Ok(None);
                 }
+                let reduced = reduced + self.reduced[arc];
+                // Every completion is a depot walk entering i whose load
+                // excludes the rest of the suffix; its recourse is at least
+                // the walk's detour charges plus a continuation value.
+                let prefix = match (&self.prefixes, i != 0) {
+                    (Some((prefixes, _)), true) => {
+                        let load = self.problem.capacity as f64 - mean
+                            + self.problem.demands[i - 1].mean()
+                            + 1e-9 * (1. + self.problem.capacity as f64);
+                        Some(prefixes.prefix(i, j, load, visited))
+                    }
+                    _ => None,
+                };
+                let threshold = self.prefixes.as_ref().map_or(0., |(_, t)| *t);
+                let prunes = |continuation: f64, prefix: f64| {
+                    let bound = reduced + continuation + prefix;
+                    bound
+                        >= threshold
+                            + 1e-9 * (1. + reduced.abs() + continuation.abs() + prefix.abs())
+                };
+                if let (Some(prefix), true) = (prefix, j != 0 && self.enabled) {
+                    // Failures cost nothing negative and a refill before j
+                    // costs at least its detour, so this bounds the Bellman
+                    // minimum below without evaluating it.
+                    let detour = self.problem.costs[i][0] + self.problem.costs[0][j]
+                        - self.problem.costs[i][j];
+                    let floor = next.iter().copied().fold(f64::INFINITY, f64::min) + detour.min(0.);
+                    if prunes(floor, prefix) {
+                        return Ok(None);
+                    }
+                }
                 let mut values = vec![0.; self.problem.capacity + 1];
                 if j != 0 && self.enabled {
                     self.problem
                         .prepend_recourse(i, j, next, &mut values, self.policy)?;
                 }
+                if let Some(prefix) = prefix {
+                    let continuation = values.iter().copied().fold(f64::INFINITY, f64::min);
+                    if prunes(continuation, prefix) {
+                        return Ok(None);
+                    }
+                }
                 Ok(Some(PluginState::new(State::Continuation {
                     visited,
                     values,
+                    reduced,
                 })))
             }
             (Some(State::Forward { route, .. }), true) => {
@@ -278,7 +361,9 @@ impl Problem {
             branch_duals,
             phase_one,
             false,
+            None,
         )
+        .map(|(graph, _)| graph)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -291,7 +376,9 @@ impl Problem {
         branch_duals: &[f64],
         phase_one: bool,
         reversed: bool,
-    ) -> Result<Graph<3>> {
+        // Pruning threshold and size of the completion subset set `M`.
+        completion: Option<(f64, usize, bool)>,
+    ) -> Result<(Graph<3>, LoadWalkBounds)> {
         self.validate_branches(branches)?;
         let n = self.demands.len();
         if n > crate::graph::ng::NG_MEMORY_CAPACITY
@@ -382,6 +469,31 @@ impl Problem {
                 "stochastic pricing cost scale exceeds BALDES range; rescale costs",
             ));
         }
+        let reduced: Vec<_> = g.arcs.iter().map(|a| a.reduced_cost).collect();
+        let charges = if phase_one {
+            vec![0.; n]
+        } else {
+            self.recourse_customer_lower_bounds()
+        };
+        let weighted: Vec<_> = arcs
+            .iter()
+            .zip(&reduced)
+            .map(|(&(from, to), &r)| (from, to, r))
+            .collect();
+        let (bounds, prefixes) = match completion.filter(|_| reversed) {
+            Some((threshold, size, knapsack)) => {
+                // M: customers with the largest positive dual per unit of
+                // mean demand (Florio et al. 2023).
+                let mut members: Vec<_> = (1..=n).filter(|&j| customer_duals[j - 1] > 0.).collect();
+                let ratio = |j: usize| customer_duals[j - 1] / self.demands[j - 1].mean().max(1e-9);
+                members.sort_by(|&a, &b| ratio(b).total_cmp(&ratio(a)).then(a.cmp(&b)));
+                members.truncate(size.min(MAX_COMPLETION_SUBSET_SIZE));
+                let subsets = SubsetWalkBounds::new(self, &weighted, &charges, members, knapsack);
+                let bounds = subsets.unrestricted().clone();
+                (bounds, Some((Arc::new(subsets), threshold)))
+            }
+            None => (LoadWalkBounds::new(self, &weighted, &charges), None),
+        };
         g.set_coupled_resources(&[CoupledResource::Plugin(PluginResource::new(
             RecourseResource {
                 problem: self.clone(),
@@ -389,9 +501,35 @@ impl Problem {
                 arcs,
                 enabled: !phase_one,
                 reversed,
+                reduced,
+                prefixes,
             },
         ))])?;
-        Ok(g)
+        Ok((g, bounds))
+    }
+
+    /// Load-indexed walk (q-route) lower bound on every elementary route's
+    /// stochastic reduced cost, valid after any pricing interruption.
+    pub(super) fn route_relaxation_bound(
+        &self,
+        policy: Policy,
+        customer_duals: &[f64],
+        fleet_dual: f64,
+        branches: &[ArcBranch],
+        branch_duals: &[f64],
+        phase_one: bool,
+    ) -> Result<Option<f64>> {
+        let (_, bounds) = self.build_pricing_graph(
+            policy,
+            customer_duals,
+            fleet_dual,
+            branches,
+            branch_duals,
+            phase_one,
+            true,
+            None,
+        )?;
+        Ok(bounds.route().map(|b| b - 1e-9 * (1. + b.abs())))
     }
 
     // A customer can incur at most one negative preventive detour per visit.
@@ -406,6 +544,22 @@ impl Problem {
                     * (1. + 1e-10)
             })
             .collect()
+    }
+
+    /// Travel cost plus per-customer recourse lower bounds: a lower bound on
+    /// the expected cost of the route under either policy.
+    pub fn relaxed_route_cost(&self, route: &[usize]) -> f64 {
+        let charges = self.recourse_customer_lower_bounds();
+        let mut from = 0;
+        let mut cost = 0.;
+        for &to in route.iter().chain(std::iter::once(&0)) {
+            cost += self.costs[from][to];
+            if to != 0 {
+                cost += charges[to - 1];
+            }
+            from = to;
+        }
+        cost
     }
 
     pub(super) fn recourse_lower_bound(&self) -> f64 {
@@ -457,7 +611,11 @@ impl Problem {
         options: PricingOptions,
     ) -> Result<PricingResult> {
         let started = Instant::now();
-        let graph = self.build_pricing_graph(
+        let pruning = options
+            .completion_threshold
+            .filter(|t| !options.bidirectional && t.is_finite())
+            .map(|t| t.min(0.));
+        let (graph, bounds) = self.build_pricing_graph(
             policy,
             customer_duals,
             fleet_dual,
@@ -465,12 +623,24 @@ impl Problem {
             branch_duals,
             phase_one,
             !options.bidirectional,
+            pruning.map(|t| {
+                (
+                    t,
+                    options.completion_subset_size,
+                    options.completion_knapsack,
+                )
+            }),
         )?;
+        let walk = self.walk_pricing_bound(&graph, phase_one);
+        let loaded = bounds.route().map(|b| b - 1e-9 * (1. + b.abs()));
         let mut result = PricingResult {
             status: PricingStatus::WorkLimit,
             routes: vec![],
             minimum_reduced_cost: None,
-            lower_bound: self.walk_pricing_bound(&graph, phase_one),
+            lower_bound: match (walk, loaded) {
+                (Some(a), Some(b)) => Some(a.max(b)),
+                (a, b) => a.or(b),
+            },
             statistics: Default::default(),
         };
         if self.demands.is_empty() {
@@ -546,9 +716,226 @@ impl Problem {
         };
         if result.status != PricingStatus::Complete {
             result.minimum_reduced_cost = None;
+        } else if let Some(threshold) = pruning {
+            result.minimum_reduced_cost = Some(
+                result
+                    .minimum_reduced_cost
+                    .map_or(threshold, |m| m.min(threshold)),
+            );
         }
         Ok(result)
     }
+
+    /// Split pricing by each route's last customer. Part `g` forbids the
+    /// depot arcs of every customer outside it, so the parts are disjoint and
+    /// together contain every route. Returns `None` when there is no split.
+    pub(super) fn last_customer_parts(
+        &self,
+        branches: &[ArcBranch],
+        branch_duals: &[f64],
+        parts: usize,
+    ) -> Option<Vec<(Vec<ArcBranch>, Vec<f64>)>> {
+        let n = self.demands.len();
+        let parts = parts.min(n);
+        if parts < 2 {
+            return None;
+        }
+        Some(
+            (0..parts)
+                .map(|g| {
+                    let mut part_branches = branches.to_vec();
+                    let mut part_duals = branch_duals.to_vec();
+                    for j in (1..=n).filter(|j| (j - 1) % parts != g) {
+                        part_branches.push(ArcBranch {
+                            from: j,
+                            to: 0,
+                            required: false,
+                        });
+                        part_duals.push(0.);
+                    }
+                    (part_branches, part_duals)
+                })
+                .collect(),
+        )
+    }
+
+    /// Exact pricing over `parts` disjoint last-customer parts, each a full
+    /// reverse labeling run on the ambient rayon pool. Minima and bounds
+    /// combine by minimum; the result is Complete only if every part is.
+    #[allow(clippy::too_many_arguments)]
+    pub fn price_partitioned(
+        &self,
+        policy: Policy,
+        customer_duals: &[f64],
+        fleet_dual: f64,
+        branches: &[ArcBranch],
+        branch_duals: &[f64],
+        phase_one: bool,
+        options: PricingOptions,
+        parts: usize,
+    ) -> Result<PricingResult> {
+        let Some(split) = self
+            .last_customer_parts(branches, branch_duals, parts)
+            .filter(|_| !options.bidirectional)
+        else {
+            return self.price(
+                policy,
+                customer_duals,
+                fleet_dual,
+                branches,
+                branch_duals,
+                phase_one,
+                options,
+            );
+        };
+        // Parts share the label budget, so peak label memory stays that of
+        // one serial call.
+        let mut options = options;
+        options.max_labels = options.max_labels.div_ceil(split.len());
+        let results = split
+            .par_iter()
+            .map(|(part_branches, part_duals)| {
+                self.price(
+                    policy,
+                    customer_duals,
+                    fleet_dual,
+                    part_branches,
+                    part_duals,
+                    phase_one,
+                    options,
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(combine_parts(results))
+    }
+
+    /// Exact pricing over last-customer parts that retries only the parts
+    /// stopped by their work limit. Each retry doubles their label budget
+    /// while the retried parts together stay within `label_cap` labels, and
+    /// stops once any part finds a route below `-tolerance`. Completed parts
+    /// keep their results, so hard parts search deeper in the same memory.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn price_adaptive(
+        &self,
+        policy: Policy,
+        customer_duals: &[f64],
+        fleet_dual: f64,
+        branches: &[ArcBranch],
+        branch_duals: &[f64],
+        phase_one: bool,
+        options: PricingOptions,
+        parts: usize,
+        label_cap: usize,
+        tolerance: f64,
+    ) -> Result<PricingResult> {
+        let started = Instant::now();
+        let split = self
+            .last_customer_parts(branches, branch_duals, parts)
+            .filter(|_| !options.bidirectional)
+            .unwrap_or_else(|| vec![(branches.to_vec(), branch_duals.to_vec())]);
+        let mut budget = options.max_labels.div_ceil(split.len()).max(1);
+        let mut results: Vec<Option<PricingResult>> = vec![None; split.len()];
+        let mut statistics = crate::labeling::Statistics::default();
+        let mut pending: Vec<usize> = (0..split.len()).collect();
+        loop {
+            let mut part_options = options;
+            part_options.max_labels = budget;
+            part_options.time_limit = options.time_limit.saturating_sub(started.elapsed());
+            let priced = pending
+                .par_iter()
+                .map(|&k| {
+                    let (part_branches, part_duals) = &split[k];
+                    self.price(
+                        policy,
+                        customer_duals,
+                        fleet_dual,
+                        part_branches,
+                        part_duals,
+                        phase_one,
+                        part_options,
+                    )
+                })
+                .collect::<Result<Vec<_>>>()?;
+            for (&k, part) in pending.iter().zip(priced) {
+                statistics.absorb(&part.statistics);
+                results[k] = Some(part);
+            }
+            let improving = results
+                .iter()
+                .flatten()
+                .any(|r| r.routes.iter().any(|route| route.reduced_cost < -tolerance));
+            pending.retain(|&k| {
+                results[k]
+                    .as_ref()
+                    .is_some_and(|r| r.status == PricingStatus::WorkLimit)
+            });
+            let next = budget
+                .saturating_mul(2)
+                .min(label_cap / pending.len().max(1));
+            if improving
+                || pending.is_empty()
+                || next <= budget
+                || started.elapsed() >= options.time_limit
+            {
+                break;
+            }
+            budget = next;
+        }
+        let mut combined = combine_parts(results.into_iter().flatten().collect());
+        combined.statistics = statistics;
+        Ok(combined)
+    }
+}
+
+/// Worst status of disjoint pricing parts.
+pub(super) fn combined_status(statuses: impl IntoIterator<Item = PricingStatus>) -> PricingStatus {
+    let rank = |s: PricingStatus| match s {
+        PricingStatus::Complete => 0,
+        PricingStatus::Heuristic => 1,
+        PricingStatus::WorkLimit => 2,
+        PricingStatus::TimeLimit => 3,
+    };
+    statuses
+        .into_iter()
+        .max_by_key(|&s| rank(s))
+        .unwrap_or(PricingStatus::Complete)
+}
+
+/// A global bound exists only if every part supplies one.
+pub(super) fn combined_bound(bounds: impl IntoIterator<Item = Option<f64>>) -> Option<f64> {
+    bounds
+        .into_iter()
+        .try_fold(f64::INFINITY, |acc, b| b.map(|b| acc.min(b)))
+        .filter(|b| b.is_finite())
+}
+
+fn combine_parts(parts: Vec<PricingResult>) -> PricingResult {
+    let status = combined_status(parts.iter().map(|p| p.status));
+    let lower_bound = combined_bound(parts.iter().map(|p| p.lower_bound));
+    // A complete part with no minimum has an empty route domain.
+    let minimum_reduced_cost = (status == PricingStatus::Complete)
+        .then(|| {
+            parts
+                .iter()
+                .filter_map(|p| p.minimum_reduced_cost)
+                .fold(None, |m: Option<f64>, x| Some(m.map_or(x, |m| m.min(x))))
+        })
+        .flatten();
+    let mut result = PricingResult {
+        status,
+        routes: vec![],
+        minimum_reduced_cost,
+        lower_bound,
+        statistics: Default::default(),
+    };
+    for mut part in parts {
+        result.statistics.absorb(&part.statistics);
+        result.routes.append(&mut part.routes);
+    }
+    result
+        .routes
+        .sort_by(|a, b| a.reduced_cost.total_cmp(&b.reduced_cost));
+    result
 }
 
 pub(super) fn route_uses(route: &[usize], branch: ArcBranch) -> bool {

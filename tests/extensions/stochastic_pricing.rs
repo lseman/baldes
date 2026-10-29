@@ -368,9 +368,15 @@ mod master {
     #[test]
     fn fractional_root_requires_arc_branching_and_child_pricing() {
         let p = fractional();
-        let answer = p
-            .solve(Policy::Classical, 2, SolveOptions::default())
-            .unwrap();
+        // Without capacity cuts the pair-route cover stays fractional.
+        let uncut = SolveOptions {
+            column_generation: ColumnGenerationOptions {
+                capacity_cut_rounds: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let answer = p.solve(Policy::Classical, 2, uncut).unwrap();
         assert_eq!(answer.status, SolveStatus::Optimal);
         assert!(
             answer.nodes > 1,
@@ -384,12 +390,24 @@ mod master {
                 2,
                 SolveOptions {
                     max_nodes: 1,
-                    ..Default::default()
+                    ..uncut
                 },
             )
             .unwrap();
         assert_eq!(limited.status, SolveStatus::NodeLimit);
         assert!(limited.lower_bound <= 4.5 + 1e-6);
+    }
+
+    #[test]
+    fn capacity_cuts_close_the_fractional_pair_cover_at_the_root() {
+        // x(delta({1,2,3})) >= 2 ceil(3/2) = 4 removes the pair-route cover.
+        let answer = fractional()
+            .solve(Policy::Classical, 2, SolveOptions::default())
+            .unwrap();
+        assert_eq!(answer.status, SolveStatus::Optimal);
+        assert_eq!(answer.nodes, 1);
+        close(answer.solution.unwrap().total_cost, 5.);
+        assert!(answer.lower_bound > 4.9);
     }
 
     #[test]
@@ -425,12 +443,48 @@ mod master {
     }
 
     #[test]
+    fn cutoff_stops_column_generation_only_with_a_bound_reaching_it() {
+        let p = problem();
+        for policy in [Policy::Classical, Policy::OptimalRestocking] {
+            let mut reference =
+                Master::new(p.clone(), policy, 4, vec![], ClpMaster::new().unwrap()).unwrap();
+            let lp = reference
+                .optimize(ColumnGenerationOptions::default())
+                .unwrap()
+                .snapshot
+                .unwrap()
+                .objective;
+            for (cutoff, expected) in [
+                (lp - 1., ColumnGenerationStatus::BoundCutoff),
+                (lp + 1., ColumnGenerationStatus::Converged),
+            ] {
+                let mut master =
+                    Master::new(p.clone(), policy, 4, vec![], ClpMaster::new().unwrap()).unwrap();
+                let answer = master
+                    .optimize(ColumnGenerationOptions {
+                        cutoff: Some(cutoff),
+                        ..Default::default()
+                    })
+                    .unwrap();
+                assert_eq!(answer.status, expected);
+                let bound = answer.lower_bound.unwrap();
+                assert!(bound <= lp + 1e-6);
+                if expected == ColumnGenerationStatus::BoundCutoff {
+                    assert!(bound >= cutoff);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn interrupted_pricing_retains_an_incumbent_and_conservative_bound() {
         let p = problem();
         let options = SolveOptions {
             column_generation: ColumnGenerationOptions {
+                // Completion bounds can finish this tiny pricing within one
+                // label, so interrupt it by time instead.
                 pricing: PricingOptions {
-                    max_labels: 1,
+                    time_limit: Duration::ZERO,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -953,5 +1007,427 @@ fn bounded_ng_column_search_does_not_claim_a_relaxation_bound() {
     for route in ng.routes {
         p.evaluate_route(&route.customers, Policy::Classical)
             .unwrap();
+    }
+}
+
+#[test]
+fn completion_bounded_pricing_finds_every_route_below_its_threshold() {
+    // Cyclic asymmetric costs and a nonmetric matrix with negative detours.
+    let nonmetric = {
+        let demands = (2..=5)
+            .map(|d| Demand::new(vec![(1, 0.5), (d, 0.3), (8, 0.2)]).unwrap())
+            .collect();
+        let costs = (0..5)
+            .map(|i| {
+                (0..5)
+                    .map(|j| {
+                        if i == j {
+                            0.
+                        } else {
+                            ((i * 7 + j * 3) % 11 + 1) as f64
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+        Problem::new(10, demands, costs).unwrap()
+    };
+    for p in [problem(), nonmetric] {
+        for policy in [Policy::Classical, Policy::OptimalRestocking] {
+            let mut orders = vec![];
+            enumerate(&p, policy, &mut vec![], &mut orders);
+            for duals in [vec![0.; 4], vec![5., 8., 2., 4.], vec![9., 14., 6., 11.]] {
+                let fleet = -0.7;
+                let expected = orders
+                    .iter()
+                    .map(|r| {
+                        p.evaluate_route(r, policy).unwrap().total_cost
+                            - r.iter().map(|&j| duals[j - 1]).sum::<f64>()
+                            - fleet
+                    })
+                    .fold(f64::INFINITY, f64::min);
+                for threshold in [0., -1., -5.] {
+                    let priced = p
+                        .price(
+                            policy,
+                            &duals,
+                            fleet,
+                            &[],
+                            &[],
+                            false,
+                            PricingOptions {
+                                completion_threshold: Some(threshold),
+                                ..Default::default()
+                            },
+                        )
+                        .unwrap();
+                    assert_eq!(priced.status, PricingStatus::Complete);
+                    let minimum = priced.minimum_reduced_cost.unwrap();
+                    if expected < threshold - 1e-7 {
+                        close(minimum, expected);
+                    } else {
+                        assert!(minimum <= expected + 1e-7);
+                        assert!(minimum >= threshold.min(expected) - 1e-7);
+                    }
+                    assert!(priced.lower_bound.unwrap() <= expected + 1e-7);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn last_customer_partitioned_pricing_matches_serial_pricing_and_enumeration() {
+    let p = problem();
+    let branches = [
+        ArcBranch {
+            from: 1,
+            to: 2,
+            required: false,
+        },
+        ArcBranch {
+            from: 3,
+            to: 0,
+            required: true,
+        },
+    ];
+    for policy in [Policy::Classical, Policy::OptimalRestocking] {
+        let mut orders = vec![];
+        enumerate(&p, policy, &mut vec![], &mut orders);
+        for duals in [vec![0.; 4], vec![5., 8., 2., 4.], vec![9., 14., 6., 11.]] {
+            for (branches, branch_duals) in
+                [(&branches[..0], &[][..]), (&branches[..], &[0., 1.5][..])]
+            {
+                let fleet = -0.7;
+                let expected = orders
+                    .iter()
+                    .filter(|r| !branches.iter().any(|&b| !b.required && uses(r, b)))
+                    .map(|r| {
+                        let charged: f64 = branches
+                            .iter()
+                            .zip(branch_duals)
+                            .filter(|(&b, _)| uses(r, b))
+                            .map(|(_, &d)| d)
+                            .sum();
+                        p.evaluate_route(r, policy).unwrap().total_cost
+                            - r.iter().map(|&j| duals[j - 1]).sum::<f64>()
+                            - fleet
+                            - charged
+                    })
+                    .fold(f64::INFINITY, f64::min);
+                let serial = p
+                    .price(
+                        policy,
+                        &duals,
+                        fleet,
+                        branches,
+                        branch_duals,
+                        false,
+                        Default::default(),
+                    )
+                    .unwrap();
+                for parts in [2, 3, 4] {
+                    let split = p
+                        .price_partitioned(
+                            policy,
+                            &duals,
+                            fleet,
+                            branches,
+                            branch_duals,
+                            false,
+                            Default::default(),
+                            parts,
+                        )
+                        .unwrap();
+                    assert_eq!(split.status, PricingStatus::Complete);
+                    close(split.minimum_reduced_cost.unwrap(), expected);
+                    close(
+                        split.minimum_reduced_cost.unwrap(),
+                        serial.minimum_reduced_cost.unwrap(),
+                    );
+                    assert!(split.lower_bound.unwrap() <= expected + 1e-7);
+                    let mut routes: Vec<_> = split.routes.iter().map(|r| &r.customers).collect();
+                    routes.sort();
+                    routes.dedup();
+                    assert_eq!(routes.len(), split.routes.len(), "parts must be disjoint");
+                }
+            }
+        }
+    }
+}
+
+/// Seven customers whose mean demands allow at most two per route, so
+/// rounded capacity cuts with k(S) >= 2 bind on fractional packings.
+#[cfg(feature = "clp")]
+fn capacity_tight_problem() -> Problem {
+    let demands = (0..7)
+        .map(|k| Demand::new(vec![(3 + k % 3, 0.6), (6, 0.4)]).unwrap())
+        .collect();
+    let position: [f64; 8] = [6., 0., 3., 7., 12., 5., 9., 14.];
+    let costs = position
+        .iter()
+        .map(|a| {
+            position
+                .iter()
+                .map(|b| if a == b { 0. } else { (a - b).abs() + 1. })
+                .collect()
+        })
+        .collect();
+    Problem::new(10, demands, costs).unwrap()
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn capacity_cuts_and_parallel_pricing_match_the_tiny_oracle() {
+    use baldes::extensions::stochastic::{
+        ColumnGenerationOptions, SolveOptions, SolveStatus, TinyOptions,
+    };
+    let p = capacity_tight_problem();
+    for policy in [Policy::Classical, Policy::OptimalRestocking] {
+        let oracle = p
+            .solve_tiny(
+                policy,
+                TinyOptions {
+                    max_vehicles: 4,
+                    route_budget: 100_000,
+                },
+            )
+            .unwrap()
+            .unwrap();
+        for capacity_cut_rounds in [0, 20] {
+            for (pricing_parts, threads) in [(1, 1), (3, 1), (0, 4)] {
+                let answer = p
+                    .solve(
+                        policy,
+                        4,
+                        SolveOptions {
+                            column_generation: ColumnGenerationOptions {
+                                ng_size: 2,
+                                capacity_cut_rounds,
+                                pricing_parts,
+                                ..Default::default()
+                            },
+                            threads,
+                            ..Default::default()
+                        },
+                    )
+                    .unwrap();
+                assert_eq!(answer.status, SolveStatus::Optimal);
+                close(answer.solution.unwrap().total_cost, oracle.total_cost);
+                assert!(answer.lower_bound <= oracle.total_cost + 1e-6);
+            }
+        }
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn root_capacity_cuts_are_valid_and_never_weaken_the_root_bound() {
+    use baldes::extensions::stochastic::{ColumnGenerationOptions, Master, TinyOptions};
+    use baldes::master::clp::ClpMaster;
+    let p = capacity_tight_problem();
+    for policy in [Policy::Classical, Policy::OptimalRestocking] {
+        let oracle = p
+            .solve_tiny(
+                policy,
+                TinyOptions {
+                    max_vehicles: 4,
+                    route_budget: 100_000,
+                },
+            )
+            .unwrap()
+            .unwrap();
+        let root = |rounds: usize| {
+            let mut master =
+                Master::new(p.clone(), policy, 4, vec![], ClpMaster::new().unwrap()).unwrap();
+            for j in 1..=7 {
+                master.add_route(&[j]).unwrap();
+            }
+            let answer = master
+                .optimize(ColumnGenerationOptions {
+                    capacity_cut_rounds: rounds,
+                    ..Default::default()
+                })
+                .unwrap();
+            (answer.lower_bound.unwrap(), master.capacity_cuts().len())
+        };
+        let (plain, none) = root(0);
+        let (cut, added) = root(20);
+        assert_eq!(none, 0);
+        assert!(added > 0, "the tight instance must separate capacity cuts");
+        assert!(cut >= plain - 1e-6, "{cut} < {plain}");
+        assert!(
+            cut <= oracle.total_cost + 1e-6,
+            "{cut} > {}",
+            oracle.total_cost
+        );
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn knapsack_and_subset_completion_bounds_keep_every_route_below_the_threshold() {
+    let p = capacity_tight_problem();
+    for policy in [Policy::Classical, Policy::OptimalRestocking] {
+        let mut orders = vec![];
+        enumerate(&p, policy, &mut vec![], &mut orders);
+        for duals in [vec![30.; 7], vec![18., 40., 25., 33., 12., 45., 28.]] {
+            let fleet = -2.;
+            let expected = orders
+                .iter()
+                .map(|r| {
+                    p.evaluate_route(r, policy).unwrap().total_cost
+                        - r.iter().map(|&j| duals[j - 1]).sum::<f64>()
+                        - fleet
+                })
+                .fold(f64::INFINITY, f64::min);
+            for (subset, knapsack) in [(0, false), (0, true), (4, true), (7, true)] {
+                for threshold in [0., -5., -20.] {
+                    let priced = p
+                        .price(
+                            policy,
+                            &duals,
+                            fleet,
+                            &[],
+                            &[],
+                            false,
+                            PricingOptions {
+                                completion_threshold: Some(threshold),
+                                completion_subset_size: subset,
+                                completion_knapsack: knapsack,
+                                ..Default::default()
+                            },
+                        )
+                        .unwrap();
+                    assert_eq!(priced.status, PricingStatus::Complete);
+                    let minimum = priced.minimum_reduced_cost.unwrap();
+                    if expected < threshold - 1e-7 {
+                        close(minimum, expected);
+                    } else {
+                        assert!(minimum >= threshold.min(expected) - 1e-7);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn routing_tree_with_theta_cuts_matches_the_tiny_oracle() {
+    use baldes::extensions::stochastic::TinyOptions;
+    use baldes::master::tree::{TreeOptions, TreeStatus};
+    for (p, fleets) in [
+        (problem(), vec![1, 2, 4]),
+        (capacity_tight_problem(), vec![4, 5]),
+    ] {
+        for policy in [Policy::Classical, Policy::OptimalRestocking] {
+            for &vehicles in &fleets {
+                let oracle = p
+                    .solve_tiny(
+                        policy,
+                        TinyOptions {
+                            max_vehicles: vehicles,
+                            route_budget: 100_000,
+                        },
+                    )
+                    .unwrap()
+                    .unwrap();
+                for (threads, dynamic_ng, cut_limit, completion) in [
+                    (1, None, None, true),
+                    (4, None, None, true),
+                    (1, Some(0.), None, true),
+                    (1, Some(1.), Some(3.), true),
+                    (4, Some(1.), Some(12.), true),
+                    (1, Some(-1.), Some(8.), true),
+                    (1, None, None, false),
+                    (4, Some(1.), Some(8.), false),
+                ] {
+                    let mut tree = TreeOptions {
+                        threads,
+                        ..Default::default()
+                    };
+                    // Leave CutOptions at its generic default: solve_theta_cuts
+                    // must enable both rank-one and mean-capacity separation.
+                    if let Some(limit) = cut_limit {
+                        tree.root
+                            .pricing_options
+                            .push(("BALDESrankOneCutsMaxNumPerRound".into(), limit));
+                    }
+                    if !completion {
+                        tree.root
+                            .pricing_options
+                            .push(("BALDESloadCompletionResource".into(), -1.));
+                    }
+                    if let Some(mode) = dynamic_ng {
+                        tree.root
+                            .pricing_options
+                            .push(("BALDESdynamicNGmode".into(), mode));
+                    }
+                    let answer = p.solve_theta_cuts(policy, vehicles, 2, tree).unwrap();
+                    assert_eq!(answer.status, TreeStatus::Optimal, "{policy:?} {vehicles}");
+                    close(answer.incumbent, oracle.total_cost);
+                    assert!(answer.bound <= oracle.total_cost + 1e-6);
+                    let replayed: f64 = answer
+                        .routes
+                        .iter()
+                        .map(|r| {
+                            let customers: Vec<usize> = r.nodes[1..r.nodes.len() - 1]
+                                .iter()
+                                .map(|&v| v as usize)
+                                .collect();
+                            p.evaluate_route(&customers, policy).unwrap().total_cost
+                        })
+                        .sum();
+                    close(replayed, oracle.total_cost);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn theta_recourse_runs_bucket_fixing_without_enumerating_routes() {
+    use baldes::extensions::stochastic::TinyOptions;
+    use baldes::master::{cg, routing};
+    let p = Problem::new(
+        2,
+        vec![Demand::new(vec![(0, 0.5), (2, 0.5)]).unwrap(); 3],
+        (0..4)
+            .map(|i| (0..4).map(|j| if i == j { 0. } else { 1. }).collect())
+            .collect(),
+    )
+    .unwrap();
+    for policy in [Policy::Classical, Policy::OptimalRestocking] {
+        let oracle = p
+            .solve_tiny(
+                policy,
+                TinyOptions {
+                    max_vehicles: 2,
+                    route_budget: 1000,
+                },
+            )
+            .unwrap()
+            .unwrap();
+        let mut objectives = vec![];
+        for enabled in [false, true] {
+            let mut options = routing::RootOptions::default();
+            // A fractional pair cover leaves an open gap. Theta recourse
+            // disables enumeration even though RootOptions defaults it on.
+            options.incumbent = oracle.total_cost;
+            options.pricing_options.push((
+                "BALDESapplyReducedCostFixing".into(),
+                if enabled { 1. } else { 0. },
+            ));
+            let answer =
+                routing::solve(p.theta_cut_context(policy, 2, 3).unwrap(), options).unwrap();
+            assert_eq!(answer.master.status, cg::Status::Optimal);
+            assert_eq!(answer.enumerated_routes, 0);
+            assert_eq!(answer.fixing_calls > 0, enabled);
+            assert!(answer.master.bound <= oracle.total_cost + 1e-6);
+            objectives.push(answer.master.lp);
+        }
+        close(objectives[0], objectives[1]);
     }
 }

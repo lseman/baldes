@@ -199,6 +199,19 @@ impl<const D: usize> State<D> {
         let batch = result?;
         self.pricing.correction = batch.correction;
         self.pricing.gradient = batch.gradient;
+        // A Theta variable with a negative reduced cost at these duals leaves
+        // the Lagrangian unbounded below, so this pass yields no bound.
+        if problem.recourse.is_some() {
+            let mut charged = vec![0.; problem.model.networks[0].graph.vertices.len()];
+            for (cut, row) in self.cut.theta_cuts.iter().zip(&self.cut.theta_rows) {
+                if let Some(row) = row {
+                    charged[cut.anchor] += duals[*row] / cut.excess;
+                }
+            }
+            if charged.iter().any(|&c| 1. - c < -1e-9 * (1. + c.abs())) {
+                self.pricing.correction = None;
+            }
+        }
         Ok(batch.answer)
     }
 }

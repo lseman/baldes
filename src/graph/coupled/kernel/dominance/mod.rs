@@ -421,9 +421,10 @@ impl CoupledKernel {
                 .zip(a.slope_relations.iter().zip(&b.slope_relations))
                 .all(|(prepared, (a, b))| {
                     if prepared.has_costs() {
-                        prepared.monotone_constant_suffix_dominates(a, b) || (prepared.has_exact_cost_continuations()
-                            && a.bounded_cost.is_some()
-                            && b.bounded_cost.is_some())
+                        prepared.monotone_constant_suffix_dominates(a, b)
+                            || (prepared.has_exact_cost_continuations()
+                                && a.bounded_cost.is_some()
+                                && b.bounded_cost.is_some())
                     } else {
                         a.upper.is_some() && b.upper.is_some()
                     }

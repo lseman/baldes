@@ -9,10 +9,12 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
         tags: &[i32],
         artificials: &[usize],
     ) -> Result<()> {
-        self.3 = artificials.iter().try_fold(f64::INFINITY, |minimum, &index| {
-            let cost = *master.costs().get(index)?;
-            (cost.is_finite() && cost > 0.).then_some(minimum.min(cost))
-        });
+        self.3 = artificials
+            .iter()
+            .try_fold(f64::INFINITY, |minimum, &index| {
+                let cost = *master.costs().get(index)?;
+                (cost.is_finite() && cost > 0.).then_some(minimum.min(cost))
+            });
         let mut state = self.0.borrow_mut();
         let objective = master.objective();
         state.pricing_master =
@@ -98,15 +100,21 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
             // with an artificially weak network offset. Explicit restrictions
             // and finite retained-universe boxes still need their own caps.
             let covered = self.3.is_some_and(|penalty| {
-                penalty == f64::INFINITY || state.routes.get(tag as usize).is_some_and(|route| {
-                    crate::core::rounding::add_down(route.route.original_cost, penalty)
-                        .is_some_and(|sum| sum >= 0.)
-                })
+                penalty == f64::INFINITY
+                    || state.routes.get(tag as usize).is_some_and(|route| {
+                        crate::core::rounding::add_down(route.route.original_cost, penalty)
+                            .is_some_and(|sum| sum >= 0.)
+                    })
             });
-            if covered && state.master_variables.is_empty() && state.shared_rows.is_empty()
-                && state.variable_boxes.is_empty() && state.grouped_variable_boxes.is_empty()
-                && state.synchronized_services.is_empty() && state.universe.is_none()
-                && !state.route_upper_bounds.contains_key(&(tag as usize)) {
+            if covered
+                && state.master_variables.is_empty()
+                && state.shared_rows.is_empty()
+                && state.variable_boxes.is_empty()
+                && state.grouped_variable_boxes.is_empty()
+                && state.synchronized_services.is_empty()
+                && state.universe.is_none()
+                && !state.route_upper_bounds.contains_key(&(tag as usize))
+            {
                 return None;
             }
             enumeration::route_upper(&state, tag as usize).filter(|u| u.is_finite())

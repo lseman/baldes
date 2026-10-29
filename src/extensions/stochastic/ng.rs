@@ -1,7 +1,8 @@
 //! Cheap NG-route relaxation: scalar travel pricing followed by true recourse replay.
-use super::pricing::route_uses;
+use super::pricing::{combined_bound, combined_status, route_uses};
 use super::{ArcBranch, Policy, PricedRoute, PricingOptions, PricingStatus, Problem};
 use crate::{invalid, Result};
+use rayon::prelude::*;
 use std::collections::BTreeSet;
 use std::time::Instant;
 
@@ -52,6 +53,73 @@ impl Problem {
             options,
             false,
         )
+    }
+
+    /// NG pricing over disjoint last-customer parts on the ambient rayon
+    /// pool. Each part returns its own columns, so one call yields up to
+    /// `parts * max_columns` candidates. A bound needs a bound from every part.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn price_ng_partitioned(
+        &self,
+        policy: Policy,
+        customer_duals: &[f64],
+        fleet_dual: f64,
+        branches: &[ArcBranch],
+        branch_duals: &[f64],
+        phase_one: bool,
+        neighborhood: usize,
+        options: PricingOptions,
+        complete_first: bool,
+        parts: usize,
+    ) -> Result<NgPricingResult> {
+        let Some(split) = self.last_customer_parts(branches, branch_duals, parts) else {
+            return self.price_ng_scheduled(
+                policy,
+                customer_duals,
+                fleet_dual,
+                branches,
+                branch_duals,
+                phase_one,
+                neighborhood,
+                options,
+                complete_first,
+            );
+        };
+        // Scalar NG labels are small, so each part keeps the full budget.
+        let results = split
+            .par_iter()
+            .map(|(part_branches, part_duals)| {
+                self.price_ng_scheduled(
+                    policy,
+                    customer_duals,
+                    fleet_dual,
+                    part_branches,
+                    part_duals,
+                    phase_one,
+                    neighborhood,
+                    options,
+                    complete_first,
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let mut result = NgPricingResult {
+            status: combined_status(results.iter().map(|r| r.status)),
+            routes: vec![],
+            lower_bound: combined_bound(results.iter().map(|r| r.lower_bound)),
+            statistics: Default::default(),
+            refinements: 0,
+            discarded_walks: 0,
+        };
+        for mut part in results {
+            result.statistics.absorb(&part.statistics);
+            result.refinements += part.refinements;
+            result.discarded_walks += part.discarded_walks;
+            result.routes.append(&mut part.routes);
+        }
+        result
+            .routes
+            .sort_by(|a, b| a.reduced_cost.total_cmp(&b.reduced_cost));
+        Ok(result)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -146,8 +214,10 @@ impl Problem {
             solver.controls.max_columns = options.max_columns;
             solver.controls.max_route_arcs = Some(n + 1);
             solver.controls.time_limit = remaining;
-            // One directional sweep keeps the configured single-thread budget.
-            solver.set_option("BALDESuseBidirectionalSearch", 0.)?;
+            solver.set_option(
+                "BALDESuseBidirectionalSearch",
+                if options.ng_bidirectional { 1. } else { 0. },
+            )?;
             let priced = match solver.price_phase_partial(0, options.max_columns, false) {
                 Ok(p) => p,
                 Err(e) if e.message.contains("time limit") => {
@@ -159,12 +229,18 @@ impl Problem {
             };
             labels_left = labels_left.saturating_sub(priced.statistics.generated.max(1));
             result.statistics.absorb(&priced.statistics);
-            if priced.exact && !priced.columns.is_empty() {
-                let minimum = priced.minimum_reduced_cost;
+            if priced.exact {
+                // An exact pass that returns no column has no walk below zero.
+                let minimum = if priced.columns.is_empty() {
+                    priced.minimum_reduced_cost.min(0.)
+                } else {
+                    priced.minimum_reduced_cost
+                };
                 let bound = minimum - 1e-8 * (1. + minimum.abs());
                 result.lower_bound = Some(result.lower_bound.map_or(bound, |b| b.max(bound)));
             }
             let mut tightened = false;
+            let mut found_elementary = false;
             for column in priced.columns {
                 let route: Vec<_> = column
                     .nodes
@@ -189,10 +265,25 @@ impl Problem {
                     }
                     previous[j] = Some(position);
                 }
-                if !elementary {
+                let route = if elementary {
+                    route
+                } else {
+                    // The walk itself is never a column. Its first-visit
+                    // shortcut is elementary and often still improving.
                     result.discarded_walks += 1;
-                    continue;
-                }
+                    let mut seen = vec![false; n + 1];
+                    let shortcut: Vec<_> = route
+                        .into_iter()
+                        .filter(|&j| !std::mem::replace(&mut seen[j], true))
+                        .collect();
+                    if branches
+                        .iter()
+                        .any(|&b| !b.required && route_uses(&shortcut, b))
+                    {
+                        continue;
+                    }
+                    shortcut
+                };
                 let load: f64 = (1..=n)
                     .filter(|j| route.contains(j))
                     .map(|j| self.demands[j - 1].mean())
@@ -201,8 +292,12 @@ impl Problem {
                     continue;
                 }
                 let evaluation = self.evaluate_route(&route, policy)?;
-                let mut reduced_cost =
-                    if phase_one { 0. } else { evaluation.total_cost } - fleet_dual;
+                let cost = if options.relaxed_route_costs {
+                    self.relaxed_route_cost(&route)
+                } else {
+                    evaluation.total_cost
+                };
+                let mut reduced_cost = if phase_one { 0. } else { cost } - fleet_dual;
                 for &j in &route {
                     reduced_cost -= customer_duals[j - 1];
                 }
@@ -214,6 +309,7 @@ impl Problem {
                 if !reduced_cost.is_finite() {
                     return Err(invalid("NG recourse replay overflow"));
                 }
+                found_elementary |= elementary && reduced_cost < -1e-7;
                 if reduced_cost < -1e-7 && orders.insert(route.clone()) {
                     result.routes.push(PricedRoute {
                         customers: route,
@@ -229,7 +325,11 @@ impl Problem {
             } else {
                 PricingStatus::WorkLimit
             };
-            if !result.routes.is_empty() {
+            // In the complete stage, columns repaired from cyclic walks do not
+            // stop refinement: refined memories still tighten the bound.
+            let refining =
+                heuristic_stage.is_none() && priced.exact && tightened && !found_elementary;
+            if !result.routes.is_empty() && !refining {
                 if heuristic_stage.is_some() && result.status != PricingStatus::TimeLimit {
                     result.status = PricingStatus::Heuristic;
                 }

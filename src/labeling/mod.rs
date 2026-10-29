@@ -186,6 +186,7 @@ pub struct Statistics {
     pub generated: usize,
     pub expanded: usize,
     pub dominated: usize,
+    pub completion_pruned: usize,
     pub dominance_checks: usize,
     pub other_dominance_checks: usize,
     pub other_bucket_searches: usize,
@@ -207,6 +208,7 @@ impl Statistics {
             generated,
             expanded,
             dominated,
+            completion_pruned,
             dominance_checks,
             other_dominance_checks,
             other_bucket_searches,
@@ -224,6 +226,7 @@ impl Statistics {
         self.generated += generated;
         self.expanded += expanded;
         self.dominated += dominated;
+        self.completion_pruned += completion_pruned;
         self.dominance_checks += dominance_checks;
         self.other_dominance_checks += other_dominance_checks;
         self.other_bucket_searches += other_bucket_searches;
@@ -238,6 +241,8 @@ impl Statistics {
 #[derive(Debug)]
 pub struct PricingResult {
     pub columns: Vec<Route>,
+    /// Minimum reduced cost, or a conservative lower bound capped at the
+    /// configured load-completion threshold when routes were pruned.
     pub minimum_reduced_cost: f64,
     pub exact: bool,
     pub statistics: Statistics,

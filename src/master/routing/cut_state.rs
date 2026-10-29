@@ -87,6 +87,14 @@ impl CutState {
             }
             entries
         };
+        for (cut, row) in self.theta_cuts.iter().zip(&self.theta_rows) {
+            if let Some(row) = row {
+                let coefficient = cut.coefficient(route);
+                if coefficient != 0. {
+                    entries.push((*row, coefficient));
+                }
+            }
+        }
         for (cut, row) in solver.cuts.knapsack_cuts.iter().zip(&self.knapsack_rows) {
             if let Some(row) = row {
                 let coefficient = solver.knapsack_coefficient(cut, &route.resources);
