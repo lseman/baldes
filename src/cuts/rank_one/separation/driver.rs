@@ -131,7 +131,7 @@ impl Separation {
         self.current_max_rank = input.separation_phase;
         self.cut_memory_type = input.cut_memory_type;
         if self.cut_memory_type == 1 {
-            self.active_cuts = input.active_cuts.clone();
+            self.active_cuts.clone_from(&input.active_cuts);
         }
         let mut columns = vec![];
         for (sol, &raw) in input.solutions.iter().zip(&input.values) {

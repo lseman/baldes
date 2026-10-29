@@ -400,10 +400,11 @@ impl ProximalState {
     }
 
     pub fn snapshot(&self) -> Option<ProximalSnapshot> {
+        let phase = self.phase?;
         Some(ProximalSnapshot {
             center: self.center.clone(),
             bound: self.bound,
-            phase: self.phase?,
+            phase,
             curvature: self.curvature,
             configuration: self.configuration.clone(),
             explicit_bands: self.explicit_bands.clone(),
@@ -594,7 +595,8 @@ impl ProximalState {
         // Serious steps require a completed pricing pass. An auxiliary LP
         // objective is never a bound for the original column universe.
         if exact && bound.is_finite() && bound > self.bound {
-            self.center = dual.to_vec();
+            self.center.clear();
+            self.center.extend_from_slice(dual);
             self.bound = bound;
             if self.max_points > 0 {
                 for sample in &mut self.samples {

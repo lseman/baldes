@@ -59,7 +59,8 @@ impl KPathPreparation {
         }
         self.capacity = capacity;
         self.two_path_resource = two_path_resource;
-        self.demands = demands.to_vec();
+        self.demands.clear();
+        self.demands.extend_from_slice(demands);
         self.num_customers = demands.len();
         for input in graphs {
             let g = &input.graph;

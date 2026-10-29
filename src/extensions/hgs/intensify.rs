@@ -178,29 +178,32 @@ fn select_routes(
     rng: &mut Xoroshiro128Plus,
     excluded: &BTreeSet<usize>,
 ) -> Vec<usize> {
-    let eligible: Vec<_> = (0..plan.routes.len())
+    let mut eligible: Vec<_> = (0..plan.routes.len())
         .filter(|&i| !excluded.contains(&i) && plan.routes[i].len() <= options.max_customers)
         .collect();
     if eligible.is_empty() {
         return Vec::new();
     }
-    let anchor = eligible[rng.next() as usize % eligible.len()];
+    let anchor_index = rng.next() as usize % eligible.len();
+    let anchor = eligible.remove(anchor_index);
     let route = &plan.routes[anchor];
-    let mut neighbors: Vec<_> = eligible.into_iter().filter(|&i| i != anchor).collect();
+    let mut neighbors = eligible;
     if round % 5 == 4 {
         rng.shuffle(&mut neighbors);
     } else {
+        let center = |r: &[usize]| {
+            let (x, y) = r.iter().fold((0.0, 0.0), |(x, y), &c| {
+                (x + instance.customers[c].x, y + instance.customers[c].y)
+            });
+            (x / r.len() as f64, y / r.len() as f64)
+        };
+        let anchor_center = options.barycenter.then(|| center(route));
         let mut ranked: Vec<_> = neighbors
-            .into_iter()
+            .iter()
+            .copied()
             .map(|i| {
                 let distance = if options.barycenter {
-                    let center = |r: &[usize]| {
-                        let (x, y) = r.iter().fold((0.0, 0.0), |(x, y), &c| {
-                            (x + instance.customers[c].x, y + instance.customers[c].y)
-                        });
-                        (x / r.len() as f64, y / r.len() as f64)
-                    };
-                    let (ax, ay) = center(route);
+                    let (ax, ay) = anchor_center.unwrap();
                     let (bx, by) = center(&plan.routes[i]);
                     (ax - bx).hypot(ay - by)
                 } else {
@@ -223,7 +226,8 @@ fn select_routes(
             })
             .collect();
         ranked.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
-        neighbors = ranked.into_iter().map(|(i, _)| i).collect();
+        neighbors.clear();
+        neighbors.extend(ranked.into_iter().map(|(i, _)| i));
     }
     let count = (2 + stall / 5).min(options.max_routes);
     let mut selected = vec![anchor];

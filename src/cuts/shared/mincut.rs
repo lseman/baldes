@@ -65,10 +65,15 @@ impl MinCutDigraph {
         self.capacity[tail as usize][head as usize] = value;
     }
     fn initialize(&mut self) {
-        self.residual = self.capacity.clone();
+        self.residual.clone_from(&self.capacity);
         let n = self.capacity.len();
-        self.excess = vec![0.; n];
-        self.flow = vec![vec![0.; n]; n];
+        self.excess.resize(n, 0.);
+        self.excess.fill(0.);
+        self.flow.resize_with(n, Vec::new);
+        for row in &mut self.flow {
+            row.resize(n, 0.);
+            row.fill(0.);
+        }
         self.source_side.clear();
         self.in_source_side.clear();
         self.source_side.push(self.source);
