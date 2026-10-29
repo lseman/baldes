@@ -13,6 +13,14 @@ pub trait Controller<M> {
     fn pricing_complete(&self) -> bool {
         true
     }
+    /// The last pricing batch supplies columns only and cannot justify a bound.
+    fn pricing_columns_only(&self) -> bool {
+        false
+    }
+    /// Request an exact retry after a columns-only batch failed to improve the master.
+    fn retry_exact_pricing(&mut self) -> bool {
+        false
+    }
     /// Optional original-model cap, restored whenever this column is loaded.
     /// The controller must justify the cap for every omitted/future column
     /// with the same tag. Numerical/certified bounds must account for it.

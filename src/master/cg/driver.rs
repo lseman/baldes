@@ -600,8 +600,10 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                 // Preserve duplicates produced within one oracle batch, as
                 // with restricted-master insertion below.
                 pool_seen.extend(created);
-                answer.exact =
-                    controller.pricing_complete() && (answer.exact || schedule[stage].exact());
+                let columns_only = controller.pricing_columns_only();
+                answer.exact = !columns_only
+                    && controller.pricing_complete()
+                    && (answer.exact || schedule[stage].exact());
                 out.pricing_calls += 1;
                 fresh = answer
                     .columns
@@ -613,23 +615,37 @@ fn optimize_inner<M: LpMaster, P: FnMut(usize, &[f64]) -> Result<Answer>, C: Con
                             && !seen.contains(*identity)
                     })
                     .count();
+                if columns_only && fresh == 0 {
+                    if controller.retry_exact_pricing() {
+                        continue;
+                    }
+                    return Err(crate::incomplete(
+                        "columns-only pricing requires exact retry",
+                    ));
+                }
                 minimum = answer
                     .columns
                     .iter()
                     .filter(|c| c.acceptable)
                     .fold(answer.minimum, |best, c| best.min(c.reduced_cost));
                 let corrected = answer.bound_minimum.unwrap_or(minimum);
-                pass_bound = controller
-                    .pricing_bound(master, &current)?
-                    .unwrap_or_else(|| {
-                        lagrangian(master, &current, corrected, options.multiplicity)
-                    });
+                pass_bound = if columns_only {
+                    f64::NEG_INFINITY
+                } else {
+                    controller
+                        .pricing_bound(master, &current)?
+                        .unwrap_or_else(|| {
+                            lagrangian(master, &current, corrected, options.multiplicity)
+                        })
+                };
                 if !pass_bound.is_finite() && pass_bound != f64::NEG_INFINITY {
                     return Err(invalid("invalid pricing lower bound"));
                 }
-                let slack = stage_bound.abs().max(pass_bound.abs()) * 1e-10 + 1e-6;
-                if !(stage_bound - slack > pass_bound) {
-                    stage_bound = pass_bound;
+                if !columns_only {
+                    let slack = stage_bound.abs().max(pass_bound.abs()) * 1e-10 + 1e-6;
+                    if !(stage_bound - slack > pass_bound) {
+                        stage_bound = pass_bound;
+                    }
                 }
                 if answer.exact {
                     pricing_estimate = pricing_estimate.max(pass_bound);

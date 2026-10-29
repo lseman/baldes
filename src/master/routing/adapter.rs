@@ -4,6 +4,9 @@ use crate::master::pricing::{
     Additive, Collected, Context, Envelopes, NetworkPricingSchedule, Networks, Request, Scheduler,
 };
 
+// Refresh an exact pricing bound periodically while using discovery passes.
+const EXACT_BOUND_REFRESH_INTERVAL: usize = 16;
+
 pub(super) struct RootPricing {
     scheduler: Scheduler,
     pub master: Option<(f64, f64)>,
@@ -15,6 +18,8 @@ pub(super) struct RootPricing {
     pub attempts: usize,
     pub oracle_calls: usize,
     pub node_depth: usize,
+    pub columns_only: bool,
+    pub force_exact: bool,
     multiplicity: f64,
 }
 impl Default for RootPricing {
@@ -35,6 +40,8 @@ impl RootPricing {
             attempts: 0,
             oracle_calls: 0,
             node_depth: options.node_depth,
+            columns_only: false,
+            force_exact: false,
             multiplicity: options.multiplicity,
         }
     }
@@ -102,12 +109,75 @@ impl<const D: usize> State<D> {
         self.pricing.attempts += 1;
         self.pricing.correction = None;
         self.pricing.gradient = None;
+        self.pricing.columns_only = false;
+        let force_exact = std::mem::take(&mut self.pricing.force_exact);
+        let solver_phase = phase + floor;
+        let mut pricing_deadline = self.deadline;
+        if !force_exact
+            && self.pricing.attempts % EXACT_BOUND_REFRESH_INTERVAL != 0
+            && self
+                .solver
+                .phases
+                .get(solver_phase)
+                .is_some_and(|p| p.exact())
+            && !self.solver.cuts.cuts.is_empty()
+            && !self
+                .solver
+                .enumeration
+                .as_ref()
+                .is_some_and(|e| e.completed)
+        {
+            let mut adapter = RoutingAdapter {
+                state: self,
+                problem,
+                floor,
+            };
+            // Candidate generation needs only the current cached objective.
+            // The full raw arc vector is built if exact pricing is needed.
+            let offset = adapter.state.reprice(problem, duals)?;
+            let remaining = adapter
+                .state
+                .deadline
+                .map_or(std::time::Duration::MAX, |end| {
+                    end.saturating_duration_since(std::time::Instant::now())
+                });
+            if remaining.is_zero() {
+                return Err(crate::incomplete("network pricing time limit"));
+            }
+            let solver = adapter.enter(0);
+            let saved_limit = solver.controls.time_limit;
+            if let Some(end) = started.checked_add(saved_limit) {
+                pricing_deadline = Some(pricing_deadline.map_or(end, |old| old.min(end)));
+            }
+            let remaining = pricing_deadline.map_or(remaining, |end| {
+                remaining.min(end.saturating_duration_since(std::time::Instant::now()))
+            });
+            if remaining.is_zero() {
+                return Err(crate::incomplete("network pricing time limit"));
+            }
+            solver.controls.time_limit = remaining;
+            let result = solver.price_phase(solver_phase, solver.controls.max_columns, false);
+            solver.controls.time_limit = saved_limit;
+            let result = result?;
+            let minimum = result.minimum_reduced_cost + offset;
+            let collected = adapter.collect(0, result.columns, offset, duals)?;
+            if collected.fresh > 0 {
+                adapter.state.pricing.columns_only = true;
+                adapter.state.pricing_seconds += started.elapsed().as_secs_f64();
+                return Ok(Answer {
+                    columns: collected.columns,
+                    minimum,
+                    exact: false,
+                    bound_minimum: None,
+                });
+            }
+        }
         let rhs = self.pricing.rhs.clone();
         let context = Context {
             phase,
             duals,
             rhs: &rhs,
-            deadline: self.deadline,
+            deadline: pricing_deadline,
             admission: self.pricing.admission,
             master: self.pricing.master,
             gap: self.pricing.gap,

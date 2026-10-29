@@ -271,3 +271,105 @@ fn disabled_stabilization_does_not_request_or_allocate_an_unused_subgradient() {
     .unwrap();
     assert_eq!(out.status, Status::Optimal);
 }
+
+#[test]
+fn columns_only_batch_without_improvement_retries_exact_before_closure() {
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    struct Retry(Rc<Cell<bool>>);
+    impl Controller<ClpMaster> for Retry {
+        fn pricing_columns_only(&self) -> bool {
+            !self.0.get()
+        }
+        fn retry_exact_pricing(&mut self) -> bool {
+            self.0.set(true);
+            true
+        }
+    }
+    let retried = Rc::new(Cell::new(false));
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::GreaterEqual, 1., &[]).unwrap();
+    master.add_column(1., &[(0, 1.)]).unwrap();
+    let options = Options {
+        stabilize: false,
+        known: vec![column(1., 0, "initial")],
+        ..Default::default()
+    };
+    let flag = retried.clone();
+    let out = optimize(
+        &mut master,
+        &exact(),
+        move |_, _| {
+            Ok(Answer {
+                columns: vec![],
+                minimum: 0.,
+                exact: flag.get(),
+                bound_minimum: None,
+            })
+        },
+        &mut Retry(retried.clone()),
+        options,
+    )
+    .unwrap();
+    assert!(retried.get());
+    assert_eq!(out.status, Status::Optimal);
+    assert_eq!(out.lp, 1.);
+}
+
+#[test]
+fn columns_only_improvement_cannot_publish_approximate_bound() {
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    struct Discovery(Rc<Cell<usize>>);
+    impl Controller<ClpMaster> for Discovery {
+        fn pricing_columns_only(&self) -> bool {
+            self.0.get() == 1
+        }
+        fn pricing_bound(&self, _: &ClpMaster, _: &[f64]) -> Result<Option<f64>> {
+            Ok((self.0.get() == 1).then_some(1_000.))
+        }
+    }
+    let calls = Rc::new(Cell::new(0));
+    let mut master = ClpMaster::new().unwrap();
+    master.add_row(RowSense::GreaterEqual, 1., &[]).unwrap();
+    master.add_column(1., &[(0, 1.)]).unwrap();
+    let options = Options {
+        stabilize: false,
+        known: vec![column(1., 0, "initial")],
+        ..Default::default()
+    };
+    let counter = calls.clone();
+    let out = optimize(
+        &mut master,
+        &exact(),
+        move |_, duals| {
+            counter.set(counter.get() + 1);
+            if counter.get() == 1 {
+                let mut improving = column(0., 1, "improving");
+                improving.reduced_cost = -duals[0];
+                Ok(Answer {
+                    columns: vec![improving],
+                    minimum: 1_000.,
+                    exact: true,
+                    bound_minimum: Some(1_000.),
+                })
+            } else {
+                Ok(Answer {
+                    columns: vec![],
+                    minimum: 0.,
+                    exact: true,
+                    bound_minimum: None,
+                })
+            }
+        },
+        &mut Discovery(calls.clone()),
+        options,
+    )
+    .unwrap();
+    assert!(calls.get() >= 2);
+    assert_eq!(out.status, Status::Optimal);
+    assert_eq!(out.lp, 0.);
+    assert!(out.numerical_bound <= 0.);
+}

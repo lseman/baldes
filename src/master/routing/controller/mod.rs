@@ -139,6 +139,13 @@ impl<const D: usize> Controller<ClpMaster> for RootController<D> {
     fn pricing_complete(&self) -> bool {
         self.state.borrow().pricing.complete()
     }
+    fn pricing_columns_only(&self) -> bool {
+        self.state.borrow().pricing.columns_only
+    }
+    fn retry_exact_pricing(&mut self) -> bool {
+        self.state.borrow_mut().pricing.force_exact = true;
+        true
+    }
     fn pricing_bound(&self, master: &ClpMaster, duals: &[f64]) -> Result<Option<f64>> {
         let state = self.state.borrow();
         Ok(Some(state.pricing.correction.map_or(
