@@ -5,6 +5,10 @@ use crate::{invalid, Result};
 use std::collections::BTreeSet;
 use std::time::Instant;
 
+#[cfg(test)]
+#[path = "../../../tests/unit/extensions/stochastic/ng_proof_sweep.rs"]
+mod proof_sweep_tests;
+
 #[derive(Clone, Debug)]
 pub struct NgPricingResult {
     /// Complete means the final scalar NG relaxation was completely priced.
@@ -36,6 +40,32 @@ impl Problem {
         phase_one: bool,
         neighborhood: usize,
         options: PricingOptions,
+    ) -> Result<NgPricingResult> {
+        self.price_ng_scheduled(
+            policy,
+            customer_duals,
+            fleet_dual,
+            branches,
+            branch_duals,
+            phase_one,
+            neighborhood,
+            options,
+            false,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn price_ng_scheduled(
+        &self,
+        policy: Policy,
+        customer_duals: &[f64],
+        fleet_dual: f64,
+        branches: &[ArcBranch],
+        branch_duals: &[f64],
+        phase_one: bool,
+        neighborhood: usize,
+        options: PricingOptions,
+        complete_first: bool,
     ) -> Result<NgPricingResult> {
         if neighborhood == 0 {
             return Err(invalid("NG neighborhood must be positive"));
@@ -96,7 +126,7 @@ impl Problem {
         // Mirror the default CVRP/VRPTW staged pricer: try a jump-arc NG
         // phase first, then progressively relax bucket truncation. These
         // phases only generate candidate columns; they never certify bounds.
-        let mut heuristic_stage = (n > 9).then_some(0usize);
+        let mut heuristic_stage = (n > 9 && !complete_first).then_some(0usize);
         while labels_left > 0 && options.max_columns > 0 && n > 0 {
             let remaining = options.time_limit.saturating_sub(started.elapsed());
             if remaining.is_zero() {

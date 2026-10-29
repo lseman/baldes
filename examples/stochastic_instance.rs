@@ -1,5 +1,5 @@
 //! Load synthetic paper-style JSON; validate by default, solve only with --solve.
-use baldes::extensions::stochastic::{Demand, Policy, Problem, SolveOptions};
+use baldes::extensions::stochastic::{Demand, HgsWarmStart, Policy, Problem, SolveOptions};
 use serde::Deserialize;
 use std::{
     error::Error,
@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let total_started = Instant::now();
     let mut args = std::env::args().skip(1);
     let path = args.next().ok_or(
-        "usage: stochastic_instance INSTANCE.json [--solve] [--seconds N] [--policy p1|p3] [--json] [--max-labels N] [--bidirectional] [--ng-size N]",
+        "usage: stochastic_instance INSTANCE.json [--solve] [--seconds N] [--policy p1|p3] [--json] [--max-labels N] [--bidirectional] [--ng-size N] [--hgs-seconds N] [--hgs-seed N]",
     )?;
     let mut bidirectional = false;
     let mut solve = false;
@@ -42,6 +42,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut ng_size = 8;
     let mut max_labels = 1_000_000;
     let mut seconds = 30.0_f64;
+    let mut hgs_seconds = None;
+    let mut hgs_seed = 0;
     let mut policy = Policy::OptimalRestocking;
     while let Some(option) = args.next() {
         match option.as_str() {
@@ -51,6 +53,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             "--ng-size" => ng_size = args.next().ok_or("missing NG size")?.parse()?,
             "--max-labels" => max_labels = args.next().ok_or("missing max labels")?.parse()?,
             "--seconds" => seconds = args.next().ok_or("missing seconds")?.parse()?,
+            "--hgs-seconds" => {
+                hgs_seconds = Some(args.next().ok_or("missing HGS seconds")?.parse::<f64>()?)
+            }
+            "--hgs-seed" => hgs_seed = args.next().ok_or("missing HGS seed")?.parse()?,
             "--policy" => {
                 policy = match args.next().as_deref() {
                     Some("p1") => Policy::Classical,
@@ -62,6 +68,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     let time_limit = Duration::try_from_secs_f64(seconds)?;
+    let hgs_warm_start = hgs_seconds
+        .map(|seconds| -> Result<_, Box<dyn Error>> {
+            let time_limit = Duration::try_from_secs_f64(seconds)?;
+            if time_limit.is_zero() {
+                return Err("HGS seconds must be positive".into());
+            }
+            Ok(HgsWarmStart {
+                time_limit,
+                seed: hgs_seed,
+            })
+        })
+        .transpose()?;
     let input: Input = serde_json::from_slice(&std::fs::read(path)?)?;
     if input.schema != "baldes.stochastic.generated.v1"
         || input.provenance.original_benchmark_instance
@@ -101,6 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         options.column_generation.ng_size = ng_size;
         options.column_generation.pricing.max_labels = max_labels;
         options.column_generation.pricing.bidirectional = bidirectional;
+        options.hgs_warm_start = hgs_warm_start;
         let solve_started = Instant::now();
         let answer = problem
             .solve(policy, input.vehicles, options)
@@ -124,6 +143,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "generated_labels": answer.generated_labels, "max_labels": max_labels,
                     "bidirectional": bidirectional, "ng_size": ng_size,
                     "ng_memory_capacity": baldes::graph::ng::NG_MEMORY_CAPACITY,
+                    "hgs_warm_start": answer.hgs_warm_start.map(|s| serde_json::json!({
+                        "accepted_columns": s.accepted_columns, "rejected_columns": s.rejected_columns,
+                        "accepted_plan": s.accepted_plan, "elapsed_seconds": s.elapsed_seconds,
+                    })),
                     "time_limit_seconds": seconds, "build_seconds": build_seconds,
                     "solve_seconds": solve_seconds, "total_seconds": total_started.elapsed().as_secs_f64(),
                 })

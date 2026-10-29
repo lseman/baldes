@@ -14,12 +14,14 @@ mod ng;
 mod pricing;
 pub use ng::NgPricingResult;
 mod tree;
+mod warm_start;
 pub use master::{
     Column, ColumnGenerationOptions, ColumnGenerationResult, ColumnGenerationStatus, Master,
     MasterPhase, MasterSnapshot,
 };
 pub use pricing::{ArcBranch, PricedRoute, PricingOptions, PricingResult, PricingStatus};
 pub use tree::{Solution, SolveOptions, SolveResult, SolveStatus};
+pub use warm_start::{HgsWarmStart, HgsWarmStartSummary};
 mod tiny;
 pub use tiny::{ExactSolution, TinyOptions};
 

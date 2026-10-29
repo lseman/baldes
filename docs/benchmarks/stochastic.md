@@ -84,6 +84,9 @@ Column generation defaults to NG prepricing with eight-customer memories;
 with true stochastic recourse; cyclic walks are excluded from incumbents.
 The reverse Bellman-vector fallback can be compared with the original
 adapter using `stochastic_instance ... --bidirectional`.
+Pass `--hgs-seconds 3 --hgs-seed 0` to the paired runner to enable the
+mean-demand HGS warm start for BALDES. Its budget is included in BALDES's
+solve limit and the report records the option and route-validation counts.
 
 The runner marks comparable completed solves only if BOTH statuses are Optimal,
 and then checks objective agreement. An Error, timeout, work limit or absence

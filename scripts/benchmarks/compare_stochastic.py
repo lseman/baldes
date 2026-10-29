@@ -57,12 +57,16 @@ def main() -> None:
                         help="NG prepricing neighborhood; 0 disables (default: 8)")
     parser.add_argument("--max-labels", type=int, default=1_000_000,
                         help="stored-label limit per BALDES pricing call (default: 1000000)")
+    parser.add_argument("--hgs-seconds", type=float, help="optional BALDES mean-demand HGS budget, included in --seconds")
+    parser.add_argument("--hgs-seed", type=int, default=0)
     parser.add_argument("--build-description", default="user-supplied binary; build flags not independently verified")
     args = parser.parse_args()
     if not math.isfinite(args.seconds) or args.seconds <= 0 or min(args.threads, args.repetitions, args.max_labels) < 1:
         parser.error("need positive finite seconds and positive threads/repetitions/max-labels")
     if args.ng_size < 0:
         parser.error("NG size must be nonnegative")
+    if args.hgs_seconds is not None and (not math.isfinite(args.hgs_seconds) or args.hgs_seconds <= 0):
+        parser.error("HGS seconds must be positive and finite")
     binary = args.baldes_bin.resolve(strict=True)
     if args.output.exists() and any(args.output.iterdir()):
         parser.error("output directory must be new or empty")
@@ -76,11 +80,12 @@ def main() -> None:
     metadata = {"policy": args.policy, "time_limit_seconds": args.seconds, "threads": args.threads,
                 "repetitions": args.repetitions, "max_labels_per_pricing_call": args.max_labels,
                 "ng_size": args.ng_size,
+                "hgs_seconds": args.hgs_seconds, "hgs_seed": args.hgs_seed,
                 "baldes_binary_sha256": digest(binary), "branch_cut_script_sha256": digest(script),
                 "python": sys.version, "build_description": args.build_description, "inputs": hashes,
                 "comparison_scope": "new synthetic cases; directed Python BC-Theta with non-CVRPSEP fractional separation",
                 "budget_scope": "Gurobi TimeLimit covers optimize only; BALDES limit covers node construction and solves. Report process wall/build/solve times separately.",
-                "warm_start_scope": "no external starts; BALDES internally seeds singleton columns and bounded greedy starts"}
+                "warm_start_scope": "BALDES singleton/greedy starts and optional mean-demand HGS; no external starts"}
     (args.output / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
     all_results = []
     for index, path in enumerate(inputs):
@@ -93,6 +98,8 @@ def main() -> None:
                 "baldes": [str(binary), str(path), "--solve", "--json", "--policy", args.policy,
                            "--seconds", str(args.seconds), "--max-labels", str(args.max_labels),
                            "--ng-size", str(args.ng_size)]}
+            if args.hgs_seconds is not None:
+                commands["baldes"] += ["--hgs-seconds", str(args.hgs_seconds), "--hgs-seed", str(args.hgs_seed)]
             record = {"input": str(path), "input_sha256": hashes[str(path)], "repetition": repetition,
                       "policy": args.policy, "results": {}}
             order = ["gurobi", "baldes"] if (index + repetition) % 2 == 0 else ["baldes", "gurobi"]

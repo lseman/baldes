@@ -61,13 +61,23 @@ forward resource replay enforces the expected-demand capacity condition.
 Cost magnitudes are checked against BALDES's route-pool sentinel; unusually
 large units must be rescaled.
 
-Column generation now starts with scalar NG-route prepricing when the customer
+Column generation starts with scalar NG-route prepricing when the customer
 count exceeds `ColumnGenerationOptions::ng_size` (default 8; zero disables it).
+For configured sizes above four, it first tries a four-customer neighborhood.
+If that stage neither finds a new improving route nor proves convergence, it
+tries the configured size, then falls back to stochastic Bellman pricing.
+Completed lower bounds are retained across stages; interrupted stages cannot
+certify convergence by themselves.
 `Problem::price_ng` builds nearest-customer memories in the ordinary BALDES
 engine. Its first sweep retains 16 labels per bucket to find columns quickly;
-this heuristic sweep supplies **no lower bound**. A complete scalar sweep can
-supply a bound, with the default master allocating at most 100,000 labels and
-two seconds to the NG stage before falling back to stochastic Bellman pricing.
+these heuristic sweeps supply **no lower bound**. A complete scalar sweep can
+supply a bound. The master allocates at most 100,000 labels and two seconds per
+NG neighborhood, subject to the remaining pricing and solve time budgets.
+During the expected-cost phase, every eighth master iteration also starts each
+NG neighborhood with a complete scalar sweep, bypassing the bounded heuristic
+sweeps. This gives bound-producing pricing a chance even when earlier
+iterations keep finding improving columns. The same label and time limits
+apply; an interrupted sweep cannot certify convergence.
 
 The scalar objective charges travel plus each visited customer's minimum
 nonpositive preventive detour. Bellman recourse is bounded below by the sum of
@@ -106,6 +116,26 @@ only an integer restricted route pool is not used to establish optimality.
 ```rust,ignore
 use baldes::extensions::stochastic::{Policy, SolveOptions};
 let answer = problem.solve(Policy::OptimalRestocking, 3, SolveOptions::default())?;
+```
+
+An optional HGS warm start searches a deterministic CVRP with the same cost
+matrix and mean customer demands. HGS uses integer loads, so means are scaled
+and rounded down for the heuristic. Every candidate route is independently
+checked for elementarity and the original expected-capacity constraint, then
+evaluated with the selected stochastic recourse policy before entering the
+column pool. A complete HGS plan becomes an incumbent only if it covers each
+customer once, respects the fleet limit, and all its routes pass validation.
+HGS candidates do not establish bounds or optimality. Its time budget is part
+of the overall solve time; initialization can overrun the requested limit.
+
+Set `SolveOptions::hgs_warm_start` to `Some(HgsWarmStart { time_limit, seed })`.
+The result's `hgs_warm_start` summary reports accepted and rejected candidate
+counts and whether the HGS plan passed validation. For generated instances:
+
+```sh
+cargo run --release --features clp,ng-memory-63 --example stochastic_instance -- \
+  instances/stochastic/generated_salavati_style/synthetic-n20-m2-r01-fr0.90.json \
+  --solve --seconds 30 --hgs-seconds 3 --hgs-seed 0 --json
 ```
 
 Run the complete example:

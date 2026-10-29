@@ -9,6 +9,33 @@ use std::time::{Duration, Instant};
 /// Adaptive pricing retries may grow the per-call label cap, but remain bounded
 /// independently of the caller's wall-clock limit.
 const MAX_ADAPTIVE_PRICING_LABELS: usize = 16_000_000;
+// Periodically spend the NG budget on a complete scalar relaxation, even
+// when heuristic sweeps repeatedly find new columns. Only complete pricing
+// can turn this attempt into a bound.
+const NG_PROOF_SWEEP_INTERVAL: usize = 8;
+
+// Each completed scalar relaxation bounds the same elementary pricing problem.
+// An interrupted later stage cannot invalidate an earlier complete bound.
+fn merge_ng_results(aggregate: &mut super::NgPricingResult, mut stage: super::NgPricingResult) {
+    if let Some(bound) = stage.lower_bound {
+        aggregate.lower_bound = Some(aggregate.lower_bound.map_or(bound, |old| old.max(bound)));
+    }
+    aggregate.statistics.absorb(&stage.statistics);
+    aggregate.refinements = aggregate.refinements.saturating_add(stage.refinements);
+    aggregate.discarded_walks = aggregate
+        .discarded_walks
+        .saturating_add(stage.discarded_walks);
+    aggregate.routes.append(&mut stage.routes);
+    aggregate
+        .routes
+        .sort_by(|a, b| a.reduced_cost.total_cmp(&b.reduced_cost));
+    aggregate.routes.dedup_by(|a, b| a.customers == b.customers);
+    aggregate.status = stage.status;
+}
+
+#[cfg(test)]
+#[path = "../../../tests/unit/extensions/stochastic/ng_schedule.rs"]
+mod ng_schedule_tests;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MasterPhase {
@@ -29,7 +56,8 @@ pub enum ColumnGenerationStatus {
 #[derive(Clone, Copy, Debug)]
 pub struct ColumnGenerationOptions {
     pub pricing: PricingOptions,
-    /// Nearest-customer NG neighborhood for scalar prepricing; zero disables.
+    /// Maximum nearest-customer NG neighborhood for scalar prepricing; zero disables.
+    /// Sizes above four first try a four-customer neighborhood.
     /// Returned columns always receive full stochastic recourse replay.
     pub ng_size: usize,
     pub max_iterations: usize,
@@ -375,32 +403,61 @@ impl<M: LpMaster> Master<M> {
                 .min(options.time_limit.saturating_sub(started.elapsed()));
             let pricing_deadline = pricing_options.time_limit;
             let pricing_started = Instant::now();
-            let relaxed = if options.ng_size > 0 && self.problem.demands.len() > options.ng_size {
-                let mut ng_options = pricing_options;
-                ng_options.max_labels = ng_options.max_labels.min(100_000);
-                ng_options.time_limit = ng_options.time_limit.min(Duration::from_secs(2));
-                result.pricing_calls += 1;
-                Some(self.problem.price_ng(
-                    self.policy,
-                    &duals,
-                    fleet_dual,
-                    &self.branches,
-                    &branch_duals,
-                    self.phase == MasterPhase::Feasibility,
-                    options.ng_size,
-                    ng_options,
-                )?)
-            } else {
-                None
-            };
+            let mut relaxed: Option<super::NgPricingResult> = None;
+            if options.ng_size > 0 && self.problem.demands.len() > options.ng_size {
+                let initial = options.ng_size.min(4);
+                let neighborhoods = [
+                    Some(initial),
+                    (initial != options.ng_size).then_some(options.ng_size),
+                ];
+                for neighborhood in neighborhoods.into_iter().flatten() {
+                    let remaining = pricing_deadline.saturating_sub(pricing_started.elapsed());
+                    if remaining.is_zero() {
+                        break;
+                    }
+                    let mut ng_options = pricing_options;
+                    ng_options.max_labels = ng_options.max_labels.min(100_000);
+                    ng_options.time_limit = remaining.min(Duration::from_secs(2));
+                    result.pricing_calls += 1;
+                    let stage = self.problem.price_ng_scheduled(
+                        self.policy,
+                        &duals,
+                        fleet_dual,
+                        &self.branches,
+                        &branch_duals,
+                        self.phase == MasterPhase::Feasibility,
+                        neighborhood,
+                        ng_options,
+                        self.phase == MasterPhase::ExpectedCost
+                            && result.iterations % NG_PROOF_SWEEP_INTERVAL == 0,
+                    )?;
+                    if let Some(previous) = &mut relaxed {
+                        merge_ng_results(previous, stage);
+                    } else {
+                        relaxed = Some(stage);
+                    }
+                    let combined = relaxed.as_ref().expect("NG result present");
+                    let proves = combined
+                        .lower_bound
+                        .is_some_and(|b| b >= -options.reduced_cost_tolerance);
+                    let improves = combined.routes.iter().any(|r| {
+                        r.reduced_cost < -options.reduced_cost_tolerance
+                            && !self.orders.contains_key(&r.customers)
+                    });
+                    if proves || improves {
+                        break;
+                    }
+                }
+            }
             let ng_proves_convergence = relaxed
                 .as_ref()
                 .and_then(|r| r.lower_bound)
                 .is_some_and(|b| b >= -options.reduced_cost_tolerance);
             let ng_improves = relaxed.as_ref().is_some_and(|r| {
-                r.routes
-                    .iter()
-                    .any(|r| r.reduced_cost < -options.reduced_cost_tolerance)
+                r.routes.iter().any(|r| {
+                    r.reduced_cost < -options.reduced_cost_tolerance
+                        && !self.orders.contains_key(&r.customers)
+                })
             });
             let pricing = if ng_proves_convergence || ng_improves {
                 let relaxed = relaxed.expect("NG result present");

@@ -15,6 +15,8 @@ pub struct SolveOptions {
     pub max_nodes: usize,
     pub time_limit: Duration,
     pub integrality_tolerance: f64,
+    /// Optional mean-demand HGS search, charged to the solve time limit.
+    pub hgs_warm_start: Option<super::HgsWarmStart>,
 }
 impl Default for SolveOptions {
     fn default() -> Self {
@@ -23,6 +25,7 @@ impl Default for SolveOptions {
             max_nodes: 10_000,
             time_limit: Duration::from_secs(3600),
             integrality_tolerance: 1e-7,
+            hgs_warm_start: None,
         }
     }
 }
@@ -54,6 +57,8 @@ pub struct SolveResult {
     pub nodes: usize,
     pub pricing_calls: usize,
     pub generated_labels: usize,
+    /// Counts from the optional HGS search and stochastic route validation.
+    pub hgs_warm_start: Option<super::HgsWarmStartSummary>,
 }
 struct Node {
     branches: Vec<ArcBranch>,
@@ -407,6 +412,7 @@ impl Problem {
             nodes: 0,
             pricing_calls: 0,
             generated_labels: 0,
+            hgs_warm_start: None,
         };
         let mut pending = vec![Node {
             branches: vec![],
@@ -418,6 +424,24 @@ impl Problem {
         }
         if let Some(solution) = &result.solution {
             pool.extend(solution.routes.iter().cloned());
+        }
+        if let Some(warm) = options.hgs_warm_start {
+            let remaining = options.time_limit.saturating_sub(started.elapsed());
+            if !remaining.is_zero() && !self.demands.is_empty() && vehicles > 0 {
+                let (columns, solution, summary) =
+                    self.hgs_seed(policy, vehicles, warm, remaining)?;
+                pool.extend(columns);
+                if let Some(solution) = solution {
+                    if result
+                        .solution
+                        .as_ref()
+                        .map_or(true, |s| solution.total_cost < s.total_cost)
+                    {
+                        result.solution = Some(solution);
+                    }
+                }
+                result.hgs_warm_start = Some(summary);
+            }
         }
         let mut closed_lower = f64::INFINITY;
         while !pending.is_empty() {

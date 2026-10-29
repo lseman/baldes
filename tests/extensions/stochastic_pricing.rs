@@ -1,6 +1,86 @@
 use baldes::extensions::stochastic::{
     ArcBranch, Demand, Policy, PricingOptions, PricingStatus, Problem,
 };
+
+#[cfg(feature = "clp")]
+#[test]
+fn hgs_warm_start_replays_routes_and_preserves_a_valid_bound() {
+    use baldes::extensions::stochastic::{HgsWarmStart, SolveOptions};
+    let p = problem();
+    for policy in [Policy::Classical, Policy::OptimalRestocking] {
+        let answer = p
+            .solve(
+                policy,
+                2,
+                SolveOptions {
+                    max_nodes: 0,
+                    hgs_warm_start: Some(HgsWarmStart {
+                        time_limit: Duration::from_millis(30),
+                        seed: 3,
+                    }),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let summary = answer.hgs_warm_start.unwrap();
+        assert!(summary.accepted_columns > 0);
+        let solution = answer.solution.unwrap();
+        let mut covered: Vec<_> = solution.routes.iter().flatten().copied().collect();
+        covered.sort_unstable();
+        assert_eq!(covered, vec![1, 2, 3, 4]);
+        assert!(solution.routes.len() <= 2);
+        let replay: f64 = solution
+            .routes
+            .iter()
+            .map(|r| p.evaluate_route(r, policy).unwrap().total_cost)
+            .sum();
+        close(solution.total_cost, replay);
+        assert!(answer.lower_bound <= replay);
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn adaptive_ng_schedule_matches_tiny_oracle() {
+    use baldes::extensions::stochastic::{
+        ColumnGenerationOptions, SolveOptions, SolveStatus, TinyOptions,
+    };
+    let demands = (0..6)
+        .map(|j| Demand::new(vec![(0, 0.4), (2 + j % 2, 0.6)]).unwrap())
+        .collect();
+    let costs = (0usize..7)
+        .map(|i| (0usize..7).map(|j| i.abs_diff(j) as f64).collect())
+        .collect();
+    let p = Problem::new(5, demands, costs).unwrap();
+    for policy in [Policy::Classical, Policy::OptimalRestocking] {
+        let oracle = p
+            .solve_tiny(
+                policy,
+                TinyOptions {
+                    max_vehicles: 3,
+                    route_budget: 100_000,
+                },
+            )
+            .unwrap()
+            .unwrap();
+        let answer = p
+            .solve(
+                policy,
+                3,
+                SolveOptions {
+                    column_generation: ColumnGenerationOptions {
+                        ng_size: 5,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(answer.status, SolveStatus::Optimal);
+        close(answer.solution.unwrap().total_cost, oracle.total_cost);
+        assert!(answer.lower_bound <= oracle.total_cost + 1e-6);
+    }
+}
 use std::time::Duration;
 
 fn problem() -> Problem {
