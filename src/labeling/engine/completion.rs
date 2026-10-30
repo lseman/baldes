@@ -181,6 +181,7 @@ impl<const D: usize> LabelingEngine<D> {
             threshold,
             scan,
             self.full_ready,
+            false,
             None,
         )
     }
@@ -194,8 +195,16 @@ impl<const D: usize> LabelingEngine<D> {
         threshold: f64,
         scan: bool,
         complete_labels: bool,
+        feasibility_only: bool,
         timer: Option<(Instant, std::time::Duration)>,
     ) -> bool {
+        if threshold.is_nan() {
+            return true;
+        }
+        if feasibility_only && (!complete_labels || !scan) {
+            return true;
+        }
+        let threshold = if feasibility_only { f64::INFINITY } else { threshold };
         // A partial opposite-label store cannot certify that a coupled
         // resource prefix has no completion. This applies to numeric and
         // piecewise states as well as paired fronts.
@@ -248,9 +257,9 @@ impl<const D: usize> LabelingEngine<D> {
                 .knapsack
                 .partial_cost(g, label.resources(), forward);
         let base_key = key;
-        let scan_all_knapsack = self.cuts.knapsack.active
-            && g.coupled_kernel().is_some_and(|kernel| kernel.has_slope_fronts());
-        let key = if scan_all_knapsack {
+        let scan_all = feasibility_only || (self.cuts.knapsack.active
+            && g.coupled_kernel().is_some_and(|kernel| kernel.has_slope_fronts()));
+        let key = if scan_all {
             f64::NEG_INFINITY
         } else {
             self.ctx().resource_completion_key(
@@ -282,7 +291,7 @@ impl<const D: usize> LabelingEngine<D> {
             if !scan {
                 return true;
             }
-            let scan_key = if scan_all_knapsack {
+            let scan_key = if scan_all {
                 self.ctx().bucket_completion_feasible(
                     g, forward, label.coupled_state(), vertex, k,
                 ).then_some(f64::NEG_INFINITY)
@@ -369,17 +378,13 @@ impl<const D: usize> LabelingEngine<D> {
         if self.branching.resources != 0 && label.branch_state.is_none() {
             return true;
         }
-        // Pricing completion bounds use limited-memory states. Negative
-        // full-memory charges or covering join corrections can improve a
-        // continuation beyond those bounds. Until a bound on that improvement
-        // is available, retain the label.
-        if self.cuts.full.as_ref().is_some_and(|full| {
+        // These full-memory charges can improve on pricing's cut bound.
+        // In that case only a complete feasibility scan can reject a prefix.
+        let feasibility_only = self.cuts.full.as_ref().is_some_and(|full| {
             full.fields
                 .iter()
                 .any(|field| field.cost < 0. || field.covering)
-        }) {
-            return true;
-        }
+        });
         let mut ng = 0;
         for (bit, &e) in self.ng.local_elements[label.vertex].iter().enumerate() {
             if label.visited[e / 64] & (1u64 << (e % 64)) != 0 {
@@ -416,6 +421,7 @@ impl<const D: usize> LabelingEngine<D> {
             threshold,
             scan,
             self.full_ready,
+            feasibility_only,
             timer,
         )
     }

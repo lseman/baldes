@@ -216,6 +216,9 @@ impl<const D: usize> LabelingEngine<D> {
     /// a substitute: an unreachable forward cell can still inherit a valid
     /// completion bound from its dominance predecessors.
     pub fn prepare_full_labels(&mut self, g: &Graph<D>, controls: &Controls) -> Result<()> {
+        if let Some(kernel) = g.coupled_kernel() {
+            kernel.validate_for(g)?;
+        }
         if self.load_completion.take().is_some() {
             self.half_ready = false;
             self.full_ready = false;

@@ -559,6 +559,23 @@ impl PathStorage {
         knapsack: &crate::cuts::knapsack::KnapsackPricing,
         presence: &crate::cuts::soft_conflicts::PresencePricing,
     ) -> Result<usize> {
+        self.inspect_with_presence_until(g, cutoff, cuts, kpath, knapsack, presence, None)
+    }
+
+    pub(crate) fn inspect_with_presence_until<const D: usize>(
+        &mut self,
+        g: &Graph<D>,
+        cutoff: f64,
+        cuts: &[LimitedInput],
+        kpath: &[LimitedKPathInput],
+        knapsack: &crate::cuts::knapsack::KnapsackPricing,
+        presence: &crate::cuts::soft_conflicts::PresencePricing,
+        timer: Option<(std::time::Instant, std::time::Duration)>,
+    ) -> Result<usize> {
+        let expired = || timer.is_some_and(|(start, limit)| start.elapsed() > limit);
+        if expired() {
+            return Err(crate::incomplete("enumeration time limit exceeded"));
+        }
         if g.coupled_kernel()
             .is_some_and(|kernel| kernel.has_negative_paired_objectives())
         {
@@ -586,6 +603,9 @@ impl PathStorage {
         let mut costs = Vec::with_capacity(self.len);
         for row in &self.partitions {
             for path in row {
+                if expired() {
+                    return Err(crate::incomplete("enumeration time limit exceeded"));
+                }
                 let mut cost = if let Some(costs) = &paired_costs {
                     *costs.get(&path.arcs).ok_or_else(|| {
                         crate::incomplete("paired front-program inspection path unavailable")
@@ -621,13 +641,16 @@ impl PathStorage {
                     }
                     cost += knapsack.cost(&q);
                 }
-                if paired_costs.is_some() && !cost.is_finite() {
+                if !cost.is_finite() {
                     return Err(crate::incomplete(
-                        "paired front-program inspection cost is nonfinite",
+                        "enumeration inspection cost is nonfinite",
                     ));
                 }
                 costs.push(cost);
             }
+        }
+        if expired() {
+            return Err(crate::incomplete("enumeration time limit exceeded"));
         }
         let mut costs = costs.into_iter();
         for row in &mut self.partitions {
@@ -653,10 +676,28 @@ impl PathStorage {
         }
     }
     pub fn routes<const D: usize>(&self, g: &Graph<D>) -> Result<Vec<Route>> {
-        self.ordered_paths()
-            .into_iter()
-            .map(|path| self.route(g, path))
-            .collect()
+        self.routes_until(g, None)
+    }
+    pub(crate) fn routes_until<const D: usize>(
+        &self,
+        g: &Graph<D>,
+        timer: Option<(std::time::Instant, std::time::Duration)>,
+    ) -> Result<Vec<Route>> {
+        let expired = || timer.is_some_and(|(start, limit)| start.elapsed() > limit);
+        if expired() {
+            return Err(crate::incomplete("enumeration time limit exceeded"));
+        }
+        let mut routes = Vec::with_capacity(self.len);
+        for path in self.ordered_paths() {
+            if expired() {
+                return Err(crate::incomplete("enumeration time limit exceeded"));
+            }
+            routes.push(self.route(g, path)?);
+        }
+        if expired() {
+            return Err(crate::incomplete("enumeration time limit exceeded"));
+        }
+        Ok(routes)
     }
     /// Rank retained paths without replaying every resource schedule. The
     /// minimum describes the retained domain independently of output limits.

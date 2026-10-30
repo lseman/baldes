@@ -10,6 +10,7 @@ impl CoupledKernel {
             }
         }
         Box::new(CoupledLabelState {
+            completion_identity: self.identity.clone(),
             selection,
             loads: StateValues::filled(self.load_capacities.len(), [0.; 3]),
             budgets: budgeted::PreparedBudgeted::root(&self.budgeted, forward),
@@ -155,6 +156,7 @@ impl CoupledKernel {
         // The old suffix is read below while its replacement is composed.
         // Cloning it here would copy every old entry condition only to discard it.
         let mut next = CoupledLabelState {
+            completion_identity: state.completion_identity.clone(),
             selection: state.selection.clone(),
             loads: state.loads.clone(),
             budgets: state.budgets.clone(),

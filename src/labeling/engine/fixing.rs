@@ -30,14 +30,15 @@ impl<const D: usize> LabelingEngine<D> {
             return Err(invalid("finite fixing threshold required"));
         }
         // Packed pricing cuts can forget information retained by full-memory
-        // enumeration. Do not use those labels to discard paired-resource
-        // arcs without a certificate relating their objectives.
+        // enumeration. In that case scan only for feasibility; pricing's cut
+        // costs cannot establish that an otherwise compatible route is costly.
         let paired = g.coupled_kernel().is_some_and(|kernel| kernel.has_slope_fronts());
-        let scalar_only = paired && (self.has_cuts() || has_full_cuts);
+        let feasibility_only = g.has_coupled_resources() && (self.has_cuts() || has_full_cuts);
+        let threshold = if feasibility_only { f64::INFINITY } else { threshold };
         // A paired front and a knapsack term have independent lower-bound
         // representations. Scan actual joins instead of combining those
         // bounds as if their minimizing resource controls were identical.
-        let scan_all_knapsack = paired && self.cuts.knapsack.active;
+        let scan_all = feasibility_only || (paired && self.cuts.knapsack.active);
         // Both roles must be disproved before fixing a dual-orientation arc.
         if self.consumption_joins
             && g.coupled_kernel()
@@ -74,7 +75,7 @@ impl<const D: usize> LabelingEngine<D> {
                         } else {
                             physical.tail
                         }];
-                        if !scalar_only && self.consumption_joins && physical.head == g.sink {
+                        if self.consumption_joins && physical.head == g.sink {
                             // The physical terminal has no suffix. Dominated
                             // prefixes still inherit useful terminal arcs from
                             // predecessor buckets, even without active labels.
@@ -120,9 +121,6 @@ impl<const D: usize> LabelingEngine<D> {
                             removed.insert(arc.id);
                             continue;
                         };
-                        if scalar_only {
-                            continue;
-                        }
                         let mut extended = vec![];
                         let mut minimum = NO_ROUTE_COST;
                         for &id in
@@ -133,7 +131,7 @@ impl<const D: usize> LabelingEngine<D> {
                             {
                                 let key = l.key()
                                     + self.cuts.knapsack.partial_cost(g, &l.resources, forward);
-                                minimum = if scan_all_knapsack {
+                                minimum = if scan_all {
                                     f64::NEG_INFINITY
                                 } else {
                                     minimum.min(self.ctx().resource_completion_key(
@@ -181,7 +179,7 @@ impl<const D: usize> LabelingEngine<D> {
                                                 &l.resources,
                                                 forward,
                                             );
-                                        let key = if scan_all_knapsack {
+                                        let key = if scan_all {
                                             if !self.ctx().bucket_completion_feasible(
                                                 g, forward, l.coupled_state.as_deref(),
                                                 storage_vertex, bucket,
