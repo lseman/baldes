@@ -156,7 +156,9 @@ impl CoupledKernel {
                 _ => false,
             }),
             identity: std::sync::Arc::new(()),
+            machine_identity: std::sync::Arc::new(()),
             definitions: definitions.to_vec().into(),
+            custom_indices: definitions.iter().enumerate().filter_map(|(index, resource)| matches!(resource, CoupledResource::CustomResource { .. }).then_some(index)).collect(),
             slots,
             initial,
             cost_scale: 1.,
@@ -315,6 +317,9 @@ impl CoupledKernel {
     pub(crate) fn cache_identity(&self) -> &std::sync::Arc<()> {
         &self.identity
     }
+    pub(crate) fn machine_identity(&self) -> &std::sync::Arc<()> {
+        &self.machine_identity
+    }
     pub fn definitions(&self) -> &[CoupledResource] {
         &self.definitions
     }
@@ -390,7 +395,6 @@ impl CoupledKernel {
             _ => false,
         })
     }
-    #[cfg(feature = "clp")]
     pub(crate) fn suppress_costs(&mut self) {
         self.identity = std::sync::Arc::new(());
         self.cost_scale = 0.;

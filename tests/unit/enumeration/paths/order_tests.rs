@@ -1,6 +1,66 @@
 use super::*;
 
 #[test]
+fn tolerance_order_uses_first_greater_candidate_even_when_costs_are_not_partitioned() {
+    for preserve in [false, true] {
+        let mut storage = PathStorage::new(1).unwrap();
+        storage.preserve_arc_paths = preserve;
+        for (id, multiple) in [0., 2., 1., 1., 0.].into_iter().enumerate() {
+            let mut visited = [0; 16];
+            visited[0] = 1 << id;
+            assert!(storage.insert(Path {
+                arcs: vec![id],
+                element_hash: 0,
+                visited,
+                original_cost: multiple * EPSILON,
+                reduced_cost: 0.,
+            }));
+        }
+        let order: Vec<_> = storage.ordered_paths().iter().map(|path| path.arcs[0]).collect();
+        assert_eq!(order, [0, 4, 1, 2, 3]);
+    }
+}
+
+#[test]
+fn replacement_keeps_the_native_partition_order_without_replaying_survivors() {
+    let mut storage = PathStorage::new(1).unwrap();
+    for (id, mask, multiple) in [(0, 0, 2.), (1, 1, 1.), (2, 2, 0.), (3, 0, 0.), (4, 0, 0.)] {
+        let mut visited = [0; 16];
+        visited[0] = 1 << mask;
+        let inserted = storage.insert(Path {
+            arcs: vec![id], element_hash: 0, visited,
+            original_cost: multiple * EPSILON, reduced_cost: 0.,
+        });
+        assert_eq!(inserted, id != 4);
+    }
+    let order: Vec<_> = storage.ordered_paths().iter().map(|path| path.arcs[0]).collect();
+    assert_eq!(order, [2, 3, 1]);
+    let mut child = storage.clone();
+    child.retain(|path| path.arcs[0] != 2);
+    let retained: Vec<_> = child.ordered_paths().iter().map(|path| path.arcs[0]).collect();
+    assert_eq!(retained, [3, 1]);
+    assert_eq!(storage.ordered_paths().len(), 3);
+}
+
+#[test]
+fn duplicate_scan_uses_export_partition_when_storage_buckets_are_coalesced() {
+    for count in [1, 8] {
+        let mut storage = PathStorage::new(count).unwrap();
+        for (id, mask, multiple) in [(0, 0, 2.), (1, 0, 1.), (2, 0, 1.), (3, 1, 1.), (4, 1, 0.)] {
+            let mut visited = [0; 16];
+            visited[0] = 1 << mask;
+            let inserted = storage.insert(Path {
+                arcs: vec![id], element_hash: mask, visited,
+                original_cost: multiple * EPSILON, reduced_cost: 0.,
+            });
+            assert_eq!(inserted, id == 0 || id == 3);
+        }
+        let order: Vec<_> = storage.ordered_paths().iter().map(|path| path.arcs[0]).collect();
+        assert_eq!(order, [0, 3]);
+    }
+}
+
+#[test]
 fn export_order_survives_partition_tuning_replacement_retention_and_forks() {
     let mut graph = Graph::<2>::new(4, 1).unwrap();
     for (tail, head, cost) in [(0, 1, 1.), (1, 3, 1.), (0, 2, 2.), (2, 3, 2.), (1, 2, 1.)] {
@@ -101,8 +161,10 @@ fn preserved_identity_index_is_shared_until_membership_changes() {
     child.inspect(&graph, f64::INFINITY, &[], &[]).unwrap();
     child.retain(|_| true);
     assert!(Arc::ptr_eq(&child.path_order, &parent.path_order));
+    assert!(Arc::ptr_eq(&child.export_rows, &parent.export_rows));
     child.retain(|p| p.arcs != [0, 1]);
     assert!(!Arc::ptr_eq(&child.path_order, &parent.path_order));
+    assert!(!Arc::ptr_eq(&child.export_rows, &parent.export_rows));
     assert_eq!(parent.len, 2);
     assert_eq!(child.len, 1);
     let retained: &[usize] = &[2, 3];

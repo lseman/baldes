@@ -7,8 +7,8 @@ impl MachineForwardState {
     /// and `arc` identifies the transition. The caller must supply an envelope
     /// produced by that transition after its lower and upper filters succeed.
     /// This operation does not verify the envelope's association with the arc.
-    /// A missing predecessor means the recurrence did not write that field;
-    /// the modern wrapper initializes it to `1e12` before the recurrence.
+    /// A missing envelope predecessor means the recurrence did not write that
+    /// field; the resulting state retains the wrapper's `1e12` initialization.
     pub fn from_filtered_waiting(
         reduced: &SlopeFront,
         envelope: &MachineWaitingEnvelope,
@@ -29,12 +29,9 @@ impl MachineForwardState {
         let pairs = function.pairs();
         // The wrapper scans at most eleven segments in its twelve-pair
         // fixed array. Ordinary prepared functions have strictly increasing
-        // coordinates; machine-only duplicates retain their narrower proven
-        // representations. This does not validate the preceding filters.
-        let ordinary = !function.is_machine_zero_length() && (2..=12).contains(&pairs.len());
-        let duplicate = pairs.len() == 2 && function.is_machine_zero_length()
-            || pairs.len() == 3 && function.has_internal_zero_length();
-        if !ordinary && !duplicate {
+        // coordinates. Machine arrays can retain duplicate endpoints; the
+        // wrapper scans every stored segment in the same order.
+        if !(2..=12).contains(&pairs.len()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "unrecovered machine forward state geometry",
             ));
@@ -45,8 +42,9 @@ impl MachineForwardState {
         if pairs.len() > budget.max_pairs {
             return FrontierOutcome::Unknown(FrontierUnknown::PairLimit);
         }
-        let valid_bits = ((1u64 << pairs.len()) - 1) & !1;
-        if envelope.waiting_bits & !valid_bits != 0
+        // The native state stores a 13-bit bitset, including scratch bits
+        // beyond the current segment count after a merge.
+        if envelope.waiting_bits & !((1u64 << 13) - 1) != 0
             || envelope.predecessor.is_some_and(|value| !value.is_finite())
             || pairs.iter().any(|&(a, b)| !a.is_finite() || !b.is_finite())
         {
@@ -88,12 +86,13 @@ impl MachineForwardState {
         if let Err(reason) = work.charge(0) {
             return FrontierOutcome::Unknown(reason);
         }
+        let predecessor = Some(envelope.predecessor.unwrap_or(1e12));
         let front = SlopeFront {
             components: vec![function.clone()].into(),
             provenance: Arc::new(FrontierProvenance::PairedMachineWaiting {
                 input: reduced.provenance().clone(),
                 arc,
-                predecessor: envelope.predecessor,
+                predecessor,
                 waiting_bits: envelope.waiting_bits,
             }),
             tolerant_alignment: true,
@@ -101,7 +100,7 @@ impl MachineForwardState {
         FrontierOutcome::Complete(Self {
             front,
             waiting_bits: envelope.waiting_bits,
-            predecessor: envelope.predecessor,
+            predecessor,
             key,
         })
     }
@@ -144,7 +143,7 @@ impl MachineForwardState {
         }
         let function = &self.front.components[0];
         let pairs = function.pairs();
-        if function.is_machine_zero_length() || !(3..=12).contains(&pairs.len()) {
+        if function.has_machine_only_geometry() || !(3..=12).contains(&pairs.len()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "machine multisegment waiting geometry",
             ));
@@ -247,7 +246,12 @@ impl MachineForwardState {
         }
         let function = &self.front.components[0];
         let pairs = function.pairs();
-        if !function.has_internal_zero_length() || pairs.len() != 3 || self.waiting_bits != 1 << 2 {
+        if !function.has_internal_zero_length()
+            || pairs.len() != 3
+            || pairs[0].1 != pairs[1].1
+            || pairs[1].1 >= pairs[2].1
+            || self.waiting_bits != 1 << 2
+        {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "machine duplicate waiting reconstruction geometry",
             ));
@@ -386,7 +390,7 @@ impl MachineForwardState {
         }
         let function = &self.front.components[0];
         let pairs = function.pairs();
-        if function.is_machine_zero_length()
+        if function.has_machine_only_geometry()
             || pairs.len() != 2
             || coordinate < pairs[0].1
             || coordinate > pairs[1].1

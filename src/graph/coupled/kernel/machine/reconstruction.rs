@@ -7,6 +7,95 @@ use descriptor::{
 use std::time::Instant;
 
 impl<const D: usize> Graph<D> {
+    /// Select a paired join only when the saved histories are the requested
+    /// physical route. This checks the handoff without running the recorder.
+    pub(crate) fn paired_machine_selection_for_path(
+        &self,
+        resource: usize,
+        forward: &CoupledLabelState,
+        backward: &CoupledLabelState,
+        arcs: &[usize],
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<descriptor::MachineConcatenation> {
+        let started = Instant::now();
+        let Some(kernel) = self.coupled.as_ref() else {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join has no coupled resources"));
+        };
+        if !matches!(kernel.definitions.get(resource), Some(CoupledResource::SlopePaired { .. }))
+            || kernel.check_state(forward).is_err() || kernel.check_state(backward).is_err()
+            || forward.suffix.is_some() || backward.suffix.is_none()
+        {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join resource or label direction"));
+        }
+        let index = kernel.definitions[..resource].iter()
+            .filter(|definition| matches!(definition, CoupledResource::SlopePaired { .. })).count();
+        let Some(history) = forward.slope_relations[index].machine_history.as_ref() else {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join forward history unavailable"));
+        };
+        let Some(backward_history) = backward.slope_relations[index].machine_history.as_ref() else {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join backward history unavailable"));
+        };
+        let suffix = &backward.suffix.as_ref().unwrap().program;
+        if backward_history.len().checked_sub(1) != Some(suffix.len()) {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join backward history shape"));
+        }
+        let validation = resource.saturating_add(kernel.definitions.len().saturating_mul(2))
+            .saturating_add(history.len().saturating_mul(2))
+            .saturating_add(backward_history.len().saturating_mul(2))
+            .saturating_add(suffix.len()).saturating_add(arcs.len());
+        let Some(work) = budget.max_operations.checked_sub(validation) else {
+            return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
+        };
+        let remaining = budget.max_elapsed.map(|limit| limit.saturating_sub(started.elapsed()));
+        if remaining.is_some_and(|time| time.is_zero()) {
+            return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
+        }
+        let snapshots = match history.snapshots(FrontierBudget {
+            max_operations: history.len(), max_elapsed: remaining, ..budget
+        }) {
+            FrontierOutcome::Complete(snapshots) => snapshots,
+            FrontierOutcome::Empty => return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join forward history empty")),
+            FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
+        };
+        let remaining = budget.max_elapsed.map(|limit| limit.saturating_sub(started.elapsed()));
+        if remaining.is_some_and(|time| time.is_zero()) {
+            return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
+        }
+        let backward_snapshots = match backward_history.snapshots(FrontierBudget {
+            max_operations: backward_history.len(), max_elapsed: remaining, ..budget
+        }) {
+            FrontierOutcome::Complete(snapshots) => snapshots,
+            FrontierOutcome::Empty => return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join backward history empty")),
+            FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
+        };
+        if !matches!(snapshots.first(), Some(MachinePathSnapshot::Root(_)))
+            || !matches!(backward_snapshots.first(), Some(MachinePathSnapshot::Root(_)))
+            || !backward_snapshots.iter().skip(1).rev().zip(suffix.iter()).all(|(snapshot, arc)| {
+                matches!(snapshot, MachinePathSnapshot::Backward { arc: saved, .. } if *saved == arc)
+            })
+        {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join backward history path mismatch"));
+        }
+        let mut path = Vec::with_capacity(arcs.len());
+        for snapshot in snapshots.iter().skip(1) {
+            let MachinePathSnapshot::Forward { arc, .. } = snapshot else {
+                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join forward history direction"));
+            };
+            path.push(*arc);
+        }
+        path.extend(suffix.iter());
+        if path != arcs {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join path does not match retained route"));
+        }
+        let remaining = budget.max_elapsed.map(|limit| limit.saturating_sub(started.elapsed()));
+        if remaining.is_some_and(|time| time.is_zero()) {
+            return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
+        }
+        kernel.paired_machine_resource_join(resource, forward, backward, FrontierBudget {
+            max_operations: work, max_elapsed: remaining, ..budget
+        })
+    }
+
     /// Select and reconstruct a joined pair of retained machine labels.
     /// Installed roots, physical arc identities, path continuity and prepared
     /// operands must match. This returns raw machine consumptions, not a source
@@ -16,6 +105,42 @@ impl<const D: usize> Graph<D> {
         resource: usize,
         forward: &CoupledLabelState,
         backward: &CoupledLabelState,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<MachineJoinedPathReconstruction> {
+        self.reconstruct_paired_machine_join_checked(resource, forward, backward, None, 0, budget)
+    }
+
+    /// Reconstruct using the specified native recorder diagnostic level.
+    pub fn reconstruct_paired_machine_join_with_debug(
+        &self,
+        resource: usize,
+        forward: &CoupledLabelState,
+        backward: &CoupledLabelState,
+        debug_level: i32,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<MachineJoinedPathReconstruction> {
+        self.reconstruct_paired_machine_join_checked(resource, forward, backward, None, debug_level, budget)
+    }
+
+    pub(crate) fn reconstruct_paired_machine_join_for_path(
+        &self,
+        resource: usize,
+        forward: &CoupledLabelState,
+        backward: &CoupledLabelState,
+        arcs: &[usize],
+        debug_level: i32,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<MachineJoinedPathReconstruction> {
+        self.reconstruct_paired_machine_join_checked(resource, forward, backward, Some(arcs), debug_level, budget)
+    }
+
+    fn reconstruct_paired_machine_join_checked(
+        &self,
+        resource: usize,
+        forward: &CoupledLabelState,
+        backward: &CoupledLabelState,
+        expected_arcs: Option<&[usize]>,
+        debug_level: i32,
         budget: FrontierBudget,
     ) -> FrontierOutcome<MachineJoinedPathReconstruction> {
         let started = Instant::now();
@@ -83,6 +208,7 @@ impl<const D: usize> Graph<D> {
                     .saturating_add(backward.len())
                     .saturating_add(suffix.program.len().saturating_mul(3))
                     .saturating_add(self.arcs.len())
+                    .saturating_add(expected_arcs.map_or(0, |arcs| arcs.len()))
                     .saturating_add(1);
                 work = work
                     .checked_sub(validation)
@@ -180,12 +306,22 @@ impl<const D: usize> Graph<D> {
                         "machine join path does not reach sink",
                     ));
                 }
-                let result = PreparedSlopeRelationArc::machine_reconstruct_joined_path(
+                if expected_arcs.is_some_and(|arcs| {
+                    !arcs.iter().copied().eq(inverses.iter().map(|(arc, _)| *arc).chain(steps.iter().map(|(arc, _)| *arc)))
+                }) {
+                    return Err(FrontierUnknown::Unsupported("machine join path does not match retained route"));
+                }
+                let waiting_rates = prepared.machine_waiting_rates().map(|rates| {
+                    steps.iter().map(|(arc, _)| rates[*arc]).collect::<Vec<_>>()
+                });
+                let result = PreparedSlopeRelationArc::machine_reconstruct_joined_path_with_debug(
                     forward,
                     backward,
                     &inverses,
                     &steps,
                     prepared.machine_mode(),
+                    waiting_rates.as_deref(),
+                    debug_level,
                     remaining(work)?,
                 );
                 remaining(0)?;

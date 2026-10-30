@@ -238,3 +238,73 @@ fn native_point_exception_does_not_widen_domains_or_guess_clamp_values() {
     ));
     assert_eq!(strict.components()[0].pairs(), &[(3., 1.)]);
 }
+
+#[test]
+fn native_rounded_crossing_remains_distinct_from_source_certification() {
+    // Captured from native maximum helper 0x71f320 on the pinned ELF.
+    let input = function(&[(-0.125, 4.), (0.375, 8.)]);
+    let lower = function(&[(0., 4.), (0., 8.)]);
+    let upper = function(&[(10., 4.), (0., 8.)]);
+    let front = SlopeFront::from_prepared(input);
+    let FrontierOutcome::Complete(machine) = clamp_filter(
+        &front,
+        &lower,
+        &upper,
+        FrontOperationPolicy::FrontAlgebra,
+        FrontierBudget::default(),
+    ) else {
+        panic!("native rounded crossing should be representable")
+    };
+    assert_eq!(machine.components().len(), 1);
+    assert_eq!(
+        machine.components()[0].pairs(),
+        &[(0., 4.), (0., 4.333333333333333), (0.375, 8.)]
+    );
+    assert!(matches!(
+        clamp_filter(
+            &front,
+            &lower,
+            &upper,
+            FrontOperationPolicy::StrictDomain,
+            FrontierBudget::default(),
+        ),
+        FrontierOutcome::Unknown(_)
+    ));
+}
+
+#[test]
+fn native_affine_maximum_crossings_match_both_directions() {
+    // Outputs captured from maximum helper 0x71f320 in the pinned ELF.
+    let cases = [
+        (-0.125, 0.375, 0., 0., 4.333333333333333),
+        (0.125, -0.375, 0., 0., 4.333333333333333),
+        (-0.125, 0.5, 0., 0.125, 4.333333333333333),
+        (0.125, -0.25, 0., 0.125, 4.333333333333333),
+        (-0.375, 0.625, 0.125, -0.125, 4.666666666666667),
+        (0.375, -0.625, -0.125, 0.125, 4.666666666666667),
+        (-1., 1., 0., 0.25, 5.333333333333333),
+        (1., -1., 0., -0.25, 5.333333333333333),
+    ];
+    for (initial, slope, bound, bound_slope, crossing) in cases {
+        let front = SlopeFront::from_prepared(function(&[(initial, 4.), (slope, 8.)]));
+        let lower = function(&[(bound, 4.), (bound_slope, 8.)]);
+        let upper = function(&[(10., 4.), (0., 8.)]);
+        let result = complete(clamp_filter(
+            &front,
+            &lower,
+            &upper,
+            FrontOperationPolicy::FrontAlgebra,
+            FrontierBudget::default(),
+        ));
+        let expected = if initial > bound {
+            [(initial, 4.), (slope, crossing), (bound_slope, 8.)]
+        } else {
+            [(bound, 4.), (bound_slope, crossing), (slope, 8.)]
+        };
+        assert_eq!(
+            result.components()[0].pairs(),
+            &expected,
+            "case {initial:?}, {slope:?}, {bound:?}, {bound_slope:?}"
+        );
+    }
+}

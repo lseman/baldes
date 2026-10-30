@@ -143,7 +143,7 @@ impl PreparedMachineArc {
     }
     fn same_bits(&self, other: &Self) -> bool {
         fn function(a: &PreparedSlopeFunction, b: &PreparedSlopeFunction) -> bool {
-            a.is_machine_zero_length() == b.is_machine_zero_length()
+            a.has_machine_only_geometry() == b.has_machine_only_geometry()
                 && a.pairs().len() == b.pairs().len()
                 && a.pairs()
                     .iter()

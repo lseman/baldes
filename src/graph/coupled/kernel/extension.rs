@@ -16,6 +16,8 @@ impl CoupledKernel {
             reversal_peaks: None,
             reversed_use: false,
             numeric: StateValues::from_slice(&self.initial),
+            custom_machine: vec![Default::default(); self.custom_indices.len()],
+            custom_machine_identity: (!self.custom_indices.is_empty()).then(|| self.machine_identity.clone()),
             slope_fronts: self
                 .slope_roots
                 .iter()
@@ -159,6 +161,8 @@ impl CoupledKernel {
             reversal_peaks: state.reversal_peaks.clone(),
             reversed_use: state.reversed_use,
             numeric: state.numeric.clone(),
+            custom_machine: state.custom_machine.clone(),
+            custom_machine_identity: state.custom_machine_identity.clone(),
             suffix: None,
             fronts: Vec::with_capacity(state.fronts.len()),
             slope_fronts: Vec::with_capacity(state.slope_fronts.len()),
@@ -170,6 +174,19 @@ impl CoupledKernel {
             resource_objective: 0.,
             accounting: None,
         };
+        for (trace, &index) in next.custom_machine.iter_mut().zip(&self.custom_indices) {
+            let resource = &self.definitions[index];
+            let CoupledResource::CustomResource { increments, weights, .. } = resource else { unreachable!() };
+            if trace.accepted {
+                let contribution = if forward {
+                    trace.state.extend_forward(increments[arc], weights[arc])
+                } else {
+                    trace.state.extend_backward(increments[arc], weights[arc])
+                };
+                trace.accepted = crate::graph::coupled::CustomMachineState::contribution_accepted(contribution);
+                trace.wrapper_cost = if trace.accepted { contribution + trace.wrapper_cost } else { 1e12 };
+            }
+        }
         let prepared = &self.transitions.arcs[arc];
         for ((domain, &allowed), memory) in next
             .selection

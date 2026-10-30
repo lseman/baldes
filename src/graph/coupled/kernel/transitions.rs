@@ -41,10 +41,20 @@ impl NumericOperation {
                 weight,
                 cost_coefficient,
             } => {
-                numeric[slot] = finite(numeric[slot] + increment)?;
                 let scale = finite(scale * cost_coefficient)?;
-                if scale != 0. {
-                    *cost = finite(*cost + finite(scale * finite(numeric[slot] * weight)?)?)?;
+                if scale == 1. {
+                    let mut state = crate::graph::coupled::CustomMachineState {
+                        value: numeric[slot],
+                        cost: *cost,
+                    };
+                    state.extend_forward(increment, weight);
+                    numeric[slot] = finite(state.value)?;
+                    *cost = finite(state.cost)?;
+                } else {
+                    numeric[slot] = finite(numeric[slot] + increment)?;
+                    if scale != 0. {
+                        *cost = finite(*cost + finite(scale * finite(numeric[slot] * weight)?)?)?;
+                    }
                 }
             }
             Self::BaseMap {
@@ -382,7 +392,6 @@ impl PreparedTransitions {
             deferred,
         }
     }
-    #[cfg(feature = "clp")]
     pub(super) fn suppress_costs(&mut self, n: usize) {
         for arc in std::sync::Arc::make_mut(&mut self.arcs) {
             arc.state_costs = Default::default();

@@ -40,8 +40,8 @@ pub(super) fn compose(
     upper: f64,
     work: &mut Work,
 ) -> Result<Option<PreparedSlopeFunction>> {
-    if !lower.is_finite() || !upper.is_finite() || lower > upper {
-        return Err(unsupported("composition needs a finite ordered interval"));
+    if !lower.is_finite() || !upper.is_finite() {
+        return Err(unsupported("composition needs a finite interval"));
     }
     work.pairs(outer.pairs().len())?;
     work.pairs(inner.pairs().len())?;
@@ -54,10 +54,32 @@ pub(super) fn compose(
         return Ok(None);
     }
     if near(lower, upper)? {
-        return short_composition(outer, inner, lower, upper, work).map(Some);
+        let Some((inner_value, _)) = inner
+            .machine_vector_value_and_segment(lower)
+            .map_err(FrontierUnknown::Arithmetic)?
+        else {
+            return Ok(None);
+        };
+        if inner_value == 1e12 {
+            return Ok(None);
+        }
+        let Some((value, _)) = outer
+            .machine_value_and_segment(inner_value)
+            .map_err(FrontierUnknown::Arithmetic)?
+        else {
+            return Ok(None);
+        };
+        if value == 1e12 {
+            return Ok(None);
+        }
+        work.pairs(2)?;
+        return PreparedSlopeFunction::from_machine_pairs(vec![(value, lower), (0., upper)])
+            .map(Some)
+            .map_err(FrontierUnknown::Arithmetic);
     }
-    if inner.pairs().iter().skip(1).any(|pair| pair.0 < 0.) {
-        return Err(unsupported("composition inner map decreases"));
+    // The helper checks ordering only after its near-equal short branch.
+    if lower > upper {
+        return Ok(None);
     }
     let (mut inner_value, mut inner_index) = if near(lower, start)? {
         (inner.pairs()[0].0, 1)
@@ -69,12 +91,14 @@ pub(super) fn compose(
     };
     // Unlike the short branch, the long scan passes an inner lookup's
     // sentinel into the outer lookup. Only the outer result is rejected.
-    let (mut outer_value, mut outer_index) = outer
-        .machine_value_and_segment(inner_value)
+    let Some((mut outer_value, mut outer_index)) = outer
+        .machine_vector_value_and_segment(inner_value)
         .map_err(FrontierUnknown::Arithmetic)?
-        .ok_or_else(|| unsupported("machine composition outer lookup sentinel"))?;
+    else {
+        return Ok(None);
+    };
     if outer_value == 1e12 {
-        return Err(unsupported("machine composition outer sentinel"));
+        return Ok(None);
     }
     work.pairs(1)?;
     let mut output = vec![(outer_value, lower)];
@@ -137,7 +161,7 @@ pub(super) fn compose(
             outer_index += 1;
         }
         if exhausted && !near(outer.pairs()[outer_index - 1].1, image)? {
-            return Err(unsupported("machine composition exhausted outer domain"));
+            return Ok(None);
         }
         let last_coordinate = output.last().unwrap().1;
         if last_coordinate < stop && !near(last_coordinate, stop)? {

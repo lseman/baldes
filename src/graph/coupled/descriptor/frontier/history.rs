@@ -58,16 +58,12 @@ impl MachinePathHistory {
     }
 
     /// Immutable root identity, used to reject histories from replaced arc
-    /// inputs or a different installed terminal root. Caller budgets traversal.
+    /// inputs or a different installed terminal root.
     pub(crate) fn shares_root(&self, root: &Self) -> bool {
         if root.len != 1 {
             return false;
         }
-        let mut node = &self.head;
-        while let Some(previous) = &node.previous {
-            node = previous;
-        }
-        Arc::ptr_eq(node, &root.head)
+        Arc::ptr_eq(&self.root, &root.root)
     }
 
     /// Terminal ceiling retained by a backward machine history.
@@ -128,6 +124,7 @@ impl MachinePathHistory {
                     ceiling,
                 },
             }),
+            root: self.root.clone(),
             len: next_len,
             max_states: self.max_states,
         })
@@ -154,11 +151,13 @@ impl MachinePathHistory {
         if let Err(reason) = work.charge(pairs.saturating_add(1)) {
             return FrontierOutcome::Unknown(reason);
         }
+        let root = Arc::new(MachinePathNode {
+            previous: None,
+            snapshot: MachinePathSnapshot::Root(root.clone()),
+        });
         FrontierOutcome::Complete(Self {
-            head: Arc::new(MachinePathNode {
-                previous: None,
-                snapshot: MachinePathSnapshot::Root(root.clone()),
-            }),
+            head: root.clone(),
+            root,
             len: 1,
             max_states,
         })
@@ -222,6 +221,7 @@ impl MachinePathHistory {
                     state: state.clone(),
                 },
             }),
+            root: self.root.clone(),
             len: next_len,
             max_states: self.max_states,
         })

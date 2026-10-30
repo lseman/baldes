@@ -60,6 +60,46 @@ fn weaker_bounds(a: &Suffix, b: &Suffix) -> bool {
     })
 }
 impl CoupledKernel {
+    /// Evaluate the raw custom-resource dominance callback for retained
+    /// labels. This value is not a source-model dominance certificate.
+    pub fn custom_machine_dominance_cost(
+        &self,
+        a: &CoupledLabelState,
+        b: &CoupledLabelState,
+        forward: bool,
+    ) -> Result<Option<f64>> {
+        let [resource] = self.custom_indices.as_slice() else {
+            return Err(invalid("custom machine dominance requires one custom resource"));
+        };
+        self.custom_machine_resource_dominance_cost(*resource, a, b, forward)
+    }
+
+    /// Evaluate one custom dominance callback by coupled-resource index.
+    pub fn custom_machine_resource_dominance_cost(
+        &self,
+        resource: usize,
+        a: &CoupledLabelState,
+        b: &CoupledLabelState,
+        forward: bool,
+    ) -> Result<Option<f64>> {
+        self.check_state(a)?;
+        self.check_state(b)?;
+        if a.suffix.is_none() != forward || b.suffix.is_none() != forward {
+            return Err(invalid("custom machine dominance direction mismatch"));
+        }
+        let index = self.custom_indices.iter().position(|&entry| entry == resource)
+            .ok_or_else(|| invalid("custom machine resource unavailable"))?;
+        let (left, right) = (&a.custom_machine[index], &b.custom_machine[index]);
+        if !left.accepted || !right.accepted {
+            return Ok(None);
+        }
+        let Some(CoupledResource::CustomResource { forward_bound, backward_bound, .. }) = self.definitions.get(resource) else {
+            return Err(invalid("custom machine resource unavailable"));
+        };
+        let bound = if forward { *forward_bound } else { *backward_bound };
+        Ok(bound.map(|bound| left.state.dominance_cost(&right.state, bound)))
+    }
+
     /// A nonnegative upper bound on the additional continuation cost of a
     /// relative to b. None means resource feasibility/order is not established.
     /// Nonnegative penalties preserve the existing hot-key scan ordering.

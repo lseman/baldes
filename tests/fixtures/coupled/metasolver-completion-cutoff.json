@@ -1,0 +1,43 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "mode": 4,
+  "ceiling": 100.0,
+  "forward": [
+    [
+      5.0,
+      0.0
+    ],
+    [
+      0.0,
+      2.0
+    ]
+  ],
+  "backward": [
+    [
+      98.0,
+      0.0
+    ],
+    [
+      0.0,
+      2.0
+    ]
+  ],
+  "forward_cost": -20.0,
+  "backward_cost": 1.0,
+  "joined_cost": -19.0,
+  "correction": 0.0,
+  "cases": [
+    {
+      "cutoff": -19.000000000000004,
+      "accepted": false
+    },
+    {
+      "cutoff": -19.0,
+      "accepted": false
+    },
+    {
+      "cutoff": -18.999999999999996,
+      "accepted": true
+    }
+  ]
+}

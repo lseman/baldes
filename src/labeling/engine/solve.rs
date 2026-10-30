@@ -43,6 +43,8 @@ impl<const D: usize> LabelingEngine<D> {
         self.last_costs.clear();
         self.last_costs
             .extend(g.arcs.iter().map(|a| a.reduced_cost));
+        self.last_original_costs.clear();
+        self.last_original_costs.extend(g.arcs.iter().map(|a| a.cost));
         self.forward
             .reset(self.grid.forward.buckets.iter().map(Vec::len));
         self.backward
@@ -341,22 +343,10 @@ impl<const D: usize> LabelingEngine<D> {
                 "negative paired objectives require source-control master pricing",
             ));
         }
-        if self.full_ready
-            && self
-                .last_costs
-                .iter()
-                .copied()
-                .eq(g.arcs.iter().map(|a| a.reduced_cost))
-        {
+        if self.full_ready && self.labels_match_graph(g) {
             return Ok(());
         }
-        if !self.half_ready
-            || !self
-                .last_costs
-                .iter()
-                .copied()
-                .eq(g.arcs.iter().map(|a| a.reduced_cost))
-        {
+        if !self.half_ready || !self.labels_match_graph(g) {
             return Err(invalid("continuation requires fresh exact half-labels"));
         }
         self.half_ready = false;

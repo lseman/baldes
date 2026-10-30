@@ -1,0 +1,1661 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "cases": [
+    {
+      "vertex": 1,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x10",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x1",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 2,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x8",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x1",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 3,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x4",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x1",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 1,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x10",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x2",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 2,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x8",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x2",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 3,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x4",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x2",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 1,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x10",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x4",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 2,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x8",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x4",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 4,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x2",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x4",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 5,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x1",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x4",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 1,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x10",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x8",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 3,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x4",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x8",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 4,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x2",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x8",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 5,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x1",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x8",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 2,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x8",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x10",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 3,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x4",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x10",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 4,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x2",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x10",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 5,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x1",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x10",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 1,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x0",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x11",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 2,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x0",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x9",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 3,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x0",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x5",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 4,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x0",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x6",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 5,
+      "left": {
+        "scalar_cost": 0.125,
+        "mask": "0x0",
+        "front": [
+          [
+            0.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": -0.875,
+        "mask": "0x5",
+        "front": [
+          [
+            7.5,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 2,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x10",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x8",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 3,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x10",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x4",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 4,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x10",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x2",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 5,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x10",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x1",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 1,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x8",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x10",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 3,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x8",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x4",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 4,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x8",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x2",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 5,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x8",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x1",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 1,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x4",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x10",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 2,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x4",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x8",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 4,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x4",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x2",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 5,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x4",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x1",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 1,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x2",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x10",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 2,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x2",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x8",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 3,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x2",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x4",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 1,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x1",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x10",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 2,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x1",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x8",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 3,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x1",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x4",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 1,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x11",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x0",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 2,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x9",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x0",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 3,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x5",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x0",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 4,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x6",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x0",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    },
+    {
+      "vertex": 5,
+      "left": {
+        "scalar_cost": -0.75,
+        "mask": "0x5",
+        "front": [
+          [
+            0.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "right": {
+        "scalar_cost": 0.0,
+        "mask": "0x0",
+        "front": [
+          [
+            7.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ]
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "cost": 0.0,
+      "correction": 0.75
+    }
+  ]
+}

@@ -145,6 +145,19 @@ pub(crate) fn build_inputs_cached<const D: usize>(
 }
 
 impl CutInputSource {
+    pub(crate) fn projection_fields(&self, full: &FullPreparation) -> Option<Vec<usize>> {
+        let mut rows = std::collections::HashMap::new();
+        for (index, &cut) in self.rows[2].iter().chain(&self.rows[3]).enumerate() {
+            let field = usize::try_from(*full.row_to_field.get(index)?).ok()?;
+            if field >= full.fields.len() || rows.insert(cut, field).is_some() {
+                return None;
+            }
+        }
+        self.rows[0].iter().chain(&self.rows[1])
+            .map(|cut| rows.get(cut).copied())
+            .collect()
+    }
+
     pub(crate) fn matches<const D: usize>(
         &self,
         registry: &CutRegistry,

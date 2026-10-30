@@ -89,6 +89,12 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         default: 1000000.0,
         support: OptionSupport::Implemented("src/pricing/fixing_workflow.rs; src/pricing/universe.rs"),
     },
+    OptionInfo {
+        name: "BALDESstopRatioForConcatenationInEnum",
+        kind: OptionKind::Double,
+        default: 30.0,
+        support: OptionSupport::Implemented("src/pricing/fixing_workflow.rs; src/enumeration/engine/directional.rs"),
+    },
     #[cfg(all(feature = "clp", feature = "highs"))]
     OptionInfo {
         name: "BALDESmaxNumOfEnumSolutionsForMIP",

@@ -56,6 +56,11 @@ impl<const D: usize> Solver<D> {
             {
                 return Err(invalid("enumeration limits must be nonnegative"));
             }
+            "BALDESstopRatioForConcatenationInEnum" if value < 0. => {
+                return Err(invalid(
+                    "enumeration concatenation ratio must be nonnegative",
+                ));
+            }
             _ => {}
         }
         let changed = self.options.get(name)? != value;
@@ -73,6 +78,7 @@ impl<const D: usize> Solver<D> {
             && !matches!(
                 name,
                 "BALDEShardTimeThresholdInPricing"
+                    | "BALDESstopRatioForConcatenationInEnum"
                     | "BALDESmaxNumOfColsPerExactIteration"
                     | "BALDESmaxNumOfColsPerIteration"
                     | "BALDESheurLabelingStrategy"

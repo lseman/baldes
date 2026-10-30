@@ -59,7 +59,7 @@ fn machine_point_inner_long_interval_retains_requested_start_and_no_segment() {
             FrontOperationPolicy::FrontAlgebra,
             FrontierBudget::default(),
         ),
-        FrontierOutcome::Unknown(_)
+        FrontierOutcome::Empty
     ));
     assert!(matches!(
         compose_increasing(
@@ -330,7 +330,7 @@ fn strict_composition_preserves_negative_outer_slopes_and_domains() {
 }
 
 #[test]
-fn native_exhausted_outer_domain_is_unknown_while_strict_composition_clips() {
+fn native_exhausted_outer_domain_is_empty_while_strict_composition_clips() {
     let outer = f(&[(0.25, 0.), (-0.5, 0.7), (0.75, 2.)]);
     let inner = f(&[(0.7, 0.), (0.75, 0.9), (0.75, 2.)]);
     for lower in [0.9, 1., 1.5] {
@@ -344,7 +344,7 @@ fn native_exhausted_outer_domain_is_unknown_while_strict_composition_clips() {
                     FrontOperationPolicy::FrontAlgebra,
                     FrontierBudget::default()
                 ),
-                FrontierOutcome::Unknown(FrontierUnknown::Unsupported(_))
+                FrontierOutcome::Empty
             ));
             let clipped = complete(compose_increasing(
                 &outer,
@@ -745,6 +745,8 @@ fn machine_composition_endpoint_and_degenerate_branches_match_recorded_binary_bi
                 .map(|pair| (pair.0.to_bits(), pair.1.to_bits()))
                 .collect();
             assert_eq!(actual, expected, "{fixture}");
+        } else if fixture["status"] == false && fixture["finite"] == true {
+            assert!(matches!(result, FrontierOutcome::Empty), "{fixture}: {result:?}");
         } else {
             assert!(
                 matches!(result, FrontierOutcome::Unknown(_)),

@@ -26,6 +26,27 @@ impl<const D: usize> Solver<D> {
                 cutoff = (cutoff - zero) / gap.abs() + zero;
             }
         }
+        // The enumeration concatenation phase has its own limit derived from
+        // the preceding pricing work. Capture it before full-label completion
+        // resets the engine statistics.
+        let (pricing_seconds, previous_concatenation) =
+            self.engine.as_ref().map_or((0., 0.), |engine| {
+                let stats = &engine.statistics;
+                (
+                    (stats.forward_time + stats.backward_time) + stats.concatenation_time,
+                    stats.concatenation_time,
+                )
+            });
+        let base = if mode == 1 {
+            100.
+        } else {
+            pricing_seconds.max(0.01)
+        };
+        let ratio = self.options.get("BALDESstopRatioForConcatenationInEnum")?;
+        // The reference compares against accumulated concatenation time,
+        // including the preceding pricing pass, not just the current phase.
+        let remaining = (base * ratio - previous_concatenation).max(0.);
+        let concatenation_limit = Duration::try_from_secs_f64(remaining).unwrap_or(Duration::MAX);
         let saved_time = self.controls.time_limit;
         let saved_options = self.options.clone();
         let outcome = (|| {
@@ -63,13 +84,14 @@ impl<const D: usize> Solver<D> {
             if let Some(end) = fixing_deadline {
                 self.controls.time_limit = end.saturating_duration_since(std::time::Instant::now());
             }
-            match self.enumerate(cutoff) {
+            match self.enumerate_with_concatenation_limit(cutoff, Some(concatenation_limit)) {
                 Ok(routes) => {
                     report.state = 2;
                     report.routes = routes.len();
                     Ok(report)
                 }
-                Err(e) if e.message.contains("budget") || e.message.contains("time limit") => {
+                Err(e) if super::universe::is_enumeration_interruption(&e.message)
+                    || e.message == "pricing hard time limit exceeded" => {
                     report.state = 1;
                     Ok(report)
                 }

@@ -59,3 +59,121 @@ fn label_join_cost_keeps_nonfinite_arithmetic_unknown() {
         ));
     }
 }
+
+#[cfg(feature = "clp")]
+#[test]
+fn paired_completion_joins_match_registered_reference_operands() {
+    let capture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../fixtures/coupled/metasolver-completion-joins.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        capture["reference_sha256"],
+        "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6"
+    );
+    let cases = capture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 46);
+    for case in cases {
+        let make = |side: &str| {
+            let pairs = case[side]["front"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|pair| (pair[0].as_f64().unwrap(), pair[1].as_f64().unwrap()))
+                .collect();
+            PreparedSlopeFunction::from_machine_pairs(pairs).unwrap()
+        };
+        let left = make("left");
+        let right = make("right");
+        let FrontierOutcome::Complete(selection) = PreparedSlopeRelationArc::machine_concatenation(
+            &left,
+            &right,
+            case["ceiling"].as_f64().unwrap(),
+            case["mode"].as_i64().unwrap() as i32,
+            FrontierBudget::default(),
+        ) else {
+            panic!("native join did not reconstruct: {case}")
+        };
+        let mask = |side: &str| {
+            u64::from_str_radix(
+                case[side]["mask"]
+                    .as_str()
+                    .unwrap()
+                    .trim_start_matches("0x"),
+                16,
+            )
+            .unwrap()
+        };
+        let FrontierOutcome::Complete(joined) = selection.join_labels(
+            case["left"]["scalar_cost"].as_f64().unwrap(),
+            case["right"]["scalar_cost"].as_f64().unwrap(),
+            0.,
+            mask("left"),
+            mask("right"),
+        ) else {
+            panic!("native label join did not reconstruct: {case}")
+        };
+        assert_eq!(
+            joined.compatible,
+            case["returned"].as_bool().unwrap(),
+            "{case}"
+        );
+        assert!(
+            (joined.dependent_cost - case["correction"].as_f64().unwrap()).abs() < 1e-12,
+            "{case}"
+        );
+        assert!(
+            (joined.reduced_cost - case["cost"].as_f64().unwrap()).abs() < 1e-12,
+            "{case}"
+        );
+    }
+}
+
+#[cfg(feature = "clp")]
+#[test]
+fn completion_join_cutoff_matches_native_equality_and_adjacent_values() {
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../fixtures/coupled/metasolver-completion-cutoff.json"
+    ))
+    .unwrap();
+    let make = |name: &str| {
+        PreparedSlopeFunction::from_machine_pairs(
+            fixture[name]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|p| (p[0].as_f64().unwrap(), p[1].as_f64().unwrap()))
+                .collect(),
+        )
+        .unwrap()
+    };
+    let FrontierOutcome::Complete(selection) = PreparedSlopeRelationArc::machine_concatenation(
+        &make("forward"),
+        &make("backward"),
+        fixture["ceiling"].as_f64().unwrap(),
+        fixture["mode"].as_i64().unwrap() as i32,
+        FrontierBudget::default(),
+    ) else {
+        panic!("expected a finite native-compatible join")
+    };
+    let FrontierOutcome::Complete(joined) = selection.join_labels(
+        fixture["forward_cost"].as_f64().unwrap(),
+        fixture["backward_cost"].as_f64().unwrap(),
+        0.,
+        1,
+        2,
+    ) else {
+        panic!("expected a finite joined label")
+    };
+    assert!(joined.compatible);
+    assert_eq!(
+        joined.reduced_cost,
+        fixture["joined_cost"].as_f64().unwrap()
+    );
+    for case in fixture["cases"].as_array().unwrap() {
+        assert_eq!(
+            joined.reduced_cost < case["cutoff"].as_f64().unwrap(),
+            case["accepted"].as_bool().unwrap()
+        );
+    }
+}

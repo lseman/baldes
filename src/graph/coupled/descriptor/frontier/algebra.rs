@@ -285,17 +285,17 @@ impl SlopeFront {
                     reduced.push((slope, end));
                 }
             }
-            // The reducer checks consecutive emitted segment endpoints after
-            // merging. The first anchor/endpoint pair is exempt.
+            // The reducer checks consecutive emitted slopes after merging.
+            // The anchor is a value, so comparisons start at segment two.
             for index in 2..reduced.len() {
                 work.charge(0)?;
                 if near(
-                    reduced[index - 1].1,
-                    reduced[index].1,
+                    reduced[index - 1].0,
+                    reduced[index].0,
                     FrontOperationPolicy::FrontAlgebra,
                 )? {
                     return Err(FrontierUnknown::Unsupported(
-                        "machine reduction consecutive endpoints",
+                        "machine reduction consecutive slopes",
                     ));
                 }
             }
@@ -359,7 +359,7 @@ impl SlopeFront {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
         if self.components.len() != 1
-            || !self.components[0].is_machine_zero_length()
+            || !self.components[0].has_machine_only_geometry()
             || self.components[0].has_internal_zero_length()
         {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
@@ -736,7 +736,7 @@ impl SlopeFront {
         })
     }
     pub fn from_prepared(function: PreparedSlopeFunction) -> Self {
-        let tolerant_alignment = function.is_machine_zero_length();
+        let tolerant_alignment = function.has_machine_only_geometry();
         let components: Arc<[PreparedSlopeFunction]> = vec![function].into();
         Self {
             provenance: Arc::new(FrontierProvenance::Source(components.clone())),
@@ -805,7 +805,7 @@ impl SlopeFront {
             && (policy != FrontOperationPolicy::FrontAlgebra
                 || self.components.len() != 1
                 || other.components.len() != 1
-                || !self.components[0].is_machine_zero_length())
+                || !self.components[0].has_machine_only_geometry())
         {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "machine zero-length segment addition",
@@ -1020,7 +1020,7 @@ impl SlopeFront {
         if budget.max_components < 1 {
             return FrontierOutcome::Unknown(FrontierUnknown::ComponentLimit);
         }
-        if budget.max_pairs < 3 {
+        if budget.max_pairs < self.components[0].pairs().len() {
             return FrontierOutcome::Unknown(FrontierUnknown::PairLimit);
         }
         if let Err(reason) = work.charge(1) {
@@ -1047,10 +1047,10 @@ impl SlopeFront {
         if budget.max_components < 1 {
             return FrontierOutcome::Unknown(FrontierUnknown::ComponentLimit);
         }
-        if budget.max_pairs < 3 {
+        if budget.max_pairs < self.components[0].pairs().len() {
             return FrontierOutcome::Unknown(FrontierUnknown::PairLimit);
         }
-        if let Err(reason) = work.charge(7) {
+        if let Err(reason) = work.charge(1 + 3 * (self.components[0].pairs().len() - 1)) {
             return FrontierOutcome::Unknown(reason);
         }
         let pairs = self.components[0].pairs();
