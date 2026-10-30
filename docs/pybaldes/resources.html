@@ -125,12 +125,12 @@ Adding those to base arc cost -40 gives -17. Coupled charges appear in
 <td>Interval cost with explicit slope encodings and front policy</td>
 </tr>
 <tr>
-<td><code>add_paired_piecewise_linear</code></td>
-<td>Initial interval/front, per-arc arrival/increment/lower/upper functions, integer waiting rates, and mode</td>
+<td><code>add_paired_front</code></td>
+<td>Declare a paired front resource and its feasibility/cost mode</td>
 </tr>
 <tr>
-<td><code>add_slope_paired</code></td>
-<td>Paired relation with encoded slope functions, front policy, and cost normalization</td>
+<td><code>set_paired_front_program</code></td>
+<td>Attach source/terminal windows, root and per-arc base/dependent functions</td>
 </tr>
 <tr>
 <td><code>install</code></td>
@@ -164,16 +164,19 @@ different evaluation order. Do not pass knot pairs to <code>slope_segments</code
 raises <code>ValueError</code>. <code>to_dict()</code>/<code>from_dict()</code> retain explicit wire encoding.
 Use them when inserting encoded functions into network JSON descriptors.</p>
 <p>Knot functions use strict closed domains. Slope functions accept evaluation
-policy <code>&quot;strict_domain&quot;</code> (default) or <code>&quot;endpoint_tolerance&quot;</code>. Slope interval/paired
+policy <code>&quot;strict_domain&quot;</code> (default) or <code>&quot;endpoint_tolerance&quot;</code>. Slope interval
 resources separately choose front policy <code>&quot;strict_domain&quot;</code> or
 <code>&quot;front_algebra&quot;</code>. Strict fronts require strict slope functions;
 front-algebra fronts require endpoint-tolerance slope functions. Knot
 functions cannot be substituted where lossless slope encodings are required.</p>
 <p>Paired modes are <code>&quot;feasibility&quot;</code>, <code>&quot;cost_bounded&quot;</code>, and <code>&quot;cost_unbounded&quot;</code>.
-Slope-paired normalization defaults to <code>&quot;absolute_final_value&quot;</code>; the alternative
-is <code>&quot;final_minus_initial_minimum&quot;</code>. These choices affect objective meaning and
-arithmetic; do not change them to bypass a domain error. A successful numerical
-front operation does not automatically provide an independent bound certificate.</p>
+Paired resources use an explicit front program rather than an <code>EncodedFunction</code>
+resource declaration. Its base function uses prepared slope pairs, while root,
+dependent and bound functions are explicit affine or vector dictionaries. See
+<a href="../extensions/coupled-resources.html#paired-front-programs-and-waiting">paired front programs</a>
+for the schema and a complete builder example. Cost modes charge the selected
+joined dependent value; no initial-minimum normalization is applied. Different
+meeting splits can produce different values for a physical path.</p>
 <h2 id="disjoint-time-windows">Disjoint time windows</h2>
 <p>Requires a build with <code>multi-time-windows</code>:</p>
 <div class="code-block"><div class="code-heading"><span>Python</span></div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">pybaldes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Solver</span>

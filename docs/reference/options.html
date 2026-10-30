@@ -45,10 +45,9 @@ controls, phase schedules or engine state. Failed live-solver setters preserve
 the prior option values, controls, phases and prepared engine.</p>
 <h2 id="configuration-and-runtime-overrides">Configuration and runtime overrides</h2>
 <ul>
-<li><code>BALDESlabelDominanceStrategy</code> accepts 0 or 1 and reaches labeling through
-<code>Solver::dominance_mode</code>. The dedicated C strategy setter uses the same
-path, so its value agrees with the named option getter. Full-label fixing
-still selects its required dominance behavior.</li>
+<li><code>BALDESlabelDominanceStrategy</code> selects strategy 1, partial dominance, which
+is not implemented, so the setter rejects 1. Every other integer keeps
+ordinary dominance. The option does not set <code>Solver::dominance_mode</code>.</li>
 <li><code>BALDESuseCapacityCuts</code> and <code>BALDEScapCutsMaxNumPerRound</code> override an explicitly
 configured root capacity separator and apply after inherited cut state is
 installed. Omitting an override preserves the configuration or parent's
@@ -212,7 +211,7 @@ reconfigure its existing separator.</p>
 <td><code>BALDESlabelDominanceStrategy</code></td>
 <td>Int</td>
 <td><code>0.0</code></td>
-<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/mod.rs">src/pricing/mod.rs</a>; label dominance mode (0 or 1), shared with the C strategy setter</td>
+<td><a href="https://github.com/lseman/baldes/blob/main/src/pricing/configuration.rs">src/pricing/configuration.rs</a>; 1 (partial dominance) is rejected, other integers use ordinary dominance</td>
 </tr>
 <tr>
 <td><code>BALDESdynBuckStepAdjustRatioThreshold</code></td>
@@ -364,7 +363,7 @@ enabled. They apply to opt-in tree MIP solving; see
 <span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">baldes</span><span class="p">::</span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">::</span><span class="n">support</span><span class="p">(</span><span class="s">"BALDESlabelDominanceStrategy"</span><span class="p">)</span><span class="o">?</span><span class="p">);</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Solver</span><span class="p">::</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-<span class="w">    </span><span class="n">solver</span><span class="p">.</span><span class="n">set_option</span><span class="p">(</span><span class="s">"BALDESlabelDominanceStrategy"</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">solver</span><span class="p">.</span><span class="n">set_option</span><span class="p">(</span><span class="s">"BALDESnumberOfBucketsPerVertex"</span><span class="p">,</span><span class="w"> </span><span class="mf">20.0</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
 <span class="p">}</span>
 </code></pre></div>
@@ -374,12 +373,12 @@ enabled. They apply to opt-in tree MIP solving; see
 <span class="n">names</span> <span class="o">=</span> <span class="n">Solver</span><span class="o">.</span><span class="n">option_names</span><span class="p">()</span>
 <span class="n">implemented</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="n">Solver</span><span class="o">.</span><span class="n">option_support</span><span class="p">(</span><span class="s2">"BALDESlabelDominanceStrategy"</span><span class="p">)</span>
 <span class="n">solver</span> <span class="o">=</span> <span class="n">Solver</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-<span class="n">solver</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s2">"BALDESlabelDominanceStrategy"</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s2">"BALDESnumberOfBucketsPerVertex"</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">)</span>
 </code></pre></div>
 <p>CLI overrides are repeatable:</p>
 <div class="code-block"><div class="code-heading"><span>Terminal</span></div><pre><code class="language-sh">cargo<span class="w"> </span>run<span class="w"> </span>--release<span class="w"> </span>--features<span class="w"> </span>clp<span class="w"> </span>--bin<span class="w"> </span>baldes<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>solve<span class="w"> </span>instances/Solomon/R101.txt<span class="w"> </span>--customers<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--option<span class="w"> </span><span class="nv">BALDESlabelDominanceStrategy</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>--time<span class="w"> </span><span class="m">60</span>
+<span class="w">  </span>--option<span class="w"> </span><span class="nv">BALDESnumberOfBucketsPerVertex</span><span class="o">=</span><span class="m">20</span><span class="w"> </span>--time<span class="w"> </span><span class="m">60</span>
 </code></pre></div>
 <p><a href="https://github.com/lseman/baldes/blob/main/src/core/options.rs"><code>OPTION_TABLE</code></a> is the source of truth for names,
 types, defaults, and feature-dependent support. It lists only controls supported
