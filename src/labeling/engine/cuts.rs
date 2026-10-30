@@ -257,6 +257,9 @@ impl<const D: usize> LabelingEngine<D> {
             .reset(self.grid.forward.buckets.iter().map(Vec::len));
         self.backward
             .reset(self.grid.backward.buckets.iter().map(Vec::len));
+        let protected = self.cuts.knapsack.dominance_protected_resources();
+        self.forward.protected_resources.clone_from(&protected);
+        self.backward.protected_resources = protected;
         let ordinary = !self.has_cuts() && self.branching.resources == 0;
         let branch_only = !self.has_cuts() && self.branching.resources != 0;
         self.forward.labels.set_resource_mode(
@@ -290,7 +293,7 @@ impl<const D: usize> LabelingEngine<D> {
                 self.update_unreachable(false);
             }
             if self.resource_error.load(Ordering::Relaxed) {
-                return Err(incomplete("coupled resource completion arithmetic failure"));
+                return Err(incomplete("resource or bucket completion arithmetic failure"));
             }
             self.refresh_coupled_completion(g);
             self.full_ready = true;

@@ -137,6 +137,7 @@ pub struct LabelStorage<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }>
     pub buckets: Vec<Vec<LabelBucket<D>>>,
     pub crossing: Vec<Vec<usize>>,
     pub root: Option<usize>,
+    pub(crate) protected_resources: Vec<usize>,
 }
 
 #[cfg(test)]

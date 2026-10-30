@@ -208,6 +208,60 @@ impl KnapsackPricing {
         }
         result
     }
+    /// Lower bound for any complete join, independent of resource values.
+    /// Include zero because a load below every breakpoint contributes zero.
+    pub(crate) fn global_cost_lower_bound(&self) -> Option<f64> {
+        use crate::core::rounding::{add_down, multiply_down};
+        let mut lower = 0.0;
+        for (_, _, cut, penalty) in &self.exact_terms {
+            if !penalty.is_finite() {
+                return None;
+            }
+            let mut term = 0.0f64;
+            for &coefficient in cut.coefficients.values() {
+                term = term.min(multiply_down(coefficient as f64, *penalty)?);
+            }
+            lower = add_down(lower, term)?;
+        }
+        for steps in self.resources.values() {
+            let mut term = 0.0f64;
+            for &value in steps.values() {
+                if !value.is_finite() {
+                    return None;
+                }
+                term = term.min(value);
+            }
+            lower = add_down(lower, term)?;
+        }
+        Some(lower)
+    }
+    /// Resources with a potentially varying cut cost. Label dominance permits
+    /// a resource tolerance, which can cross even an increasing breakpoint.
+    pub(crate) fn dominance_protected_resources(&self) -> Vec<usize> {
+        let mut protected = std::collections::BTreeSet::new();
+        for (&resource, steps) in &self.resources {
+            for &value in steps.values() {
+                if !value.is_finite() || value != 0.0 {
+                    protected.insert(resource);
+                    break;
+                }
+            }
+        }
+        for (resource, scale, cut, penalty) in &self.exact_terms {
+            if !scale.is_finite() || *scale <= 0. || !penalty.is_finite() {
+                protected.insert(*resource);
+                continue;
+            }
+            for &coefficient in cut.coefficients.values() {
+                let value = coefficient as f64 * penalty;
+                if !value.is_finite() || value != 0.0 {
+                    protected.insert(*resource);
+                    break;
+                }
+            }
+        }
+        protected.into_iter().collect()
+    }
     /// resConsKnapsackCutsDualsCost: forward consumption, or sink upper
     /// minus the backward label's remaining-resource coordinate.
     pub fn partial_cost<const D: usize>(

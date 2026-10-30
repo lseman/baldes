@@ -272,26 +272,34 @@ impl BucketGraph {
 
     #[inline(always)]
     pub fn bucket_id(&self, forward: bool, vertex: usize, q: [f64; 2]) -> Option<usize> {
-        let term = |r: usize, q: f64| {
-            let x = if forward {
-                q - (self.lower[vertex][r] - 1e-6)
-            } else {
-                self.upper[vertex][r] + 1e-6 - q
-            };
-            floor_isize(x / self.step[r]) * self.stride[vertex][r] as isize
-        };
+        self.bucket_id_checked(forward, vertex, q).ok().flatten()
+    }
+
+    /// Distinguish an unrepresentable lookup from a coordinate outside the
+    /// grid, so completion queries do not treat arithmetic failure as proof.
+    pub(crate) fn bucket_id_checked(
+        &self, forward: bool, vertex: usize, q: [f64; 2],
+    ) -> std::result::Result<Option<usize>, ()> {
         let mut index = 0isize;
-        if self.dimensions > 0 {
-            index += term(0, q[0]);
+        for (r, &coordinate) in q.iter().enumerate().take(self.dimensions) {
+            let step = self.step[r];
+            if !coordinate.is_finite() || !step.is_finite() || step <= 0. {
+                return Err(());
+            }
+            let x = if forward {
+                coordinate - (self.lower.get(vertex).ok_or(())?[r] - 1e-6)
+            } else {
+                self.upper.get(vertex).ok_or(())?[r] + 1e-6 - coordinate
+            } / step;
+            if !x.is_finite() || x <= isize::MIN as f64 || x >= isize::MAX as f64 {
+                return Err(());
+            }
+            let stride = isize::try_from(self.stride.get(vertex).ok_or(())?[r]).map_err(|_| ())?;
+            let term = floor_isize(x).checked_mul(stride).ok_or(())?;
+            index = index.checked_add(term).ok_or(())?;
         }
-        if self.dimensions > 1 {
-            index += term(1, q[1]);
-        }
-        usize::try_from(index).ok().filter(|&i| {
-            self.direction(forward)
-                .buckets
-                .get(vertex)
-                .is_some_and(|v| i < v.len())
-        })
+        Ok(usize::try_from(index).ok().filter(|&i| {
+            self.direction(forward).buckets.get(vertex).is_some_and(|row| i < row.len())
+        }))
     }
 }

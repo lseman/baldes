@@ -200,7 +200,7 @@ impl<const D: usize> Context<'_, D> {
     pub(super) fn completion_sum(&self, a: f64, b: f64) -> f64 {
         // Keys already include the resource correction lower bound. Unknown
         // state hulls leave a -infinity key and cannot authorize pruning.
-        if !self.cuts.presence.active() && !self.coupled_costs {
+        if !self.cuts.presence.active() && !self.coupled_costs && !self.cuts.knapsack.active {
             return a + b;
         }
         crate::core::rounding::add_down(a, b).unwrap_or(f64::NEG_INFINITY)

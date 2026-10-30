@@ -169,7 +169,8 @@ impl<const D: usize> LabelingEngine<D> {
         }
         let bucket = self
             .grid
-            .bucket_id(forward, internal, self.grid.coordinate(&resources))
+            .bucket_id_checked(forward, internal, self.grid.coordinate(&resources))
+            .map_err(|()| incomplete("root bucket index overflow"))?
             .ok_or_else(|| invalid("root outside bucket grid"))?;
         let label = StoredLabel {
             id: 0,
@@ -224,6 +225,8 @@ impl<const D: usize> LabelingEngine<D> {
     }
     pub(super) fn labels_match_graph(&self, g: &Graph<D>) -> bool {
         self.costs_unchanged(g)
+            && self.forward.protected_resources == self.cuts.knapsack.dominance_protected_resources()
+            && self.backward.protected_resources == self.forward.protected_resources
             && self.last_original_costs.iter().map(|cost| cost.to_bits())
                 .eq(g.arcs.iter().map(|arc| arc.cost.to_bits()))
             && match (&self.coupled_identity, g.coupled_kernel()) {

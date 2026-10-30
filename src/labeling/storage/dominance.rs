@@ -8,6 +8,16 @@ fn cut_words_equal(a: &[u32], b: &[u32]) -> bool {
 }
 
 impl<const D: usize> LabelStorage<D> {
+    pub(crate) fn protected_resources_equal(
+        protected: &[usize],
+        a: &HotLabel<D>,
+        b: &HotLabel<D>,
+    ) -> bool {
+        protected.iter().all(|&resource| {
+            a.resources.get(resource).zip(b.resources.get(resource))
+                .is_some_and(|(a, b)| a.to_bits() == b.to_bits())
+        })
+    }
     #[inline]
     pub fn dominates(
         g: &Graph<D>,

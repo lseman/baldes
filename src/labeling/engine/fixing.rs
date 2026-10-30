@@ -32,13 +32,13 @@ impl<const D: usize> LabelingEngine<D> {
         // Packed pricing cuts can forget information retained by full-memory
         // enumeration. In that case scan only for feasibility; pricing's cut
         // costs cannot establish that an otherwise compatible route is costly.
-        let paired = g.coupled_kernel().is_some_and(|kernel| kernel.has_slope_fronts());
         let feasibility_only = g.has_coupled_resources() && (self.has_cuts() || has_full_cuts);
         let threshold = if feasibility_only { f64::INFINITY } else { threshold };
-        // A paired front and a knapsack term have independent lower-bound
-        // representations. Scan actual joins instead of combining those
-        // bounds as if their minimizing resource controls were identical.
-        let scan_all = feasibility_only || (paired && self.cuts.knapsack.active);
+        // A global complete-join knapsack lower bound can be added to the
+        // resource lower bound without assuming matching minimizing controls.
+        let scan_all = feasibility_only;
+        let knapsack_lower = self.cuts.knapsack.global_cost_lower_bound()
+            .unwrap_or(f64::NEG_INFINITY);
         // Both roles must be disproved before fixing a dual-orientation arc.
         if self.consumption_joins
             && g.coupled_kernel()
@@ -106,7 +106,7 @@ impl<const D: usize> LabelingEngine<D> {
                         let arrival = self
                             .grid
                             .propagate(g, forward, arc.physical, point)
-                            .and_then(|mut q| {
+                            .map(|mut q| {
                                 if self.consumption_joins {
                                     for r in 0..self.grid.dimensions {
                                         q[r] = self.grid.upper[target][r]
@@ -115,8 +115,11 @@ impl<const D: usize> LabelingEngine<D> {
                                     }
                                 }
                                 self.grid
-                                    .bucket_id(self.consumption_joins || !forward, target, q)
-                            });
+                                    .bucket_id_checked(self.consumption_joins || !forward, target, q)
+                            })
+                            .transpose()
+                            .map_err(|()| incomplete("fixing bucket index overflow"))?
+                            .flatten();
                         let Some(arrival) = arrival else {
                             removed.insert(arc.id);
                             continue;
@@ -129,8 +132,8 @@ impl<const D: usize> LabelingEngine<D> {
                             if let Some(l) =
                                 self.extend(g, forward, arc, self.storage(forward).labels.view(id))
                             {
-                                let key = l.key()
-                                    + self.cuts.knapsack.partial_cost(g, &l.resources, forward);
+                                let key = crate::core::rounding::add_down(l.key(), knapsack_lower)
+                                    .unwrap_or(f64::NEG_INFINITY);
                                 minimum = if scan_all {
                                     f64::NEG_INFINITY
                                 } else {
@@ -161,7 +164,7 @@ impl<const D: usize> LabelingEngine<D> {
                                 let opposite = &storage.buckets[storage_vertex][bucket];
                                 if self.ctx().completion_sum(
                                     minimum,
-                                    opposite.completion_bound(self.cuts.knapsack.active),
+                                    opposite.completion_bound(false),
                                 ) >= threshold
                                 {
                                     continue;
@@ -173,12 +176,8 @@ impl<const D: usize> LabelingEngine<D> {
                                         physical.tail
                                     };
                                     'pairs: for l in &extended {
-                                        let key = l.key()
-                                            + self.cuts.knapsack.partial_cost(
-                                                g,
-                                                &l.resources,
-                                                forward,
-                                            );
+                                        let key = crate::core::rounding::add_down(l.key(), knapsack_lower)
+                                            .unwrap_or(f64::NEG_INFINITY);
                                         let key = if scan_all {
                                             if !self.ctx().bucket_completion_feasible(
                                                 g, forward, l.coupled_state.as_deref(),
@@ -247,7 +246,7 @@ impl<const D: usize> LabelingEngine<D> {
                 }
             }
             if self.resource_error.load(Ordering::Relaxed) {
-                return Err(incomplete("coupled resource fixing arithmetic failure"));
+                return Err(incomplete("resource or bucket fixing arithmetic failure"));
             }
             if forward {
                 report.eliminated_forward = removed.len();

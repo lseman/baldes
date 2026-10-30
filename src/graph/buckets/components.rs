@@ -5,7 +5,7 @@ impl BucketGraph {
         &self,
         g: &Graph<D>,
         forward: bool,
-    ) -> (Vec<BucketId>, Vec<usize>, Vec<Vec<usize>>) {
+    ) -> Result<(Vec<BucketId>, Vec<usize>, Vec<Vec<usize>>)> {
         let d = self.direction(forward);
         let mut ids = vec![];
         let mut offsets = vec![];
@@ -133,7 +133,8 @@ impl BucketGraph {
                         }
                     }
                 }
-                let Some(start) = self.bucket_id(forward, target, if forward { low } else { high })
+                let Some(start) = self.bucket_id_checked(forward, target, if forward { low } else { high })
+                    .map_err(|()| crate::incomplete("bucket graph index overflow"))?
                 else {
                     continue;
                 };
@@ -186,7 +187,7 @@ impl BucketGraph {
                 }
             }
         }
-        (ids, offsets, edges)
+        Ok((ids, offsets, edges))
     }
 
     pub(super) fn order_components<const D: usize>(
@@ -211,7 +212,7 @@ impl BucketGraph {
         forward: bool,
         update_depth: bool,
     ) -> Result<()> {
-        let (ids, offsets, mut edges) = self.auxiliary(g, forward);
+        let (ids, offsets, mut edges) = self.auxiliary(g, forward)?;
         if ids.is_empty() {
             return Err(invalid("empty bucket graph"));
         }
