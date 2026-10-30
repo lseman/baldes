@@ -17,6 +17,9 @@ impl<const D: usize> LabelingEngine<D> {
         controls: &Controls,
         allow_partial: bool,
     ) -> Result<PricingResult> {
+        if let Some(kernel) = g.coupled_kernel() {
+            kernel.validate_for(g)?;
+        }
         if g.coupled_kernel()
             .is_some_and(|kernel| kernel.has_negative_paired_objectives())
         {

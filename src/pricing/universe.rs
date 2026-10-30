@@ -177,34 +177,59 @@ impl<const D: usize> Solver<D> {
             return Err(incomplete("enumeration time limit exceeded"));
         }
         let g = &self.graph;
+        let mut interrupted = false;
         universe.paths.retain(|p| {
+            if interrupted || enumeration_started.elapsed() > controls.time_limit {
+                interrupted = true;
+                return true;
+            }
             self.ryan_foster.iter().all(|c| {
                 c.satisfied_by(
                     std::iter::once(g.source).chain(p.arcs.iter().map(|&a| g.arcs[a].head)),
                 )
             })
         });
+        if interrupted || enumeration_started.elapsed() > controls.time_limit {
+            return Err(incomplete("enumeration time limit exceeded"));
+        }
         if self.presence_pricing.active() {
-            if let Err(error) = universe.paths.inspect_with_presence(
+            if let Err(error) = universe.paths.inspect_with_presence_until(
                 &self.graph,
                 cutoff,
                 &self.applied_cuts.0,
                 &enumerated_kpath,
                 &self.knapsack_pricing,
                 &self.presence_pricing,
+                Some((enumeration_started, controls.time_limit)),
             ) {
-                self.restore_arcs();
+                if !is_enumeration_interruption(&error.message) {
+                    self.restore_arcs();
+                }
                 return Err(error);
             }
         }
-        let routes = match universe.paths.routes(&self.graph) {
+        if enumeration_started.elapsed() > controls.time_limit {
+            return Err(incomplete("enumeration time limit exceeded"));
+        }
+        let routes = match universe.paths.routes_until(
+            &self.graph, Some((enumeration_started, controls.time_limit)),
+        ) {
             Ok(routes) => routes,
             Err(error) => {
-                self.restore_arcs();
+                if !is_enumeration_interruption(&error.message) {
+                    self.restore_arcs();
+                }
                 return Err(error);
             }
         };
-        self.enumeration_snapshot = Some(self.topology());
+        if enumeration_started.elapsed() > controls.time_limit {
+            return Err(incomplete("enumeration time limit exceeded"));
+        }
+        let snapshot = self.topology();
+        if enumeration_started.elapsed() > controls.time_limit {
+            return Err(incomplete("enumeration time limit exceeded"));
+        }
+        self.enumeration_snapshot = Some(snapshot);
         self.enumeration = Some(universe);
         Ok(routes)
     }

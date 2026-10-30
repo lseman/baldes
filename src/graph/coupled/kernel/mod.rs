@@ -104,6 +104,7 @@ struct Suffix {
 /// extension. Only a forward/backward join supplies that value.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CoupledLabelState {
+    completion_identity: std::sync::Arc<()>,
     selection: StateValues<u64, 2>,
     loads: StateValues<[f64; 3], 1>,
     /// Budgeted worst-case vectors, concatenated in declaration order.

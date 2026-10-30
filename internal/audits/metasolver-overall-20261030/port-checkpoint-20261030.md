@@ -31,3 +31,17 @@ latest integration changes. Those changes have not been regression-tested or
 compared against the pinned binary, and formatting has been deferred. Existing
 tests that assert engine disposal after enumeration interruption may need updates
 to reflect the new retained-engine behavior.
+
+## Subsequent work in progress
+
+- Added graph and completion-state identity checks to reject stale prepared
+  labels and conservatively retain states that cannot be matched.
+- Propagated enumeration deadlines through path inspection and export, and
+  reject nonfinite inspected prices before modifying stored paths.
+- Added feasibility-only scans for mixed-cut completion and coupled-resource
+  arc fixing. Their interaction with label dominance, especially for coupled
+  resource implementations and slope shifts, still needs a soundness audit.
+
+These subsequent changes are untested and are not evidence of native parity.
+Exact interruption timing and the safety of the feasibility-only scans remain
+open; formatting and regression testing are deferred until after porting.

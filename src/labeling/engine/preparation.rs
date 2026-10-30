@@ -230,6 +230,7 @@ impl<const D: usize> LabelingEngine<D> {
                 (None, None) => true,
                 (Some(identity), Some(kernel)) => {
                     std::sync::Arc::ptr_eq(identity, kernel.cache_identity())
+                        && kernel.validate_for(g).is_ok()
                 }
                 _ => false,
             }

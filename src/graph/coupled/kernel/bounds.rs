@@ -390,7 +390,9 @@ impl CoupledStateBounds {
 
 impl CoupledKernel {
     pub(crate) fn completion_state_matches(&self, state: &CoupledLabelState) -> bool {
-        if self.check_state(state).is_err() {
+        if !std::sync::Arc::ptr_eq(&self.identity, &state.completion_identity)
+            || self.check_state(state).is_err()
+        {
             return false;
         }
         !self.front_program_domain || self.slope_paired.iter().zip(&state.slope_relations)
