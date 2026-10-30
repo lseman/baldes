@@ -57,6 +57,21 @@ impl<const D: usize> Solver<D> {
     pub fn fork_for_node(&self) -> Self {
         self.fork_pricing(true)
     }
+    /// Enter a node resumed from a stored fork, as native `restoreFromRecord`.
+    /// A grid whose steps another node changed since the store reorders its
+    /// components on its own arcs.
+    pub fn restore_node_state(&mut self) -> Result<()> {
+        match &mut self.engine {
+            Some(engine) => engine.grid.restore_step_version(&self.graph),
+            None => Ok(()),
+        }
+    }
+    /// Separate this fork's step versions from the tree it was taken from.
+    pub(crate) fn detach_step_versions(&mut self) {
+        if let Some(engine) = &mut self.engine {
+            engine.grid.detach_step_versions();
+        }
+    }
     /// Drop cost-dependent working state without copying potentially large
     /// retained path stores. Logical graph and branch restrictions still copy.
     pub(super) fn fork_pricing(&self, keep_cost_state: bool) -> Self {

@@ -191,6 +191,38 @@ impl<const D: usize> RoutingContext<D> {
         self.branch_constraints.push((logical, constraint));
         Ok(())
     }
+    pub(super) fn activity_entries(&self, route: &Route) -> Result<Vec<(usize, f64)>> {
+        let network = &self.model.networks[0];
+        if network.activity_entries.is_empty() {
+            return Ok(vec![]);
+        }
+        let arcs = route
+            .arcs
+            .iter()
+            .map(|id| {
+                self.arc_position(*id)
+                    .ok_or_else(|| invalid("unknown activity row arc"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        network
+            .activity_entries
+            .iter()
+            .filter(|entry| entry.coefficient != 0.)
+            .map(|entry| {
+                let value = crate::master::model::accumulated_activity_column_value(
+                    &network.graph,
+                    route,
+                    &arcs,
+                    entry.resource,
+                )? * entry.coefficient;
+                if !value.is_finite() {
+                    return Err(invalid("activity row coefficient overflow"));
+                }
+                Ok((entry.row, value))
+            })
+            .collect()
+    }
+
     pub(crate) fn base_entries(&self, route: &Route) -> Result<Vec<(usize, f64)>> {
         let map = self.row_map.borrow();
         let mut coefficients = std::collections::BTreeMap::new();
@@ -205,6 +237,9 @@ impl<const D: usize> RoutingContext<D> {
                 *coefficients.entry(map[r]).or_insert(0.) += a;
             }
         }
+        for (row, value) in self.activity_entries(route)? {
+            *coefficients.entry(map[row]).or_insert(0.) += value;
+        }
         for (r, c) in &self.branch_constraints {
             if c.nonlinear() {
                 let value = c.nonlinear_coefficient(self, route);
@@ -215,7 +250,7 @@ impl<const D: usize> RoutingContext<D> {
         }
         Ok(coefficients.into_iter().filter(|(_, a)| *a != 0.).collect())
     }
-    pub(super) fn route_cost(&self, route: &Route) -> (f64, Vec<i32>) {
+    pub(super) fn route_cost(&self, route: &Route) -> Result<(f64, Vec<i32>)> {
         let mut identities = route.arcs.clone();
         identities.sort_unstable();
         let mut cost = 0.;
@@ -224,22 +259,25 @@ impl<const D: usize> RoutingContext<D> {
             *counts.entry(id).or_insert(0usize) += 1;
         }
         for (id, count) in counts {
-            cost += self.model.networks[0].graph.arcs[self.arc_position(id).unwrap()].cost
-                * count as f64;
+            let position = self
+                .arc_position(id)
+                .ok_or_else(|| invalid("unknown route arc"))?;
+            cost += self.model.networks[0].graph.arcs[position].cost * count as f64;
         }
         if self.model.networks[0].graph.has_coupled_resources() {
             let positions: Vec<_> = route
                 .arcs
                 .iter()
-                .map(|id| self.arc_position(*id).unwrap())
-                .collect();
+                .map(|id| {
+                    self.arc_position(*id)
+                        .ok_or_else(|| invalid("unknown route arc"))
+                })
+                .collect::<Result<_>>()?;
             cost += route
-                .coupled_cost(&self.model.networks[0].graph, &positions)
-                .ok()
-                .flatten()
-                .unwrap_or(f64::INFINITY);
+                .coupled_cost(&self.model.networks[0].graph, &positions)?
+                .ok_or_else(|| invalid("route violates coupled resources"))?;
         }
-        (cost, identities)
+        Ok((cost, identities))
     }
     pub(super) fn reprice(
         &self,
@@ -278,67 +316,86 @@ impl<const D: usize> RoutingContext<D> {
 
 impl<const D: usize> RoutingContext<D> {
     pub(crate) fn elementary_route(&self, ids: &[i32]) -> Option<Route> {
+        self.elementary_route_checked(ids).ok().flatten()
+    }
+
+    pub(crate) fn elementary_route_checked(&self, ids: &[i32]) -> Result<Option<Route>> {
         let g = &self.model.networks[0].graph;
-        if ids.len() > g.original_max_arcs() {
-            return None;
-        }
-        let mut at = g.source;
-        let mut nodes = vec![at as i32];
-        let mut visited = HashSet::new();
-        let mut groups = HashSet::new();
-        if g.has_explicit_elementarity_groups() {
-            groups.extend(g.vertices[g.source].elements.iter().copied());
-        }
-        let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
-        for (r, value) in q.iter_mut().enumerate().take(g.resources.len()) {
-            *value = g.root_resource(r, true)?;
-            if *value < g.vertices[at].bounds[r].lower || *value > g.vertices[at].bounds[r].upper {
+        let Some((nodes, positions, cost, resources, resource_profile)) = (|| {
+            if ids.len() > g.original_max_arcs() {
                 return None;
             }
-        }
-        let mut resource_profile = vec![q[..g.resources.len()].to_vec()];
-        let mut cost = 0.;
-        for &id in ids {
-            let arc = &g.arcs[self.arc_position(id)?];
-            if arc.tail != at || at == g.sink {
-                return None;
-            }
+            let mut at = g.source;
+            let mut nodes = vec![at as i32];
+            let mut visited = HashSet::new();
+            let mut groups = HashSet::new();
             if g.has_explicit_elementarity_groups() {
-                let mut transition_elements = HashSet::new();
-                for &element in arc.elements.iter().chain(&g.vertices[arc.head].elements) {
-                    if transition_elements.insert(element) && !groups.insert(element) {
-                        return None;
-                    }
+                groups.extend(g.vertices[g.source].elements.iter().copied());
+            }
+            let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
+            for (r, value) in q.iter_mut().enumerate().take(g.resources.len()) {
+                *value = g.root_resource(r, true)?;
+                if *value < g.vertices[at].bounds[r].lower
+                    || *value > g.vertices[at].bounds[r].upper
+                {
+                    return None;
                 }
             }
-            q = extend_resources(g, arc, &q, true)?;
-            at = arc.head;
-            if at == g.source
-                || (at != g.sink && !visited.insert(at) && g.max_route_arcs().is_none())
-            {
+            let mut resource_profile = vec![q[..g.resources.len()].to_vec()];
+            let mut cost = 0.;
+            for &id in ids {
+                let arc = &g.arcs[self.arc_position(id)?];
+                if arc.tail != at || at == g.sink {
+                    return None;
+                }
+                if g.has_explicit_elementarity_groups() {
+                    let mut transition_elements = HashSet::new();
+                    for &element in arc.elements.iter().chain(&g.vertices[arc.head].elements) {
+                        if transition_elements.insert(element) && !groups.insert(element) {
+                            return None;
+                        }
+                    }
+                }
+                q = extend_resources(g, arc, &q, true)?;
+                at = arc.head;
+                if at == g.source
+                    || (at != g.sink && !visited.insert(at) && g.max_route_arcs().is_none())
+                {
+                    return None;
+                }
+                cost += arc.cost;
+                nodes.push(at as i32);
+                resource_profile.push(q[..g.resources.len()].to_vec());
+            }
+            if at != g.sink {
                 return None;
             }
-            cost += arc.cost;
-            nodes.push(at as i32);
-            resource_profile.push(q[..g.resources.len()].to_vec());
-        }
-        if at != g.sink {
-            return None;
-        }
-        let positions: Vec<_> = ids
-            .iter()
-            .map(|id| self.arc_position(*id))
-            .collect::<Option<_>>()?;
-        cost += g.coupled_path_cost(&positions).ok()??;
-        Some(Route {
-            coupled_controls: Vec::new(),
-            coupled_values: g.coupled_paired_values(&positions).ok()?,
+            let positions: Vec<_> = ids
+                .iter()
+                .map(|id| self.arc_position(*id))
+                .collect::<Option<_>>()?;
+            Some((
+                nodes,
+                positions,
+                cost,
+                q[..g.resources.len()].to_vec(),
+                resource_profile,
+            ))
+        })() else {
+            return Ok(None);
+        };
+        let Some(coupled) = g.coupled_route_cost(&positions)? else {
+            return Ok(None);
+        };
+        let cost = cost + coupled;
+        Ok(Some(Route {
+            coupled_values: g.coupled_paired_values(&positions)?,
             nodes,
             arcs: ids.to_vec(),
             cost,
             original_cost: cost,
-            resources: q[..g.resources.len()].to_vec(),
+            resources,
             resource_profile,
-        })
+        }))
     }
 }

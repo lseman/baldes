@@ -77,7 +77,7 @@ impl<const D: usize> Solver<D> {
             .is_some_and(|kernel| kernel.has_negative_paired_objectives())
         {
             return Err(incomplete(
-                "negative paired objectives require source-control master pricing",
+                "negative paired objectives are not supported by paired front programs",
             ));
         }
         let phase = *self
@@ -110,6 +110,13 @@ impl<const D: usize> Solver<D> {
         if self.enumeration.is_some() {
             let enumerated_kpath = self.enumerated_kpath_inputs();
             let universe = self.enumeration.as_mut().unwrap();
+            let previous: Vec<f64> = universe
+                .paths
+                .partitions
+                .iter()
+                .flatten()
+                .map(|path| path.reduced_cost)
+                .collect();
             universe.paths.inspect_with_presence(
                 &self.graph,
                 f64::INFINITY,
@@ -118,12 +125,22 @@ impl<const D: usize> Solver<D> {
                 &self.knapsack_pricing,
                 &self.presence_pricing,
             )?;
-            let (routes, minimum) = universe.paths.priced_routes(
+            let priced = universe.paths.priced_routes(
                 &self.graph,
                 maximum.min(self.controls.max_columns),
                 negative_only,
                 self.controls.zero_threshold,
-            )?;
+            );
+            let (routes, minimum) = match priced {
+                Ok(result) => result,
+                Err(error) => {
+                    for (path, old) in universe.paths.partitions.iter_mut().flatten().zip(previous)
+                    {
+                        path.reduced_cost = old;
+                    }
+                    return Err(error);
+                }
+            };
             return Ok(PricingResult {
                 columns: routes,
                 minimum_reduced_cost: minimum,

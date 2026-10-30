@@ -746,7 +746,10 @@ fn machine_composition_endpoint_and_degenerate_branches_match_recorded_binary_bi
                 .collect();
             assert_eq!(actual, expected, "{fixture}");
         } else if fixture["status"] == false && fixture["finite"] == true {
-            assert!(matches!(result, FrontierOutcome::Empty), "{fixture}: {result:?}");
+            assert!(
+                matches!(result, FrontierOutcome::Empty),
+                "{fixture}: {result:?}"
+            );
         } else {
             assert!(
                 matches!(result, FrontierOutcome::Unknown(_)),

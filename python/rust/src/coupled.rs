@@ -1,10 +1,9 @@
 //! Direct coupled-resource model installation for the low-level Python API.
 use super::{run, Solver};
 use baldes::graph::coupled::{
-    descriptor::{PairedCostNormalization, RawAffine, SlopeRelationArc},
-    CoupledResource, EncodedFunction as FunctionDefinition, EvaluationPolicy, FrontOperationPolicy,
-    PairedResourceArc, PairedResourceMode, PiecewiseLinearFunction, PreparedMachineArc,
-    PreparedMachineBackwardInputs, PreparedSlopeFunction,
+    descriptor::RawAffine, CoupledResource, EncodedFunction as FunctionDefinition,
+    EvaluationPolicy, FrontOperationPolicy, PairedResourceMode, PiecewiseLinearFunction,
+    PreparedMachineArc, PreparedMachineBackwardInputs, PreparedSlopeFunction,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -151,6 +150,117 @@ fn prepared_machine_arc(dictionary: &Bound<'_, PyDict>) -> PyResult<PreparedMach
     })
 }
 
+#[derive(Clone)]
+enum FrontInput {
+    Affine(RawAffine),
+    Vector(PreparedSlopeFunction),
+}
+impl FrontInput {
+    fn input(&self) -> baldes::graph::coupled::descriptor::MachineRootInput<'_> {
+        use baldes::graph::coupled::descriptor::MachineRootInput;
+        match self {
+            Self::Affine(value) => MachineRootInput::Affine(*value),
+            Self::Vector(value) => MachineRootInput::Vector(value),
+        }
+    }
+}
+
+fn front_input(dictionary: &Bound<'_, PyDict>) -> PyResult<FrontInput> {
+    let encoding: String = required_field(dictionary, "encoding")?.extract()?;
+    match encoding.as_str() {
+        "affine" => {
+            exact_fields(dictionary, &["encoding", "intercept", "slope"])?;
+            let intercept = required_field(dictionary, "intercept")?.extract()?;
+            let slope = required_field(dictionary, "slope")?.extract()?;
+            Ok(FrontInput::Affine(
+                RawAffine::new(intercept, slope)
+                    .map_err(|error| PyValueError::new_err(error.to_string()))?,
+            ))
+        }
+        "vector" => {
+            exact_fields(dictionary, &["encoding", "function"])?;
+            Ok(FrontInput::Vector(prepared_machine_function(
+                dictionary, "function",
+            )?))
+        }
+        _ => Err(PyValueError::new_err(
+            "front input encoding must be affine or vector",
+        )),
+    }
+}
+
+#[derive(Clone)]
+struct FrontArc {
+    tail: baldes::graph::Window,
+    waiting: baldes::graph::Window,
+    rate: f64,
+    base: PreparedSlopeFunction,
+    dependent: FrontInput,
+    lower: FrontInput,
+    upper: FrontInput,
+}
+#[derive(Clone)]
+struct FrontProgram {
+    source: baldes::graph::Window,
+    terminal: baldes::graph::Window,
+    root: FrontInput,
+    arcs: Vec<FrontArc>,
+}
+
+fn front_window(value: Bound<'_, PyAny>) -> PyResult<baldes::graph::Window> {
+    let [lower, upper] = value.extract::<[f64; 2]>()?;
+    baldes::graph::Window::new(lower, upper).map_err(|error| PyValueError::new_err(error.message))
+}
+
+fn front_program(dictionary: &Bound<'_, PyDict>) -> PyResult<FrontProgram> {
+    exact_fields(
+        dictionary,
+        &["source_bounds", "terminal_bounds", "root", "arcs"],
+    )?;
+    let py = dictionary.py();
+    let arcs = required_field(dictionary, "arcs")?.extract::<Vec<Py<PyDict>>>()?;
+    let mut parsed = Vec::with_capacity(arcs.len());
+    for arc in arcs {
+        let arc = arc.bind(py);
+        exact_fields(
+            arc,
+            &[
+                "tail_bounds",
+                "waiting_bounds",
+                "waiting_rate",
+                "base",
+                "dependent",
+                "dependent_lower",
+                "dependent_upper",
+            ],
+        )?;
+        let rate: f64 = required_field(arc, "waiting_rate")?.extract()?;
+        if !rate.is_finite()
+            || rate.trunc() < f64::from(i32::MIN)
+            || rate.trunc() > f64::from(i32::MAX)
+        {
+            return Err(PyValueError::new_err(
+                "waiting rate is outside the supported integer range",
+            ));
+        }
+        parsed.push(FrontArc {
+            tail: front_window(required_field(arc, "tail_bounds")?)?,
+            waiting: front_window(required_field(arc, "waiting_bounds")?)?,
+            rate,
+            base: prepared_machine_function(arc, "base")?,
+            dependent: front_input(required_field(arc, "dependent")?.cast::<PyDict>()?)?,
+            lower: front_input(required_field(arc, "dependent_lower")?.cast::<PyDict>()?)?,
+            upper: front_input(required_field(arc, "dependent_upper")?.cast::<PyDict>()?)?,
+        });
+    }
+    Ok(FrontProgram {
+        source: front_window(required_field(dictionary, "source_bounds")?)?,
+        terminal: front_window(required_field(dictionary, "terminal_bounds")?)?,
+        root: front_input(required_field(dictionary, "root")?.cast::<PyDict>()?)?,
+        arcs: parsed,
+    })
+}
+
 #[pymethods]
 impl EncodedFunction {
     /// Construct literal argument/value knots with a strict closed domain.
@@ -277,6 +387,8 @@ pub struct ResourceModel {
     paired_machine_inputs: Vec<(usize, Vec<PreparedMachineArc>)>,
     paired_machine_roots: Vec<(usize, PreparedSlopeFunction)>,
     paired_machine_terminal_bounds: Vec<(usize, baldes::graph::Window)>,
+    paired_machine_waiting_rates: Vec<(usize, Vec<f64>)>,
+    paired_front_programs: Vec<(usize, FrontProgram)>,
 }
 impl ResourceModel {
     fn push(&mut self, resource: CoupledResource) -> usize {
@@ -295,6 +407,8 @@ impl ResourceModel {
             paired_machine_inputs: Vec::new(),
             paired_machine_roots: Vec::new(),
             paired_machine_terminal_bounds: Vec::new(),
+            paired_machine_waiting_rates: Vec::new(),
+            paired_front_programs: Vec::new(),
         }
     }
     /// Map a slope-paired resource to its physical scalar base resource for
@@ -306,13 +420,12 @@ impl ResourceModel {
         base_resource: Option<usize>,
     ) -> PyResult<()> {
         match self.resources.get(resource) {
-            Some(CoupledResource::SlopePaired {
-                policy: FrontOperationPolicy::FrontAlgebra,
-                ..
-            }) => {}
-            _ => return Err(PyValueError::new_err(
-                "waiting base resource requires a slope-paired resource with front_algebra policy",
-            )),
+            Some(CoupledResource::PairedFront { .. }) => {}
+            _ => {
+                return Err(PyValueError::new_err(
+                    "waiting base resource requires a paired resource",
+                ))
+            }
         }
         self.paired_waiting_base_resources
             .retain(|&(id, _)| id != resource);
@@ -332,13 +445,10 @@ impl ResourceModel {
         arcs: Option<Vec<Py<PyDict>>>,
     ) -> PyResult<()> {
         match self.resources.get(resource) {
-            Some(CoupledResource::SlopePaired {
-                policy: FrontOperationPolicy::FrontAlgebra,
-                ..
-            }) => {}
+            Some(CoupledResource::PairedFront { .. }) => {}
             _ => {
                 return Err(PyValueError::new_err(
-                    "machine inputs require a slope-paired resource with front_algebra policy",
+                    "machine inputs require a paired resource",
                 ))
             }
         }
@@ -365,13 +475,10 @@ impl ResourceModel {
     ) -> PyResult<()> {
         if !matches!(
             self.resources.get(resource),
-            Some(CoupledResource::SlopePaired {
-                policy: FrontOperationPolicy::FrontAlgebra,
-                ..
-            })
+            Some(CoupledResource::PairedFront { .. })
         ) {
             return Err(PyValueError::new_err(
-                "machine root requires a slope-paired resource with front_algebra policy",
+                "machine root requires a paired resource",
             ));
         }
         let parsed = root
@@ -411,10 +518,62 @@ impl ResourceModel {
         Ok(())
     }
 
+    /// Retain the original per-arc waiting rates for paired path recording.
+    fn set_paired_machine_waiting_rates(
+        &mut self,
+        resource: usize,
+        rates: Option<Vec<f64>>,
+    ) -> PyResult<()> {
+        if !matches!(
+            self.resources.get(resource),
+            Some(CoupledResource::PairedFront { .. })
+        ) {
+            return Err(PyValueError::new_err(
+                "waiting rates require a paired resource",
+            ));
+        }
+        if rates
+            .as_ref()
+            .is_some_and(|rates| rates.iter().any(|rate| !rate.is_finite()))
+        {
+            return Err(PyValueError::new_err("waiting rates must be finite"));
+        }
+        self.paired_machine_waiting_rates
+            .retain(|(id, _)| *id != resource);
+        if let Some(rates) = rates {
+            self.paired_machine_waiting_rates.push((resource, rates));
+        }
+        Ok(())
+    }
+
+    /// Store the complete paired front program for preparation during install.
+    fn set_paired_front_program(
+        &mut self,
+        py: Python<'_>,
+        resource: usize,
+        program: Option<Py<PyDict>>,
+    ) -> PyResult<()> {
+        if !matches!(
+            self.resources.get(resource),
+            Some(CoupledResource::PairedFront { .. })
+        ) {
+            return Err(PyValueError::new_err(
+                "front program requires a paired resource",
+            ));
+        }
+        let parsed = program
+            .map(|program| front_program(program.bind(py)))
+            .transpose()?;
+        self.paired_front_programs.retain(|(id, _)| *id != resource);
+        if let Some(program) = parsed {
+            self.paired_front_programs.push((resource, program));
+        }
+        Ok(())
+    }
+
     /// Install resource kernels on this solver's physical graph in place.
     /// Existing options remain; labels, fixing and enumeration are invalidated.
-    /// front_program_domain selects a computed native-program model;
-    /// the default keeps source-control feasibility.
+    /// Paired resources use the prepared front program.
     #[pyo3(signature = (solver, *, front_program_domain=false))]
     fn install(&self, solver: &mut Solver, front_program_domain: bool) -> PyResult<()> {
         run(|| {
@@ -446,6 +605,70 @@ impl ResourceModel {
                         })
                     }
                 }
+            }
+            for (resource, program) in &self.paired_front_programs {
+                use baldes::graph::coupled::{
+                    descriptor::{FrontierBudget, FrontierOutcome},
+                    MachineArcFunctionInput,
+                };
+                if self
+                    .paired_machine_inputs
+                    .iter()
+                    .any(|(id, _)| id == resource)
+                    || self
+                        .paired_machine_roots
+                        .iter()
+                        .any(|(id, _)| id == resource)
+                    || self
+                        .paired_machine_terminal_bounds
+                        .iter()
+                        .any(|(id, _)| id == resource)
+                    || self
+                        .paired_machine_waiting_rates
+                        .iter()
+                        .any(|(id, _)| id == resource)
+                {
+                    return Err(baldes::core::error::OrError {
+                        kind: baldes::core::error::ErrorKind::InvalidArgument,
+                        message: "paired front program conflicts with separate inputs".into(),
+                    });
+                }
+                let arcs: Vec<_> = program
+                    .arcs
+                    .iter()
+                    .enumerate()
+                    .map(|(physical_arc, arc)| MachineArcFunctionInput {
+                        physical_arc,
+                        tail_bounds: arc.tail,
+                        waiting_bounds: arc.waiting,
+                        waiting_rate: arc.rate.trunc() as i32,
+                        base: &arc.base,
+                        dependent: arc.dependent.input(),
+                        dependent_lower: arc.lower.input(),
+                        dependent_upper: arc.upper.input(),
+                    })
+                    .collect();
+                let rates: Vec<_> = program.arcs.iter().map(|arc| arc.rate).collect();
+                match checked.prepare_paired_front_program_with_rates(
+                    *resource,
+                    &arcs,
+                    program.root.input(),
+                    program.source,
+                    program.terminal,
+                    &rates,
+                    FrontierBudget::default(),
+                ) {
+                    FrontierOutcome::Complete(()) => {}
+                    other => {
+                        return Err(baldes::core::error::OrError {
+                            kind: baldes::core::error::ErrorKind::InvalidArgument,
+                            message: format!("paired front program unavailable: {other:?}"),
+                        })
+                    }
+                }
+            }
+            for (resource, rates) in &self.paired_machine_waiting_rates {
+                checked.set_paired_machine_waiting_rates(*resource, rates)?;
             }
             if front_program_domain {
                 checked.set_front_program_domain(true)?;
@@ -598,151 +821,16 @@ impl ResourceModel {
             policy,
         }))
     }
-    /// Retain a paired base/dependent relation with optional waiting.
-    /// Arrival functions give the total base arrival, not its increment.
-    /// Cost modes use an explicit normalization, relative by default.
-    #[pyo3(signature = (initial_lower, initial_upper, initial, arrivals, increments, lowers, uppers, waiting, mode="feasibility", normalization="final_minus_initial_minimum"))]
-    fn add_paired_piecewise_linear(
-        &mut self,
-        initial_lower: f64,
-        initial_upper: f64,
-        initial: Vec<(f64, f64)>,
-        arrivals: Vec<Vec<(f64, f64)>>,
-        increments: Vec<Vec<(f64, f64)>>,
-        lowers: Vec<Vec<(f64, f64)>>,
-        uppers: Vec<Vec<(f64, f64)>>,
-        waiting: Vec<i32>,
-        mode: &str,
-        normalization: &str,
-    ) -> PyResult<usize> {
-        let resource = run(|| {
-            let invalid = |message: &str| baldes::core::error::OrError {
-                kind: baldes::core::error::ErrorKind::InvalidArgument,
-                message: message.into(),
-            };
-            let function = |points: Vec<(f64, f64)>| {
-                PiecewiseLinearFunction::new(points.into_iter().map(|(x, y)| [x, y]).collect())
-            };
-            let count = arrivals.len();
-            if [increments.len(), lowers.len(), uppers.len(), waiting.len()]
-                .iter()
-                .any(|&n| n != count)
-            {
-                return Err(invalid("paired resource arc vector lengths differ"));
-            }
-            let mode = match mode {
-                "feasibility" => PairedResourceMode::Feasibility,
-                "cost_unbounded" => PairedResourceMode::CostUnbounded,
-                "cost_bounded" => PairedResourceMode::CostBounded,
-                _ => return Err(invalid("unknown paired resource mode")),
-            };
-            let arcs = arrivals
-                .into_iter()
-                .zip(increments)
-                .zip(lowers)
-                .zip(uppers)
-                .zip(waiting)
-                .map(|((((arrival, increment), lower), upper), waiting)| {
-                    Ok(PairedResourceArc {
-                        arrival: function(arrival)?,
-                        increment: function(increment)?,
-                        lower: function(lower)?,
-                        upper: function(upper)?,
-                        waiting,
-                    })
-                })
-                .collect::<baldes::Result<Vec<_>>>()?;
-            Ok(CoupledResource::PairedPiecewiseLinear {
-                initial: function(initial)?,
-                initial_base: baldes::Window::new(initial_lower, initial_upper)?,
-                arcs,
-                mode,
-                normalization: match normalization {
-                    "absolute_final_value" => PairedCostNormalization::AbsoluteFinalValue,
-                    "final_minus_initial_minimum" => {
-                        PairedCostNormalization::FinalMinusInitialMinimum
-                    }
-                    _ => return Err(invalid("unknown paired cost normalization")),
-                },
-            })
-        })?;
-        Ok(self.push(resource))
-    }
-    /// Retain a paired slope-front relation with an explicit objective baseline.
-    /// Only slope encodings with policies matching the chosen front operator
-    /// are accepted. Cost modes default to charging the absolute final value.
-    /// Native operator compatibility is distinct from source-control replay.
-    #[pyo3(signature = (initial_lower, initial_upper, initial, arrivals, increments, lowers, uppers, waiting, mode="feasibility", policy="strict_domain", normalization="absolute_final_value"))]
-    fn add_slope_paired(
-        &mut self,
-        initial_lower: f64,
-        initial_upper: f64,
-        initial: PyRef<'_, EncodedFunction>,
-        arrivals: Vec<PyRef<'_, EncodedFunction>>,
-        increments: Vec<PyRef<'_, EncodedFunction>>,
-        lowers: Vec<PyRef<'_, EncodedFunction>>,
-        uppers: Vec<PyRef<'_, EncodedFunction>>,
-        waiting: Vec<i32>,
-        mode: &str,
-        policy: &str,
-        normalization: &str,
-    ) -> PyResult<usize> {
+    /// Add a paired resource whose functions are supplied by a front program.
+    #[pyo3(signature = (mode="feasibility"))]
+    fn add_paired_front(&mut self, mode: &str) -> PyResult<usize> {
         let mode = match mode {
             "feasibility" => PairedResourceMode::Feasibility,
             "cost_unbounded" => PairedResourceMode::CostUnbounded,
             "cost_bounded" => PairedResourceMode::CostBounded,
             _ => return Err(PyValueError::new_err("unknown paired resource mode")),
         };
-        let normalization =
-            match normalization {
-                "absolute_final_value" => PairedCostNormalization::AbsoluteFinalValue,
-                "final_minus_initial_minimum" => PairedCostNormalization::FinalMinusInitialMinimum,
-                _ => return Err(PyValueError::new_err(
-                    "normalization must be 'absolute_final_value' or 'final_minus_initial_minimum'",
-                )),
-            };
-        let (policy, leaf_policy) = front_policy(policy)?;
-        let initial_base = baldes::Window::new(initial_lower, initial_upper)
-            .map_err(|error| PyValueError::new_err(error.to_string()))?;
-        if !initial_lower.is_finite() || !initial_upper.is_finite() {
-            return Err(PyValueError::new_err(
-                "slope paired initial window must be finite",
-            ));
-        }
-        let initial = slope_function(&initial.definition, leaf_policy)?;
-        let count = arrivals.len();
-        if [increments.len(), lowers.len(), uppers.len(), waiting.len()]
-            .iter()
-            .any(|&n| n != count)
-        {
-            return Err(PyValueError::new_err(
-                "paired resource arc vector lengths differ",
-            ));
-        }
-        let arcs = arrivals
-            .into_iter()
-            .zip(increments)
-            .zip(lowers)
-            .zip(uppers)
-            .zip(waiting)
-            .map(|((((arrival, increment), lower), upper), waiting)| {
-                Ok(SlopeRelationArc {
-                    arrival: slope_function(&arrival.definition, leaf_policy)?,
-                    increment: slope_function(&increment.definition, leaf_policy)?,
-                    lower: slope_function(&lower.definition, leaf_policy)?,
-                    upper: slope_function(&upper.definition, leaf_policy)?,
-                    waiting,
-                })
-            })
-            .collect::<PyResult<Vec<_>>>()?;
-        Ok(self.push(CoupledResource::SlopePaired {
-            initial,
-            initial_base,
-            arcs,
-            mode,
-            normalization,
-            policy,
-        }))
+        Ok(self.push(CoupledResource::PairedFront { mode }))
     }
     /// Replace a numeric state with its per-arc piecewise-linear map.
     fn add_piecewise_linear_resource(

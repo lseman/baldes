@@ -32,7 +32,6 @@ mod incumbent;
 use crate::master::numerics::ExactSum;
 pub(crate) use incumbent::{
     exact_route_feasibility, exact_route_feasibility_with_budget, exact_route_feasible,
-    exact_scalar_path_feasibility,
 };
 mod integer;
 pub use integer::{EnumeratedMipOutput, EnumerationMipPolicy};

@@ -501,12 +501,12 @@ fn paired_column_values_match_registered_native_values_and_reject_stale_pool_met
     )))
     .unwrap();
     let mut source = corpus["cases"][0]["model"].clone();
-    for arc in source["networks"][0]["coupled_resources"][0]["arcs"]
+    for arc in source["networks"][0]["paired_front_programs"][0]["arcs"]
         .as_array_mut()
         .unwrap()
     {
-        arc["increment"]["pairs"][0][0] = serde_json::json!(1.);
-        for pair in arc["increment"]["pairs"]
+        arc["dependent"]["function"]["pairs"][0][0] = serde_json::json!(1.);
+        for pair in arc["dependent"]["function"]["pairs"]
             .as_array_mut()
             .unwrap()
             .iter_mut()

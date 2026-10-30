@@ -1,166 +1,7 @@
 //! Prepared relation continuation operations.
 use super::*;
 
-impl PreparedSlopeRelationArc {
-    pub fn new(
-        source: &SlopeRelationArc,
-        policy: FrontOperationPolicy,
-    ) -> Result<Self, RawFunctionError> {
-        if [
-            &source.arrival,
-            &source.increment,
-            &source.lower,
-            &source.upper,
-        ]
-        .iter()
-        .any(|function| function.has_machine_only_geometry())
-        {
-            return Err(RawFunctionError::Unsupported(
-                "machine zero-length segment as paired source",
-            ));
-        }
-        if source.arrival.pairs().iter().skip(1).any(|p| p.0 <= 0.) {
-            return Err(RawFunctionError::Unsupported(
-                "arrival must be strictly increasing",
-            ));
-        }
-        let mut previous = source.arrival.pairs()[0].1;
-        let mut mapped = source.arrival.pairs()[0].0;
-        if mapped < previous {
-            return Err(RawFunctionError::Unsupported("arrival precedes departure"));
-        }
-        for &(slope, x) in &source.arrival.pairs()[1..] {
-            mapped += slope * (x - previous);
-            if !mapped.is_finite() {
-                return Err(RawFunctionError::ArithmeticOverflow("arrival validation"));
-            }
-            if mapped < x {
-                return Err(RawFunctionError::Unsupported("arrival precedes departure"));
-            }
-            previous = x;
-        }
-        let shape = (|| {
-            let constant = |f: &PreparedSlopeFunction| {
-                f.pairs()
-                    .iter()
-                    .skip(1)
-                    .all(|p| p.0 == 0.)
-                    .then_some(f.pairs()[0].0)
-            };
-            if source.arrival.pairs().len() > 2
-                || !source.arrival.pairs().iter().skip(1).all(|p| p.0 == 1.)
-                || source.arrival.pairs()[0].1 != 0.
-            {
-                return Err("general arrival composition");
-            }
-            let delta = source.arrival.pairs()[0].0;
-            if delta < 0. {
-                return Err("non-FIFO arrival translation");
-            }
-            let phi = constant(&source.increment).ok_or("nonconstant paired increment")?;
-            let (al, ah) = source.arrival.domain();
-            let (pl, ph) = source.increment.domain();
-            let (ll, lh) = source.lower.domain();
-            let (ul, uh) = source.upper.domain();
-            Ok(Translation {
-                delta,
-                phi,
-                tail_lo: al.max(pl),
-                tail_hi: ah.min(ph),
-                head_lo: ll.max(ul),
-                head_hi: lh.min(uh),
-            })
-        })();
-        let inverse = match inverse_increasing(&source.arrival, FrontierBudget::default()) {
-            FrontierOutcome::Complete(f) => FrontierOutcome::Complete(Arc::new(f)),
-            FrontierOutcome::Empty => FrontierOutcome::Empty,
-            FrontierOutcome::Unknown(e) => FrontierOutcome::Unknown(e),
-        };
-        let composition = match &inverse {
-            FrontierOutcome::Complete(f) => {
-                PreparedCompositionMap::new(f, FrontierBudget::default())
-            }
-            FrontierOutcome::Empty => FrontierOutcome::Empty,
-            FrontierOutcome::Unknown(e) => FrontierOutcome::Unknown(e.clone()),
-        };
-        // Native preparation constructs Phi = phi composed with q inverse.
-        // Runtime composes F separately, then adds this cached Phi.
-        let increment_front = match (&composition, &inverse) {
-            (FrontierOutcome::Complete(map), FrontierOutcome::Complete(inverse)) => {
-                let (lo, hi) = inverse.domain();
-                match map.compose_clipped(
-                    &source.increment,
-                    lo,
-                    hi,
-                    policy,
-                    FrontierBudget::default(),
-                ) {
-                    FrontierOutcome::Complete(f) => {
-                        FrontierOutcome::Complete(SlopeFront::from_prepared(f))
-                    }
-                    FrontierOutcome::Empty => FrontierOutcome::Empty,
-                    FrontierOutcome::Unknown(e) => FrontierOutcome::Unknown(e),
-                }
-            }
-            (FrontierOutcome::Unknown(e), _) => FrontierOutcome::Unknown(e.clone()),
-            (_, FrontierOutcome::Unknown(e)) => FrontierOutcome::Unknown(e.clone()),
-            _ => FrontierOutcome::Empty,
-        };
-        Ok(Self {
-            source: Arc::new(source.clone()),
-            policy,
-            shape,
-            inverse,
-            composition,
-            increment_front,
-            bounds: PreparedClampFilter::new(&source.lower, &source.upper)?,
-        })
-    }
-
-    /// Ordered slope addition and monotone secant composition followed by a
-    /// running-min waiting envelope, lower clamping and upper filtering.
-    /// Unresolved numerical crossings return Unknown, never infeasibility.
-    pub fn extend(
-        &self,
-        front: &SlopeFront,
-        budget: FrontierBudget,
-    ) -> FrontierOutcome<SlopeFront> {
-        match self.extend_checked(front, budget, None) {
-            Ok(Some(out)) => FrontierOutcome::Complete(out),
-            Ok(None) => FrontierOutcome::Empty,
-            Err(reason) => FrontierOutcome::Unknown(reason),
-        }
-    }
-
-    /// Extend with the explicit machine waiting bounds supplied by the
-    /// reference's per-arc accumulated-base record. These bounds are separate
-    /// from the domains of the dependent bound functions. Only recovered
-    /// zero-length waiting, maximum and upper-filter branches use them;
-    /// unsupported geometry remains unknown and no source certificate follows.
-    pub fn extend_with_machine_waiting_bounds(
-        &self,
-        front: &SlopeFront,
-        lower: f64,
-        upper: f64,
-        budget: FrontierBudget,
-    ) -> FrontierOutcome<SlopeFront> {
-        if self.policy != FrontOperationPolicy::FrontAlgebra {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                "explicit machine waiting bounds require front algebra",
-            ));
-        }
-        if !lower.is_finite() || !upper.is_finite() || lower > upper {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                "machine waiting needs finite ordered bounds",
-            ));
-        }
-        match self.extend_checked(front, budget, Some((lower, upper))) {
-            Ok(Some(out)) => FrontierOutcome::Complete(out),
-            Ok(None) => FrontierOutcome::Empty,
-            Err(reason) => FrontierOutcome::Unknown(reason),
-        }
-    }
-
+impl PairedFrontOperations {
     /// Apply the recovered finite preflight before machine-front composition.
     /// `tail_limit` and `head_limit` are respectively the first and third
     /// scalar arguments of the machine recurrence; `forward_mapping` is its
@@ -171,17 +12,13 @@ impl PreparedSlopeRelationArc {
     /// Sentinel lookups and unsupported arithmetic remain unknown. This does
     /// not perform composition, extension, or produce a route witness.
     pub fn machine_continuation_preflight(
-        &self,
         front: &SlopeFront,
         tail_limit: f64,
         head_limit: f64,
         forward_mapping: &PreparedSlopeFunction,
         budget: FrontierBudget,
     ) -> FrontierOutcome<(SlopeFront, f64, f64)> {
-        if self.policy != FrontOperationPolicy::FrontAlgebra
-            || !tail_limit.is_finite()
-            || !head_limit.is_finite()
-        {
+        if !tail_limit.is_finite() || !head_limit.is_finite() {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "machine continuation preflight inputs",
             ));
@@ -276,14 +113,12 @@ impl PreparedSlopeRelationArc {
     /// result of `machine_continuation_preflight` for the same transition.
     /// Unsupported composition geometry remains unknown.
     pub fn machine_continuation_compose(
-        &self,
         preflight: (SlopeFront, f64, f64),
         inverse: &PreparedSlopeFunction,
         budget: FrontierBudget,
     ) -> FrontierOutcome<(SlopeFront, PreparedSlopeFunction)> {
         let (reduced, lower, upper) = preflight;
-        if self.policy != FrontOperationPolicy::FrontAlgebra
-            || reduced.components().len() != 1
+        if reduced.components().len() != 1
             || !matches!(
                 reduced.provenance().as_ref(),
                 FrontierProvenance::MachineReduction { .. }
@@ -419,19 +254,16 @@ impl PreparedSlopeRelationArc {
     /// Apply the recovered sum with the separately prepared vector operand,
     /// followed by the continuation caller's fixed-array validity check.
     pub fn machine_continuation_sum(
-        &self,
         composition: (SlopeFront, PreparedSlopeFunction),
         vector: &PreparedSlopeFunction,
         budget: FrontierBudget,
     ) -> FrontierOutcome<(SlopeFront, PreparedSlopeFunction)> {
         let started = Instant::now();
         let (reduced, fixed) = composition;
-        if self.policy != FrontOperationPolicy::FrontAlgebra
-            || !matches!(
-                reduced.provenance().as_ref(),
-                FrontierProvenance::MachineReduction { .. }
-            )
-        {
+        if !matches!(
+            reduced.provenance().as_ref(),
+            FrontierProvenance::MachineReduction { .. }
+        ) {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "machine continuation sum inputs",
             ));
@@ -485,7 +317,6 @@ impl PreparedSlopeRelationArc {
     /// remaining elapsed time from one start instant. A stage may exhaust its
     /// fraction even when a different partition could have succeeded.
     pub fn machine_continue(
-        &self,
         front: &SlopeFront,
         inputs: &MachineContinuationInputs<'_>,
         budget: FrontierBudget,
@@ -529,7 +360,7 @@ impl PreparedSlopeRelationArc {
                 }
             };
         }
-        let preflight = match self.machine_continuation_preflight(
+        let preflight = match Self::machine_continuation_preflight(
             front,
             inputs.tail_limit,
             inputs.head_limit,
@@ -541,13 +372,16 @@ impl PreparedSlopeRelationArc {
             FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
         };
         let composed =
-            match self.machine_continuation_compose(preflight, inputs.inverse, next_budget!()) {
+            match Self::machine_continuation_compose(preflight, inputs.inverse, next_budget!()) {
                 FrontierOutcome::Complete(value) => value,
                 FrontierOutcome::Empty => return FrontierOutcome::Empty,
                 FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
             };
-        let (reduced, sum) =
-            stage!(self.machine_continuation_sum(composed, inputs.sum_vector, next_budget!()));
+        let (reduced, sum) = stage!(Self::machine_continuation_sum(
+            composed,
+            inputs.sum_vector,
+            next_budget!()
+        ));
         let sum_front = SlopeFront::from_prepared(sum);
         let waiting = stage!(sum_front.machine_waiting(
             inputs.waiting_lower,
@@ -556,7 +390,11 @@ impl PreparedSlopeRelationArc {
             next_budget!()
         ));
         let lower = stage!(waiting.apply_lower_bound(inputs.dependent_lower, next_budget!()));
-        let upper = stage!(lower.apply_upper_bound(inputs.dependent_upper, next_budget!()));
+        let upper = match lower.apply_upper_bound(inputs.dependent_upper, next_budget!()) {
+            FrontierOutcome::Complete(value) => value,
+            FrontierOutcome::Empty => return FrontierOutcome::Empty,
+            FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
+        };
         if budget
             .max_elapsed
             .is_some_and(|limit| started.elapsed() >= limit)
@@ -571,7 +409,6 @@ impl PreparedSlopeRelationArc {
     /// provenance are not a source-control feasibility or pruning proof.
     /// The supplied inputs must describe this same physical arc.
     pub fn machine_transition(
-        &self,
         front: &SlopeFront,
         inputs: &MachineContinuationInputs<'_>,
         mode: i32,
@@ -595,7 +432,7 @@ impl PreparedSlopeRelationArc {
             max_operations: stage_work * 6,
             ..budget
         };
-        let (reduced, envelope) = match self.machine_continue(front, inputs, continuation_budget) {
+        let (reduced, envelope) = match Self::machine_continue(front, inputs, continuation_budget) {
             FrontierOutcome::Complete(value) => value,
             FrontierOutcome::Empty => return FrontierOutcome::Empty,
             FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
@@ -611,13 +448,7 @@ impl PreparedSlopeRelationArc {
             max_elapsed: remaining,
             ..budget
         };
-        match MachineForwardState::from_filtered_waiting(
-            &reduced,
-            &envelope,
-            self.source.clone(),
-            mode,
-            state_budget,
-        ) {
+        match MachineForwardState::from_filtered_waiting(&reduced, &envelope, mode, state_budget) {
             FrontierOutcome::Complete(state) => {
                 if budget
                     .max_elapsed

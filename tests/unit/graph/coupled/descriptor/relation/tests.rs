@@ -18,7 +18,7 @@ fn general_machine_minimum_matches_binary_scan() {
                     .collect::<Vec<_>>(),
             )
         };
-        let result = PreparedSlopeRelationArc::machine_minimum_streams(
+        let result = PairedFrontOperations::machine_minimum_streams(
             &decode("left"),
             &decode("right"),
             FrontierBudget::default(),
@@ -75,7 +75,7 @@ fn machine_backward_cost_comparison_matches_ordered_binary_scan() {
             )
         };
         let result = if row["mode"].as_i64().unwrap() == 4 {
-            match PreparedSlopeRelationArc::machine_backward_feasibility_dominance(
+            match PairedFrontOperations::machine_backward_feasibility_dominance(
                 &decode("left"),
                 &decode("right"),
                 FrontierBudget::default(),
@@ -87,7 +87,7 @@ fn machine_backward_cost_comparison_matches_ordered_binary_scan() {
                 FrontierOutcome::Unknown(reason) => FrontierOutcome::Unknown(reason),
             }
         } else {
-            PreparedSlopeRelationArc::machine_backward_cost_dominance(
+            PairedFrontOperations::machine_backward_cost_dominance(
                 &decode("left"),
                 &decode("right"),
                 row["mode"].as_i64().unwrap() as i32,
@@ -121,13 +121,11 @@ fn machine_lower_streams_keep_a_prefix_across_strictly_rejected_trailing_segment
     // 7237eb and 723522 reach status 2 only on re-entry or a later near tie.
     let lower = function(&[(2., 0.), (0., 3.)]);
     let input = SlopeFront::from_prepared(function(&[(3., 0.), (-2., 1.), (-1., 3.)]));
-    let FrontierOutcome::Complete(result) =
-        PreparedSlopeRelationArc::machine_backward_lower_streams(
-            &input,
-            &lower,
-            FrontierBudget::default(),
-        )
-    else {
+    let FrontierOutcome::Complete(result) = PairedFrontOperations::machine_backward_lower_streams(
+        &input,
+        &lower,
+        FrontierBudget::default(),
+    ) else {
         panic!("strictly rejected trailing segments should retain the prefix");
     };
     assert_eq!(result.components()[0].pairs(), &[(3., 0.), (-2., 0.5)]);
@@ -135,7 +133,7 @@ fn machine_lower_streams_keep_a_prefix_across_strictly_rejected_trailing_segment
         // The first alternative re-enters above; the second reaches a tie.
         let input = SlopeFront::from_prepared(function(&[(3., 0.), (-2., 1.), (end_slope, 3.)]));
         assert!(matches!(
-            PreparedSlopeRelationArc::machine_backward_lower_streams(
+            PairedFrontOperations::machine_backward_lower_streams(
                 &input,
                 &lower,
                 FrontierBudget::default(),
@@ -152,7 +150,7 @@ fn machine_lower_streams_preserve_near_ties_and_point_outputs_without_source_cla
     let lower = function(&[(2.00001, 0.), (0., 1.)]);
     let input = SlopeFront::from_prepared(function(&[(2., 0.), (0., 1.)]));
     let FrontierOutcome::Complete(result) =
-        PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+        PairedFrontOperations::machine_backward_constant_lower_pass(
             &input,
             &lower,
             FrontierBudget::default(),
@@ -166,7 +164,7 @@ fn machine_lower_streams_preserve_near_ties_and_point_outputs_without_source_cla
     assert!(result.components()[0].pairs()[0].0 < lower.pairs()[0].0);
     let lower = function(&[(1., 0.), (0., 2.)]);
     let input = SlopeFront::from_prepared(function(&[(1., 0.), (-1., 2.)]));
-    let FrontierOutcome::Complete(point) = PreparedSlopeRelationArc::machine_backward_lower_streams(
+    let FrontierOutcome::Complete(point) = PairedFrontOperations::machine_backward_lower_streams(
         &input,
         &lower,
         FrontierBudget::default(),
@@ -177,12 +175,15 @@ fn machine_lower_streams_preserve_near_ties_and_point_outputs_without_source_cla
     assert!(point.components()[0].is_machine_zero_length());
     let input = SlopeFront::from_prepared(function(&[(0., 0.), (0., 2.)]));
     assert!(matches!(
-        PreparedSlopeRelationArc::machine_backward_lower_streams(
+        PairedFrontOperations::machine_backward_lower_streams(
             &input,
             &lower,
             FrontierBudget::default(),
         ),
-        FrontierOutcome::Unknown(_)
+        // The pinned helper returns status zero with cleared count -1.
+        // The standalone filter exposes no retained front; its backward
+        // caller handles the later minimum stage separately.
+        FrontierOutcome::Empty
     ));
 }
 
@@ -190,13 +191,11 @@ fn machine_lower_streams_preserve_near_ties_and_point_outputs_without_source_cla
 fn machine_lower_streams_begin_at_a_tied_endpoint_then_retain_original_slopes() {
     let lower = function(&[(1., 0.), (0., 2.)]);
     let input = SlopeFront::from_prepared(function(&[(0., 0.), (1., 1.), (1., 2.)]));
-    let FrontierOutcome::Complete(result) =
-        PreparedSlopeRelationArc::machine_backward_lower_streams(
-            &input,
-            &lower,
-            FrontierBudget::default(),
-        )
-    else {
+    let FrontierOutcome::Complete(result) = PairedFrontOperations::machine_backward_lower_streams(
+        &input,
+        &lower,
+        FrontierBudget::default(),
+    ) else {
         panic!("first tied endpoint should start the retained region");
     };
     assert_eq!(result.components()[0].pairs(), &[(1., 1.), (1., 2.)]);
@@ -210,7 +209,7 @@ fn machine_minimum_streams_follow_near_anchor_endpoint_and_lookup_branches() {
     let minimum = |a: &[(f64, f64)], b: &[(f64, f64)]| {
         let a = PreparedSlopeFunction::from_prepared_pairs(a.to_vec()).unwrap();
         let b = PreparedSlopeFunction::from_prepared_pairs(b.to_vec()).unwrap();
-        match PreparedSlopeRelationArc::machine_minimum_streams(&a, &b, FrontierBudget::default()) {
+        match PairedFrontOperations::machine_minimum_streams(&a, &b, FrontierBudget::default()) {
             FrontierOutcome::Complete(value) => value,
             other => panic!("unexpected minimum: {other:?}"),
         }
@@ -249,7 +248,7 @@ fn machine_minimum_streams_retain_point_and_internal_duplicate_outputs() {
     let a = PreparedSlopeFunction::constant_point(2., 0.).unwrap();
     let b = PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (0., 1.)]).unwrap();
     let FrontierOutcome::Complete(point) =
-        PreparedSlopeRelationArc::machine_minimum_streams(&a, &b, FrontierBudget::default())
+        PairedFrontOperations::machine_minimum_streams(&a, &b, FrontierBudget::default())
     else {
         panic!("point input should preserve the machine segment count");
     };
@@ -258,14 +257,14 @@ fn machine_minimum_streams_retain_point_and_internal_duplicate_outputs() {
     let a = PreparedSlopeFunction::from_machine_pairs(vec![(2., 0.), (3., 0.), (4., 1.)]).unwrap();
     let b = PreparedSlopeFunction::from_prepared_pairs(vec![(100., 0.), (0., 1.)]).unwrap();
     let FrontierOutcome::Complete(result) =
-        PreparedSlopeRelationArc::machine_minimum_streams(&a, &b, FrontierBudget::default())
+        PairedFrontOperations::machine_minimum_streams(&a, &b, FrontierBudget::default())
     else {
         panic!("minimum should retain the selected duplicate segment");
     };
     assert_eq!(result.pairs(), a.pairs());
     assert!(result.has_internal_zero_length());
     assert!(matches!(
-        PreparedSlopeRelationArc::machine_minimum_streams(
+        PairedFrontOperations::machine_minimum_streams(
             &a,
             &b,
             FrontierBudget {
@@ -276,7 +275,7 @@ fn machine_minimum_streams_retain_point_and_internal_duplicate_outputs() {
         FrontierOutcome::Unknown(FrontierUnknown::WorkLimit)
     ));
     assert!(matches!(
-        PreparedSlopeRelationArc::machine_minimum_streams(
+        PairedFrontOperations::machine_minimum_streams(
             &a,
             &b,
             FrontierBudget {
@@ -294,7 +293,7 @@ fn machine_minimum_streams_cross_with_ordered_intercepts_and_merge_selected_slop
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (2., 2.), (-2., 4.)]).unwrap();
     let b = PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (0., 1.), (0., 4.)]).unwrap();
     let FrontierOutcome::Complete(result) =
-        PreparedSlopeRelationArc::machine_minimum_streams(&a, &b, FrontierBudget::default())
+        PairedFrontOperations::machine_minimum_streams(&a, &b, FrontierBudget::default())
     else {
         panic!("independent streams should complete");
     };
@@ -324,7 +323,7 @@ fn backward_initial_bounds_cross_a_covering_constant_upper() {
     );
     let lower = PreparedSlopeFunction::from_prepared_pairs(vec![(-100., -1.), (0., 3.)]).unwrap();
     let upper = PreparedSlopeFunction::from_prepared_pairs(vec![(1., -1.), (0., 3.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_initial_bounds(
+    let result = PairedFrontOperations::machine_backward_initial_bounds(
         &front,
         0.,
         2.,
@@ -347,7 +346,7 @@ fn backward_lower_filter_clips_single_front_against_covering_bound() {
     let front = SlopeFront::from_prepared(
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 2.)]).unwrap(),
     );
-    let result = PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+    let result = PairedFrontOperations::machine_backward_constant_lower_pass(
         &front,
         &lower,
         FrontierBudget::default(),
@@ -365,7 +364,7 @@ fn backward_lower_filter_clips_multisegment_front_against_zero_bound() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(-2., 0.), (1., 1.), (2., 2.), (1., 3.)])
             .unwrap(),
     );
-    let result = PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+    let result = PairedFrontOperations::machine_backward_constant_lower_pass(
         &front,
         &lower,
         FrontierBudget::default(),
@@ -405,7 +404,7 @@ fn backward_transition_caps_multisegment_front_by_constant_upper() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -427,7 +426,7 @@ fn backward_lower_filter_clips_multisegment_front_against_covering_constant() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(-1., 0.), (1., 1.), (2., 2.), (1., 3.)])
             .unwrap(),
     );
-    let result = PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+    let result = PairedFrontOperations::machine_backward_constant_lower_pass(
         &front,
         &lower,
         FrontierBudget::default(),
@@ -450,7 +449,7 @@ fn backward_lower_filter_clips_one_crossing_in_aligned_streams() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(-2., 0.), (1., 1.), (2., 2.), (1., 3.)])
             .unwrap(),
     );
-    let result = PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+    let result = PairedFrontOperations::machine_backward_constant_lower_pass(
         &ascending,
         &lower,
         FrontierBudget::default(),
@@ -466,7 +465,7 @@ fn backward_lower_filter_clips_one_crossing_in_aligned_streams() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(2., 0.), (-1., 1.), (-2., 2.), (-1., 3.)])
             .unwrap(),
     );
-    let result = PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+    let result = PairedFrontOperations::machine_backward_constant_lower_pass(
         &descending,
         &lower,
         FrontierBudget::default(),
@@ -506,7 +505,7 @@ fn backward_transition_uses_endpoint_after_lower_bound_clips_front() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -526,7 +525,7 @@ fn backward_lower_filter_ends_at_strict_interior_crossing() {
     let prepared = PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (-1., 2.)]).unwrap();
     let lower = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 2.)]).unwrap();
     let front = SlopeFront::from_prepared(prepared);
-    let result = PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+    let result = PairedFrontOperations::machine_backward_constant_lower_pass(
         &front,
         &lower,
         FrontierBudget::default(),
@@ -542,7 +541,7 @@ fn backward_lower_filter_starts_at_strict_interior_crossing() {
     let prepared = PreparedSlopeFunction::from_prepared_pairs(vec![(-1., 0.), (1., 2.)]).unwrap();
     let lower = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 2.)]).unwrap();
     let front = SlopeFront::from_prepared(prepared);
-    let result = PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+    let result = PairedFrontOperations::machine_backward_constant_lower_pass(
         &front,
         &lower,
         FrontierBudget::default(),
@@ -559,7 +558,7 @@ fn backward_minimum_crosses_inside_an_aligned_multisegment_front() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (2., 1.), (0., 2.)]).unwrap();
     let upper =
         PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (0., 1.), (-1., 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_minimum_aligned_streams(
+    let result = PairedFrontOperations::machine_minimum_aligned_streams(
         &fixed,
         &upper,
         FrontierBudget::default(),
@@ -602,7 +601,7 @@ fn backward_transition_prefixes_and_caps_multiple_steep_segments() {
         (4., vec![(3., 0.), (1., 3.), (0., 4.)]),
     ] {
         input.mapped_upper = upper_limit;
-        let result = PreparedSlopeRelationArc::machine_backward_transition(
+        let result = PairedFrontOperations::machine_backward_transition(
             &incoming,
             &input,
             100.,
@@ -623,7 +622,7 @@ fn backward_waiting_collapses_multiple_steep_leading_segments() {
     let front =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (2., 1.), (3., 2.), (0., 3.)])
             .unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_wait_full_window(
+    let result = PairedFrontOperations::machine_backward_wait_full_window(
         &front,
         1,
         FrontierBudget::default(),
@@ -640,7 +639,7 @@ fn backward_waiting_intersection_scans_multiple_nonsteep_segments() {
     let front =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 1.), (0.25, 2.), (1.5, 3.)])
             .unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_wait_full_window(
+    let result = PairedFrontOperations::machine_backward_wait_full_window(
         &front,
         1,
         FrontierBudget::default(),
@@ -679,7 +678,7 @@ fn backward_transition_prefixes_and_caps_intersecting_waiting_envelope() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -701,7 +700,7 @@ fn backward_transition_prefixes_and_caps_intersecting_waiting_envelope() {
 fn backward_waiting_intersects_first_segment_before_steep_suffix() {
     let front =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 1.), (1.5, 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_wait_full_window(
+    let result = PairedFrontOperations::machine_backward_wait_full_window(
         &front,
         1,
         FrontierBudget::default(),
@@ -719,7 +718,7 @@ fn backward_waiting_dominates_mixed_front_with_steep_first_segment() {
     let front =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (2., 1.), (0., 2.), (4., 3.)])
             .unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_wait_full_window(
+    let result = PairedFrontOperations::machine_backward_wait_full_window(
         &front,
         1,
         FrontierBudget::default(),
@@ -744,7 +743,7 @@ fn backward_bounds_accept_identical_multisegment_fronts() {
     let prepared =
         PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (1., 1.), (2., 2.)]).unwrap();
     let front = SlopeFront::from_prepared(prepared.clone());
-    let lower = PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+    let lower = PairedFrontOperations::machine_backward_constant_lower_pass(
         &front,
         &prepared,
         FrontierBudget::default(),
@@ -753,7 +752,7 @@ fn backward_bounds_accept_identical_multisegment_fronts() {
         panic!("unexpected equal lower bound");
     };
     assert_eq!(lower.components()[0].pairs(), prepared.pairs());
-    let upper = PreparedSlopeRelationArc::machine_minimum_constant_multisegment(
+    let upper = PairedFrontOperations::machine_minimum_constant_multisegment(
         &prepared,
         &prepared,
         FrontierBudget::default(),
@@ -771,7 +770,7 @@ fn backward_minimum_keeps_strictly_lower_aligned_piecewise_front() {
     let second =
         PreparedSlopeFunction::from_prepared_pairs(vec![(10., 0.), (-1., 1.), (1., 2.)]).unwrap();
     for (fixed, vector) in [(&first, &second), (&second, &first)] {
-        let result = PreparedSlopeRelationArc::machine_minimum_constant_multisegment(
+        let result = PairedFrontOperations::machine_minimum_constant_multisegment(
             fixed,
             vector,
             FrontierBudget::default(),
@@ -790,7 +789,7 @@ fn backward_lower_filter_accepts_strictly_separated_aligned_slopes() {
     let lower =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 1.), (1., 2.)]).unwrap();
     let front = SlopeFront::from_prepared(prepared.clone());
-    let result = PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+    let result = PairedFrontOperations::machine_backward_constant_lower_pass(
         &front,
         &lower,
         FrontierBudget::default(),
@@ -807,7 +806,7 @@ fn backward_composition_starts_on_inner_and_outer_breakpoints() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 1.), (2., 3.)]).unwrap();
     let inner =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 1.), (2., 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_compose_streams(
+    let result = PairedFrontOperations::machine_backward_compose_streams(
         &outer,
         1 << 2,
         &inner,
@@ -827,7 +826,7 @@ fn backward_waiting_dominates_mixed_multisegment_front() {
     let front =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 1.), (2., 2.), (4., 3.)])
             .unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_wait_full_window(
+    let result = PairedFrontOperations::machine_backward_wait_full_window(
         &front,
         1,
         FrontierBudget::default(),
@@ -844,7 +843,7 @@ fn backward_multistream_composition_crosses_outer_with_one_mapping_segment() {
     let outer =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (2., 2.), (1., 4.)]).unwrap();
     let inner = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 3.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_compose_streams(
+    let result = PairedFrontOperations::machine_backward_compose_streams(
         &outer,
         1 << 1,
         &inner,
@@ -865,7 +864,7 @@ fn backward_multistream_composition_accepts_interior_outer_bounds() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (2., 2.), (1., 4.)]).unwrap();
     let inner =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 1.), (1., 3.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_compose_streams(
+    let result = PairedFrontOperations::machine_backward_compose_streams(
         &outer,
         1 << 1,
         &inner,
@@ -886,7 +885,7 @@ fn backward_multistream_composition_starts_and_stops_inside_mapping_segments() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.5), (2., 2.), (1., 2.5)]).unwrap();
     let inner =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 1.), (1.5, 3.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_compose_streams(
+    let result = PairedFrontOperations::machine_backward_compose_streams(
         &outer,
         1 << 1,
         &inner,
@@ -916,7 +915,7 @@ fn backward_multistream_composition_stops_inside_mapping_segment() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (2., 2.), (1., 2.5)]).unwrap();
     let inner =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 1.), (1.5, 3.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_compose_streams(
+    let result = PairedFrontOperations::machine_backward_compose_streams(
         &outer,
         1 << 1,
         &inner,
@@ -946,7 +945,7 @@ fn backward_composition_walks_both_multi_segment_streams() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (2., 2.), (1., 4.)]).unwrap();
     let inner =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 1.), (1.5, 3.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_compose_streams(
+    let result = PairedFrontOperations::machine_backward_compose_streams(
         &outer,
         1 << 1,
         &inner,
@@ -996,7 +995,7 @@ fn backward_transition_combines_prefix_with_multisegment_cap() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -1037,7 +1036,7 @@ fn backward_transition_caps_intersecting_waiting_envelope() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -1079,7 +1078,7 @@ fn backward_transition_caps_a_multi_segment_waiting_front() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -1093,7 +1092,7 @@ fn backward_transition_caps_a_multi_segment_waiting_front() {
     assert_eq!(bits, 0);
     assert_eq!(key, 97.);
     input.waiting_rate = 0;
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -1138,7 +1137,7 @@ fn backward_transition_supports_prefix_and_cap_together() {
         let front = SlopeFront::from_prepared(
             PreparedSlopeFunction::from_prepared_pairs(vec![(4., 2.), (slope, 8.)]).unwrap(),
         );
-        let result = PreparedSlopeRelationArc::machine_backward_transition(
+        let result = PairedFrontOperations::machine_backward_transition(
             &front,
             &input,
             100.,
@@ -1178,7 +1177,7 @@ fn backward_transition_caps_waiting_at_mapped_upper_limit() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -1219,7 +1218,7 @@ fn backward_transition_extends_waiting_prefix_before_retained_suffix() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -1260,7 +1259,7 @@ fn backward_transition_extends_an_existing_waiting_segment() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -1301,7 +1300,7 @@ fn backward_transition_extends_waiting_before_bounded_front() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -1326,7 +1325,7 @@ fn backward_preflight_truncates_one_side_of_multi_segment_front() {
         (0., 5., vec![(2., 0.), (1., 2.), (-1., 4.), (2., 5.)]),
         (3., 6., vec![(3., 3.), (-1., 4.), (2., 6.)]),
     ] {
-        let result = PreparedSlopeRelationArc::machine_backward_cover_preflight(
+        let result = PairedFrontOperations::machine_backward_cover_preflight(
             &front,
             lower,
             upper,
@@ -1351,7 +1350,7 @@ fn backward_preflight_truncates_either_side_of_a_segment() {
         (0., 8., vec![(2., 0.), (1., 8.)]),
         (2., 10., vec![(4., 2.), (1., 10.)]),
     ] {
-        let result = PreparedSlopeRelationArc::machine_backward_cover_preflight(
+        let result = PairedFrontOperations::machine_backward_cover_preflight(
             &front,
             lower,
             upper,
@@ -1391,7 +1390,7 @@ fn backward_transition_handles_clipped_window_and_covering_bounds() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -1411,7 +1410,7 @@ fn backward_preflight_truncates_an_interior_waiting_window() {
     let front = SlopeFront::from_prepared(
         PreparedSlopeFunction::from_prepared_pairs(vec![(2., 0.), (1., 10.)]).unwrap(),
     );
-    let result = PreparedSlopeRelationArc::machine_backward_cover_preflight(
+    let result = PairedFrontOperations::machine_backward_cover_preflight(
         &front,
         2.,
         8.,
@@ -1432,7 +1431,7 @@ fn backward_lower_filter_accepts_a_wider_constant_domain() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(4., 2.), (1., 8.)]).unwrap(),
     );
     let lower = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 10.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+    let result = PairedFrontOperations::machine_backward_constant_lower_pass(
         &front,
         &lower,
         FrontierBudget::default(),
@@ -1469,7 +1468,7 @@ fn backward_transition_accepts_reduced_multisegment_front_below_constant_bounds(
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -1492,7 +1491,7 @@ fn backward_constant_lower_checks_every_multi_segment_endpoint() {
             .unwrap();
     let front = SlopeFront::from_prepared(safe.clone());
     let FrontierOutcome::Complete(result) =
-        PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+        PairedFrontOperations::machine_backward_constant_lower_pass(
             &front,
             &lower,
             FrontierBudget::default(),
@@ -1505,7 +1504,7 @@ fn backward_constant_lower_checks_every_multi_segment_endpoint() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(3., 0.), (-4., 1.), (4., 2.), (0., 3.)])
             .unwrap();
     assert!(matches!(
-        PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+        PairedFrontOperations::machine_backward_constant_lower_pass(
             &SlopeFront::from_prepared(crossing),
             &lower,
             FrontierBudget::default(),
@@ -1524,7 +1523,7 @@ fn backward_cover_preflight_reduces_multi_segment_fronts() {
     ])
     .unwrap();
     let front = SlopeFront::from_prepared(function);
-    let result = PreparedSlopeRelationArc::machine_backward_cover_preflight(
+    let result = PairedFrontOperations::machine_backward_cover_preflight(
         &front,
         0.,
         3.,
@@ -1546,7 +1545,7 @@ fn backward_cover_preflight_reduces_multi_segment_fronts() {
 fn backward_wait_steep_suffix_can_dominate_the_full_window() {
     let front =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 1.), (2., 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_wait_full_window(
+    let result = PairedFrontOperations::machine_backward_wait_full_window(
         &front,
         0,
         FrontierBudget::default(),
@@ -1563,7 +1562,7 @@ fn backward_wait_keeps_a_multi_segment_suffix_after_steep_prefix() {
     let front =
         PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (2., 1.), (0., 2.), (-1., 3.)])
             .unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_wait_full_window(
+    let result = PairedFrontOperations::machine_backward_wait_full_window(
         &front,
         0,
         FrontierBudget::default(),
@@ -1579,7 +1578,7 @@ fn backward_wait_keeps_a_multi_segment_suffix_after_steep_prefix() {
 fn backward_wait_replaces_steep_prefix_and_preserves_later_segment() {
     let front =
         PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (2., 1.), (0., 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_wait_full_window(
+    let result = PairedFrontOperations::machine_backward_wait_full_window(
         &front,
         0,
         FrontierBudget::default(),
@@ -1595,7 +1594,7 @@ fn backward_wait_replaces_steep_prefix_and_preserves_later_segment() {
 fn backward_wait_full_window_replaces_strictly_steep_segments() {
     let front =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (2., 1.), (3., 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_wait_full_window(
+    let result = PairedFrontOperations::machine_backward_wait_full_window(
         &front,
         1,
         FrontierBudget::default(),
@@ -1611,7 +1610,7 @@ fn backward_wait_full_window_replaces_strictly_steep_segments() {
 fn backward_wait_full_window_walks_each_segment_in_reverse() {
     let front =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (2., 1.5), (0., 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_wait_full_window(
+    let result = PairedFrontOperations::machine_backward_wait_full_window(
         &front,
         2,
         FrontierBudget::default(),
@@ -1647,7 +1646,7 @@ fn backward_transition_carries_crossing_upper_through_full_window() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         10.,
@@ -1661,7 +1660,7 @@ fn backward_transition_carries_crossing_upper_through_full_window() {
     assert_eq!(bits, 0);
     assert_eq!(key, 7.);
     input.waiting_rate = 0;
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         10.,
@@ -1680,7 +1679,7 @@ fn backward_transition_carries_crossing_upper_through_full_window() {
 fn backward_minimum_splits_crossing_segments_at_reference_intersection() {
     let fixed = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (2., 2.)]).unwrap();
     let upper = PreparedSlopeFunction::from_prepared_pairs(vec![(3., 0.), (0., 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_minimum_separated_segments(
+    let result = PairedFrontOperations::machine_minimum_separated_segments(
         &fixed,
         &upper,
         FrontierBudget::default(),
@@ -1694,7 +1693,7 @@ fn backward_minimum_splits_crossing_segments_at_reference_intersection() {
 #[test]
 fn backward_minimum_keeps_bit_identical_single_segments() {
     let function = PreparedSlopeFunction::from_prepared_pairs(vec![(100., 0.), (0., 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_minimum_separated_segments(
+    let result = PairedFrontOperations::machine_minimum_separated_segments(
         &function,
         &function,
         FrontierBudget::default(),
@@ -1729,7 +1728,7 @@ fn backward_transition_connects_bounds_waiting_composition_and_key() {
         dependent_lower: &lower,
         dependent_upper: &upper,
     };
-    let result = PreparedSlopeRelationArc::machine_backward_transition(
+    let result = PairedFrontOperations::machine_backward_transition(
         &incoming,
         &input,
         100.,
@@ -1749,7 +1748,7 @@ fn backward_wait_finish_carries_waiting_through_composition_and_difference() {
     let upper = PreparedSlopeFunction::from_prepared_pairs(vec![(4., 0.), (2., 10.)]).unwrap();
     let mapping = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 10.)]).unwrap();
     let increment = PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (0., 10.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_wait_finish(
+    let result = PairedFrontOperations::machine_backward_wait_finish(
         &upper,
         0,
         &mapping,
@@ -1773,7 +1772,7 @@ fn backward_outer_composition_splits_when_waiting_bits_change() {
     let outer =
         PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (2., 2.), (2., 4.)]).unwrap();
     let inner = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 4.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_compose_outer_stream(
+    let result = PairedFrontOperations::machine_backward_compose_outer_stream(
         &outer,
         1 << 1,
         &inner,
@@ -1793,7 +1792,7 @@ fn backward_composition_stream_preserves_segment_waiting_bits() {
     let outer = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (2., 10.)]).unwrap();
     let inner =
         PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (1., 2.), (2., 4.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_compose_stream(
+    let result = PairedFrontOperations::machine_backward_compose_stream(
         &outer,
         1 << 1,
         &inner,
@@ -1813,7 +1812,7 @@ fn backward_single_outer_stream_accepts_interior_mapping_bounds() {
     let outer = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (2., 10.)]).unwrap();
     let inner =
         PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (1., 2.), (2., 4.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_compose_stream(
+    let result = PairedFrontOperations::machine_backward_compose_stream(
         &outer,
         1 << 1,
         &inner,
@@ -1833,7 +1832,7 @@ fn backward_composition_stream_accepts_exact_full_outer_domain() {
     let outer = PreparedSlopeFunction::from_prepared_pairs(vec![(4., 0.), (2., 4.)]).unwrap();
     let inner =
         PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 2.), (1., 4.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_compose_stream(
+    let result = PairedFrontOperations::machine_backward_compose_stream(
         &outer,
         1 << 1,
         &inner,
@@ -1854,7 +1853,7 @@ fn backward_finish_composes_subtracts_and_computes_the_key() {
     let envelope = PreparedSlopeFunction::from_prepared_pairs(vec![(4., 0.), (2., 10.)]).unwrap();
     let mapping = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 10.)]).unwrap();
     let increment = PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (0., 10.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_finish(
+    let result = PairedFrontOperations::machine_backward_finish(
         &envelope,
         1 << 1,
         &mapping,
@@ -1877,7 +1876,7 @@ fn backward_finish_composes_subtracts_and_computes_the_key() {
 fn backward_composition_uses_secant_and_carries_waiting_bit() {
     let outer = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (3., 20.)]).unwrap();
     let inner = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 10.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_compose_single_segment(
+    let result = PairedFrontOperations::machine_backward_compose_single_segment(
         &outer,
         1 << 1,
         &inner,
@@ -1896,7 +1895,7 @@ fn backward_composition_uses_secant_and_carries_waiting_bit() {
 fn backward_composition_accepts_full_identity_domain() {
     let outer = PreparedSlopeFunction::from_prepared_pairs(vec![(4., 0.), (2., 10.)]).unwrap();
     let inner = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 10.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_compose_single_segment(
+    let result = PairedFrontOperations::machine_backward_compose_single_segment(
         &outer,
         1 << 1,
         &inner,
@@ -1919,7 +1918,7 @@ fn backward_aligned_difference_merges_only_equal_waiting_segments() {
     let second =
         PreparedSlopeFunction::from_prepared_pairs(vec![(2., 0.), (1., 1.), (2., 2.), (2., 3.)])
             .unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_difference(
+    let result = PairedFrontOperations::machine_backward_difference(
         &first,
         (1 << 1) | (1 << 2),
         &second,
@@ -1939,7 +1938,7 @@ fn backward_difference_splits_at_both_inputs_and_carries_first_wait_bits() {
     let second =
         PreparedSlopeFunction::from_prepared_pairs(vec![(2., 0.), (1., 1.), (2., 3.), (1., 4.)])
             .unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_difference(
+    let result = PairedFrontOperations::machine_backward_difference(
         &first,
         1 << 1,
         &second,
@@ -1959,7 +1958,7 @@ fn backward_difference_splits_at_both_inputs_and_carries_first_wait_bits() {
 fn backward_difference_stops_at_the_first_exhausted_input() {
     let first = PreparedSlopeFunction::from_prepared_pairs(vec![(5., 0.), (2., 4.)]).unwrap();
     let second = PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (1., 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_difference(
+    let result = PairedFrontOperations::machine_backward_difference(
         &first,
         1 << 1,
         &second,
@@ -1976,7 +1975,7 @@ fn backward_difference_stops_at_the_first_exhausted_input() {
 fn backward_difference_reanchors_at_later_domain_start() {
     let first = PreparedSlopeFunction::from_prepared_pairs(vec![(5., 0.), (2., 3.)]).unwrap();
     let second = PreparedSlopeFunction::from_prepared_pairs(vec![(2., 1.), (1., 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_difference(
+    let result = PairedFrontOperations::machine_backward_difference(
         &first,
         1 << 1,
         &second,
@@ -1994,7 +1993,7 @@ fn backward_difference_uses_first_coordinates_for_near_matches() {
     let first = PreparedSlopeFunction::from_prepared_pairs(vec![(5., 0.), (2., 2.)]).unwrap();
     let second =
         PreparedSlopeFunction::from_prepared_pairs(vec![(2., 0.00005), (1., 2.00005)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_difference(
+    let result = PairedFrontOperations::machine_backward_difference(
         &first,
         1 << 1,
         &second,
@@ -2013,7 +2012,7 @@ fn backward_difference_advances_segment_for_start_near_breakpoint() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(5., 0.), (2., 1.), (4., 3.)]).unwrap();
     let start = 0.99995;
     let second = PreparedSlopeFunction::from_prepared_pairs(vec![(2., start), (1., 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_difference(
+    let result = PairedFrontOperations::machine_backward_difference(
         &first,
         1 << 2,
         &second,
@@ -2030,7 +2029,7 @@ fn backward_difference_advances_segment_for_start_near_breakpoint() {
 fn backward_difference_accepts_point_front_with_near_start() {
     let first = PreparedSlopeFunction::from_prepared_pairs(vec![(5., 0.)]).unwrap();
     let second = PreparedSlopeFunction::from_prepared_pairs(vec![(2., 0.00005), (1., 2.)]).unwrap();
-    let result = PreparedSlopeRelationArc::machine_backward_difference(
+    let result = PairedFrontOperations::machine_backward_difference(
         &first,
         0,
         &second,
@@ -2050,7 +2049,7 @@ fn backward_initial_bounds_apply_separated_upper_minimum() {
     );
     let lower = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 2.)]).unwrap();
     let upper = PreparedSlopeFunction::from_prepared_pairs(vec![(2., 0.), (0., 2.)]).unwrap();
-    match PreparedSlopeRelationArc::machine_backward_initial_bounds(
+    match PairedFrontOperations::machine_backward_initial_bounds(
         &front,
         0.,
         2.,
@@ -2074,7 +2073,7 @@ fn backward_initial_filter_combines_cover_and_lower_bound() {
         PreparedSlopeFunction::from_prepared_pairs(vec![(3., 0.), (-1., 2.)]).unwrap(),
     );
     let lower = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 2.)]).unwrap();
-    match PreparedSlopeRelationArc::machine_backward_initial_filter(
+    match PairedFrontOperations::machine_backward_initial_filter(
         &front,
         0.,
         2.,
@@ -2099,7 +2098,7 @@ fn backward_lower_filter_retains_the_region_above_a_crossing_bound() {
     let function = PreparedSlopeFunction::from_prepared_pairs(vec![(3., 0.), (-1., 2.)]).unwrap();
     let front = SlopeFront::from_prepared(function.clone());
     let lower = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 2.)]).unwrap();
-    match PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+    match PairedFrontOperations::machine_backward_constant_lower_pass(
         &front,
         &lower,
         FrontierBudget::default(),
@@ -2111,7 +2110,7 @@ fn backward_lower_filter_retains_the_region_above_a_crossing_bound() {
     }
     let crossing = PreparedSlopeFunction::from_prepared_pairs(vec![(2., 0.), (0., 2.)]).unwrap();
     let FrontierOutcome::Complete(clipped) =
-        PreparedSlopeRelationArc::machine_backward_constant_lower_pass(
+        PairedFrontOperations::machine_backward_constant_lower_pass(
             &front,
             &crossing,
             FrontierBudget::default(),
@@ -2127,7 +2126,7 @@ fn backward_cover_preflight_retains_front_and_caps_end() {
     let front = SlopeFront::from_prepared(
         PreparedSlopeFunction::from_prepared_pairs(vec![(2., 1.), (0., 3.)]).unwrap(),
     );
-    let result = PreparedSlopeRelationArc::machine_backward_cover_preflight(
+    let result = PairedFrontOperations::machine_backward_cover_preflight(
         &front,
         0.,
         4.,
@@ -2143,7 +2142,7 @@ fn backward_cover_preflight_retains_front_and_caps_end() {
         _ => panic!("covered one-segment front should pass preflight"),
     }
     assert!(matches!(
-        PreparedSlopeRelationArc::machine_backward_cover_preflight(
+        PairedFrontOperations::machine_backward_cover_preflight(
             &front,
             2.,
             4.,
@@ -2159,7 +2158,7 @@ fn backward_cover_preflight_retains_front_and_caps_end() {
 fn mode_four_aligned_meeting_handles_initial_overlap_and_crossing() {
     let forward = PreparedSlopeFunction::from_prepared_pairs(vec![(2., 0.), (-1., 2.)]).unwrap();
     let backward = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 2.)]).unwrap();
-    match PreparedSlopeRelationArc::machine_mode_four_single_segment_meeting(
+    match PairedFrontOperations::machine_mode_four_single_segment_meeting(
         &forward,
         &backward,
         FrontierBudget::default(),
@@ -2167,7 +2166,7 @@ fn mode_four_aligned_meeting_handles_initial_overlap_and_crossing() {
         FrontierOutcome::Complete(coordinate) => assert_eq!(coordinate, 1.),
         _ => panic!("aligned crossing should yield a coordinate"),
     }
-    match PreparedSlopeRelationArc::machine_mode_four_single_segment_meeting(
+    match PairedFrontOperations::machine_mode_four_single_segment_meeting(
         &backward,
         &forward,
         FrontierBudget::default(),
@@ -2176,7 +2175,7 @@ fn mode_four_aligned_meeting_handles_initial_overlap_and_crossing() {
         _ => panic!("initial overlap should yield the starting coordinate"),
     }
     let later = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.5), (1., 2.)]).unwrap();
-    match PreparedSlopeRelationArc::machine_mode_four_single_segment_meeting(
+    match PairedFrontOperations::machine_mode_four_single_segment_meeting(
         &forward,
         &later,
         FrontierBudget::default(),
@@ -2190,7 +2189,7 @@ fn mode_four_aligned_meeting_handles_initial_overlap_and_crossing() {
 fn machine_minimum_preserves_selected_segments_and_splits_crossings() {
     let a = PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (2., 2.)]).unwrap();
     let b = PreparedSlopeFunction::from_prepared_pairs(vec![(4., 0.), (1., 2.)]).unwrap();
-    let minimum = PreparedSlopeRelationArc::machine_minimum_separated_segments(
+    let minimum = PairedFrontOperations::machine_minimum_separated_segments(
         &a,
         &b,
         FrontierBudget::default(),
@@ -2201,7 +2200,7 @@ fn machine_minimum_preserves_selected_segments_and_splits_crossings() {
     }
     let crossing = PreparedSlopeFunction::from_prepared_pairs(vec![(4., 0.), (-1., 2.)]).unwrap();
     let FrontierOutcome::Complete(split) =
-        PreparedSlopeRelationArc::machine_minimum_separated_segments(
+        PairedFrontOperations::machine_minimum_separated_segments(
             &a,
             &crossing,
             FrontierBudget::default(),
@@ -2213,7 +2212,7 @@ fn machine_minimum_preserves_selected_segments_and_splits_crossings() {
     let short_a = PreparedSlopeFunction::from_prepared_pairs(vec![(1., 0.), (0., 1e-12)]).unwrap();
     let short_b = PreparedSlopeFunction::from_prepared_pairs(vec![(4., 0.), (0., 1e-12)]).unwrap();
     assert!(matches!(
-        PreparedSlopeRelationArc::machine_minimum_separated_segments(
+        PairedFrontOperations::machine_minimum_separated_segments(
             &short_a,
             &short_b,
             FrontierBudget::default(),
@@ -2224,157 +2223,6 @@ fn machine_minimum_preserves_selected_segments_and_splits_crossings() {
 fn function(p: &[(f64, f64)]) -> PreparedSlopeFunction {
     PreparedSlopeFunction::from_prepared_pairs(p.to_vec()).unwrap()
 }
-fn arc(waiting: i32) -> PreparedSlopeRelationArc {
-    PreparedSlopeRelationArc::new(
-        &SlopeRelationArc {
-            arrival: function(&[(0., 0.), (1., 10.)]),
-            increment: function(&[(1., 0.), (0., 10.)]),
-            lower: function(&[(0., 0.), (0., 10.)]),
-            upper: function(&[(100., 0.), (0., 10.)]),
-            waiting,
-        },
-        FrontOperationPolicy::StrictDomain,
-    )
-    .unwrap()
-}
-#[test]
-fn nonconvex_waiting_keeps_record_until_actual_crossing() {
-    let front = SlopeFront::from_prepared(function(&[(0., 0.), (2., 1.), (-2., 3.)]));
-    let FrontierOutcome::Complete(out) = arc(0).extend(&front, FrontierBudget::default()) else {
-        panic!("exact crossing must remain supported")
-    };
-    assert_eq!(
-        out.components()[0]
-            .evaluate(1.5, EvaluationPolicy::StrictDomain)
-            .unwrap(),
-        Some(1.)
-    );
-    assert_eq!(
-        out.components()[0]
-            .evaluate(2.5, EvaluationPolicy::StrictDomain)
-            .unwrap(),
-        Some(0.)
-    );
-}
-#[test]
-fn fractional_native_underpricing_is_not_a_feasibility_result() {
-    let front = SlopeFront::from_prepared(function(&[(2.1, 0.), (0.3, 0.7), (-0.2, 2.)]));
-    let out = arc(0).extend(&front, FrontierBudget::default());
-    match out {
-        FrontierOutcome::Unknown(_) => {}
-        FrontierOutcome::Complete(out) => {
-            let FrontierOutcome::Complete(w) = out.minimum(FrontierBudget::default()) else {
-                panic!("minimum")
-            };
-            assert!(w.value >= 3.05 - 1e-12);
-        }
-        FrontierOutcome::Empty => panic!("unsupported arithmetic cannot mean infeasible"),
-    }
-}
-#[test]
-fn zero_work_is_unknown_not_empty() {
-    let out = arc(1).extend(
-        &SlopeFront::zero(0., 10.).unwrap(),
-        FrontierBudget {
-            max_operations: 0,
-            ..FrontierBudget::default()
-        },
-    );
-    assert!(matches!(out, FrontierOutcome::Unknown(_)));
-}
-#[test]
-fn increasing_arrival_and_departure_increment_use_cached_composition() {
-    let source = SlopeRelationArc {
-        arrival: function(&[(0., 0.), (2., 2.)]),
-        increment: function(&[(0., 0.), (1., 2.)]),
-        lower: function(&[(0., 0.), (0., 4.)]),
-        upper: function(&[(100., 0.), (0., 4.)]),
-        waiting: 5,
-    };
-    let arc = PreparedSlopeRelationArc::new(&source, FrontOperationPolicy::StrictDomain).unwrap();
-    let front = SlopeFront::from_prepared(function(&[(2., 0.), (0., 2.)]));
-    let FrontierOutcome::Complete(out) = arc.extend(&front, FrontierBudget::default()) else {
-        panic!("dyadic composition must remain supported")
-    };
-    assert_eq!(
-        out.components()[0]
-            .evaluate(3., EvaluationPolicy::StrictDomain)
-            .unwrap(),
-        Some(3.5)
-    );
-}
-#[test]
-fn paired_composition_intersects_each_component_domain_before_waiting() {
-    for policy in [
-        FrontOperationPolicy::StrictDomain,
-        FrontOperationPolicy::FrontAlgebra,
-    ] {
-        let source = SlopeRelationArc {
-            arrival: function(&[(0., 0.), (2., 4.)]),
-            increment: function(&[(1., 0.), (1., 4.)]),
-            lower: function(&[(0., 1.), (0., 4.)]),
-            upper: function(&[(100., 1.), (0., 4.)]),
-            waiting: 1,
-        };
-        let arc = PreparedSlopeRelationArc::new(&source, policy).unwrap();
-        let front = SlopeFront::from_prepared(function(&[(5., 0.), (2., 2.)]));
-        let FrontierOutcome::Complete(out) = arc.extend(&front, FrontierBudget::default()) else {
-            panic!("partial component preimage remains feasible under {policy:?}");
-        };
-        assert_eq!(out.components()[0].domain(), (1., 4.));
-        assert_eq!(
-            out.components()[0]
-                .evaluate(1., EvaluationPolicy::StrictDomain)
-                .unwrap(),
-            Some(7.)
-        );
-        assert_eq!(
-            out.components()[0]
-                .evaluate(4., EvaluationPolicy::StrictDomain)
-                .unwrap(),
-            Some(10.)
-        );
-    }
-}
-#[test]
-fn signed_waiting_and_function_valued_lower_bound_remain_operational() {
-    let front = SlopeFront::from_prepared(function(&[(2., 0.), (0., 2.)]));
-    let mut source = SlopeRelationArc {
-        arrival: function(&[(0., 0.), (1., 2.)]),
-        increment: function(&[(0., 0.), (0., 2.)]),
-        lower: function(&[(0., 0.), (0., 2.)]),
-        upper: function(&[(100., 0.), (0., 2.)]),
-        waiting: -1,
-    };
-    let prepared =
-        PreparedSlopeRelationArc::new(&source, FrontOperationPolicy::StrictDomain).unwrap();
-    let FrontierOutcome::Complete(out) = prepared.extend(&front, FrontierBudget::default()) else {
-        panic!("signed waiting")
-    };
-    assert_eq!(
-        out.components()[0]
-            .evaluate(1., EvaluationPolicy::StrictDomain)
-            .unwrap(),
-        Some(1.)
-    );
-    source.lower = function(&[(0., 0.), (1., 2.)]);
-    source.waiting = 0;
-    let prepared =
-        PreparedSlopeRelationArc::new(&source, FrontOperationPolicy::StrictDomain).unwrap();
-    let FrontierOutcome::Complete(out) = prepared.extend(
-        &SlopeFront::zero(0., 2.).unwrap(),
-        FrontierBudget::default(),
-    ) else {
-        panic!("function-valued lower bound")
-    };
-    assert_eq!(
-        out.components()[0]
-            .evaluate(1.5, EvaluationPolicy::StrictDomain)
-            .unwrap(),
-        Some(1.5)
-    );
-}
-
 #[test]
 fn machine_sum_and_difference_match_recorded_reference_merges() {
     // Reproduce: python3 internal/reference/metasolver_paired_operators.py.
@@ -2382,7 +2230,7 @@ fn machine_sum_and_difference_match_recorded_reference_merges() {
     let a = function(&[(2., 0.), (1., 1.), (2., 3.)]);
     let b = function(&[(3., 0.), (4., 2.), (5., 3.)]);
     let FrontierOutcome::Complete(sum) =
-        PreparedSlopeRelationArc::machine_sum_streams(&a, &b, FrontierBudget::default())
+        PairedFrontOperations::machine_sum_streams(&a, &b, FrontierBudget::default())
     else {
         panic!("multi-segment machine sum");
     };
@@ -2404,12 +2252,7 @@ fn machine_sum_and_difference_match_recorded_reference_merges() {
     let near = function(&[(2., 0.), (1., 1.), (1.00001, 3.)]);
     let b = function(&[(3., 0.), (4., 3.)]);
     let FrontierOutcome::Complete((difference, bits)) =
-        PreparedSlopeRelationArc::machine_backward_difference(
-            &near,
-            6,
-            &b,
-            FrontierBudget::default(),
-        )
+        PairedFrontOperations::machine_backward_difference(&near, 6, &b, FrontierBudget::default())
     else {
         panic!("machine difference merge");
     };
@@ -2417,7 +2260,7 @@ fn machine_sum_and_difference_match_recorded_reference_merges() {
     assert_eq!(bits, 6); // Includes the reference's scratch bit after merging.
     let point = PreparedSlopeFunction::from_machine_pairs(vec![(2., 0.), (1., 0.)]).unwrap();
     let FrontierOutcome::Complete(sum) =
-        PreparedSlopeRelationArc::machine_sum_streams(&point, &b, FrontierBudget::default())
+        PairedFrontOperations::machine_sum_streams(&point, &b, FrontierBudget::default())
     else {
         panic!("retained zero-width machine sum");
     };
@@ -2445,7 +2288,7 @@ fn backward_pipeline_consumes_unordered_intermediate_without_certifying_source_v
         dependent_upper: &upper,
     };
     let FrontierOutcome::Complete((result, bits, key)) =
-        PreparedSlopeRelationArc::machine_backward_transition(
+        PairedFrontOperations::machine_backward_transition(
             &incoming,
             &input,
             100.,
@@ -2473,4 +2316,170 @@ fn backward_pipeline_consumes_unordered_intermediate_without_certifying_source_v
         .fold(f64::NEG_INFINITY, f64::max);
     assert_eq!(source_value, 0.);
     assert_ne!(result.pairs()[0].0, source_value);
+}
+
+#[test]
+fn waiting_composition_and_difference_retain_nan_candidates_for_every_waiting_mask() {
+    let outer =
+        PreparedSlopeFunction::from_machine_pairs(vec![(1., 0.), (0., 1.), (0., 1.)]).unwrap();
+    let inner = PreparedSlopeFunction::from_machine_pairs(vec![(0., 0.), (2., 2.)]).unwrap();
+    let zero = PreparedSlopeFunction::from_machine_pairs(vec![(0., 0.), (0., 2.)]).unwrap();
+    for mask in 0..8 {
+        let FrontierOutcome::Complete((composed, bits)) =
+            PairedFrontOperations::machine_backward_compose_streams(
+                &outer,
+                mask,
+                &inner,
+                0.,
+                0.5,
+                FrontierBudget::default(),
+            )
+        else {
+            panic!("native composition retains the empty NaN candidate for mask {mask}");
+        };
+        assert_eq!(bits, mask & 6);
+        assert_eq!(&composed.pairs()[..2], &[(1., 0.), (0., 0.5)]);
+        assert_eq!(composed.pairs().len(), 3);
+        assert_eq!(composed.pairs()[2].0.to_bits(), 0xfff8_0000_0000_0000);
+        assert_eq!(composed.pairs()[2].1, 0.5);
+        let FrontierOutcome::Complete((difference, bits)) =
+            PairedFrontOperations::machine_backward_difference(
+                &composed,
+                bits,
+                &zero,
+                FrontierBudget::default(),
+            )
+        else {
+            panic!("native difference retains the empty NaN candidate for mask {mask}");
+        };
+        assert_eq!(bits, mask & 6);
+        assert_eq!(difference, composed);
+    }
+}
+
+#[test]
+fn retained_nan_front_survives_preflight_filters_and_reverse_waiting_matches_the_machine() {
+    let nan = f64::from_bits(0xfff8_0000_0000_0000);
+    let raw =
+        PreparedSlopeFunction::from_machine_output_pairs(vec![(0., 0.), (-1., 0.5), (nan, 0.5)])
+            .unwrap();
+    let front = SlopeFront::from_prepared(raw.clone());
+    let FrontierOutcome::Complete(reduced) =
+        front.machine_reduce_for_continuation(FrontierBudget::default())
+    else {
+        panic!("native reduction retains the NaN slope");
+    };
+    assert_eq!(reduced.components()[0], raw);
+    let lower = PreparedSlopeFunction::from_machine_pairs(vec![(-100., 0.), (0., 2.)]).unwrap();
+    let upper = PreparedSlopeFunction::from_machine_pairs(vec![(100., 0.), (0., 2.)]).unwrap();
+    let FrontierOutcome::Complete(filtered) = PairedFrontOperations::machine_backward_lower_streams(
+        &front,
+        &lower,
+        FrontierBudget::default(),
+    ) else {
+        panic!("native lower filter retains the NaN slope");
+    };
+    assert_eq!(filtered.components()[0], raw);
+    let FrontierOutcome::Complete(bounded) =
+        PairedFrontOperations::machine_minimum_streams(&raw, &upper, FrontierBudget::default())
+    else {
+        panic!("native minimum retains the NaN slope");
+    };
+    assert_eq!(bounded, raw);
+    let FrontierOutcome::Complete((waiting, bits)) =
+        PairedFrontOperations::machine_backward_wait_window(
+            &raw,
+            0,
+            0.,
+            0.5,
+            FrontierBudget::default(),
+        )
+    else {
+        panic!("native reverse waiting consumes the NaN slope");
+    };
+    assert_eq!(waiting.pairs(), &[(-0.5, 0.)]);
+    assert_eq!(bits, 0);
+}
+
+#[test]
+fn waiting_composition_retains_an_initial_nan_segment_before_later_finite_segments() {
+    let outer =
+        PreparedSlopeFunction::from_machine_pairs(vec![(1., 0.), (0., 0.), (0., 1.)]).unwrap();
+    let inner = PreparedSlopeFunction::from_machine_pairs(vec![(0., 0.), (1., 1.)]).unwrap();
+    let FrontierOutcome::Complete((composed, bits)) =
+        PairedFrontOperations::machine_backward_compose_streams(
+            &outer,
+            0,
+            &inner,
+            0.,
+            1.,
+            FrontierBudget::default(),
+        )
+    else {
+        panic!("native composition retains the initial NaN slope");
+    };
+    assert_eq!(composed.pairs().len(), 3);
+    assert_eq!(composed.pairs()[0], (1., 0.));
+    assert_eq!(composed.pairs()[1].0.to_bits(), 0xfff8_0000_0000_0000);
+    assert_eq!(composed.pairs()[1].1, 0.);
+    assert_eq!(composed.pairs()[2], (0., 1.));
+    assert_eq!(bits, 0);
+}
+
+#[test]
+fn nan_lower_filter_uses_ordered_reentry_and_empty_count_is_explicit() {
+    let nan = f64::from_bits(0xfff8_0000_0000_0000);
+    let raw =
+        PreparedSlopeFunction::from_machine_output_pairs(vec![(0., 0.), (-1., 0.5), (nan, 0.5)])
+            .unwrap();
+    let front = SlopeFront::from_prepared(raw.clone());
+    for bound in [-0.5, -0.25, 0., 0.25, 1.] {
+        let lower = PreparedSlopeFunction::from_machine_pairs(vec![(bound, 0.), (0., 2.)]).unwrap();
+        let result = PairedFrontOperations::machine_backward_lower_streams(
+            &front,
+            &lower,
+            FrontierBudget::default(),
+        );
+        if bound > 0. {
+            assert!(matches!(result, FrontierOutcome::Empty));
+            continue;
+        }
+        let FrontierOutcome::Complete(filtered) = result else {
+            panic!("native status zero preserves/truncates the front at bound {bound}");
+        };
+        if bound == -0.5 {
+            assert_eq!(filtered.components()[0], raw);
+        } else if bound == -0.25 {
+            assert_eq!(filtered.components()[0].pairs(), &[(0., 0.), (-1., 0.25)]);
+        } else {
+            assert_eq!(filtered.components()[0].pairs(), &[(0., 0.), (0., 0.)]);
+        }
+    }
+}
+
+#[test]
+fn backward_caller_continues_with_the_cleared_array_after_a_successful_empty_lower_filter() {
+    let nan = f64::from_bits(0xfff8_0000_0000_0000);
+    let raw =
+        PreparedSlopeFunction::from_machine_output_pairs(vec![(0., 0.), (-1., 0.5), (nan, 0.5)])
+            .unwrap();
+    let front = SlopeFront::from_prepared(raw);
+    let lower = PreparedSlopeFunction::from_machine_pairs(vec![(0.25, 0.), (0., 2.)]).unwrap();
+    let upper = PreparedSlopeFunction::from_machine_pairs(vec![(100., 0.), (0., 2.)]).unwrap();
+    let FrontierOutcome::Complete((bounded, limit)) =
+        PairedFrontOperations::machine_backward_initial_bounds(
+            &front,
+            0.,
+            2.,
+            0.,
+            2.,
+            &lower,
+            &upper,
+            FrontierBudget::default(),
+        )
+    else {
+        panic!("native minimum consumes the cleared count-minus-one storage");
+    };
+    assert_eq!(bounded.pairs(), &[(0., 0.), (0., 0.)]);
+    assert_eq!(limit, 0.5);
 }

@@ -214,7 +214,9 @@ pub(super) fn solve_seeded<const D: usize>(
         None
     };
     let mut solver = if let Some(saved) = saved {
-        saved.pricing.fork_for_node()
+        let mut solver = saved.pricing.fork_for_node();
+        solver.restore_node_state()?;
+        solver
     } else {
         let mut solver = Solver::new(
             problem.model.networks[0].graph.vertices.len(),
@@ -577,6 +579,7 @@ pub(super) fn solve_seeded<const D: usize>(
         .as_ref()
         .map_or(problem.model.rows.len(), |w| w.initial_rows);
     let capture_state = options.capture_state;
+    let owner_gap = (options.cg.gap_absolute, options.cg.gap_relative);
     let inherited_cuts = saved.map_or(0, |s| s.active_cuts());
     if let Some(deadline) = state.borrow().deadline {
         // Preparation has already consumed part of the root budget. CG and
@@ -608,6 +611,22 @@ pub(super) fn solve_seeded<const D: usize>(
         }
     };
     enforcement::close_at_master_objective(&problem, phase_floor, &master.values, &mut output);
+    if state
+        .borrow()
+        .has_unpriced_paired_objective(&problem, &master.duals())
+        && output.status == cg::Status::Optimal
+        && (!output.bound.is_finite()
+            || !cg::gap_smaller_than_tolerance(output.bound, output.lp, owner_gap.0, owner_gap.1))
+    {
+        output.status = cg::Status::Stalled;
+    }
+    if output.status == cg::Status::Stalled
+        && state
+            .borrow()
+            .has_unpriced_paired_objective(&problem, &master.duals())
+    {
+        eprintln!("BALDES warning: paired pricing retains the unit resource objective; the associated owner objective or active row dual differs. The restricted master value is available, but raw pricing cannot certify this owner optimum (status Stalled).");
+    }
     output.warm_start.initial_rows = initial_rows;
     let state = state.borrow();
     // Extract values, duals and simplex iterations before moving master into snapshot.

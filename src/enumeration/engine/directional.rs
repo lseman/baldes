@@ -101,13 +101,24 @@ impl<const D: usize> Enumeration<D> {
         }
         let depot_mask = crate::graph::symmetry::depot_mask(g);
         if !consumption && grid.backward.buckets.is_empty() {
-            return Self::run_forward_with_completion(g, grid, controls, cuts, branching, completion);
+            return Self::run_forward_with_completion(
+                g, grid, controls, cuts, branching, completion,
+            );
         }
         if grid.resource_slots.is_empty() {
             if union_reversal {
-                return Self::run_forward_with_completion(g, grid, controls, cuts, branching, |_, _| true);
+                return Self::run_forward_with_completion(
+                    g,
+                    grid,
+                    controls,
+                    cuts,
+                    branching,
+                    |_, _| true,
+                );
             }
-            return Self::run_forward_with_completion(g, grid, controls, cuts, branching, completion);
+            return Self::run_forward_with_completion(
+                g, grid, controls, cuts, branching, completion,
+            );
         }
         g.validate()?;
         if controls.label_limit == 0 || controls.path_limit == 0 || !controls.cutoff.is_finite() {
@@ -119,6 +130,12 @@ impl<const D: usize> Enumeration<D> {
         let preserve = controls.preserve_arc_paths
             || g.has_coupled_resources()
             || cuts.and_then(|c| c.presence).is_some_and(|p| p.active());
+        let preserve_paths = controls.preserve_arc_paths
+            || cuts.and_then(|c| c.presence).is_some_and(|p| p.active())
+            || (g.has_coupled_resources()
+                && !g
+                    .coupled_kernel()
+                    .is_some_and(|kernel| kernel.machine_paired_join_complete()));
         let started = Instant::now();
         let mut forward = Storage::new(controls.partitions)?;
         let mut backward = Storage::new(controls.partitions)?;
@@ -129,10 +146,10 @@ impl<const D: usize> Enumeration<D> {
             forward.protected_resources.clone_from(&protected);
             backward.protected_resources = protected;
         }
-        let mut pruning = PruningFrontier::for_run(preserve);
+        let mut pruning = PruningFrontier::for_run(preserve && preserve_paths);
         let mut paths = PathStorage::new(controls.partitions)?;
         let mut extensions = 0usize;
-        paths.preserve_arc_paths = preserve;
+        paths.preserve_arc_paths = preserve_paths;
         let mut crossing = vec![vec![]; g.vertices.len()];
         let mut roots = vec![];
         for direction in [true, false] {
@@ -225,7 +242,8 @@ impl<const D: usize> Enumeration<D> {
                     continue;
                 }
                 let v = grid.internal[from.vertex];
-                let Some(bucket) = grid.bucket_id_checked(direction, v, grid.coordinate(&from.resources))
+                let Some(bucket) = grid
+                    .bucket_id_checked(direction, v, grid.coordinate(&from.resources))
                     .map_err(|()| incomplete("enumeration bucket index overflow"))?
                 else {
                     continue;
@@ -364,7 +382,13 @@ impl<const D: usize> Enumeration<D> {
                                 } else {
                                     (root.clone(), Box::new(state.clone()))
                                 };
-                                machine_contribution = Some((kernel.machine_identity().clone(), contribution, paired_resource, forward, backward));
+                                machine_contribution = Some((
+                                    kernel.machine_identity().clone(),
+                                    contribution,
+                                    paired_resource,
+                                    forward,
+                                    backward,
+                                ));
                             }
                             if kernel.has_costs() {
                                 let value = if direction {
@@ -462,7 +486,8 @@ impl<const D: usize> Enumeration<D> {
                         if !next.add_elements(&g.vertices[next.vertex].elements) {
                             continue;
                         }
-                        if let (Some(branching), Some(state)) = (branching, &mut next.branch_state) {
+                        if let (Some(branching), Some(state)) = (branching, &mut next.branch_state)
+                        {
                             if !branching.visit(state, next.vertex) {
                                 continue;
                             }
@@ -481,8 +506,10 @@ impl<const D: usize> Enumeration<D> {
         // Bucket, partition and original-cost order determine which equivalent
         // elementary route survives. Preserve that order across crossing joins.
         let concatenation_started = Instant::now();
-        let expired = || started.elapsed() > controls.time_limit
-            || concatenation_limit.is_some_and(|limit| concatenation_started.elapsed() > limit);
+        let expired = || {
+            started.elapsed() > controls.time_limit
+                || concatenation_limit.is_some_and(|limit| concatenation_started.elapsed() > limit)
+        };
         let opposite = if consumption { &forward } else { &backward };
         let mut buckets: Vec<Vec<Vec<usize>>> = grid
             .direction(consumption)
@@ -499,7 +526,8 @@ impl<const D: usize> Enumeration<D> {
                 }
                 let label = &opposite.arena[id];
                 let vertex = grid.internal[label.vertex];
-                if let Some(k) = grid.bucket_id_checked(consumption, vertex, grid.coordinate(&label.resources))
+                if let Some(k) = grid
+                    .bucket_id_checked(consumption, vertex, grid.coordinate(&label.resources))
                     .map_err(|()| incomplete("enumeration bucket index overflow"))?
                 {
                     buckets[vertex][k].push(id);
@@ -528,7 +556,9 @@ impl<const D: usize> Enumeration<D> {
             })
         });
         let minimum_knapsack_join = cuts.map_or(0., |c| {
-            c.knapsack.global_cost_lower_bound().unwrap_or(f64::NEG_INFINITY)
+            c.knapsack
+                .global_cost_lower_bound()
+                .unwrap_or(f64::NEG_INFINITY)
         });
         for row in &mut buckets {
             if expired() {
@@ -629,7 +659,9 @@ impl<const D: usize> Enumeration<D> {
                     for &id in bucket {
                         preparation_work = preparation_work.wrapping_add(1);
                         if preparation_work & 255 == 0 && expired() {
-                            return Err(incomplete("enumeration concatenation time limit exceeded"));
+                            return Err(incomplete(
+                                "enumeration concatenation time limit exceeded",
+                            ));
                         }
                         bounds.include(opposite.arena[id].coupled_state.as_deref());
                     }
@@ -662,8 +694,10 @@ impl<const D: usize> Enumeration<D> {
                         q[r] = grid.upper[vertex][r] + grid.lower[vertex][r] - q[r];
                     }
                 }
-                let Some(k) = grid.bucket_id_checked(consumption, vertex, q)
-                    .map_err(|()| incomplete("enumeration bucket index overflow"))? else {
+                let Some(k) = grid
+                    .bucket_id_checked(consumption, vertex, q)
+                    .map_err(|()| incomplete("enumeration bucket index overflow"))?
+                else {
                     continue;
                 };
                 let key = label_key(f);
@@ -673,8 +707,20 @@ impl<const D: usize> Enumeration<D> {
                     None => Some(0.),
                 };
                 let coupled_costs = g.coupled_kernel().is_some_and(|kernel| kernel.has_costs());
+                let paired_sum = resource_lower == 0.
+                    && presence.is_none()
+                    && minimum_cut_join == 0.
+                    && minimum_knapsack_join == 0.
+                    && f.coupled_state
+                        .as_deref()
+                        .and_then(|state| state.paired_completion_key(0., 0.))
+                        .is_some();
                 let ordered_bound = |other: f64| {
-                    if coupled_costs || presence.is_some() || minimum_cut_join != 0.
+                    if paired_sum {
+                        key + other
+                    } else if coupled_costs
+                        || presence.is_some()
+                        || minimum_cut_join != 0.
                         || minimum_knapsack_join != 0.
                     {
                         crate::core::rounding::add_down(key, other)
@@ -711,20 +757,47 @@ impl<const D: usize> Enumeration<D> {
                         continue;
                     }
                     let row_possible = match (&coupled_rows, g.coupled_kernel()) {
-                        (Some(rows), Some(kernel)) => rows[vertex][bucket].as_deref()
-                            .is_some_and(|bounds| kernel.completion_feasible(
-                                true, f.coupled_state.as_deref(), bounds,
-                            )),
+                        (Some(rows), Some(kernel)) => {
+                            rows[vertex][bucket].as_deref().is_some_and(|bounds| {
+                                kernel.completion_feasible(true, f.coupled_state.as_deref(), bounds)
+                            })
+                        }
                         _ => true,
                     };
-                    for &id in if row_possible { &buckets[vertex][bucket][..] } else { &[] } {
+                    for (position, &id) in (if row_possible {
+                        &buckets[vertex][bucket][..]
+                    } else {
+                        &[]
+                    })
+                    .iter()
+                    .enumerate()
+                    {
                         examined = examined.wrapping_add(1);
                         if examined & 255 == 0 && expired() {
-                            return Err(incomplete("enumeration concatenation time limit exceeded"));
+                            return Err(incomplete(
+                                "enumeration concatenation time limit exceeded",
+                            ));
                         }
                         let b = &opposite.arena[id];
-                        let bound = ordered_bound(label_key(b));
-                        if bound >= controls.cutoff {
+                        let candidate_key = if position == 0 {
+                            label_key(b)
+                        } else {
+                            let half_potential = cuts
+                                .and_then(|c| c.info.vertex_cut_potential.get(b.vertex))
+                                .map_or(0., |&value| 0.5 * value);
+                            b.coupled_state
+                                .as_deref()
+                                .and_then(|state| {
+                                    state.paired_completion_scan_key(half_potential, b.cut_cost)
+                                })
+                                .unwrap_or_else(|| label_key(b))
+                        };
+                        let bound = ordered_bound(candidate_key);
+                        if if paired_sum {
+                            !(bound < controls.cutoff)
+                        } else {
+                            bound >= controls.cutoff
+                        } {
                             pruning.ordered(bound);
                             break;
                         }
@@ -734,6 +807,15 @@ impl<const D: usize> Enumeration<D> {
                             if !branching.joins(forward, backward) {
                                 continue;
                             }
+                        }
+                        if controls.max_route_arcs.is_some_and(|limit| {
+                            f.hops.checked_add(b.hops).is_none_or(|hops| hops > limit)
+                        }) || f.visited.iter().zip(&b.visited).zip(&depot_mask).any(
+                            |((x, y), depot)| {
+                                x & y & if consumption { !depot } else { u64::MAX } != 0
+                            },
+                        ) {
+                            continue;
                         }
                         let (cost, original_cost) =
                             if g.coupled_kernel().is_some_and(|kernel| kernel.has_costs()) {
@@ -799,28 +881,12 @@ impl<const D: usize> Enumeration<D> {
                             pruning.joined(cost);
                             continue;
                         }
-                        if controls.max_route_arcs.is_some_and(|limit| {
-                            f.hops.checked_add(b.hops).is_none_or(|hops| hops > limit)
-                        }) || f.visited.iter().zip(&b.visited).zip(&depot_mask).any(
-                            |((x, y), depot)| {
-                                x & y & if consumption { !depot } else { u64::MAX } != 0
-                            },
+                        if !crate::labeling::standard_resources_join(
+                            g,
+                            &f.resources,
+                            &b.resources,
+                            consumption,
                         ) {
-                            continue;
-                        }
-                        if !g.resources.iter().enumerate().all(|(r, kind)| match kind {
-                            ResourceKind::Disposable => {
-                                if consumption {
-                                    f.resources[r] + b.resources[r]
-                                        - g.initial[r]
-                                            .unwrap_or(g.vertices[g.source].bounds[r].lower)
-                                        <= g.vertices[g.sink].bounds[r].upper + EPSILON
-                                } else {
-                                    f.resources[r] <= b.resources[r] + EPSILON
-                                }
-                            }
-                            ResourceKind::Equality => f.resources[r] == b.resources[r],
-                        }) {
                             continue;
                         }
                         let arcs = crossing_arc_path(
@@ -854,9 +920,16 @@ impl<const D: usize> Enumeration<D> {
                             let backward = b.coupled_state.as_deref()?;
                             let contribution = kernel.machine_join_contribution(forward, backward);
                             let paired_resource = kernel.retained_paired_machine_resource();
-                            (paired_resource.is_some() || kernel.has_custom_machine_resource()).then(|| {
-                                (kernel.machine_identity().clone(), contribution, paired_resource, Box::new(forward.clone()), Box::new(backward.clone()))
-                            })
+                            (paired_resource.is_some() || kernel.has_custom_machine_resource())
+                                .then(|| {
+                                    (
+                                        kernel.machine_identity().clone(),
+                                        contribution,
+                                        paired_resource,
+                                        Box::new(forward.clone()),
+                                        Box::new(backward.clone()),
+                                    )
+                                })
                         });
                         paths.insert_with_machine_contribution(
                             Path {
@@ -878,14 +951,18 @@ impl<const D: usize> Enumeration<D> {
                     while end < predecessors.len() && predecessors[end].bucket.bucket >= min {
                         examined = examined.wrapping_add(1);
                         if examined & 255 == 0 && expired() {
-                            return Err(incomplete("enumeration concatenation time limit exceeded"));
+                            return Err(incomplete(
+                                "enumeration concatenation time limit exceeded",
+                            ));
                         }
                         end += 1;
                     }
                     for p in predecessors[..end].iter().rev() {
                         examined = examined.wrapping_add(1);
                         if examined & 255 == 0 && expired() {
-                            return Err(incomplete("enumeration concatenation time limit exceeded"));
+                            return Err(incomplete(
+                                "enumeration concatenation time limit exceeded",
+                            ));
                         }
                         pending.push((p.bucket.bucket, min.max(p.minimum)));
                     }
@@ -948,9 +1025,7 @@ fn crossing_arc_path<const D: usize>(
     arcs
 }
 
-/// Continue retained forward scalar sums in physical suffix order, then add
-/// the resource objective once. Proven backward caches avoid resource replay;
-/// physical-path vectors are allocated only after accepting the joined route.
+/// Combine the retained scalar and resource costs for a joined route.
 pub(super) fn coupled_canonical_join<const D: usize>(
     g: &Graph<D>,
     forward: &crate::graph::coupled::CoupledLabelState,
@@ -969,11 +1044,21 @@ pub(super) fn coupled_canonical_join<const D: usize>(
     let mut original = forward
         .scalar_original_cost()
         .ok_or_else(|| invalid("missing coupled forward scalar accounting"))?;
-    for arc in kernel.suffix_arcs(backward) {
-        reduced += g.arcs[arc].reduced_cost;
-        original += g.arcs[arc].cost;
-        if !reduced.is_finite() || !original.is_finite() {
-            return Err(incomplete("coupled enumeration base cost overflow"));
+    if kernel.machine_paired_join_complete() {
+        reduced += backward
+            .scalar_reduced_cost()
+            .ok_or_else(|| invalid("missing coupled backward scalar accounting"))?;
+        reduced += 0.;
+        original += backward
+            .scalar_original_cost()
+            .ok_or_else(|| invalid("missing coupled backward scalar accounting"))?;
+    } else {
+        for arc in kernel.suffix_arcs(backward) {
+            reduced += g.arcs[arc].reduced_cost;
+            original += g.arcs[arc].cost;
+            if !reduced.is_finite() || !original.is_finite() {
+                return Err(incomplete("coupled enumeration base cost overflow"));
+            }
         }
     }
     reduced += resource;

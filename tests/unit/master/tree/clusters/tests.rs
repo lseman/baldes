@@ -34,7 +34,6 @@ fn mst_partition_and_aggregate_coefficients_match_physical_crossings() {
         })
         .collect();
     let route = Route {
-        coupled_controls: Vec::new(),
         coupled_values: Vec::new(),
         nodes: nodes.iter().map(|&v| v as i32).collect(),
         arcs,

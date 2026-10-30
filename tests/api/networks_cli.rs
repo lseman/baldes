@@ -1145,28 +1145,42 @@ fn registered_accumulated_variables_share_cli_object_array_root_and_tree_paths()
 }
 
 #[test]
-fn graph_relative_objective_coefficients_reach_the_shared_cli_solver() {
-    let model = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/coupled/negative-relative-network.json");
+fn paired_front_signed_owner_cost_is_reported_without_an_uncertified_bound_by_cli() {
+    let corpus: Value = serde_json::from_str(include_str!(
+        "../fixtures/coupled/metasolver-paired-preparation.json"
+    ))
+    .unwrap();
+    let mut model = corpus["cases"][0]["model"].clone();
+    model["networks"][0]["coupled_objective_coefficients"] = json!([[0, -1.]]);
+    let path = std::env::temp_dir().join(format!(
+        "baldes-negative-paired-{}.json",
+        std::process::id()
+    ));
+    std::fs::write(&path, model.to_string()).unwrap();
     let output = command()
         .arg("solve")
-        .arg(model)
-        .args([
-            "--no-stabilization",
-            "--bound-mode",
-            "certified",
-            "--json",
-            "-",
-        ])
+        .arg(&path)
+        .args(["--no-stabilization", "--json", "-"])
         .output()
         .unwrap();
+    std::fs::remove_file(path).unwrap();
     assert!(
         output.status.success(),
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
     let result: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(result["status"], "Optimal");
-    assert!((result["lp"].as_f64().unwrap() + 26.).abs() < 1e-7);
-    assert!((result["bound"].as_f64().unwrap() + 26.).abs() < 1e-7);
+    assert_eq!(result["status"], "Stalled");
+    assert_eq!(result["lp"], -23.);
+    assert!(result["bound"].is_null());
+    let route = result["routes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|route| route["value"].as_f64().unwrap() > 0.)
+        .unwrap();
+    assert_eq!(route["cost"], -23.);
+    assert_eq!(route["coupled_values"], json!([[0, 3.]]));
+    assert!(String::from_utf8_lossy(&output.stderr)
+        .contains("raw pricing cannot certify this owner optimum"));
 }

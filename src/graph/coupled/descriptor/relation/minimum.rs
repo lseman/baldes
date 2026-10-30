@@ -1,7 +1,7 @@
 //! Prepared relation minimum operations.
 use super::*;
 
-impl PreparedSlopeRelationArc {
+impl PairedFrontOperations {
     /// Merge the ordered machine streams, carrying the selected operand and
     /// near-tie state. Losing-operand endpoints advance without manufacturing
     /// output pieces. This operation does not certify source-model feasibility.
@@ -57,7 +57,7 @@ impl PreparedSlopeRelationArc {
                 // its value, unlike the ordinary point-evaluation helper.
                 while j < b.len() && b[j].1 < ax {
                     deadline()?;
-                    bv = finite(bv + finite(finite(b[j].1 - bx)? * b[j].0)?)?;
+                    bv = bv + ((b[j].1 - bx) * b[j].0);
                     bx = b[j].1;
                     j += 1;
                 }
@@ -65,13 +65,13 @@ impl PreparedSlopeRelationArc {
                     "machine minimum stream start lookup",
                 ))?;
                 if near(end, ax)? {
-                    bv = finite(bv + finite(finite(end - bx)? * slope)?)?;
+                    bv = bv + ((end - bx) * slope);
                     bx = end;
                     j += 1;
                     bv
                 } else {
                     previous_order = -1;
-                    finite(bv + finite(finite(ax - bx)? * slope)?)?
+                    (bv + ((ax - bx) * slope))
                 }
             };
             let mut choose_a = av <= b_start;
@@ -81,7 +81,11 @@ impl PreparedSlopeRelationArc {
                           slope: f64,
                           end: f64|
              -> Result<(), FrontierUnknown> {
-                if output.len() > 1 && near(output.last().unwrap().0, slope)? {
+                if output.len() > 1
+                    && slope.is_finite()
+                    && output.last().unwrap().0.is_finite()
+                    && near(output.last().unwrap().0, slope)?
+                {
                     // Both slope and endpoint are overwritten on a merge.
                     *output.last_mut().unwrap() = (slope, end);
                 } else {
@@ -95,8 +99,8 @@ impl PreparedSlopeRelationArc {
             while i < a.len() && j < b.len() {
                 deadline()?;
                 let (ae, be) = (a[i].1, b[j].1);
-                let aend = finite(av + finite(finite(ae - ax)? * a[i].0)?)?;
-                let bend = finite(bv + finite(finite(be - bx)? * b[j].0)?)?;
+                let aend = av + ((ae - ax) * a[i].0);
+                let bend = bv + ((be - bx) * b[j].0);
                 let order = if near(ae, be)? {
                     0
                 } else if be <= ae {
@@ -105,25 +109,27 @@ impl PreparedSlopeRelationArc {
                     -1
                 };
                 let (x, ay, by) = match order {
-                    1 => (be, finite(av + finite(finite(be - ax)? * a[i].0)?)?, bend),
-                    -1 => (ae, aend, finite(bv + finite(finite(ae - bx)? * b[j].0)?)?),
+                    1 => (be, (av + ((be - ax) * a[i].0)), bend),
+                    -1 => (ae, aend, (bv + ((ae - bx) * b[j].0))),
                     _ => (ae, aend, bend),
                 };
-                let tie = near(ay, by)?;
+                // The native value comparison's unordered branch retains the
+                // current operand; slope coalescing below remains ordered.
+                let tie = ay.is_nan() || by.is_nan() || near(ay, by)?;
                 let next_a = if tie { choose_a } else { ay <= by };
                 if choose_a != next_a {
                     // A tie at a jointly consumed previous endpoint changes
                     // selection without an artificial zero-width crossing.
                     if !(previous_tie && previous_order == 0) {
-                        let ai = finite(aend - finite(ae * a[i].0)?)?;
-                        let bi = finite(bend - finite(be * b[j].0)?)?;
-                        let denominator = finite(a[i].0 - b[j].0)?;
+                        let ai = aend - (ae * a[i].0);
+                        let bi = bend - (be * b[j].0);
+                        let denominator = a[i].0 - b[j].0;
                         if denominator == 0. {
                             return Err(FrontierUnknown::Unsupported(
                                 "machine minimum stream parallel crossing",
                             ));
                         }
-                        let crossing = finite(finite(bi - ai)? / denominator)?;
+                        let crossing = (bi - ai) / denominator;
                         append(
                             &mut output,
                             if choose_a { a[i].0 } else { b[j].0 },
@@ -155,7 +161,8 @@ impl PreparedSlopeRelationArc {
                 output.push((0., output[0].1));
             }
             deadline()?;
-            PreparedSlopeFunction::from_machine_pairs(output).map_err(FrontierUnknown::Arithmetic)
+            PreparedSlopeFunction::from_machine_output_pairs(output)
+                .map_err(FrontierUnknown::Arithmetic)
         };
         match compute() {
             Ok(value) => FrontierOutcome::Complete(value),
@@ -277,6 +284,33 @@ impl PreparedSlopeRelationArc {
         lower: &PreparedSlopeFunction,
         budget: FrontierBudget,
     ) -> FrontierOutcome<(SlopeFront, f64)> {
+        match Self::machine_backward_initial_filter_output(
+            front,
+            waiting_lower,
+            waiting_upper,
+            forward_lower,
+            mapped_upper,
+            lower,
+            budget,
+        ) {
+            FrontierOutcome::Complete((Some(front), limit)) => {
+                FrontierOutcome::Complete((front, limit))
+            }
+            FrontierOutcome::Complete((None, _)) => FrontierOutcome::Empty,
+            FrontierOutcome::Empty => FrontierOutcome::Empty,
+            FrontierOutcome::Unknown(reason) => FrontierOutcome::Unknown(reason),
+        }
+    }
+
+    pub(super) fn machine_backward_initial_filter_output(
+        front: &SlopeFront,
+        waiting_lower: f64,
+        waiting_upper: f64,
+        forward_lower: f64,
+        mapped_upper: f64,
+        lower: &PreparedSlopeFunction,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<(Option<SlopeFront>, f64)> {
         let started = Instant::now();
         let first_work = budget.max_operations / 2;
         let first_budget = FrontierBudget {
@@ -310,8 +344,8 @@ impl PreparedSlopeRelationArc {
                 ..budget
             },
         ) {
-            FrontierOutcome::Complete(front) => FrontierOutcome::Complete((front, upper)),
-            FrontierOutcome::Empty => FrontierOutcome::Empty,
+            FrontierOutcome::Complete(front) => FrontierOutcome::Complete((Some(front), upper)),
+            FrontierOutcome::Empty => FrontierOutcome::Complete((None, upper)),
             // The lower-filter helper returns status 2 when the feasible
             // front re-enters after leaving. The backward caller rejects the
             // extension on that status; status 1 remains diagnostic.
@@ -532,7 +566,7 @@ impl PreparedSlopeRelationArc {
             } else {
                 while j < b.len() && b[j].1 < ax {
                     deadline()?;
-                    bv = finite(bv + finite(finite(b[j].1 - bx)? * b[j].0)?)?;
+                    bv = bv + ((b[j].1 - bx) * b[j].0);
                     bx = b[j].1;
                     j += 1;
                 }
@@ -540,12 +574,12 @@ impl PreparedSlopeRelationArc {
                     "machine lower stream start lookup",
                 ))?;
                 if near(end, ax)? {
-                    bv = finite(bv + finite(finite(end - bx)? * slope)?)?;
+                    bv = bv + ((end - bx) * slope);
                     bx = end;
                     j += 1;
                     bv
                 } else {
-                    finite(bv + finite(finite(ax - bx)? * slope)?)?
+                    (bv + ((ax - bx) * slope))
                 }
             };
             let mut active = b_start < av || near(av, b_start)?;
@@ -561,8 +595,8 @@ impl PreparedSlopeRelationArc {
             while i < a.len() && j < b.len() {
                 deadline()?;
                 let (ae, be) = (a[i].1, b[j].1);
-                let aend = finite(av + finite(finite(ae - ax)? * a[i].0)?)?;
-                let bend = finite(bv + finite(finite(be - bx)? * b[j].0)?)?;
+                let aend = av + ((ae - ax) * a[i].0);
+                let bend = bv + ((be - bx) * b[j].0);
                 let order = if near(ae, be)? {
                     0
                 } else if be <= ae {
@@ -571,26 +605,29 @@ impl PreparedSlopeRelationArc {
                     -1
                 };
                 let (x, ay, by) = match order {
-                    1 => (be, finite(av + finite(finite(be - ax)? * a[i].0)?)?, bend),
-                    -1 => (ae, aend, finite(bv + finite(finite(ae - bx)? * b[j].0)?)?),
+                    1 => (be, (av + ((be - ax) * a[i].0)), bend),
+                    -1 => (ae, aend, (bv + ((ae - bx) * b[j].0))),
                     _ => (ae, aend, bend),
                 };
-                let tie = near(ay, by)?;
+                // Ties are ordered. Only the active branch's JBE comparison
+                // also accepts unordered endpoint values; an inactive filter
+                // must not manufacture a reentry from a NaN endpoint.
+                let tie = !ay.is_nan() && !by.is_nan() && near(ay, by)?;
                 if active {
-                    if tie || by <= ay {
+                    if tie || by <= ay || ay.is_nan() || by.is_nan() {
                         // The lower filter copies each common endpoint. It
                         // does not perform the minimum operator's slope merge.
                         append(&mut output, (a[i].0, x))?;
                     } else {
-                        let ai = finite(aend - finite(ae * a[i].0)?)?;
-                        let bi = finite(bend - finite(be * b[j].0)?)?;
-                        let denominator = finite(a[i].0 - b[j].0)?;
+                        let ai = aend - (ae * a[i].0);
+                        let bi = bend - (be * b[j].0);
+                        let denominator = a[i].0 - b[j].0;
                         if denominator == 0. {
                             return Err(FrontierUnknown::Unsupported(
                                 "machine lower stream parallel crossing",
                             ));
                         }
-                        let crossing = finite(finite(bi - ai)? / denominator)?;
+                        let crossing = (bi - ai) / denominator;
                         if !near(crossing, output.last().unwrap().1)? {
                             append(&mut output, (a[i].0, crossing))?;
                         }
@@ -610,16 +647,16 @@ impl PreparedSlopeRelationArc {
                             "machine lower stream reentry status",
                         ));
                     }
-                    let ai = finite(aend - finite(ae * a[i].0)?)?;
-                    let bi = finite(bend - finite(be * b[j].0)?)?;
-                    let denominator = finite(a[i].0 - b[j].0)?;
+                    let ai = aend - (ae * a[i].0);
+                    let bi = bend - (be * b[j].0);
+                    let denominator = a[i].0 - b[j].0;
                     if denominator == 0. {
                         return Err(FrontierUnknown::Unsupported(
                             "machine lower stream parallel crossing",
                         ));
                     }
-                    let crossing = finite(finite(bi - ai)? / denominator)?;
-                    let anchor = finite(finite(crossing * a[i].0)? + ai)?;
+                    let crossing = (bi - ai) / denominator;
+                    let anchor = (crossing * a[i].0) + ai;
                     append(&mut output, (anchor, crossing))?;
                     // The entry branch stores the full fixed endpoint, even
                     // when this comparison exhausted only the vector segment.
@@ -650,12 +687,15 @@ impl PreparedSlopeRelationArc {
                 append(&mut output, (0., coordinate))?;
             }
             deadline()?;
-            let result = PreparedSlopeFunction::from_machine_pairs(output)
+            let result = PreparedSlopeFunction::from_machine_output_pairs(output)
                 .map_err(FrontierUnknown::Arithmetic)?;
             Ok(SlopeFront::from_prepared(result))
         };
         match compute() {
             Ok(value) => FrontierOutcome::Complete(value),
+            Err(FrontierUnknown::Unsupported("machine lower stream invalid empty count")) => {
+                FrontierOutcome::Empty
+            }
             Err(reason) => FrontierOutcome::Unknown(reason),
         }
     }

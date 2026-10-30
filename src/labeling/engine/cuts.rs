@@ -293,7 +293,9 @@ impl<const D: usize> LabelingEngine<D> {
                 self.update_unreachable(false);
             }
             if self.resource_error.load(Ordering::Relaxed) {
-                return Err(incomplete("resource or bucket completion arithmetic failure"));
+                return Err(incomplete(
+                    "resource or bucket completion arithmetic failure",
+                ));
             }
             self.refresh_coupled_completion(g);
             self.full_ready = true;

@@ -1,7 +1,65 @@
 //! Ordered machine-front comparison, independent of source pruning proofs.
 use super::*;
 
-impl PreparedSlopeRelationArc {
+impl PairedFrontOperations {
+    /// Apply the backward machine wrapper, including its domain checks.
+    pub fn machine_backward_dominance(
+        left: &PreparedSlopeFunction,
+        right: &PreparedSlopeFunction,
+        mode: i32,
+        accumulated: f64,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<f64> {
+        let started = Instant::now();
+        if budget.max_elapsed.is_some_and(|limit| limit.is_zero()) {
+            return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
+        }
+        let Some(remaining_work) = budget.max_operations.checked_sub(4) else {
+            return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
+        };
+        let (Some(a0), Some(a1), Some(b0), Some(b1)) = (
+            left.pairs().first(),
+            left.pairs().last(),
+            right.pairs().first(),
+            right.pairs().last(),
+        ) else {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "backward dominance empty front",
+            ));
+        };
+        let starts = match near(a0.1, b0.1) {
+            Ok(equal) => equal || a0.1 <= b0.1,
+            Err(reason) => return FrontierOutcome::Unknown(reason),
+        };
+        let ends = match near(a1.1, b1.1) {
+            Ok(equal) => equal || b1.1 <= a1.1,
+            Err(reason) => return FrontierOutcome::Unknown(reason),
+        };
+        let remaining_time = budget
+            .max_elapsed
+            .map(|limit| limit.saturating_sub(started.elapsed()));
+        if remaining_time.is_some_and(|limit| limit.is_zero()) {
+            return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
+        }
+        if !starts || !ends {
+            return FrontierOutcome::Empty;
+        }
+        let budget = FrontierBudget {
+            max_operations: remaining_work,
+            max_elapsed: remaining_time,
+            ..budget
+        };
+        match mode {
+            4 => match Self::machine_backward_feasibility_dominance(left, right, budget) {
+                FrontierOutcome::Complete(()) => FrontierOutcome::Complete(accumulated),
+                FrontierOutcome::Empty => FrontierOutcome::Empty,
+                FrontierOutcome::Unknown(reason) => FrontierOutcome::Unknown(reason),
+            },
+            5 | 6 => Self::machine_backward_cost_dominance(left, right, mode, accumulated, budget),
+            _ => FrontierOutcome::Unknown(FrontierUnknown::Unsupported("backward dominance mode")),
+        }
+    }
+
     /// Ordered feasibility-only machine comparison. Endpoint tolerance and
     /// the asymmetric interior-start check are literal machine behavior;
     /// acceptance does not establish strict source-domain containment.
@@ -13,7 +71,7 @@ impl PreparedSlopeRelationArc {
         let started = Instant::now();
         let calculate = || -> Result<bool, FrontierUnknown> {
             let (a, b) = (left.pairs(), right.pairs());
-            if a.len() < 2 || b.len() < 2 || a.len() > 12 || b.len() > 12 {
+            if a.is_empty() || b.is_empty() || a.len() > 12 || b.len() > 12 {
                 return Err(FrontierUnknown::Unsupported(
                     "backward feasibility comparison geometry",
                 ));
@@ -130,7 +188,7 @@ impl PreparedSlopeRelationArc {
             }
             let a = left.pairs();
             let b = right.pairs();
-            if a.len() < 2 || b.len() < 2 || a.len() > 12 || b.len() > 12 {
+            if a.is_empty() || b.is_empty() || a.len() > 12 || b.len() > 12 {
                 return Err(FrontierUnknown::Unsupported(
                     "backward cost comparison geometry",
                 ));

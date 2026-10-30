@@ -90,10 +90,14 @@ impl Range {
 // Conservative version of the paired wrapper's endpoint disjointness test
 // over two hulls. The tolerance uses the largest possible endpoint magnitudes.
 fn machine_domains_separated(starts: Range, ends: Range) -> bool {
-    let Some(gap) = add_down(starts.lo, -ends.hi) else { return false; };
+    let Some(gap) = add_down(starts.lo, -ends.hi) else {
+        return false;
+    };
     let start_abs = starts.lo.abs().max(starts.hi.abs());
     let end_abs = ends.lo.abs().max(ends.hi.abs());
-    let Some(sum) = add_up(start_abs, end_abs) else { return false; };
+    let Some(sum) = add_up(start_abs, end_abs) else {
+        return false;
+    };
     let Some(relative) = multiply_down(-sum, 2.220446049250313e-10).map(|x| -x) else {
         return false;
     };
@@ -221,6 +225,7 @@ pub(crate) struct CoupledStateBounds {
     selection: Vec<u64>,
     loads: Vec<[Range; 3]>,
     paired_domains: Vec<Option<[Range; 2]>>,
+    paired_ordered_keys: bool,
     state_costs: Range,
     initial_dot: Option<Range>,
     direction: Option<bool>,
@@ -260,14 +265,34 @@ impl CoupledStateBounds {
             .suffix
             .as_ref()
             .map_or(&[][..], |s| s.coefficients.as_slice());
-        let domains: Vec<_> = state.slope_relations.iter().map(|label| {
-            let history = label.machine_history.as_ref()?;
-            let [front] = history.last().front().components() else { return None; };
-            let first = front.pairs().first()?.1;
-            let last = front.pairs().last()?.1;
-            (first.is_finite() && last.is_finite())
-                .then_some([Range::point(first), Range::point(last)])
-        }).collect();
+        let domains: Vec<_> = state
+            .slope_relations
+            .iter()
+            .map(|label| {
+                let history = label.machine_history.as_ref()?;
+                let [front] = history.last().front().components() else {
+                    return None;
+                };
+                let first = front.pairs().first()?.1;
+                let last = front.pairs().last()?.1;
+                (first.is_finite() && last.is_finite())
+                    .then_some([Range::point(first), Range::point(last)])
+            })
+            .collect();
+        // A backward root's key is the terminal ceiling, not a lower bound
+        // on the cost of joining a prefix to that root. Treat a hull containing
+        // it as unknown for ordered-key pruning; the actual join still applies.
+        let ordered_key = !reversed
+            && state
+                .paired_completion_key(0., 0.)
+                .is_some_and(f64::is_finite)
+            && (forward
+                || state.slope_relations.iter().all(|label| {
+                    !matches!(
+                        label.machine_history.as_ref().map(|history| history.last()),
+                        Some(descriptor::MachinePathSnapshot::Root(_))
+                    )
+                }));
         if self.count == 0 {
             self.direction = Some(forward);
             self.state_costs = state_costs;
@@ -280,6 +305,7 @@ impl CoupledStateBounds {
             self.numeric = state.numeric.iter().copied().map(Range::point).collect();
             self.coefficients = coefficients.iter().copied().map(Range::point).collect();
             self.paired_domains = domains;
+            self.paired_ordered_keys = ordered_key;
         } else if self.direction != Some(forward)
             || self.numeric.len() != state.numeric.len()
             || self.coefficients.len() != coefficients.len()
@@ -290,6 +316,7 @@ impl CoupledStateBounds {
             self.invalid = true;
             return;
         } else {
+            self.paired_ordered_keys &= ordered_key;
             self.state_costs.lo = self.state_costs.lo.min(state_costs.lo);
             self.state_costs.hi = self.state_costs.hi.max(state_costs.hi);
             for (union, &domain) in self.selection.iter_mut().zip(&state.selection) {
@@ -351,6 +378,7 @@ impl CoupledStateBounds {
             self.invalid = true;
             return;
         }
+        self.paired_ordered_keys &= other.paired_ordered_keys;
         for (a, b) in self
             .numeric
             .iter_mut()
@@ -395,19 +423,23 @@ impl CoupledKernel {
         {
             return false;
         }
-        !self.front_program_domain || self.slope_paired.iter().zip(&state.slope_relations)
-            .all(|(prepared, label)| {
-                if !prepared.has_machine_program_input() {
-                    return true;
-                }
-                label.machine_history.as_ref().is_some_and(|history| {
-                    if state.suffix.is_none() {
-                        prepared.matches_forward_root(history)
-                    } else {
-                        prepared.matches_backward_root(history)
+        !self.front_program_domain
+            || self
+                .slope_paired
+                .iter()
+                .zip(&state.slope_relations)
+                .all(|(prepared, label)| {
+                    if !prepared.has_machine_program_input() {
+                        return true;
                     }
+                    label.machine_history.as_ref().is_some_and(|history| {
+                        if state.suffix.is_none() {
+                            prepared.matches_forward_root(history)
+                        } else {
+                            prepared.matches_backward_root(history)
+                        }
+                    })
                 })
-            })
     }
 
     /// Necessary compatibility with an entire opposite-label hull. False is
@@ -442,15 +474,23 @@ impl CoupledKernel {
         {
             return false;
         }
-        if self.front_program_domain && state.slope_relations.len() == opposite.paired_domains.len() {
+        if self.front_program_domain && state.slope_relations.len() == opposite.paired_domains.len()
+        {
             // The machine wrapper rejects disjoint endpoint domains unless
             // the endpoints are within its absolute or relative tolerance.
             // Round the gap down and the tolerance up so a hull rejects only
             // when every represented endpoint is certainly separated.
             for (label, hull) in state.slope_relations.iter().zip(&opposite.paired_domains) {
-                let (Some(history), Some(hull)) = (&label.machine_history, hull) else { continue; };
-                let [front] = history.last().front().components() else { continue; };
-                let (Some(first), Some(last)) = (front.pairs().first(), front.pairs().last()) else { continue; };
+                let (Some(history), Some(hull)) = (&label.machine_history, hull) else {
+                    continue;
+                };
+                let [front] = history.last().front().components() else {
+                    continue;
+                };
+                let (Some(first), Some(last)) = (front.pairs().first(), front.pairs().last())
+                else {
+                    continue;
+                };
                 if machine_domains_separated(Range::point(first.1), hull[1])
                     || machine_domains_separated(hull[0], Range::point(last.1))
                 {
@@ -498,12 +538,40 @@ impl CoupledKernel {
         state: Option<&CoupledLabelState>,
         opposite: &CoupledStateBounds,
     ) -> f64 {
+        if self.machine_paired_join_complete()
+            && self.cost_scale == 1.
+            && self.pricing_activities.is_empty()
+            && !opposite.invalid
+            && opposite.count > 0
+            && opposite.direction == Some(!forward)
+            && opposite.paired_ordered_keys
+            && state.is_some_and(|state| {
+                state.suffix.is_none() == forward
+                    && self.completion_state_matches(state)
+                    && state
+                        .paired_completion_key(0., 0.)
+                        .is_some_and(f64::is_finite)
+            })
+        {
+            return 0.;
+        }
+        // With paired cost suppressed, both label directions and every
+        // completed native join contribute zero resource cost. Keep the
+        // scalar completion bound active in this domain.
+        if self.machine_paired_join_complete()
+            && self.cost_scale == 0.
+            && self.pricing_activities.is_empty()
+        {
+            return 0.;
+        }
         if self.weighted_objective
             || !self.pricing_activities.is_empty()
             || !self.front_indices.is_empty()
             || !self.slope_indices.is_empty()
-            || self.slope_paired.iter().any(|resource| resource.has_costs())
-            || self.paired.iter().any(|resource| resource.has_costs())
+            || self
+                .slope_paired
+                .iter()
+                .any(|resource| resource.has_costs())
             || !self.plugins.is_empty()
         {
             return f64::NEG_INFINITY;
@@ -879,6 +947,10 @@ impl CoupledStateBounds {
         let within = |r: &Range, x: f64| x.is_finite() && r.lo <= x && x <= r.hi;
         self.usable()
             && self.direction == Some(state.suffix.is_none())
+            && (!self.paired_ordered_keys
+                || state
+                    .paired_completion_key(0., 0.)
+                    .is_some_and(f64::is_finite))
             && self.numeric.len() == state.numeric.len()
             && self.coefficients.len() == coefficients.len()
             && self.selection.len() == state.selection.len()
@@ -904,13 +976,26 @@ impl CoupledStateBounds {
                 .iter()
                 .zip(&state.loads)
                 .all(|(r, x)| r.iter().zip(x).all(|(r, &x)| within(r, x)))
-            && self.paired_domains.iter().zip(&state.slope_relations).all(|(hull, label)| {
-                let Some(hull) = hull else { return true; };
-                let Some(history) = &label.machine_history else { return false; };
-                let [front] = history.last().front().components() else { return false; };
-                let (Some(first), Some(last)) = (front.pairs().first(), front.pairs().last()) else { return false; };
-                within(&hull[0], first.1) && within(&hull[1], last.1)
-            })
+            && self
+                .paired_domains
+                .iter()
+                .zip(&state.slope_relations)
+                .all(|(hull, label)| {
+                    let Some(hull) = hull else {
+                        return true;
+                    };
+                    let Some(history) = &label.machine_history else {
+                        return false;
+                    };
+                    let [front] = history.last().front().components() else {
+                        return false;
+                    };
+                    let (Some(first), Some(last)) = (front.pairs().first(), front.pairs().last())
+                    else {
+                        return false;
+                    };
+                    within(&hull[0], first.1) && within(&hull[1], last.1)
+                })
             && costs.lo >= self.state_costs.lo
             && costs.hi <= self.state_costs.hi
     }
@@ -974,12 +1059,21 @@ impl CoupledKernel {
         // The selection/load rejection above is necessary independently of
         // other resource families. Their objective contributions, however,
         // cannot be inferred from these numeric hulls.
-        let correction_lower = if self.weighted_objective
+        let correction_lower = if self.machine_paired_join_complete()
+            && self.cost_scale == 1.
+            && self.pricing_activities.is_empty()
+            && f.paired_ordered_keys
+            && b.paired_ordered_keys
+        {
+            0.
+        } else if self.weighted_objective
             || !self.pricing_activities.is_empty()
             || !self.front_indices.is_empty()
             || !self.slope_indices.is_empty()
-            || self.slope_paired.iter().any(|resource| resource.has_costs())
-            || self.paired.iter().any(|resource| resource.has_costs())
+            || self
+                .slope_paired
+                .iter()
+                .any(|resource| resource.has_costs())
             || !self.plugins.is_empty()
         {
             f64::NEG_INFINITY

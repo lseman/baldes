@@ -143,13 +143,13 @@ fn zero_objective_coefficients_and_phase_one_do_not_suppress_row_activities() {
 
 #[cfg(feature = "clp")]
 #[test]
-fn raw_paired_absolute_coefficients_preserve_values_joins_and_directed_costs() {
+fn paired_associated_coefficients_keep_unit_raw_pricing_and_weighted_original_costs() {
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
         "../../../../fixtures/coupled/metasolver-paired-preparation.json"
     ))
     .unwrap();
     for case_index in [0, 18] {
-        for coefficient in [0., 0.5, 1., 2., 1e-308] {
+        for coefficient in [-2., -1., 0., 0.5, 1., 2., 1e-308] {
             let mut problem = crate::master::model::format::Model::from_json(
                 &corpus["cases"][case_index]["model"].to_string(),
             )
@@ -167,6 +167,12 @@ fn raw_paired_absolute_coefficients_preserve_values_joins_and_directed_costs() {
                 kernel.selected_paired_values(&[1, 2]).unwrap(),
                 Some(vec![(0, 3.)])
             );
+            assert_eq!(kernel.objective_coefficient(0), Some(coefficient));
+            assert_eq!(kernel.replay_pricing(&[1, 2]).unwrap(), Some(3.));
+            assert_eq!(
+                kernel.certify_pricing_with_budget(&[1, 2], &mut 100_000, None),
+                Some((true, [3., 3.]))
+            );
             let (feasible, interval) = kernel.certify(&[1, 2]).unwrap();
             assert!(feasible && interval[0] <= expected && expected <= interval[1]);
             for split in 0..=2 {
@@ -180,8 +186,8 @@ fn raw_paired_absolute_coefficients_preserve_values_joins_and_directed_costs() {
                     b = kernel.extend(&b, arc, false).unwrap().unwrap().0;
                 }
                 assert_eq!(
-                    kernel.join_original_objective(&f, &b).unwrap(),
-                    Some(expected)
+                    kernel.join_objective_costs(&f, &b).unwrap(),
+                    Some((3., expected))
                 );
             }
             let mut suppressed = kernel.clone();
@@ -191,9 +197,6 @@ fn raw_paired_absolute_coefficients_preserve_values_joins_and_directed_costs() {
                 suppressed.selected_paired_values(&[1, 2]).unwrap(),
                 Some(vec![(0, 3.)])
             );
-            assert!(graph
-                .set_coupled_objective_coefficients(&[(0, -1.)])
-                .is_err());
         }
     }
 }

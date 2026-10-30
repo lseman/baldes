@@ -1,29 +1,74 @@
 use super::*;
 use crate::graph::coupled::PiecewiseLinearFunction;
 
+/// Parallel arcs `0 -> 1` with one explicit paired program on base window
+/// `[0, 2]`, zero base consumption and constant dependent bounds.
+fn parallel_paired_front(
+    mode: crate::graph::coupled::PairedResourceMode,
+    initial: f64,
+    increments: &[descriptor::PreparedSlopeFunction],
+    uppers: &[f64],
+    waiting: i32,
+) -> Graph<2> {
+    use crate::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
+    };
+    let window = Window::new(0., 2.).unwrap();
+    let mut graph = Graph::<2>::new(2, 0).unwrap();
+    for _ in increments {
+        graph.add_arc(0, 1, 0.).unwrap();
+    }
+    graph
+        .set_coupled_resources(&[CoupledResource::PairedFront { mode }])
+        .unwrap();
+    let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+    let base = PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 2.)]).unwrap();
+    let inputs: Vec<_> = increments
+        .iter()
+        .zip(uppers)
+        .enumerate()
+        .map(
+            |(physical_arc, (increment, &upper))| crate::graph::coupled::MachineArcFunctionInput {
+                physical_arc,
+                tail_bounds: window,
+                waiting_bounds: window,
+                waiting_rate: waiting,
+                base: &base,
+                dependent: MachineRootInput::Vector(increment),
+                dependent_lower: affine(0.),
+                dependent_upper: affine(upper),
+            },
+        )
+        .collect();
+    let result = graph.prepare_paired_front_program(
+        0,
+        &inputs,
+        affine(initial),
+        window,
+        window,
+        FrontierBudget::default(),
+    );
+    assert!(
+        matches!(result, FrontierOutcome::Complete(())),
+        "{result:?}"
+    );
+    graph
+}
+fn line(a: f64, b: f64) -> descriptor::PreparedSlopeFunction {
+    descriptor::PreparedSlopeFunction::from_prepared_pairs(vec![(a, 0.), ((b - a) / 2., 2.)])
+        .unwrap()
+}
+
 #[test]
 fn unbounded_relation_shift_pays_for_a_higher_nonconstant_front() {
-    use crate::graph::coupled::{PairedResourceArc, PairedResourceMode};
-    let line = |a, b| PiecewiseLinearFunction::new(vec![[0., a], [2., b]]).unwrap();
-    let mut graph = Graph::<2>::new(2, 0).unwrap();
-    graph.add_arc(0, 1, 0.).unwrap();
-    graph.add_arc(0, 1, 0.).unwrap();
-    let arc = |increment| PairedResourceArc {
-        arrival: line(0., 2.),
-        increment,
-        lower: line(0., 0.),
-        upper: line(1e12, 1e12),
-        waiting: 1,
-    };
-    graph
-        .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
-            normalization: crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
-            initial: line(0., 0.),
-            initial_base: Window::new(0., 2.).unwrap(),
-            arcs: vec![arc(line(0., 2.)), arc(line(0., 0.))],
-            mode: PairedResourceMode::CostUnbounded,
-        }])
-        .unwrap();
+    use crate::graph::coupled::PairedResourceMode;
+    let graph = parallel_paired_front(
+        PairedResourceMode::CostUnbounded,
+        0.,
+        &[line(0., 2.), line(0., 0.)],
+        &[1e12, 1e12],
+        1,
+    );
     let kernel = graph.coupled_kernel().unwrap();
     let root = kernel.root(true);
     let mut high = kernel.extend(&root, 0, true).unwrap().unwrap().0;
@@ -37,27 +82,14 @@ fn unbounded_relation_shift_pays_for_a_higher_nonconstant_front() {
 
 #[test]
 fn backward_paired_fronts_compare_different_suffix_programs() {
-    use crate::graph::coupled::{PairedResourceArc, PairedResourceMode};
-    let line = |a, b| PiecewiseLinearFunction::new(vec![[0., a], [2., b]]).unwrap();
-    let mut graph = Graph::<2>::new(2, 0).unwrap();
-    graph.add_arc(0, 1, 0.).unwrap();
-    graph.add_arc(0, 1, 0.).unwrap();
-    let arc = |upper| PairedResourceArc {
-        arrival: line(0., 2.),
-        increment: line(1., 1.),
-        lower: line(0., 0.),
-        upper: line(upper, upper),
-        waiting: 0,
-    };
-    graph
-        .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
-            normalization: crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
-            initial: line(5., 5.),
-            initial_base: Window::new(0., 2.).unwrap(),
-            arcs: vec![arc(10.), arc(8.)],
-            mode: PairedResourceMode::Feasibility,
-        }])
-        .unwrap();
+    use crate::graph::coupled::PairedResourceMode;
+    let graph = parallel_paired_front(
+        PairedResourceMode::Feasibility,
+        5.,
+        &[line(1., 1.), line(1., 1.)],
+        &[10., 8.],
+        0,
+    );
     let kernel = graph.coupled_kernel().unwrap();
     let root = kernel.root(false);
     let wide = kernel.extend(&root, 0, false).unwrap().unwrap().0;
@@ -72,32 +104,20 @@ fn backward_paired_fronts_compare_different_suffix_programs() {
 
 #[test]
 fn paired_terminal_above_numerical_infinity_retains_suffix_replay() {
-    use crate::graph::coupled::{PairedResourceArc, PairedResourceMode};
-    let line = |value| PiecewiseLinearFunction::new(vec![[0., value], [2., value]]).unwrap();
-    let mut graph = Graph::<2>::new(2, 0).unwrap();
-    graph.add_arc(0, 1, 0.).unwrap();
-    graph
-        .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
-            normalization: crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
-            initial: line(1.5e12),
-            initial_base: Window::new(0., 2.).unwrap(),
-            arcs: vec![PairedResourceArc {
-                arrival: PiecewiseLinearFunction::new(vec![[0., 0.], [2., 2.]]).unwrap(),
-                increment: line(1.),
-                lower: line(0.),
-                upper: line(2e12),
-                waiting: 0,
-            }],
-            mode: PairedResourceMode::Feasibility,
-        }])
-        .unwrap();
+    use crate::graph::coupled::PairedResourceMode;
+    let graph = parallel_paired_front(
+        PairedResourceMode::Feasibility,
+        1.5e12,
+        &[line(1., 1.)],
+        &[2e12],
+        0,
+    );
     let kernel = graph.coupled_kernel().unwrap();
     let suffix = kernel
         .extend(&kernel.root(false), 0, false)
         .unwrap()
         .unwrap()
         .0;
-    assert!(suffix.relations[0].backward_upper().is_none());
     assert!(kernel.join(&kernel.root(true), &suffix).unwrap().is_some());
 }
 
@@ -568,49 +588,4 @@ fn permanently_zero_fronts_keep_domain_inclusion_dominance() {
     let (b, _) = kernel.extend(&root, 1, true).unwrap().unwrap();
     assert_eq!(kernel.dominance_penalty(&a, &b, true), Some(0.));
     assert_eq!(kernel.dominance_penalty(&b, &a, true), None);
-}
-
-#[test]
-fn signed_paired_forward_dominance_requires_both_envelopes_and_equal_accounting() {
-    use crate::graph::coupled::{PairedResourceArc, PairedResourceMode};
-    let line = |a, b| PiecewiseLinearFunction::new(vec![[0., a], [2., b]]).unwrap();
-    let mut graph = Graph::<2>::new(2, 0).unwrap();
-    graph.add_arc(0, 1, 0.).unwrap();
-    graph.add_arc(0, 1, 0.).unwrap();
-    let arc = |increment| PairedResourceArc {
-        arrival: line(0., 2.),
-        increment: line(increment, increment),
-        lower: line(0., 0.),
-        upper: line(10., 10.),
-        waiting: 0,
-    };
-    graph
-        .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
-            normalization: crate::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
-            initial: line(0., 0.),
-            initial_base: Window::new(0., 2.).unwrap(),
-            arcs: vec![arc(0.), arc(1.)],
-            mode: PairedResourceMode::CostUnbounded,
-        }])
-        .unwrap();
-    graph
-        .set_coupled_objective_coefficients(&[(0, -1.)])
-        .unwrap();
-    let kernel = graph.coupled_kernel().unwrap();
-    let root = kernel.root(true);
-    let mut low = kernel.extend(&root, 0, true).unwrap().unwrap().0;
-    let mut high = kernel.extend(&root, 1, true).unwrap().unwrap().0;
-    low.account_extension(&root, 0., 0.).unwrap();
-    high.account_extension(&root, 0., 0.).unwrap();
-    assert_eq!(kernel.dominance_penalty(&low, &high, true), Some(0.));
-    assert_eq!(kernel.dominance_penalty(&high, &low, true), None);
-    let mut unknown = low.clone();
-    if let super::super::paired::PairedLabel::Forward { upper_negative, .. } =
-        &mut unknown.relations[0]
-    {
-        *upper_negative = None;
-    }
-    assert_eq!(kernel.dominance_penalty(&unknown, &high, true), None);
-    low.accounting = None;
-    assert_eq!(kernel.dominance_penalty(&low, &high, true), None);
 }

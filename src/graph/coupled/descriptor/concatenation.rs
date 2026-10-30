@@ -41,18 +41,28 @@ impl MachineLabelConcatenation {
             return FrontierOutcome::Complete(self);
         }
         let Some(vertex_info) = info.vertices.get(vertex) else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("limited-memory cut join vertex"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "limited-memory cut join vertex",
+            ));
         };
         if vertex >= info.vertex_cut_potential.len()
             || vertex_info.dominance.iter().any(|field| {
-                field.denominator == i32::MIN || usize::try_from(field.word)
-                    .map_or(true, |word| word >= crate::cuts::shared::state::LIMITED_WORDS)
+                field.denominator == i32::MIN
+                    || usize::try_from(field.word).map_or(true, |word| {
+                        word >= crate::cuts::shared::state::LIMITED_WORDS
+                    })
             })
         {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("limited-memory cut join layout"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "limited-memory cut join layout",
+            ));
         }
         self.reduced_cost = crate::cuts::shared::state::concatenation_cost(
-            info, vertex, (forward.0, forward.1), (backward.0, backward.1), self.reduced_cost,
+            info,
+            vertex,
+            (forward.0, forward.1),
+            (backward.0, backward.1),
+            self.reduced_cost,
         );
         FrontierOutcome::Complete(self)
     }
@@ -73,14 +83,21 @@ impl MachineLabelConcatenation {
         }
         if vertex >= info.vertex_cut_potential.len()
             || preparation.fields.iter().any(|field| {
-                field.denominator == i32::MIN || usize::try_from(field.word)
-                    .map_or(true, |word| word >= crate::cuts::shared::state::FULL_WORDS)
+                field.denominator == i32::MIN
+                    || usize::try_from(field.word)
+                        .map_or(true, |word| word >= crate::cuts::shared::state::FULL_WORDS)
             })
         {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("full-memory cut join layout"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "full-memory cut join layout",
+            ));
         }
         self.reduced_cost = crate::cuts::shared::state::full_memory_concatenation_cost(
-            info, preparation, vertex, (forward.0, forward.1), (backward.0, backward.1),
+            info,
+            preparation,
+            vertex,
+            (forward.0, forward.1),
+            (backward.0, backward.1),
             self.reduced_cost,
         );
         FrontierOutcome::Complete(self)
@@ -160,8 +177,13 @@ fn forward_entry(
         ));
     };
     let pairs = function.pairs();
-    if !check_sentinel && coordinate > pairs.last().unwrap().1 && !near(coordinate, pairs.last().unwrap().1)? {
-        return Err(FrontierUnknown::Unsupported("machine forward recorder upper diagnostic"));
+    if !check_sentinel
+        && coordinate > pairs.last().unwrap().1
+        && !near(coordinate, pairs.last().unwrap().1)?
+    {
+        return Err(FrontierUnknown::Unsupported(
+            "machine forward recorder upper diagnostic",
+        ));
     }
     // The fixed-array lookup advances the returned segment at a near final
     // knot too. Intermediate recorder entries initialize the segment to one
@@ -171,7 +193,9 @@ fn forward_entry(
         .map_err(FrontierUnknown::Arithmetic)?
         .unwrap_or((1e12, 1));
     if check_sentinel && value == 1e12 {
-        return Err(FrontierUnknown::Unsupported("machine forward recorder lookup sentinel"));
+        return Err(FrontierUnknown::Unsupported(
+            "machine forward recorder lookup sentinel",
+        ));
     }
     if segment != 1 {
         let previous = pairs
@@ -231,7 +255,7 @@ fn near(a: f64, b: f64) -> Result<bool, FrontierUnknown> {
     Ok(difference < 0.0001 || difference < finite(finite(a + b)?.abs() * 2.220446049250313e-10)?)
 }
 
-impl PreparedSlopeRelationArc {
+impl PairedFrontOperations {
     /// Port the paired enumeration-label wrapper through its resource check.
     /// The returned cost is before the separate set-based cut callback.
     pub fn machine_join_enumeration_labels(
@@ -251,7 +275,11 @@ impl PreparedSlopeRelationArc {
         // The native wrapper does not read this output before the overlap
         // check. An overlap preserves it verbatim; otherwise the resource
         // wrapper first resets it to positive zero.
-        if forward_elements.iter().zip(backward_elements).any(|(left, right)| left & right != 0) {
+        if forward_elements
+            .iter()
+            .zip(backward_elements)
+            .any(|(left, right)| left & right != 0)
+        {
             return FrontierOutcome::Complete(MachineLabelConcatenation {
                 compatible: false,
                 reduced_cost: physical,
@@ -285,7 +313,9 @@ impl PreparedSlopeRelationArc {
         mode: i32,
         budget: FrontierBudget,
     ) -> FrontierOutcome<MachineConcatenation> {
-        Self::machine_concatenation_impl(forward, backward, ceiling, mode, budget, true, -1e12, 1e12)
+        Self::machine_concatenation_impl(
+            forward, backward, ceiling, mode, budget, true, -1e12, 1e12,
+        )
     }
 
     /// Run the raw concatenation scan used directly by the solution recorder.
@@ -297,7 +327,9 @@ impl PreparedSlopeRelationArc {
         mode: i32,
         budget: FrontierBudget,
     ) -> FrontierOutcome<MachineConcatenation> {
-        Self::machine_concatenation_impl(forward, backward, ceiling, mode, budget, false, -1e12, 1e12)
+        Self::machine_concatenation_impl(
+            forward, backward, ceiling, mode, budget, false, -1e12, 1e12,
+        )
     }
 
     /// Run the raw scan with the caller's initial output coordinate and cost.
@@ -312,12 +344,21 @@ impl PreparedSlopeRelationArc {
         budget: FrontierBudget,
     ) -> FrontierOutcome<MachineConcatenationScan> {
         match Self::machine_concatenation_impl(
-            forward, backward, ceiling, mode, budget, false, initial_coordinate, initial_dependent,
+            forward,
+            backward,
+            ceiling,
+            mode,
+            budget,
+            false,
+            initial_coordinate,
+            initial_dependent,
         ) {
-            FrontierOutcome::Complete(selection) => FrontierOutcome::Complete(MachineConcatenationScan {
-                coordinate: selection.coordinate,
-                dependent: selection.dependent.unwrap_or(initial_dependent),
-            }),
+            FrontierOutcome::Complete(selection) => {
+                FrontierOutcome::Complete(MachineConcatenationScan {
+                    coordinate: selection.coordinate,
+                    dependent: selection.dependent.unwrap_or(initial_dependent),
+                })
+            }
             FrontierOutcome::Empty => FrontierOutcome::Empty,
             FrontierOutcome::Unknown(reason) => FrontierOutcome::Unknown(reason),
         }
@@ -380,6 +421,13 @@ impl PreparedSlopeRelationArc {
             }
         }
         let compute = || -> Result<Option<MachineConcatenation>, FrontierUnknown> {
+            // This scan consumes generated machine arrays, which may retain
+            // an empty NaN segment. Native arithmetic and unordered comparisons
+            // preserve an earlier finite optimum while scanning those entries.
+            let near = |a: f64, b: f64| -> Result<bool, FrontierUnknown> {
+                let difference = (a - b).abs();
+                Ok(difference < 0.0001 || difference < (a + b).abs() * 2.220446049250313e-10)
+            };
             let deadline = || -> Result<(), FrontierUnknown> {
                 if budget
                     .max_elapsed
@@ -421,7 +469,7 @@ impl PreparedSlopeRelationArc {
                         dependent: None,
                     }));
                 }
-                let value = finite(finite(ceiling - bv)? + av)?;
+                let value = (ceiling - bv) + av;
                 if value < minimum {
                     minimum = value;
                     selected = Some(coordinate);
@@ -439,19 +487,19 @@ impl PreparedSlopeRelationArc {
                 if near(ae, be)? {
                     // Each near endpoint uses its own span, then the forward
                     // coordinate becomes the common anchor for the next step.
-                    bv = finite(bv + finite(sb * finite(be - previous)?)?)?;
-                    av = finite(av + finite(sa * finite(ae - previous)?)?)?;
+                    bv = bv + sb * (be - previous);
+                    av = av + sa * (ae - previous);
                     coordinate = ae;
                     i += 1;
                     j += 1;
                 } else if be <= ae {
-                    bv = finite(bv + finite(sb * finite(be - previous)?)?)?;
-                    av = finite(av + finite(sa * finite(be - previous)?)?)?;
+                    bv = bv + sb * (be - previous);
+                    av = av + sa * (be - previous);
                     coordinate = be;
                     j += 1;
                 } else {
-                    av = finite(av + finite(sa * finite(ae - previous)?)?)?;
-                    bv = finite(bv + finite(sb * finite(ae - previous)?)?)?;
+                    av = av + sa * (ae - previous);
+                    bv = bv + sb * (ae - previous);
                     coordinate = ae;
                     i += 1;
                 }
@@ -465,18 +513,17 @@ impl PreparedSlopeRelationArc {
                             "machine concatenation sentinel crossing segment",
                         ));
                     }
-                    let numerator =
-                        finite(finite(finite(bv - av)? + finite(sa * ae)?)? - finite(sb * be)?)?;
+                    let numerator = ((bv - av) + sa * ae) - sb * be;
                     // The native feasibility branch returns success after a
                     // literal division; a zero slope difference can leave an
                     // infinite or NaN coordinate in the raw output.
-                    let coordinate = numerator / finite(sa - sb)?;
+                    let coordinate = numerator / (sa - sb);
                     return Ok(Some(MachineConcatenation {
                         coordinate,
                         dependent: None,
                     }));
                 }
-                let value = finite(finite(ceiling - bv)? + av)?;
+                let value = (ceiling - bv) + av;
                 if value < minimum {
                     minimum = value;
                     selected = Some(coordinate);
@@ -496,20 +543,18 @@ impl PreparedSlopeRelationArc {
                 let &(sb, _) = b.get(j).ok_or(FrontierUnknown::Unsupported(
                     "machine concatenation exhausted backward stream",
                 ))?;
-                av = finite(av + finite(finite(upper - a[i - 1].1)? * sa)?)?;
-                bv = finite(bv + finite(finite(upper - b[j - 1].1)? * sb)?)?;
+                av = av + (upper - a[i - 1].1) * sa;
+                bv = bv + (upper - b[j - 1].1) * sb;
                 if allowed(av, bv)? {
                     compatible = true;
                     if mode == 4 {
-                        let numerator = finite(
-                            finite(finite(bv - av)? + finite(sa * upper)?)? - finite(upper * sb)?,
-                        )?;
+                        let numerator = ((bv - av) + sa * upper) - upper * sb;
                         return Ok(Some(MachineConcatenation {
-                            coordinate: numerator / finite(sa - sb)?,
+                            coordinate: numerator / (sa - sb),
                             dependent: None,
                         }));
                     }
-                    let value = finite(finite(ceiling - bv)? + av)?;
+                    let value = (ceiling - bv) + av;
                     if value < minimum {
                         minimum = value;
                         selected = Some(upper);
@@ -633,7 +678,11 @@ impl PreparedSlopeRelationArc {
             let mut initial_waiting = 0.;
             for position in (0..snapshots.len()).rev() {
                 deadline()?;
-                let (value, predecessor, waiting) = forward_entry(snapshots[position], coordinate, position + 1 == snapshots.len())?;
+                let (value, predecessor, waiting) = forward_entry(
+                    snapshots[position],
+                    coordinate,
+                    position + 1 == snapshots.len(),
+                )?;
                 result.base[position] = coordinate;
                 result.dependent[position] = value;
                 if position == 0 {
@@ -698,7 +747,14 @@ impl PreparedSlopeRelationArc {
         budget: FrontierBudget,
     ) -> FrontierOutcome<MachineJoinedPathReconstruction> {
         Self::machine_reconstruct_joined_path_with_debug(
-            forward, backward, inverses, suffix, mode, waiting_rates, 0, budget,
+            forward,
+            backward,
+            inverses,
+            suffix,
+            mode,
+            waiting_rates,
+            0,
+            budget,
         )
     }
 
@@ -764,16 +820,21 @@ impl PreparedSlopeRelationArc {
             work = work
                 .checked_sub(concat_work)
                 .ok_or(FrontierUnknown::WorkLimit)?;
-            let selection =
-                match Self::machine_concatenation_scan(a, b, ceiling, mode, remaining(concat_work)?) {
-                    FrontierOutcome::Complete(value) => value,
-                    FrontierOutcome::Empty => {
-                        return Err(FrontierUnknown::Unsupported(
-                            "machine joined selection empty",
-                        ))
-                    }
-                    FrontierOutcome::Unknown(reason) => return Err(reason),
-                };
+            let selection = match Self::machine_concatenation_scan(
+                a,
+                b,
+                ceiling,
+                mode,
+                remaining(concat_work)?,
+            ) {
+                FrontierOutcome::Complete(value) => value,
+                FrontierOutcome::Empty => {
+                    return Err(FrontierUnknown::Unsupported(
+                        "machine joined selection empty",
+                    ))
+                }
+                FrontierOutcome::Unknown(reason) => return Err(reason),
+            };
             // Reserve the actual bounded forward-recorder scans; leave all
             // remaining work for the variable-length backward waiting scans.
             let mut forward_work = forward.len();

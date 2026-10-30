@@ -43,6 +43,13 @@ impl<const D: usize> LabelData for EnumerationProjection<'_, D> {
         self.label.cut_cost
     }
     fn key(&self) -> f64 {
+        if let Some(key) =
+            self.label.coupled_state.as_deref().and_then(|state| {
+                state.paired_completion_key(self.half_potential, self.label.cut_cost)
+            })
+        {
+            return key;
+        }
         (self.half_potential + self.label.cut_cost) + (0.0 + self.label.reduced_cost)
     }
 }
@@ -204,7 +211,11 @@ impl<const D: usize> LabelingEngine<D> {
         if feasibility_only && (!complete_labels || !scan) {
             return true;
         }
-        let threshold = if feasibility_only { f64::INFINITY } else { threshold };
+        let threshold = if feasibility_only {
+            f64::INFINITY
+        } else {
+            threshold
+        };
         // A partial opposite-label store cannot certify that a coupled
         // resource prefix has no completion. This applies to numeric and
         // piecewise states as well as paired fronts.
@@ -223,7 +234,10 @@ impl<const D: usize> LabelingEngine<D> {
             return true;
         }
         if let Some(kernel) = g.coupled_kernel() {
-            if label.coupled_state().is_none_or(|state| !kernel.completion_state_matches(state)) {
+            if label
+                .coupled_state()
+                .is_none_or(|state| !kernel.completion_state_matches(state))
+            {
                 return true;
             }
         }
@@ -262,7 +276,10 @@ impl<const D: usize> LabelingEngine<D> {
             Err(()) => return true,
         };
         let storage = self.storage(opposite);
-        let knapsack_lower = self.cuts.knapsack.global_cost_lower_bound()
+        let knapsack_lower = self
+            .cuts
+            .knapsack
+            .global_cost_lower_bound()
             .unwrap_or(f64::NEG_INFINITY);
         let key = crate::core::rounding::add_down(label.key(), knapsack_lower)
             .unwrap_or(f64::NEG_INFINITY);
@@ -281,6 +298,21 @@ impl<const D: usize> LabelingEngine<D> {
                 key,
             )
         };
+        let paired_sum = !scan_all
+            && !self.cuts.presence.active()
+            && !self.cuts.knapsack.active
+            && label
+                .coupled_state()
+                .and_then(|state| state.paired_completion_key(0., 0.))
+                .is_some()
+            && key.to_bits() == label.key().to_bits();
+        let completion_sum = |left: f64, right: f64| {
+            if paired_sum {
+                left + right
+            } else {
+                self.ctx().completion_sum(left, right)
+            }
+        };
         // The initial bucket needs no heap storage. Bounds-only queries and
         // leaf buckets finish here without allocating a predecessor stack.
         let mut initial = Some((bucket, 0usize));
@@ -292,20 +324,17 @@ impl<const D: usize> LabelingEngine<D> {
                 return true;
             }
             let row = &storage.buckets[vertex][k];
-            if self
-                .ctx()
-                .completion_sum(key, row.completion_bound(false))
-                >= threshold
-            {
+            let row_bound = completion_sum(key, row.completion_bound(false));
+            if row_bound >= threshold {
                 continue;
             }
             if !scan {
                 return true;
             }
             let scan_key = if scan_all {
-                self.ctx().bucket_completion_feasible(
-                    g, forward, label.coupled_state(), vertex, k,
-                ).then_some(f64::NEG_INFINITY)
+                self.ctx()
+                    .bucket_completion_feasible(g, forward, label.coupled_state(), vertex, k)
+                    .then_some(f64::NEG_INFINITY)
             } else {
                 self.ctx().bucket_completion_data(
                     g,
@@ -319,13 +348,39 @@ impl<const D: usize> LabelingEngine<D> {
                 )
             };
             if let Some(scan_key) = scan_key {
-                for &id in &row.active {
+                for (position, &id) in row.active.iter().enumerate() {
                     examined = examined.wrapping_add(1);
-                    if examined & 255 == 0 && timer.is_some_and(|(start, limit)| start.elapsed() > limit) {
+                    if examined & 255 == 0
+                        && timer.is_some_and(|(start, limit)| start.elapsed() > limit)
+                    {
                         return true;
                     }
                     let other = storage.labels.view(id);
-                    if self.ctx().completion_sum(scan_key, other.key()) >= threshold {
+                    let candidate_key = if position == 0 {
+                        other.key()
+                    } else {
+                        let half_potential = self
+                            .cuts
+                            .info
+                            .vertex_cut_potential
+                            .get(label.vertex())
+                            .map_or(0., |&value| 0.5 * value);
+                        other
+                            .coupled_state()
+                            .and_then(|state| {
+                                state.paired_completion_scan_key(
+                                    half_potential,
+                                    other.additional_cost(),
+                                )
+                            })
+                            .unwrap_or_else(|| other.key())
+                    };
+                    let candidate_bound = completion_sum(scan_key, candidate_key);
+                    if if paired_sum {
+                        !(candidate_bound < threshold)
+                    } else {
+                        candidate_bound >= threshold
+                    } {
                         break;
                     }
                     let (feasible, cost) = if forward {
@@ -344,14 +399,18 @@ impl<const D: usize> LabelingEngine<D> {
             let mut end = 0;
             while end < predecessors.len() && predecessors[end].bucket.bucket >= min {
                 examined = examined.wrapping_add(1);
-                if examined & 255 == 0 && timer.is_some_and(|(start, limit)| start.elapsed() > limit) {
+                if examined & 255 == 0
+                    && timer.is_some_and(|(start, limit)| start.elapsed() > limit)
+                {
                     return true;
                 }
                 end += 1;
             }
             for p in predecessors[..end].iter().rev() {
                 examined = examined.wrapping_add(1);
-                if examined & 255 == 0 && timer.is_some_and(|(start, limit)| start.elapsed() > limit) {
+                if examined & 255 == 0
+                    && timer.is_some_and(|(start, limit)| start.elapsed() > limit)
+                {
                     return true;
                 }
                 work.push((p.bucket.bucket, min.max(p.minimum)));
@@ -386,7 +445,8 @@ impl<const D: usize> LabelingEngine<D> {
         if timer.is_some_and(|(start, limit)| start.elapsed() > limit) {
             return true;
         }
-        if label.vertex >= self.ng.local_elements.len() || label.vertex >= self.grid.internal.len() {
+        if label.vertex >= self.ng.local_elements.len() || label.vertex >= self.grid.internal.len()
+        {
             return true;
         }
         if self.branching.resources != 0 && label.branch_state.is_none() {
@@ -411,7 +471,10 @@ impl<const D: usize> LabelingEngine<D> {
         let cut_words = match (&self.cuts.full, self.has_cuts()) {
             (Some(full), true) => {
                 let Some(words) = state::project_words_mapped(
-                    &self.cuts.limited, full, label.vertex, &label.cut_words,
+                    &self.cuts.limited,
+                    full,
+                    label.vertex,
+                    &label.cut_words,
                 ) else {
                     return true;
                 };

@@ -60,8 +60,8 @@ The [API reference](api.md#resourcemodel-signatures) lists exact signatures.
 | `add_encoded_piecewise_linear_dependent` | Numeric dependency using encoded functions |
 | `add_interval_cost` | Initial interval, global bounds, per-arc increments and knot functions; preserve a shared continuous initial choice |
 | `add_slope_interval_cost` | Interval cost with explicit slope encodings and front policy |
-| `add_paired_piecewise_linear` | Initial interval/front, per-arc arrival/increment/lower/upper functions, integer waiting rates, and mode |
-| `add_slope_paired` | Paired relation with encoded slope functions, front policy, and cost normalization |
+| `add_paired_front` | Declare a paired front resource and its feasibility/cost mode |
+| `set_paired_front_program` | Attach source/terminal windows, root and per-arc base/dependent functions |
 | `install` | Validate and attach the declaration list to a `Solver` |
 
 Selection masks encode allowed values as bits, rather than a list of scalar
@@ -96,17 +96,20 @@ raises `ValueError`. `to_dict()`/`from_dict()` retain explicit wire encoding.
 Use them when inserting encoded functions into network JSON descriptors.
 
 Knot functions use strict closed domains. Slope functions accept evaluation
-policy `"strict_domain"` (default) or `"endpoint_tolerance"`. Slope interval/paired
+policy `"strict_domain"` (default) or `"endpoint_tolerance"`. Slope interval
 resources separately choose front policy `"strict_domain"` or
 `"front_algebra"`. Strict fronts require strict slope functions;
 front-algebra fronts require endpoint-tolerance slope functions. Knot
 functions cannot be substituted where lossless slope encodings are required.
 
 Paired modes are `"feasibility"`, `"cost_bounded"`, and `"cost_unbounded"`.
-Slope-paired normalization defaults to `"absolute_final_value"`; the alternative
-is `"final_minus_initial_minimum"`. These choices affect objective meaning and
-arithmetic; do not change them to bypass a domain error. A successful numerical
-front operation does not automatically provide an independent bound certificate.
+Paired resources use an explicit front program rather than an `EncodedFunction`
+resource declaration. Its base function uses prepared slope pairs, while root,
+dependent and bound functions are explicit affine or vector dictionaries. See
+[paired front programs](../extensions/coupled-resources.md#paired-front-programs-and-waiting)
+for the schema and a complete builder example. Cost modes charge the selected
+joined dependent value; no initial-minimum normalization is applied. Different
+meeting splits can produce different values for a physical path.
 
 ## Disjoint time windows
 

@@ -85,7 +85,7 @@ fn residual_fork<const D: usize>(
             return Err(invalid("positive fixed-route quantity required"));
         }
         let route = problem
-            .elementary_route(&entry.arcs)
+            .elementary_route_checked(&entry.arcs)?
             .ok_or_else(|| invalid("fixed route must be a nonempty feasible elementary path"))?;
         if !parent
             .pricing

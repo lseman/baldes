@@ -1,7 +1,7 @@
 //! Prepared relation reconstruction operations.
 use super::*;
 
-impl PreparedSlopeRelationArc {
+impl PairedFrontOperations {
     /// Port of the backward-entry solution-recording loop. Steps are supplied
     /// in physical traversal order, opposite to backward history construction.
     /// The initial dependent value belongs to the joined forward prefix.
@@ -14,7 +14,13 @@ impl PreparedSlopeRelationArc {
         budget: FrontierBudget,
     ) -> FrontierOutcome<MachinePathReconstruction> {
         Self::machine_reconstruct_backward_path_with_rates(
-            history, steps, initial_base, initial_dependent, mode, None, budget,
+            history,
+            steps,
+            initial_base,
+            initial_dependent,
+            mode,
+            None,
+            budget,
         )
     }
 
@@ -31,7 +37,14 @@ impl PreparedSlopeRelationArc {
         budget: FrontierBudget,
     ) -> FrontierOutcome<MachinePathReconstruction> {
         Self::machine_reconstruct_backward_path_with_rates_and_debug(
-            history, steps, initial_base, initial_dependent, mode, waiting_rates, 0, budget,
+            history,
+            steps,
+            initial_base,
+            initial_dependent,
+            mode,
+            waiting_rates,
+            0,
+            budget,
         )
     }
 
@@ -51,9 +64,10 @@ impl PreparedSlopeRelationArc {
             || !initial_dependent.is_finite()
             || history.len().checked_sub(1) != Some(steps.len())
             || waiting_rates.is_some_and(|rates| {
-                rates.len() != steps.len() || rates.iter().zip(steps).any(|(rate, (_, input))| {
-                    !rate.is_finite() || rate.trunc() != f64::from(input.waiting_rate)
-                })
+                rates.len() != steps.len()
+                    || rates.iter().zip(steps).any(|(rate, (_, input))| {
+                        !rate.is_finite() || rate.trunc() != f64::from(input.waiting_rate)
+                    })
             })
         {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
@@ -166,9 +180,14 @@ impl PreparedSlopeRelationArc {
                     // Reserve only for waiting scans actually reached. A
                     // clipped point may be expanded to two machine pairs.
                     let count = next.pairs().len();
-                    let wait_work = count.saturating_mul(16).saturating_add(160)
-                        .saturating_add(count.max(2).saturating_add(input.dependent_upper.pairs().len()).saturating_mul(64));
-                    remaining_work = remaining_work.checked_sub(wait_work)
+                    let wait_work = count.saturating_mul(16).saturating_add(160).saturating_add(
+                        count
+                            .max(2)
+                            .saturating_add(input.dependent_upper.pairs().len())
+                            .saturating_mul(64),
+                    );
+                    remaining_work = remaining_work
+                        .checked_sub(wait_work)
                         .ok_or(FrontierUnknown::WorkLimit)?;
                     match Self::machine_backward_waiting_with_debug(
                         next,
@@ -195,11 +214,10 @@ impl PreparedSlopeRelationArc {
                     0.
                 };
                 base = finite(arrival + waiting)?;
-                let waiting_rate = waiting_rates.map_or(f64::from(input.waiting_rate), |rates| rates[position]);
-                dependent = finite(
-                    finite(dependent + increment)?
-                        + finite(waiting * waiting_rate)?,
-                )?;
+                let waiting_rate =
+                    waiting_rates.map_or(f64::from(input.waiting_rate), |rates| rates[position]);
+                dependent =
+                    finite(finite(dependent + increment)? + finite(waiting * waiting_rate)?)?;
                 result.waiting.push(waiting);
                 result.base.push(base);
                 result.dependent.push(dependent);
@@ -243,11 +261,7 @@ impl PreparedSlopeRelationArc {
     /// certify a pricing-label history, a source-control route, or feasibility.
     pub fn machine_replay_path(
         root: &MachineRootState,
-        steps: &[(
-            usize,
-            &PreparedSlopeRelationArc,
-            MachineContinuationInputs<'_>,
-        )],
+        steps: &[(usize, MachineContinuationInputs<'_>)],
         mode: i32,
         max_states: usize,
         budget: FrontierBudget,
@@ -300,8 +314,8 @@ impl PreparedSlopeRelationArc {
             max_states,
             next_budget!()
         ));
-        for (arc, transition, inputs) in steps {
-            let (reduced, next) = match transition.machine_transition(
+        for (arc, inputs) in steps {
+            let (reduced, next) = match Self::machine_transition(
                 history.last().front(),
                 inputs,
                 mode,

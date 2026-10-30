@@ -25,6 +25,21 @@ def test_backward_machine_terminal_bounds_round_trip():
     assert NetworkProblem.from_json(model.to_json()) == model
 
 
+@pytest.mark.parametrize("bounds", [(None, None), (-4.0, None), (None, 2.0), (0.0, 100.0)])
+def test_paired_owner_registration_bounds_round_trip_without_path_windows(bounds):
+    network = PricingNetwork(
+        7, 2, (0, 1), (PricingArc(0, 1, 0),),
+        paired_owner_registration_bounds=((0, bounds),),
+    )
+    model = NetworkProblem((), network)
+    payload = json.loads(model.to_json())
+    assert payload["networks"][0]["paired_owner_registration_bounds"] == [[0, list(bounds)]]
+    restored = NetworkProblem.from_json(model.to_json())
+    assert restored == model
+    assert restored.networks[0].resources == ()
+    assert restored.networks[0].arcs[0].bounds == ()
+
+
 def triangle():
     return NetworkProblem.from_file(FIXTURE)
 
@@ -986,513 +1001,107 @@ def test_selected_paired_values_survive_python_output_and_resume():
             assert route.coupled_values == ((0, expected),)
 
 
-@pytest.mark.parametrize("representation", ["raw", "control_point"])
 @pytest.mark.parametrize("case_index", [0, 18])
-@pytest.mark.parametrize("coefficient", [0.0, 0.5, 1.0, 2.0, 8.0])
+@pytest.mark.parametrize("coefficient", [-1.0, 0.0, 0.5, 1.0, 2.0, 8.0])
 @pytest.mark.parametrize("mode", ["numerical", "certified"])
-def test_paired_original_variable_reports_selected_value_with_nonnegative_weight(case_index, coefficient, mode, representation):
-    selected_case = (36 if case_index == 0 else 39) if representation == "control_point" else case_index
-    data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[selected_case]["model"]))
-    final_value = 3.0
-    if representation == "control_point":
-        data["networks"][0]["front_program_domain"] = False
-        resource = data["networks"][0]["coupled_resources"][0]
-        def knots(function):
-            value, start = function["pairs"][0]
-            points = [[start, value]]
-            for slope, end in function["pairs"][1:]:
-                value += slope * (end - start)
-                start = end
-                points.append([start, value])
-            return {"points": points}
-        resource["initial"] = knots(resource["initial"])
-        for arc in resource["arcs"]:
-            for key in ("arrival", "increment", "lower", "upper"):
-                arc[key] = knots(arc[key])
-        resource["kind"] = "paired_piecewise_linear"
-        del resource["policy"]
-        final_value = 5.0
+def test_paired_original_variable_reports_selected_value_with_owner_weight(case_index, coefficient, mode):
+    data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[case_index]["model"]))
     data["pricing_variables"] = [{"network": 42, "id": 901, "cost": coefficient,
                                   "accumulated_resource": 0}]
     model = NetworkProblem.from_json(json.dumps(data))
     root = model.solve(stabilize=False, bound_mode=mode)
-    expected = min(0.0, -20.0 + final_value * coefficient)
-    gamma = final_value if expected < 0 else 0.0
-    for result in (root, root.snapshot.solve(stabilize=False, bound_mode=mode),
-                   model.solve(tree=True, stabilize=False, bound_mode=mode)):
+    expected = min(0.0, -20.0 + 3.0 * coefficient)
+    gamma = 3.0 if expected < 0 else 0.0
+    for result in (root, root.snapshot.solve(stabilize=False, bound_mode=mode)):
         assert result.original_variables == ({"network": 42, "id": 901,
                                                "lower": gamma, "upper": gamma},)
+        assert result.status == ("Optimal" if coefficient == 1.0 else "Stalled")
     assert root.lp == pytest.approx(expected)
+    tree = model.solve(tree=True, stabilize=False, bound_mode=mode)
+    if coefficient == 1.0:
+        assert tree.status == "Optimal"
+        assert tree.incumbent == pytest.approx(expected)
+        assert tree.original_variables == root.original_variables
+    else:
+        # Raw unit pricing does not certify an owner objective with another
+        # coefficient. The tree must not invent a certified integer witness.
+        assert tree.status == "Incomplete"
+        assert tree.bound is None
+        assert tree.incumbent is None
+        assert tree.original_variables == ()
     if expected < 0:
         route = next(r for r in root.routes if r.value > 0)
         fixed = root.snapshot.fix_route(route.route_index, 1).solve(stabilize=False, bound_mode=mode)
         assert fixed.original_variables == root.original_variables
 
 
-@pytest.mark.parametrize("case_index", [0, 18])
-@pytest.mark.parametrize("coefficient", [0.5, 2.0])
-@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
-def test_explicit_route_controls_survive_pool_resume_fixing_and_original_reporting(case_index, coefficient, bound_mode):
-    from pybaldes import PairedControl
-    data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[case_index]["model"]))
-    data["networks"][0]["front_program_domain"] = False
-    data["networks"][0]["coupled_resources"][0]["policy"] = "strict_domain"
-    data["pricing_variables"] = [{"network": 42, "id": 901, "cost": coefficient,
-                                  "accumulated_resource": 0}]
-    model = NetworkProblem.from_json(json.dumps(data))
-    root = model.solve(stabilize=False, bound_mode=bound_mode)
-    assert root.status == "Optimal"
-    original = next(route for route in root.routes if len(route.arcs) == 2)
-    generated = root.snapshot.optimize_route_control(original.route_index, 0, terminal=(4.0, 4.0), maximize=True)
-    assert generated.complete and generated.maximize
-    assert generated.work_used > 0 and generated.lp_iterations > 0
-    assert generated.dependent == 4.0 and generated.lower_bound <= -4.0
-    control = generated.control
-    assert isinstance(control, PairedControl)
-    maximum = root.snapshot.optimize_route_control(original.route_index, 0, maximize=True)
-    assert maximum.complete and maximum.dependent == 8.0
-    incomplete = root.snapshot.optimize_route_control(original.route_index, 0, max_cells=0)
-    assert not incomplete.complete and incomplete.control is None
-    empty = root.snapshot.optimize_route_control(original.route_index, 0, terminal=(9.0, 9.0))
-    assert empty.complete and empty.control is None
-    expanded = root.snapshot.with_route_controls(original.route_index, (control,)).solve(
-        stabilize=False, bound_mode=bound_mode)
-    assert expanded.lp == pytest.approx(-20 + 3*coefficient)
-    alternative = next(route for route in expanded.routes if route.coupled_controls)
-    assert alternative.coupled_controls == (control,)
-    assert isinstance(alternative.coupled_controls[0].base, tuple)
-    assert alternative.coupled_values == ((0, 4.0),)
-    assert alternative.cost == -20 + 4*coefficient
-    fixed = expanded.snapshot.fix_route(alternative.route_index).solve(stabilize=False, bound_mode=bound_mode)
-    assert fixed.status == "Optimal"
-    assert fixed.lp == pytest.approx(alternative.cost)
-    assert fixed.fixed_routes[0].coupled_controls == (control,)
-    assert fixed.original_variables == ({"network": 42, "id": 901, "lower": 4.0, "upper": 4.0},)
-    resumed = fixed.snapshot.solve(stabilize=False, bound_mode=bound_mode)
-    assert resumed.original_variables == fixed.original_variables
-    assert resumed.fixed_routes[0].coupled_controls == (control,)
-    tree = fixed.snapshot.solve(tree=True, stabilize=False, bound_mode=bound_mode)
-    assert tree.status == "Optimal"
-    assert tree.incumbent == pytest.approx(alternative.cost)
-    assert tree.original_variables == fixed.original_variables
-    assert tree.routes[0].coupled_controls == (control,)
-    with pytest.raises(ValueError, match="infeasible or uncertified"):
-        root.snapshot.with_route_controls(original.route_index, (PairedControl(0, (0.5, 1.0, 2.0)),))
-
-
-@pytest.mark.parametrize("case_index", [0, 18])
-@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
-def test_paired_shared_rows_generate_and_retain_interior_controls(case_index, bound_mode):
-    data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[case_index]["model"]))
-    network = data["networks"][0]
-    network["front_program_domain"] = False
-    network["coupled_resources"][0]["policy"] = "strict_domain"
-    data["rows"] = [{"sense": "ge", "rhs": 4.0}]
+@pytest.mark.parametrize("binding", [
+    {"cost": -1.0}, {"integer": True}, {"entries": [[0, 1.0]]},
+])
+def test_paired_front_program_accepts_registered_owner_activity_bindings(binding):
+    data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[0]["model"]))
+    data["rows"] = [{"sense": "le", "rhs": 100.0}]
     data["pricing_variables"] = [{"network": 42, "id": 901, "cost": 1.0,
-                                  "accumulated_resource": 0, "entries": [[0, 1.0]]}]
-    root = NetworkProblem.from_json(json.dumps(data)).solve(stabilize=False, bound_mode=bound_mode)
-    assert root.status == "Optimal"
-    assert root.lp == pytest.approx(-16.0)
-    assert root.bound <= -16.0 + 1e-10
-    assert root.bound == pytest.approx(-16.0)
-    assert root.original_variables[0]["lower"] == pytest.approx(4.0)
-    alternative = next(r for r in root.routes if r.coupled_values == ((0, 4.0),) and len(r.arcs) == 2)
-    assert alternative.coupled_controls
-    fixed = root.snapshot.fix_route(alternative.route_index).solve(stabilize=False, bound_mode=bound_mode)
-    assert fixed.status == "Optimal"
-    assert fixed.lp == pytest.approx(-16.0)
-    assert fixed.original_variables[0]["lower"] == pytest.approx(4.0)
-    resumed = root.snapshot.solve(stabilize=False, bound_mode=bound_mode)
-    assert resumed.lp == pytest.approx(-16.0)
+                                  "accumulated_resource": 0, **binding}]
+    result = NetworkProblem.from_json(json.dumps(data)).solve(stabilize=False)
+    assert result.routes
+    assert result.original_variables[0]["lower"] == pytest.approx(3.0)
+    assert result.lp == pytest.approx(-20.0 + 3.0 * binding.get("cost", 1.0))
 
 
-@pytest.mark.parametrize("representation", ["slope", "points"])
-@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
-@pytest.mark.parametrize("upper", [None, 4.0])
-def test_negative_paired_objectives_price_controls_and_preserve_fixed_certificates(representation, bound_mode, upper):
+def test_paired_integer_owner_registration_retains_native_fractional_activity():
     data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[0]["model"]))
     network = data["networks"][0]
-    network["front_program_domain"] = False
-    resource = network["coupled_resources"][0]
-    resource["policy"] = "strict_domain"
-    if representation == "points":
-        def knots(function):
-            pairs = function["pairs"]
-            value, start = pairs[0]
-            points = [[start, value]]
-            for slope, end in pairs[1:]:
-                value += slope * (end - start)
-                start = end
-                points.append([start, value])
-            return {"points": points}
-        resource["initial"] = knots(resource["initial"])
-        for arc in resource["arcs"]:
-            for key in ("arrival", "increment", "lower", "upper"):
-                arc[key] = knots(arc[key])
-        resource["kind"] = "paired_piecewise_linear"
-        del resource["policy"]
-    variable = {"network": 42, "id": 901, "cost": -1.0, "accumulated_resource": 0}
-    if upper is not None:
-        data["rows"] = [{"sense": "le", "rhs": upper}]
-        variable["entries"] = [[0, 1.0]]
-    data["pricing_variables"] = [variable]
-    root = NetworkProblem.from_json(json.dumps(data)).solve(stabilize=False, bound_mode=bound_mode)
-    gamma = upper if upper is not None else 8.0
-    expected = -20.0 - gamma
-    assert root.status == "Optimal"
-    assert root.lp == pytest.approx(expected)
-    assert root.bound <= expected + 1e-10
-    assert root.bound == pytest.approx(expected)
-    assert root.original_variables[0]["lower"] == pytest.approx(gamma)
-    route = next(r for r in root.routes if len(r.arcs) == 2 and r.coupled_values == ((0, gamma),))
-    assert route.coupled_controls
-    fixed = root.snapshot.fix_route(route.route_index).solve(stabilize=False, bound_mode=bound_mode)
-    assert fixed.status == "Optimal"
-    assert fixed.lp == pytest.approx(expected)
-    assert fixed.bound == pytest.approx(expected)
-    assert fixed.original_variables[0]["lower"] == pytest.approx(gamma)
-
-
-@pytest.mark.parametrize("case_index", [0, 18])
-@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
-@pytest.mark.parametrize("cost", [-1.0, 1.0])
-def test_paired_boxes_enclose_alternative_controls(case_index, bound_mode, cost):
-    data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[case_index]["model"]))
-    network = data["networks"][0]
-    network["front_program_domain"] = False
-    network["coupled_resources"][0]["policy"] = "strict_domain"
-    data["pricing_variables"] = [{"network": 42, "id": 901, "cost": cost, "accumulated_resource": 0}]
-    model = NetworkProblem.from_json(json.dumps(data))
-    box = {"network": 42, "id": 901, "lower": 0.0, "upper": 8.0}
-    root = model.solve(stabilize=False, bound_mode=bound_mode, original_variable_boxes=[box])
-    expected = -20.0 + cost * (8.0 if cost < 0 else 3.0)
-    assert root.status == "Optimal"
-    assert root.lp == pytest.approx(expected)
-    assert root.bound == pytest.approx(expected)
-    assert root.snapshot.solve(stabilize=False, bound_mode=bound_mode).lp == pytest.approx(expected)
-    with pytest.raises(ValueError, match="envelope is unproved"):
-        model.solve(stabilize=False, bound_mode=bound_mode, original_variable_boxes=[dict(box, upper=3.0)])
-
-
-@pytest.mark.parametrize("case_index", [0, 4])
-@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
-@pytest.mark.parametrize("cost", [-1.0, 0.0])
-def test_integer_paired_bindings_reach_fresh_and_snapshot_trees(case_index, bound_mode, cost):
-    cases = json.loads((Path(__file__).resolve().parents[2] /
-        "tests/fixtures/coupled/metasolver-paired-objective-mapping.json").read_text())["cases"]
-    data = json.loads(json.dumps(cases[case_index]["model"]))
-    for i, arc in enumerate(data["networks"][0]["arcs"]):
-        arc["cost"] = 100.0 if i == 0 else (20.0 if i in (1, 3) else 0.0)
-        if i in (1, 3):
-            arc["entries"] = [[0, 1.0]]
-    data["rows"] = [{"sense": "ge", "rhs": 0.25}]
-    data["pricing_variables"] = [{"network": 42, "id": 901, "cost": cost,
-                                  "accumulated_resource": 0, "integer": True, "priority": 100.0}]
-    model = NetworkProblem.from_json(json.dumps(data))
-    root = model.solve(stabilize=False, bound_mode=bound_mode)
-    assert root.status == "Optimal"
-    assert root.lp == pytest.approx(5.0 + 0.5 * cost)
-    assert root.original_variables[0]["lower"] == pytest.approx(0.5)
-    for tree in (model.solve(tree=True, stabilize=False, bound_mode=bound_mode, network_branching="resource-first"),
-                 root.snapshot.solve(tree=True, stabilize=False, bound_mode=bound_mode, network_branching="resource-first")):
-        assert tree.status == "Optimal"
-        assert tree.incumbent == pytest.approx(20.0 + 2.0 * cost)
-        assert tree.original_variables[0]["lower"] == pytest.approx(2.0)
-
-
-def test_paired_integer_endpoints_do_not_authorize_continuous_activity_registration():
-    data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[0]["model"]))
-    data["networks"][0]["front_program_domain"] = False
-    data["networks"][0]["coupled_resources"][0]["policy"] = "strict_domain"
-    data["pricing_variables"] = [{"network": 42, "id": 901, "cost": 0.0,
+    for arc in network["paired_front_programs"][0]["arcs"]:
+        arc["dependent"]["function"]["pairs"] = [[0.25, 0.0], [0.0, 8.0]]
+    network["paired_owner_registration_bounds"] = [[0, [0.0, 100.0]]]
+    data["pricing_variables"] = [{"network": 42, "id": 901, "cost": 1.0,
                                   "accumulated_resource": 0, "integer": True}]
-    with pytest.raises(ValueError, match="exactly integer"):
-        NetworkProblem.from_json(json.dumps(data)).solve()
+    # Pinned native integer-all-fractional registration accepts selected gamma=.5.
+    result = NetworkProblem.from_json(json.dumps(data)).solve(stabilize=False)
+    assert result.lp == pytest.approx(-19.5)
+    assert result.original_variables == ({"network": 42, "id": 901,
+                                          "lower": 0.5, "upper": 0.5},)
 
 
-@pytest.mark.parametrize("case_index", [0, 4])
-@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
-@pytest.mark.parametrize("cost", [-1.0, 1.0])
-def test_invariant_paired_controls_have_complete_enumerated_snapshots(case_index, bound_mode, cost):
-    cases = json.loads((Path(__file__).resolve().parents[2] /
-        "tests/fixtures/coupled/metasolver-paired-objective-mapping.json").read_text())["cases"]
-    data = json.loads(json.dumps(cases[case_index]["model"]))
-    data["rows"] = [{"sense": "ge", "rhs": 1.0}]
-    data["pricing_variables"] = [{"network": 42, "id": 901, "cost": cost,
-                                  "accumulated_resource": 0, "entries": [[0, 1.0]]}]
-    parent = NetworkProblem.from_json(json.dumps(data)).solve(stabilize=False, bound_mode=bound_mode)
-    complete = parent.snapshot.solve(enumerate=True, stabilize=False, bound_mode=bound_mode)
-    assert complete.status == "Optimal"
-    assert complete.enumeration_reports[0].complete
-    assert complete.enumeration_reports[0].routes == 3
-    assert complete.lp == pytest.approx(-20.0 + 2 * cost)
-    assert complete.bound == pytest.approx(complete.lp)
-    route = next(r for r in complete.routes if len(r.arcs) == 2)
-    assert route.coupled_controls
-    fixed = complete.snapshot.fix_route(route.route_index).solve(stabilize=False, bound_mode=bound_mode)
-    assert fixed.status == "Optimal"
-    assert fixed.lp == pytest.approx(complete.lp)
-    assert fixed.original_variables[0]["lower"] == 2.0
-    assert parent.enumeration_reports[0].attempts == 0
+def test_paired_front_program_accepts_signed_graph_owner_coefficients():
+    data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[0]["model"]))
+    data["networks"][0]["coupled_objective_coefficients"] = [[0, -1.0]]
+    result = NetworkProblem.from_json(json.dumps(data)).solve(stabilize=False)
+    assert result.lp == pytest.approx(-23.0)
+
+
+@pytest.mark.parametrize("extra", [
+    {"kind": "paired_front", "mode": "cost_unbounded"},
+    {"kind": "custom_resource", "increments": [0.0] * 5, "weights": [1.0] * 5},
+    {"kind": "cumulative_cost", "initial": 0.0,
+     "increments": [0.0] * 5, "weights": [1.0] * 5},
+])
+def test_paired_front_program_rejects_unsupported_solver_compositions(extra):
+    data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[0]["model"]))
+    data["networks"][0]["coupled_resources"].append(extra)
+    with pytest.raises(ValueError, match="paired resource (program|combination)"):
+        NetworkProblem.from_json(json.dumps(data)).solve(stabilize=False)
 
 
 @pytest.mark.parametrize("dynamic", [False, True])
-@pytest.mark.parametrize("cost", [-1.0, 1.0])
-def test_shared_python_row_api_adds_paired_activities_to_complete_universes(dynamic, cost):
-    cases = json.loads((Path(__file__).resolve().parents[2] /
-        "tests/fixtures/coupled/metasolver-paired-objective-mapping.json").read_text())["cases"]
-    data = json.loads(json.dumps(cases[0]["model"]))
-    data["pricing_variables"][0]["cost"] = cost
-    root = NetworkProblem.from_json(json.dumps(data)).solve(stabilize=False, enumerate=True, bound_mode="certified")
-    assert root.enumeration_reports[0].complete
-    coefficients = (NetworkRowCoefficients(42, (0.5,) * 5, per_route=1.0, activities=((0, 1.0),)),)
-    child = root.snapshot.with_row(SharedRow("ge", 4.0), coefficients, dynamic=dynamic).solve(
-        stabilize=False, bound_mode="certified")
-    assert child.status == "Optimal"
-    assert child.lp == pytest.approx(-20.0 + 2 * cost)
-    assert child.enumeration_reports[0].complete
-    impossible = root.snapshot.with_row(SharedRow("ge", 5.0), coefficients, dynamic=dynamic).solve(
-        stabilize=False, bound_mode="certified")
-    assert impossible.status == "Infeasible"
+def test_paired_front_program_accepts_nonbinding_snapshot_activity_rows(dynamic):
+    model = NetworkProblem.from_json(json.dumps(_PREPARED_RESOURCE_MODELS[0]["model"]))
+    root = model.solve(stabilize=False)
+    coefficients = (NetworkRowCoefficients(42, (0.0,) * 5, activities=((0, 1.0),)),)
+    child = root.snapshot.with_row(SharedRow("le", 100.0), coefficients, dynamic=dynamic)
+    assert child.solve(stabilize=False).lp == pytest.approx(root.lp)
     assert root.snapshot.solve(stabilize=False).lp == pytest.approx(root.lp)
 
 
-def test_python_paired_activity_rows_reject_widening_a_continuous_universe():
+def test_paired_front_program_and_fractional_waiting_rates_round_trip():
     data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[0]["model"]))
-    data["networks"][0]["front_program_domain"] = False
-    data["networks"][0]["coupled_resources"][0]["policy"] = "strict_domain"
-    root = NetworkProblem.from_json(json.dumps(data)).solve(stabilize=False, enumerate=True)
-    assert root.enumeration_reports[0].complete
-    coefficients = (NetworkRowCoefficients(42, (0.0,) * 5, activities=((0, 1.0),)),)
-    with pytest.raises(ValueError, match="cannot widen"):
-        root.snapshot.with_row(SharedRow("ge", 4.0), coefficients)
-    assert root.snapshot.solve(stabilize=False).lp == pytest.approx(-17.0)
-
-@pytest.mark.parametrize("representation", ["slope", "points"])
-@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
-@pytest.mark.parametrize("singular", [False, True])
-def test_network_graph_coefficients_preserve_relative_objectives_across_frontends(representation, bound_mode, singular):
-    from pathlib import Path
-    data = json.loads(Path("tests/fixtures/coupled/negative-relative-network.json").read_text())
-    network = data["networks"][0]
-    if representation == "points":
-        def knots(function):
-            value, start = function["pairs"][0]
-            points = [[start, value]]
-            for slope, end in function["pairs"][1:]:
-                value += slope * (end - start)
-                start = end
-                points.append([start, value])
-            return {"points": points}
-        resource = network["coupled_resources"][0]
-        resource["initial"] = knots(resource["initial"])
-        for arc in resource["arcs"]:
-            for key in ("arrival", "increment", "lower", "upper"):
-                arc[key] = knots(arc[key])
-        resource["kind"] = "paired_piecewise_linear"
-        del resource["policy"]
-    if singular:
-        data["networks"] = network
-    problem = NetworkProblem.from_json(json.dumps(data))
-    assert problem.networks[0].coupled_objective_coefficients == ((0, -1.0),)
-    restored = NetworkProblem.from_json(problem.to_json())
-    assert restored == problem
-    root = restored.solve(stabilize=False, bound_mode=bound_mode)
-    assert root.status == "Optimal"
-    assert root.lp == pytest.approx(-26.0)
-    assert root.bound == pytest.approx(-26.0)
-    assert root.snapshot.solve(stabilize=False, bound_mode=bound_mode).lp == pytest.approx(-26.0)
-    route = next(r for r in root.routes if r.coupled_values == ((0, 8.0),) and len(r.arcs) == 2)
-    assert route.coupled_controls
-    fixed = root.snapshot.fix_route(route.route_index).solve(stabilize=False, bound_mode=bound_mode)
-    assert fixed.status == "Optimal"
-    assert fixed.lp == pytest.approx(-26.0)
-    tree = root.snapshot.solve(tree=True, stabilize=False, bound_mode=bound_mode)
-    assert tree.status == "Optimal"
-    assert tree.incumbent == pytest.approx(-26.0)
-
-
-@pytest.mark.parametrize("coefficients", [((0, -1.), (0, -2.)), ((9, 1.),)])
-def test_network_graph_coefficient_validation_uses_the_graph_contract(coefficients):
-    from pathlib import Path
-    data = json.loads(Path("tests/fixtures/coupled/negative-relative-network.json").read_text())
-    data["networks"][0]["coupled_objective_coefficients"] = coefficients
-    with pytest.raises(ValueError, match="invalid accumulated objective coefficient"):
-        NetworkProblem.from_json(json.dumps(data)).solve()
-
-
-def test_network_graph_coefficients_reject_two_cost_owners():
-    from pathlib import Path
-    data = json.loads(Path("tests/fixtures/coupled/negative-relative-network.json").read_text())
-    data["pricing_variables"] = [dict(network=42, id=901, cost=-1., accumulated_resource=0)]
-    with pytest.raises(ValueError, match="not both"):
-        NetworkProblem.from_json(json.dumps(data)).solve()
-
-@pytest.mark.parametrize("points", [False, True])
-@pytest.mark.parametrize("relative", [False, True])
-@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
-def test_objective_only_control_endpoints_survive_complete_transfer(points, relative, bound_mode):
-    from pathlib import Path
-    data = json.loads(Path("tests/fixtures/coupled/negative-relative-network.json").read_text())
-    resource = data["networks"][0]["coupled_resources"][0]
-    if not relative:
-        resource["normalization"] = "absolute_final_value"
-    if points:
-        def knots(function):
-            value, start = function["pairs"][0]
-            result = [[start, value]]
-            for slope, end in function["pairs"][1:]:
-                value += slope * (end - start)
-                start = end
-                result.append([start, value])
-            return {"points": result}
-        resource["initial"] = knots(resource["initial"])
-        for arc in resource["arcs"]:
-            for key in ("arrival", "increment", "lower", "upper"):
-                arc[key] = knots(arc[key])
-        resource["kind"] = "paired_piecewise_linear"
-        del resource["policy"]
-    root = NetworkProblem.from_json(json.dumps(data)).solve(stabilize=False, bound_mode=bound_mode)
-    complete = root.snapshot.solve(enumerate=True, stabilize=False, bound_mode=bound_mode)
-    assert complete.enumeration_reports[0].complete
-    assert complete.enumeration_reports[0].routes == 3
-    expected = -26. if relative else -28.
-    assert complete.status == "Optimal"
-    assert complete.lp == pytest.approx(expected)
-    assert complete.bound == pytest.approx(expected)
-    route = next(r for r in complete.routes if r.coupled_values == ((0, 8.),) and len(r.arcs) == 2)
-    fixed = complete.snapshot.fix_route(route.route_index).solve(stabilize=False, bound_mode=bound_mode)
-    assert fixed.status == "Optimal"
-    assert fixed.lp == pytest.approx(expected)
-    if not relative:
-        from pybaldes import SharedRow, NetworkRowCoefficients
-        with pytest.raises(ValueError, match="paired rows cannot widen"):
-            complete.snapshot.with_row(SharedRow("le", 4.), [
-                NetworkRowCoefficients(42, (0.,) * len(data["networks"][0]["arcs"]), activities=((0, 1.),))])
-
-@pytest.mark.parametrize("points", [False, True])
-@pytest.mark.parametrize("cost,sense,coefficient,rhs,gamma", [
-    (-1., "ge", 1., 5., 8.), (1., "ge", -1., -4., 3.),
-    (0., "ge", 1., 5., 8.),
-])
-def test_monotone_paired_rows_preserve_feasibility_through_endpoint_transfer(points, cost, sense, coefficient, rhs, gamma):
-    data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[0]["model"]))
-    network = data["networks"][0]
-    network["front_program_domain"] = False
-    resource = network["coupled_resources"][0]
-    resource["policy"] = "strict_domain"
-    if points:
-        def knots(function):
-            value, start = function["pairs"][0]
-            result = [[start, value]]
-            for slope, end in function["pairs"][1:]:
-                value += slope * (end - start)
-                start = end
-                result.append([start, value])
-            return {"points": result}
-        resource["initial"] = knots(resource["initial"])
-        for arc in resource["arcs"]:
-            for key in ("arrival", "increment", "lower", "upper"):
-                arc[key] = knots(arc[key])
-        resource["kind"] = "paired_piecewise_linear"
-        del resource["policy"]
-    data["rows"] = [dict(sense=sense, rhs=rhs)]
-    data["pricing_variables"] = [dict(network=42, id=901, cost=cost,
-        accumulated_resource=0, entries=[[0, coefficient]])]
-    root = NetworkProblem.from_json(json.dumps(data)).solve(stabilize=False, bound_mode="certified")
-    complete = root.snapshot.solve(enumerate=True, stabilize=False, bound_mode="certified")
-    assert complete.enumeration_reports[0].complete
-    assert complete.status == "Optimal"
-    assert complete.lp == pytest.approx(-20. + cost * gamma)
-    assert complete.bound == pytest.approx(complete.lp)
-    assert complete.original_variables[0]["lower"] == pytest.approx(gamma)
-
-@pytest.mark.parametrize("cost,sense,rhs,gamma", [(-1., "ge", 14., 8.), (1., "le", 7., 3.)])
-@pytest.mark.parametrize("dynamic", [False, True])
-def test_compatible_new_activity_rows_reuse_projected_controls_and_fixed_copies(cost, sense, rhs, gamma, dynamic):
-    from pybaldes import SharedRow, NetworkRowCoefficients
-    data = json.loads(json.dumps(_PREPARED_RESOURCE_MODELS[0]["model"]))
-    network = data["networks"][0]
-    network["front_program_domain"] = False
-    network["multiplicity"] = [0.,2.]
-    network["coupled_resources"][0]["policy"] = "strict_domain"
-    data["pricing_variables"] = [dict(network=42,id=901,cost=cost,accumulated_resource=0)]
-    root = NetworkProblem.from_json(json.dumps(data)).solve(stabilize=False, bound_mode="certified", enumerate=True)
-    assert root.enumeration_reports[0].complete
-    terms = [NetworkRowCoefficients(42, (0.,) * len(data["networks"][0]["arcs"]), activities=((0,1.),))]
-    child = root.snapshot.with_row(SharedRow(sense,rhs), terms, dynamic=dynamic).solve(stabilize=False, bound_mode="certified")
-    expected = 2. * (-20. + cost * gamma)
-    assert child.status == "Optimal"
-    assert child.lp == pytest.approx(expected)
-    assert child.enumeration_reports[0].complete
-    route = next(r for r in child.routes if r.coupled_values == ((0,gamma),) and len(r.arcs) == 2)
-    fixed = child.snapshot.fix_route(route.route_index)
-    repeated = fixed.with_row(SharedRow(sense,rhs), terms, dynamic=dynamic).solve(stabilize=False, bound_mode="certified")
-    assert repeated.status == "Optimal"
-    assert repeated.lp == pytest.approx(expected)
-    assert repeated.enumeration_reports[0].complete
-    with pytest.raises(ValueError, match="paired rows cannot widen"):
-        root.snapshot.with_row(SharedRow("eq",2.*gamma), terms, dynamic=dynamic)
-    assert root.snapshot.solve(stabilize=False).lp == pytest.approx(expected)
-
-
-@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
-@pytest.mark.parametrize("shape", ["one", "array", "multiple"])
-@pytest.mark.parametrize("copies", [1, 2])
-def test_joint_paired_rows_recover_interior_integer_witnesses(bound_mode, shape, copies):
-    data = json.loads((Path(__file__).resolve().parents[2] /
-        "tests/fixtures/coupled/joint-interior-model.json").read_text())
-    data["networks"][0]["multiplicity"] = [copies, copies]
-    if shape == "one":
-        data["networks"] = data["networks"][0]
-    elif shape == "multiple":
-        data["networks"].append({"id": 7, "vertices": 2, "source": 0, "sink": 1,
-            "multiplicity": [1, 1], "arcs": [{"tail": 0, "head": 1, "cost": 2.}]})
+    program = data["networks"][0]["paired_front_programs"][0]
+    program["arcs"][0]["waiting_rate"] = 1.5
     model = NetworkProblem.from_json(json.dumps(data))
-    root = model.solve(stabilize=False, bound_mode=bound_mode)
-    expected = -10. * copies + (2. if shape == "multiple" else 0.)
-    for tree in (model.solve(tree=True, stabilize=False, bound_mode=bound_mode),
-                 root.snapshot.solve(tree=True, stabilize=False, bound_mode=bound_mode)):
-        assert tree.status == "Optimal"
-        assert tree.incumbent == expected
-        assert tree.bound <= expected and tree.bound == pytest.approx(expected)
-        primary = next(route for route in tree.routes if route.network == 42)
-        assert primary.value == copies
-        assert primary.coupled_values == ((0, 4. / copies), (1, 4. / copies))
-        assert len(primary.coupled_controls) == 2
-
-
-@pytest.mark.parametrize("bound_mode", ["numerical", "certified"])
-@pytest.mark.parametrize("cross_network", [False, True])
-@pytest.mark.parametrize("counts", [(1, 1), (2, 2), (2, 1), (3, 1), (3, 3)])
-def test_joint_control_recovery_couples_active_networks_and_physical_paths(bound_mode, cross_network, counts):
-    name = "cross-network-interior-model.json" if cross_network else "cross-path-interior-model.json"
-    data = json.loads((Path(__file__).resolve().parents[2] /
-        "tests/fixtures/coupled" / name).read_text())
-    if cross_network:
-        for network, count in zip(data["networks"], counts):
-            network["multiplicity"] = [count, count]
-    else:
-        data["networks"][0]["multiplicity"] = [sum(counts), sum(counts)]
-        for row, count in zip(data["rows"][:2], counts):
-            row["rhs"] = count
-    model = NetworkProblem.from_json(json.dumps(data))
-    root = model.solve(stabilize=False, bound_mode=bound_mode)
-    for tree in (model.solve(tree=True, stabilize=False, bound_mode=bound_mode),
-                 root.snapshot.solve(tree=True, stabilize=False, bound_mode=bound_mode)):
-        assert tree.status == "Optimal"
-        assert tree.incumbent == -10 * counts[0] + 2 * counts[1]
-        assert tree.bound <= tree.incumbent and tree.bound == pytest.approx(tree.incumbent)
-        quantities = [0., 0.]
-        gamma = [0., 0.]
-        for route in tree.routes:
-            second = route.network == 7 if cross_network else tuple(route.arcs) == (1,)
-            index = int(second)
-            assert route.value > 0 and route.value == int(route.value)
-            quantities[index] += route.value
-            values = dict(route.coupled_values)
-            gamma[index] += route.value * values[0 if cross_network else index]
-            if not cross_network:
-                assert values[1 - index] == 0.
-        assert quantities == list(counts)
-        assert gamma == [4., 4.]
+    assert NetworkProblem.from_json(model.to_json()) == model
+    assert json.loads(model.to_json())["networks"][0]["paired_front_programs"] == [program]
+    network = PricingNetwork(7, 2, (0, 1), (PricingArc(0, 1, 0),),
+                             paired_machine_waiting_rates=((0, (1.5,)),))
+    restored = NetworkProblem.from_json(NetworkProblem((), network).to_json())
+    assert restored.networks[0].paired_machine_waiting_rates == ((0, (1.5,)),)

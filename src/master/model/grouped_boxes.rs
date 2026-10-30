@@ -2,7 +2,6 @@
 use super::*;
 use crate::{core::rounding::add_down, master::preprocessing::Bounds};
 mod admission;
-mod paired;
 pub(super) use admission::coupled as coupled_admission;
 
 /// A bound on one registered original activity, not a new graph restriction.
@@ -127,8 +126,7 @@ fn walk_range<const D: usize>(
 /// ambiguous feasibility or activity arithmetic must decline the envelope.
 fn activity_range<const D: usize>(graph: &Graph<D>, resource: usize) -> Option<Option<Bounds>> {
     if activity_rows::paired(graph, resource) {
-        return paired::range(graph, resource, false)
-            .or_else(|| paired::integer_program_range(graph, resource).map(Some));
+        return None;
     }
     activity_proof(graph, resource, false).or_else(|| {
         graph.validate().ok()?;
@@ -151,13 +149,7 @@ pub(super) fn integral_activity<const D: usize>(
     )
     .ok()?;
     if activity_rows::paired(graph, resource) {
-        if let Some(range) = paired::integer_program_range(graph, resource) {
-            return Some(range);
-        }
-        return paired::range(graph, resource, true)?.or(Some(Bounds {
-            lower: 0.,
-            upper: 0.,
-        }));
+        return None;
     }
     if let Some(range) = integer_program_range(graph, resource) {
         return Some(range);

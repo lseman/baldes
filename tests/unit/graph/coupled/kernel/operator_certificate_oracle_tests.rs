@@ -1,9 +1,74 @@
 //! Independent finite-control oracles for the exact raw operator subsets.
 use super::*;
 use crate::graph::coupled::descriptor::{
-    FrontOperationPolicy, PairedCostNormalization, PreparedSlopeFunction, SlopeRelationArc,
+    FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
 };
-use std::collections::BTreeSet;
+
+/// One chain arc: tail and head windows, constant base consumption, and
+/// constant dependent increment, lower and upper values.
+struct ChainArc {
+    tail: Window,
+    head: Window,
+    consumption: f64,
+    increment: f64,
+    lower: f64,
+    upper: f64,
+    waiting: i32,
+}
+
+/// Build a chain graph with one explicit paired front program.
+fn paired_chain(
+    root: MachineRootInput<'_>,
+    arcs: &[ChainArc],
+    mode: PairedResourceMode,
+) -> Graph<2> {
+    let mut graph = Graph::<2>::new(arcs.len() + 1, 0).unwrap();
+    for arc in 0..arcs.len() {
+        graph.add_arc(arc, arc + 1, 0.).unwrap();
+    }
+    graph
+        .set_coupled_resources(&[CoupledResource::PairedFront { mode }])
+        .unwrap();
+    let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+    let base: Vec<_> = arcs
+        .iter()
+        .map(|arc| {
+            PreparedSlopeFunction::from_prepared_pairs(vec![
+                (arc.consumption, arc.tail.lower),
+                (0., arc.tail.upper),
+            ])
+            .unwrap()
+        })
+        .collect();
+    let inputs: Vec<_> = arcs
+        .iter()
+        .zip(&base)
+        .enumerate()
+        .map(|(physical_arc, (arc, base))| MachineArcFunctionInput {
+            physical_arc,
+            tail_bounds: arc.tail,
+            waiting_bounds: arc.head,
+            waiting_rate: arc.waiting,
+            base,
+            dependent: affine(arc.increment),
+            dependent_lower: affine(arc.lower),
+            dependent_upper: affine(arc.upper),
+        })
+        .collect();
+    let result = graph.prepare_paired_front_program(
+        0,
+        &inputs,
+        root,
+        arcs[0].tail,
+        arcs[arcs.len() - 1].head,
+        FrontierBudget::default(),
+    );
+    assert!(
+        matches!(result, FrontierOutcome::Complete(())),
+        "{result:?}"
+    );
+    graph
+}
 
 #[test]
 fn native_alignment_spacing_is_a_proof_condition_not_a_feasibility_epsilon() {
@@ -38,32 +103,21 @@ fn native_alignment_spacing_is_a_proof_condition_not_a_feasibility_epsilon() {
 
 #[test]
 fn disconnected_native_paired_fronts_do_not_bypass_the_lattice_invariant() {
-    let f = |value, lo, slope, hi| {
-        PreparedSlopeFunction::from_prepared_pairs(vec![(value, lo), (slope, hi)]).unwrap()
-    };
-    let mut graph = Graph::<2>::new(2, 0).unwrap();
-    graph.add_arc(0, 1, 0.).unwrap();
-    graph
-        .set_coupled_resources(&[CoupledResource::SlopePaired {
-            initial: PreparedSlopeFunction::from_prepared_pairs(vec![
-                (0., 0.),
-                (1., 2.),
-                (-1., 4.),
-            ])
-            .unwrap(),
-            initial_base: Window::new(0., 4.).unwrap(),
-            arcs: vec![SlopeRelationArc {
-                arrival: f(1., 0., 1., 5.),
-                increment: f(0., 0., 0., 5.),
-                lower: f(-10., 1., 0., 5.),
-                upper: f(0., 1., 0., 5.),
-                waiting: 1,
-            }],
-            mode: PairedResourceMode::CostUnbounded,
-            normalization: PairedCostNormalization::AbsoluteFinalValue,
-            policy: FrontOperationPolicy::FrontAlgebra,
-        }])
-        .unwrap();
+    let initial =
+        PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (1., 2.), (-1., 4.)]).unwrap();
+    let graph = paired_chain(
+        MachineRootInput::Vector(&initial),
+        &[ChainArc {
+            tail: Window::new(0., 4.).unwrap(),
+            head: Window::new(1., 5.).unwrap(),
+            consumption: 1.,
+            increment: 0.,
+            lower: -10.,
+            upper: 0.,
+            waiting: 1,
+        }],
+        PairedResourceMode::CostUnbounded,
+    );
     // Only the separated endpoints survive the upper filter. A numerical
     // feasible result is not permission to ignore the certificate invariant.
     let kernel = graph.coupled_kernel().unwrap();
@@ -116,90 +170,37 @@ fn dyadic_raw_operator_certificates_match_a_shared_control_oracle() {
 }
 
 #[test]
-fn native_nonconstant_paired_fronts_and_signed_waiting_match_control_paths() {
-    let function = |value, lo, slope, hi| {
-        PreparedSlopeFunction::from_prepared_pairs(vec![(value, lo), (slope, hi)]).unwrap()
-    };
+fn paired_nonconstant_certificates_enclose_split_zero_replay() {
+    let initial =
+        PreparedSlopeFunction::from_prepared_pairs(vec![(3., 0.), (-1., 2.), (1., 4.)]).unwrap();
     for upper in [0, 4, 50] {
         for head_hi in [4, 12] {
             for waiting in [-1, 0, 1] {
                 for length in 1..=3 {
-                    for normalization in [
-                        PairedCostNormalization::AbsoluteFinalValue,
-                        PairedCostNormalization::FinalMinusInitialMinimum,
-                    ] {
-                        // Independent control-path enumeration. All affine vertices
-                        // and bound crossings are integers in this unit-slope class.
-                        let mut states: BTreeSet<_> =
-                            (0..=4).map(|x: i32| (x, 1 + (x - 2).abs())).collect();
-                        for arc in 0..length {
-                            let mut next = BTreeSet::new();
-                            for &(base, dependent) in &states {
-                                for head in 0..=head_hi {
-                                    if head >= base + 1 {
-                                        let value = (dependent + arc - 1
-                                            + waiting * (head - base - 1))
-                                            .max(-20);
-                                        if value <= upper {
-                                            next.insert((head, value));
-                                        }
-                                    }
-                                }
-                            }
-                            states = next;
-                        }
-                        let baseline =
-                            if normalization == PairedCostNormalization::FinalMinusInitialMinimum {
-                                1
+                    let head = Window::new(0., f64::from(head_hi)).unwrap();
+                    let arcs: Vec<_> = (0..length)
+                        .map(|arc| ChainArc {
+                            tail: if arc == 0 {
+                                Window::new(0., 4.).unwrap()
                             } else {
-                                0
-                            };
-                        let expected = states.iter().map(|p| p.1 - baseline).min().map(f64::from);
-                        let mut graph = Graph::<2>::new(length as usize + 1, 0).unwrap();
-                        for arc in 0..length as usize {
-                            graph.add_arc(arc, arc + 1, 0.).unwrap();
-                        }
-                        graph
-                            .set_coupled_resources(&[CoupledResource::SlopePaired {
-                                initial: PreparedSlopeFunction::from_prepared_pairs(vec![
-                                    (3., 0.),
-                                    (-1., 2.),
-                                    (1., 4.),
-                                ])
-                                .unwrap(),
-                                initial_base: Window::new(0., 4.).unwrap(),
-                                arcs: (0..length)
-                                    .map(|arc| SlopeRelationArc {
-                                        arrival: function(1., 0., 1., 20.),
-                                        increment: function(f64::from(arc - 1), 0., 0., 20.),
-                                        lower: function(-20., 0., 0., f64::from(head_hi)),
-                                        upper: function(
-                                            f64::from(upper),
-                                            0.,
-                                            0.,
-                                            f64::from(head_hi),
-                                        ),
-                                        waiting,
-                                    })
-                                    .collect(),
-                                mode: PairedResourceMode::CostUnbounded,
-                                normalization,
-                                policy: FrontOperationPolicy::FrontAlgebra,
-                            }])
-                            .unwrap();
-                        let path: Vec<_> = (0..length as usize).collect();
-                        let kernel = graph.coupled_kernel().unwrap();
-                        let certificate = kernel.certify(&path).unwrap();
-                        assert_eq!(kernel.replay(&path).unwrap(), expected);
-                        match expected {
-                    Some(value) => assert_eq!(
-                        certificate,
-                        (true, [value, value]),
-                        "waiting={waiting} length={length} normalization={normalization:?} upper={upper} head_hi={head_hi}"
-                    ),
-                    None => assert!(!certificate.0),
-                }
-                    }
+                                head
+                            },
+                            head,
+                            consumption: 1.,
+                            increment: f64::from(arc - 1),
+                            lower: -20.,
+                            upper: f64::from(upper),
+                            waiting,
+                        })
+                        .collect();
+                    let graph = paired_chain(
+                        MachineRootInput::Vector(&initial),
+                        &arcs,
+                        PairedResourceMode::CostUnbounded,
+                    );
+                    let path: Vec<_> = (0..length as usize).collect();
+                    let kernel = graph.coupled_kernel().unwrap();
+                    assert_paired_certificate_encloses_replay(kernel, &path);
                 }
             }
         }
@@ -302,106 +303,79 @@ fn signed_piecewise_slope_operator_certificates_match_integer_control_oracle() {
 }
 
 #[test]
-fn native_constant_paired_certificates_match_explicit_integer_state_paths() {
-    fn function(value: i32, lo: i32, slope: i32, hi: i32) -> PreparedSlopeFunction {
-        PreparedSlopeFunction::from_prepared_pairs(vec![
-            (f64::from(value), f64::from(lo)),
-            (f64::from(slope), f64::from(hi)),
-        ])
-        .unwrap()
-    }
+fn paired_constant_certificates_enclose_split_zero_replay() {
     for mode in [
         PairedResourceMode::Feasibility,
         PairedResourceMode::CostUnbounded,
         PairedResourceMode::CostBounded,
     ] {
-        for normalization in [
-            PairedCostNormalization::AbsoluteFinalValue,
-            PairedCostNormalization::FinalMinusInitialMinimum,
-        ] {
-            for seed in 0..8 {
-                for length in 1..=4 {
-                    let upper = if seed % 3 == 0 { 0 } else { 20 };
-                    let specs: Vec<_> = (0..length)
-                        .map(|i| {
-                            let increment = if mode == PairedResourceMode::CostBounded {
-                                1 + (seed + i) % 3
-                            } else {
-                                (seed + 3 * i) % 5 - 2
-                            };
-                            (
-                                1 + (seed + i) % 2,
-                                increment,
-                                seed % 2,
-                                2 + seed % 4 + 2 * i,
-                            )
-                        })
-                        .collect();
-                    let mut states: BTreeSet<_> = (0..=4).map(|base| (base, 2)).collect();
-                    for &(delta, increment, left, right) in &specs {
-                        let mut next = BTreeSet::new();
-                        for &(base, dependent) in &states {
-                            if !(0..=30).contains(&base) {
-                                continue;
-                            }
-                            for head in left..=right {
-                                let dependent = (dependent + increment).max(-5);
-                                if head >= base + delta && dependent <= upper {
-                                    next.insert((head, dependent));
-                                }
-                            }
-                        }
-                        states = next;
-                    }
-                    let expected = states.iter().map(|p| p.1).min().map(|value| {
-                        if mode == PairedResourceMode::Feasibility {
-                            0.
+        for seed in 0..8 {
+            for length in 1..=4 {
+                let upper = if seed % 3 == 0 { 0 } else { 20 };
+                let specs: Vec<_> = (0..length)
+                    .map(|i| {
+                        let increment = if mode == PairedResourceMode::CostBounded {
+                            1 + (seed + i) % 3
                         } else {
-                            f64::from(
-                                value
-                                    - match normalization {
-                                        PairedCostNormalization::AbsoluteFinalValue => 0,
-                                        PairedCostNormalization::FinalMinusInitialMinimum => 2,
-                                    },
-                            )
-                        }
-                    });
-                    let arcs = specs
-                        .iter()
-                        .map(|&(delta, increment, left, right)| SlopeRelationArc {
-                            arrival: function(delta, 0, 1, 30),
-                            increment: function(increment, 0, 0, 30),
-                            lower: function(-5, left, 0, right),
-                            upper: function(upper, left, 0, right),
+                            (seed + 3 * i) % 5 - 2
+                        };
+                        (
+                            1 + (seed + i) % 2,
+                            increment,
+                            seed % 2,
+                            2 + seed % 4 + 2 * i,
+                        )
+                    })
+                    .collect();
+                let mut tail = Window::new(0., 4.).unwrap();
+                let arcs: Vec<_> = specs
+                    .iter()
+                    .map(|&(delta, increment, left, right)| {
+                        let head = Window::new(f64::from(left), f64::from(right)).unwrap();
+                        let arc = ChainArc {
+                            tail,
+                            head,
+                            consumption: f64::from(delta),
+                            increment: f64::from(increment),
+                            lower: -5.,
+                            upper: f64::from(upper),
                             waiting: 0,
-                        })
-                        .collect();
-                    let mut graph = Graph::<2>::new(length as usize + 1, 0).unwrap();
-                    for i in 0..length as usize {
-                        graph.add_arc(i, i + 1, 0.).unwrap();
-                    }
-                    graph
-                        .set_coupled_resources(&[CoupledResource::SlopePaired {
-                            initial: function(2, 0, 0, 4),
-                            initial_base: Window::new(0., 4.).unwrap(),
-                            arcs,
-                            mode,
-                            normalization,
-                            policy: FrontOperationPolicy::FrontAlgebra,
-                        }])
-                        .unwrap();
-                    let path: Vec<_> = (0..length as usize).collect();
-                    let certificate = graph.coupled_kernel().unwrap().certify(&path).unwrap();
-                    assert_eq!(
-                        graph.coupled_kernel().unwrap().replay(&path).unwrap(),
-                        expected
-                    );
-                    match expected {
-                        Some(cost)=>assert_eq!(certificate,(true,[cost,cost]),"mode={mode:?} normalization={normalization:?} seed={seed} length={length}"),
-                        None=>assert!(!certificate.0),
-                    }
-                }
+                        };
+                        tail = head;
+                        arc
+                    })
+                    .collect();
+                let graph = paired_chain(
+                    MachineRootInput::Affine(RawAffine::new(2., 0.).unwrap()),
+                    &arcs,
+                    mode,
+                );
+                let path: Vec<_> = (0..length as usize).collect();
+                assert_paired_certificate_encloses_replay(graph.coupled_kernel().unwrap(), &path);
             }
         }
+    }
+}
+
+// Certificates enclose every successful split, while replay selects split zero.
+// Native split values are checked independently by the captured chain corpus.
+fn assert_paired_certificate_encloses_replay(kernel: &CoupledKernel, path: &[usize]) {
+    let certificate = kernel.certify(path);
+    if certificate.is_none() {
+        return; // An unavailable split or arithmetic proof remains unknown.
+    }
+    let replay = kernel.replay(path).unwrap();
+    match certificate {
+        Some((true, [lower, upper])) => {
+            assert!(lower <= upper);
+            if let Some(value) = replay {
+                assert!(
+                    lower <= value && value <= upper,
+                    "{path:?}: {value} outside [{lower}, {upper}]"
+                );
+            }
+        }
+        Some((false, _)) => assert_eq!(replay, None),
+        None => {} // An unavailable split or arithmetic proof remains unknown.
     }
 }

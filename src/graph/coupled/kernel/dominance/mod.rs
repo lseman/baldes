@@ -60,6 +60,132 @@ fn weaker_bounds(a: &Suffix, b: &Suffix) -> bool {
     })
 }
 impl CoupledKernel {
+    /// Apply the recovered forward paired-resource dominance wrapper to two
+    /// retained machine states. This raw result cannot authorize source-model
+    /// pruning unless a separate source dominance proof exists.
+    pub fn paired_machine_forward_dominance(
+        &self,
+        resource: usize,
+        a: &CoupledLabelState,
+        b: &CoupledLabelState,
+        accumulated: f64,
+        budget: descriptor::FrontierBudget,
+    ) -> descriptor::FrontierOutcome<f64> {
+        self.paired_machine_directional_dominance(resource, a, b, false, accumulated, budget)
+    }
+
+    /// Apply the backward paired-resource machine dominance wrapper.
+    /// This raw result is not a source-model pruning certificate.
+    pub fn paired_machine_backward_dominance(
+        &self,
+        resource: usize,
+        a: &CoupledLabelState,
+        b: &CoupledLabelState,
+        accumulated: f64,
+        budget: descriptor::FrontierBudget,
+    ) -> descriptor::FrontierOutcome<f64> {
+        self.paired_machine_directional_dominance(resource, a, b, true, accumulated, budget)
+    }
+
+    fn paired_machine_directional_dominance(
+        &self,
+        resource: usize,
+        a: &CoupledLabelState,
+        b: &CoupledLabelState,
+        backward: bool,
+        accumulated: f64,
+        budget: descriptor::FrontierBudget,
+    ) -> descriptor::FrontierOutcome<f64> {
+        use descriptor::{FrontierOutcome, FrontierUnknown};
+        let started = std::time::Instant::now();
+        if budget.max_elapsed.is_some_and(|limit| limit.is_zero()) {
+            return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
+        }
+        let validation = self
+            .definitions
+            .len()
+            .saturating_mul(2)
+            .saturating_add(resource)
+            .saturating_add(a.suffix.as_ref().map_or(0, |suffix| suffix.bounds.len()))
+            .saturating_add(b.suffix.as_ref().map_or(0, |suffix| suffix.bounds.len()))
+            .saturating_add(a.reversal_peaks.as_ref().map_or(0, |peaks| peaks.len()))
+            .saturating_add(b.reversal_peaks.as_ref().map_or(0, |peaks| peaks.len()));
+        let Some(remaining_work) = budget.max_operations.checked_sub(validation) else {
+            return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
+        };
+        if !self.front_program_domain
+            || !matches!(
+                self.definitions.get(resource),
+                Some(CoupledResource::PairedFront { .. })
+            )
+            || !self.completion_state_matches(a)
+            || !self.completion_state_matches(b)
+            || a.suffix.is_some() != backward
+            || b.suffix.is_some() != backward
+        {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired forward dominance state",
+            ));
+        }
+        let index = self.definitions[..resource]
+            .iter()
+            .filter(|definition| matches!(definition, CoupledResource::PairedFront { .. }))
+            .count();
+        let Some(prepared) = self.slope_paired.get(index) else {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired forward dominance resource",
+            ));
+        };
+        let (Some(left), Some(right)) = (
+            a.slope_relations
+                .get(index)
+                .and_then(|label| label.machine_history.as_deref()),
+            b.slope_relations
+                .get(index)
+                .and_then(|label| label.machine_history.as_deref()),
+        ) else {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired forward dominance histories",
+            ));
+        };
+        let roots_match = if backward {
+            prepared.matches_backward_root(left) && prepared.matches_backward_root(right)
+        } else {
+            prepared.matches_forward_root(left) && prepared.matches_forward_root(right)
+        };
+        if !roots_match {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired forward dominance stale histories",
+            ));
+        }
+        let remaining = budget
+            .max_elapsed
+            .map(|limit| limit.saturating_sub(started.elapsed()));
+        if remaining.is_some_and(|limit| limit.is_zero()) {
+            return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
+        }
+        let remaining_budget = descriptor::FrontierBudget {
+            max_operations: remaining_work,
+            max_elapsed: remaining,
+            ..budget
+        };
+        if backward {
+            left.backward_dominance(
+                right,
+                prepared.machine_mode(),
+                accumulated,
+                remaining_budget,
+            )
+        } else {
+            left.forward_dominance(
+                right,
+                prepared.machine_mode(),
+                accumulated,
+                remaining_budget,
+            )
+        }
+    }
+
     /// Evaluate the raw custom-resource dominance callback for retained
     /// labels. This value is not a source-model dominance certificate.
     pub fn custom_machine_dominance_cost(
@@ -69,7 +195,9 @@ impl CoupledKernel {
         forward: bool,
     ) -> Result<Option<f64>> {
         let [resource] = self.custom_indices.as_slice() else {
-            return Err(invalid("custom machine dominance requires one custom resource"));
+            return Err(invalid(
+                "custom machine dominance requires one custom resource",
+            ));
         };
         self.custom_machine_resource_dominance_cost(*resource, a, b, forward)
     }
@@ -87,16 +215,28 @@ impl CoupledKernel {
         if a.suffix.is_none() != forward || b.suffix.is_none() != forward {
             return Err(invalid("custom machine dominance direction mismatch"));
         }
-        let index = self.custom_indices.iter().position(|&entry| entry == resource)
+        let index = self
+            .custom_indices
+            .iter()
+            .position(|&entry| entry == resource)
             .ok_or_else(|| invalid("custom machine resource unavailable"))?;
         let (left, right) = (&a.custom_machine[index], &b.custom_machine[index]);
         if !left.accepted || !right.accepted {
             return Ok(None);
         }
-        let Some(CoupledResource::CustomResource { forward_bound, backward_bound, .. }) = self.definitions.get(resource) else {
+        let Some(CoupledResource::CustomResource {
+            forward_bound,
+            backward_bound,
+            ..
+        }) = self.definitions.get(resource)
+        else {
             return Err(invalid("custom machine resource unavailable"));
         };
-        let bound = if forward { *forward_bound } else { *backward_bound };
+        let bound = if forward {
+            *forward_bound
+        } else {
+            *backward_bound
+        };
         Ok(bound.map(|bound| left.state.dominance_cost(&right.state, bound)))
     }
 
@@ -168,6 +308,14 @@ impl CoupledKernel {
         {
             return None;
         }
+        // Equality of history handles is not enough after machine inputs or
+        // installed roots have been replaced. Check this before any of the
+        // equal-state fast paths as well as before directional comparison.
+        if self.front_program_domain
+            && (!self.completion_state_matches(a) || !self.completion_state_matches(b))
+        {
+            return None;
+        }
         if self.has_negative_paired_objectives() {
             self.check_state(a).ok()?;
             self.check_state(b).ok()?;
@@ -182,7 +330,7 @@ impl CoupledKernel {
             // proofs succeed and every other continuation/accounting
             // component is identical. The hot label key checks current cost.
             // Native tolerance is never used as a proof rule.
-            return self.signed_paired_fronts_dominate(a, b, forward);
+            return None;
         }
         if (self.weighted_objective && (forward || !self.nonnegative_paired_weights_only))
             || !self.pricing_activities.is_empty()
@@ -212,39 +360,36 @@ impl CoupledKernel {
                         &a.numeric, &b.numeric, a.numeric_cost, b.numeric_cost,
                     ))
         };
-        let tracked_order = if !charged
-            && self.front_indices.is_empty()
-            && self.slope_indices.is_empty()
-            && self.relation_indices.is_empty()
-        {
-            false
-        } else {
-            match (a.accounting, b.accounting) {
-                (Some(a_cost), Some(b_cost)) => {
-                    if a_cost.reduced > b_cost.reduced
-                        || a.numeric_cost > b.numeric_cost
-                        || !numeric_order()
-                        || a.fronts
-                            .iter()
-                            .zip(&b.fronts)
-                            .any(|(a, b)| a.minimum() > b.minimum())
-                    {
-                        return None;
+        let tracked_order =
+            if !charged && self.front_indices.is_empty() && self.slope_indices.is_empty() {
+                false
+            } else {
+                match (a.accounting, b.accounting) {
+                    (Some(a_cost), Some(b_cost)) => {
+                        if a_cost.reduced > b_cost.reduced
+                            || a.numeric_cost > b.numeric_cost
+                            || !numeric_order()
+                            || a.fronts
+                                .iter()
+                                .zip(&b.fronts)
+                                .any(|(a, b)| a.minimum() > b.minimum())
+                        {
+                            return None;
+                        }
+                        true
                     }
-                    true
-                }
-                (None, None) => {
-                    // Public resource-only states carry no scalar history,
-                    // but their already accumulated numeric objective is
-                    // still part of the continuation component contract.
-                    if (charged && a.numeric_cost > b.numeric_cost) || !numeric_order() {
-                        return None;
+                    (None, None) => {
+                        // Public resource-only states carry no scalar history,
+                        // but their already accumulated numeric objective is
+                        // still part of the continuation component contract.
+                        if (charged && a.numeric_cost > b.numeric_cost) || !numeric_order() {
+                            return None;
+                        }
+                        false
                     }
-                    false
+                    _ => return None,
                 }
-                _ => return None,
-            }
-        };
+            };
         let frozen_fronts = frozen_fronts && tracked_order;
         if !forward
             && a.suffix.as_ref()?.program != b.suffix.as_ref()?.program
@@ -318,10 +463,7 @@ impl CoupledKernel {
         if !self.plugins_dominate(a, b, forward) {
             return None;
         }
-        let relation_penalty = add_up(
-            self.relations_dominate(a, b, forward, tracked_order)?,
-            slope_penalty,
-        )?;
+        let relation_penalty = slope_penalty;
         let relation_penalty = add_up(
             relation_penalty,
             self.slope_relations_dominate(a, b, forward, tracked_order)?,
@@ -393,97 +535,25 @@ impl CoupledKernel {
         Some(penalty)
     }
 
-    fn signed_paired_fronts_dominate(
-        &self,
-        a: &CoupledLabelState,
-        b: &CoupledLabelState,
-        forward: bool,
-    ) -> Option<f64> {
-        let relation_changed = a.relations != b.relations;
-        let slope_changed = a.slope_relations != b.slope_relations;
-        if !forward
-            || self.cost_scale <= 0.
-            || (!relation_changed && !slope_changed)
-            || a.accounting.is_none()
-            || a.accounting != b.accounting
-            || a.numeric_cost != b.numeric_cost
-            || a.numeric != b.numeric
-            || a.relations.len() != self.paired.len()
-            || b.relations.len() != self.paired.len()
-            || a.relations.iter().zip(&b.relations).zip(&self.paired).any(
-                |((left, right), prepared)| {
-                    let scale = self.cost_scale * prepared.objective_coefficient;
-                    left != right && (!prepared.has_costs() || !scale.is_finite() || scale >= 0.)
-                },
-            )
-            || a.slope_relations.len() != self.slope_paired.len()
-            || b.slope_relations.len() != self.slope_paired.len()
-            || a.slope_relations
-                .iter()
-                .zip(&b.slope_relations)
-                .zip(&self.slope_paired)
-                .any(|((left, right), prepared)| {
-                    left != right && !prepared.uses_strict_front_policy()
-                })
-        {
-            return None;
-        }
-        // Permit only paired labels and their recomputed objective total to
-        // differ. Scalar sums, other resource fronts, plugins, row adjustments,
-        // route masks, and suffix state must match exactly.
-        let mut normalized = a.clone();
-        normalized.relations.clone_from(&b.relations);
-        normalized.slope_relations.clone_from(&b.slope_relations);
-        normalized.resource_objective = b.resource_objective;
-        if normalized != *b {
-            return None;
-        }
-        let relations = self.relations_dominate(a, b, true, true)?;
-        let slopes = self.slope_relations_dominate(a, b, true, true)?;
-        add_up(relations, slopes)
-    }
-
     /// Backward labels with different suffix arc programs may still compare
     /// when every replay-dependent relation has a sufficient suffix summary:
     /// a feasibility upper front or an exact bounded-cost transfer. Other
     /// resources retain the common-program restriction. Cost transfers also
     /// need a global proof that reachable prefix values lie on a bounded exact lattice;
     /// numerical adjoints alone cannot compare fractional-prefix rounding.
-    fn backward_programs_free(&self, a: &CoupledLabelState, b: &CoupledLabelState) -> bool {
+    fn backward_programs_free(&self, _a: &CoupledLabelState, _b: &CoupledLabelState) -> bool {
+        // The explicit paired machine-feasibility contract carries its full
+        // backward state in the retained front. Its directional comparison
+        // below checks the installed root and compares those fronts; requiring
+        // equal physical suffix programs here would prevent that comparison
+        // from being used for different paths.
+        if self.machine_paired_join_complete() {
+            return !self.transitions.deferred;
+        }
         !self.transitions.deferred
             && self.plugins.is_empty()
             && self.slope_indices.is_empty()
-            && a.slope_relations.len() == self.slope_paired.len()
-            && b.slope_relations.len() == self.slope_paired.len()
-            && self
-                .slope_paired
-                .iter()
-                .zip(a.slope_relations.iter().zip(&b.slope_relations))
-                .all(|(prepared, (a, b))| {
-                    if prepared.has_costs() {
-                        prepared.monotone_constant_suffix_dominates(a, b)
-                            || (prepared.has_exact_cost_continuations()
-                                && a.bounded_cost.is_some()
-                                && b.bounded_cost.is_some())
-                    } else {
-                        a.upper.is_some() && b.upper.is_some()
-                    }
-                })
-            && a.relations.len() == self.paired.len()
-            && b.relations.len() == self.paired.len()
-            && self
-                .paired
-                .iter()
-                .zip(a.relations.iter().zip(&b.relations))
-                .all(|(prepared, (a, b))| {
-                    if prepared.has_costs() {
-                        prepared.has_exact_cost_continuations()
-                            && a.backward_cost().is_some()
-                            && b.backward_cost().is_some()
-                    } else {
-                        a.backward_upper().is_some() && b.backward_upper().is_some()
-                    }
-                })
+            && self.slope_paired.is_empty()
     }
 
     /// Different physical paths can execute exactly the same paired program.
@@ -506,7 +576,6 @@ impl CoupledKernel {
         a.program.equivalent_by(&b.program, |a, b| {
             a < self.arc_count
                 && b < self.arc_count
-                && self.paired.iter().all(|p| p.same_arc_operation(a, b))
                 && self.slope_paired.iter().all(|p| p.same_arc_operation(a, b))
         })
     }
@@ -519,7 +588,7 @@ impl CoupledKernel {
         a: &CoupledLabelState,
         b: &CoupledLabelState,
         forward: bool,
-        tracked_order: bool,
+        _tracked_order: bool,
     ) -> Option<f64> {
         if a.slope_relations.len() != b.slope_relations.len() {
             return None;
@@ -534,12 +603,47 @@ impl CoupledKernel {
             if left == right {
                 continue;
             }
-            let charged = prepared.has_costs() && self.cost_scale != 0.;
-            if charged && forward && !(tracked_order && self.cost_scale > 0.) {
-                return None;
+            // The paired front is the resource contract in this domain.
+            // Apply the directional scan, including its cost accumulator.
+            if self.machine_paired_join_complete() {
+                let (Some(a), Some(b)) = (&left.machine_history, &right.machine_history) else {
+                    return None;
+                };
+                let roots_match = if forward {
+                    prepared.matches_forward_root(a) && prepared.matches_forward_root(b)
+                } else {
+                    prepared.matches_backward_root(a) && prepared.matches_backward_root(b)
+                };
+                if !roots_match {
+                    return None;
+                }
+                let budget = descriptor::FrontierBudget::default();
+                let comparison = if forward {
+                    a.forward_dominance(b, prepared.machine_mode(), 0., budget)
+                } else {
+                    a.backward_dominance(b, prepared.machine_mode(), 0., budget)
+                };
+                let descriptor::FrontierOutcome::Complete(gap) = comparison else {
+                    return None;
+                };
+                if prepared.has_costs() {
+                    let scale = self.cost_scale * prepared.objective_coefficient;
+                    if !scale.is_finite() || scale < 0. {
+                        return None;
+                    }
+                    let adjustment = Range::point(gap)
+                        .multiply(Range::point(scale))
+                        .add(Range::point(right.minimum))
+                        .subtract(Range::point(left.minimum))
+                        .hi;
+                    if !adjustment.is_finite() {
+                        return None;
+                    }
+                    penalty = add_up(penalty, adjustment.max(0.))?;
+                }
+                continue;
             }
-            let gap = prepared.penalty(left, right, forward, self.cost_scale)?;
-            penalty = add_up(penalty, gap)?;
+            return None;
         }
         Some(penalty)
     }
@@ -563,75 +667,6 @@ impl CoupledKernel {
                         plugin.0.dominates(a, b, forward)
                     }
                 })
-    }
-
-    /// Forward relation fronts dominate by covering and staying below; the
-    /// final minimum is then no higher for every completion. A charged
-    /// relation also needs the scalar prefix order proven by `tracked_order`,
-    /// since its own objective term is then no higher as well. In
-    /// cost-unbounded mode without upper bounds a front may exceed the other
-    /// by delta and pay scale * (delta + min_b - min_a) (the reference's
-    /// max(a - b) cost charge). Backward labels compare feasibility upper
-    /// fronts or exact bounded-cost transfers; unknown transfers retain the
-    /// common-program restriction. Returns the penalty.
-    fn relations_dominate(
-        &self,
-        a: &CoupledLabelState,
-        b: &CoupledLabelState,
-        forward: bool,
-        tracked_order: bool,
-    ) -> Option<f64> {
-        if a.relations.len() != b.relations.len() {
-            return None;
-        }
-        let mut penalty = 0.;
-        for ((left, right), prepared) in a.relations.iter().zip(&b.relations).zip(&self.paired) {
-            if left == right {
-                continue;
-            }
-            if !forward {
-                if prepared.backward_dominates(left, right, self.cost_scale) {
-                    continue;
-                }
-                return None;
-            }
-            let upper_left = left.forward_upper_negative();
-            let upper_right = right.forward_upper_negative();
-            let (Some(left), Some(right)) = (left.forward(), right.forward()) else {
-                return None;
-            };
-            let charged = prepared.has_costs() && self.cost_scale != 0.;
-            if !forward || (charged && !(tracked_order && self.cost_scale > 0.)) {
-                return None;
-            }
-            let signed_scale = self.cost_scale * prepared.objective_coefficient;
-            if !signed_scale.is_finite() {
-                return None;
-            }
-            if charged && signed_scale < 0. {
-                let (Some(upper_left), Some(upper_right)) = (upper_left, upper_right) else {
-                    return None;
-                };
-                if left.covers_below_strict(right) && upper_left.covers_below_strict(upper_right) {
-                    continue;
-                }
-                return None;
-            }
-            let excess = left.excess(right)?;
-            if excess <= 0. {
-                continue;
-            }
-            if !(charged && prepared.shifts()) {
-                return None;
-            }
-            let gap = Range::point(excess)
-                .add(Range::point(right.minimum()))
-                .subtract(Range::point(left.minimum()))
-                .multiply(Range::point(self.cost_scale))
-                .hi;
-            penalty = add_up(penalty, gap.max(0.))?;
-        }
-        Some(penalty)
     }
 }
 impl<const D: usize> Graph<D> {

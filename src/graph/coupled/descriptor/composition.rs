@@ -189,8 +189,12 @@ pub fn prepare_machine_arc(
     // Forward and inverse vectors preserve the truncated array's pair count.
     // The initial-limit scan charges two pair checks, two forward lookups,
     // one inverse lookup and four branch operations.
-    let Some(limit_work) = truncated.pairs().len().checked_mul(3)
-        .and_then(|work| work.checked_add(6)) else {
+    let Some(limit_work) = truncated
+        .pairs()
+        .len()
+        .checked_mul(3)
+        .and_then(|work| work.checked_add(6))
+    else {
         return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
     };
     let limit_work = limit_work.min(budget.max_operations / 2);
@@ -329,8 +333,12 @@ pub fn prepare_machine_inputs(
         Some(value) => value,
         None => return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit),
     };
-    let inverse_work = match truncated.pairs().len().checked_mul(6)
-        .and_then(|work| work.checked_add(1)) {
+    let inverse_work = match truncated
+        .pairs()
+        .len()
+        .checked_mul(6)
+        .and_then(|work| work.checked_add(1))
+    {
         Some(value) => value,
         None => return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit),
     };
@@ -338,9 +346,12 @@ pub fn prepare_machine_inputs(
     // pairs. For smaller budgets retain the earlier quarter-budget limit,
     // so a short output is not rejected merely by reserving for twelve.
     let check_work = 72usize.min(budget.max_operations / 4);
-    let Some(composition_work) = budget.max_operations.checked_sub(forward_work)
+    let Some(composition_work) = budget
+        .max_operations
+        .checked_sub(forward_work)
         .and_then(|work| work.checked_sub(inverse_work))
-        .and_then(|work| work.checked_sub(check_work)) else {
+        .and_then(|work| work.checked_sub(check_work))
+    else {
         return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
     };
     if budget.max_components == 0 {
@@ -550,34 +561,19 @@ impl PreparedCompositionMap {
         policy: FrontOperationPolicy,
         budget: FrontierBudget,
     ) -> FrontierOutcome<PreparedSlopeFunction> {
-        self.compose_with_clipping(outer, lower, upper, policy, false, budget)
+        self.compose_prepared(outer, lower, upper, policy, budget)
     }
 
-    /// Paired relations explicitly intersect a component's feasible preimage.
-    /// Preserve their ordered native arithmetic while permitting that clipping;
-    /// this is a relation operation, not a standalone native-helper witness.
-    pub(super) fn compose_clipped(
+    fn compose_prepared(
         &self,
         outer: &PreparedSlopeFunction,
         lower: f64,
         upper: f64,
         policy: FrontOperationPolicy,
-        budget: FrontierBudget,
-    ) -> FrontierOutcome<PreparedSlopeFunction> {
-        self.compose_with_clipping(outer, lower, upper, policy, true, budget)
-    }
-
-    fn compose_with_clipping(
-        &self,
-        outer: &PreparedSlopeFunction,
-        lower: f64,
-        upper: f64,
-        policy: FrontOperationPolicy,
-        allow_outer_clipping: bool,
         budget: FrontierBudget,
     ) -> FrontierOutcome<PreparedSlopeFunction> {
         let mut work = Work::new(budget);
-        if policy == FrontOperationPolicy::FrontAlgebra && !allow_outer_clipping {
+        if policy == FrontOperationPolicy::FrontAlgebra {
             return finish(machine::compose(
                 outer,
                 &self.function,
@@ -594,13 +590,7 @@ impl PreparedCompositionMap {
             knots: Cow::Borrowed(&self.knots),
         };
         finish(compose_cached(
-            outer,
-            &inner,
-            lower,
-            upper,
-            policy,
-            allow_outer_clipping,
-            &mut work,
+            outer, &inner, lower, upper, policy, &mut work,
         ))
     }
 }
@@ -618,7 +608,7 @@ fn compose_checked(
         return machine::compose(outer, inner, lower, upper, &mut work);
     }
     let inner = Cached::new(inner, true, &mut work)?;
-    compose_cached(outer, &inner, lower, upper, policy, false, &mut work)
+    compose_cached(outer, &inner, lower, upper, policy, &mut work)
 }
 
 /// The short-interval branch performs only two lookups. In particular, it
@@ -661,7 +651,6 @@ fn compose_cached(
     lower: f64,
     upper: f64,
     policy: FrontOperationPolicy,
-    allow_outer_clipping: bool,
     work: &mut Work,
 ) -> Result<Option<PreparedSlopeFunction>> {
     if !lower.is_finite() || !upper.is_finite() || lower > upper {
@@ -806,10 +795,7 @@ fn compose_cached(
             }
             continue;
         }
-        if policy == FrontOperationPolicy::FrontAlgebra
-            && !allow_outer_clipping
-            && (y0 < outer_lo || y1 > outer_hi)
-        {
+        if policy == FrontOperationPolicy::FrontAlgebra && (y0 < outer_lo || y1 > outer_hi) {
             // The native helper can reject an exhausted outer domain even
             // when a nonempty clipped composition exists. Its false result
             // does not certify infeasibility. Keep strict-domain clipping

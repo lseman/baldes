@@ -1,12 +1,8 @@
-//! Registered paired resources, controls, and independent path oracles.
+//! Registered paired front programs and independent path oracles.
 use super::*;
 
-mod cycles;
-mod enumeration;
 mod objectives;
 mod registration;
-mod rows;
-mod witnesses;
 
 fn check_registered_cases(source: &str) -> usize {
     let corpus: serde_json::Value = serde_json::from_str(source).unwrap();
@@ -17,11 +13,11 @@ fn check_registered_cases(source: &str) -> usize {
     let mut compared = 0;
     for case in corpus["cases"].as_array().unwrap() {
         if let Some(waiting) = case["registration"]["functions"]["waiting"].as_f64() {
-            for arc in case["model"]["networks"][0]["coupled_resources"][0]["arcs"]
+            for arc in case["model"]["networks"][0]["paired_front_programs"][0]["arcs"]
                 .as_array()
                 .unwrap()
             {
-                assert_eq!(arc["waiting"].as_i64().unwrap(), waiting.trunc() as i64);
+                assert_eq!(arc["waiting_rate"].as_f64().unwrap(), waiting);
             }
         }
         let expected = case["independent_objective"].as_f64().unwrap();
@@ -80,30 +76,4 @@ fn check_registered_cases(source: &str) -> usize {
         }
     }
     compared
-}
-
-fn control_point_source_model(mut source: serde_json::Value) -> serde_json::Value {
-    fn knots(function: &serde_json::Value) -> serde_json::Value {
-        let pairs = function["pairs"].as_array().unwrap();
-        let (mut y, mut x) = (pairs[0][0].as_f64().unwrap(), pairs[0][1].as_f64().unwrap());
-        let mut points = vec![serde_json::json!([x, y])];
-        for pair in &pairs[1..] {
-            let end = pair[1].as_f64().unwrap();
-            y += pair[0].as_f64().unwrap() * (end - x);
-            x = end;
-            points.push(serde_json::json!([x, y]));
-        }
-        serde_json::json!({"points":points})
-    }
-    for resource in source["coupled_resources"].as_array_mut().unwrap() {
-        resource["initial"] = knots(&resource["initial"]);
-        for arc in resource["arcs"].as_array_mut().unwrap() {
-            for key in ["arrival", "increment", "lower", "upper"] {
-                arc[key] = knots(&arc[key]);
-            }
-        }
-        resource["kind"] = "paired_piecewise_linear".into();
-        resource.as_object_mut().unwrap().remove("policy");
-    }
-    source
 }

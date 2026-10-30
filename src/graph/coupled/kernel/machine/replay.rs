@@ -26,7 +26,7 @@ impl<const D: usize> Graph<D> {
         };
         if !matches!(
             kernel.definitions.get(resource),
-            Some(CoupledResource::SlopePaired { .. })
+            Some(CoupledResource::PairedFront { .. })
         ) {
             return descriptor::FrontierOutcome::Unknown(descriptor::FrontierUnknown::Unsupported(
                 "machine replay requires a paired slope resource",
@@ -34,7 +34,7 @@ impl<const D: usize> Graph<D> {
         }
         let index = kernel.definitions[..resource]
             .iter()
-            .filter(|r| matches!(r, CoupledResource::SlopePaired { .. }))
+            .filter(|r| matches!(r, CoupledResource::PairedFront { .. }))
             .count();
         kernel.slope_paired[index].machine_replay(self, root, path, mode, max_states, budget)
     }
@@ -61,7 +61,7 @@ impl<const D: usize> Graph<D> {
         };
         if !matches!(
             kernel.definitions.get(resource),
-            Some(CoupledResource::SlopePaired { .. })
+            Some(CoupledResource::PairedFront { .. })
         ) {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "machine replay requires a paired slope resource",
@@ -81,7 +81,7 @@ impl<const D: usize> Graph<D> {
             {
                 return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
             }
-            if matches!(definition, CoupledResource::SlopePaired { .. }) {
+            if matches!(definition, CoupledResource::PairedFront { .. }) {
                 index += 1;
             }
         }
@@ -156,7 +156,7 @@ impl<const D: usize> Graph<D> {
         if !std::sync::Arc::ptr_eq(&kernel.machine_identity, &history.identity)
             || !matches!(
                 kernel.definitions.get(history.resource),
-                Some(CoupledResource::SlopePaired { .. })
+                Some(CoupledResource::PairedFront { .. })
             )
         {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
@@ -174,7 +174,7 @@ impl<const D: usize> Graph<D> {
             {
                 return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
             }
-            if matches!(definition, CoupledResource::SlopePaired { .. }) {
+            if matches!(definition, CoupledResource::PairedFront { .. }) {
                 index += 1;
             }
         }
@@ -215,9 +215,7 @@ impl<const D: usize> Graph<D> {
         initial_dependent: f64,
         budget: descriptor::FrontierBudget,
     ) -> descriptor::FrontierOutcome<descriptor::MachinePathReconstruction> {
-        use descriptor::{
-            FrontierBudget, FrontierOutcome, FrontierUnknown, PreparedSlopeRelationArc,
-        };
+        use descriptor::{FrontierBudget, FrontierOutcome, FrontierUnknown, PairedFrontOperations};
         let started = std::time::Instant::now();
         if budget.max_elapsed.is_some_and(|limit| limit.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
@@ -228,7 +226,7 @@ impl<const D: usize> Graph<D> {
         if kernel.check_state(backward).is_err()
             || !matches!(
                 kernel.definitions.get(resource),
-                Some(CoupledResource::SlopePaired { .. })
+                Some(CoupledResource::PairedFront { .. })
             )
         {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
@@ -242,7 +240,7 @@ impl<const D: usize> Graph<D> {
         };
         let index = kernel.definitions[..resource]
             .iter()
-            .filter(|definition| matches!(definition, CoupledResource::SlopePaired { .. }))
+            .filter(|definition| matches!(definition, CoupledResource::PairedFront { .. }))
             .count();
         let prepared = &kernel.slope_paired[index];
         let Some(history) = backward.slope_relations[index].machine_history.as_ref() else {
@@ -334,10 +332,10 @@ impl<const D: usize> Graph<D> {
         if remaining_time.is_some_and(|limit| limit.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
-        let waiting_rates = prepared.machine_waiting_rates().map(|rates| {
-            path.iter().map(|&arc| rates[arc]).collect::<Vec<_>>()
-        });
-        PreparedSlopeRelationArc::machine_reconstruct_backward_path_with_rates(
+        let waiting_rates = prepared
+            .machine_waiting_rates()
+            .map(|rates| path.iter().map(|&arc| rates[arc]).collect::<Vec<_>>());
+        PairedFrontOperations::machine_reconstruct_backward_path_with_rates(
             history,
             &steps,
             initial_base,

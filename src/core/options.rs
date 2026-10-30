@@ -179,7 +179,7 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         name: "BALDESlabelDominanceStrategy",
         kind: OptionKind::Int,
         default: 0.0,
-        support: OptionSupport::Implemented("src/pricing/mod.rs; label dominance mode (0 or 1), shared with the C strategy setter"),
+        support: OptionSupport::Implemented("src/pricing/configuration.rs; 1 (partial dominance) is rejected, other integers use ordinary dominance"),
     },
     OptionInfo {
         name: "BALDESdynBuckStepAdjustRatioThreshold",

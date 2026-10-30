@@ -25,6 +25,16 @@ impl CoupledKernel {
         g: &Graph<D>,
         definitions: &[CoupledResource],
     ) -> Result<Self> {
+        let paired = definitions
+            .iter()
+            .filter(|resource| matches!(resource, CoupledResource::PairedFront { .. }))
+            .count();
+        if paired > 1 {
+            return Err(invalid("only one paired resource program is supported; two or more base/dependent resources are defined"));
+        }
+        if paired == 1 && definitions.len() != 1 {
+            return Err(invalid("unsupported paired resource combination: a paired program can only combine with standard graph resources; additional coupled resources are not supported"));
+        }
         let mut initial = Vec::new();
         let mut slots = Vec::new();
         for (i, r) in definitions.iter().enumerate() {
@@ -106,40 +116,9 @@ impl CoupledKernel {
         let slope_paired = definitions
             .iter()
             .filter_map(|resource| match resource {
-                CoupledResource::SlopePaired {
-                    initial,
-                    initial_base,
-                    arcs,
-                    mode,
-                    normalization,
-                    policy,
-                } => Some(slope_paired::PreparedSlopePaired::new(
-                    initial,
-                    *initial_base,
-                    arcs,
-                    *mode,
-                    *normalization,
-                    *policy,
-                )),
-                _ => None,
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let paired = definitions
-            .iter()
-            .filter_map(|r| match r {
-                CoupledResource::PairedPiecewiseLinear {
-                    initial,
-                    initial_base,
-                    arcs,
-                    mode,
-                    normalization,
-                } => Some(paired::PreparedPaired::new(
-                    initial,
-                    *initial_base,
-                    arcs,
-                    *mode,
-                    *normalization,
-                )),
+                CoupledResource::PairedFront { mode } => {
+                    Some(slope_paired::PreparedSlopePaired::new(g.arcs.len(), *mode))
+                }
                 _ => None,
             })
             .collect::<Result<Vec<_>>>()?;
@@ -158,19 +137,28 @@ impl CoupledKernel {
             identity: std::sync::Arc::new(()),
             machine_identity: std::sync::Arc::new(()),
             definitions: definitions.to_vec().into(),
-            custom_indices: definitions.iter().enumerate().filter_map(|(index, resource)| matches!(resource, CoupledResource::CustomResource { .. }).then_some(index)).collect(),
+            custom_indices: definitions
+                .iter()
+                .enumerate()
+                .filter_map(|(index, resource)| {
+                    matches!(resource, CoupledResource::CustomResource { .. }).then_some(index)
+                })
+                .collect(),
             slots,
             initial,
             cost_scale: 1.,
             objective_coefficients,
+            paired_associated_costs: Default::default(),
+            paired_owner_registration_bounds: Default::default(),
             weighted_objective: false,
             nonnegative_paired_weights_only: true,
             negative_paired_objective: false,
             pricing_adjustments: Default::default(),
             pricing_activities: Default::default(),
-            front_program_domain: false,
+            front_program_domain: definitions
+                .iter()
+                .any(|definition| matches!(definition, CoupledResource::PairedFront { .. })),
             frozen,
-            paired,
             plugins: definitions
                 .iter()
                 .filter_map(|r| match r {
@@ -225,13 +213,6 @@ impl CoupledKernel {
                 })
                 .collect(),
             budgeted: budgeted::PreparedBudgeted::prepare(g, definitions),
-            relation_indices: definitions
-                .iter()
-                .enumerate()
-                .filter_map(|(i, r)| {
-                    matches!(r, CoupledResource::PairedPiecewiseLinear { .. }).then_some(i)
-                })
-                .collect(),
             front_indices,
             slope_indices,
             slope_roots,
@@ -247,12 +228,7 @@ impl CoupledKernel {
                         | CoupledResource::SlopeIntervalCost { .. }
                         | CoupledResource::PiecewiseLinearCost { .. }
                         | CoupledResource::EncodedPiecewiseLinearCost { .. }
-                        | CoupledResource::SlopePaired {
-                            mode: PairedResourceMode::CostUnbounded
-                                | PairedResourceMode::CostBounded,
-                            ..
-                        }
-                        | CoupledResource::PairedPiecewiseLinear {
+                        | CoupledResource::PairedFront {
                             mode: PairedResourceMode::CostUnbounded
                                 | PairedResourceMode::CostBounded,
                             ..
@@ -337,6 +313,15 @@ impl CoupledKernel {
                 "paired machine pricing requires both prepared root and arc inputs",
             ));
         }
+        if self
+            .slope_paired
+            .iter()
+            .any(|paired| !paired.waiting_windows_match_inputs())
+        {
+            return Err(invalid(
+                "paired waiting windows differ from the installed front program",
+            ));
+        }
         let optimization = PreparedBounds::new(g, &self.definitions, &self.slots, &self.initial);
         if self.arc_count != g.arcs.len()
             || self.optimization != optimization
@@ -370,10 +355,7 @@ impl CoupledKernel {
                 CoupledResource::SlopeIntervalCost {
                     policy: FrontOperationPolicy::FrontAlgebra,
                     ..
-                } | CoupledResource::SlopePaired {
-                    policy: FrontOperationPolicy::FrontAlgebra,
-                    ..
-                }
+                } | CoupledResource::PairedFront { .. }
             )
         })
     }
@@ -387,11 +369,9 @@ impl CoupledKernel {
     pub fn has_machine_cost_contracts(&self) -> bool {
         self.definitions.iter().any(|definition| match definition {
             CoupledResource::SlopeIntervalCost { .. } => true,
-            CoupledResource::SlopePaired {
-                policy: FrontOperationPolicy::FrontAlgebra,
-                mode,
-                ..
-            } => self.front_program_domain && *mode != PairedResourceMode::Feasibility,
+            CoupledResource::PairedFront { mode, .. } => {
+                self.front_program_domain && *mode != PairedResourceMode::Feasibility
+            }
             _ => false,
         })
     }

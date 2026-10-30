@@ -49,6 +49,8 @@ pub struct Solver<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub requires_rollback: bool,
     pub round: controller::RoundState,
     pub maximum_variable_id: Option<usize>,
+    /// 1 drops cost from label dominance (resources and ng only). Not set by
+    /// `BALDESlabelDominanceStrategy`; that option's strategy 1 is partial dominance.
     pub dominance_mode: i32,
     accumulated_branches: Vec<restrictions::AccumulatedResourceBranch>,
     accumulated_original_bounds: Vec<(i32, usize, Option<crate::graph::Window>, bool)>,

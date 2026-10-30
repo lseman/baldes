@@ -1,4 +1,4 @@
-"""Explicit function encodings; runtime execution deferred during implementation."""
+"""Explicit function encodings and paired front programs."""
 import json
 import math
 
@@ -262,113 +262,89 @@ def test_slope_interval_cost_network_json_retains_operator_policy_and_phase_i_co
     assert result.lp == pytest.approx(5.0)
 
 
-def _slope_pair_arguments(leaf_policy="strict_domain"):
-    def affine(a, b, upper=20.0):
-        return EncodedFunction.affine(a, b, 0.0, upper, leaf_policy)
+def _paired_front_program():
+    affine = lambda intercept: {"encoding": "affine", "intercept": intercept, "slope": 0.0}
     return {
-        "initial_lower": 0.0, "initial_upper": 4.0,
-        "initial": affine(5.0, 2.0, 4.0),
-        "arrivals": [affine(1.0, 1.0)] * 2,
-        "increments": [affine(1.0, 0.0)] * 2,
-        "lowers": [affine(0.0, 0.0, 21.0)] * 2,
-        "uppers": [affine(100.0, 0.0, 21.0)] * 2,
-        "waiting": [0, 0],
+        "source_bounds": [0.0, 4.0], "terminal_bounds": [0.0, 8.0],
+        "root": affine(5.0),
+        "arcs": [{
+            "tail_bounds": [0.0, 4.0] if i == 0 else [0.0, 8.0],
+            "waiting_bounds": [0.0, 8.0], "waiting_rate": 0,
+            "base": {"pairs": [[1.0, 0.0], [0.0, 8.0]]},
+            "dependent": affine(1.0), "dependent_lower": affine(0.0),
+            "dependent_upper": affine(100.0),
+        } for i in range(2)],
     }
 
 
-@pytest.mark.parametrize("front_policy, leaf_policy", [
-    ("strict_domain", "strict_domain"),
-    ("front_algebra", "endpoint_tolerance"),
-])
-@pytest.mark.parametrize("mode", [0, 1, 2])
-@pytest.mark.parametrize("normalization, expected", [
-    ("absolute_final_value", -13.0),
-    ("final_minus_initial_minimum", -18.0),
-])
-def test_slope_paired_keeps_initial_value_and_normalization_explicit(front_policy, leaf_policy, mode, normalization, expected):
+@pytest.mark.parametrize("direction", [0, 1, 2])
+@pytest.mark.parametrize("encoding", ["affine", "vector"])
+def test_paired_front_program_preserves_initial_value_and_literal_function_encoding(direction, encoding):
     solver = Solver(3, 0)
     solver.new_arc(0, 1, -10.0)
     solver.new_arc(1, 2, -10.0)
-    solver.set_bidirectional_mode(mode)
+    solver.set_bidirectional_mode(direction)
     model = ResourceModel()
-    model.add_slope_paired(
-        **_slope_pair_arguments(leaf_policy), mode="cost_bounded",
-        policy=front_policy, normalization=normalization,
-    )
+    paired = model.add_paired_front(mode="cost_bounded")
+    program = _paired_front_program()
+    if encoding == "vector":
+        program["root"] = {"encoding": "vector", "function": {"pairs": [[5.0, 0.0], [0.0, 4.0]]}}
+    model.set_paired_front_program(paired, program)
     model.install(solver)
     minimum, routes = solver.price(10)
-    # Initial minimum5; two positive increments1 yield absolute7 or delta2.
-    assert minimum == expected
-    assert routes[0].original_cost == expected
+    assert minimum == -13.0
+    assert routes[0].original_cost == minimum
+    assert routes[0].coupled_values == [(0, 7.0)]
     assert routes[0].nodes() == [0, 1, 2]
 
 
-def test_slope_paired_default_normalization_charges_absolute_final_value():
-    solver = Solver(3, 0)
-    solver.new_arc(0, 1, -10.0)
-    solver.new_arc(1, 2, -10.0)
+@pytest.mark.parametrize("field", ["root", "dependent", "dependent_lower", "dependent_upper"])
+@pytest.mark.parametrize("encoding", ["knots", "slope_segments"])
+def test_paired_front_program_rejects_source_leaf_encodings(field, encoding):
+    program = _paired_front_program()
+    target = program if field == "root" else program["arcs"][0]
+    target[field] = {"encoding": encoding, "function": {"pairs": [[0.0, 0.0], [0.0, 8.0]]}}
     model = ResourceModel()
-    model.add_slope_paired(**_slope_pair_arguments(), mode="cost_bounded")
-    model.install(solver)
-    minimum, routes = solver.price(10)
-    assert minimum == -13.0 and routes[0].original_cost == -13.0
+    paired = model.add_paired_front()
+    with pytest.raises(ValueError, match="encoding must be affine or vector"):
+        model.set_paired_front_program(paired, program)
 
 
-@pytest.mark.parametrize("field", ["initial", "arrivals", "increments", "lowers", "uppers"])
-@pytest.mark.parametrize("bad_encoding", ["knots", "mismatched_leaf_policy"])
-def test_slope_paired_rejects_lossy_or_mismatched_function_in_every_role(field, bad_encoding):
-    arguments = _slope_pair_arguments()
-    bad = (EncodedFunction.knots([(0.0, 0.0), (21.0, 21.0)]) if bad_encoding == "knots"
-           else EncodedFunction.affine(0.0, 1.0, 0.0, 21.0, "endpoint_tolerance"))
-    arguments[field] = bad if field == "initial" else [bad] * 2
-    with pytest.raises(ValueError):
-        ResourceModel().add_slope_paired(**arguments, mode="cost_bounded")
+@pytest.mark.parametrize("rate", [math.inf, math.nan, 2.0 ** 40])
+def test_paired_front_program_rejects_unrepresentable_waiting_rates(rate):
+    model = ResourceModel()
+    paired = model.add_paired_front()
+    program = _paired_front_program()
+    program["arcs"][0]["waiting_rate"] = rate
+    with pytest.raises(ValueError, match="waiting rate"):
+        model.set_paired_front_program(paired, program)
 
 
-@pytest.mark.parametrize("overrides", [
-    {"mode": "unknown"}, {"normalization": "delta"}, {"policy": "endpoint_tolerance"},
-    {"waiting": [0]}, {"increments": []}, {"initial_upper": math.inf},
-])
-def test_slope_paired_rejects_invalid_modes_normalization_and_arc_shapes(overrides):
-    arguments = _slope_pair_arguments()
-    arguments.update(overrides)
-    with pytest.raises(ValueError):
-        ResourceModel().add_slope_paired(**arguments)
+def test_paired_front_program_rejects_unknown_mode_and_nonpaired_resource():
+    model = ResourceModel()
+    with pytest.raises(ValueError, match="unknown paired resource mode"):
+        model.add_paired_front("unknown")
+    other = model.add_custom_resource([1.0], [0.0])
+    with pytest.raises(ValueError, match="requires a paired resource"):
+        model.set_paired_front_program(other, _paired_front_program())
 
 
 @pytest.mark.skipif(not has_clp, reason="Clp build required")
-@pytest.mark.parametrize("normalization, expected", [
-    ("absolute_final_value", 9.0), ("final_minus_initial_minimum", 4.0),
-])
-@pytest.mark.parametrize("policy", ["strict_domain", "front_algebra"])
-def test_slope_paired_network_phase_i_and_sibling_restore_retain_normalization(normalization, expected, policy):
+def test_paired_front_program_network_phase_i_and_sibling_restore_keep_selected_cost():
     def network(network_id, arc_cost):
         value = _encoded_network(network_id, arc_cost)
-        arguments = _slope_pair_arguments()
-        value["coupled_resources"] = [{
-            "kind": "slope_paired", "initial_base": {"lower": 0.0, "upper": 4.0},
-            "initial": arguments["initial"].to_dict()["function"],
-            "arcs": [{
-                "arrival": arguments["arrivals"][i].to_dict()["function"],
-                "increment": arguments["increments"][i].to_dict()["function"],
-                "lower": arguments["lowers"][i].to_dict()["function"],
-                "upper": arguments["uppers"][i].to_dict()["function"], "waiting": 0,
-            } for i in range(2)],
-            "mode": "cost_bounded", "normalization": normalization, "policy": policy,
-        }]
+        value["coupled_resources"] = [{"kind": "paired_front", "mode": "cost_bounded"}]
+        value["paired_front_programs"] = [{"resource": 0, **_paired_front_program()}]
         return value
     model = NetworkProblem.from_json(json.dumps({
         "rows": [{"sense": "eq", "rhs": 1.0}],
         "networks": [network(7, 1.0), network(8, 5.0)],
     }))
-    wire = json.loads(model.to_json())
-    assert wire["networks"][0]["coupled_resources"][0]["normalization"] == normalization
-    assert wire["networks"][0]["coupled_resources"][0]["policy"] == policy
+    assert NetworkProblem.from_json(model.to_json()) == model
     root = model.solve(bound_mode="numerical", stabilize=False)
-    assert root.status == "Optimal" and root.lp == pytest.approx(expected)
-    assert root.snapshot is not None
+    assert root.status == "Optimal" and root.lp == pytest.approx(9.0)
     for child in [root.snapshot.branch_assignment(0, 8, True), root.snapshot.branch_assignment(0, 7, False)]:
         solved = child.solve(bound_mode="numerical", stabilize=False)
-        assert solved.status == "Optimal" and solved.lp == pytest.approx(expected + 8.0)
+        assert solved.status == "Optimal" and solved.lp == pytest.approx(17.0)
     restored = root.snapshot.solve(bound_mode="numerical", stabilize=False)
-    assert restored.status == "Optimal" and restored.lp == pytest.approx(expected)
+    assert restored.lp == pytest.approx(9.0)

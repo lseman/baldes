@@ -187,3 +187,64 @@ fn bucket_refinement_transfers_fixings_and_scales_existing_depths() {
         assert_eq!(format!("{grid:?}"), before);
     }
 }
+
+#[test]
+fn node_restore_reorders_components_only_after_a_step_change_elsewhere() {
+    use super::BucketGraph;
+    for (resources, bidirectional) in [(1, false), (1, true), (2, true)] {
+        let graph = dense_graph(resources);
+        let mut parent = BucketGraph::prepare(&graph, [4.; 2], 20, bidirectional).unwrap();
+        // Fixing removes every arc into vertex 2 without reordering components,
+        // so its buckets stay marked reachable in the stored grid.
+        let fixed: Vec<_> = graph.arcs.iter().map(|a| a.head == 2).collect();
+        for direction in [&mut parent.forward, &mut parent.backward] {
+            for bucket in direction.buckets.iter_mut().flatten() {
+                bucket.arcs.retain(|arc| !fixed[arc.physical]);
+            }
+        }
+        let vertex = parent.internal[2];
+        assert!(parent.forward.buckets[vertex].iter().any(|b| b.reachable));
+        let directions = |grid: &BucketGraph| format!("{:?}{:?}", grid.forward, grid.backward);
+        let stored = directions(&parent);
+
+        // No step change since the store: the stored order is kept.
+        let mut child = parent.clone();
+        child.restore_step_version(&graph).unwrap();
+        assert_eq!(directions(&child), stored);
+
+        // A sibling refines the steps; the next restore reorders on its own arcs.
+        parent.clone().decrease_steps(&graph).unwrap();
+        let mut detached = parent.clone();
+        detached.detach_step_versions();
+        let mut child = parent.clone();
+        child.restore_step_version(&graph).unwrap();
+        let mut expected = parent.clone();
+        for forward in [true, false] {
+            if !forward && !bidirectional {
+                continue;
+            }
+            expected
+                .order_components_preserving_depth(&graph, forward)
+                .unwrap();
+            expected.refresh_counts(&graph, forward);
+            expected.regenerate_jumps(&graph, forward);
+        }
+        assert_eq!(directions(&child), directions(&expected));
+        assert_ne!(directions(&child), stored);
+        assert!(child.forward.buckets[vertex]
+            .iter()
+            .all(|b| !b.reachable && b.arcs.is_empty()));
+        assert_eq!(child.forward.depth, parent.forward.depth);
+        assert_eq!(child.backward.depth, parent.backward.depth);
+        assert_eq!((child.step, child.version), (parent.step, parent.version));
+
+        // The restore made this version current again for the whole lineage.
+        let mut sibling = parent.clone();
+        sibling.restore_step_version(&graph).unwrap();
+        assert_eq!(directions(&sibling), stored);
+
+        // A detached lineage never observes the other lineage's refinement.
+        detached.restore_step_version(&graph).unwrap();
+        assert_eq!(directions(&detached), stored);
+    }
+}

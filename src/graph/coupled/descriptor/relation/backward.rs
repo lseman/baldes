@@ -1,7 +1,7 @@
 //! Prepared relation backward operations.
 use super::*;
 
-impl PreparedSlopeRelationArc {
+impl PairedFrontOperations {
     /// Ordered waiting-aware composition, including short intervals, near
     /// knots and the two distinct secant-merge branches. Unsupported machine
     /// representations remain unknown rather than proving infeasibility.
@@ -134,14 +134,19 @@ impl PreparedSlopeRelationArc {
                     return Err(FrontierUnknown::PairLimit);
                 }
                 let previous = index - 1;
-                let slope =
-                    finite(finite(value - before_value)? / finite(end - output[previous].1)?)?;
+                let slope = finite(value - before_value)? / finite(end - output[previous].1)?;
                 let bit = (waiting_bits >> segment) & 1;
                 *bits = (*bits & !(1u64 << index)) | (bit << index);
-                if previous > 0
-                    && ((*bits >> previous) & 1) == bit
-                    && near(slope, output[previous].0)?
-                {
+                let mergeable = previous > 0 && ((*bits >> previous) & 1) == bit;
+                // UCOMISD's unordered result takes the native append branch
+                // before the waiting-bit merge test. An undefined secant is
+                // retained even when the two waiting bits are equal.
+                if slope.is_nan() {
+                    output.push((slope, end));
+                    return Ok(());
+                }
+                let slope = finite(slope)?;
+                if mergeable && output[previous].0.is_finite() && near(slope, output[previous].0)? {
                     if overwrite_slope {
                         output[previous].0 = slope;
                     }
@@ -219,7 +224,7 @@ impl PreparedSlopeRelationArc {
                 }
                 current_y = end_y;
             }
-            let result = PreparedSlopeFunction::from_machine_pairs(output)
+            let result = PreparedSlopeFunction::from_machine_output_pairs(output)
                 .map_err(FrontierUnknown::Arithmetic)?;
             deadline()?;
             Ok((result, output_bits))
@@ -452,12 +457,12 @@ impl PreparedSlopeRelationArc {
                         let end = if right <= cap { right } else { cap };
                         append(&mut reverse, &mut reverse_bits, slope, end, false)?;
                         if previous < lower && !near(previous, lower)? {
-                            let anchor = finite(value - finite(slope * finite(right - lower)?)?)?;
+                            let anchor = value - (slope * (right - lower));
                             append(&mut reverse, &mut reverse_bits, anchor, lower, false)?;
                             break;
                         }
                     }
-                    value = finite(value - finite(slope * finite(right - previous)?)?)?;
+                    value = value - (slope * (right - previous));
                     if k > 1 {
                         k -= 1;
                         right = pairs[k].1;
@@ -468,7 +473,7 @@ impl PreparedSlopeRelationArc {
                             cap = pairs[0].1;
                         }
                         append(&mut reverse, &mut reverse_bits, rate, cap, true)?;
-                        value = finite(pairs[0].0 - finite(rate * finite(pairs[0].1 - lower)?)?)?;
+                        value = pairs[0].0 - (rate * (pairs[0].1 - lower));
                     }
                     append(&mut reverse, &mut reverse_bits, value, lower, false)?;
                     break;
@@ -477,11 +482,9 @@ impl PreparedSlopeRelationArc {
                 let mut j = k.saturating_sub(2);
                 let mut scanned = value;
                 if !all_waiting {
-                    scanned = finite(
-                        finite(value - finite(slope * finite(right - previous)?)?)?
-                            - finite(finite(previous - pairs[j].1)? * pairs[k - 1].0)?,
-                    )?;
-                    let mut line = finite(value - finite(finite(right - pairs[j].1)? * rate)?)?;
+                    scanned = (value - slope * (right - previous))
+                        - (previous - pairs[j].1) * pairs[k - 1].0;
+                    let mut line = value - ((right - pairs[j].1) * rate);
                     while line > scanned && !near(line, scanned)? {
                         deadline()?;
                         if j == 0 {
@@ -489,11 +492,8 @@ impl PreparedSlopeRelationArc {
                             break;
                         }
                         j -= 1;
-                        scanned = finite(
-                            scanned
-                                - finite(finite(pairs[j + 1].1 - pairs[j].1)? * pairs[j + 1].0)?,
-                        )?;
-                        line = finite(value - finite(finite(right - pairs[j].1)? * rate)?)?;
+                        scanned = scanned - ((pairs[j + 1].1 - pairs[j].1) * pairs[j + 1].0);
+                        line = value - ((right - pairs[j].1) * rate);
                     }
                 }
                 if all_waiting {
@@ -501,7 +501,7 @@ impl PreparedSlopeRelationArc {
                         cap = right;
                     }
                     append(&mut reverse, &mut reverse_bits, rate, cap, true)?;
-                    let anchor = finite(value - finite(rate * finite(right - lower)?)?)?;
+                    let anchor = value - (rate * (right - lower));
                     append(&mut reverse, &mut reverse_bits, anchor, lower, false)?;
                     break;
                 }
@@ -517,18 +517,16 @@ impl PreparedSlopeRelationArc {
                 }
                 let next = j + 1;
                 let next_slope = pairs[next].0;
-                let crossing = finite(
-                    finite(
-                        finite(finite(scanned - value)? - finite(pairs[next].1 * next_slope)?)?
-                            + finite(rate * right)?,
-                    )? / finite(rate - next_slope)?,
-                )?;
+                let crossing = (((scanned - value) - pairs[next].1 * next_slope) + rate * right)
+                    / (rate - next_slope);
                 if crossing < cap && !near(crossing, cap)? {
                     let end = if right <= cap { right } else { cap };
                     append(&mut reverse, &mut reverse_bits, rate, end, true)?;
                 }
-                if crossing <= lower || near(crossing, lower)? {
-                    let anchor = finite(value - finite(rate * finite(right - lower)?)?)?;
+                // The inlined native scan uses JBE here: unordered crossings
+                // take the same anchor branch as crossings below the lower bound.
+                if crossing.is_nan() || crossing <= lower || near(crossing, lower)? {
+                    let anchor = value - (rate * (right - lower));
                     append(&mut reverse, &mut reverse_bits, anchor, lower, false)?;
                     break;
                 }
@@ -538,8 +536,7 @@ impl PreparedSlopeRelationArc {
                 // rather than replacing it with a geometric knot coordinate.
                 let scalar = pairs[j].0;
                 if scalar < lower && !near(scalar, lower)? {
-                    let anchor =
-                        finite(scanned + finite(finite(lower - pairs[k - 1].1)? * pairs[k].0)?)?;
+                    let anchor = scanned + ((lower - pairs[k - 1].1) * pairs[k].0);
                     append(&mut reverse, &mut reverse_bits, anchor, lower, false)?;
                     break;
                 }
@@ -548,7 +545,7 @@ impl PreparedSlopeRelationArc {
                         cap = pairs[0].1;
                     }
                     append(&mut reverse, &mut reverse_bits, rate, cap, true)?;
-                    let anchor = finite(pairs[0].0 - finite(rate * finite(pairs[0].1 - lower)?)?)?;
+                    let anchor = pairs[0].0 - (rate * (pairs[0].1 - lower));
                     append(&mut reverse, &mut reverse_bits, anchor, lower, false)?;
                     break;
                 }
@@ -855,7 +852,7 @@ impl PreparedSlopeRelationArc {
                 }
                 let bit = (waiting_bits >> i) & 1;
                 result_bits = (result_bits & !(1u64 << index)) | (bit << index);
-                let slope = finite(a[i].0 - b[j].0)?;
+                let slope = a[i].0 - b[j].0;
                 let end = if near(a[i].1, b[j].1)? {
                     let end = a[i].1;
                     i += 1;
@@ -873,6 +870,8 @@ impl PreparedSlopeRelationArc {
                 let previous = output.len() - 1;
                 if previous > 0
                     && (result_bits >> previous) & 1 == bit
+                    && slope.is_finite()
+                    && output[previous].0.is_finite()
                     && near(output[previous].0, slope)?
                 {
                     output[previous].1 = end;
@@ -883,7 +882,7 @@ impl PreparedSlopeRelationArc {
                     output.push((slope, end));
                 }
             }
-            let result = PreparedSlopeFunction::from_machine_pairs(output)
+            let result = PreparedSlopeFunction::from_machine_output_pairs(output)
                 .map_err(FrontierUnknown::Arithmetic)?;
             deadline()?;
             Ok((result, result_bits))
@@ -911,7 +910,7 @@ impl PreparedSlopeRelationArc {
     ) -> FrontierOutcome<(PreparedSlopeFunction, f64)> {
         let started = Instant::now();
         let first_work = budget.max_operations / 2;
-        let (filtered, limit) = match Self::machine_backward_initial_filter(
+        let (filtered, limit) = match Self::machine_backward_initial_filter_output(
             front,
             waiting_lower,
             waiting_upper,
@@ -927,6 +926,16 @@ impl PreparedSlopeRelationArc {
             FrontierOutcome::Empty => return FrontierOutcome::Empty,
             FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
         };
+        // A successful lower filter can leave count -1 and clear the
+        // fixed array. The native caller still invokes the minimum helper,
+        // whose literal zero storage behaves as the two-pair point below.
+        let empty_storage = filtered.is_none();
+        let filtered = filtered.unwrap_or_else(|| {
+            SlopeFront::from_prepared(
+                PreparedSlopeFunction::from_machine_pairs(vec![(0., 0.), (0., 0.)])
+                    .expect("literal cleared machine array"),
+            )
+        });
         let remaining_time = budget
             .max_elapsed
             .map(|limit| limit.saturating_sub(started.elapsed()));
@@ -942,6 +951,7 @@ impl PreparedSlopeRelationArc {
             Self::machine_minimum_streams(&filtered.components()[0], upper, minimum_budget);
         match minimum {
             FrontierOutcome::Complete(vector) => FrontierOutcome::Complete((vector, limit)),
+            FrontierOutcome::Empty if empty_storage => FrontierOutcome::Empty,
             FrontierOutcome::Empty => FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "machine backward minimum diagnostic",
             )),

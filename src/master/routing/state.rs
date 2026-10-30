@@ -42,7 +42,7 @@ impl<const D: usize> State<D> {
         let mut entries = problem.base_entries(route)?;
         entries.extend(self.cut_entries(problem, route)?);
         entries.sort_by_key(|&(row, _)| row);
-        let (cost, _) = problem.route_cost(route);
+        let (cost, _) = problem.route_cost(route)?;
         let mut reduced_cost = cost;
         for &(r, a) in &entries {
             reduced_cost -= duals.get(r).copied().unwrap_or(0.) * a;

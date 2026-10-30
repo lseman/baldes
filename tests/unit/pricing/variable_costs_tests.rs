@@ -66,36 +66,47 @@ fn functor_round_refines_the_grid_used_by_the_raw_search() {
 
 #[test]
 fn restored_parent_and_siblings_keep_independent_bucket_refinement_versions() {
-    use crate::graph::coupled::{
-        CoupledResource, FrontOperationPolicy, PairedCostNormalization, PairedResourceMode,
-        PreparedSlopeFunction, SlopeRelationArc,
+    use crate::graph::coupled::descriptor::{
+        FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
     };
+    use crate::graph::coupled::{CoupledResource, MachineArcFunctionInput, PairedResourceMode};
     for paired in [false, true] {
         let mut parent = model();
         if paired {
-            let function = |value, slope| {
-                PreparedSlopeFunction::from_prepared_pairs(vec![(value, 0.), (slope, 10.)]).unwrap()
-            };
+            let bounds = crate::graph::Window::new(0., 10.).unwrap();
+            let base =
+                PreparedSlopeFunction::from_prepared_pairs(vec![(0., 0.), (0., 10.)]).unwrap();
+            let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+            let inputs: Vec<_> = (0..parent.graph.arcs.len())
+                .map(|physical_arc| MachineArcFunctionInput {
+                    physical_arc,
+                    tail_bounds: bounds,
+                    waiting_bounds: bounds,
+                    waiting_rate: 0,
+                    base: &base,
+                    dependent: affine(0.5),
+                    dependent_lower: affine(0.),
+                    dependent_upper: affine(100.),
+                })
+                .collect();
             parent
                 .graph
-                .set_coupled_resources(&[CoupledResource::SlopePaired {
-                    initial: function(0., 0.),
-                    initial_base: crate::graph::Window::new(0., 10.).unwrap(),
-                    arcs: vec![
-                        SlopeRelationArc {
-                            arrival: function(0., 1.),
-                            increment: function(0.5, 0.),
-                            lower: function(0., 0.),
-                            upper: function(100., 0.),
-                            waiting: 0,
-                        };
-                        parent.graph.arcs.len()
-                    ],
+                .set_coupled_resources(&[CoupledResource::PairedFront {
                     mode: PairedResourceMode::CostUnbounded,
-                    normalization: PairedCostNormalization::AbsoluteFinalValue,
-                    policy: FrontOperationPolicy::StrictDomain,
                 }])
                 .unwrap();
+            let result = parent.graph.prepare_paired_front_program(
+                0,
+                &inputs,
+                affine(0.),
+                bounds,
+                bounds,
+                FrontierBudget::default(),
+            );
+            assert!(
+                matches!(result, FrontierOutcome::Complete(())),
+                "{result:?}"
+            );
         }
         parent.bucket_steps[0] = 2.;
         parent.cache_variable_costs(&[1e-9]).unwrap();

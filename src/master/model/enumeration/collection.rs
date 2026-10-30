@@ -19,7 +19,6 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
     let mut paths_left = options.max_routes;
     let mut work_left = options.max_work;
     let mut arcs_left = options.max_stored_arcs;
-    let mut control_iterations = 100_000;
     let mut routes = vec![];
     let mut counts = vec![];
     for (network_index, oracle) in state.oracles.iter().enumerate() {
@@ -38,15 +37,37 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
             counts.push((oracle.network.id, 0));
             continue;
         }
-        // Replacing a control cannot preserve an identity-specific cap on
-        // that column. Invariant Gamma needs no such dominance argument.
-        let objective_projection = !state
-            .route_upper_bounds
-            .keys()
-            .any(|&tag| state.routes[tag].network == oracle.network.id);
+        if let Some(super::super::bounds::NetworkCutoff::Cost { network, .. }) = cutoff {
+            if *network != oracle.network.id {
+                return Err("cutoff network mismatch".into());
+            }
+        }
         let domain = super::super::resource_groups::residual_domain_graph(oracle)
             .map_err(|e| e.to_string())?;
         let graph = domain.as_ref();
+        if graph
+            .coupled_kernel()
+            .is_some_and(|kernel| kernel.machine_paired_join_complete())
+        {
+            let (collected, candidate_count, generated, stored_arcs) =
+                collect_paired_program_routes(
+                    oracle, graph, cutoff, paths_left, work_left, arcs_left, deadline,
+                )?;
+            paths_left = paths_left.checked_sub(candidate_count).ok_or("PathLimit")?;
+            work_left = work_left.checked_sub(generated).ok_or("WorkLimit")?;
+            arcs_left = arcs_left.checked_sub(stored_arcs).ok_or("StoredArcLimit")?;
+            counts.push((oracle.network.id, collected.len()));
+            for mut route in collected {
+                route.original_cost = super::super::original_costs::route_cost(oracle, &route)
+                    .map_err(|error| error.to_string())?;
+                route.cost = route.original_cost;
+                routes.push(NetworkRoute {
+                    network: oracle.network.id,
+                    route,
+                });
+            }
+            continue;
+        }
         // Disposable transitions relax scalar equality transitions: clamping a
         // too-small load adds paths, never removes an equality-feasible path.
         // Collect that superset, then replay every path on the original graph.
@@ -140,7 +161,6 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
                 .map(|&a| graph.arcs[a].id)
                 .collect();
             let mut probe = Route {
-                coupled_controls: Vec::new(),
                 coupled_values: Vec::new(),
                 nodes: std::iter::once(graph.source as i32)
                     .chain(
@@ -155,34 +175,6 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
                 resources: vec![],
                 resource_profile: vec![],
             };
-            let mut controls_complete = true;
-            if super::super::control_pricing::needed(oracle) {
-                match crate::master::routing::exact_scalar_path_feasibility(&problem, &probe) {
-                    Some(false) => continue,
-                    Some(true) => {}
-                    None => return Err("Arithmetic: exact scalar replay is unknown".into()),
-                }
-            }
-            let positions: Vec<_> = probe.arcs.iter().map(|id| oracle.index[id]).collect();
-            if super::super::control_pricing::needed(oracle) {
-                let controls = super::super::control_pricing::enumeration_controls(
-                    oracle,
-                    &positions,
-                    &mut work_left,
-                    &mut control_iterations,
-                    deadline,
-                    objective_projection,
-                    &state.shared_rows,
-                )
-                .ok_or(
-                    "paired control domain is not proved invariant or objective-dominated; path enumeration is incomplete",
-                )?;
-                let Some(controls) = controls else {
-                    continue;
-                };
-                controls_complete = controls.complete;
-                probe.coupled_controls = controls.controls;
-            }
             match crate::master::routing::exact_route_feasibility_with_budget(
                 &problem,
                 &probe,
@@ -200,40 +192,13 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
             {
                 continue;
             }
-            if !controls_complete {
-                return Err(
-                    "paired control domain is not proved invariant or objective-dominated; path enumeration is incomplete"
-                        .into(),
-                );
-            }
             // Never silently omit an exact-feasible path whose rounded forward
             // schedule cannot be reconstructed by the current scalar kernel.
-            let mut canonical = problem
+            let canonical = problem
                 .elementary_route(&probe.arcs)
                 .ok_or("Arithmetic: canonical resource replay")?;
-            let controlled_cost = if probe.coupled_controls.is_empty() {
-                None
-            } else {
-                let selection = oracle
-                    .network
-                    .graph
-                    .coupled_kernel()
-                    .ok_or("missing control kernel")?
-                    .replay_with_controls_using(
-                        &positions,
-                        &probe.coupled_controls,
-                        &mut work_left,
-                        Some(deadline),
-                    )
-                    .map_err(|e| e.to_string())?
-                    .ok_or("Arithmetic: controlled resource replay")?;
-                canonical.coupled_controls = std::mem::take(&mut probe.coupled_controls);
-                canonical.coupled_values = selection.paired_values;
-                Some(selection.cost)
-            };
             probe.resources = canonical.resources;
             probe.resource_profile = canonical.resource_profile;
-            probe.coupled_controls = canonical.coupled_controls;
             probe.coupled_values = canonical.coupled_values;
             let mut ids = probe.arcs.clone();
             ids.sort_unstable();
@@ -241,20 +206,17 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
                 .iter()
                 .map(|id| oracle.network.graph.arcs[oracle.index[id]].cost)
                 .sum::<f64>()
-                + match controlled_cost {
-                    Some(cost) => cost,
-                    None => probe
-                        .coupled_cost(
-                            &oracle.network.graph,
-                            &probe
-                                .arcs
-                                .iter()
-                                .map(|id| oracle.index[id])
-                                .collect::<Vec<_>>(),
-                        )
-                        .map_err(|e| e.to_string())?
-                        .ok_or("infeasible coupled path")?,
-                };
+                + probe
+                    .coupled_cost(
+                        &oracle.network.graph,
+                        &probe
+                            .arcs
+                            .iter()
+                            .map(|id| oracle.index[id])
+                            .collect::<Vec<_>>(),
+                    )
+                    .map_err(|e| e.to_string())?
+                    .ok_or("infeasible coupled path")?;
             probe.cost = probe.original_cost;
             if !probe.cost.is_finite() {
                 return Err("Arithmetic: route cost".into());
@@ -270,4 +232,123 @@ pub(super) fn collect_routes_with_plan<const D: usize>(
         return Err("TimeLimit".into());
     }
     Ok((routes, counts))
+}
+
+fn collect_paired_program_routes<const D: usize>(
+    oracle: &Oracle<D>,
+    graph: &Graph<D>,
+    cutoff: Option<&super::super::bounds::NetworkCutoff>,
+    max_paths: usize,
+    max_work: usize,
+    max_arcs: usize,
+    deadline: Instant,
+) -> std::result::Result<(Vec<Route>, usize, usize, usize), String> {
+    if max_work == 0 {
+        return Err("WorkLimit".into());
+    }
+    let mut solver = crate::pricing::Solver::<D>::new(graph.vertices.len(), graph.resources.len())
+        .map_err(|error| error.to_string())?;
+    solver.graph = graph.clone();
+    for arc in &mut solver.graph.arcs {
+        arc.reduced_cost = 0.;
+    }
+    solver.graph.suppress_coupled_costs();
+    solver.enumeration_preserve_arc_paths = true;
+    solver.controls.max_labels = max_work;
+    solver.controls.time_limit = deadline.saturating_duration_since(Instant::now());
+    solver
+        .options
+        .set("BALDESmaxNumOfLabelsInEnumeration", max_work as f64)
+        .map_err(|error| error.to_string())?;
+    solver
+        .options
+        .set("BALDESmaxNumOfEnumeratedSolutions", max_paths.max(1) as f64)
+        .map_err(|error| error.to_string())?;
+    let candidates = solver
+        .enumerate(f64::MAX)
+        .map_err(|error| error.to_string())?;
+    if Instant::now() >= deadline {
+        return Err("TimeLimit".into());
+    }
+    let candidate_count = candidates.len();
+    if candidate_count > max_paths {
+        return Err("PathLimit".into());
+    }
+    let enumeration = solver
+        .enumeration
+        .as_ref()
+        .ok_or("paired enumeration unavailable")?;
+    if !enumeration.completed {
+        return Err("paired enumeration incomplete".into());
+    }
+    let mut work = enumeration.generated;
+    let mut stored_arcs = 0usize;
+    let problem = crate::master::routing::RoutingContext::set_partitioning(graph.clone(), 1.)
+        .map_err(|error| error.to_string())?;
+    let mut routes = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        if Instant::now() >= deadline {
+            return Err("TimeLimit".into());
+        }
+        stored_arcs = stored_arcs
+            .checked_add(candidate.arcs.len())
+            .ok_or("StoredArcLimit")?;
+        if stored_arcs > max_arcs {
+            return Err("StoredArcLimit".into());
+        }
+        work = work
+            .checked_add(candidate.arcs.len().checked_add(1).ok_or("WorkLimit")?)
+            .ok_or("WorkLimit")?;
+        if work > max_work {
+            return Err("WorkLimit".into());
+        }
+        if let Some(super::super::bounds::NetworkCutoff::Cost {
+            arc_cost_lower_bounds,
+            arc_ceiling,
+            ..
+        }) = cutoff
+        {
+            let mut lower = Some(0.);
+            for id in &candidate.arcs {
+                let index = *oracle.index.get(id).ok_or("unknown enumeration arc")?;
+                let value = *arc_cost_lower_bounds
+                    .get(index)
+                    .ok_or("missing enumeration cost bound")?;
+                lower = lower.and_then(|sum| crate::core::rounding::add_down(sum, value));
+            }
+            if lower.is_some_and(|value| value > *arc_ceiling) {
+                continue;
+            }
+        }
+        if !oracle
+            .solver
+            .route_satisfies_relaxation(&candidate.nodes, &candidate.arcs)
+            .map_err(|error| error.to_string())?
+        {
+            continue;
+        }
+        let mut remaining = max_work - work;
+        match crate::master::routing::exact_route_feasibility_with_budget(
+            &problem,
+            &candidate,
+            &mut remaining,
+            deadline,
+        ) {
+            Some(false) => {
+                work = max_work - remaining;
+                continue;
+            }
+            Some(true) => {}
+            None => return Err("Arithmetic: paired front replay is unknown".into()),
+        }
+        work = max_work - remaining;
+        let route = problem
+            .elementary_route(&candidate.arcs)
+            .ok_or("Arithmetic: paired route reconstruction")?;
+        routes.push(route);
+    }
+    if Instant::now() >= deadline {
+        return Err("TimeLimit".into());
+    }
+    Ok((routes, candidate_count, work, stored_arcs))
 }

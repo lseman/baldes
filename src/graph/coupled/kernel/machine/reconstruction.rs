@@ -2,7 +2,7 @@
 use super::*;
 use descriptor::{
     FrontierBudget, FrontierOutcome, FrontierUnknown, MachineJoinedPathReconstruction,
-    MachinePathSnapshot, PreparedSlopeRelationArc,
+    MachinePathSnapshot, PairedFrontOperations,
 };
 use std::time::Instant;
 
@@ -19,53 +19,88 @@ impl<const D: usize> Graph<D> {
     ) -> FrontierOutcome<descriptor::MachineConcatenation> {
         let started = Instant::now();
         let Some(kernel) = self.coupled.as_ref() else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join has no coupled resources"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "machine join has no coupled resources",
+            ));
         };
-        if !matches!(kernel.definitions.get(resource), Some(CoupledResource::SlopePaired { .. }))
-            || kernel.check_state(forward).is_err() || kernel.check_state(backward).is_err()
-            || forward.suffix.is_some() || backward.suffix.is_none()
+        if !matches!(
+            kernel.definitions.get(resource),
+            Some(CoupledResource::PairedFront { .. })
+        ) || kernel.check_state(forward).is_err()
+            || kernel.check_state(backward).is_err()
+            || forward.suffix.is_some()
+            || backward.suffix.is_none()
         {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join resource or label direction"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "machine join resource or label direction",
+            ));
         }
-        let index = kernel.definitions[..resource].iter()
-            .filter(|definition| matches!(definition, CoupledResource::SlopePaired { .. })).count();
+        let index = kernel.definitions[..resource]
+            .iter()
+            .filter(|definition| matches!(definition, CoupledResource::PairedFront { .. }))
+            .count();
         let Some(history) = forward.slope_relations[index].machine_history.as_ref() else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join forward history unavailable"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "machine join forward history unavailable",
+            ));
         };
-        let Some(backward_history) = backward.slope_relations[index].machine_history.as_ref() else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join backward history unavailable"));
+        let Some(backward_history) = backward.slope_relations[index].machine_history.as_ref()
+        else {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "machine join backward history unavailable",
+            ));
         };
         let suffix = &backward.suffix.as_ref().unwrap().program;
         if backward_history.len().checked_sub(1) != Some(suffix.len()) {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join backward history shape"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "machine join backward history shape",
+            ));
         }
-        let validation = resource.saturating_add(kernel.definitions.len().saturating_mul(2))
+        let validation = resource
+            .saturating_add(kernel.definitions.len().saturating_mul(2))
             .saturating_add(history.len().saturating_mul(2))
             .saturating_add(backward_history.len().saturating_mul(2))
-            .saturating_add(suffix.len()).saturating_add(arcs.len());
+            .saturating_add(suffix.len())
+            .saturating_add(arcs.len());
         let Some(work) = budget.max_operations.checked_sub(validation) else {
             return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
         };
-        let remaining = budget.max_elapsed.map(|limit| limit.saturating_sub(started.elapsed()));
+        let remaining = budget
+            .max_elapsed
+            .map(|limit| limit.saturating_sub(started.elapsed()));
         if remaining.is_some_and(|time| time.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
         let snapshots = match history.snapshots(FrontierBudget {
-            max_operations: history.len(), max_elapsed: remaining, ..budget
+            max_operations: history.len(),
+            max_elapsed: remaining,
+            ..budget
         }) {
             FrontierOutcome::Complete(snapshots) => snapshots,
-            FrontierOutcome::Empty => return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join forward history empty")),
+            FrontierOutcome::Empty => {
+                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                    "machine join forward history empty",
+                ))
+            }
             FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
         };
-        let remaining = budget.max_elapsed.map(|limit| limit.saturating_sub(started.elapsed()));
+        let remaining = budget
+            .max_elapsed
+            .map(|limit| limit.saturating_sub(started.elapsed()));
         if remaining.is_some_and(|time| time.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
         let backward_snapshots = match backward_history.snapshots(FrontierBudget {
-            max_operations: backward_history.len(), max_elapsed: remaining, ..budget
+            max_operations: backward_history.len(),
+            max_elapsed: remaining,
+            ..budget
         }) {
             FrontierOutcome::Complete(snapshots) => snapshots,
-            FrontierOutcome::Empty => return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join backward history empty")),
+            FrontierOutcome::Empty => {
+                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                    "machine join backward history empty",
+                ))
+            }
             FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
         };
         if !matches!(snapshots.first(), Some(MachinePathSnapshot::Root(_)))
@@ -79,21 +114,34 @@ impl<const D: usize> Graph<D> {
         let mut path = Vec::with_capacity(arcs.len());
         for snapshot in snapshots.iter().skip(1) {
             let MachinePathSnapshot::Forward { arc, .. } = snapshot else {
-                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join forward history direction"));
+                return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                    "machine join forward history direction",
+                ));
             };
             path.push(*arc);
         }
         path.extend(suffix.iter());
         if path != arcs {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine join path does not match retained route"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "machine join path does not match retained route",
+            ));
         }
-        let remaining = budget.max_elapsed.map(|limit| limit.saturating_sub(started.elapsed()));
+        let remaining = budget
+            .max_elapsed
+            .map(|limit| limit.saturating_sub(started.elapsed()));
         if remaining.is_some_and(|time| time.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
-        kernel.paired_machine_resource_join(resource, forward, backward, FrontierBudget {
-            max_operations: work, max_elapsed: remaining, ..budget
-        })
+        kernel.paired_machine_resource_join(
+            resource,
+            forward,
+            backward,
+            FrontierBudget {
+                max_operations: work,
+                max_elapsed: remaining,
+                ..budget
+            },
+        )
     }
 
     /// Select and reconstruct a joined pair of retained machine labels.
@@ -119,7 +167,14 @@ impl<const D: usize> Graph<D> {
         debug_level: i32,
         budget: FrontierBudget,
     ) -> FrontierOutcome<MachineJoinedPathReconstruction> {
-        self.reconstruct_paired_machine_join_checked(resource, forward, backward, None, debug_level, budget)
+        self.reconstruct_paired_machine_join_checked(
+            resource,
+            forward,
+            backward,
+            None,
+            debug_level,
+            budget,
+        )
     }
 
     pub(crate) fn reconstruct_paired_machine_join_for_path(
@@ -131,7 +186,14 @@ impl<const D: usize> Graph<D> {
         debug_level: i32,
         budget: FrontierBudget,
     ) -> FrontierOutcome<MachineJoinedPathReconstruction> {
-        self.reconstruct_paired_machine_join_checked(resource, forward, backward, Some(arcs), debug_level, budget)
+        self.reconstruct_paired_machine_join_checked(
+            resource,
+            forward,
+            backward,
+            Some(arcs),
+            debug_level,
+            budget,
+        )
     }
 
     fn reconstruct_paired_machine_join_checked(
@@ -170,7 +232,7 @@ impl<const D: usize> Graph<D> {
                     .ok_or(FrontierUnknown::WorkLimit)?;
                 if !matches!(
                     kernel.definitions.get(resource),
-                    Some(CoupledResource::SlopePaired { .. })
+                    Some(CoupledResource::PairedFront { .. })
                 ) || kernel.check_state(forward).is_err()
                     || kernel.check_state(backward).is_err()
                     || forward.suffix.is_some()
@@ -187,7 +249,7 @@ impl<const D: usize> Graph<D> {
                     ))?;
                 let index = kernel.definitions[..resource]
                     .iter()
-                    .filter(|definition| matches!(definition, CoupledResource::SlopePaired { .. }))
+                    .filter(|definition| matches!(definition, CoupledResource::PairedFront { .. }))
                     .count();
                 let prepared = &kernel.slope_paired[index];
                 let forward = forward.slope_relations[index]
@@ -232,7 +294,8 @@ impl<const D: usize> Graph<D> {
                     .ok_or(FrontierUnknown::Unsupported(
                         "machine join topology unavailable",
                     ))?;
-                if self.source != topology.source
+                if !prepared.machine_topology_matches(self)
+                    || self.source != topology.source
                     || self.sink != topology.sink
                     || self.source >= self.vertices.len()
                     || self.sink >= self.vertices.len()
@@ -307,14 +370,19 @@ impl<const D: usize> Graph<D> {
                     ));
                 }
                 if expected_arcs.is_some_and(|arcs| {
-                    !arcs.iter().copied().eq(inverses.iter().map(|(arc, _)| *arc).chain(steps.iter().map(|(arc, _)| *arc)))
+                    !arcs.iter().copied().eq(inverses
+                        .iter()
+                        .map(|(arc, _)| *arc)
+                        .chain(steps.iter().map(|(arc, _)| *arc)))
                 }) {
-                    return Err(FrontierUnknown::Unsupported("machine join path does not match retained route"));
+                    return Err(FrontierUnknown::Unsupported(
+                        "machine join path does not match retained route",
+                    ));
                 }
-                let waiting_rates = prepared.machine_waiting_rates().map(|rates| {
-                    steps.iter().map(|(arc, _)| rates[*arc]).collect::<Vec<_>>()
-                });
-                let result = PreparedSlopeRelationArc::machine_reconstruct_joined_path_with_debug(
+                let waiting_rates = prepared
+                    .machine_waiting_rates()
+                    .map(|rates| steps.iter().map(|(arc, _)| rates[*arc]).collect::<Vec<_>>());
+                let result = PairedFrontOperations::machine_reconstruct_joined_path_with_debug(
                     forward,
                     backward,
                     &inverses,

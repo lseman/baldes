@@ -47,7 +47,8 @@ impl<const D: usize> LabelingEngine<D> {
         self.last_costs
             .extend(g.arcs.iter().map(|a| a.reduced_cost));
         self.last_original_costs.clear();
-        self.last_original_costs.extend(g.arcs.iter().map(|a| a.cost));
+        self.last_original_costs
+            .extend(g.arcs.iter().map(|a| a.cost));
         self.forward
             .reset(self.grid.forward.buckets.iter().map(Vec::len));
         self.backward
@@ -132,7 +133,10 @@ impl<const D: usize> LabelingEngine<D> {
                 // Crossing labels share a traversal stack; each traversal resets
                 // its contents while retaining capacity from the previous label.
                 let mut work = Vec::new();
-                let knapsack_lower = self.cuts.knapsack.global_cost_lower_bound()
+                let knapsack_lower = self
+                    .cuts
+                    .knapsack
+                    .global_cost_lower_bound()
                     .unwrap_or(f64::NEG_INFINITY);
                 for internal in 0..self.grid.order.len() {
                     let v = self.grid.order[internal];
@@ -147,10 +151,10 @@ impl<const D: usize> LabelingEngine<D> {
                                     - coordinate[r];
                             }
                         }
-                        let Some(bucket) =
-                            self.grid
-                                .bucket_id_checked(self.consumption_joins, internal, coordinate)
-                                .map_err(|()| incomplete("pricing bucket index overflow"))?
+                        let Some(bucket) = self
+                            .grid
+                            .bucket_id_checked(self.consumption_joins, internal, coordinate)
+                            .map_err(|()| incomplete("pricing bucket index overflow"))?
                         else {
                             continue;
                         };
@@ -168,10 +172,7 @@ impl<const D: usize> LabelingEngine<D> {
                         work.push((bucket, 0usize));
                         while let Some((k, min)) = work.pop() {
                             let row = &self.storage(self.consumption_joins).buckets[internal][k];
-                            if self.ctx().completion_sum(
-                                key,
-                                row.completion_bound(false),
-                            ) >= cutoff
+                            if self.ctx().completion_sum(key, row.completion_bound(false)) >= cutoff
                             {
                                 continue;
                             }

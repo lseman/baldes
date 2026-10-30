@@ -397,3 +397,40 @@ fn machine_checker_rejects_invalid_topology_overflow_and_exhausted_proofs() {
         .is_none());
     assert_eq!(remaining, 100);
 }
+
+// Test-only exact division oracle retained for the independent rounding corpus.
+fn ieee_divide(a: f64, b: f64) -> Option<f64> {
+    let a = decode(a)?;
+    let b = decode(b)?;
+    if b.significand == 0 {
+        return None;
+    }
+    let negative = a.negative ^ b.negative;
+    if a.significand == 0 {
+        return Some(f64::from_bits(if negative { SIGN } else { 0 }));
+    }
+    let numerator = u128::from(a.significand);
+    let denominator = u128::from(b.significand);
+    let mut logarithm =
+        (64 - a.significand.leading_zeros()) as i32 - (64 - b.significand.leading_zeros()) as i32;
+    let below = if logarithm >= 0 {
+        numerator < denominator << logarithm as u32
+    } else {
+        (numerator << (-logarithm) as u32) < denominator
+    };
+    if below {
+        logarithm -= 1;
+    }
+    //55 normalized quotient bits:53 retained bits and two rounding guards.
+    // At most108 numerator bits are needed, including subnormal operands.
+    let shift = (54 - logarithm) as u32;
+    let scaled = numerator.checked_shl(shift)?;
+    let quotient = scaled / denominator;
+    let remainder = scaled % denominator;
+    pack(
+        negative,
+        quotient,
+        a.exponent - b.exponent - shift as i32,
+        remainder != 0,
+    )
+}

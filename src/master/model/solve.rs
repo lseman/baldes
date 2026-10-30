@@ -459,6 +459,11 @@ pub(super) fn run<const D: usize>(
     {
         result.status = cg::Status::Stalled;
     }
+    if result.status == cg::Status::Stalled
+        && state.borrow().has_unpriced_paired_terms(&master.duals())
+    {
+        eprintln!("BALDES warning: paired pricing retains the unit resource objective; the associated owner objective or active row dual differs. The restricted master value is available, but raw pricing cannot certify this owner optimum (status Stalled).");
+    }
     if result.feasibility.iter().any(|r| r.certified_infeasible) {
         state.borrow_mut().phase_one_infeasible = true;
     }

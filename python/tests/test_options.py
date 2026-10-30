@@ -5,7 +5,10 @@ from pybaldes import Solver
 
 def test_option_discovery_is_supported_canonical_and_feature_specific():
     names = Solver.option_names()
-    assert len(names) in (41, 43)
+    assert {
+        "BALDESlabelDominanceStrategy", "BALDESuseBidirectionalSearch",
+        "BALDESnumberOfBucketsPerVertex",
+    }.issubset(names)
     assert len(names) == len(set(names))
     assert all(name.startswith("BALDES") for name in names)
     assert all(Solver.option_support(name)[0] for name in names)
@@ -19,11 +22,11 @@ def test_option_discovery_is_supported_canonical_and_feature_specific():
 
 def test_legacy_inputs_share_values_and_validation_with_canonical_names():
     solver = Solver(2, 0)
-    solver.set_option("RCSPlabelDominanceStrategy", 1)
-    assert solver.get_option("BALDESlabelDominanceStrategy") == 1
-    with pytest.raises(RuntimeError, match="unsupported label dominance strategy"):
-        solver.set_option("RCSPlabelDominanceStrategy", 2)
-    assert solver.get_option("BALDESlabelDominanceStrategy") == 1
+    solver.set_option("RCSPlabelDominanceStrategy", 2)
+    assert solver.get_option("BALDESlabelDominanceStrategy") == 2
+    with pytest.raises(RuntimeError, match="partial dominance"):
+        solver.set_option("RCSPlabelDominanceStrategy", 1)
+    assert solver.get_option("BALDESlabelDominanceStrategy") == 2
     solver.set_option("BALDESlabelDominanceStrategy", 0)
     assert solver.get_option("RCSPlabelDominanceStrategy") == 0
 

@@ -5,17 +5,8 @@ use descriptor::{FrontierBudget, FrontierOutcome, SlopeFront};
 #[derive(Clone, Debug)]
 pub(super) struct SlopeLabel {
     pub(super) front: Option<SlopeFront>,
-    /// Negated upper envelope for paired raw-slope relations. Its minimum is
-    /// the negative of the largest attainable dependent value.
     pub(super) upper_negative: Option<SlopeFront>,
     pub(super) minimum: f64,
-    pub(super) upper: Option<relation::RelationFront>,
-    /// Exact bounded paired suffix transfer, independent of the forward raw
-    /// frontier. Interval-cost labels never install this cache.
-    pub(super) bounded_cost: Option<Box<relation::BoundedCostFront>>,
-    /// General raw adjoint for backward diagnostics and future certified
-    /// consumers. It cannot replace ordered source/machine replay at a join.
-    pub(super) raw_upper: Option<std::sync::Arc<slope_paired::RawAdjoint>>,
     /// Explicit machine-program path state; never a source feasibility proof.
     pub(super) machine_history: Option<std::sync::Arc<descriptor::MachinePathHistory>>,
 }
@@ -26,14 +17,7 @@ impl PartialEq for SlopeLabel {
             (Some(a), Some(b)) if std::sync::Arc::ptr_eq(a, b) => {}
             _ => return false,
         }
-        if self.minimum.to_bits() != other.minimum.to_bits()
-            || (self.bounded_cost.is_none()
-                && other.bounded_cost.is_none()
-                && self.raw_upper.as_ref().map(|a| a.depth)
-                    != other.raw_upper.as_ref().map(|b| b.depth))
-            || self.upper != other.upper
-            || self.bounded_cost != other.bounded_cost
-        {
+        if self.minimum.to_bits() != other.minimum.to_bits() {
             return false;
         }
         fronts_equal(self.front.as_ref(), other.front.as_ref())
@@ -189,9 +173,6 @@ impl SlopeLabel {
             front: forward.then(|| front.clone()),
             upper_negative: None,
             minimum: 0.,
-            upper: None,
-            bounded_cost: None,
-            raw_upper: None,
             machine_history: None,
         }
     }
@@ -241,9 +222,6 @@ impl SlopeLabel {
             front: Some(front),
             upper_negative: None,
             minimum: finite(witness.value)?,
-            upper: None,
-            bounded_cost: None,
-            raw_upper: None,
             machine_history: None,
         }))
     }

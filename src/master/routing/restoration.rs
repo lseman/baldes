@@ -66,7 +66,7 @@ pub(super) fn columns<const D: usize>(
             .iter()
             .map(|&a| graph.arcs[a].id)
             .collect::<Vec<_>>();
-        let Some(route) = problem.elementary_route(&ids) else {
+        let Some(route) = problem.elementary_route_checked(&ids)? else {
             continue;
         };
         if !route.cost.is_finite()

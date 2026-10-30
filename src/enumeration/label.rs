@@ -154,9 +154,23 @@ impl<const D: usize> Label<D> {
 
     /// Enumeration bucket key, ((0.5 potential + additional) + reduced) + 0.
     pub fn key(&self) -> f64 {
+        if let Some(key) = self
+            .coupled_state
+            .as_deref()
+            .and_then(|state| state.paired_completion_key(0., self.cut_cost))
+        {
+            return key;
+        }
         ((0.0 + self.cut_cost) + self.reduced_cost) + 0.0
     }
     pub fn key_with(&self, potential: f64) -> f64 {
+        if let Some(key) = self
+            .coupled_state
+            .as_deref()
+            .and_then(|state| state.paired_completion_key(0.5 * potential, self.cut_cost))
+        {
+            return key;
+        }
         ((0.5 * potential + self.cut_cost) + self.reduced_cost) + 0.0
     }
     /// Test vertex elementarity without adding it to the completion projection.

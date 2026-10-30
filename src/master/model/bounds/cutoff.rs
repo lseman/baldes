@@ -58,26 +58,25 @@ pub(in crate::master::model) fn cutoff_plan<const D: usize>(
             .checked_mul(graph.arcs.len())?
             .checked_mul(3)?;
         *work = work.checked_sub(scans.checked_add(graph.vertices.len())?)?;
-        let (minimum, joint) =
-            if !oracle.activity_rows.is_empty() || super::super::control_pricing::needed(oracle) {
-                let weights = additive_arc_cost_lower_bounds(oracle, state.shared_offset, duals)?;
-                match columns::cutoff_minimum(
-                    oracle,
-                    state.shared_offset,
-                    duals,
-                    &weights,
-                    work,
-                    deadline,
-                )? {
-                    Some(bounds) => (Some(bounds.reduced), Some((weights, bounds.remainder))),
-                    None => (None, None),
-                }
-            } else {
-                (
-                    network_minimum(oracle, state.shared_offset, duals, work, deadline)?,
-                    None,
-                )
-            };
+        let (minimum, joint) = if !oracle.activity_rows.is_empty() {
+            let weights = additive_arc_cost_lower_bounds(oracle, state.shared_offset, duals)?;
+            match columns::cutoff_minimum(
+                oracle,
+                state.shared_offset,
+                duals,
+                &weights,
+                work,
+                deadline,
+            )? {
+                Some(bounds) => (Some(bounds.reduced), Some((weights, bounds.remainder))),
+                None => (None, None),
+            }
+        } else {
+            (
+                network_minimum(oracle, state.shared_offset, duals, work, deadline)?,
+                None,
+            )
+        };
         joint_bounds.push(joint);
         if minimum.is_none() && oracle.network.multiplicity.lower > 0. {
             return None;

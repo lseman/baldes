@@ -74,7 +74,12 @@ impl PathStorage {
             Arc::make_mut(&mut self.path_order)
                 .insert(Arc::from(path.arcs.as_slice()), self.next_path);
             self.next_path += 1;
-            self.record_export_path(export_partition, Arc::from(path.arcs.as_slice()), path.original_cost, &[]);
+            self.record_export_path(
+                export_partition,
+                Arc::from(path.arcs.as_slice()),
+                path.original_cost,
+                &[],
+            );
             self.partitions[partition].push(path);
             self.len += 1;
             return true;
@@ -83,8 +88,12 @@ impl PathStorage {
         // Dominance storage can coalesce several native export partitions.
         // Only candidates in this path's export partition may stop the native
         // cost scan or reject an equivalent candidate.
-        let equivalent: Vec<&[usize]> = row.iter()
-            .filter(|previous| previous.visited == path.visited)
+        let equivalent: Vec<&[usize]> = row
+            .iter()
+            .filter(|previous| {
+                previous.element_hash % EXPORT_PARTITIONS == export_partition
+                    && previous.visited == path.visited
+            })
             .map(|previous| previous.arcs.as_slice())
             .collect();
         for (arcs, cost) in &self.export_rows[self.export_ranks[&export_partition]] {
@@ -111,7 +120,7 @@ impl PathStorage {
             let current = index;
             index += 1;
             self.checks += 1;
-            if p.visited == path.visited {
+            if p.element_hash % EXPORT_PARTITIONS == export_partition && p.visited == path.visited {
                 if current < at {
                     removed_before += 1;
                 }
@@ -135,7 +144,13 @@ impl PathStorage {
         self.len += 1;
         true
     }
-    fn record_export_path(&mut self, partition: u32, arcs: Arc<[usize]>, cost: f64, removed: &[(u32, Vec<usize>)]) {
+    fn record_export_path(
+        &mut self,
+        partition: u32,
+        arcs: Arc<[usize]>,
+        cost: f64,
+        removed: &[(u32, Vec<usize>)],
+    ) {
         let rank = self.export_ranks[&partition];
         let rows = Arc::make_mut(&mut self.export_rows);
         for (old_partition, old_arcs) in removed {
@@ -146,20 +161,32 @@ impl PathStorage {
             }
         }
         let row = &mut rows[rank];
-        let at = row.iter()
+        let at = row
+            .iter()
             .position(|(_, previous)| *previous > cost + EPSILON)
             .unwrap_or(row.len());
-        let removed_before = row[..at].iter()
-            .filter(|(arcs, _)| removed.iter().any(|(_, old)| old.as_slice() == arcs.as_ref()))
+        let removed_before = row[..at]
+            .iter()
+            .filter(|(arcs, _)| {
+                removed
+                    .iter()
+                    .any(|(_, old)| old.as_slice() == arcs.as_ref())
+            })
             .count();
-        row.retain(|(arcs, _)| !removed.iter().any(|(_, old)| old.as_slice() == arcs.as_ref()));
+        row.retain(|(arcs, _)| {
+            !removed
+                .iter()
+                .any(|(_, old)| old.as_slice() == arcs.as_ref())
+        });
         row.insert(at - removed_before, (arcs, cost));
     }
     /// Raw machine resource contribution retained for this path, indexed by
     /// physical arc-vector indices, when its join carried installed machine
     /// state. This is not a source-objective or feasibility certificate.
     pub fn machine_contribution(&self, arcs: &[usize]) -> Option<f64> {
-        self.machine_contributions.get(arcs).and_then(|join| join.contribution)
+        self.machine_contributions
+            .get(arcs)
+            .and_then(|join| join.contribution)
     }
 
     /// Return raw retained resource scalars in enumeration export order.
@@ -168,7 +195,9 @@ impl PathStorage {
         &self,
         g: &Graph<D>,
     ) -> Result<Option<Vec<(Vec<usize>, f64)>>> {
-        let Some(kernel) = g.coupled_kernel() else { return Ok(None); };
+        let Some(kernel) = g.coupled_kernel() else {
+            return Ok(None);
+        };
         kernel.validate_for(g)?;
         if !kernel.has_complete_machine_inspection_contribution() {
             return Ok(None);
@@ -176,12 +205,21 @@ impl PathStorage {
         if self.len == 0 {
             return Ok(Some(Vec::new()));
         }
-        if !self.machine_identity.as_ref().is_some_and(|identity| Arc::ptr_eq(identity, kernel.machine_identity())) {
+        if !self
+            .machine_identity
+            .as_ref()
+            .is_some_and(|identity| Arc::ptr_eq(identity, kernel.machine_identity()))
+        {
             return Ok(None);
         }
-        Ok(self.ordered_paths().into_iter().map(|path| {
-            self.machine_contribution(&path.arcs).map(|value| (path.arcs.clone(), value))
-        }).collect())
+        Ok(self
+            .ordered_paths()
+            .into_iter()
+            .map(|path| {
+                self.machine_contribution(&path.arcs)
+                    .map(|value| (path.arcs.clone(), value))
+            })
+            .collect())
     }
 
     /// Return one retained paired-resource machine selection without running
@@ -192,14 +230,22 @@ impl PathStorage {
         arcs: &[usize],
         resource: Option<usize>,
         budget: crate::graph::coupled::descriptor::FrontierBudget,
-    ) -> crate::graph::coupled::descriptor::FrontierOutcome<crate::graph::coupled::descriptor::MachineConcatenation> {
+    ) -> crate::graph::coupled::descriptor::FrontierOutcome<
+        crate::graph::coupled::descriptor::MachineConcatenation,
+    > {
         use crate::graph::coupled::descriptor::{FrontierBudget, FrontierOutcome, FrontierUnknown};
         let started = std::time::Instant::now();
         let Some(kernel) = g.coupled_kernel() else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired front program unavailable"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired front program unavailable",
+            ));
         };
-        let validation = g.arcs.len().saturating_add(g.vertices.len())
-            .saturating_add(kernel.definitions().len()).saturating_add(arcs.len());
+        let validation = g
+            .arcs
+            .len()
+            .saturating_add(g.vertices.len())
+            .saturating_add(kernel.definitions().len())
+            .saturating_add(arcs.len());
         let Some(remaining_work) = budget.max_operations.checked_sub(validation) else {
             return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
         };
@@ -207,26 +253,46 @@ impl PathStorage {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
         if kernel.validate_for(g).is_err() {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired front program graph changed"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired front program graph changed",
+            ));
         }
-        if !self.machine_identity.as_ref().is_some_and(|identity| Arc::ptr_eq(identity, kernel.machine_identity())) {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired retained join is stale"));
+        if !self
+            .machine_identity
+            .as_ref()
+            .is_some_and(|identity| Arc::ptr_eq(identity, kernel.machine_identity()))
+        {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired retained join is stale",
+            ));
         }
         let Some(join) = self.machine_contributions.get(arcs) else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired retained join unavailable"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired retained join unavailable",
+            ));
         };
         let Some(resource) = resource.or(join.paired_resource) else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired retained resource unavailable"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired retained resource unavailable",
+            ));
         };
-        let remaining_time = budget.max_elapsed.map(|limit| limit.saturating_sub(started.elapsed()));
+        let remaining_time = budget
+            .max_elapsed
+            .map(|limit| limit.saturating_sub(started.elapsed()));
         if remaining_time.is_some_and(|time| time.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
-        g.paired_machine_selection_for_path(resource, &join.forward, &join.backward, arcs, FrontierBudget {
-            max_operations: remaining_work,
-            max_elapsed: remaining_time,
-            ..budget
-        })
+        g.paired_machine_selection_for_path(
+            resource,
+            &join.forward,
+            &join.backward,
+            arcs,
+            FrontierBudget {
+                max_operations: remaining_work,
+                max_elapsed: remaining_time,
+                ..budget
+            },
+        )
     }
 
     /// Reconstruct the raw paired machine choices retained with an enumerated
@@ -236,7 +302,9 @@ impl PathStorage {
         g: &Graph<D>,
         arcs: &[usize],
         budget: crate::graph::coupled::descriptor::FrontierBudget,
-    ) -> crate::graph::coupled::descriptor::FrontierOutcome<crate::graph::coupled::descriptor::MachineJoinedPathReconstruction> {
+    ) -> crate::graph::coupled::descriptor::FrontierOutcome<
+        crate::graph::coupled::descriptor::MachineJoinedPathReconstruction,
+    > {
         self.reconstruct_front_program_path_with_debug(g, arcs, 0, budget)
     }
 
@@ -247,7 +315,9 @@ impl PathStorage {
         arcs: &[usize],
         debug_level: i32,
         budget: crate::graph::coupled::descriptor::FrontierBudget,
-    ) -> crate::graph::coupled::descriptor::FrontierOutcome<crate::graph::coupled::descriptor::MachineJoinedPathReconstruction> {
+    ) -> crate::graph::coupled::descriptor::FrontierOutcome<
+        crate::graph::coupled::descriptor::MachineJoinedPathReconstruction,
+    > {
         self.reconstruct_front_program_resource_with_debug(g, arcs, None, debug_level, budget)
     }
 
@@ -259,127 +329,133 @@ impl PathStorage {
         resource: Option<usize>,
         debug_level: i32,
         budget: crate::graph::coupled::descriptor::FrontierBudget,
-    ) -> crate::graph::coupled::descriptor::FrontierOutcome<crate::graph::coupled::descriptor::MachineJoinedPathReconstruction> {
+    ) -> crate::graph::coupled::descriptor::FrontierOutcome<
+        crate::graph::coupled::descriptor::MachineJoinedPathReconstruction,
+    > {
         use crate::graph::coupled::descriptor::{FrontierOutcome, FrontierUnknown};
         let started = std::time::Instant::now();
         if budget.max_elapsed.is_some_and(|limit| limit.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
         let Some(kernel) = g.coupled_kernel() else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired front program unavailable"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired front program unavailable",
+            ));
         };
-        let validation = g.arcs.len().saturating_add(g.vertices.len())
-            .saturating_add(kernel.definitions().len()).saturating_add(arcs.len());
+        let validation = g
+            .arcs
+            .len()
+            .saturating_add(g.vertices.len())
+            .saturating_add(kernel.definitions().len())
+            .saturating_add(arcs.len());
         let Some(remaining_work) = budget.max_operations.checked_sub(validation) else {
             return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
         };
         if kernel.validate_for(g).is_err() {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired front program graph changed"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired front program graph changed",
+            ));
         }
-        if !self.machine_identity.as_ref().is_some_and(|identity| Arc::ptr_eq(identity, kernel.machine_identity())) {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired retained join is stale"));
+        if !self
+            .machine_identity
+            .as_ref()
+            .is_some_and(|identity| Arc::ptr_eq(identity, kernel.machine_identity()))
+        {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired retained join is stale",
+            ));
         }
         let Some(join) = self.machine_contributions.get(arcs) else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired retained join unavailable"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired retained join unavailable",
+            ));
         };
         let Some(resource) = resource.or(join.paired_resource) else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired retained resource unavailable"));
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "paired retained resource unavailable",
+            ));
         };
-        let remaining_time = budget.max_elapsed.map(|limit| limit.saturating_sub(started.elapsed()));
+        let remaining_time = budget
+            .max_elapsed
+            .map(|limit| limit.saturating_sub(started.elapsed()));
         if remaining_time.is_some_and(|time| time.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
-        g.reconstruct_paired_machine_join_for_path(resource, &join.forward, &join.backward, arcs, debug_level, crate::graph::coupled::descriptor::FrontierBudget {
-            max_operations: remaining_work,
-            max_elapsed: remaining_time,
-            ..budget
-        })
-    }
-
-    /// Recover a retained machine trajectory and independently certify its
-    /// paired source control and exact terminal dependent value. This proves
-    /// the selected control only; it does not establish optimality or certify
-    /// other resource families.
-    pub fn certify_reconstructed_paired_control<const D: usize>(
-        &self,
-        g: &Graph<D>,
-        arcs: &[usize],
-        resource: Option<usize>,
-        budget: crate::graph::coupled::descriptor::FrontierBudget,
-    ) -> crate::graph::coupled::descriptor::FrontierOutcome<(crate::graph::coupled::PairedControl, f64)> {
-        use crate::graph::coupled::descriptor::{FrontierOutcome, FrontierUnknown};
-        let started = std::time::Instant::now();
-        let Some(join) = self.machine_contributions.get(arcs) else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired retained join unavailable"));
-        };
-        let Some(resource) = resource.or(join.paired_resource) else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired retained resource unavailable"));
-        };
-        let reconstruction_work = budget.max_operations / 2;
-        let reconstructed = match self.reconstruct_front_program_resource_with_debug(
-            g, arcs, Some(resource), 0,
+        g.reconstruct_paired_machine_join_for_path(
+            resource,
+            &join.forward,
+            &join.backward,
+            arcs,
+            debug_level,
             crate::graph::coupled::descriptor::FrontierBudget {
-                max_operations: reconstruction_work,
+                max_operations: remaining_work,
+                max_elapsed: remaining_time,
                 ..budget
             },
-        ) {
-            FrontierOutcome::Complete(path) => path,
-            FrontierOutcome::Empty => return FrontierOutcome::Empty,
-            FrontierOutcome::Unknown(reason) => return FrontierOutcome::Unknown(reason),
-        };
-        let Some(&recorded) = reconstructed.path.dependent.last() else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired recorded dependent unavailable"));
-        };
-        let control = crate::graph::coupled::PairedControl {
-            resource,
-            base: reconstructed.path.base,
-        };
-        let Some(kernel) = g.coupled_kernel() else {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired source resource unavailable"));
-        };
-        let mut work = budget.max_operations - reconstruction_work;
-        let deadline = budget.max_elapsed.and_then(|limit| started.checked_add(limit));
-        if deadline.is_some_and(|end| std::time::Instant::now() >= end) {
-            return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
-        }
-        match kernel.certify_paired_control(arcs, &control, &mut work, deadline) {
-            Ok(Some(certificate)) if certificate.certifies_value(recorded) => {
-                FrontierOutcome::Complete((control, recorded))
-            }
-            Ok(Some(certificate)) if !certificate.feasible => FrontierOutcome::Empty,
-            Ok(_) => FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired source control is not exactly certified")),
-            Err(_) => FrontierOutcome::Unknown(FrontierUnknown::Unsupported("paired source control is invalid")),
-        }
+        )
     }
 
     /// Record a retained custom-resource path using its saved label states.
     /// The result is raw machine output, not a source-model cost certificate.
-    pub fn record_custom_machine_path<const D: usize>(&self, g: &Graph<D>, arcs: &[usize]) -> Result<Option<f64>> {
-        let Some(kernel) = g.coupled_kernel() else { return Ok(None); };
+    pub fn record_custom_machine_path<const D: usize>(
+        &self,
+        g: &Graph<D>,
+        arcs: &[usize],
+    ) -> Result<Option<f64>> {
+        let Some(kernel) = g.coupled_kernel() else {
+            return Ok(None);
+        };
         kernel.validate_for(g)?;
-        if !kernel.has_single_custom_machine_resource() { return Ok(None); }
-        if !self.machine_identity.as_ref().is_some_and(|identity| Arc::ptr_eq(identity, kernel.machine_identity())) {
+        if !kernel.has_single_custom_machine_resource() {
             return Ok(None);
         }
-        let Some(join) = self.machine_contributions.get(arcs) else { return Ok(None); };
+        if !self
+            .machine_identity
+            .as_ref()
+            .is_some_and(|identity| Arc::ptr_eq(identity, kernel.machine_identity()))
+        {
+            return Ok(None);
+        }
+        let Some(join) = self.machine_contributions.get(arcs) else {
+            return Ok(None);
+        };
         kernel.record_custom_machine_path(arcs, &join.forward, &join.backward)
     }
 
     /// Record a selected custom resource using the retained coupled labels.
-    pub fn record_custom_machine_resource_path<const D: usize>(&self, g: &Graph<D>, arcs: &[usize], resource: usize) -> Result<Option<f64>> {
-        let Some(kernel) = g.coupled_kernel() else { return Ok(None); };
+    pub fn record_custom_machine_resource_path<const D: usize>(
+        &self,
+        g: &Graph<D>,
+        arcs: &[usize],
+        resource: usize,
+    ) -> Result<Option<f64>> {
+        let Some(kernel) = g.coupled_kernel() else {
+            return Ok(None);
+        };
         kernel.validate_for(g)?;
-        if !self.machine_identity.as_ref().is_some_and(|identity| Arc::ptr_eq(identity, kernel.machine_identity())) {
+        if !self
+            .machine_identity
+            .as_ref()
+            .is_some_and(|identity| Arc::ptr_eq(identity, kernel.machine_identity()))
+        {
             return Ok(None);
         }
-        let Some(join) = self.machine_contributions.get(arcs) else { return Ok(None); };
+        let Some(join) = self.machine_contributions.get(arcs) else {
+            return Ok(None);
+        };
         kernel.record_custom_machine_resource_path(resource, arcs, &join.forward, &join.backward)
     }
 
     pub(super) fn insert_with_machine_contribution(
         &mut self,
         path: Path,
-        contribution: Option<(Arc<()>, Option<f64>, Option<usize>, Box<crate::graph::coupled::CoupledLabelState>, Box<crate::graph::coupled::CoupledLabelState>)>,
+        contribution: Option<(
+            Arc<()>,
+            Option<f64>,
+            Option<usize>,
+            Box<crate::graph::coupled::CoupledLabelState>,
+            Box<crate::graph::coupled::CoupledLabelState>,
+        )>,
     ) -> bool {
         let key = contribution
             .as_ref()
@@ -387,7 +463,9 @@ impl PathStorage {
         if !self.insert(path) {
             return false;
         }
-        if let (Some(key), Some((identity, value, paired_resource, forward, backward))) = (key, contribution) {
+        if let (Some(key), Some((identity, value, paired_resource, forward, backward))) =
+            (key, contribution)
+        {
             if self.machine_contributions.is_empty() {
                 self.machine_identity = Some(identity.clone());
             }
@@ -396,7 +474,15 @@ impl PathStorage {
                 .as_ref()
                 .is_some_and(|current| Arc::ptr_eq(current, &identity))
             {
-                Arc::make_mut(&mut self.machine_contributions).insert(key, MachineRetainedJoin { contribution: value, paired_resource, forward, backward });
+                Arc::make_mut(&mut self.machine_contributions).insert(
+                    key,
+                    MachineRetainedJoin {
+                        contribution: value,
+                        paired_resource,
+                        forward,
+                        backward,
+                    },
+                );
             }
         }
         true
@@ -411,7 +497,7 @@ impl PathStorage {
         cuts: &[LimitedInput],
         kpath: &[LimitedKPathInput],
     ) -> Result<Option<Vec<(Vec<usize>, f64)>>> {
-        self.machine_inspection_costs_until(g, cuts, kpath, None)
+        self.machine_inspection_costs_until(g, cuts, kpath, None, false)
     }
 
     fn machine_inspection_costs_until<const D: usize>(
@@ -420,6 +506,7 @@ impl PathStorage {
         cuts: &[LimitedInput],
         kpath: &[LimitedKPathInput],
         timer: Option<(std::time::Instant, std::time::Duration)>,
+        normalize_paired: bool,
     ) -> Result<Option<Vec<(Vec<usize>, f64)>>> {
         let expired = || timer.is_some_and(|(start, limit)| start.elapsed() > limit);
         if expired() {
@@ -452,6 +539,9 @@ impl PathStorage {
             let Some(mut cost) = self.machine_contribution(&path.arcs) else {
                 return Ok(None);
             };
+            if normalize_paired {
+                cost = kernel.paired_retained_cost(cost)?;
+            }
             for &index in &path.arcs {
                 if expired() {
                     return Err(crate::incomplete("enumeration time limit exceeded"));
@@ -606,10 +696,15 @@ impl PathStorage {
         if cutoff.is_nan() {
             return Err(invalid("invalid enumeration inspection cutoff"));
         }
-        let paired_costs = if g.coupled_kernel().is_some_and(|kernel| kernel.uses_zero_paired_inspection_cost()) {
-            let paths = self.machine_inspection_costs_until(g, cuts, kpath, timer)?.ok_or_else(|| {
-                crate::incomplete("paired front-program inspection contributions unavailable")
-            })?;
+        let paired_costs = if g.coupled_kernel().is_some_and(|kernel| {
+            kernel.machine_paired_join_complete()
+                && kernel.has_complete_machine_inspection_contribution()
+        }) {
+            let paths = self
+                .machine_inspection_costs_until(g, cuts, kpath, timer, true)?
+                .ok_or_else(|| {
+                    crate::incomplete("paired front-program inspection contributions unavailable")
+                })?;
             Some(paths.into_iter().collect::<HashMap<_, _>>())
         } else {
             None
@@ -761,27 +856,69 @@ impl PathStorage {
         // Native export visits hash partitions in activation order, then
         // their candidates in original-cost insertion order. Dominance may
         // use fewer physical partitions without changing this path index.
-        let paths: HashMap<&[usize], &Path> = self.partitions.iter().flatten()
-            .map(|path| (path.arcs.as_slice(), path)).collect();
-        self.export_rows.iter().flatten()
-            .map(|(arcs, _)| paths[arcs.as_ref()]).collect()
+        let paths: HashMap<&[usize], &Path> = self
+            .partitions
+            .iter()
+            .flatten()
+            .map(|path| (path.arcs.as_slice(), path))
+            .collect();
+        self.export_rows
+            .iter()
+            .flatten()
+            .map(|(arcs, _)| paths[arcs.as_ref()])
+            .collect()
     }
     fn route<const D: usize>(&self, g: &Graph<D>, path: &Path) -> Result<Route> {
-        let machine_feasible = if let Some(kernel) = g.coupled_kernel()
+        let retained_selection = if g
+            .coupled_kernel()
+            .is_some_and(|kernel| kernel.machine_paired_join_complete())
+        {
+            use crate::graph::coupled::descriptor::{FrontierBudget, FrontierOutcome};
+            let resource = self
+                .machine_contributions
+                .get(path.arcs.as_slice())
+                .and_then(|join| join.paired_resource)
+                .ok_or_else(|| crate::incomplete("paired retained resource unavailable"))?;
+            match self.machine_paired_selection(
+                g,
+                &path.arcs,
+                Some(resource),
+                FrontierBudget::default(),
+            ) {
+                FrontierOutcome::Complete(selection) => Some((resource, selection.dependent)),
+                FrontierOutcome::Empty => {
+                    return Err(invalid("enumerated paired join is infeasible"))
+                }
+                FrontierOutcome::Unknown(reason) => {
+                    return Err(crate::incomplete(format!(
+                        "paired retained join unavailable: {reason:?}"
+                    )))
+                }
+            }
+        } else {
+            None
+        };
+        let machine_feasible = if let Some(kernel) = g
+            .coupled_kernel()
             .filter(|kernel| kernel.uses_zero_paired_inspection_cost())
         {
             kernel.validate_for(g)?;
-            if !self.machine_identity.as_ref().is_some_and(|identity| Arc::ptr_eq(identity, kernel.machine_identity()))
+            if !self
+                .machine_identity
+                .as_ref()
+                .is_some_and(|identity| Arc::ptr_eq(identity, kernel.machine_identity()))
                 || self.machine_contribution(&path.arcs).is_none()
             {
-                return Err(crate::incomplete("paired front-program route contribution unavailable"));
+                return Err(crate::incomplete(
+                    "paired front-program route contribution unavailable",
+                ));
             }
             true
         } else {
             false
         };
-        if !machine_feasible {
-            g.coupled_path_cost(&path.arcs)?
+        if retained_selection.is_none() {
+            g.coupled_route_cost(&path.arcs)?
                 .ok_or_else(|| invalid("enumerated route violates coupled resources"))?;
         }
         let mut q = crate::graph::ResourceValues::filled(g.resources.len(), 0.);
@@ -800,8 +937,15 @@ impl PathStorage {
             resource_profile.push(q[..g.resources.len()].to_vec());
         }
         Ok(Route {
-            coupled_controls: Vec::new(),
-            coupled_values: if machine_feasible { Vec::new() } else { g.coupled_paired_values(&path.arcs)? },
+            coupled_values: if let Some((resource, value)) = retained_selection {
+                value
+                    .map(|value| vec![(resource, value)])
+                    .unwrap_or_default()
+            } else if machine_feasible {
+                Vec::new()
+            } else {
+                g.coupled_paired_values(&path.arcs)?
+            },
             nodes,
             arcs: path.arcs.iter().map(|&a| g.arcs[a].id).collect(),
             cost: path.reduced_cost,

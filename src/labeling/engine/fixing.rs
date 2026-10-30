@@ -9,7 +9,11 @@ impl<const D: usize> LabelingEngine<D> {
         g: &Graph<D>,
         threshold: f64,
     ) -> Result<crate::pricing::fixing::FixingReport> {
-        let has_full_cuts = self.cuts.full.as_ref().is_some_and(|full| !full.fields.is_empty());
+        let has_full_cuts = self
+            .cuts
+            .full
+            .as_ref()
+            .is_some_and(|full| !full.fields.is_empty());
         self.fix_bucket_arcs_with_full_cut_state(g, threshold, has_full_cuts)
     }
 
@@ -24,7 +28,9 @@ impl<const D: usize> LabelingEngine<D> {
             return Err(invalid("fixing requires complete exact labeling"));
         }
         if !self.labels_match_graph(g) {
-            return Err(invalid("fixing requires labels at current reduced costs and resource configuration"));
+            return Err(invalid(
+                "fixing requires labels at current reduced costs and resource configuration",
+            ));
         }
         if !threshold.is_finite() {
             return Err(invalid("finite fixing threshold required"));
@@ -33,11 +39,24 @@ impl<const D: usize> LabelingEngine<D> {
         // enumeration. In that case scan only for feasibility; pricing's cut
         // costs cannot establish that an otherwise compatible route is costly.
         let feasibility_only = g.has_coupled_resources() && (self.has_cuts() || has_full_cuts);
-        let threshold = if feasibility_only { f64::INFINITY } else { threshold };
+        let threshold = if feasibility_only {
+            f64::INFINITY
+        } else {
+            threshold
+        };
         // A global complete-join knapsack lower bound can be added to the
         // resource lower bound without assuming matching minimizing controls.
         let scan_all = feasibility_only;
-        let knapsack_lower = self.cuts.knapsack.global_cost_lower_bound()
+        // Paired fixing scans use the literal label-key sums before testing
+        // concatenation. Pricing completion corrections change that scan's
+        // cutoff decisions, including terminal arcs with signed increments.
+        let paired_keys = g
+            .coupled_kernel()
+            .is_some_and(|kernel| kernel.machine_paired_join_complete());
+        let knapsack_lower = self
+            .cuts
+            .knapsack
+            .global_cost_lower_bound()
             .unwrap_or(f64::NEG_INFINITY);
         // Both roles must be disproved before fixing a dual-orientation arc.
         if self.consumption_joins
@@ -114,8 +133,11 @@ impl<const D: usize> LabelingEngine<D> {
                                             - q[r];
                                     }
                                 }
-                                self.grid
-                                    .bucket_id_checked(self.consumption_joins || !forward, target, q)
+                                self.grid.bucket_id_checked(
+                                    self.consumption_joins || !forward,
+                                    target,
+                                    q,
+                                )
                             })
                             .transpose()
                             .map_err(|()| incomplete("fixing bucket index overflow"))?
@@ -136,6 +158,8 @@ impl<const D: usize> LabelingEngine<D> {
                                     .unwrap_or(f64::NEG_INFINITY);
                                 minimum = if scan_all {
                                     f64::NEG_INFINITY
+                                } else if paired_keys {
+                                    minimum.min(key)
                                 } else {
                                     minimum.min(self.ctx().resource_completion_key(
                                         g,
@@ -162,11 +186,13 @@ impl<const D: usize> LabelingEngine<D> {
                                     target
                                 };
                                 let opposite = &storage.buckets[storage_vertex][bucket];
-                                if self.ctx().completion_sum(
-                                    minimum,
-                                    opposite.completion_bound(false),
-                                ) >= threshold
-                                {
+                                let bound = if paired_keys {
+                                    minimum + opposite.completion_bound(false)
+                                } else {
+                                    self.ctx()
+                                        .completion_sum(minimum, opposite.completion_bound(false))
+                                };
+                                if bound >= threshold {
                                     continue;
                                 }
                                 if !contains(&self.grid, &frontier, target, bucket) {
@@ -176,16 +202,24 @@ impl<const D: usize> LabelingEngine<D> {
                                         physical.tail
                                     };
                                     'pairs: for l in &extended {
-                                        let key = crate::core::rounding::add_down(l.key(), knapsack_lower)
-                                            .unwrap_or(f64::NEG_INFINITY);
+                                        let key = crate::core::rounding::add_down(
+                                            l.key(),
+                                            knapsack_lower,
+                                        )
+                                        .unwrap_or(f64::NEG_INFINITY);
                                         let key = if scan_all {
                                             if !self.ctx().bucket_completion_feasible(
-                                                g, forward, l.coupled_state.as_deref(),
-                                                storage_vertex, bucket,
+                                                g,
+                                                forward,
+                                                l.coupled_state.as_deref(),
+                                                storage_vertex,
+                                                bucket,
                                             ) {
                                                 continue 'pairs;
                                             }
                                             f64::NEG_INFINITY
+                                        } else if paired_keys {
+                                            key
                                         } else {
                                             let Some(key) = self.ctx().bucket_completion(
                                                 g,
@@ -205,9 +239,12 @@ impl<const D: usize> LabelingEngine<D> {
                                         };
                                         for &id in &opposite.active {
                                             let other = storage.labels.view(id);
-                                            if self.ctx().completion_sum(key, other.key())
-                                                >= threshold
-                                            {
+                                            let bound = if paired_keys {
+                                                key + other.key()
+                                            } else {
+                                                self.ctx().completion_sum(key, other.key())
+                                            };
+                                            if bound >= threshold {
                                                 break;
                                             }
                                             concatenation_tests += 1;

@@ -1,8 +1,17 @@
 //! Install collected route universes atomically on a private master.
 use super::*;
 
-fn path_key(route: &NetworkRoute) -> (i32, Vec<i32>) {
-    (route.network, route.route.arcs.clone())
+fn path_key(route: &NetworkRoute) -> (i32, Vec<i32>, Vec<(usize, u64)>) {
+    (
+        route.network,
+        route.route.arcs.clone(),
+        route
+            .route
+            .coupled_values
+            .iter()
+            .map(|&(resource, value)| (resource, if value == 0. { 0 } else { value.to_bits() }))
+            .collect(),
+    )
 }
 
 pub(in crate::master::model) fn transfer<const D: usize>(
@@ -70,30 +79,6 @@ pub(super) fn install_collected_with<const D: usize>(
     for (index, route) in registry.iter().enumerate() {
         path_tags.entry(path_key(route)).or_insert(index);
     }
-    // Controlled networks must retain the certified representative, not an
-    // arbitrary earlier physical-path alias with different selected metadata.
-    for route in &routes {
-        let oracle = state
-            .oracles
-            .iter()
-            .find(|o| o.network.id == route.network)
-            .unwrap();
-        if !super::super::control_pricing::needed(oracle) {
-            continue;
-        }
-        let key = path_key(route);
-        path_tags.remove(&key);
-        if let Some(&tag) = state.tags.get(&(route.network, route.route.identity())) {
-            let index = usize::try_from(tag).map_err(|_| invalid("controlled enumeration tag"))?;
-            if registry
-                .get(index)
-                .is_some_and(|old| old.route.original_cost == route.route.original_cost)
-            {
-                path_tags.insert(key, index);
-                registry[index] = Arc::new(route.clone());
-            }
-        }
-    }
     let mut tags = state.tags.clone();
     let mut route_upper_bounds = state.route_upper_bounds.clone();
     let mut universe = vec![];
@@ -123,8 +108,8 @@ pub(super) fn install_collected_with<const D: usize>(
                 }
                 let tag = metadata.tag as usize;
                 let key = path_key(&registry[tag]);
-                // Keep one canonical variable per physical path. Resource
-                // profile aliases must not bypass a path's proved cap.
+                // Keep one variable per path and selected paired value. Scalar
+                // profile aliases must not bypass that column's proved cap.
                 if !allowed.contains(&key) || path_tags.get(&key) != Some(&tag) {
                     destination.set_upper(column, 0.)?;
                     route_upper_bounds.insert(tag, 0.);

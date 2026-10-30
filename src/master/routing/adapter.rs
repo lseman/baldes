@@ -98,6 +98,58 @@ impl RootPricing {
     }
 }
 impl<const D: usize> State<D> {
+    pub(super) fn has_unpriced_paired_objective(
+        &self,
+        problem: &RoutingContext<D>,
+        duals: &[f64],
+    ) -> bool {
+        if self
+            .solver
+            .enumeration
+            .as_ref()
+            .is_some_and(|e| e.completed)
+        {
+            return false;
+        }
+        let Some(kernel) = self.solver.graph.coupled_kernel() else {
+            return false;
+        };
+        let map = problem.row_map.borrow();
+        kernel
+            .definitions()
+            .iter()
+            .enumerate()
+            .any(|(resource, definition)| {
+                if !matches!(
+                    definition,
+                    crate::graph::coupled::CoupledResource::PairedFront { .. }
+                ) {
+                    return false;
+                }
+                let mut omitted = crate::master::numerics::ExactSum::default();
+                if omitted
+                    .add(kernel.objective_coefficient(resource).unwrap_or(1.))
+                    .is_none()
+                    || omitted.add(-1.).is_none()
+                {
+                    return true;
+                }
+                for entry in problem.model.networks[0]
+                    .activity_entries
+                    .iter()
+                    .filter(|entry| entry.resource == resource)
+                {
+                    let Some(&dual) = map.get(entry.row).and_then(|&row| duals.get(row)) else {
+                        return true;
+                    };
+                    if omitted.product(-dual, entry.coefficient).is_none() {
+                        return true;
+                    }
+                }
+                omitted.sign() != 0.
+            })
+    }
+
     pub(super) fn price(
         &mut self,
         problem: &RoutingContext<D>,
@@ -196,9 +248,16 @@ impl<const D: usize> State<D> {
         self.pricing.scheduler = scheduler;
         self.pricing.rhs = rhs;
         self.pricing_seconds += started.elapsed().as_secs_f64();
-        let batch = result?;
+        let mut batch = result?;
         self.pricing.correction = batch.correction;
         self.pricing.gradient = batch.gradient;
+        // Raw paired pricing completion is retained for enumeration. Its unit
+        // objective cannot supply a bound on a differently weighted owner.
+        if self.has_unpriced_paired_objective(problem, duals) {
+            self.pricing.correction = None;
+            self.pricing.gradient = None;
+            batch.answer.bound_minimum = None;
+        }
         // A Theta variable with a negative reduced cost at these duals leaves
         // the Lagrangian unbounded below, so this pass yields no bound.
         if problem.recourse.is_some() {

@@ -51,7 +51,6 @@ fn chain(consumption: &[f64], upper: f64) -> (RoutingContext<2>, Route) {
     // Profiles and rounded costs are untrusted payloads. Feasibility and
     // objective are reconstructed from physical arcs and original inputs.
     let route = Route {
-        coupled_controls: Vec::new(),
         coupled_values: Vec::new(),
         nodes: (0..n as i32).collect(),
         arcs: (0..n as i32 - 1).collect(),
@@ -214,4 +213,44 @@ fn signed_resource_replay_retains_exact_cancellation_beyond_binary64_profiles() 
     assert!(problem.elementary_route(&route.arcs).is_some());
     assert_eq!(exact_route_feasibility(&problem, &route), Some(false));
     assert!(validated_upper(&problem, &[route], &[0], &[1.]).is_none());
+}
+
+#[test]
+fn paired_selected_activity_rows_are_replayed_in_the_original_witness() {
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../fixtures/coupled/metasolver-paired-preparation.json"
+    ))
+    .unwrap();
+    let (problem, _) =
+        crate::master::model::format::Model::from_json(&corpus["cases"][0]["model"].to_string())
+            .unwrap()
+            .compile::<2>()
+            .unwrap();
+    let mut context =
+        RoutingContext::set_partitioning(problem.networks[0].graph.clone(), 1.).unwrap();
+    for row in &mut context.model.rows {
+        row.sense = RowSense::LessEqual;
+    }
+    context.model.rows[1].rhs = 3.;
+    context.model.networks[0].activity_entries.push(
+        crate::master::model::AccumulatedActivityEntry {
+            row: 1,
+            resource: 0,
+            coefficient: 1.,
+        },
+    );
+    let route = context.elementary_route(&[1, 2]).unwrap();
+    assert_eq!(route.coupled_values, [(0, 3.)]);
+    assert_eq!(
+        validated_upper(&context, &[route.clone()], &[0], &[1.]),
+        Some(-17.)
+    );
+    context.model.rows[1].rhs = 2.;
+    assert_eq!(
+        validated_upper(&context, &[route.clone()], &[0], &[1.]),
+        None
+    );
+    let mut altered = route;
+    altered.coupled_values[0].1 = 2.;
+    assert_eq!(validated_upper(&context, &[altered], &[0], &[1.]), None);
 }

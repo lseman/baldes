@@ -2,126 +2,10 @@
 use super::*;
 use descriptor::{
     FrontierBudget, FrontierOutcome, FrontierUnknown, MachinePathHistory, MachineRootState,
-    PairedCostNormalization, PreparedSlopeAdjointArc, PreparedSlopeRelationArc, SlopeFront,
-    SlopeRelationArc,
-};
-use relation::{
-    BoundedCostFront, PreparedCostLattice, PreparedRelationArc, RelationFront, RelationPiece,
+    PairedFrontOperations, SlopeFront,
 };
 use slope_interval::{outcome, SlopeLabel};
-use std::sync::{Arc, OnceLock};
-
-/// Persistent suffix program. Numerical fronts are diagnostic, so label
-/// extension records the program and only evaluates it when inspected.
-#[derive(Debug)]
-pub(super) struct RawAdjoint {
-    pub(super) depth: usize,
-    arc: Arc<PreparedSlopeAdjointArc>,
-    previous: Option<Arc<RawAdjoint>>,
-    terminal: bool,
-    outcome: OnceLock<FrontierOutcome<SlopeFront>>,
-}
-impl Drop for RawAdjoint {
-    fn drop(&mut self) {
-        // A uniquely owned long suffix would otherwise recursively drop one
-        // Arc per arc. Stop at a shared node, whose remaining owners keep it
-        // alive, and drain uniquely owned predecessors iteratively.
-        let mut previous = self.previous.take();
-        while let Some(link) = previous {
-            match Arc::try_unwrap(link) {
-                Ok(mut node) => previous = node.previous.take(),
-                Err(_) => break,
-            }
-        }
-    }
-}
-impl RawAdjoint {
-    fn recompute(&self, budget: FrontierBudget) -> FrontierOutcome<SlopeFront> {
-        let started = std::time::Instant::now();
-        let mut nodes = Vec::new();
-        let mut current = self;
-        loop {
-            if nodes.len() >= budget.max_operations {
-                return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
-            }
-            if budget
-                .max_elapsed
-                .is_some_and(|limit| started.elapsed() >= limit)
-            {
-                return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
-            }
-            nodes.push(current);
-            match current.previous.as_deref() {
-                Some(previous) => current = previous,
-                None => break,
-            }
-        }
-        let per_arc = (budget.max_operations - nodes.len()) / nodes.len();
-        if per_arc == 0 {
-            return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
-        }
-        let mut result = None;
-        for node in nodes.into_iter().rev() {
-            let remaining_time = match budget.max_elapsed {
-                Some(limit) => match limit.checked_sub(started.elapsed()) {
-                    Some(remaining) if !remaining.is_zero() => Some(remaining),
-                    _ => return FrontierOutcome::Unknown(FrontierUnknown::Deadline),
-                },
-                None => None,
-            };
-            let arc_budget = FrontierBudget {
-                max_operations: per_arc,
-                max_elapsed: remaining_time,
-                ..budget
-            };
-            result = Some(match result {
-                None if node.terminal => node.arc.prepend_terminal(arc_budget),
-                None => FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                    "preceding raw adjoint is unavailable",
-                )),
-                Some(FrontierOutcome::Complete(front)) => node.arc.prepend(&front, arc_budget),
-                Some(other) => other,
-            });
-        }
-        result.expect("a suffix contains at least one arc")
-    }
-
-    fn outcome(&self) -> &FrontierOutcome<SlopeFront> {
-        // Walk iteratively to avoid recursion on long bounded walks. Shared
-        // suffixes retain their computed result and are evaluated at most once
-        // in the uncontended case; racing computations have identical inputs.
-        let mut pending = Vec::new();
-        let mut current = self;
-        while current.outcome.get().is_none() {
-            pending.push(current);
-            match current.previous.as_deref() {
-                Some(previous) => current = previous,
-                None => break,
-            }
-        }
-        while let Some(node) = pending.pop() {
-            node.outcome.get_or_init(|| match node.previous.as_deref() {
-                Some(previous) => match previous.outcome.get() {
-                    Some(FrontierOutcome::Complete(front)) => {
-                        node.arc.prepend(front, FrontierBudget::default())
-                    }
-                    Some(FrontierOutcome::Empty) => FrontierOutcome::Empty,
-                    Some(FrontierOutcome::Unknown(reason)) => {
-                        FrontierOutcome::Unknown(reason.clone())
-                    }
-                    None => FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                        "preceding raw adjoint is unavailable",
-                    )),
-                },
-                None if node.terminal => node.arc.prepend_terminal(FrontierBudget::default()),
-                None => FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
-                    "preceding raw adjoint is unavailable",
-                )),
-            });
-        }
-        self.outcome.get().expect("raw adjoint outcome initialized")
-    }
-}
+use std::sync::Arc;
 
 mod inputs;
 
@@ -138,16 +22,17 @@ pub(super) struct MachineTopology {
     pub arcs: Arc<[(i32, usize, usize)]>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct BaseWindows {
+    pub resource: usize,
+    pub vertices: Vec<(u64, u64)>,
+    pub arcs: Vec<Option<(u64, u64)>>,
+}
+
 #[derive(Clone, Debug)]
 pub(super) struct PreparedSlopePaired {
     pub(super) objective_coefficient: f64,
-    initial: SlopeLabel,
-    upper_initial: Option<SlopeFront>,
-    initial_minimum: f64,
-    arcs: std::sync::Arc<[PreparedSlopeRelationArc]>,
-    upper_arcs: Option<std::sync::Arc<[SlopeFront]>>,
-    sources: std::sync::Arc<[SlopeRelationArc]>,
-    operator_classes: Arc<[usize]>,
+    arc_count: usize,
     waiting_windows: Option<std::sync::Arc<[Window]>>,
     machine_inputs: Option<Arc<[PreparedMachineArc]>>,
     machine_waiting_rates: Option<Arc<[f64]>>,
@@ -155,24 +40,13 @@ pub(super) struct PreparedSlopePaired {
     machine_root_history: Option<Arc<MachinePathHistory>>,
     machine_backward_root: Option<Arc<MachinePathHistory>>,
     machine_topology: Option<MachineTopology>,
-    backward: std::sync::Arc<[Option<PreparedRelationArc>]>,
-    adjoints: Arc<[Arc<PreparedSlopeAdjointArc>]>,
-    exact_cost: bool,
-    integral_costs: bool,
-    monotone_constant_transfers: bool,
-    cost_lattice: Option<Arc<PreparedCostLattice>>,
-    ceiling: f64,
+    base_windows: Option<BaseWindows>,
     mode: PairedResourceMode,
-    normalization: PairedCostNormalization,
-    policy: FrontOperationPolicy,
 }
 impl PartialEq for PreparedSlopePaired {
     fn eq(&self, b: &Self) -> bool {
-        self.initial == b.initial
-            && self.objective_coefficient == b.objective_coefficient
-            && self.initial_minimum.to_bits() == b.initial_minimum.to_bits()
-            && self.sources == b.sources
-            && self.operator_classes == b.operator_classes
+        self.objective_coefficient == b.objective_coefficient
+            && self.arc_count == b.arc_count
             && waiting_windows_equal(
                 self.waiting_windows.as_deref(),
                 b.waiting_windows.as_deref(),
@@ -180,7 +54,12 @@ impl PartialEq for PreparedSlopePaired {
             && machine_inputs_equal(self.machine_inputs.as_deref(), b.machine_inputs.as_deref())
             && match (&self.machine_waiting_rates, &b.machine_waiting_rates) {
                 (None, None) => true,
-                (Some(a), Some(b)) => a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.to_bits() == y.to_bits()),
+                (Some(a), Some(b)) => {
+                    a.len() == b.len()
+                        && a.iter()
+                            .zip(b.iter())
+                            .all(|(x, y)| x.to_bits() == y.to_bits())
+                }
                 _ => false,
             }
             && match (&self.machine_backward_root, &b.machine_backward_root) {
@@ -200,12 +79,8 @@ impl PartialEq for PreparedSlopePaired {
                 _ => false,
             }
             && self.machine_topology == b.machine_topology
+            && self.base_windows == b.base_windows
             && self.mode == b.mode
-            && self.integral_costs == b.integral_costs
-            && self.monotone_constant_transfers == b.monotone_constant_transfers
-            && self.cost_lattice == b.cost_lattice
-            && self.normalization == b.normalization
-            && self.policy == b.policy
     }
 }
 fn waiting_windows_equal(a: Option<&[Window]>, b: Option<&[Window]>) -> bool {
@@ -220,77 +95,6 @@ fn waiting_windows_equal(a: Option<&[Window]>, b: Option<&[Window]>) -> bool {
         _ => false,
     }
 }
-fn constant(function: &PreparedSlopeFunction) -> Option<f64> {
-    function
-        .pairs()
-        .iter()
-        .skip(1)
-        .all(|p| p.0 == 0.)
-        .then(|| function.pairs()[0].0)
-}
-fn negate_function(function: &PreparedSlopeFunction) -> Result<PreparedSlopeFunction> {
-    PreparedSlopeFunction::from_prepared_pairs(
-        function
-            .pairs()
-            .iter()
-            .map(|&(slope, coordinate)| (-slope, coordinate))
-            .collect(),
-    )
-    .map_err(|error| invalid(error.to_string()))
-}
-fn negated_upper_on(
-    feasible: &SlopeFront,
-    negative_upper: &SlopeFront,
-    policy: FrontOperationPolicy,
-    budget: FrontierBudget,
-) -> FrontierOutcome<SlopeFront> {
-    let zero_components = match feasible
-        .components()
-        .iter()
-        .map(|component| {
-            let (lower, upper) = component.domain();
-            if lower == upper {
-                PreparedSlopeFunction::constant_point(0., lower)
-            } else {
-                PreparedSlopeFunction::from_prepared_pairs(vec![(0., lower), (0., upper)])
-            }
-        })
-        .collect::<std::result::Result<Vec<_>, _>>()
-    {
-        Ok(components) => components,
-        Err(error) => return FrontierOutcome::Unknown(FrontierUnknown::Arithmetic(error)),
-    };
-    match SlopeFront::from_components(zero_components, budget) {
-        FrontierOutcome::Complete(mask) => negative_upper.add(&mask, policy, budget),
-        FrontierOutcome::Empty => FrontierOutcome::Empty,
-        FrontierOutcome::Unknown(reason) => FrontierOutcome::Unknown(reason),
-    }
-}
-// Conversion is advisory. Singleton domains and unrepresentable slopes keep
-// suffix replay as the authoritative feasibility check.
-fn relation_function(function: &PreparedSlopeFunction) -> Option<PiecewiseLinearFunction> {
-    let pairs = function.pairs();
-    let mut points = vec![[pairs[0].1, pairs[0].0]];
-    for &(slope, end) in &pairs[1..] {
-        let [start, value] = *points.last()?;
-        let next = value + slope * (end - start);
-        if (next - value) / (end - start) != slope {
-            return None;
-        }
-        points.push([end, next]);
-    }
-    PiecewiseLinearFunction::new(points).ok()
-}
-fn backward_arc(arc: &SlopeRelationArc) -> Option<PreparedRelationArc> {
-    PreparedRelationArc::new(&PairedResourceArc {
-        arrival: relation_function(&arc.arrival)?,
-        increment: relation_function(&arc.increment)?,
-        lower: relation_function(&arc.lower)?,
-        upper: relation_function(&arc.upper)?,
-        waiting: arc.waiting,
-    })
-    .ok()
-}
 impl PreparedSlopePaired {
     pub(super) fn machine_topology_matches<const D: usize>(&self, graph: &Graph<D>) -> bool {
         match (&self.machine_inputs, &self.machine_topology) {
@@ -301,6 +105,36 @@ impl PreparedSlopePaired {
                     && graph.vertices.len() == topology.vertex_count
                     && graph.arcs.len() == inputs.len()
                     && graph.arcs.len() == topology.arcs.len()
+                    && self.base_windows.as_ref().is_none_or(|snapshot| {
+                        let resource = snapshot.resource;
+                        #[cfg(feature = "multi-time-windows")]
+                        if graph
+                            .time_windows
+                            .keys()
+                            .any(|&(_, index)| index == resource)
+                        {
+                            return false;
+                        }
+                        graph.vertices.len() == snapshot.vertices.len()
+                            && graph.arcs.len() == snapshot.arcs.len()
+                            && graph.vertices.iter().zip(&snapshot.vertices).all(
+                                |(vertex, &expected)| {
+                                    vertex.bounds.get(resource).is_some_and(|window| {
+                                        (window.lower.to_bits(), window.upper.to_bits()) == expected
+                                    })
+                                },
+                            )
+                            && graph
+                                .arcs
+                                .iter()
+                                .zip(&snapshot.arcs)
+                                .all(|(arc, expected)| {
+                                    arc.bounds.get(resource).is_some_and(|window| {
+                                        window.map(|w| (w.lower.to_bits(), w.upper.to_bits()))
+                                            == *expected
+                                    })
+                                })
+                    })
                     && graph
                         .arcs
                         .iter()
@@ -317,13 +151,24 @@ impl PreparedSlopePaired {
         self.machine_waiting_rates.as_deref()
     }
     pub(super) fn set_machine_waiting_rates(&mut self, rates: &[f64]) -> Result<bool> {
-        let inputs = self.machine_inputs.as_deref().ok_or_else(|| invalid("paired machine inputs unavailable"))?;
-        if rates.len() != inputs.len() || rates.iter().zip(inputs).any(|(rate, input)| {
-            !rate.is_finite() || rate.trunc() != f64::from(input.waiting_rate)
-        }) {
-            return Err(invalid("paired machine waiting rates do not match transition operands"));
+        let inputs = self
+            .machine_inputs
+            .as_deref()
+            .ok_or_else(|| invalid("paired machine inputs unavailable"))?;
+        if rates.len() != inputs.len()
+            || rates.iter().zip(inputs).any(|(rate, input)| {
+                !rate.is_finite() || rate.trunc() != f64::from(input.waiting_rate)
+            })
+        {
+            return Err(invalid(
+                "paired machine waiting rates do not match transition operands",
+            ));
         }
-        if self.machine_waiting_rates.as_ref().is_some_and(|old| old.iter().zip(rates).all(|(a, b)| a.to_bits() == b.to_bits())) {
+        if self.machine_waiting_rates.as_ref().is_some_and(|old| {
+            old.iter()
+                .zip(rates)
+                .all(|(a, b)| a.to_bits() == b.to_bits())
+        }) {
             return Ok(false);
         }
         self.machine_waiting_rates = Some(Arc::from(rates));
@@ -360,7 +205,22 @@ impl PreparedSlopePaired {
         self.machine_inputs.is_some() || self.machine_root_input.is_some()
     }
     pub(super) fn machine_program_inputs_complete(&self) -> bool {
-        self.machine_inputs.is_some() == self.machine_root_history.is_some()
+        self.machine_inputs.is_some()
+            && self.machine_root_history.is_some()
+            && self.machine_backward_root.is_some()
+    }
+
+    pub(super) fn waiting_windows_match_inputs(&self) -> bool {
+        match (&self.waiting_windows, &self.machine_inputs) {
+            (Some(windows), Some(inputs)) => {
+                windows.len() == inputs.len()
+                    && windows.iter().zip(inputs.iter()).all(|(window, input)| {
+                        window.lower.to_bits() == input.waiting_lower.to_bits()
+                            && window.upper.to_bits() == input.waiting_upper.to_bits()
+                    })
+            }
+            _ => true,
+        }
     }
 
     pub(super) fn machine_backtrack_bound<const D: usize>(
@@ -387,14 +247,15 @@ impl PreparedSlopePaired {
                 "paired machine topology unavailable",
             ));
         };
-        if !Arc::ptr_eq(inputs, &bound.inputs)
+        if !self.machine_topology_matches(graph)
+            || !Arc::ptr_eq(inputs, &bound.inputs)
             || graph.source != topology.source
             || graph.sink != topology.sink
             || graph.vertices.len() != topology.vertex_count
             || graph.source >= graph.vertices.len()
             || graph.arcs.len() != topology.arcs.len()
             || graph.arcs.len() != inputs.len()
-            || graph.arcs.len() != self.arcs.len()
+            || graph.arcs.len() != self.arc_count
             || bound.history.len().checked_sub(1) != Some(bound.path.len())
         {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
@@ -488,7 +349,7 @@ impl PreparedSlopePaired {
         if remaining.is_some_and(|limit| limit.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
-        PreparedSlopeRelationArc::machine_backtrack_coordinates(
+        PairedFrontOperations::machine_backtrack_coordinates(
             &bound.history,
             terminal,
             &inverses,
@@ -505,11 +366,8 @@ impl PreparedSlopePaired {
         inputs: Option<&[PreparedMachineArc]>,
         topology: Option<MachineTopology>,
     ) -> Result<bool> {
-        if inputs.is_some() && self.policy != FrontOperationPolicy::FrontAlgebra {
-            return Err(invalid("paired machine inputs require front algebra"));
-        }
         if inputs.is_some_and(|inputs| {
-            inputs.len() != self.arcs.len() || inputs.iter().any(|arc| !arc.valid())
+            inputs.len() != self.arc_count || inputs.iter().any(|arc| !arc.valid())
         }) {
             return Err(invalid(
                 "paired machine inputs must be finite, ordered, and match the arc count",
@@ -546,9 +404,6 @@ impl PreparedSlopePaired {
         &mut self,
         root: Option<&PreparedSlopeFunction>,
     ) -> Result<bool> {
-        if root.is_some() && self.policy != FrontOperationPolicy::FrontAlgebra {
-            return Err(invalid("paired machine root requires front algebra"));
-        }
         if root.is_some_and(|root| {
             root.pairs().is_empty()
                 || root.pairs().len() > 12
@@ -625,13 +480,14 @@ impl PreparedSlopePaired {
         let Some(remaining_work) = budget.max_operations.checked_sub(scans) else {
             return FrontierOutcome::Unknown(FrontierUnknown::WorkLimit);
         };
-        if graph.source != topology.source
+        if !self.machine_topology_matches(graph)
+            || graph.source != topology.source
             || graph.sink != topology.sink
             || graph.vertices.len() != topology.vertex_count
             || graph.source >= graph.vertices.len()
             || graph.arcs.len() != topology.arcs.len()
             || graph.arcs.len() != inputs.len()
-            || graph.arcs.len() != self.arcs.len()
+            || graph.arcs.len() != self.arc_count
         {
             return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
                 "paired machine graph topology changed",
@@ -673,11 +529,7 @@ impl PreparedSlopePaired {
                 ));
             }
             vertex = arc.head;
-            steps.push((
-                index,
-                &self.arcs[index],
-                inputs[index].continuation_inputs(),
-            ));
+            steps.push((index, inputs[index].continuation_inputs()));
         }
         let remaining_time = budget
             .max_elapsed
@@ -685,7 +537,7 @@ impl PreparedSlopePaired {
         if remaining_time.is_some_and(|limit| limit.is_zero()) {
             return FrontierOutcome::Unknown(FrontierUnknown::Deadline);
         }
-        PreparedSlopeRelationArc::machine_replay_path(
+        PairedFrontOperations::machine_replay_path(
             root,
             &steps,
             mode,
@@ -698,11 +550,8 @@ impl PreparedSlopePaired {
         )
     }
     pub(super) fn set_waiting_windows(&mut self, windows: Option<&[Window]>) -> Result<bool> {
-        if windows.is_some() && self.policy != FrontOperationPolicy::FrontAlgebra {
-            return Err(invalid("paired waiting windows require front algebra"));
-        }
         if let Some(windows) = windows {
-            if windows.len() != self.arcs.len()
+            if windows.len() != self.arc_count
                 || windows
                     .iter()
                     .any(|w| !w.lower.is_finite() || !w.upper.is_finite() || w.lower > w.upper)
@@ -719,176 +568,10 @@ impl PreparedSlopePaired {
         Ok(true)
     }
 
-    pub(super) fn new(
-        initial: &PreparedSlopeFunction,
-        base: Window,
-        arcs: &[SlopeRelationArc],
-        mode: PairedResourceMode,
-        normalization: PairedCostNormalization,
-        policy: FrontOperationPolicy,
-    ) -> Result<Self> {
-        let budget = FrontierBudget::default();
-        let Some(front) = outcome(
-            SlopeFront::from_prepared(initial.clone())
-                .restrict(base.lower, base.upper, policy, budget),
-        )?
-        else {
-            return Err(invalid("empty raw paired initial front"));
-        };
-        let Some(witness) = outcome(front.minimum(budget))? else {
-            return Err(invalid("empty raw paired initial front"));
-        };
-        let upper_initial = negate_function(initial)
-            .and_then(|function| {
-                Ok(SlopeFront::from_prepared(function)
-                    .restrict(base.lower, base.upper, policy, budget))
-            })
-            .ok()
-            .and_then(|front| outcome(front).ok().flatten());
-        let upper_arcs = arcs
-            .iter()
-            .map(|arc| negate_function(&arc.upper).map(SlopeFront::from_prepared))
-            .collect::<Result<Vec<_>>>()
-            .ok()
-            .map(std::sync::Arc::from);
-        if mode != PairedResourceMode::Feasibility {
-            let first = arcs
-                .first()
-                .ok_or_else(|| invalid("raw paired cost requires physical arcs"))?;
-            let lower = constant(&first.lower).ok_or_else(|| {
-                invalid("raw paired cost requires shared constant dependent bounds")
-            })?;
-            let upper = constant(&first.upper).ok_or_else(|| {
-                invalid("raw paired cost requires shared constant dependent bounds")
-            })?;
-            if lower > upper
-                || arcs.iter().any(|arc| {
-                    constant(&arc.lower) != Some(lower) || constant(&arc.upper) != Some(upper)
-                })
-            {
-                return Err(invalid(
-                    "raw paired cost requires shared ordered constant dependent bounds",
-                ));
-            }
-            if mode == PairedResourceMode::CostBounded {
-                if witness.value < lower || arcs.iter().any(|arc| arc.waiting < 0) {
-                    return Err(invalid("bounded raw paired cost requires nonnegative waiting and initial minimum above the lower bound"));
-                }
-                for arc in arcs {
-                    let Some(minimum) =
-                        outcome(SlopeFront::from_prepared(arc.increment.clone()).minimum(budget))?
-                    else {
-                        return Err(invalid("empty raw paired increment"));
-                    };
-                    if minimum.value <= 0. {
-                        return Err(invalid(
-                            "bounded raw paired cost requires positive increment functions",
-                        ));
-                    }
-                }
-            }
-        }
-        let prepared = arcs
-            .iter()
-            .map(|arc| {
-                PreparedSlopeRelationArc::new(arc, policy)
-                    .map_err(|error| invalid(error.to_string()))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let operator_classes = continuation::operator_classes(arcs.iter().map(|arc| {
-            let mut key = vec![arc.waiting as i64 as u64];
-            for function in [&arc.arrival, &arc.increment, &arc.lower, &arc.upper] {
-                key.push(u64::from(function.has_machine_only_geometry()));
-                key.push(function.pairs().len() as u64);
-                for &(slope, coordinate) in function.pairs() {
-                    key.push(slope.to_bits());
-                    key.push(coordinate.to_bits());
-                }
-            }
-            key
-        }));
-        let adjoints = arcs
-            .iter()
-            .map(|arc| {
-                PreparedSlopeAdjointArc::new(arc, policy)
-                    .map(Arc::new)
-                    .map_err(|error| invalid(error.to_string()))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let backward: std::sync::Arc<[Option<PreparedRelationArc>]> = arcs
-            .iter()
-            .map(|arc| {
-                (policy == FrontOperationPolicy::StrictDomain)
-                    .then(|| backward_arc(arc))
-                    .flatten()
-            })
-            .collect::<Vec<_>>()
-            .into();
-        let integer = |x: f64| x.is_finite() && x.fract() == 0. && x.abs() <= 1_099_511_627_776.;
-        // The raw/knot conversion preserves every stored segment slope. Only
-        // the existing exact translation/nonnegative-increment contract may use
-        // the converted cache for cost dominance; general raw programs replay.
-        let exact_cost = mode != PairedResourceMode::Feasibility
-            && integer(base.lower)
-            && integer(base.upper)
-            && constant(initial).is_some_and(integer)
-            && arcs.first().is_some_and(|arc| {
-                constant(&arc.lower).is_some_and(|lower| witness.value >= lower)
-            })
-            && initial
-                .pairs()
-                .iter()
-                .all(|pair| integer(pair.0) && integer(pair.1))
-            && backward.iter().all(|arc| {
-                arc.as_ref()
-                    .is_some_and(PreparedRelationArc::exact_cache_eligible)
-            });
-        let ceiling = arcs
-            .first()
-            .and_then(|arc| constant(&arc.upper))
-            .unwrap_or(0.);
-        let integral_costs = exact_cost && arcs.iter().all(|arc| arc.waiting == 0);
-        // Identity base maps and identical constant, zero-waiting transfers
-        // admit control deletion: remove extra intermediate base coordinates
-        // from a longer suffix. The remaining coordinates still satisfy the
-        // same domains and identity arrivals. T(y)=max(y+c, lower), c>=0,
-        // is monotone and T(y)>=y under binary64 arithmetic; any upper bound
-        // satisfied by the longer suffix also holds for the shorter one.
-        let monotone_constant_transfers = mode != PairedResourceMode::Feasibility
-            && constant(initial).is_some()
-            && arcs.first().is_some_and(|first| {
-                let domain = initial.domain();
-                domain.0 == 0.
-                    && domain.1 > 0.
-                    && first.arrival.pairs() == [(0., 0.), (1., domain.1)]
-                    && [&first.increment, &first.lower, &first.upper]
-                        .iter()
-                        .all(|f| {
-                            f.domain() == domain && f.pairs().len() == 2 && constant(f).is_some()
-                        })
-                    && constant(&first.increment).is_some_and(|value| value >= 0.)
-                    && arcs.iter().all(|arc| arc.waiting == 0 && arc == first)
-            });
-        let cost_lattice = if mode != PairedResourceMode::Feasibility
-            && !integral_costs
-            && policy == FrontOperationPolicy::StrictDomain
-        {
-            constant(initial).and_then(|value| {
-                let arcs = backward.iter().cloned().collect::<Option<Vec<_>>>()?;
-                PreparedCostLattice::new(value, &arcs).map(Arc::new)
-            })
-        } else {
-            None
-        };
+    pub(super) fn new(arc_count: usize, mode: PairedResourceMode) -> Result<Self> {
         Ok(Self {
             objective_coefficient: 1.,
-            initial: SlopeLabel::root(&front, true),
-            upper_initial,
-            initial_minimum: finite(witness.value)?,
-            arcs: prepared.into(),
-            upper_arcs,
-            sources: arcs.to_vec().into(),
-            operator_classes,
+            arc_count,
             waiting_windows: None,
             machine_inputs: None,
             machine_waiting_rates: None,
@@ -896,269 +579,70 @@ impl PreparedSlopePaired {
             machine_root_history: None,
             machine_backward_root: None,
             machine_topology: None,
-            backward,
-            adjoints: adjoints.into(),
-            exact_cost,
-            integral_costs,
-            monotone_constant_transfers,
-            cost_lattice,
-            ceiling,
+            base_windows: None,
             mode,
-            normalization,
-            policy,
         })
-    }
-    /// Forward fronts cover and stay below under this resource's policy.
-    /// Backward feasibility uppers cover and stay above; exact bounded-cost
-    /// transfers additionally preserve the incremental suffix objective.
-    /// Unknowns require replay. A shifting forward front may instead exceed by
-    /// delta: every future step is max(value + increment, lower), which keeps
-    /// the pointwise gap, so a's terminal minimum exceeds b's by at most delta.
-    /// The objective is scale times that minimum plus a common baseline, so
-    /// the penalty is scale * delta + objective_b - objective_a. Returns the
-    /// penalty, or None.
-    pub(super) fn penalty(
-        &self,
-        a: &SlopeLabel,
-        b: &SlopeLabel,
-        forward: bool,
-        scale: f64,
-    ) -> Option<f64> {
-        let scale = if self.has_costs() {
-            scale * self.objective_coefficient
-        } else {
-            0.
-        };
-        if !forward && self.monotone_constant_suffix_dominates(a, b) {
-            return (scale.is_finite() && scale >= 0.).then_some(0.);
-        }
-        if a == b {
-            return Some(0.);
-        }
-        // Machine histories carry distinct raw arithmetic and waiting bits.
-        // Until a matching continuation proof exists, never compare two
-        // different machine programs by their source-front envelopes.
-        if a.machine_history.is_some() || b.machine_history.is_some() {
-            return None;
-        }
-        if !forward {
-            if self.has_costs() {
-                return (scale.is_finite() && scale >= 0.)
-                    .then_some(())
-                    .and_then(|()| match (&a.bounded_cost, &b.bounded_cost) {
-                        (Some(a), Some(b)) => {
-                            let dominates = if self.has_exact_cost_continuations() {
-                                a.dominates_exact_lattice(b)
-                            } else {
-                                a.dominates(b)
-                            };
-                            dominates.then_some(0.)
-                        }
-                        _ => None,
-                    });
-            }
-            return match (&a.upper, &b.upper) {
-                (Some(a), Some(b))
-                    if match self.policy {
-                        FrontOperationPolicy::StrictDomain => a.covers_above_strict(b),
-                        FrontOperationPolicy::FrontAlgebra => a.covers_above(b),
-                    } =>
-                {
-                    Some(0.)
-                }
-                _ => None,
-            };
-        }
-        if scale < 0. {
-            if self.policy != FrontOperationPolicy::StrictDomain {
-                return None;
-            }
-            let (Some(front_a), Some(front_b)) = (&a.upper_negative, &b.upper_negative) else {
-                return None;
-            };
-            let (Some(lower_a), Some(lower_b)) = (&a.front, &b.front) else {
-                return None;
-            };
-            return (lower_a.covers_below(lower_b, self.policy)
-                && front_a.covers_below(front_b, self.policy))
-            .then_some(0.);
-        }
-        let (Some(front_a), Some(front_b)) = (&a.front, &b.front) else {
-            return None;
-        };
-        // A finite source-domain ceiling remains a feasibility constraint,
-        // even when its value is the machine's conventional infinity. Paying
-        // for a higher front cannot preserve completions that reach it.
-        front_a.covers_below(front_b, self.policy).then_some(0.)
     }
     pub(super) fn has_costs(&self) -> bool {
         self.mode != PairedResourceMode::Feasibility
     }
-    pub(super) fn monotone_constant_suffix_dominates(
-        &self,
-        a: &SlopeLabel,
-        b: &SlopeLabel,
-    ) -> bool {
-        self.monotone_constant_transfers
-            && self.waiting_windows.is_none()
-            && self.machine_inputs.is_none()
-            && a.machine_history.is_none()
-            && b.machine_history.is_none()
-            && matches!((&a.raw_upper, &b.raw_upper), (Some(a), Some(b)) if a.depth <= b.depth)
+    pub(super) fn uses_unscaled_final_value(&self) -> bool {
+        self.has_costs() && self.objective_coefficient == 1.
     }
-    pub(super) fn has_exact_cost_continuations(&self) -> bool {
-        self.integral_costs || self.cost_lattice.is_some()
+    pub(super) fn base_window_snapshot(&self) -> Option<&BaseWindows> {
+        self.base_windows.as_ref()
+    }
+
+    pub(super) fn set_base_windows(&mut self, windows: BaseWindows) -> bool {
+        if self.base_windows.as_ref() == Some(&windows) {
+            return false;
+        }
+        self.base_windows = Some(windows);
+        true
+    }
+    pub(super) fn clear_base_windows(&mut self) -> bool {
+        self.base_windows.take().is_some()
     }
     pub(super) fn same_arc_operation(&self, a: usize, b: usize) -> bool {
-        self.operator_classes[a] == self.operator_classes[b]
-            && self.waiting_windows.as_ref().is_none_or(|windows| {
-                windows[a].lower.to_bits() == windows[b].lower.to_bits()
-                    && windows[a].upper.to_bits() == windows[b].upper.to_bits()
-            })
-            && self.machine_inputs.as_ref().is_none_or(|inputs| {
-                machine_inputs_equal(Some(&inputs[a..a + 1]), Some(&inputs[b..b + 1]))
-            })
+        self.machine_inputs.as_ref().is_some_and(|inputs| {
+            a < inputs.len()
+                && b < inputs.len()
+                && machine_inputs_equal(Some(&inputs[a..a + 1]), Some(&inputs[b..b + 1]))
+        }) && self.machine_waiting_rates.as_ref().is_none_or(|rates| {
+            rates
+                .get(a)
+                .zip(rates.get(b))
+                .is_some_and(|(a, b)| a.to_bits() == b.to_bits())
+        })
     }
-    pub(super) fn uses_strict_front_policy(&self) -> bool {
-        self.policy == FrontOperationPolicy::StrictDomain
+    pub(super) fn selected_value(&self, label: &SlopeLabel, _scale: f64) -> Result<f64> {
+        let history = label
+            .machine_history
+            .as_ref()
+            .ok_or_else(|| crate::incomplete("paired native history is unavailable"))?;
+        match history.last() {
+            descriptor::MachinePathSnapshot::Forward { state, .. } => finite(state.key()),
+            descriptor::MachinePathSnapshot::Root(_) => self.initial_front_minimum(),
+            descriptor::MachinePathSnapshot::Backward { .. } => {
+                Err(invalid("paired selected value requires a forward state"))
+            }
+        }
     }
-    pub(super) fn cached_join(
-        &self,
-        forward: &SlopeLabel,
-        backward: &SlopeLabel,
-    ) -> Option<Option<f64>> {
-        if !self.has_exact_cost_continuations()
-            || !self.uses_strict_front_policy()
-            || forward.machine_history.is_some()
-            || backward.machine_history.is_some()
-        {
-            return None;
-        }
-        let cache = backward.bounded_cost.as_deref()?;
-        let front = forward.front.as_ref()?;
-        let mut pieces: Vec<RelationPiece> = Vec::with_capacity(front.components().len());
-        for component in front.components() {
-            let pairs = component.pairs();
-            let value = pairs.first()?.0;
-            if component.has_machine_only_geometry()
-                || !value.is_finite()
-                || pairs.iter().skip(1).any(|pair| pair.0 != 0.)
-                || (value == 0.
-                    && value.is_sign_negative()
-                    && pairs
-                        .iter()
-                        .skip(1)
-                        .any(|pair| pair.0.to_bits() != (-0.0f64).to_bits()))
-            {
-                return None;
-            }
-            if pieces
-                .first()
-                .is_some_and(|first| first.left[1].to_bits() != value.to_bits())
-            {
-                return None;
-            }
-            let (lower, upper) = component.domain();
-            pieces.push(RelationPiece::constant(Window { lower, upper }, value)?);
-        }
-        if pieces.is_empty() {
-            return None;
-        }
-        // A raw front may represent overlapping component domains. The join
-        // stream needs ordered, nonoverlapping pieces. Their common constant
-        // value makes the exact domain union sufficient here.
-        pieces.sort_by(|a, b| {
-            a.left[0]
-                .total_cmp(&b.left[0])
-                .then_with(|| a.right[0].total_cmp(&b.right[0]))
-        });
-        let mut union: Vec<RelationPiece> = Vec::with_capacity(pieces.len());
-        for piece in pieces {
-            if let Some(last) = union.last_mut() {
-                if piece.left[0] <= last.right[0] {
-                    last.right[0] = last.right[0].max(piece.right[0]);
-                    continue;
-                }
-            }
-            union.push(piece);
-        }
-        cache.checked_compatible_join(&RelationFront::from_pieces(union))
-    }
-    fn machine_constant_value(front: &SlopeFront) -> Option<f64> {
-        let [function] = front.components() else {
-            return None;
+    pub(super) fn root(&self, forward: bool) -> SlopeLabel {
+        let history = if forward {
+            self.machine_root_history.clone()
+        } else {
+            self.machine_backward_root.clone()
         };
-        let pairs = function.pairs();
-        let value = pairs.first()?.0;
-        let stable_zero = value != 0.
-            || !value.is_sign_negative()
-            || pairs
-                .iter()
-                .skip(1)
-                .all(|pair| pair.0.to_bits() == (-0.0f64).to_bits());
-        (value.is_finite()
-            && stable_zero
-            && value != 1e12
-            && !function.has_machine_only_geometry()
-            && pairs.iter().skip(1).all(|pair| pair.0 == 0.))
-        .then_some(value)
-    }
-    pub(super) fn selected_value(&self, label: &SlopeLabel, scale: f64) -> Result<f64> {
-        if let Some(history) = &label.machine_history {
-            // Use only constants whose literal accumulation preserves their
-            // bits at every coordinate, including signed-zero behavior.
-            if let descriptor::MachinePathSnapshot::Forward { state, .. } = history.last() {
-                if let Some(value) = Self::machine_constant_value(state.front()) {
-                    return Ok(value);
-                }
-            }
-            return Err(crate::incomplete(
-                "paired machine selected value is unavailable",
-            ));
-        }
-        if self.has_costs() && finite(scale * self.objective_coefficient)? < 0. {
-            let upper = label.upper_negative.as_ref().ok_or_else(|| {
-                crate::incomplete("signed raw paired upper frontier is unavailable")
-            })?;
-            let witness = outcome(upper.minimum(FrontierBudget::default()))?
-                .ok_or_else(|| crate::incomplete("empty signed raw paired upper frontier"))?;
-            finite(-witness.value)
-        } else {
-            let front = label
-                .front
-                .as_ref()
-                .ok_or_else(|| invalid("missing raw paired front"))?;
-            let witness = outcome(front.minimum(FrontierBudget::default()))?
-                .ok_or_else(|| invalid("empty raw paired front"))?;
-            finite(witness.value)
-        }
-    }
-    pub(super) fn root(&self, forward: bool, machine_domain: bool) -> SlopeLabel {
-        if forward {
-            let mut root = self.initial.clone();
-            if machine_domain {
-                if let Some(history) = &self.machine_root_history {
-                    root.front = Some(history.last().front().clone());
-                    root.upper_negative = None;
-                    root.minimum = 0.;
-                    root.machine_history = Some(history.clone());
-                    return root;
-                }
-            }
-            root.upper_negative = self.upper_initial.clone();
-            root
-        } else {
-            SlopeLabel {
-                front: None,
-                upper_negative: None,
-                minimum: 0.,
-                upper: None,
-                bounded_cost: None,
-                raw_upper: None,
-                machine_history: machine_domain
-                    .then(|| self.machine_backward_root.clone())
-                    .flatten(),
-            }
+        SlopeLabel {
+            front: if forward {
+                history.as_ref().map(|root| root.last().front().clone())
+            } else {
+                None
+            },
+            upper_negative: None,
+            minimum: 0.,
+            machine_history: history,
         }
     }
 
@@ -1183,10 +667,6 @@ impl PreparedSlopePaired {
             .as_ref()
             .and_then(|inputs| inputs.get(arc))
             .ok_or_else(|| crate::incomplete("paired machine arc inputs are unavailable"))?;
-        let prepared = self
-            .arcs
-            .get(arc)
-            .ok_or_else(|| crate::incomplete("paired machine arc is unavailable"))?;
         let budget = FrontierBudget::default();
         if !forward {
             let history = old
@@ -1205,7 +685,7 @@ impl PreparedSlopePaired {
                 crate::incomplete("paired machine backward arc inputs are unavailable")
             })?;
             let Some((front, bits, key)) =
-                outcome(PreparedSlopeRelationArc::machine_backward_transition(
+                outcome(PairedFrontOperations::machine_backward_transition(
                     history.last().front(),
                     &backward,
                     ceiling,
@@ -1215,38 +695,16 @@ impl PreparedSlopePaired {
             else {
                 return Ok(None);
             };
-            let mut source = None;
-            if self.mode != PairedResourceMode::Feasibility && scale != 0. {
-                // This carries a source suffix program, not a machine-to-source
-                // objective conversion. Its provisional cost stays zero; a
-                // join replays the suffix from the forward source state.
-                let mut previous = old.clone();
-                previous.machine_history = None;
-                let next = self
-                    .extend(
-                        &previous,
-                        arc,
-                        false,
-                        history.len() == 1,
-                        source_scale,
-                        false,
-                    )?
-                    .ok_or_else(|| crate::incomplete("paired source suffix unavailable"))?;
-                source = Some(next);
-            }
             let next_history = outcome(history.append_backward(arc, front, bits, key, budget))?
                 .ok_or_else(|| crate::incomplete("paired machine backward history rejected"))?;
-            if let Some(mut source) = source {
-                source.machine_history = Some(Arc::new(next_history));
-                return Ok(Some(source));
-            }
             return Ok(Some(SlopeLabel {
                 front: None,
                 upper_negative: None,
-                minimum: 0.,
-                upper: None,
-                bounded_cost: None,
-                raw_upper: None,
+                minimum: if self.mode == PairedResourceMode::Feasibility || scale == 0. {
+                    0.
+                } else {
+                    finite(key * scale)?
+                },
                 machine_history: Some(Arc::new(next_history)),
             }));
         }
@@ -1257,7 +715,7 @@ impl PreparedSlopePaired {
         if !self.matches_forward_root(history) {
             return Err(crate::incomplete("paired machine forward history is stale"));
         }
-        let Some((reduced, next)) = outcome(prepared.machine_transition(
+        let Some((reduced, next)) = outcome(PairedFrontOperations::machine_transition(
             history.last().front(),
             &input.continuation_inputs(),
             self.machine_mode(),
@@ -1272,100 +730,38 @@ impl PreparedSlopePaired {
         let objective = if self.mode == PairedResourceMode::Feasibility || scale == 0. {
             0.
         } else {
-            self.mapped_machine_objective(&next_history, source_scale, scale, budget)?
+            self.final_objective(next.key(), source_scale)?
         };
         Ok(Some(SlopeLabel {
             front: Some(front),
             upper_negative: None,
             minimum: finite(objective)?,
-            upper: None,
-            bounded_cost: None,
-            raw_upper: None,
             machine_history: Some(Arc::new(next_history)),
         }))
     }
 
-    fn same_machine_front(source: &SlopeFront, machine: &SlopeFront) -> bool {
-        let source = source.components();
-        let machine = machine.components();
-        source.len() == machine.len()
-            && source.iter().zip(machine).all(|(a, b)| {
-                !a.is_machine_zero_length()
-                    && !b.is_machine_zero_length()
-                    && a.pairs().len() == b.pairs().len()
-                    && a.pairs().iter().zip(b.pairs()).all(|(a, b)| {
-                        a.0.to_bits() == b.0.to_bits() && a.1.to_bits() == b.1.to_bits()
-                    })
-            })
+    fn initial_front_minimum(&self) -> Result<f64> {
+        if let Some(root) = &self.machine_root_input {
+            let pairs = root.pairs();
+            let mut value = pairs[0].0;
+            let mut minimum = value;
+            for pair in pairs.windows(2) {
+                value = finite(value + finite(finite(pair[1].1 - pair[0].1)? * pair[1].0)?)?;
+                if value < minimum {
+                    minimum = value;
+                }
+            }
+            Ok(minimum)
+        } else {
+            Err(crate::incomplete("paired native root is unavailable"))
+        }
     }
 
-    /// Establish compatibility rather than interpreting a raw key as an
-    /// objective. Replay the declared source program and require identical
-    /// prepared fronts at every retained machine state, including the root.
-    fn mapped_machine_objective(
-        &self,
-        history: &MachinePathHistory,
-        source_scale: f64,
-        weighted_scale: f64,
-        budget: FrontierBudget,
-    ) -> Result<f64> {
-        let unavailable =
-            || crate::incomplete("paired machine objective normalization is unavailable");
-        if weighted_scale < 0. {
-            return Err(unavailable());
-        }
-        let started = std::time::Instant::now();
-        let snapshots = outcome(history.snapshots(budget))?.ok_or_else(unavailable)?;
-        if snapshots.len().saturating_mul(128) > budget.max_operations {
-            return Err(crate::incomplete(
-                "paired machine objective replay work limit",
-            ));
-        }
-        let same = |source: &SlopeLabel, machine: &SlopeFront| -> bool {
-            let Some(source) = &source.front else {
-                return false;
-            };
-            Self::same_machine_front(source, machine)
-        };
-        let mut source = self.root(true, false);
-        for (index, snapshot) in snapshots.into_iter().enumerate() {
-            if budget
-                .max_elapsed
-                .is_some_and(|limit| started.elapsed() >= limit)
-            {
-                return Err(crate::incomplete(
-                    "paired machine objective replay deadline",
-                ));
-            }
-            match snapshot {
-                descriptor::MachinePathSnapshot::Root(_) if index == 0 => {}
-                descriptor::MachinePathSnapshot::Forward { arc, .. } if index != 0 => {
-                    source = self
-                        .extend(&source, *arc, true, false, source_scale, false)?
-                        .ok_or_else(unavailable)?;
-                }
-                _ => return Err(unavailable()),
-            }
-            if !same(&source, snapshot.front()) {
-                return Err(unavailable());
-            }
-        }
-        finite(source.minimum)
-    }
-    pub(super) fn initial_minimum(&self) -> f64 {
-        self.initial_minimum
-    }
     pub(super) fn final_objective(&self, value: f64, scale: f64) -> Result<f64> {
-        if !self.has_costs() {
+        if !self.has_costs() || scale == 0. || self.objective_coefficient == 0. {
             return Ok(0.);
         }
-        self.normalization
-            .charge_selected(
-                self.initial_minimum,
-                value,
-                finite(scale * self.objective_coefficient)?,
-            )
-            .map_err(|error| invalid(error.to_string()))
+        finite(value * finite(scale * self.objective_coefficient)?)
     }
 
     pub(super) fn extend(
@@ -1373,174 +769,34 @@ impl PreparedSlopePaired {
         old: &SlopeLabel,
         arc: usize,
         forward: bool,
-        first_backward: bool,
+        _first_backward: bool,
         scale: f64,
         machine_domain: bool,
     ) -> Result<Option<SlopeLabel>> {
-        let source_scale = scale;
-        let scale = finite(scale * self.objective_coefficient)?;
-        let signed = self.has_costs() && scale < 0.;
-        if machine_domain && self.has_machine_program_input() {
-            return self.extend_machine(old, arc, forward, scale, source_scale);
-        }
-        if !forward {
-            let mut next = old.clone();
-            // A numerical adjoint never rejects a suffix or certifies a join.
-            // Keep the independently checked cache and ordered replay guards.
-            next.raw_upper = Some(Arc::new(RawAdjoint {
-                depth: old
-                    .raw_upper
-                    .as_ref()
-                    .map_or(Some(1), |old| old.depth.checked_add(1))
-                    .ok_or_else(|| invalid("paired suffix length overflow"))?,
-                arc: self.adjoints[arc].clone(),
-                previous: old.raw_upper.clone(),
-                terminal: first_backward,
-                outcome: OnceLock::new(),
-            }));
-            next.bounded_cost = (if let Some(lattice) = &self.cost_lattice {
-                lattice.prepend(old.bounded_cost.as_deref(), arc, first_backward)
-            } else if self.exact_cost {
-                self.backward[arc].as_ref().and_then(|prepared| {
-                    if let Some(old) = &old.bounded_cost {
-                        old.checked_prepend(prepared)
-                    } else if first_backward {
-                        BoundedCostFront::from_terminal_arc(prepared, self.ceiling)
-                    } else {
-                        None
-                    }
-                })
-            } else {
-                None
-            })
-            .map(Box::new);
-            // The numerical suffix minimum does not certify a lower bound
-            // for arbitrary fractional prefixes under literal rounding.
-            next.minimum = 0.;
-            next.upper = (self.mode == PairedResourceMode::Feasibility)
-                .then(|| self.backward[arc].as_ref())
-                .flatten()
-                .and_then(|prepared| {
-                    let root;
-                    let upper = if let Some(upper) = old.upper.as_ref() {
-                        upper
-                    } else if first_backward {
-                        let arc = prepared.arc();
-                        let lo = arc.lower.prepared_domain();
-                        let hi = arc.upper.prepared_domain();
-                        let (lower, upper) = (lo.lower.max(hi.lower), lo.upper.min(hi.upper));
-                        if lower > upper || arc.upper.points.iter().any(|p| p[1] > 1e12) {
-                            return None;
-                        }
-                        root = RelationFront::unbounded_upper(lower, upper);
-                        &root
-                    } else {
-                        return None;
-                    };
-                    upper
-                        .extend_backward_upper_prepared(prepared)
-                        .ok()
-                        .flatten()
-                });
-            return Ok(Some(next));
-        }
-        let front = old
-            .front
-            .as_ref()
-            .ok_or_else(|| invalid("missing raw paired forward state"))?;
-        let extension = if let Some(windows) = &self.waiting_windows {
-            let window = windows[arc];
-            self.arcs[arc].extend_with_machine_waiting_bounds(
-                front,
-                window.lower,
-                window.upper,
-                FrontierBudget::default(),
-            )
-        } else {
-            self.arcs[arc].extend(front, FrontierBudget::default())
-        };
-        let Some(front) = outcome(extension)? else {
-            return Ok(None);
-        };
-        let Some(witness) = outcome(front.minimum(FrontierBudget::default()))? else {
-            return Ok(None);
-        };
-        let upper_negative = self.upper_arcs.as_ref().and_then(|arcs| {
-            match negated_upper_on(&front, &arcs[arc], self.policy, FrontierBudget::default()) {
-                FrontierOutcome::Complete(front) => Some(front),
-                FrontierOutcome::Empty | FrontierOutcome::Unknown(_) => None,
-            }
-        });
-        if signed && upper_negative.is_none() {
+        if !machine_domain
+            || !self.machine_program_inputs_complete()
+            || !self.has_machine_program_input()
+        {
             return Err(crate::incomplete(
-                "signed raw paired upper frontier is unavailable",
+                "paired native front program is not prepared",
             ));
         }
-        let selected = if signed {
-            let witness = outcome(
-                upper_negative
-                    .as_ref()
-                    .expect("checked signed envelope")
-                    .minimum(FrontierBudget::default()),
-            )?
-            .ok_or_else(|| invalid("empty signed raw paired upper frontier"))?;
-            -witness.value
-        } else {
-            witness.value
-        };
-        let objective = if self.mode == PairedResourceMode::Feasibility {
-            0.
-        } else {
-            self.normalization
-                .charge_selected(self.initial_minimum, selected, scale)
-                .map_err(|error| invalid(error.to_string()))?
-        };
-        Ok(Some(SlopeLabel {
-            front: Some(front),
-            upper_negative,
-            minimum: finite(objective)?,
-            upper: None,
-            bounded_cost: None,
-            raw_upper: None,
-            machine_history: None,
-        }))
+        let weighted = finite(scale * self.objective_coefficient)?;
+        self.extend_machine(old, arc, forward, weighted, scale)
     }
 }
 impl CoupledLabelState {
-    /// General numerical backward upper fronts in raw paired declaration
-    /// order. None denotes a forward state or unknown/empty adjoint, not a
-    /// source infeasibility proof. Joins retain their ordered replay contract.
+    /// Backward native fronts in paired-resource order.
     pub fn slope_relation_backward_fronts(&self) -> impl Iterator<Item = Option<&SlopeFront>> {
         self.slope_relations.iter().map(|label| {
-            match label.raw_upper.as_deref().map(RawAdjoint::outcome) {
-                Some(FrontierOutcome::Complete(front)) => Some(front),
-                _ => None,
+            if self.suffix.is_some() {
+                label
+                    .machine_history
+                    .as_ref()
+                    .map(|history| history.last().front())
+            } else {
+                None
             }
-        })
-    }
-    /// Numerical backward outcomes, including an empty front or the reason a
-    /// bounded computation could not complete. These are diagnostic results,
-    /// not certificates of source infeasibility or safe dominance.
-    pub fn slope_relation_backward_outcomes(
-        &self,
-    ) -> impl Iterator<Item = Option<&FrontierOutcome<SlopeFront>>> {
-        self.slope_relations
-            .iter()
-            .map(|label| label.raw_upper.as_deref().map(RawAdjoint::outcome))
-    }
-    /// Recompute each numerical backward outcome using a caller-supplied
-    /// budget, without reusing a previously cached unknown. Each relation
-    /// receives its own budget, shared conservatively across its suffix arcs.
-    /// These results remain advisory and do not certify source feasibility.
-    pub fn slope_relation_backward_outcomes_with_budget(
-        &self,
-        budget: FrontierBudget,
-    ) -> impl Iterator<Item = Option<FrontierOutcome<SlopeFront>>> + '_ {
-        self.slope_relations.iter().map(move |label| {
-            label
-                .raw_upper
-                .as_deref()
-                .map(|upper| upper.recompute(budget))
         })
     }
     /// Computed forward paired slope fronts. Backward states retain the operator

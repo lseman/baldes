@@ -23,7 +23,6 @@ use std::{
 
 mod bounds;
 mod column_pool;
-mod control_pricing;
 mod enumeration;
 pub mod format;
 pub mod imported;
@@ -35,6 +34,7 @@ mod synchronization;
 pub use synchronization::{SynchronizedService, SynchronizedServiceMember};
 mod activity_rows;
 mod resource_rows;
+pub(crate) use activity_rows::value_on_graph as accumulated_activity_column_value;
 pub use activity_rows::{AccumulatedActivityCoefficients, AccumulatedActivityEntry};
 pub use presence_rows::PresenceCoefficients;
 pub use resource_groups::{ResourceGroupCandidate, ResourceGroupMember};

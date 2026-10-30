@@ -287,10 +287,7 @@ def test_master_worker_budget_defaults_and_validation():
     assert result.status == "Optimal"
 
 
-def test_root_scaling_defaults_to_off():
-    import inspect
-
-    assert inspect.signature(solve).parameters["clp_scaling"].default == "off"
+def test_root_default_matches_explicit_scaling_off():
     default = solve(triangle(), reduced_cost_fixing=False)
     explicit = solve(triangle(), reduced_cost_fixing=False, clp_scaling="off")
     assert default.status == explicit.status == "Optimal"

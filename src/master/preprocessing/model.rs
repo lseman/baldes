@@ -40,6 +40,10 @@ pub struct PreprocessingReport {
     pub skipped: Option<String>,
     pub networks: Vec<NetworkActivityBounds>,
     pub master_bounds: Vec<(i32, Bounds)>,
+    /// Node-local owner registration bounds; not restrictions on individual paths.
+    pub paired_owner_bounds: Vec<(i32, usize, Bounds)>,
+    /// Aggregate row coordinates, distinct from the local callback bounds above.
+    pub paired_owner_aggregate_bounds: Vec<(i32, usize, Bounds)>,
     pub route_upper_bounds: Vec<(usize, f64)>,
 }
 

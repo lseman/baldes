@@ -66,12 +66,9 @@ fn exact_integer_encoding<const D: usize>(
             }
             if let Some(kernel) = oracle.network.graph.coupled_kernel() {
                 let arcs: Vec<_> = route.route.arcs.iter().map(|id| oracle.index[id]).collect();
-                let Some((true, bounds)) = kernel.certify_with_controls(
-                    &arcs,
-                    &route.route.coupled_controls,
-                    &mut proof_work,
-                    Some(deadline),
-                ) else {
+                let Some((true, bounds)) =
+                    kernel.certify_with_budget(&arcs, &mut proof_work, Some(deadline))
+                else {
                     return Ok(false);
                 };
                 if bounds[0] != bounds[1] || cost.add(bounds[0]).is_none() {

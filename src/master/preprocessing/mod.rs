@@ -194,3 +194,6 @@ pub use conservative::{propagate_conservative, propagate_mixed_conservative};
 
 #[cfg(feature = "clp")]
 pub(crate) mod flow;
+
+#[cfg(feature = "clp")]
+pub(crate) mod paired_owner;

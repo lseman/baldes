@@ -5,12 +5,6 @@ use baldes::pricing::Solver;
 fn public_metadata_lists_only_supported_canonical_names_and_consistent_indices() {
     let mut options = Options::default();
     let mut solver = Solver::<2>::new(2, 0).unwrap();
-    let expected = if cfg!(all(feature = "clp", feature = "highs")) {
-        46
-    } else {
-        44
-    };
-    assert_eq!(OPTION_TABLE.len(), expected);
     let mut names = std::collections::HashSet::new();
     for (index, info) in OPTION_TABLE.iter().enumerate() {
         assert!(info.name.starts_with("BALDES"));
@@ -27,6 +21,13 @@ fn public_metadata_lists_only_supported_canonical_names_and_consistent_indices()
         assert_eq!(Options::index(&legacy).unwrap(), index);
         assert_eq!(options.get(&legacy).unwrap(), info.default);
         solver.set_option(&legacy, info.default).unwrap();
+    }
+    for required in [
+        "BALDESnumberOfBucketsPerVertex",
+        "BALDESuseBidirectionalSearch",
+        "BALDESlabelDominanceStrategy",
+    ] {
+        assert!(names.contains(required), "missing core option {required}");
     }
     assert!(Options::support("unknown").is_err());
 }
@@ -78,13 +79,11 @@ fn legacy_aliases_share_storage_and_reach_runtime_validation() {
     options.set("BALDESnumberOfBucketsPerVertex", 23.).unwrap();
     assert_eq!(options.get("RCSPnumberOfBucketsPerVertex").unwrap(), 23.);
     let mut solver = Solver::<2>::new(2, 0).unwrap();
-    solver.set_option("RCSPlabelDominanceStrategy", 1.).unwrap();
-    assert_eq!(solver.dominance_mode, 1);
-    assert!(solver.set_option("RCSPlabelDominanceStrategy", 2.).is_err());
-    assert_eq!(solver.dominance_mode, 1);
+    solver.set_option("RCSPlabelDominanceStrategy", 2.).unwrap();
+    assert!(solver.set_option("RCSPlabelDominanceStrategy", 1.).is_err());
     assert_eq!(
         solver.options.get("BALDESlabelDominanceStrategy").unwrap(),
-        1.
+        2.
     );
 }
 
@@ -103,7 +102,7 @@ fn failed_solver_setters_preserve_options_controls_phases_and_prepared_engine() 
     for (name, value) in [
         ("BALDEShardTimeThresholdInPricing", f64::MAX),
         ("BALDESmaxNumOfColsPerExactIteration", 0.),
-        ("BALDESlabelDominanceStrategy", 2.),
+        ("BALDESlabelDominanceStrategy", 1.),
         ("BALDESuseBidirectionalSearch", 3.),
         ("BALDESdynamicBucketSteps", 2.),
         ("BALDEScapacityCutsSeparator", 0.),
@@ -133,14 +132,27 @@ fn failed_solver_setters_preserve_options_controls_phases_and_prepared_engine() 
     );
 }
 
+/// Strategy 1 is partial dominance, which is not implemented, so the setter
+/// rejects it. Other integers keep ordinary dominance and leave the
+/// cost-free `dominance_mode` untouched.
 #[test]
-fn named_dominance_option_reaches_labeling() {
+fn label_dominance_strategy_rejects_partial_dominance_and_keeps_ordinary_dominance() {
     let mut solver = Solver::<2>::new(2, 0).unwrap();
     solver.graph.add_arc(0, 1, -2.).unwrap();
-    solver
+    let error = solver
         .set_option("BALDESlabelDominanceStrategy", 1.)
-        .unwrap();
-    assert_eq!(solver.dominance_mode, 1);
+        .unwrap_err();
+    assert!(error.to_string().contains("partial dominance"), "{error}");
+    assert_eq!(
+        solver.options.get("BALDESlabelDominanceStrategy").unwrap(),
+        0.
+    );
+    for value in [0., 2., -1.] {
+        solver
+            .set_option("BALDESlabelDominanceStrategy", value)
+            .unwrap();
+        assert_eq!(solver.dominance_mode, 0);
+    }
     assert_eq!(
         solver
             .price_phase(0, 10, true)
@@ -148,7 +160,7 @@ fn named_dominance_option_reaches_labeling() {
             .minimum_reduced_cost,
         -2.
     );
-    assert_eq!(solver.engine.as_ref().unwrap().controls.dominance_mode, 1);
+    assert_eq!(solver.engine.as_ref().unwrap().controls.dominance_mode, 0);
 }
 
 #[cfg(feature = "clp")]

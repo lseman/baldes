@@ -276,6 +276,11 @@ impl<const WORDS: usize, const D: usize> LabelData for AuxiliaryLabel<WORDS, D> 
     }
     #[inline(always)]
     fn key(&self) -> f64 {
+        if let Some(key) = self.coupled_state.as_deref().and_then(|state| {
+            state.paired_completion_key(self.half_potential, self.additional_cost)
+        }) {
+            return key;
+        }
         (self.half_potential + self.additional_cost) + (0.0 + self.base.cost)
     }
 }

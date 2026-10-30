@@ -10,7 +10,7 @@ fn joined_label_cost_order_and_ng_rejection_match_recorded_binary_outputs() {
     let forward = PreparedSlopeFunction::from_machine_pairs(vec![(5., 0.), (0., 2.)]).unwrap();
     let backward = PreparedSlopeFunction::from_machine_pairs(vec![(98., 0.), (0., 2.)]).unwrap();
     for case in cases.as_array().unwrap() {
-        let FrontierOutcome::Complete(selection) = PreparedSlopeRelationArc::machine_concatenation(
+        let FrontierOutcome::Complete(selection) = PairedFrontOperations::machine_concatenation(
             &forward,
             &backward,
             100.,
@@ -43,7 +43,7 @@ fn joined_label_cost_order_and_ng_rejection_match_recorded_binary_outputs() {
 }
 
 #[test]
-fn label_join_cost_keeps_nonfinite_arithmetic_unknown() {
+fn label_join_cost_preserves_raw_ieee_nonfinite_outputs() {
     let selection = MachineConcatenation {
         coordinate: 0.,
         dependent: Some(7.),
@@ -53,10 +53,19 @@ fn label_join_cost_keeps_nonfinite_arithmetic_unknown() {
         (0., 0., f64::INFINITY),
         (f64::NAN, 0., 0.),
     ] {
-        assert!(matches!(
-            selection.join_labels(costs.0, costs.1, costs.2, 0, 0),
-            FrontierOutcome::Unknown(FrontierUnknown::Arithmetic(_))
-        ));
+        let FrontierOutcome::Complete(joined) =
+            selection.join_labels(costs.0, costs.1, costs.2, 0, 0)
+        else {
+            panic!("raw label arithmetic should complete");
+        };
+        let expected = (costs.0 + costs.1) + (7. + costs.2);
+        assert!(joined.compatible);
+        assert_eq!(joined.dependent_cost, 7.);
+        if expected.is_nan() {
+            assert!(joined.reduced_cost.is_nan());
+        } else {
+            assert_eq!(joined.reduced_cost, expected);
+        }
     }
 }
 
@@ -85,7 +94,7 @@ fn paired_completion_joins_match_registered_reference_operands() {
         };
         let left = make("left");
         let right = make("right");
-        let FrontierOutcome::Complete(selection) = PreparedSlopeRelationArc::machine_concatenation(
+        let FrontierOutcome::Complete(selection) = PairedFrontOperations::machine_concatenation(
             &left,
             &right,
             case["ceiling"].as_f64().unwrap(),
@@ -147,7 +156,7 @@ fn completion_join_cutoff_matches_native_equality_and_adjacent_values() {
         )
         .unwrap()
     };
-    let FrontierOutcome::Complete(selection) = PreparedSlopeRelationArc::machine_concatenation(
+    let FrontierOutcome::Complete(selection) = PairedFrontOperations::machine_concatenation(
         &make("forward"),
         &make("backward"),
         fixture["ceiling"].as_f64().unwrap(),
@@ -175,5 +184,27 @@ fn completion_join_cutoff_matches_native_equality_and_adjacent_values() {
             joined.reduced_cost < case["cutoff"].as_f64().unwrap(),
             case["accepted"].as_bool().unwrap()
         );
+    }
+}
+
+#[test]
+fn retained_empty_nan_tail_does_not_discard_a_finite_machine_join() {
+    let nan = f64::from_bits(0xfff8_0000_0000_0000);
+    let forward = PreparedSlopeFunction::from_machine_pairs(vec![(0., 0.), (0., 2.)]).unwrap();
+    let backward =
+        PreparedSlopeFunction::from_machine_output_pairs(vec![(0., 0.), (-1., 0.5), (nan, 0.5)])
+            .unwrap();
+    for mode in [4, 5, 6] {
+        let FrontierOutcome::Complete(joined) = PairedFrontOperations::machine_concatenation(
+            &forward,
+            &backward,
+            3.,
+            mode,
+            FrontierBudget::default(),
+        ) else {
+            panic!("retained native NaN tail must preserve the earlier feasible join");
+        };
+        assert_eq!(joined.coordinate, 0.);
+        assert_eq!(joined.dependent, (mode != 4).then_some(3.));
     }
 }

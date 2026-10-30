@@ -98,7 +98,8 @@ fn machine_pairs_preserve_zero_width_coordinate_bits_without_relaxing_source_inp
     assert!(machine.has_internal_zero_length());
     assert_eq!(machine.pairs()[0].1.to_bits(), (-0.0f64).to_bits());
     assert_eq!(machine.pairs()[1].1.to_bits(), 0.0f64.to_bits());
-    let repeated = PreparedSlopeFunction::from_machine_pairs(vec![(1., 0.), (2., 0.), (3., 0.)]).unwrap();
+    let repeated =
+        PreparedSlopeFunction::from_machine_pairs(vec![(1., 0.), (2., 0.), (3., 0.)]).unwrap();
     assert!(repeated.has_internal_zero_length());
 }
 
@@ -352,4 +353,24 @@ fn serde_round_trip_cannot_bypass_prepared_validation() {
     assert!(serde_json::from_str::<PreparedSlopeFunction>(r#"{"pairs":[[0,1],[2,0]]}"#).is_err());
     assert!(serde_json::from_str::<PreparedSlopeFunction>(r#"{"pairs":[]}"#).is_err());
     assert!(serde_json::from_str::<RawAffine>(r#"{"intercept":0,"slope":1,"extra":3}"#).is_err());
+}
+
+#[test]
+fn generated_empty_nan_segments_preserve_finite_lookup_prefix_and_replay_identity() {
+    let nan = f64::from_bits(0xfff8_0000_0000_0000);
+    let pairs = vec![(0., 0.), (-1., 0.5), (nan, 0.5)];
+    assert!(PreparedSlopeFunction::from_prepared_pairs(pairs.clone()).is_err());
+    assert!(PreparedSlopeFunction::from_machine_pairs(pairs.clone()).is_err());
+    let output = PreparedSlopeFunction::from_machine_output_pairs(pairs).unwrap();
+    assert_eq!(output.pairs()[2].0.to_bits(), nan.to_bits());
+    assert_eq!(output.machine_value_and_segment(0.).unwrap(), Some((0., 1)));
+    assert_eq!(
+        output.machine_value_and_segment(0.25).unwrap(),
+        Some((-0.25, 1))
+    );
+    assert_eq!(
+        output.machine_value_and_segment(0.5).unwrap(),
+        Some((-0.5, 2))
+    );
+    assert_eq!(output, output.clone());
 }

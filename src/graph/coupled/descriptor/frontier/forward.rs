@@ -4,7 +4,7 @@ use super::*;
 impl MachineForwardState {
     /// Construct a machine state from a successful, already filtered waiting
     /// envelope. `reduced` retains the input front's machine-reduction history
-    /// and `arc` identifies the transition. The caller must supply an envelope
+    /// and the caller must supply an envelope
     /// produced by that transition after its lower and upper filters succeed.
     /// This operation does not verify the envelope's association with the arc.
     /// A missing envelope predecessor means the recurrence did not write that
@@ -12,7 +12,6 @@ impl MachineForwardState {
     pub fn from_filtered_waiting(
         reduced: &SlopeFront,
         envelope: &MachineWaitingEnvelope,
-        arc: Arc<crate::graph::coupled::descriptor::SlopeRelationArc>,
         mode: i32,
         budget: FrontierBudget,
     ) -> FrontierOutcome<Self> {
@@ -91,7 +90,6 @@ impl MachineForwardState {
             components: vec![function.clone()].into(),
             provenance: Arc::new(FrontierProvenance::PairedMachineWaiting {
                 input: reduced.provenance().clone(),
-                arc,
                 predecessor,
                 waiting_bits: envelope.waiting_bits,
             }),

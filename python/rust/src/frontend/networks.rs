@@ -92,53 +92,6 @@ impl NetworkNode {
                 .map_err(error)?,
         })
     }
-    #[pyo3(signature=(route_index,resource,maximize,terminal,max_cells,max_work,max_lp_iterations,seconds))]
-    fn optimize_route_control(
-        &self,
-        route_index: usize,
-        resource: usize,
-        maximize: bool,
-        terminal: Option<(f64, f64)>,
-        max_cells: usize,
-        max_work: usize,
-        max_lp_iterations: usize,
-        seconds: f64,
-    ) -> PyResult<String> {
-        let duration = std::time::Duration::try_from_secs_f64(seconds).map_err(error)?;
-        let deadline = Instant::now()
-            .checked_add(duration)
-            .ok_or_else(|| error("control search deadline overflow"))?;
-        let terminal = terminal
-            .map(|(lo, hi)| baldes::Window::new(lo, hi))
-            .transpose()
-            .map_err(error)?;
-        let result = self
-            .snapshot
-            .optimize_route_control(
-                route_index,
-                resource,
-                maximize,
-                terminal,
-                baldes::master::controls::ControlSearchLimits {
-                    max_cells,
-                    max_work,
-                    max_lp_iterations,
-                    deadline: Some(deadline),
-                },
-            )
-            .map_err(error)?;
-        model::format::control_optimization_json(&result).map_err(error)
-    }
-    fn with_route_controls(&self, route_index: usize, controls_json: &str) -> PyResult<Self> {
-        let controls = model::format::parse_paired_controls(controls_json).map_err(error)?;
-        Ok(Self {
-            registry: self.registry.clone(),
-            snapshot: self
-                .snapshot
-                .with_route_controls(route_index, controls)
-                .map_err(error)?,
-        })
-    }
     fn fix_route(&self, route_index: usize, quantity: f64) -> PyResult<Self> {
         Ok(Self {
             registry: self.registry.clone(),

@@ -1,5 +1,55 @@
 use super::*;
-use baldes::graph::coupled::CoupledResource;
+use baldes::graph::coupled::descriptor::{
+    FrontierBudget, FrontierOutcome, MachineRootInput, PreparedSlopeFunction, RawAffine,
+};
+use baldes::graph::coupled::{CoupledResource, MachineArcFunctionInput, PairedResourceMode};
+
+/// Install a cost-unbounded paired front with one constant dependent
+/// increment per arc, zero waiting and a common base window.
+fn install_paired_front(
+    graph: &mut Graph<2>,
+    increments: &[f64],
+    consumption: f64,
+    window: Window,
+) {
+    graph
+        .set_coupled_resources(&[CoupledResource::PairedFront {
+            mode: PairedResourceMode::CostUnbounded,
+        }])
+        .unwrap();
+    let affine = |value| MachineRootInput::Affine(RawAffine::new(value, 0.).unwrap());
+    let base = PreparedSlopeFunction::from_prepared_pairs(vec![
+        (consumption, window.lower),
+        (0., window.upper),
+    ])
+    .unwrap();
+    let inputs: Vec<_> = increments
+        .iter()
+        .enumerate()
+        .map(|(physical_arc, &increment)| MachineArcFunctionInput {
+            physical_arc,
+            tail_bounds: window,
+            waiting_bounds: window,
+            waiting_rate: 0,
+            base: &base,
+            dependent: affine(increment),
+            dependent_lower: affine(-100.),
+            dependent_upper: affine(100.),
+        })
+        .collect();
+    let result = graph.prepare_paired_front_program(
+        0,
+        &inputs,
+        affine(0.),
+        window,
+        window,
+        FrontierBudget::default(),
+    );
+    assert!(
+        matches!(result, FrontierOutcome::Complete(())),
+        "{result:?}"
+    );
+}
 
 fn problem() -> Problem<2> {
     let mut first = network(7, &[(10., &[0]), (0., &[0])], 1);
@@ -35,87 +85,45 @@ fn problem() -> Problem<2> {
 }
 
 #[test]
-fn negative_unbounded_paired_cost_has_a_finite_hop_certificate() {
-    use baldes::graph::coupled::{
-        PairedCostNormalization, PairedResourceArc, PairedResourceMode, PiecewiseLinearFunction,
-    };
-    let constant = |value| PiecewiseLinearFunction::new(vec![[0., value], [10., value]]).unwrap();
+fn paired_owner_weights_do_not_reverse_the_raw_front_choice() {
     let mut instance = network(7, &[(0., &[]), (0., &[])], 0);
-    let arrival = PiecewiseLinearFunction::new(vec![[0., 0.], [10., 10.]]).unwrap();
-    let mut increments = [5., 0., 0., 0.].into_iter();
-    instance
-        .graph
-        .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
-            normalization: PairedCostNormalization::AbsoluteFinalValue,
-            initial: constant(0.),
-            initial_base: Window::new(0., 10.).unwrap(),
-            arcs: (0..4)
-                .map(|_| PairedResourceArc {
-                    arrival: arrival.clone(),
-                    increment: constant(increments.next().unwrap()),
-                    lower: constant(-100.),
-                    upper: constant(1e12),
-                    waiting: 0,
-                })
-                .collect(),
-            mode: PairedResourceMode::CostUnbounded,
-        }])
-        .unwrap();
-    instance
-        .graph
-        .set_coupled_objective_coefficients(&[(0, -1.)])
-        .unwrap();
-    let root = model::solve(
-        Problem {
-            rows: vec![],
-            networks: vec![instance],
-        },
-        {
-            let mut configured = options();
-            configured.cg.bound_mode = BoundMode::Certified;
-            configured
-        },
-    )
-    .unwrap();
-    optimal(&root, -15.);
-    let best = root
-        .routes
-        .iter()
-        .position(|route| route.route.arcs == [0, 1])
-        .unwrap();
-    assert_eq!(root.values[best], 3.);
+    install_paired_front(
+        &mut instance.graph,
+        &[5., 0., 0., 0.],
+        0.,
+        Window::new(0., 10.).unwrap(),
+    );
+    // Native associates this coefficient with selected original columns,
+    // while the paired pricing callback keeps its unit objective. A negative
+    // association does not turn its front scan into a maximization.
+    for coefficient in [-1., 0., 2.] {
+        instance
+            .graph
+            .set_coupled_objective_coefficients(&[(0, coefficient)])
+            .unwrap();
+        let kernel = instance.graph.coupled_kernel().unwrap();
+        assert_eq!(kernel.objective_coefficient(0), Some(coefficient));
+        assert_eq!(kernel.replay_pricing(&[0, 1]).unwrap(), Some(5.));
+        assert_eq!(kernel.replay_pricing(&[2, 3]).unwrap(), Some(0.));
+        assert_eq!(kernel.replay(&[0, 1]).unwrap(), Some(5. * coefficient));
+        assert_eq!(kernel.replay(&[2, 3]).unwrap(), Some(0.));
+    }
 }
 
 #[test]
 fn paired_network_costs_reach_certified_enumeration_fixing_and_integer_solving() {
-    use baldes::graph::coupled::{PairedResourceArc, PairedResourceMode, PiecewiseLinearFunction};
-    let constant = |value| PiecewiseLinearFunction::new(vec![[0., value], [12., value]]).unwrap();
     let mut problem = problem();
     for (network, increments) in problem
         .networks
         .iter_mut()
         .zip([[-9., 0., 5., 0.], [0., 0., 4., 0.]])
     {
-        network
-            .graph
-            .set_coupled_resources(&[CoupledResource::PairedPiecewiseLinear {
-                normalization:
-                    baldes::graph::coupled::PairedCostNormalization::FinalMinusInitialMinimum,
-                initial: constant(0.),
-                initial_base: Window::new(0., 0.).unwrap(),
-                arcs: increments
-                    .into_iter()
-                    .map(|increment| PairedResourceArc {
-                        arrival: PiecewiseLinearFunction::new(vec![[0., 1.], [10., 11.]]).unwrap(),
-                        increment: constant(increment),
-                        lower: constant(-100.),
-                        upper: constant(100.),
-                        waiting: 0,
-                    })
-                    .collect(),
-                mode: PairedResourceMode::CostUnbounded,
-            }])
-            .unwrap();
+        install_paired_front(
+            &mut network.graph,
+            &increments,
+            1.,
+            Window::new(0., 12.).unwrap(),
+        );
     }
     let root = model::solve(problem, options()).unwrap();
     optimal(&root, 1.);

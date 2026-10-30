@@ -110,7 +110,7 @@ impl RawAffine {
 
 /// Immutable validated prepared slope representation, with a closed domain.
 /// No conversion to endpoint knots is claimed to preserve literal arithmetic.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "clp", derive(serde::Serialize))]
 pub struct PreparedSlopeFunction {
     pairs: Vec<(f64, f64)>,
@@ -122,6 +122,21 @@ pub struct PreparedSlopeFunction {
     // segment. Their consumers are not those of a point front.
     #[cfg_attr(feature = "clp", serde(skip))]
     machine_internal_zero_length: bool,
+}
+
+impl PartialEq for PreparedSlopeFunction {
+    fn eq(&self, other: &Self) -> bool {
+        let same =
+            |a: f64, b: f64| a == b || a.is_nan() && b.is_nan() && a.to_bits() == b.to_bits();
+        self.machine_zero_length == other.machine_zero_length
+            && self.machine_internal_zero_length == other.machine_internal_zero_length
+            && self.pairs.len() == other.pairs.len()
+            && self
+                .pairs
+                .iter()
+                .zip(&other.pairs)
+                .all(|(a, b)| same(a.0, b.0) && same(a.1, b.1))
+    }
 }
 
 impl PreparedSlopeFunction {
@@ -293,6 +308,39 @@ impl PreparedSlopeFunction {
         Ok(function)
     }
 
+    /// Retain a generated machine array's undefined slopes.
+    /// Public source and machine-input constructors remain finite-only. A raw
+    /// output can contain 0/0 at an empty segment without making its earlier
+    /// coordinates unavailable to the literal machine lookup and join scan.
+    pub(super) fn from_machine_output_pairs(pairs: Vec<(f64, f64)>) -> Result<Self> {
+        if pairs.iter().all(|pair| pair.0.is_finite()) {
+            return Self::from_machine_pairs(pairs);
+        }
+        let &(anchor, first) = pairs
+            .first()
+            .ok_or(RawFunctionError::EmptyPreparedFunction)?;
+        finite(anchor, "initial value")?;
+        finite(first, "initial coordinate")?;
+        let mut previous = first;
+        for (index, &(slope, end)) in pairs.iter().enumerate().skip(1) {
+            finite(end, "segment end")?;
+            if index > 1 && end < previous {
+                return Err(RawFunctionError::InvalidOrdering { pair: index });
+            }
+            if slope.is_infinite() {
+                return Err(RawFunctionError::Unsupported(
+                    "infinite machine output slope",
+                ));
+            }
+            previous = end;
+        }
+        Ok(Self {
+            pairs,
+            machine_zero_length: true,
+            machine_internal_zero_length: true,
+        })
+    }
+
     /// Retain a native fixed array's `(value, lower), (slope, upper)` output
     /// when its coordinates compare equal. This is an output representation,
     /// not an accepted source descriptor; downstream operations must opt in.
@@ -397,7 +445,7 @@ impl PreparedSlopeFunction {
     /// the fixed-array helper used by concatenation both have this behavior;
     /// some inlined fixed-array lookups retain the final segment instead.
     /// Both evaluate at the original argument without snapping it to the knot.
-    pub(super) fn machine_vector_value_and_segment(
+    pub(in crate::graph::coupled) fn machine_vector_value_and_segment(
         &self,
         argument: f64,
     ) -> Result<Option<(f64, usize)>> {
@@ -413,8 +461,7 @@ impl PreparedSlopeFunction {
                 return Ok(false);
             }
         }
-        Ok(near(self.pairs[0].1, lower)?
-            && near(self.pairs[self.pairs.len() - 1].1, upper)?)
+        Ok(near(self.pairs[0].1, lower)? && near(self.pairs[self.pairs.len() - 1].1, upper)?)
     }
 
     fn machine_lookup_segment(&self, argument: f64, vector: bool) -> Result<Option<(f64, usize)>> {
@@ -448,9 +495,9 @@ impl PreparedSlopeFunction {
         let mut previous = lower;
         for (index, &(slope, end)) in pairs.iter().enumerate().skip(1) {
             if argument <= end {
-                let span = arithmetic(argument - previous, "machine lookup span")?;
-                let product = arithmetic(span * slope, "machine lookup multiplication")?;
-                value = arithmetic(value + product, "machine lookup accumulation")?;
+                let span = argument - previous;
+                let product = span * slope;
+                value += product;
                 let selected = if (vector || index + 1 < pairs.len()) && near(end, argument)? {
                     index + 1
                 } else {
@@ -458,9 +505,9 @@ impl PreparedSlopeFunction {
                 };
                 return Ok(Some((value, selected)));
             }
-            let span = arithmetic(end - previous, "machine lookup span")?;
-            let product = arithmetic(span * slope, "machine lookup multiplication")?;
-            value = arithmetic(value + product, "machine lookup accumulation")?;
+            let span = end - previous;
+            let product = span * slope;
+            value += product;
             previous = end;
         }
         if near(argument, upper)? {

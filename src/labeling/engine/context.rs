@@ -114,8 +114,11 @@ impl<'a, const D: usize> Context<'a, D> {
         f: &F,
         b: &B,
     ) -> (bool, f64) {
+        let paired_first = g
+            .coupled_kernel()
+            .is_some_and(|kernel| kernel.machine_paired_join_complete());
         if !self.branching.joins(f.branch_state(), b.branch_state())
-            || !self.resources_join(g, f, b)
+            || (!paired_first && !self.resources_join(g, f, b))
         {
             return (false, 0.);
         }
@@ -141,6 +144,9 @@ impl<'a, const D: usize> Context<'a, D> {
         } else {
             0.
         };
+        if paired_first && !self.resources_join(g, f, b) {
+            return (false, 0.);
+        }
         // Scalar arc sums and resource objectives have distinct rounding
         // histories. Never recover the scalar base by subtracting minima from
         // mixed keys, or combine independently minimized halves before replay.
@@ -156,23 +162,38 @@ impl<'a, const D: usize> Context<'a, D> {
                 self.resource_error.store(true, Ordering::Relaxed);
                 return (false, 0.);
             };
-            for arc in kernel.suffix_arcs(b_state) {
-                base += g.arcs[arc].reduced_cost;
-                if !base.is_finite() {
+            if kernel.machine_paired_join_complete() {
+                let Some(backward) = b_state.scalar_reduced_cost() else {
                     self.resource_error.store(true, Ordering::Relaxed);
                     return (false, 0.);
+                };
+                base += backward;
+            } else {
+                for arc in kernel.suffix_arcs(b_state) {
+                    base += g.arcs[arc].reduced_cost;
+                    if !base.is_finite() {
+                        self.resource_error.store(true, Ordering::Relaxed);
+                        return (false, 0.);
+                    }
                 }
             }
             base
         } else {
             f.cost() + b.cost()
         };
-        let cost = scalar_cost
-            + coupled_cost
-            + self
-                .cuts
-                .knapsack
-                .join_cost(g, f.resources(), b.resources(), self.consumption_joins);
+        let mut cost = scalar_cost + coupled_cost;
+        if self.cuts.knapsack.active
+            || !g
+                .coupled_kernel()
+                .is_some_and(|kernel| kernel.machine_paired_join_complete())
+        {
+            cost += self.cuts.knapsack.join_cost(
+                g,
+                f.resources(),
+                b.resources(),
+                self.consumption_joins,
+            );
+        }
         if g.has_coupled_resources() && !cost.is_finite() {
             self.resource_error.store(true, Ordering::Relaxed);
             return (false, 0.);
@@ -408,7 +429,11 @@ impl<'a, const D: usize> Context<'a, D> {
         {
             return None;
         }
-        let vertex = if forward { physical.head } else { physical.tail };
+        let vertex = if forward {
+            physical.head
+        } else {
+            physical.tail
+        };
         if BRANCHING && !self.branching.can_visit(from.branch_state(), vertex) {
             return None;
         }
@@ -458,13 +483,17 @@ impl<'a, const D: usize> Context<'a, D> {
         };
         let ng = transition.extend(from.ng(), 0)?;
         let internal = self.grid.internal[vertex];
-        let bucket = match self.grid.bucket_id_checked(forward, internal, self.grid.coordinate(&resources)) {
-            Ok(bucket) => bucket?,
-            Err(()) => {
-                self.resource_error.store(true, Ordering::Relaxed);
-                return None;
-            }
-        };
+        let bucket =
+            match self
+                .grid
+                .bucket_id_checked(forward, internal, self.grid.coordinate(&resources))
+            {
+                Ok(bucket) => bucket?,
+                Err(()) => {
+                    self.resource_error.store(true, Ordering::Relaxed);
+                    return None;
+                }
+            };
         let mut additional_cost = from.additional_cost();
         let cut_words = if CUTS {
             let table = if forward {
@@ -565,21 +594,11 @@ impl<'a, const D: usize> Context<'a, D> {
         f: &F,
         b: &B,
     ) -> bool {
-        g.resources.iter().enumerate().all(|(r, k)| match k {
-            ResourceKind::Disposable => {
-                if self.consumption_joins {
-                    f.resources()[r] + b.resources()[r]
-                        - g.initial[r].unwrap_or(g.vertices[g.source].bounds[r].lower)
-                        <= g.vertices[g.sink].bounds[r].upper + EPSILON
-                } else {
-                    f.resources()[r] <= b.resources()[r] + EPSILON
-                }
-            }
-            // Consumption-mode concatenation checks only disposable
-            // resources; equality resources are checked in value mode.
-            ResourceKind::Equality => {
-                self.consumption_joins || f.resources()[r] == b.resources()[r]
-            }
-        })
+        crate::labeling::standard_resources_join(
+            g,
+            f.resources(),
+            b.resources(),
+            self.consumption_joins,
+        )
     }
 }

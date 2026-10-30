@@ -1,0 +1,4099 @@
+{
+  "reference_sha256": "103caf4a9c58d6141e935848294bff16677f400323466dc23cd4b9e5c15889d6",
+  "scope": "Public registered native owner run, naturally invoked fixing and enumeration; negative dependent increments, positive initial dependent value.",
+  "registration": {
+    "initial": 2.0,
+    "dependent_increment": -0.25,
+    "dependent_lower": 0.0,
+    "dependent_upper": 8.0,
+    "waiting": 0
+  },
+  "preparation": {
+    "kind": "preparation",
+    "entry": "0x658950",
+    "return": 1,
+    "base_id": 0,
+    "dependent_id": 1,
+    "mode": 5,
+    "vertex_lower": [
+      0.0,
+      1.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "vertex_upper": [
+      1.5,
+      2.5,
+      2.5,
+      2.5,
+      2.5
+    ],
+    "initial": [
+      [
+        2.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.5
+      ]
+    ],
+    "arcs": [
+      {
+        "id": 0,
+        "tail": 0,
+        "head": 3,
+        "bounds": [
+          1.0,
+          2.5
+        ],
+        "waiting": 0.0,
+        "functions": {
+          "0x30": [
+            [
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.5
+            ]
+          ],
+          "0x48": [
+            [
+              1.0,
+              0.0
+            ],
+            [
+              1.0,
+              1.5
+            ]
+          ],
+          "0x60": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x78": [
+            [
+              -0.25,
+              0.0
+            ],
+            [
+              0.0,
+              1.5
+            ]
+          ],
+          "0x90": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xa8": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xc0": [
+            [
+              8.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ]
+        }
+      },
+      {
+        "id": 1,
+        "tail": 3,
+        "head": 4,
+        "bounds": [
+          1.0,
+          2.5
+        ],
+        "waiting": 0.0,
+        "functions": {
+          "0x30": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x48": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x60": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x78": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x90": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xa8": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xc0": [
+            [
+              8.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ]
+        }
+      },
+      {
+        "id": 2,
+        "tail": 3,
+        "head": 2,
+        "bounds": [
+          2.0,
+          2.5
+        ],
+        "waiting": 0.0,
+        "functions": {
+          "0x30": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x48": [
+            [
+              2.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x60": [
+            [
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              3.5
+            ]
+          ],
+          "0x78": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x90": [
+            [
+              -0.25,
+              2.0
+            ],
+            [
+              0.0,
+              3.5
+            ]
+          ],
+          "0xa8": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xc0": [
+            [
+              8.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "tail": 3,
+        "head": 1,
+        "bounds": [
+          2.0,
+          2.5
+        ],
+        "waiting": 0.0,
+        "functions": {
+          "0x30": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x48": [
+            [
+              2.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x60": [
+            [
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              3.5
+            ]
+          ],
+          "0x78": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x90": [
+            [
+              -0.25,
+              2.0
+            ],
+            [
+              0.0,
+              3.5
+            ]
+          ],
+          "0xa8": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xc0": [
+            [
+              8.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ]
+        }
+      },
+      {
+        "id": 4,
+        "tail": 0,
+        "head": 2,
+        "bounds": [
+          1.0,
+          2.5
+        ],
+        "waiting": 0.0,
+        "functions": {
+          "0x30": [
+            [
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.5
+            ]
+          ],
+          "0x48": [
+            [
+              1.0,
+              0.0
+            ],
+            [
+              1.0,
+              1.5
+            ]
+          ],
+          "0x60": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x78": [
+            [
+              -0.25,
+              0.0
+            ],
+            [
+              0.0,
+              1.5
+            ]
+          ],
+          "0x90": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xa8": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xc0": [
+            [
+              8.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "tail": 2,
+        "head": 4,
+        "bounds": [
+          1.0,
+          2.5
+        ],
+        "waiting": 0.0,
+        "functions": {
+          "0x30": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x48": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x60": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x78": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x90": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xa8": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xc0": [
+            [
+              8.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "tail": 2,
+        "head": 3,
+        "bounds": [
+          2.0,
+          2.5
+        ],
+        "waiting": 0.0,
+        "functions": {
+          "0x30": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x48": [
+            [
+              2.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x60": [
+            [
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              3.5
+            ]
+          ],
+          "0x78": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x90": [
+            [
+              -0.25,
+              2.0
+            ],
+            [
+              0.0,
+              3.5
+            ]
+          ],
+          "0xa8": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xc0": [
+            [
+              8.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "tail": 2,
+        "head": 1,
+        "bounds": [
+          2.0,
+          2.5
+        ],
+        "waiting": 0.0,
+        "functions": {
+          "0x30": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x48": [
+            [
+              2.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x60": [
+            [
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              3.5
+            ]
+          ],
+          "0x78": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x90": [
+            [
+              -0.25,
+              2.0
+            ],
+            [
+              0.0,
+              3.5
+            ]
+          ],
+          "0xa8": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xc0": [
+            [
+              8.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ]
+        }
+      },
+      {
+        "id": 8,
+        "tail": 0,
+        "head": 1,
+        "bounds": [
+          1.0,
+          2.5
+        ],
+        "waiting": 0.0,
+        "functions": {
+          "0x30": [
+            [
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.5
+            ]
+          ],
+          "0x48": [
+            [
+              1.0,
+              0.0
+            ],
+            [
+              1.0,
+              1.5
+            ]
+          ],
+          "0x60": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x78": [
+            [
+              -0.25,
+              0.0
+            ],
+            [
+              0.0,
+              1.5
+            ]
+          ],
+          "0x90": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xa8": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xc0": [
+            [
+              8.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ]
+        }
+      },
+      {
+        "id": 9,
+        "tail": 1,
+        "head": 4,
+        "bounds": [
+          1.0,
+          2.5
+        ],
+        "waiting": 0.0,
+        "functions": {
+          "0x30": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x48": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x60": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x78": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x90": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xa8": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xc0": [
+            [
+              8.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "tail": 1,
+        "head": 3,
+        "bounds": [
+          2.0,
+          2.5
+        ],
+        "waiting": 0.0,
+        "functions": {
+          "0x30": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x48": [
+            [
+              2.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x60": [
+            [
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              3.5
+            ]
+          ],
+          "0x78": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x90": [
+            [
+              -0.25,
+              2.0
+            ],
+            [
+              0.0,
+              3.5
+            ]
+          ],
+          "0xa8": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xc0": [
+            [
+              8.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ]
+        }
+      },
+      {
+        "id": 11,
+        "tail": 1,
+        "head": 2,
+        "bounds": [
+          2.0,
+          2.5
+        ],
+        "waiting": 0.0,
+        "functions": {
+          "0x30": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x48": [
+            [
+              2.0,
+              1.0
+            ],
+            [
+              1.0,
+              2.5
+            ]
+          ],
+          "0x60": [
+            [
+              1.0,
+              2.0
+            ],
+            [
+              1.0,
+              3.5
+            ]
+          ],
+          "0x78": [
+            [
+              -0.25,
+              1.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0x90": [
+            [
+              -0.25,
+              2.0
+            ],
+            [
+              0.0,
+              3.5
+            ]
+          ],
+          "0xa8": [
+            [
+              0.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ],
+          "0xc0": [
+            [
+              8.0,
+              2.0
+            ],
+            [
+              0.0,
+              2.5
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "physical_arc_reduced_costs": [
+    -0.125,
+    0.0,
+    -1.125,
+    -1.125,
+    -0.125,
+    0.0,
+    -1.125,
+    -1.125,
+    -0.125,
+    0.0,
+    -1.125,
+    -1.125
+  ],
+  "cutoff": 1.3749999988025001,
+  "lower_bound": -0.0,
+  "fixing": {
+    "checked": 30,
+    "eliminated_forward": 6,
+    "eliminated_backward": 3,
+    "decisions": [
+      {
+        "forward": true,
+        "bucket_arc_id": 0,
+        "source": [
+          0,
+          0
+        ],
+        "physical_arc_id": 8,
+        "tail": 0,
+        "head": 1,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                2.0,
+                0.0
+              ],
+              [
+                0.0,
+                1.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x0",
+            "key": 0.0,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 2,
+        "source": [
+          0,
+          0
+        ],
+        "physical_arc_id": 4,
+        "tail": 0,
+        "head": 2,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                2.0,
+                0.0
+              ],
+              [
+                0.0,
+                1.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x0",
+            "key": 0.0,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 4,
+        "source": [
+          0,
+          0
+        ],
+        "physical_arc_id": 0,
+        "tail": 0,
+        "head": 3,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                2.0,
+                0.0
+              ],
+              [
+                0.0,
+                1.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x0",
+            "key": 0.0,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 18,
+        "source": [
+          3,
+          0
+        ],
+        "physical_arc_id": 3,
+        "tail": 3,
+        "head": 1,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                1.75,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -0.125,
+            "mask": "0x1",
+            "key": 1.75,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 20,
+        "source": [
+          3,
+          0
+        ],
+        "physical_arc_id": 2,
+        "tail": 3,
+        "head": 2,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                1.75,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -0.125,
+            "mask": "0x1",
+            "key": 1.75,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 22,
+        "source": [
+          3,
+          0
+        ],
+        "physical_arc_id": 1,
+        "tail": 3,
+        "head": 4,
+        "jump_bucket": -1,
+        "eliminated": true,
+        "source_labels": [
+          {
+            "front": [
+              [
+                1.75,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -0.125,
+            "mask": "0x1",
+            "key": 1.75,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 12,
+        "source": [
+          2,
+          0
+        ],
+        "physical_arc_id": 7,
+        "tail": 2,
+        "head": 1,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                1.75,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -0.125,
+            "mask": "0x2",
+            "key": 1.75,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 14,
+        "source": [
+          2,
+          0
+        ],
+        "physical_arc_id": 6,
+        "tail": 2,
+        "head": 3,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                1.75,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -0.125,
+            "mask": "0x2",
+            "key": 1.75,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 16,
+        "source": [
+          2,
+          0
+        ],
+        "physical_arc_id": 5,
+        "tail": 2,
+        "head": 4,
+        "jump_bucket": -1,
+        "eliminated": true,
+        "source_labels": [
+          {
+            "front": [
+              [
+                1.75,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -0.125,
+            "mask": "0x2",
+            "key": 1.75,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 6,
+        "source": [
+          1,
+          0
+        ],
+        "physical_arc_id": 11,
+        "tail": 1,
+        "head": 2,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                1.75,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -0.125,
+            "mask": "0x4",
+            "key": 1.75,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 8,
+        "source": [
+          1,
+          0
+        ],
+        "physical_arc_id": 10,
+        "tail": 1,
+        "head": 3,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                1.75,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -0.125,
+            "mask": "0x4",
+            "key": 1.75,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 10,
+        "source": [
+          1,
+          0
+        ],
+        "physical_arc_id": 9,
+        "tail": 1,
+        "head": 4,
+        "jump_bucket": -1,
+        "eliminated": true,
+        "source_labels": [
+          {
+            "front": [
+              [
+                1.75,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -0.125,
+            "mask": "0x4",
+            "key": 1.75,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 11,
+        "source": [
+          1,
+          1
+        ],
+        "physical_arc_id": 9,
+        "tail": 1,
+        "head": 4,
+        "jump_bucket": -1,
+        "eliminated": true,
+        "source_labels": [
+          {
+            "front": [
+              [
+                1.5,
+                2.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -1.25,
+            "mask": "0x5",
+            "key": 1.5,
+            "status": "65"
+          },
+          {
+            "front": [
+              [
+                1.5,
+                2.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -1.25,
+            "mask": "0x6",
+            "key": 1.5,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 23,
+        "source": [
+          3,
+          1
+        ],
+        "physical_arc_id": 1,
+        "tail": 3,
+        "head": 4,
+        "jump_bucket": -1,
+        "eliminated": true,
+        "source_labels": [
+          {
+            "front": [
+              [
+                1.5,
+                2.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -1.25,
+            "mask": "0x3",
+            "key": 1.5,
+            "status": "65"
+          },
+          {
+            "front": [
+              [
+                1.5,
+                2.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -1.25,
+            "mask": "0x5",
+            "key": 1.5,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": true,
+        "bucket_arc_id": 17,
+        "source": [
+          2,
+          1
+        ],
+        "physical_arc_id": 5,
+        "tail": 2,
+        "head": 4,
+        "jump_bucket": -1,
+        "eliminated": true,
+        "source_labels": [
+          {
+            "front": [
+              [
+                1.5,
+                2.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -1.25,
+            "mask": "0x3",
+            "key": 1.5,
+            "status": "65"
+          },
+          {
+            "front": [
+              [
+                1.5,
+                2.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": -1.25,
+            "mask": "0x6",
+            "key": 1.5,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 10,
+        "source": [
+          4,
+          0
+        ],
+        "physical_arc_id": 9,
+        "tail": 1,
+        "head": 4,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.0,
+                0.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x0",
+            "key": 8.0,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 17,
+        "source": [
+          4,
+          0
+        ],
+        "physical_arc_id": 5,
+        "tail": 2,
+        "head": 4,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.0,
+                0.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x0",
+            "key": 8.0,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 24,
+        "source": [
+          4,
+          0
+        ],
+        "physical_arc_id": 1,
+        "tail": 3,
+        "head": 4,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.0,
+                0.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x0",
+            "key": 8.0,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 4,
+        "source": [
+          3,
+          0
+        ],
+        "physical_arc_id": 0,
+        "tail": 0,
+        "head": 3,
+        "jump_bucket": -1,
+        "eliminated": true,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x1",
+            "key": -0.25,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 8,
+        "source": [
+          3,
+          0
+        ],
+        "physical_arc_id": 10,
+        "tail": 1,
+        "head": 3,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x1",
+            "key": -0.25,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 15,
+        "source": [
+          3,
+          0
+        ],
+        "physical_arc_id": 6,
+        "tail": 2,
+        "head": 3,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x1",
+            "key": -0.25,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 2,
+        "source": [
+          2,
+          0
+        ],
+        "physical_arc_id": 4,
+        "tail": 0,
+        "head": 2,
+        "jump_bucket": -1,
+        "eliminated": true,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x2",
+            "key": -0.25,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 6,
+        "source": [
+          2,
+          0
+        ],
+        "physical_arc_id": 11,
+        "tail": 1,
+        "head": 2,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x2",
+            "key": -0.25,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 22,
+        "source": [
+          2,
+          0
+        ],
+        "physical_arc_id": 2,
+        "tail": 3,
+        "head": 2,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x2",
+            "key": -0.25,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 0,
+        "source": [
+          1,
+          0
+        ],
+        "physical_arc_id": 8,
+        "tail": 0,
+        "head": 1,
+        "jump_bucket": -1,
+        "eliminated": true,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x4",
+            "key": -0.25,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 13,
+        "source": [
+          1,
+          0
+        ],
+        "physical_arc_id": 7,
+        "tail": 2,
+        "head": 1,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x4",
+            "key": -0.25,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 20,
+        "source": [
+          1,
+          0
+        ],
+        "physical_arc_id": 3,
+        "tail": 3,
+        "head": 1,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                2.5
+              ]
+            ],
+            "scalar_cost": 0.0,
+            "mask": "0x4",
+            "key": -0.25,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 1,
+        "source": [
+          1,
+          1
+        ],
+        "physical_arc_id": 8,
+        "tail": 0,
+        "head": 1,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                1.5
+              ]
+            ],
+            "scalar_cost": -1.125,
+            "mask": "0x5",
+            "key": -0.25,
+            "status": "65"
+          },
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                1.5
+              ]
+            ],
+            "scalar_cost": -1.125,
+            "mask": "0x6",
+            "key": -0.25,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 5,
+        "source": [
+          3,
+          1
+        ],
+        "physical_arc_id": 0,
+        "tail": 0,
+        "head": 3,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                1.5
+              ]
+            ],
+            "scalar_cost": -1.125,
+            "mask": "0x3",
+            "key": -0.25,
+            "status": "65"
+          },
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                1.5
+              ]
+            ],
+            "scalar_cost": -1.125,
+            "mask": "0x5",
+            "key": -0.25,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      },
+      {
+        "forward": false,
+        "bucket_arc_id": 3,
+        "source": [
+          2,
+          1
+        ],
+        "physical_arc_id": 4,
+        "tail": 0,
+        "head": 2,
+        "jump_bucket": -1,
+        "eliminated": false,
+        "source_labels": [
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                1.5
+              ]
+            ],
+            "scalar_cost": -1.125,
+            "mask": "0x3",
+            "key": -0.25,
+            "status": "65"
+          },
+          {
+            "front": [
+              [
+                8.25,
+                1.0
+              ],
+              [
+                0.0,
+                1.5
+              ]
+            ],
+            "scalar_cost": -1.125,
+            "mask": "0x6",
+            "key": -0.25,
+            "status": "65"
+          }
+        ],
+        "continuation_flags": "0102"
+      }
+    ],
+    "before": {
+      "forward": [
+        {
+          "vertex": 0,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 0,
+              "source": [
+                0,
+                0
+              ],
+              "physical_arc_id": 8,
+              "tail": 0,
+              "head": 1,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 2,
+              "source": [
+                0,
+                0
+              ],
+              "physical_arc_id": 4,
+              "tail": 0,
+              "head": 2,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 4,
+              "source": [
+                0,
+                0
+              ],
+              "physical_arc_id": 0,
+              "tail": 0,
+              "head": 3,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 3,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 18,
+              "source": [
+                3,
+                0
+              ],
+              "physical_arc_id": 3,
+              "tail": 3,
+              "head": 1,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 20,
+              "source": [
+                3,
+                0
+              ],
+              "physical_arc_id": 2,
+              "tail": 3,
+              "head": 2,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 22,
+              "source": [
+                3,
+                0
+              ],
+              "physical_arc_id": 1,
+              "tail": 3,
+              "head": 4,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 2,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 12,
+              "source": [
+                2,
+                0
+              ],
+              "physical_arc_id": 7,
+              "tail": 2,
+              "head": 1,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 14,
+              "source": [
+                2,
+                0
+              ],
+              "physical_arc_id": 6,
+              "tail": 2,
+              "head": 3,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 16,
+              "source": [
+                2,
+                0
+              ],
+              "physical_arc_id": 5,
+              "tail": 2,
+              "head": 4,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 1,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 6,
+              "source": [
+                1,
+                0
+              ],
+              "physical_arc_id": 11,
+              "tail": 1,
+              "head": 2,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 8,
+              "source": [
+                1,
+                0
+              ],
+              "physical_arc_id": 10,
+              "tail": 1,
+              "head": 3,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 10,
+              "source": [
+                1,
+                0
+              ],
+              "physical_arc_id": 9,
+              "tail": 1,
+              "head": 4,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 1,
+          "bucket": 1,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 11,
+              "source": [
+                1,
+                1
+              ],
+              "physical_arc_id": 9,
+              "tail": 1,
+              "head": 4,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 4,
+          "bucket": 1,
+          "physical_arcs": []
+        },
+        {
+          "vertex": 3,
+          "bucket": 1,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 23,
+              "source": [
+                3,
+                1
+              ],
+              "physical_arc_id": 1,
+              "tail": 3,
+              "head": 4,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 2,
+          "bucket": 1,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 17,
+              "source": [
+                2,
+                1
+              ],
+              "physical_arc_id": 5,
+              "tail": 2,
+              "head": 4,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 4,
+          "bucket": 2,
+          "physical_arcs": []
+        }
+      ],
+      "backward": [
+        {
+          "vertex": 4,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 10,
+              "source": [
+                4,
+                0
+              ],
+              "physical_arc_id": 9,
+              "tail": 1,
+              "head": 4,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 17,
+              "source": [
+                4,
+                0
+              ],
+              "physical_arc_id": 5,
+              "tail": 2,
+              "head": 4,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 24,
+              "source": [
+                4,
+                0
+              ],
+              "physical_arc_id": 1,
+              "tail": 3,
+              "head": 4,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 3,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 4,
+              "source": [
+                3,
+                0
+              ],
+              "physical_arc_id": 0,
+              "tail": 0,
+              "head": 3,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 8,
+              "source": [
+                3,
+                0
+              ],
+              "physical_arc_id": 10,
+              "tail": 1,
+              "head": 3,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 15,
+              "source": [
+                3,
+                0
+              ],
+              "physical_arc_id": 6,
+              "tail": 2,
+              "head": 3,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 2,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 2,
+              "source": [
+                2,
+                0
+              ],
+              "physical_arc_id": 4,
+              "tail": 0,
+              "head": 2,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 6,
+              "source": [
+                2,
+                0
+              ],
+              "physical_arc_id": 11,
+              "tail": 1,
+              "head": 2,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 22,
+              "source": [
+                2,
+                0
+              ],
+              "physical_arc_id": 2,
+              "tail": 3,
+              "head": 2,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 1,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 0,
+              "source": [
+                1,
+                0
+              ],
+              "physical_arc_id": 8,
+              "tail": 0,
+              "head": 1,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 13,
+              "source": [
+                1,
+                0
+              ],
+              "physical_arc_id": 7,
+              "tail": 2,
+              "head": 1,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 20,
+              "source": [
+                1,
+                0
+              ],
+              "physical_arc_id": 3,
+              "tail": 3,
+              "head": 1,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 1,
+          "bucket": 1,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 1,
+              "source": [
+                1,
+                1
+              ],
+              "physical_arc_id": 8,
+              "tail": 0,
+              "head": 1,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 3,
+          "bucket": 1,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 5,
+              "source": [
+                3,
+                1
+              ],
+              "physical_arc_id": 0,
+              "tail": 0,
+              "head": 3,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 2,
+          "bucket": 1,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 3,
+              "source": [
+                2,
+                1
+              ],
+              "physical_arc_id": 4,
+              "tail": 0,
+              "head": 2,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 0,
+          "bucket": 0,
+          "physical_arcs": []
+        },
+        {
+          "vertex": 0,
+          "bucket": 1,
+          "physical_arcs": []
+        }
+      ]
+    },
+    "after": {
+      "forward": [
+        {
+          "vertex": 0,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 0,
+              "source": [
+                0,
+                0
+              ],
+              "physical_arc_id": 8,
+              "tail": 0,
+              "head": 1,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 2,
+              "source": [
+                0,
+                0
+              ],
+              "physical_arc_id": 4,
+              "tail": 0,
+              "head": 2,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 4,
+              "source": [
+                0,
+                0
+              ],
+              "physical_arc_id": 0,
+              "tail": 0,
+              "head": 3,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 3,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 18,
+              "source": [
+                3,
+                0
+              ],
+              "physical_arc_id": 3,
+              "tail": 3,
+              "head": 1,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 20,
+              "source": [
+                3,
+                0
+              ],
+              "physical_arc_id": 2,
+              "tail": 3,
+              "head": 2,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 2,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 12,
+              "source": [
+                2,
+                0
+              ],
+              "physical_arc_id": 7,
+              "tail": 2,
+              "head": 1,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 14,
+              "source": [
+                2,
+                0
+              ],
+              "physical_arc_id": 6,
+              "tail": 2,
+              "head": 3,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 1,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 6,
+              "source": [
+                1,
+                0
+              ],
+              "physical_arc_id": 11,
+              "tail": 1,
+              "head": 2,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 8,
+              "source": [
+                1,
+                0
+              ],
+              "physical_arc_id": 10,
+              "tail": 1,
+              "head": 3,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 1,
+          "bucket": 1,
+          "physical_arcs": []
+        },
+        {
+          "vertex": 4,
+          "bucket": 1,
+          "physical_arcs": []
+        },
+        {
+          "vertex": 3,
+          "bucket": 1,
+          "physical_arcs": []
+        },
+        {
+          "vertex": 2,
+          "bucket": 1,
+          "physical_arcs": []
+        },
+        {
+          "vertex": 4,
+          "bucket": 2,
+          "physical_arcs": []
+        }
+      ],
+      "backward": [
+        {
+          "vertex": 4,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 10,
+              "source": [
+                4,
+                0
+              ],
+              "physical_arc_id": 9,
+              "tail": 1,
+              "head": 4,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 17,
+              "source": [
+                4,
+                0
+              ],
+              "physical_arc_id": 5,
+              "tail": 2,
+              "head": 4,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 24,
+              "source": [
+                4,
+                0
+              ],
+              "physical_arc_id": 1,
+              "tail": 3,
+              "head": 4,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 3,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 8,
+              "source": [
+                3,
+                0
+              ],
+              "physical_arc_id": 10,
+              "tail": 1,
+              "head": 3,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 15,
+              "source": [
+                3,
+                0
+              ],
+              "physical_arc_id": 6,
+              "tail": 2,
+              "head": 3,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 29,
+              "source": [
+                3,
+                0
+              ],
+              "physical_arc_id": 0,
+              "tail": 0,
+              "head": 3,
+              "jump_bucket": 1
+            }
+          ]
+        },
+        {
+          "vertex": 2,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 6,
+              "source": [
+                2,
+                0
+              ],
+              "physical_arc_id": 11,
+              "tail": 1,
+              "head": 2,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 22,
+              "source": [
+                2,
+                0
+              ],
+              "physical_arc_id": 2,
+              "tail": 3,
+              "head": 2,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 28,
+              "source": [
+                2,
+                0
+              ],
+              "physical_arc_id": 4,
+              "tail": 0,
+              "head": 2,
+              "jump_bucket": 1
+            }
+          ]
+        },
+        {
+          "vertex": 1,
+          "bucket": 0,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 13,
+              "source": [
+                1,
+                0
+              ],
+              "physical_arc_id": 7,
+              "tail": 2,
+              "head": 1,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 20,
+              "source": [
+                1,
+                0
+              ],
+              "physical_arc_id": 3,
+              "tail": 3,
+              "head": 1,
+              "jump_bucket": -1
+            },
+            {
+              "bucket_arc_id": 27,
+              "source": [
+                1,
+                0
+              ],
+              "physical_arc_id": 8,
+              "tail": 0,
+              "head": 1,
+              "jump_bucket": 1
+            }
+          ]
+        },
+        {
+          "vertex": 1,
+          "bucket": 1,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 1,
+              "source": [
+                1,
+                1
+              ],
+              "physical_arc_id": 8,
+              "tail": 0,
+              "head": 1,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 3,
+          "bucket": 1,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 5,
+              "source": [
+                3,
+                1
+              ],
+              "physical_arc_id": 0,
+              "tail": 0,
+              "head": 3,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 2,
+          "bucket": 1,
+          "physical_arcs": [
+            {
+              "bucket_arc_id": 3,
+              "source": [
+                2,
+                1
+              ],
+              "physical_arc_id": 4,
+              "tail": 0,
+              "head": 2,
+              "jump_bucket": -1
+            }
+          ]
+        },
+        {
+          "vertex": 0,
+          "bucket": 0,
+          "physical_arcs": []
+        },
+        {
+          "vertex": 0,
+          "bucket": 1,
+          "physical_arcs": []
+        }
+      ]
+    }
+  },
+  "resource_joins": [
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 0,
+        "source": [
+          0,
+          0
+        ],
+        "physical_arc_id": 8,
+        "tail": 0,
+        "head": 1,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-forward",
+      "left": {
+        "front": [
+          [
+            1.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -0.125,
+        "mask": "0x0"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": -1.125,
+        "mask": "0x5"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.5,
+      "total": 0.25,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 2,
+        "source": [
+          0,
+          0
+        ],
+        "physical_arc_id": 4,
+        "tail": 0,
+        "head": 2,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-forward",
+      "left": {
+        "front": [
+          [
+            1.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -0.125,
+        "mask": "0x0"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": -1.125,
+        "mask": "0x3"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.5,
+      "total": 0.25,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 4,
+        "source": [
+          0,
+          0
+        ],
+        "physical_arc_id": 0,
+        "tail": 0,
+        "head": 3,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-forward",
+      "left": {
+        "front": [
+          [
+            1.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -0.125,
+        "mask": "0x0"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": -1.125,
+        "mask": "0x3"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.5,
+      "total": 0.25,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 18,
+        "source": [
+          3,
+          0
+        ],
+        "physical_arc_id": 3,
+        "tail": 3,
+        "head": 1,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-forward",
+      "left": {
+        "front": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -1.25,
+        "mask": "0x1"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x4"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.25,
+      "total": 0.0,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 20,
+        "source": [
+          3,
+          0
+        ],
+        "physical_arc_id": 2,
+        "tail": 3,
+        "head": 2,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-forward",
+      "left": {
+        "front": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -1.25,
+        "mask": "0x1"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x2"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.25,
+      "total": 0.0,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 12,
+        "source": [
+          2,
+          0
+        ],
+        "physical_arc_id": 7,
+        "tail": 2,
+        "head": 1,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-forward",
+      "left": {
+        "front": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -1.25,
+        "mask": "0x2"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x4"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.25,
+      "total": 0.0,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 14,
+        "source": [
+          2,
+          0
+        ],
+        "physical_arc_id": 6,
+        "tail": 2,
+        "head": 3,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-forward",
+      "left": {
+        "front": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -1.25,
+        "mask": "0x2"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x1"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.25,
+      "total": 0.0,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 6,
+        "source": [
+          1,
+          0
+        ],
+        "physical_arc_id": 11,
+        "tail": 1,
+        "head": 2,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-forward",
+      "left": {
+        "front": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -1.25,
+        "mask": "0x4"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x2"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.25,
+      "total": 0.0,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 8,
+        "source": [
+          1,
+          0
+        ],
+        "physical_arc_id": 10,
+        "tail": 1,
+        "head": 3,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-forward",
+      "left": {
+        "front": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -1.25,
+        "mask": "0x4"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x1"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.25,
+      "total": 0.0,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 10,
+        "source": [
+          4,
+          0
+        ],
+        "physical_arc_id": 9,
+        "tail": 1,
+        "head": 4,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -1.25,
+        "mask": "0x5"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x0"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.25,
+      "total": 0.0,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 17,
+        "source": [
+          4,
+          0
+        ],
+        "physical_arc_id": 5,
+        "tail": 2,
+        "head": 4,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -1.25,
+        "mask": "0x3"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x0"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.25,
+      "total": 0.0,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 24,
+        "source": [
+          4,
+          0
+        ],
+        "physical_arc_id": 1,
+        "tail": 3,
+        "head": 4,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            1.5,
+            2.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -1.25,
+        "mask": "0x3"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x0"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.25,
+      "total": 0.0,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 4,
+        "source": [
+          3,
+          0
+        ],
+        "physical_arc_id": 0,
+        "tail": 0,
+        "head": 3,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            2.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x0"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": -0.125,
+        "mask": "0x0"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.75,
+      "total": 1.625,
+      "accepted": false
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 8,
+        "source": [
+          3,
+          0
+        ],
+        "physical_arc_id": 10,
+        "tail": 1,
+        "head": 3,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            1.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -0.125,
+        "mask": "0x4"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": -1.125,
+        "mask": "0x1"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.5,
+      "total": 0.25,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 15,
+        "source": [
+          3,
+          0
+        ],
+        "physical_arc_id": 6,
+        "tail": 2,
+        "head": 3,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            1.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -0.125,
+        "mask": "0x2"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": -1.125,
+        "mask": "0x1"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.5,
+      "total": 0.25,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 2,
+        "source": [
+          2,
+          0
+        ],
+        "physical_arc_id": 4,
+        "tail": 0,
+        "head": 2,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            2.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x0"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": -0.125,
+        "mask": "0x0"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.75,
+      "total": 1.625,
+      "accepted": false
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 6,
+        "source": [
+          2,
+          0
+        ],
+        "physical_arc_id": 11,
+        "tail": 1,
+        "head": 2,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            1.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -0.125,
+        "mask": "0x4"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": -1.125,
+        "mask": "0x2"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.5,
+      "total": 0.25,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 22,
+        "source": [
+          2,
+          0
+        ],
+        "physical_arc_id": 2,
+        "tail": 3,
+        "head": 2,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            1.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -0.125,
+        "mask": "0x1"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": -1.125,
+        "mask": "0x2"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.5,
+      "total": 0.25,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 0,
+        "source": [
+          1,
+          0
+        ],
+        "physical_arc_id": 8,
+        "tail": 0,
+        "head": 1,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            2.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x0"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": -0.125,
+        "mask": "0x0"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.75,
+      "total": 1.625,
+      "accepted": false
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 13,
+        "source": [
+          1,
+          0
+        ],
+        "physical_arc_id": 7,
+        "tail": 2,
+        "head": 1,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            1.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -0.125,
+        "mask": "0x2"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": -1.125,
+        "mask": "0x4"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.5,
+      "total": 0.25,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 20,
+        "source": [
+          1,
+          0
+        ],
+        "physical_arc_id": 3,
+        "tail": 3,
+        "head": 1,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            1.75,
+            1.0
+          ],
+          [
+            0.0,
+            2.5
+          ]
+        ],
+        "scalar_cost": -0.125,
+        "mask": "0x1"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            1.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": -1.125,
+        "mask": "0x4"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.5,
+      "total": 0.25,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 1,
+        "source": [
+          1,
+          1
+        ],
+        "physical_arc_id": 8,
+        "tail": 0,
+        "head": 1,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            2.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x0"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "scalar_cost": -1.25,
+        "mask": "0x0"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.75,
+      "total": 0.5,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 5,
+        "source": [
+          3,
+          1
+        ],
+        "physical_arc_id": 0,
+        "tail": 0,
+        "head": 3,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            2.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x0"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "scalar_cost": -1.25,
+        "mask": "0x0"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.75,
+      "total": 0.5,
+      "accepted": true
+    },
+    {
+      "fixing_arc": {
+        "bucket_arc_id": 3,
+        "source": [
+          2,
+          1
+        ],
+        "physical_arc_id": 4,
+        "tail": 0,
+        "head": 2,
+        "jump_bucket": -1
+      },
+      "direction": "fix-bucket-arc-backward",
+      "left": {
+        "front": [
+          [
+            2.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.5
+          ]
+        ],
+        "scalar_cost": 0.0,
+        "mask": "0x0"
+      },
+      "right": {
+        "front": [
+          [
+            8.25,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "scalar_cost": -1.25,
+        "mask": "0x0"
+      },
+      "mode": 5,
+      "ceiling": 8.0,
+      "returned": true,
+      "dependent_cost": 1.75,
+      "total": 0.5,
+      "accepted": true
+    }
+  ],
+  "enumerated_paths": [
+    {
+      "arcs": [
+        4,
+        7,
+        9
+      ],
+      "paired": 1.25
+    },
+    {
+      "arcs": [
+        0,
+        3,
+        9
+      ],
+      "paired": 1.25
+    },
+    {
+      "arcs": [
+        0,
+        2,
+        5
+      ],
+      "paired": 1.25
+    }
+  ]
+}

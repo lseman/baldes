@@ -90,8 +90,10 @@ impl<const D: usize> Solver<D> {
                     report.routes = routes.len();
                     Ok(report)
                 }
-                Err(e) if super::universe::is_enumeration_interruption(&e.message)
-                    || e.message == "pricing hard time limit exceeded" => {
+                Err(e)
+                    if super::universe::is_enumeration_interruption(&e.message)
+                        || e.message == "pricing hard time limit exceeded" =>
+                {
                     report.state = 1;
                     Ok(report)
                 }

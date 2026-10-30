@@ -110,7 +110,7 @@ For advanced routing, see the [branch-and-price tree guide](../solver/tree.md) a
 
 For named pricing controls, see the [BALDES option reference](../reference/options.md).
 Public option names start with `BALDES`, for example
-`--option BALDESlabelDominanceStrategy=1`. Rust exposes supported metadata in
+`--option BALDESnumberOfBucketsPerVertex=20`. Rust exposes supported metadata in
 `OPTION_TABLE`; Python exposes `Solver.option_names()` and
 `Solver.option_support(name)`. The public list contains 41 supported controls,
 plus two enumerated-MIP controls when both `clp` and `highs` are enabled.

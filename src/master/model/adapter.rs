@@ -206,6 +206,48 @@ impl<const D: usize> cg::Controller<ClpMaster> for Coordinator<D> {
 
 impl<const D: usize> State<D> {
     pub(super) fn price(&mut self, phase: usize, duals: &[f64]) -> Result<cg::Answer> {
+        for &(network, resource, bounds) in &self.preprocessing.paired_owner_bounds {
+            if self
+                .oracles
+                .iter()
+                .find(|oracle| oracle.network.id == network)
+                .is_some_and(|oracle| oracle.multiplicity_upper() == 0.)
+            {
+                continue;
+            }
+            if crate::graph::coupled::CoupledKernel::owner_registration_bound_is_unsupported([
+                bounds.lower,
+                bounds.upper,
+            ]) {
+                return Err(invalid(format!("non-zero lower bounds on variables associated to arcs are not supported (network {network}, paired resource {resource}, propagated owner bounds [{}, {}])", bounds.lower, bounds.upper)));
+            }
+        }
+        // Explicit registration bounds remain relevant when propagation was
+        // disabled or stopped before it could publish an owner coordinate.
+        for oracle in &self.oracles {
+            if oracle.multiplicity_upper() == 0. {
+                continue;
+            }
+            if let Some(kernel) = oracle.network.graph.coupled_kernel() {
+                for &(resource, bounds) in kernel.paired_owner_registration_bounds() {
+                    if self
+                        .preprocessing
+                        .paired_owner_bounds
+                        .iter()
+                        .any(|&(network, index, _)| {
+                            network == oracle.network.id && index == resource
+                        })
+                    {
+                        continue;
+                    }
+                    if crate::graph::coupled::CoupledKernel::owner_registration_bound_is_unsupported(
+                        bounds,
+                    ) {
+                        return Err(invalid(format!("non-zero lower bounds on variables associated to arcs are not supported (network {}, paired resource {resource}, input owner bounds {:?})", oracle.network.id, bounds)));
+                    }
+                }
+            }
+        }
         self.correction = None;
         self.gradient = None;
         self.scheduler.complete = false;
@@ -231,7 +273,15 @@ impl<const D: usize> State<D> {
             context,
         );
         self.scheduler = scheduler;
-        let batch = result?;
+        let mut batch = result?;
+        if self.has_unpriced_paired_terms(duals) {
+            // The raw operator completed, but its unit-charge minimum is not
+            // a lower bound for the associated owner expression. Keep the raw
+            // completion signal (also used to request explicit enumeration)
+            // without publishing a numerical or certified owner bound.
+            batch.correction = None;
+            batch.gradient = None;
+        }
         self.correction = batch.correction;
         self.gradient = batch.gradient;
         Ok(batch.answer)
@@ -260,7 +310,7 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
     ) -> Result<crate::master::pricing::Request> {
         use crate::master::pricing::{Envelopes, Request};
         let oracle = &mut self.state.oracles[index];
-        if self.state.universe.is_some() || control_pricing::needed(oracle) {
+        if self.state.universe.is_some() {
             return Ok(Request {
                 phase,
                 exact: true,
@@ -404,34 +454,6 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
         index: usize,
         duals: &[f64],
     ) -> Option<Result<crate::master::pricing::Retained>> {
-        if self.state.universe.is_none() && control_pricing::needed(&self.state.oracles[index]) {
-            return Some((|| {
-                let (routes, minimum) = control_pricing::price(self.state, index, duals)?;
-                self.state.oracles[index].calls += 1;
-                let collected = self.collect(index, routes, 0., duals)?;
-                let upper = self.state.oracles[index].multiplicity_upper();
-                let columns = collected
-                    .columns
-                    .into_iter()
-                    .map(|column| {
-                        let cap = self
-                            .state
-                            .route_upper_bounds
-                            .get(&(column.tag as usize))
-                            .copied()
-                            .unwrap_or(upper)
-                            .min(upper);
-                        (column, cap)
-                    })
-                    .collect();
-                Ok(crate::master::pricing::Retained {
-                    minimum_bound: Some(minimum),
-                    columns,
-                    independent_caps: false,
-                    maximum: usize::MAX,
-                })
-            })());
-        }
         let universe = self.state.universe.as_ref()?;
         Some((|| {
             let oracle = &mut self.state.oracles[index];
@@ -494,22 +516,7 @@ impl<const D: usize> crate::master::pricing::Networks<D> for NetworkAdapter<'_, 
         let mut best: Option<(f64, Vec<(usize, f64)>)> = None;
         for mut route in routes {
             let coefficients = entries(oracle, &route, self.state.shared_offset)?;
-            let mut ids = route.arcs.clone();
-            ids.sort_unstable();
-            let cost = ids
-                .iter()
-                .map(|id| oracle.network.graph.arcs[oracle.index[id]].cost)
-                .sum::<f64>()
-                + route
-                    .coupled_cost(
-                        &oracle.network.graph,
-                        &route
-                            .arcs
-                            .iter()
-                            .map(|id| oracle.index[id])
-                            .collect::<Vec<_>>(),
-                    )?
-                    .ok_or_else(|| invalid("network path violates coupled resources"))?;
+            let cost = original_costs::route_cost(oracle, &route)?;
             let reduced_cost = coefficients
                 .iter()
                 .fold(cost, |value, &(row, coefficient)| {

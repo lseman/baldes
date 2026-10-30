@@ -934,7 +934,7 @@ fn canonical_and_legacy_option_names_reach_the_same_root_and_tree_controls() {
                 "--time".to_owned(),
                 "10".to_owned(),
                 "--option".to_owned(),
-                format!("{prefix}labelDominanceStrategy=1"),
+                format!("{prefix}labelDominanceStrategy=2"),
                 "--option".to_owned(),
                 format!("{prefix}hardTimeThresholdInPricing=1"),
             ];
@@ -950,12 +950,11 @@ fn canonical_and_legacy_option_names_reach_the_same_root_and_tree_controls() {
             assert!(String::from_utf8_lossy(&output.stdout).contains("status=Optimal"));
             args.extend([
                 "--option".to_owned(),
-                format!("{prefix}labelDominanceStrategy=2"),
+                format!("{prefix}labelDominanceStrategy=1"),
             ]);
             let invalid = command().args(&args).output().unwrap();
             assert!(!invalid.status.success());
-            assert!(String::from_utf8_lossy(&invalid.stderr)
-                .contains("unsupported label dominance strategy"));
+            assert!(String::from_utf8_lossy(&invalid.stderr).contains("partial dominance"));
         }
     }
 }

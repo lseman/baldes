@@ -18,14 +18,16 @@ pub struct OriginalPricingVariable {
     #[serde(default)]
     pub arcs: Vec<(i32, f64)>,
     /// Intrinsic custom/cumulative activity or a selected absolute paired value
-    /// instead of fixed arc associations. Source paired bindings support signed
-    /// costs, shared rows and independently verified integer branching.
+    /// instead of fixed arc associations. Paired bindings retain the owner
+    /// coefficient separately from the unit-charge paired pricing program.
     /// Its objective coefficient replaces the descriptor's implicit unit cost;
     /// the JSON network cannot also assign a graph cost to this resource.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accumulated_resource: Option<usize>,
     /// Register the original activity for integer branching. This requires a
-    /// proof of integer contribution on every complete graph walk.
+    /// proof of integer contribution on every complete graph walk, except for
+    /// paired associations: their integer flag is retained as registration
+    /// metadata and does not enforce projected activity integrality.
     #[serde(default)]
     pub integer: bool,
     #[serde(default)]
@@ -57,7 +59,6 @@ pub struct OriginalColumn<'a> {
     pub network: i32,
     pub arcs: &'a [i32],
     pub coupled_values: Option<&'a [(usize, f64)]>,
-    pub coupled_controls: Option<&'a [crate::graph::coupled::PairedControl]>,
     pub quantity: f64,
 }
 
@@ -144,34 +145,28 @@ pub fn compile_pricing_variables<const D: usize>(
                     "an accumulated resource needs one original variable and no arc associations",
                 ));
             }
+            if matches!(
+                network
+                    .graph
+                    .coupled_kernel()
+                    .and_then(|kernel| kernel.definitions().get(resource)),
+                Some(crate::graph::coupled::CoupledResource::PairedFront {
+                    mode: crate::graph::coupled::PairedResourceMode::Feasibility,
+                })
+            ) {
+                return Err(invalid("a feasibility-only paired resource cannot have an associated original variable"));
+            }
             let paired = matches!(
                 network
                     .graph
                     .coupled_kernel()
                     .and_then(|kernel| kernel.definitions().get(resource)),
-                Some(
-                    crate::graph::coupled::CoupledResource::SlopePaired {
-                        mode: crate::graph::coupled::PairedResourceMode::CostBounded
-                            | crate::graph::coupled::PairedResourceMode::CostUnbounded,
-                        normalization:
-                            crate::graph::coupled::PairedCostNormalization::AbsoluteFinalValue,
-                        ..
-                    } | crate::graph::coupled::CoupledResource::PairedPiecewiseLinear {
-                        mode: crate::graph::coupled::PairedResourceMode::CostBounded
-                            | crate::graph::coupled::PairedResourceMode::CostUnbounded,
-                        normalization:
-                            crate::graph::coupled::PairedCostNormalization::AbsoluteFinalValue,
-                        ..
-                    }
-                )
+                Some(crate::graph::coupled::CoupledResource::PairedFront {
+                    mode: crate::graph::coupled::PairedResourceMode::CostBounded
+                        | crate::graph::coupled::PairedResourceMode::CostUnbounded,
+                })
             );
-            if paired {
-                if network.graph.front_program_domain()
-                    && (variable.cost < 0. || variable.integer || !variable.entries.is_empty())
-                {
-                    return Err(invalid("paired rows, integer activities and negative objectives require a source model"));
-                }
-            } else {
+            if !paired {
                 activity_rows::validate(
                     &network.graph,
                     &AccumulatedActivityCoefficients {
@@ -181,7 +176,10 @@ pub fn compile_pricing_variables<const D: usize>(
                     },
                 )?;
             }
-            if variable.integer {
+            // Paired owner registration accepts I even for fractional selected
+            // values. Preserve that flag without inventing a mapped integer
+            // activity or a proof that every selected value is integral.
+            if variable.integer && !paired {
                 let branch = MappedBranchVariable {
                     name: format!("X_{}_{}", variable.network, variable.id),
                     priority: variable.priority,
@@ -206,7 +204,7 @@ pub fn compile_pricing_variables<const D: usize>(
             resource_costs
                 .entry(variable.network)
                 .or_default()
-                .insert(resource, variable.cost);
+                .insert(resource, if paired { 1. } else { variable.cost });
             continue;
         }
         let setters: BTreeMap<_, _> = variable.arcs.iter().copied().collect();
@@ -258,6 +256,21 @@ pub fn compile_pricing_variables<const D: usize>(
             .collect();
         coefficients.extend(assignments);
         graph.set_coupled_objective_coefficients(&coefficients.into_iter().collect::<Vec<_>>())?;
+    }
+    for network in &mut problem.networks {
+        let paired_costs = variables
+            .iter()
+            .filter(|variable| variable.network == network.id)
+            .filter_map(|variable| {
+                variable
+                    .accumulated_resource
+                    .filter(|&resource| activity_rows::paired(&network.graph, resource))
+                    .map(|resource| (resource, variable.cost))
+            })
+            .collect::<Vec<_>>();
+        if !paired_costs.is_empty() {
+            network.graph.set_paired_associated_costs(&paired_costs)?;
+        }
     }
     problem.validate()?;
     for cost in &mut costs {
@@ -391,14 +404,12 @@ impl PricingVariableRegistry {
                     network: r.network,
                     arcs: &r.route.arcs,
                     coupled_values: Some(&r.route.coupled_values),
-                    coupled_controls: Some(&r.route.coupled_controls),
                     quantity: q,
                 })
                 .chain(output.fixed_routes.iter().map(|f| OriginalColumn {
                     network: f.route.network,
                     arcs: &f.route.route.arcs,
                     coupled_values: Some(&f.route.route.coupled_values),
-                    coupled_controls: Some(&f.route.route.coupled_controls),
                     quantity: f.quantity,
                 })),
         )
@@ -421,7 +432,6 @@ impl PricingVariableRegistry {
                     network,
                     arcs,
                     coupled_values: None,
-                    coupled_controls: None,
                     quantity,
                 }),
         )
@@ -445,7 +455,6 @@ impl PricingVariableRegistry {
         for OriginalColumn {
             arcs,
             coupled_values,
-            coupled_controls,
             quantity,
             ..
         } in columns
@@ -464,21 +473,28 @@ impl PricingVariableRegistry {
                     .collect::<Result<Vec<_>>>()?;
                 let value = if matches!(
                     source.kernel.definitions().get(resource),
-                    Some(
-                        crate::graph::coupled::CoupledResource::SlopePaired { .. }
-                            | crate::graph::coupled::CoupledResource::PairedPiecewiseLinear { .. }
-                    )
+                    Some(crate::graph::coupled::CoupledResource::PairedFront { .. })
                 ) {
                     let selected = coupled_values.ok_or_else(|| {
                         invalid("paired activity reporting requires selected column values")
                     })?;
-                    if source
-                        .kernel
-                        .replay_with_controls(&path, coupled_controls.unwrap_or(&[]))?
-                        .as_ref()
-                        .map(|selection| selection.paired_values.as_slice())
-                        != Some(selected)
-                    {
+                    let matches = if source.kernel.machine_paired_join_complete() {
+                        match selected {
+                            [(index, value)]
+                                if source.kernel.retained_paired_machine_resource()
+                                    == Some(*index) =>
+                            {
+                                source
+                                    .kernel
+                                    .joined_machine_path_matching(&path, Some(*value))?
+                                    .is_some()
+                            }
+                            _ => false,
+                        }
+                    } else {
+                        source.kernel.selected_paired_values(&path)?.as_deref() == Some(selected)
+                    };
+                    if !matches {
                         return Err(invalid("paired activity column values do not match the compiled resource program"));
                     }
                     selected

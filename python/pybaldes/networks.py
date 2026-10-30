@@ -89,6 +89,11 @@ class PricingNetwork:
     paired_machine_inputs: Tuple[Tuple[int, Tuple[Mapping[str, Any], ...]], ...] = ()
     paired_machine_roots: Tuple[Tuple[int, Mapping[str, Any]], ...] = ()
     paired_machine_terminal_bounds: Tuple[Tuple[int, Tuple[float, float]], ...] = ()
+    paired_machine_waiting_rates: Tuple[Tuple[int, Tuple[float, ...]], ...] = ()
+    paired_front_programs: Tuple[Mapping[str, Any], ...] = ()
+    # Owner preprocessing inputs, distinct from per-path resource windows.
+    # None is an explicitly unbounded endpoint.
+    paired_owner_registration_bounds: Tuple[Tuple[int, Tuple[Optional[float], Optional[float]]], ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "multiplicity", tuple(self.multiplicity))
@@ -108,6 +113,15 @@ class PricingNetwork:
         ))
         object.__setattr__(self, "paired_machine_terminal_bounds", tuple(
             (resource, tuple(bounds)) for resource, bounds in self.paired_machine_terminal_bounds
+        ))
+        object.__setattr__(self, "paired_machine_waiting_rates", tuple(
+            (resource, tuple(rates)) for resource, rates in self.paired_machine_waiting_rates
+        ))
+        object.__setattr__(self, "paired_owner_registration_bounds", tuple(
+            (resource, tuple(bounds)) for resource, bounds in self.paired_owner_registration_bounds
+        ))
+        object.__setattr__(self, "paired_front_programs", tuple(
+            dict(program) for program in self.paired_front_programs
         ))
         object.__setattr__(self, "route_domain", dict(self.route_domain))
         object.__setattr__(self, "route_entries", tuple(tuple(e) for e in self.route_entries))
@@ -205,6 +219,12 @@ class NetworkProblem:
                 del network["paired_machine_roots"]
             if not network["paired_machine_terminal_bounds"]:
                 del network["paired_machine_terminal_bounds"]
+            if not network["paired_machine_waiting_rates"]:
+                del network["paired_machine_waiting_rates"]
+            if not network["paired_front_programs"]:
+                del network["paired_front_programs"]
+            if not network["paired_owner_registration_bounds"]:
+                del network["paired_owner_registration_bounds"]
             for resource in network["resources"]:
                 if resource["time_windows"] is None:
                     del resource["time_windows"]
@@ -244,31 +264,6 @@ class NetworkAssignment:
 
 
 @dataclass(frozen=True)
-class PairedControl:
-    resource: int
-    base: Tuple[float, ...]
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "base", tuple(self.base))
-
-
-@dataclass(frozen=True)
-class ControlOptimization:
-    maximize: bool
-    control: Optional[PairedControl]
-    dependent: Optional[float]
-    lower_bound: Optional[float]
-    complete: bool
-    cells: int
-    work_used: int
-    lp_iterations: int
-
-    def __post_init__(self) -> None:
-        if self.control is not None and not isinstance(self.control, PairedControl):
-            object.__setattr__(self, "control", PairedControl(**self.control))
-
-
-@dataclass(frozen=True)
 class NetworkRoute:
     network: int
     route_index: Optional[int]
@@ -279,16 +274,13 @@ class NetworkRoute:
     resources: Tuple[float, ...]
     resource_profile: Tuple[Tuple[float, ...], ...]
     coupled_values: Tuple[Tuple[int, float], ...]
-    coupled_controls: Tuple[PairedControl, ...]
 
     def __post_init__(self) -> None:
         for name in ("nodes", "arcs", "resources"):
             object.__setattr__(self, name, tuple(getattr(self, name)))
         object.__setattr__(self, "resource_profile", tuple(tuple(r) for r in self.resource_profile))
         object.__setattr__(self, "coupled_values", tuple(tuple(r) for r in self.coupled_values))
-        object.__setattr__(self, "coupled_controls", tuple(
-            control if isinstance(control, PairedControl) else PairedControl(**control)
-            for control in self.coupled_controls))
+
 
 
 @dataclass(frozen=True)
@@ -333,22 +325,6 @@ class NetworkNode:
     def with_synchronized_start(self, id: int, lower: int, upper: int) -> NetworkNode:
         """Fork with an inclusive common integer start domain for one service."""
         return NetworkNode(self._native.with_synchronized_start(id, lower, upper))
-
-    def optimize_route_control(
-        self, route_index: int, resource: int, *, maximize: bool = False,
-        terminal: Optional[Tuple[float, float]] = None, max_cells: int = 4096,
-        max_work: int = 1_000_000, max_lp_iterations: int = 10_000,
-        time_limit: float = 1.0,
-    ) -> ControlOptimization:
-        """Bound a fixed path's paired control search; the bound uses -Gamma when maximizing."""
-        return ControlOptimization(**json.loads(self._native.optimize_route_control(
-            route_index, resource, maximize, terminal, max_cells, max_work,
-            max_lp_iterations, time_limit)))
-
-    def with_route_controls(self, route_index: int, controls: Tuple[PairedControl, ...]) -> NetworkNode:
-        """Retain proved source choices for an existing physical path."""
-        return NetworkNode(self._native.with_route_controls(
-            route_index, json.dumps([asdict(control) for control in controls], allow_nan=False)))
 
     def fix_route(self, route_index: int, quantity: int = 1) -> NetworkNode:
         if isinstance(quantity, bool) or not isinstance(quantity, int):

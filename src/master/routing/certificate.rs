@@ -180,7 +180,6 @@ pub(super) fn lower_bound<const D: usize>(
         // Lower resource coordinates describe an auxiliary column, not an
         // actual feasible route. Never replay/filter them with floating tests.
         let route = Route {
-            coupled_controls: Vec::new(),
             coupled_values: Vec::new(),
             nodes,
             arcs,

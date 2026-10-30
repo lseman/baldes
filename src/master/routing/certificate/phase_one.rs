@@ -76,7 +76,6 @@ pub(in crate::master::routing) fn zero_objective_lower_bound<const D: usize>(
         }
         budget.spend(0)?;
         let mut route = Route {
-            coupled_controls: vec![],
             coupled_values: vec![],
             nodes: vec![i32::try_from(graph.source).ok()?],
             arcs: vec![],

@@ -88,17 +88,110 @@ pub(super) fn apply<const D: usize>(
             Some(m),
         ));
     }
+    // Independent owner coordinates retain registration/row propagation without
+    // projecting a bound onto individual machine-selected path values.
+    let mut paired_coordinates = BTreeMap::new();
+    let mut owner_states = BTreeMap::new();
+    for (position, oracle) in state.oracles.iter().enumerate() {
+        let Some(kernel) = oracle.network.graph.coupled_kernel() else {
+            continue;
+        };
+        let resources: std::collections::BTreeSet<_> = oracle
+            .activity_rows
+            .iter()
+            .map(|entry| entry.resource)
+            .chain(
+                kernel
+                    .paired_associated_costs()
+                    .iter()
+                    .map(|&(resource, _)| resource),
+            )
+            .chain(
+                kernel
+                    .paired_owner_registration_bounds()
+                    .iter()
+                    .map(|&(resource, _)| resource),
+            )
+            .filter(|&resource| super::activity_rows::paired(&oracle.network.graph, resource))
+            .collect();
+        for resource in resources {
+            let input = kernel
+                .paired_owner_registration_bounds()
+                .iter()
+                .find(|&&(index, _)| index == resource)
+                .map(|&(_, bounds)| bounds);
+            let mut fixed_upper = crate::master::numerics::ExactSum::default();
+            let mut negative_fixed_lower = crate::master::numerics::ExactSum::default();
+            for fixed in state
+                .fixed_routes
+                .iter()
+                .filter(|fixed| fixed.route.network == oracle.network.id)
+            {
+                let arcs = fixed
+                    .route
+                    .route
+                    .arcs
+                    .iter()
+                    .map(|id| {
+                        oracle
+                            .index
+                            .get(id)
+                            .copied()
+                            .ok_or_else(|| invalid("unknown fixed owner activity arc"))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let value = super::activity_rows::column_value(
+                    oracle,
+                    &fixed.route.route,
+                    &arcs,
+                    resource,
+                )?;
+                if fixed_upper.product(value, fixed.quantity).is_none()
+                    || negative_fixed_lower
+                        .product(-value, fixed.quantity)
+                        .is_none()
+                {
+                    return Err(invalid("fixed owner activity overflow"));
+                }
+            }
+            let fixed = [
+                -negative_fixed_lower
+                    .upper()
+                    .ok_or_else(|| invalid("fixed owner activity overflow"))?,
+                fixed_upper
+                    .upper()
+                    .ok_or_else(|| invalid("fixed owner activity overflow"))?,
+            ];
+            let quantity = starts[position] + oracle.network.graph.arcs.len();
+            let owner = crate::master::preprocessing::paired_owner::OwnerBounds::new(
+                input,
+                limits[quantity],
+                fixed,
+            );
+            let index = limits.len();
+            limits.push(owner.aggregate);
+            owner_states.insert((oracle.network.id, resource), (owner, quantity));
+            paired_coordinates.insert((oracle.network.id, resource), index);
+            for entry in oracle
+                .activity_rows
+                .iter()
+                .filter(|entry| entry.resource == resource)
+            {
+                raw[entry.row].push((index, entry.coefficient));
+            }
+        }
+    }
     let shared_start = constraints.len();
     let mut equalities = vec![];
     for (r, shared) in state.shared_rows.iter().enumerate() {
         // Signed nonlinear activities have no additive flow envelope here.
         // Dropping this entire row enlarges the domain; omitting only the
         // activity term could incorrectly prove infeasibility or fix arcs.
-        if state
-            .oracles
-            .iter()
-            .any(|o| o.activity_rows.iter().any(|entry| entry.row == r))
-        {
+        if state.oracles.iter().any(|o| {
+            o.activity_rows.iter().any(|entry| {
+                entry.row == r && !paired_coordinates.contains_key(&(o.network.id, entry.resource))
+            })
+        }) {
             continue;
         }
         let nonlinear = state
@@ -173,6 +266,9 @@ pub(super) fn apply<const D: usize>(
     for (i, v) in state.master_variables.iter().enumerate() {
         integers[i] = integer_domains && v.integer;
     }
+    for &index in paired_coordinates.values() {
+        integers[index] = false;
+    }
     let mut remaining = work_limit - build_work;
     let (derived, link_work, link_complete) = links::derive(
         &constraints[shared_start..],
@@ -205,6 +301,15 @@ pub(super) fn apply<const D: usize>(
         }
         if !next.complete {
             break;
+        }
+        let mut owner_changed = false;
+        for (identity, (owner, quantity)) in &mut owner_states {
+            let index = paired_coordinates[identity];
+            owner_changed |= owner.update(limits[index], limits[*quantity]);
+            limits[index] = owner.aggregate;
+        }
+        if owner_changed {
+            continue;
         }
         if !resources {
             report.propagation.complete = true;
@@ -239,6 +344,16 @@ pub(super) fn apply<const D: usize>(
         // only with the unspent budget; no progress resets the work counter.
     }
     report.propagation.complete &= link_complete;
+    for (&(network, resource), &index) in &paired_coordinates {
+        report.paired_owner_bounds.push((
+            network,
+            resource,
+            owner_states[&(network, resource)].0.local,
+        ));
+        report
+            .paired_owner_aggregate_bounds
+            .push((network, resource, limits[index]));
+    }
     for (index, variable) in state.master_variables.iter_mut().enumerate() {
         let bound = limits[index];
         variable.bounds = bound;

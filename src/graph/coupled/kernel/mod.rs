@@ -6,7 +6,6 @@ pub(super) mod bounds;
 mod bucketing;
 mod budgeted;
 mod certificate;
-pub use certificate::PairedControlCertificate;
 mod continuation;
 mod dependency_order;
 mod domains;
@@ -14,10 +13,8 @@ mod dominance;
 mod front;
 mod frozen;
 mod objective;
-mod paired;
 mod pricing;
-pub(super) mod relation;
-mod reversal;
+pub(super) mod reversal;
 mod selection;
 mod slope_interval;
 pub(super) mod slope_paired;
@@ -71,7 +68,7 @@ pub struct MachineArcFunctionInput<'a> {
     pub dependent_upper: descriptor::MachineRootInput<'a>,
 }
 mod storage;
-pub use activities::{CoupledPathCosts, CoupledPathValues, PairedControl};
+pub use activities::CoupledPathCosts;
 use storage::StateValues;
 mod transitions;
 
@@ -120,11 +117,11 @@ pub struct CoupledLabelState {
     fronts: Vec<front::CostFront>,
     slope_fronts: Vec<slope_interval::SlopeLabel>,
     slope_relations: Vec<slope_interval::SlopeLabel>,
-    relations: Vec<paired::PairedLabel>,
     plugins: Vec<crate::graph::coupled::PluginState>,
     pricing_activities: Option<Box<[Box<CoupledLabelState>]>>,
     numeric_cost: f64,
     resource_objective: f64,
+    paired_ordered_key: bool,
     accounting: Option<accounting::ScalarCosts>,
 }
 /// Prepared resource definitions over the unchanged physical arc vector.
@@ -140,6 +137,9 @@ pub struct CoupledKernel {
     initial: Vec<f64>,
     cost_scale: f64,
     objective_coefficients: std::sync::Arc<[f64]>,
+    // Original associated-variable charges do not scale raw paired pricing.
+    paired_associated_costs: std::sync::Arc<[(usize, f64)]>,
+    paired_owner_registration_bounds: std::sync::Arc<[(usize, [f64; 2])]>,
     weighted_objective: bool,
     nonnegative_paired_weights_only: bool,
     negative_paired_objective: bool,
@@ -167,8 +167,6 @@ pub struct CoupledKernel {
     slope_charges: Vec<std::sync::Arc<[slope_interval::PreparedSlopeCharge]>>,
     slope_dominance: Vec<slope_interval::PreparedSlopeDominance>,
     slope_paired: Vec<slope_paired::PreparedSlopePaired>,
-    relation_indices: Vec<usize>,
-    paired: Vec<paired::PreparedPaired>,
     plugins: Vec<crate::graph::coupled::PluginResource>,
     front_bucket_policy: bucketing::FrontBucketPolicy,
     frozen: frozen::PreparedFrozen,
@@ -189,9 +187,7 @@ pub struct FrontProgramCertificate {
 /// Reusable per-thread resource-extension scratch. Retained labels own all
 /// their state and never borrow temporary workspace storage.
 #[derive(Default)]
-pub struct CoupledWorkspace {
-    relation: relation::RelationWorkspace,
-}
+pub struct CoupledWorkspace {}
 fn dot(a: &[f64], b: &[f64]) -> Result<f64> {
     a.iter()
         .zip(b)
@@ -212,7 +208,6 @@ impl CoupledKernel {
             .map_or(0, |states| states.len())
             != self.pricing_activities.len()
             || state.plugins.len() != self.plugins.len()
-            || state.relations.len() != self.relation_indices.len()
             || state.fronts.len() != self.front_indices.len()
             || state.slope_fronts.len() != self.slope_indices.len()
             || state.slope_relations.len() != self.slope_paired.len()
@@ -227,7 +222,12 @@ impl CoupledKernel {
             || state.numeric.len() != self.initial.len()
             || state.custom_machine.len() != self.custom_indices.len()
             || (!state.custom_machine.is_empty()
-                && !state.custom_machine_identity.as_ref().is_some_and(|identity| std::sync::Arc::ptr_eq(identity, &self.machine_identity)))
+                && !state
+                    .custom_machine_identity
+                    .as_ref()
+                    .is_some_and(|identity| {
+                        std::sync::Arc::ptr_eq(identity, &self.machine_identity)
+                    }))
             || state.selection.len() != self.selection_initial.len()
             || state.loads.len() != self.load_capacities.len()
             || state.budgets.len() != budgeted::PreparedBudgeted::width(&self.budgeted)
@@ -275,18 +275,35 @@ impl CoupledLabelState {
         self.fronts.iter().map(front::CostFront::points)
     }
 
-    /// Affine `[base,dependent]` endpoint pairs for each retained paired
-    /// frontier. Disconnected pieces are returned separately. Backward labels
-    /// retain direction-specific suffix programs/caches, so this accessor
-    /// returns None for backward labels.
+    /// Piecewise affine paired fronts at the current forward label.
     pub fn paired_resource_fronts(&self) -> Option<Vec<Vec<[[f64; 2]; 2]>>> {
-        self.suffix.is_none().then(|| {
-            self.relations
-                .iter()
-                .filter_map(|label| label.forward())
-                .map(|front| front.pieces().iter().map(|p| [p.left, p.right]).collect())
-                .collect()
-        })
+        if self.suffix.is_some() {
+            return None;
+        }
+        self.slope_relations
+            .iter()
+            .map(|label| {
+                let front = label.front.as_ref()?;
+                let mut pieces = Vec::new();
+                for function in front.components() {
+                    let pairs = function.pairs();
+                    let (mut value, mut coordinate) = *pairs.first()?;
+                    if pairs.len() == 1 {
+                        pieces.push([[coordinate, value], [coordinate, value]]);
+                    }
+                    for &(slope, end) in &pairs[1..] {
+                        let next = value + (end - coordinate) * slope;
+                        if !next.is_finite() {
+                            return None;
+                        }
+                        pieces.push([[coordinate, value], [end, next]]);
+                        coordinate = end;
+                        value = next;
+                    }
+                }
+                Some(pieces)
+            })
+            .collect()
     }
 
     pub fn selection_domains(&self) -> &[u64] {
@@ -332,28 +349,23 @@ impl<const D: usize> Graph<D> {
             .ok_or_else(|| invalid("no coupled resources"))?;
         if !matches!(
             kernel.definitions.get(resource),
-            Some(CoupledResource::SlopePaired { .. })
+            Some(CoupledResource::PairedFront { .. })
         ) {
             return Err(invalid("waiting windows require a paired slope resource"));
         }
         let index = kernel.definitions[..resource]
             .iter()
-            .filter(|r| matches!(r, CoupledResource::SlopePaired { .. }))
+            .filter(|r| matches!(r, CoupledResource::PairedFront { .. }))
             .count();
-        if kernel.slope_paired[index].set_waiting_windows(windows)? {
+        let changed = kernel.slope_paired[index].set_waiting_windows(windows)?;
+        let changed = kernel.slope_paired[index].clear_base_windows() || changed;
+        if changed {
             kernel.identity = std::sync::Arc::new(());
         }
         Ok(())
     }
 
-    /// Install paired machine waiting windows from a physical scalar resource.
-    /// The caller identifies the scalar resource representing the paired base
-    /// coordinate. Each window is the intersection of its destination vertex
-    /// bounds and physical arc bounds, in physical arc order. Absent arc bounds
-    /// use the reference's finite -1e12/+1e12 sentinels; ties retain the arc
-    /// bound's binary64 bits. Disconnected multi-time windows and empty
-    /// intersections are not representable here.
-    /// Reinstall after changing the graph or paired resource definitions.
+    /// Set waiting windows from a scalar resource without replacing an explicitly supplied front program.
     pub fn set_paired_waiting_windows_from_resource(
         &mut self,
         resource: usize,
@@ -406,16 +418,47 @@ impl<const D: usize> Graph<D> {
             };
             windows.push(Window::new(lower, upper)?);
         }
-        self.set_paired_waiting_windows(resource, Some(&windows))
+        let snapshot = slope_paired::BaseWindows {
+            resource: base_resource,
+            vertices: self
+                .vertices
+                .iter()
+                .map(|vertex| {
+                    let window = vertex
+                        .bounds
+                        .get(base_resource)
+                        .ok_or_else(|| invalid("paired waiting vertex resource is out of range"))?;
+                    Ok((window.lower.to_bits(), window.upper.to_bits()))
+                })
+                .collect::<Result<Vec<_>>>()?,
+            arcs: self
+                .arcs
+                .iter()
+                .map(|arc| {
+                    Ok(arc
+                        .bounds
+                        .get(base_resource)
+                        .ok_or_else(|| invalid("paired waiting arc resource is out of range"))?
+                        .map(|window| (window.lower.to_bits(), window.upper.to_bits())))
+                })
+                .collect::<Result<Vec<_>>>()?,
+        };
+        self.set_paired_waiting_windows(resource, Some(&windows))?;
+        let kernel = self
+            .coupled
+            .as_mut()
+            .ok_or_else(|| invalid("no coupled resources"))?;
+        let index = kernel.definitions[..resource]
+            .iter()
+            .filter(|definition| matches!(definition, CoupledResource::PairedFront { .. }))
+            .count();
+        if kernel.slope_paired[index].set_base_windows(snapshot) {
+            kernel.identity = std::sync::Arc::new(());
+        }
+        Ok(())
     }
-    /// Select a different original resource domain for native raw fronts.
-    ///
-    /// With `true`, native raw interval and paired feasibility is defined by
-    /// their checked ordered IEEE front program. This is a MODEL choice, not
-    /// a proof-strength hint: it need not equal source-control or exact-real
-    /// feasibility. The default is `false`; strict and other families do not
-    /// change. Clones, branches and cost suppression preserve the choice.
-    /// Replacing resource descriptors resets it to the default.
+    /// Select the ordered front domain for raw resources. Paired resources
+    /// always use this domain; it cannot be disabled while one is installed.
     pub fn set_front_program_domain(&mut self, enabled: bool) -> Result<()> {
         let Some(kernel) = self.coupled.as_mut() else {
             return if enabled {
@@ -426,8 +469,18 @@ impl<const D: usize> Graph<D> {
                 Ok(())
             };
         };
+        if !enabled
+            && kernel
+                .definitions
+                .iter()
+                .any(|definition| matches!(definition, CoupledResource::PairedFront { .. }))
+        {
+            return Err(invalid("paired resources require the native front domain"));
+        }
         if enabled && kernel.has_negative_paired_objectives() {
-            return Err(invalid("negative paired objectives require a source model"));
+            return Err(invalid(
+                "negative paired objectives are not supported by paired front programs",
+            ));
         }
         if enabled && !kernel.has_machine_front_contracts() {
             return Err(invalid(
@@ -477,8 +530,48 @@ impl<const D: usize> Graph<D> {
     }
     pub fn coupled_path_cost(&self, arcs: &[usize]) -> Result<Option<f64>> {
         match self.coupled_kernel() {
+            Some(k)
+                if k.machine_paired_join_complete()
+                    && (arcs.is_empty() && self.source == self.sink
+                        || arcs
+                            .first()
+                            .and_then(|&index| self.arcs.get(index))
+                            .is_some_and(|arc| arc.tail == self.source)
+                            && arcs
+                                .last()
+                                .and_then(|&index| self.arcs.get(index))
+                                .is_some_and(|arc| arc.head == self.sink)) =>
+            {
+                self.coupled_route_cost(arcs)
+            }
             Some(k) => k.replay(arcs),
             None => Ok(Some(0.)),
+        }
+    }
+    /// Complete-route check for the explicit machine-feasibility domain.
+    /// Partial-path callers retain the forward replay contract above.
+    pub(crate) fn coupled_route_cost(&self, arcs: &[usize]) -> Result<Option<f64>> {
+        match self.coupled_kernel() {
+            Some(k) if k.machine_paired_join_complete() => {
+                k.validate_for(self)?;
+                let mut vertex = self.source;
+                for &index in arcs {
+                    let arc = self
+                        .arcs
+                        .get(index)
+                        .ok_or_else(|| invalid("unknown coupled route arc"))?;
+                    if arc.tail != vertex {
+                        return Ok(None);
+                    }
+                    vertex = arc.head;
+                }
+                if vertex != self.sink {
+                    return Ok(None);
+                }
+                Ok(k.joined_associated_machine_path_matching(arcs, None)?
+                    .map(|(cost, _)| cost))
+            }
+            _ => self.coupled_path_cost(arcs),
         }
     }
 }
@@ -494,3 +587,5 @@ mod canonical_numeric_join_tests;
 #[cfg(test)]
 #[path = "../../../../tests/unit/graph/coupled/kernel/custom_resource_tests.rs"]
 mod custom_resource_tests;
+
+pub use machine::PairedBaseDomains;

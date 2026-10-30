@@ -2,6 +2,115 @@
 use super::*;
 
 impl MachinePathHistory {
+    /// Apply the full backward paired-resource machine dominance wrapper.
+    pub fn backward_dominance(
+        &self,
+        other: &Self,
+        mode: i32,
+        accumulated: f64,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<f64> {
+        if self.backward_ceiling().is_none() || other.backward_ceiling().is_none() {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "backward dominance requires backward histories",
+            ));
+        }
+        let left = self.last().front().components();
+        let right = other.last().front().components();
+        if left.len() != 1 || right.len() != 1 {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "backward dominance requires single machine fronts",
+            ));
+        }
+        PairedFrontOperations::machine_backward_dominance(
+            &left[0],
+            &right[0],
+            mode,
+            accumulated,
+            budget,
+        )
+    }
+
+    /// Apply the full forward paired-resource machine dominance wrapper.
+    pub fn forward_dominance(
+        &self,
+        other: &Self,
+        mode: i32,
+        accumulated: f64,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<f64> {
+        if self.backward_ceiling().is_some() || other.backward_ceiling().is_some() {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "forward dominance requires forward histories",
+            ));
+        }
+        let left = self.last().front().components();
+        let right = other.last().front().components();
+        if left.len() != 1 || right.len() != 1 {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "forward dominance requires single machine fronts",
+            ));
+        }
+        PairedFrontOperations::machine_forward_dominance(
+            &left[0],
+            &right[0],
+            mode,
+            accumulated,
+            budget,
+        )
+    }
+
+    /// Compare retained forward feasibility fronts with the ordered machine
+    /// scan. This result is not a source-domain dominance certificate.
+    pub fn forward_feasibility_comparison(
+        &self,
+        other: &Self,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<()> {
+        if self.backward_ceiling().is_some() || other.backward_ceiling().is_some() {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "forward comparison requires forward histories",
+            ));
+        }
+        let left = self.last().front().components();
+        let right = other.last().front().components();
+        if left.len() != 1 || right.len() != 1 {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "forward comparison requires single machine fronts",
+            ));
+        }
+        PairedFrontOperations::machine_forward_feasibility_dominance(&left[0], &right[0], budget)
+    }
+
+    /// Compare forward cost fronts and update the raw machine accumulator.
+    pub fn forward_cost_comparison(
+        &self,
+        other: &Self,
+        mode: i32,
+        accumulated: f64,
+        budget: FrontierBudget,
+    ) -> FrontierOutcome<f64> {
+        if self.backward_ceiling().is_some() || other.backward_ceiling().is_some() {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "forward comparison requires forward histories",
+            ));
+        }
+        let left = self.last().front().components();
+        let right = other.last().front().components();
+        if left.len() != 1 || right.len() != 1 {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported(
+                "forward comparison requires single machine fronts",
+            ));
+        }
+        PairedFrontOperations::machine_forward_cost_dominance(
+            &left[0],
+            &right[0],
+            mode,
+            accumulated,
+            budget,
+        )
+    }
+
     /// Compare retained backward feasibility fronts under machine tolerance.
     /// Acceptance is not strict source-domain containment.
     pub fn backward_feasibility_comparison(
@@ -21,9 +130,7 @@ impl MachinePathHistory {
                 "backward comparison requires single machine fronts",
             ));
         }
-        PreparedSlopeRelationArc::machine_backward_feasibility_dominance(
-            &left[0], &right[0], budget,
-        )
+        PairedFrontOperations::machine_backward_feasibility_dominance(&left[0], &right[0], budget)
     }
 
     /// Compare the retained backward fronts using the ordered machine scan.
@@ -48,7 +155,7 @@ impl MachinePathHistory {
                 "backward comparison requires single machine fronts",
             ));
         }
-        PreparedSlopeRelationArc::machine_backward_cost_dominance(
+        PairedFrontOperations::machine_backward_cost_dominance(
             &left[0],
             &right[0],
             mode,
