@@ -1,11 +1,12 @@
 use super::*;
 
 #[test]
-fn root_scaling_defaults_to_equilibrium_without_changing_low_level_policy() {
+fn scaling_defaults_to_off() {
     let root = crate::master::routing::RootOptions::default();
-    assert_eq!(root.clp_options.scaling, ClpScaling::Equilibrium);
+    assert_eq!(root.clp_options.scaling, ClpScaling::Off);
     assert!(root.clp_options.keep_work_areas);
-    assert_eq!(ClpOptions::default().scaling, ClpScaling::Auto);
+    assert_eq!(ClpOptions::default().scaling, ClpScaling::Off);
+    assert_eq!(ClpScaling::default(), ClpScaling::Off);
 }
 
 fn verify(master: &mut ClpMaster, expected: f64) {
@@ -49,6 +50,7 @@ fn reoptimization_policies_preserve_edits_forks_and_restoration() {
     for scaling in [
         ClpScaling::Auto,
         ClpScaling::Geometric,
+        ClpScaling::Ruiz,
         ClpScaling::Equilibrium,
         ClpScaling::Off,
     ] {
@@ -109,9 +111,13 @@ fn reoptimization_policies_preserve_edits_forks_and_restoration() {
 
 #[test]
 fn scaling_policies_solve_original_scaled_rows() {
+    extern "C" {
+        fn Clp_scalingFlag(model: *mut Model) -> i32;
+    }
     for scaling in [
         ClpScaling::Auto,
         ClpScaling::Geometric,
+        ClpScaling::Ruiz,
         ClpScaling::Equilibrium,
         ClpScaling::Off,
     ] {
@@ -128,6 +134,12 @@ fn scaling_policies_solve_original_scaled_rows() {
                 scaling,
                 keep_work_areas,
             });
+            // Verify that Clp accepted the requested native mode, including
+            // the additional Ruiz mode, before checking the solution.
+            assert_eq!(
+                unsafe { Clp_scalingFlag(master.model.unwrap().as_ptr()) },
+                scaling.code()
+            );
             master.add_row(RowSense::Equal, 1., &[]).unwrap();
             master.add_column(1., &[(0, 1e-4)]).unwrap();
             master.add_column(2., &[(0, 1e4)]).unwrap();
@@ -136,6 +148,7 @@ fn scaling_policies_solve_original_scaled_rows() {
             assert!((master.objective - 2e-4).abs() < 1e-9);
             for next in [
                 ClpScaling::Geometric,
+                ClpScaling::Ruiz,
                 ClpScaling::Auto,
                 ClpScaling::Equilibrium,
             ] {
@@ -143,6 +156,10 @@ fn scaling_policies_solve_original_scaled_rows() {
                     scaling: next,
                     keep_work_areas,
                 });
+                assert_eq!(
+                    unsafe { Clp_scalingFlag(master.model.unwrap().as_ptr()) },
+                    next.code()
+                );
                 verify(&mut master, 2e-4);
             }
         }

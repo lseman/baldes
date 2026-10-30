@@ -147,7 +147,7 @@ pub struct RootOptions {
     /// Clp and native IPM ignore this setting.
     pub master_threads: usize,
     /// Clp-only numerical scaling and reoptimization storage policy.
-    /// Root solves default to equilibrium scaling with retained work areas.
+    /// Root solves default to no scaling with retained work areas.
     pub clp_options: ClpOptions,
     /// Retain an independently forkable model and active cuts for descendants.
     pub capture_state: bool,
@@ -193,10 +193,7 @@ impl Default for RootOptions {
         Self {
             master_solver: MasterSolver::Clp,
             master_threads: 0,
-            clp_options: ClpOptions {
-                scaling: ClpScaling::Equilibrium,
-                ..ClpOptions::default()
-            },
+            clp_options: ClpOptions::default(),
             bound_mode: BoundMode::Numerical,
             capture_state: false,
             node_depth: 0,

@@ -39,7 +39,7 @@ Options:
   --mip-nodes N         Restricted-master integer-search node budget per call
   --master MODE         clp (default), highs, gurobi, or ipm (disables stabilization)
   --master-threads N    HiGHS/Gurobi worker budget; 0 = all available CPUs (default)
-  --clp-scaling MODE    equilibrium (default), auto, geometric, or off
+  --clp-scaling MODE    off (default), equilibrium, auto, geometric, or ruiz
   --clp-work-areas MODE retain (default) or discard after each LP solve
   --bound-mode MODE     numerical (default) or certified (independent bound validation)
   --hgs-time SECONDS    Run HGS before root/tree solve for this search budget

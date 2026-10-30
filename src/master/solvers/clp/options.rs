@@ -1,14 +1,16 @@
 //! Native Clp reoptimization policy, independent of LP feasibility tolerances.
 use super::*;
 
-/// Native matrix scaling policy. Automatic scaling is the default.
+/// Matrix scaling policy. Scaling is disabled by default.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ClpScaling {
+    #[default]
     Off,
     Equilibrium,
     Geometric,
-    #[default]
     Auto,
+    /// Five simultaneous infinity-norm Ruiz equilibration passes.
+    Ruiz,
 }
 impl ClpScaling {
     pub(super) fn code(self) -> i32 {
@@ -17,6 +19,7 @@ impl ClpScaling {
             Self::Equilibrium => 1,
             Self::Geometric => 2,
             Self::Auto => 3,
+            Self::Ruiz => 6,
         }
     }
 }
@@ -28,8 +31,9 @@ impl std::str::FromStr for ClpScaling {
             "equilibrium" => Ok(Self::Equilibrium),
             "geometric" => Ok(Self::Geometric),
             "auto" => Ok(Self::Auto),
+            "ruiz" => Ok(Self::Ruiz),
             _ => Err(invalid(
-                "Clp scaling must be auto, geometric, equilibrium, or off",
+                "Clp scaling must be auto, geometric, equilibrium, ruiz, or off",
             )),
         }
     }
@@ -46,7 +50,7 @@ pub struct ClpOptions {
 impl Default for ClpOptions {
     fn default() -> Self {
         Self {
-            scaling: ClpScaling::Auto,
+            scaling: ClpScaling::Off,
             keep_work_areas: true,
         }
     }
