@@ -41,6 +41,10 @@ pub struct TreeOptions {
     /// Concurrent node evaluations. One preserves sequential best-bound search.
     pub threads: usize,
     pub root: RootOptions,
+    /// Complete feasible plan supplied by the caller. Routes and objective
+    /// (including recourse) are independently reconstructed before acceptance.
+    /// Also seeds the column pool, independently of the pool heuristic budget.
+    pub initial_solution: Vec<Route>,
     pub branching: BranchingOptions,
     pub node_limit: usize,
     pub time_limit: Duration,
@@ -64,6 +68,7 @@ impl Default for TreeOptions {
         Self {
             threads: 1,
             root: RootOptions::default(),
+            initial_solution: vec![],
             branching: BranchingOptions::default(),
             node_limit: 10000,
             time_limit: Duration::from_secs(120),

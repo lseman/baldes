@@ -291,6 +291,10 @@ pub const OPTION_TABLE: &[OptionInfo] = &[
         name: "BALDESloadCompletionThreshold", kind: OptionKind::Double, default: 0.,
         support: OptionSupport::Implemented("src/labeling/engine/load_completion.rs"),
     },
+    OptionInfo {
+        name: "BALDESloadCompletionSubsetSize", kind: OptionKind::Int, default: 0.,
+        support: OptionSupport::Implemented("src/labeling/engine/load_completion.rs"),
+    },
 ];
 
 #[derive(Clone, Debug)]

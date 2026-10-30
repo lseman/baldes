@@ -295,10 +295,11 @@ impl<const D: usize> LabelingEngine<D> {
         }
         if std::env::var_os("BALDES_DEBUG_COMPLETION").is_some() && self.load_completion.is_some() {
             eprintln!(
-                "load completion: setup={completion_setup:.6} pruned={} generated={} expanded={}",
+                "load completion: setup={completion_setup:.6} pruned={} generated={} expanded={} subset={}",
                 self.statistics.completion_pruned,
                 self.statistics.generated,
-                self.statistics.expanded
+                self.statistics.expanded,
+                self.load_completion.as_ref().map_or(0, |b| b.subset_size())
             );
         }
         self.load_completion = None;

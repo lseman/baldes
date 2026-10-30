@@ -513,6 +513,11 @@ pub(super) fn solve_seeded<const D: usize>(
         .map_or_else(HashSet::new, |w| {
             w.columns.iter().flatten().map(|c| c.tag).collect()
         });
+    // Fresh auxiliary columns (notably Theta) precede imported routes.
+    // `cg.known` starts at physical column zero, so use aligned warm metadata
+    // when a prefix exists rather than tagging/capping auxiliary variables as
+    // routes. Initialize base artificials here because CG will resume it.
+    let auxiliary_columns = master.costs().len();
     for route in &options.initial_routes {
         if route.arcs.iter().any(|&id| {
             problem
@@ -540,6 +545,23 @@ pub(super) fn solve_seeded<const D: usize>(
         } else {
             options.cg.known.push(column);
         }
+    }
+    if options.cg.warm_start.is_none() && auxiliary_columns > 0 {
+        let mut warm = cg::WarmStart::empty(options.bound_mode);
+        warm.initial_rows = master.rhs().len();
+        warm.columns.resize(auxiliary_columns, None);
+        warm.columns
+            .extend(std::mem::take(&mut options.cg.known).into_iter().map(Some));
+        if options.cg.artificial_cost > 0. {
+            let rows = 0..master.rhs().len();
+            warm.artificials =
+                cg::append_artificials(&mut master, rows, options.cg.artificial_cost)?
+                    .into_iter()
+                    .map(|(_, column)| column)
+                    .collect();
+        }
+        warm.columns.resize(master.costs().len(), None);
+        options.cg.warm_start = Some(warm);
     }
     let problem = Rc::new(problem);
     let mut controller = RootController {

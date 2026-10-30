@@ -36,6 +36,15 @@ pub fn solve<const D: usize>(
             })
             .collect();
         options.branching.window_arcs = Some(split.clone());
+        options.initial_solution = std::mem::take(&mut options.initial_solution)
+            .into_iter()
+            .map(|mut route| {
+                route.arcs = graph
+                    .route_on_window_arcs(&split, &route.arcs)
+                    .ok_or_else(|| invalid("initial solution has no feasible window arcs"))?;
+                Ok(route)
+            })
+            .collect::<Result<Vec<_>>>()?;
         let mut output = solve_split(RoutingContext::set_partitioning(graph, vehicles)?, options)?;
         for route in &mut output.routes {
             split.restore(route);
@@ -169,6 +178,27 @@ fn solve_split<const D: usize>(
         customers: vec![],
         seen: HashSet::new(),
     };
+    if !options.initial_solution.is_empty() {
+        let routes = options
+            .initial_solution
+            .iter()
+            .map(|route| {
+                feasible_route(&problem, &route.arcs)
+                    .ok_or_else(|| invalid("invalid initial solution route"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        output.incumbent = problem.unit_route_incumbent(&routes).ok_or_else(|| {
+            invalid("initial solution must cover each customer once within the fleet limit")
+        })?;
+        output.routes = routes;
+        for route in &output.routes {
+            pool.add(&problem, &route.arcs);
+        }
+        options
+            .root
+            .initial_routes
+            .extend(output.routes.iter().cloned());
+    }
     for route in &options.root.initial_routes {
         pool.add(&problem, &route.arcs);
     }

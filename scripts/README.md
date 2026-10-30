@@ -35,8 +35,10 @@ benchmark files. `--help` lists options. Run
 
 The `stochastic_instance` example (`features=clp`) validates a generated JSON
 file through the actual BALDES constructors; add `--solve` to run numerical
-branch-and-price. Use `ng-memory-31` for the 19/29-customer cases and
-`ng-memory-63` for the complete grid.
+conventional routing branch-cut-and-price with Theta recourse cuts, rank-one
+cuts, capacity cuts, and dynamic NG mode -1. Add `--hgs-seconds 3 --hgs-seed 0`
+to seed columns and the incumbent with validated mean-demand HGS proposals,
+within the overall solve budget.
 
 The paper's BC-Theta comparison is implemented in
 `benchmarks/stochastic_branch_cut.py` using gurobipy. The paired runner is

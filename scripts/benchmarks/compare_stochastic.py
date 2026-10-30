@@ -54,15 +54,13 @@ def main() -> None:
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--repetitions", type=int, default=1)
     parser.add_argument("--ng-size", type=int, default=8,
-                        help="NG prepricing neighborhood; 0 disables (default: 8)")
-    parser.add_argument("--max-labels", type=int, default=1_000_000,
-                        help="stored-label limit per BALDES pricing call (default: 1000000)")
+                        help="Initial NG neighborhood size (default: 8)")
     parser.add_argument("--hgs-seconds", type=float, help="optional BALDES mean-demand HGS budget, included in --seconds")
     parser.add_argument("--hgs-seed", type=int, default=0)
     parser.add_argument("--build-description", default="user-supplied binary; build flags not independently verified")
     args = parser.parse_args()
-    if not math.isfinite(args.seconds) or args.seconds <= 0 or min(args.threads, args.repetitions, args.max_labels) < 1:
-        parser.error("need positive finite seconds and positive threads/repetitions/max-labels")
+    if not math.isfinite(args.seconds) or args.seconds <= 0 or min(args.threads, args.repetitions) < 1:
+        parser.error("need positive finite seconds and positive threads/repetitions")
     if args.ng_size < 0:
         parser.error("NG size must be nonnegative")
     if args.hgs_seconds is not None and (not math.isfinite(args.hgs_seconds) or args.hgs_seconds <= 0):
@@ -78,14 +76,14 @@ def main() -> None:
     for name in ["RAYON_NUM_THREADS", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"]:
         environment[name] = str(args.threads)
     metadata = {"policy": args.policy, "time_limit_seconds": args.seconds, "threads": args.threads,
-                "repetitions": args.repetitions, "max_labels_per_pricing_call": args.max_labels,
+                "repetitions": args.repetitions,
                 "ng_size": args.ng_size,
                 "hgs_seconds": args.hgs_seconds, "hgs_seed": args.hgs_seed,
                 "baldes_binary_sha256": digest(binary), "branch_cut_script_sha256": digest(script),
                 "python": sys.version, "build_description": args.build_description, "inputs": hashes,
                 "comparison_scope": "new synthetic cases; directed Python BC-Theta with non-CVRPSEP fractional separation",
                 "budget_scope": "Gurobi TimeLimit covers optimize only; BALDES limit covers node construction and solves. Report process wall/build/solve times separately.",
-                "warm_start_scope": "BALDES singleton/greedy starts and optional mean-demand HGS; no external starts"}
+                "warm_start_scope": "BALDES routing pool heuristic and optional mean-demand HGS; no external starts"}
     (args.output / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
     all_results = []
     for index, path in enumerate(inputs):
@@ -96,7 +94,7 @@ def main() -> None:
                 "gurobi": [sys.executable, str(script), str(path), "--policy", args.policy,
                            "--seconds", str(args.seconds), "--threads", str(args.threads), "--seed", str(repetition)],
                 "baldes": [str(binary), str(path), "--solve", "--json", "--policy", args.policy,
-                           "--seconds", str(args.seconds), "--max-labels", str(args.max_labels),
+                           "--seconds", str(args.seconds),
                            "--ng-size", str(args.ng_size)]}
             if args.hgs_seconds is not None:
                 commands["baldes"] += ["--hgs-seconds", str(args.hgs_seconds), "--hgs-seed", str(args.hgs_seed)]

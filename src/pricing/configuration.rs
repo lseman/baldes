@@ -118,6 +118,11 @@ impl<const D: usize> Solver<D> {
                 .options
                 .get("BALDESloadCompletionThreshold")
                 .unwrap_or(0.),
+            load_completion_subset_size: self
+                .options
+                .get("BALDESloadCompletionSubsetSize")
+                .unwrap_or(0.)
+                .clamp(0., 6.) as usize,
             dominance_mode: self.dominance_mode,
             steps: self.bucket_steps,
             target_buckets: self

@@ -3,30 +3,18 @@
 //! Implements policies P1 and P3, equations (9) and (11), of Tomazella,
 //! Munari and Morabito (2026). Customer order is fixed during execution.
 //! Capacity constrains expected route demand; realized overload triggers recourse.
-//! Pricing uses the ordinary BALDES physical-graph engine with a cost-bearing
-//! recourse resource. A set-partitioning master and arc branch-and-price driver
-//! share the existing LP backend interface; tiny enumeration remains an oracle.
+//! Uses the conventional routing branch-cut-and-price tree with Theta cuts
+//! for expected recourse. Tiny enumeration remains an independent oracle.
 
 use crate::{invalid, Result};
 
-mod bounds;
-mod master;
-mod ng;
-mod pricing;
-mod search;
-pub use ng::NgPricingResult;
-mod tree;
-mod warm_start;
-pub use master::{
-    Column, ColumnGenerationOptions, ColumnGenerationResult, ColumnGenerationStatus, Master,
-    MasterPhase, MasterSnapshot,
-};
-pub use pricing::{ArcBranch, PricedRoute, PricingOptions, PricingResult, PricingStatus};
-pub use tree::{Solution, SolveOptions, SolveResult, SolveStatus};
-pub use warm_start::{HgsWarmStart, HgsWarmStartSummary};
+mod solve;
 mod theta;
 mod tiny;
+mod warm_start;
+pub use solve::{SolveOptions, SolveResult};
 pub use tiny::{ExactSolution, TinyOptions};
+pub use warm_start::{HgsWarmStart, HgsWarmStartSummary};
 
 /// Finite integer support, with probabilities normalized on construction.
 #[derive(Clone, Debug)]

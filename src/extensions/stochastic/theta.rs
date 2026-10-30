@@ -31,6 +31,36 @@ impl RouteRecourse for ExpectedRecourse {
 }
 
 impl Problem {
+    // A customer can incur at most one negative preventive detour per visit.
+    // Charging each customer's own bound is tighter than n times the worst
+    // detour, and remains safe for rounded/nonmetric distance matrices.
+    pub(super) fn recourse_customer_lower_bounds(&self) -> Vec<f64> {
+        (1..=self.demands.len())
+            .map(|j| {
+                (0..=self.demands.len())
+                    .map(|i| self.costs[i][0] + self.costs[0][j] - self.costs[i][j])
+                    .fold(0., f64::min)
+                    * (1. + 1e-10)
+            })
+            .collect()
+    }
+
+    /// Travel cost plus per-customer recourse lower bounds: a lower bound on
+    /// the expected cost of the route under either policy.
+    pub fn relaxed_route_cost(&self, route: &[usize]) -> f64 {
+        let charges = self.recourse_customer_lower_bounds();
+        let mut from = 0;
+        let mut cost = 0.;
+        for &to in route.iter().chain(std::iter::once(&0)) {
+            cost += self.costs[from][to];
+            if to != 0 {
+                cost += charges[to - 1];
+            }
+            from = to;
+        }
+        cost
+    }
+
     /// Classic capacitated routing graph on mean demands. Vertex `j` is
     /// customer `j`, the sink is `n + 1`. Arc costs add the head customer's
     /// recourse lower bound, so a route costs `relaxed_route_cost`. NG
@@ -123,7 +153,9 @@ impl Problem {
     /// 15 remembered customers per vertex and on average. Explicit pricing
     /// options override these limits; `BALDESdynamicNGmode = 0` disables it.
     /// Load-indexed walk bounds prune non-improving exact-pricing completions by
-    /// default; `BALDESloadCompletionResource = -1` disables them.
+    /// default, conditioning on up to four selected NG elements.
+    /// `BALDESloadCompletionSubsetSize = 0` keeps unconditional bounds only;
+    /// `BALDESloadCompletionResource = -1` disables both.
     /// NG mode defaults to -1: strengthening pauses once rank-one rows are
     /// present. Set `BALDESdynamicNGmode = 1` to continue after their insertion.
     pub fn solve_theta_cuts(
@@ -158,6 +190,17 @@ impl Problem {
                 .root
                 .pricing_options
                 .push(("BALDESloadCompletionResource".into(), 1.));
+        }
+        if !options
+            .root
+            .pricing_options
+            .iter()
+            .any(|(k, _)| k == "BALDESloadCompletionSubsetSize")
+        {
+            options
+                .root
+                .pricing_options
+                .push(("BALDESloadCompletionSubsetSize".into(), 4.));
         }
         if options.root.relaxation_improvement_priority == 0. {
             options.root.relaxation_improvement_priority = 1.;

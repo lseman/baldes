@@ -20,12 +20,10 @@ fn main() -> baldes::Result<()> {
             },
         )?;
         println!("Tiny oracle with at most two vehicles: {solution:?}");
-        let priced = problem.price(policy, &[20., 20.], 0., &[], &[], false, Default::default())?;
-        println!("BALDES stochastic pricing: {priced:?}");
         #[cfg(feature = "clp")]
         {
             let solved = problem.solve(policy, 2, Default::default())?;
-            println!("BALDES branch-and-price: {solved:?}");
+            println!("BALDES routing with Theta recourse cuts: {solved:?}");
         }
     }
     Ok(())
