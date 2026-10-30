@@ -411,6 +411,20 @@ impl PathStorage {
         cuts: &[LimitedInput],
         kpath: &[LimitedKPathInput],
     ) -> Result<Option<Vec<(Vec<usize>, f64)>>> {
+        self.machine_inspection_costs_until(g, cuts, kpath, None)
+    }
+
+    fn machine_inspection_costs_until<const D: usize>(
+        &self,
+        g: &Graph<D>,
+        cuts: &[LimitedInput],
+        kpath: &[LimitedKPathInput],
+        timer: Option<(std::time::Instant, std::time::Duration)>,
+    ) -> Result<Option<Vec<(Vec<usize>, f64)>>> {
+        let expired = || timer.is_some_and(|(start, limit)| start.elapsed() > limit);
+        if expired() {
+            return Err(crate::incomplete("enumeration time limit exceeded"));
+        }
         let Some(kernel) = g.coupled_kernel() else {
             return Ok(None);
         };
@@ -432,10 +446,16 @@ impl PathStorage {
         let mut vertices = Vec::new();
         let mut ids = Vec::new();
         for path in self.ordered_paths() {
+            if expired() {
+                return Err(crate::incomplete("enumeration time limit exceeded"));
+            }
             let Some(mut cost) = self.machine_contribution(&path.arcs) else {
                 return Ok(None);
             };
             for &index in &path.arcs {
+                if expired() {
+                    return Err(crate::incomplete("enumeration time limit exceeded"));
+                }
                 let arc = g
                     .arcs
                     .get(index)
@@ -587,7 +607,7 @@ impl PathStorage {
             return Err(invalid("invalid enumeration inspection cutoff"));
         }
         let paired_costs = if g.coupled_kernel().is_some_and(|kernel| kernel.uses_zero_paired_inspection_cost()) {
-            let paths = self.machine_inspection_costs(g, cuts, kpath)?.ok_or_else(|| {
+            let paths = self.machine_inspection_costs_until(g, cuts, kpath, timer)?.ok_or_else(|| {
                 crate::incomplete("paired front-program inspection contributions unavailable")
             })?;
             Some(paths.into_iter().collect::<HashMap<_, _>>())
@@ -611,7 +631,14 @@ impl PathStorage {
                         crate::incomplete("paired front-program inspection path unavailable")
                     })?
                 } else {
-                    let mut cost: f64 = path.arcs.iter().map(|&a| g.arcs[a].reduced_cost).sum();
+                    // Match f64::sum's signed-zero identity and order.
+                    let mut cost = -0.0f64;
+                    for &arc in &path.arcs {
+                        if expired() {
+                            return Err(crate::incomplete("enumeration time limit exceeded"));
+                        }
+                        cost += g.arcs[arc].reduced_cost;
+                    }
                     cost += g
                         .coupled_pricing_path_cost(&path.arcs)?
                         .ok_or_else(|| invalid("enumerated path violates coupled resources"))?;
@@ -636,6 +663,9 @@ impl PathStorage {
                             .ok_or_else(|| invalid("initial resource outside source windows"))?;
                     }
                     for &arc in &path.arcs {
+                        if expired() {
+                            return Err(crate::incomplete("enumeration time limit exceeded"));
+                        }
                         q = extend_resources(g, &g.arcs[arc], &q, true)
                             .ok_or_else(|| invalid("enumerated knapsack resource infeasible"))?;
                     }

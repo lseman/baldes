@@ -10,6 +10,7 @@ pub struct Storage<const D: usize = { crate::DEFAULT_RESOURCE_DIMENSIONS }> {
     pub pending: usize,
     pub checks: u64,
     pub(super) preserve_arc_paths: bool,
+    pub(super) protected_resources: Vec<usize>,
 }
 
 impl<const D: usize> Storage<D> {
@@ -25,9 +26,16 @@ impl<const D: usize> Storage<D> {
             pending: 0,
             checks: 0,
             preserve_arc_paths: false,
+            protected_resources: Vec::new(),
         })
     }
-    fn dominates(g: &Graph<D>, a: &Label<D>, b: &Label<D>, forward: bool) -> bool {
+    fn dominates(g: &Graph<D>, a: &Label<D>, b: &Label<D>, forward: bool, protected: &[usize]) -> bool {
+        if !protected.iter().all(|&resource| {
+            a.resources.get(resource).zip(b.resources.get(resource))
+                .is_some_and(|(a, b)| a.to_bits() == b.to_bits())
+        }) {
+            return false;
+        }
         let Some(penalty) = g.coupled_dominance_penalty(
             a.coupled_state.as_deref(),
             b.coupled_state.as_deref(),
@@ -98,14 +106,14 @@ impl<const D: usize> Storage<D> {
                 break;
             }
             self.checks += 1;
-            if Self::dominates(g, previous, &label, forward) {
+            if Self::dominates(g, previous, &label, forward, &self.protected_resources) {
                 return false;
             }
         }
         let records = &mut self.partitions[partition];
         records.retain(|&id| {
             self.checks += 1;
-            if Self::dominates(g, &label, &self.arena[id], forward) {
+            if Self::dominates(g, &label, &self.arena[id], forward, &self.protected_resources) {
                 self.live[id] = false;
                 if id >= self.cursor {
                     self.pending -= 1;

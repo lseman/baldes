@@ -112,6 +112,7 @@ impl<const D: usize> LabelStorage<D> {
             let hot = bucket.hot.get(position);
             if labels.presence_for::<R>(previous) == &label.presence_state
                 && (!BRANCHING || labels.branch_for::<R>(previous) == &label.branch_state)
+                && Self::protected_resources_equal(&self.protected_resources, &hot, &candidate)
                 && Self::dominates_coupled_slices(
                     g,
                     &hot,
@@ -175,6 +176,7 @@ impl<const D: usize> LabelStorage<D> {
             let hot = bucket.hot.get(next);
             if labels.presence_for::<R>(inserted) == labels.presence_for::<R>(id)
                 && (!BRANCHING || labels.branch_for::<R>(inserted) == labels.branch_for::<R>(id))
+                && Self::protected_resources_equal(&self.protected_resources, &candidate, &hot)
                 && Self::dominates_coupled_slices(
                     g,
                     &candidate,

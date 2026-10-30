@@ -52,6 +52,9 @@ impl<const D: usize> LabelingEngine<D> {
             .reset(self.grid.forward.buckets.iter().map(Vec::len));
         self.backward
             .reset(self.grid.backward.buckets.iter().map(Vec::len));
+        let protected = self.cuts.knapsack.dominance_protected_resources();
+        self.forward.protected_resources.clone_from(&protected);
+        self.backward.protected_resources = protected;
         let ordinary = !self.has_cuts() && self.branching.resources == 0;
         let branch_only = !self.has_cuts() && self.branching.resources != 0;
         self.forward.labels.set_resource_mode(
@@ -129,6 +132,8 @@ impl<const D: usize> LabelingEngine<D> {
                 // Crossing labels share a traversal stack; each traversal resets
                 // its contents while retaining capacity from the previous label.
                 let mut work = Vec::new();
+                let knapsack_lower = self.cuts.knapsack.global_cost_lower_bound()
+                    .unwrap_or(f64::NEG_INFINITY);
                 for internal in 0..self.grid.order.len() {
                     let v = self.grid.order[internal];
                     let mut cutoff = pool.cutoff(v);
@@ -144,12 +149,13 @@ impl<const D: usize> LabelingEngine<D> {
                         }
                         let Some(bucket) =
                             self.grid
-                                .bucket_id(self.consumption_joins, internal, coordinate)
+                                .bucket_id_checked(self.consumption_joins, internal, coordinate)
+                                .map_err(|()| incomplete("pricing bucket index overflow"))?
                         else {
                             continue;
                         };
-                        let key = label.key()
-                            + self.cuts.knapsack.partial_cost(g, label.resources(), true);
+                        let key = crate::core::rounding::add_down(label.key(), knapsack_lower)
+                            .unwrap_or(f64::NEG_INFINITY);
                         let base_key = key;
                         let key = self.ctx().resource_completion_key(
                             g,
@@ -164,7 +170,7 @@ impl<const D: usize> LabelingEngine<D> {
                             let row = &self.storage(self.consumption_joins).buckets[internal][k];
                             if self.ctx().completion_sum(
                                 key,
-                                row.completion_bound(self.cuts.knapsack.active),
+                                row.completion_bound(false),
                             ) >= cutoff
                             {
                                 continue;
@@ -289,7 +295,7 @@ impl<const D: usize> LabelingEngine<D> {
             }
         }
         if self.resource_error.load(Ordering::Relaxed) {
-            return Err(incomplete("coupled resource arithmetic or state failure"));
+            return Err(incomplete("resource or bucket arithmetic or state failure"));
         }
         if self.statistics.completion_pruned > 0 {
             minimum = minimum.min(self.controls.load_completion_threshold);
@@ -385,7 +391,7 @@ impl<const D: usize> LabelingEngine<D> {
             self.update_unreachable(false);
             if self.resource_error.load(Ordering::Relaxed) {
                 return Err(incomplete(
-                    "coupled resource continuation arithmetic failure",
+                    "resource or bucket continuation arithmetic failure",
                 ));
             }
             self.refresh_coupled_completion(g);

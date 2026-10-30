@@ -63,14 +63,21 @@ impl<'a> CutTables<'a> {
                 std::slice::from_ref(&transition),
             );
         }
+        if !label.cut_cost.is_finite() {
+            return Err(incomplete("enumeration cut cost overflow"));
+        }
         Ok(())
     }
-    pub(super) fn to_vertex<const D: usize>(&self, label: &mut Label<D>) {
+    pub(super) fn to_vertex<const D: usize>(&self, label: &mut Label<D>) -> Result<()> {
         state::apply_vertex_support(
             &mut label.cut_words,
             &mut label.cut_cost,
             &self.info.vertices[label.vertex].full_memory_support,
         );
+        if !label.cut_cost.is_finite() {
+            return Err(incomplete("enumeration cut cost overflow"));
+        }
+        Ok(())
     }
     /// enumeration_labels_can_be_concatenated cost part, at the forward vertex.
     pub(super) fn join<const D: usize>(
@@ -93,11 +100,15 @@ impl<'a> CutTables<'a> {
             (&b.cut_words, b.cut_cost),
             cost,
         );
-        if let Some(presence) = self.presence.filter(|p| p.active()) {
-            Ok(cost + presence.join_cost(&f.presence_state, &b.presence_state)?)
+        let cost = if let Some(presence) = self.presence.filter(|p| p.active()) {
+            cost + presence.join_cost(&f.presence_state, &b.presence_state)?
         } else {
-            Ok(cost)
+            cost
+        };
+        if !cost.is_finite() {
+            return Err(incomplete("enumeration cut join cost overflow"));
         }
+        Ok(cost)
     }
 }
 impl<const D: usize> Label<D> {

@@ -35,6 +35,7 @@ impl<const D: usize> LabelStorage<D> {
             buckets,
             crossing,
             root: None,
+            protected_resources: Vec::new(),
         }
     }
 

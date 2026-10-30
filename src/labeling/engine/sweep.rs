@@ -167,6 +167,9 @@ impl<'a, const D: usize> Sweep<'a, D> {
                         let other_label = storage.labels.view(other);
                         if other_label.presence_state() == candidate_presence
                             && (!BRANCHING || other_label.branch_state() == candidate_branch)
+                            && LabelStorage::protected_resources_equal(
+                                &storage.protected_resources, hot, candidate_hot,
+                            )
                             && LabelStorage::dominates_coupled_slices(
                                 g,
                                 hot,

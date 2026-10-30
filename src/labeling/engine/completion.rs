@@ -241,24 +241,35 @@ impl<const D: usize> LabelingEngine<D> {
         }
         let vertex = self.grid.internal[label.vertex()];
         let mut q = self.grid.coordinate(label.resources());
+        // Invalid coordinates do not prove that a completion is impossible.
+        // In particular, bucket indexing casts floating-point values to signed
+        // integers and may otherwise turn a NaN into an ordinary bucket.
+        if q.iter().take(self.grid.dimensions).any(|x| !x.is_finite()) {
+            return true;
+        }
         let opposite = self.consumption_joins || !forward;
         if self.consumption_joins && forward {
             for r in 0..self.grid.dimensions {
                 q[r] = self.grid.upper[vertex][r] + self.grid.lower[vertex][r] - q[r];
             }
         }
-        let Some(bucket) = self.grid.bucket_id(opposite, vertex, q) else {
-            return false;
+        if q.iter().take(self.grid.dimensions).any(|x| !x.is_finite()) {
+            return true;
+        }
+        let bucket = match self.grid.bucket_id_checked(opposite, vertex, q) {
+            Ok(Some(bucket)) => bucket,
+            Ok(None) => return false,
+            Err(()) => return true,
         };
         let storage = self.storage(opposite);
-        let key = label.key()
-            + self
-                .cuts
-                .knapsack
-                .partial_cost(g, label.resources(), forward);
+        let knapsack_lower = self.cuts.knapsack.global_cost_lower_bound()
+            .unwrap_or(f64::NEG_INFINITY);
+        let key = crate::core::rounding::add_down(label.key(), knapsack_lower)
+            .unwrap_or(f64::NEG_INFINITY);
         let base_key = key;
-        let scan_all = feasibility_only || (self.cuts.knapsack.active
-            && g.coupled_kernel().is_some_and(|kernel| kernel.has_slope_fronts()));
+        // The complete knapsack charge has its own global lower bound above;
+        // it no longer relies on combining unrelated partial minima.
+        let scan_all = feasibility_only;
         let key = if scan_all {
             f64::NEG_INFINITY
         } else {
@@ -283,7 +294,7 @@ impl<const D: usize> LabelingEngine<D> {
             let row = &storage.buckets[vertex][k];
             if self
                 .ctx()
-                .completion_sum(key, row.completion_bound(self.cuts.knapsack.active))
+                .completion_sum(key, row.completion_bound(false))
                 >= threshold
             {
                 continue;
@@ -375,6 +386,9 @@ impl<const D: usize> LabelingEngine<D> {
         if timer.is_some_and(|(start, limit)| start.elapsed() > limit) {
             return true;
         }
+        if label.vertex >= self.ng.local_elements.len() || label.vertex >= self.grid.internal.len() {
+            return true;
+        }
         if self.branching.resources != 0 && label.branch_state.is_none() {
             return true;
         }
@@ -387,7 +401,10 @@ impl<const D: usize> LabelingEngine<D> {
         });
         let mut ng = 0;
         for (bit, &e) in self.ng.local_elements[label.vertex].iter().enumerate() {
-            if label.visited[e / 64] & (1u64 << (e % 64)) != 0 {
+            let Some(word) = label.visited.get(e / 64) else {
+                return true;
+            };
+            if word & (1u64 << (e % 64)) != 0 {
                 ng |= 1 << bit;
             }
         }

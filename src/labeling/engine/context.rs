@@ -458,9 +458,13 @@ impl<'a, const D: usize> Context<'a, D> {
         };
         let ng = transition.extend(from.ng(), 0)?;
         let internal = self.grid.internal[vertex];
-        let bucket = self
-            .grid
-            .bucket_id(forward, internal, self.grid.coordinate(&resources))?;
+        let bucket = match self.grid.bucket_id_checked(forward, internal, self.grid.coordinate(&resources)) {
+            Ok(bucket) => bucket?,
+            Err(()) => {
+                self.resource_error.store(true, Ordering::Relaxed);
+                return None;
+            }
+        };
         let mut additional_cost = from.additional_cost();
         let cut_words = if CUTS {
             let table = if forward {

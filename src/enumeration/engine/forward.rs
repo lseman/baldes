@@ -34,6 +34,9 @@ impl<const D: usize> Enumeration<D> {
             || cuts.and_then(|c| c.presence).is_some_and(|p| p.active());
         let mut labels = Storage::new(controls.partitions)?;
         labels.preserve_arc_paths = preserve;
+        if let Some(cuts) = cuts {
+            labels.protected_resources = cuts.knapsack.dominance_protected_resources();
+        }
         let mut pruning = PruningFrontier::for_run(preserve);
         let mut paths = PathStorage::new(controls.partitions)?;
         paths.preserve_arc_paths = preserve;
@@ -67,7 +70,7 @@ impl<const D: usize> Enumeration<D> {
             return Err(invalid("invalid source elementarity sets"));
         }
         if let Some(c) = &cuts {
-            c.to_vertex(&mut root);
+            c.to_vertex(&mut root)?;
         }
         labels.insert(g, root, true);
         let step = controls.label_limit / 50;
@@ -97,7 +100,8 @@ impl<const D: usize> Enumeration<D> {
                 continue;
             }
             let v = grid.internal[from.vertex];
-            let Some(bucket) = grid.bucket_id(true, v, grid.coordinate(&from.resources)) else {
+            let Some(bucket) = grid.bucket_id_checked(true, v, grid.coordinate(&from.resources))
+                .map_err(|()| incomplete("enumeration bucket index overflow"))? else {
                 continue;
             };
             for arc in &grid.forward.buckets[v][bucket].arcs {
@@ -142,12 +146,12 @@ impl<const D: usize> Enumeration<D> {
                         physical.cost,
                     )?;
                     next.coupled_state = Some(next_state);
-                    if !next.reduced_cost.is_finite() || !next.original_cost.is_finite() {
-                        return Err(incomplete("coupled enumeration cost overflow"));
-                    }
                 } else {
                     next.reduced_cost = physical.reduced_cost + from.reduced_cost;
                     next.original_cost = from.original_cost + physical.cost;
+                }
+                if !next.reduced_cost.is_finite() || !next.original_cost.is_finite() {
+                    return Err(incomplete("enumeration cost overflow"));
                 }
                 if !next.add_elements(&physical.elements) {
                     continue;
@@ -195,7 +199,7 @@ impl<const D: usize> Enumeration<D> {
                     }
                 }
                 if let Some(c) = &cuts {
-                    c.to_vertex(&mut next);
+                    c.to_vertex(&mut next)?;
                 }
                 if next.vertex == g.sink {
                     if let (Some(branching), Some(state)) = (branching, &next.branch_state) {
@@ -241,6 +245,9 @@ impl<const D: usize> Enumeration<D> {
                         }
                         next.reduced_cost =
                             c.join(g, false, &next, &empty, (next.reduced_cost + 0.0) + 0.0)?;
+                    }
+                    if !next.reduced_cost.is_finite() || !next.original_cost.is_finite() {
+                        return Err(incomplete("enumeration terminal cost overflow"));
                     }
                     if next.reduced_cost > controls.cutoff - EPSILON {
                         pruning.terminal(next.reduced_cost);

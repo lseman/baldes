@@ -124,6 +124,11 @@ impl<const D: usize> Enumeration<D> {
         let mut backward = Storage::new(controls.partitions)?;
         forward.preserve_arc_paths = preserve;
         backward.preserve_arc_paths = preserve;
+        if let Some(cuts) = cuts {
+            let protected = cuts.knapsack.dominance_protected_resources();
+            forward.protected_resources.clone_from(&protected);
+            backward.protected_resources = protected;
+        }
         let mut pruning = PruningFrontier::for_run(preserve);
         let mut paths = PathStorage::new(controls.partitions)?;
         let mut extensions = 0usize;
@@ -178,7 +183,7 @@ impl<const D: usize> Enumeration<D> {
                 return Err(invalid("invalid enumeration root elements"));
             }
             if let Some(c) = &cuts {
-                c.to_vertex(&mut root);
+                c.to_vertex(&mut root)?;
             }
             roots.push(root);
         }
@@ -220,7 +225,8 @@ impl<const D: usize> Enumeration<D> {
                     continue;
                 }
                 let v = grid.internal[from.vertex];
-                let Some(bucket) = grid.bucket_id(direction, v, grid.coordinate(&from.resources))
+                let Some(bucket) = grid.bucket_id_checked(direction, v, grid.coordinate(&from.resources))
+                    .map_err(|()| incomplete("enumeration bucket index overflow"))?
                 else {
                     continue;
                 };
@@ -279,12 +285,12 @@ impl<const D: usize> Enumeration<D> {
                             physical.cost,
                         )?;
                         next.coupled_state = Some(next_state);
-                        if !next.reduced_cost.is_finite() || !next.original_cost.is_finite() {
-                            return Err(incomplete("coupled enumeration cost overflow"));
-                        }
                     } else {
                         next.reduced_cost = physical.reduced_cost + from.reduced_cost;
                         next.original_cost = from.original_cost + physical.cost;
+                    }
+                    if !next.reduced_cost.is_finite() || !next.original_cost.is_finite() {
+                        return Err(incomplete("enumeration cost overflow"));
                     }
                     if !next.add_elements(&physical.elements) {
                         continue;
@@ -428,6 +434,9 @@ impl<const D: usize> Enumeration<D> {
                         {
                             continue;
                         }
+                        if !next.reduced_cost.is_finite() || !next.original_cost.is_finite() {
+                            return Err(incomplete("enumeration terminal cost overflow"));
+                        }
                         if next.reduced_cost > controls.cutoff - EPSILON {
                             pruning.terminal(next.reduced_cost);
                             continue;
@@ -462,7 +471,7 @@ impl<const D: usize> Enumeration<D> {
                             state.custom_machine_enter_vertex();
                         }
                         if let Some(c) = &cuts {
-                            c.to_vertex(&mut next);
+                            c.to_vertex(&mut next)?;
                         }
                         storage.insert(g, next, direction);
                     }
@@ -490,8 +499,8 @@ impl<const D: usize> Enumeration<D> {
                 }
                 let label = &opposite.arena[id];
                 let vertex = grid.internal[label.vertex];
-                if let Some(k) =
-                    grid.bucket_id(consumption, vertex, grid.coordinate(&label.resources))
+                if let Some(k) = grid.bucket_id_checked(consumption, vertex, grid.coordinate(&label.resources))
+                    .map_err(|()| incomplete("enumeration bucket index overflow"))?
                 {
                     buckets[vertex][k].push(id);
                 }
@@ -517,6 +526,9 @@ impl<const D: usize> Enumeration<D> {
                 .min(0.);
                 crate::core::rounding::add_down(lower, correction).unwrap_or(f64::NEG_INFINITY)
             })
+        });
+        let minimum_knapsack_join = cuts.map_or(0., |c| {
+            c.knapsack.global_cost_lower_bound().unwrap_or(f64::NEG_INFINITY)
         });
         for row in &mut buckets {
             if expired() {
@@ -650,7 +662,8 @@ impl<const D: usize> Enumeration<D> {
                         q[r] = grid.upper[vertex][r] + grid.lower[vertex][r] - q[r];
                     }
                 }
-                let Some(k) = grid.bucket_id(consumption, vertex, q) else {
+                let Some(k) = grid.bucket_id_checked(consumption, vertex, q)
+                    .map_err(|()| incomplete("enumeration bucket index overflow"))? else {
                     continue;
                 };
                 let key = label_key(f);
@@ -661,9 +674,12 @@ impl<const D: usize> Enumeration<D> {
                 };
                 let coupled_costs = g.coupled_kernel().is_some_and(|kernel| kernel.has_costs());
                 let ordered_bound = |other: f64| {
-                    if coupled_costs || presence.is_some() || minimum_cut_join != 0. {
+                    if coupled_costs || presence.is_some() || minimum_cut_join != 0.
+                        || minimum_knapsack_join != 0.
+                    {
                         crate::core::rounding::add_down(key, other)
                             .and_then(|v| crate::core::rounding::add_down(v, minimum_cut_join))
+                            .and_then(|v| crate::core::rounding::add_down(v, minimum_knapsack_join))
                             .and_then(|v| {
                                 presence_lower.and_then(|p| crate::core::rounding::add_down(v, p))
                             })
@@ -776,6 +792,9 @@ impl<const D: usize> Enumeration<D> {
                                     f.original_cost + b.original_cost + correction,
                                 )
                             };
+                        if !cost.is_finite() || !original_cost.is_finite() {
+                            return Err(incomplete("enumeration join cost overflow"));
+                        }
                         if cost >= controls.cutoff {
                             pruning.joined(cost);
                             continue;
