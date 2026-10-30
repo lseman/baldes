@@ -512,8 +512,8 @@ impl CoupledKernel {
     }
 
     /// Paired slope relations: forward fronts cover and stay below, with the
-    /// same scalar-order requirement as function relations when charged. A
-    /// shifting cost-unbounded relation may exceed and pay. Returns the penalty.
+    /// same scalar-order requirement as function relations when charged.
+    /// Finite source-domain ceilings require preserving feasible completions.
     fn slope_relations_dominate(
         &self,
         a: &CoupledLabelState,

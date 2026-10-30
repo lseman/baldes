@@ -187,8 +187,22 @@ impl CoupledKernel {
     /// Whether a retained scalar contains every coupled resource charge used
     /// by raw inspection under the current pricing configuration.
     pub(crate) fn has_complete_machine_inspection_contribution(&self) -> bool {
-        self.definitions.len() == 1
-            && self.pricing_activities.is_empty()
+        if !self.pricing_activities.is_empty() {
+            return false;
+        }
+        let mut charged = 0;
+        for resource in self.definitions.iter() {
+            match resource {
+                CoupledResource::Selection { .. }
+                | CoupledResource::SimultaneousPickupDelivery { .. }
+                | CoupledResource::BudgetedLoad { .. }
+                | CoupledResource::BudgetedTime { .. } => {}
+                CoupledResource::CustomResource { .. } => charged += 1,
+                CoupledResource::SlopePaired { .. } if self.front_program_domain => charged += 1,
+                _ => return false,
+            }
+        }
+        charged == 1
             && (self.custom_indices.len() == 1
                 || (self.front_program_domain && self.slope_paired.len() == 1))
     }
@@ -285,13 +299,13 @@ impl CoupledKernel {
             return None;
         }
         if self.custom_indices.len() == 1 {
-            return self.custom_machine_resource_join(0, forward, backward, 0.).ok().flatten();
+            return self.custom_machine_resource_join(self.custom_indices[0], forward, backward, 0.).ok().flatten();
         }
         if !self.front_program_domain || self.slope_paired.len() != 1 {
             return None;
         }
         match self.paired_machine_join_checked(0, forward, backward, descriptor::FrontierBudget::default()) {
-            descriptor::FrontierOutcome::Complete(value) => Some(value.dependent.map_or(0., |cost| 0. + cost)),
+            descriptor::FrontierOutcome::Complete(value) => Some(value.accumulate(0.)),
             descriptor::FrontierOutcome::Empty | descriptor::FrontierOutcome::Unknown(_) => None,
         }
     }

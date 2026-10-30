@@ -27,7 +27,77 @@ pub struct MachineLabelConcatenation {
     pub dependent_cost: f64,
 }
 
+impl MachineLabelConcatenation {
+    /// Apply the native limited-memory cut callback after a successful raw
+    /// pricing-label join. The paired and physical costs are already present.
+    pub fn join_limited_memory_cuts(
+        mut self,
+        info: &crate::cuts::shared::state::CutResourceInfo,
+        vertex: usize,
+        forward: (&[u32; crate::cuts::shared::state::LIMITED_WORDS], f64),
+        backward: (&[u32; crate::cuts::shared::state::LIMITED_WORDS], f64),
+    ) -> FrontierOutcome<Self> {
+        if !self.compatible {
+            return FrontierOutcome::Complete(self);
+        }
+        let Some(vertex_info) = info.vertices.get(vertex) else {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("limited-memory cut join vertex"));
+        };
+        if vertex >= info.vertex_cut_potential.len()
+            || vertex_info.dominance.iter().any(|field| {
+                field.denominator == i32::MIN || usize::try_from(field.word)
+                    .map_or(true, |word| word >= crate::cuts::shared::state::LIMITED_WORDS)
+            })
+        {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("limited-memory cut join layout"));
+        }
+        self.reduced_cost = crate::cuts::shared::state::concatenation_cost(
+            info, vertex, (forward.0, forward.1), (backward.0, backward.1), self.reduced_cost,
+        );
+        FrontierOutcome::Complete(self)
+    }
+
+    /// Apply the native full-memory cut callback after a successful raw
+    /// enumeration-label join. Rejected labels never enter that callback.
+    /// This remains a machine value, not a source-objective certificate.
+    pub fn join_full_memory_cuts(
+        mut self,
+        info: &crate::cuts::shared::state::CutResourceInfo,
+        preparation: &crate::cuts::shared::state::FullPreparation,
+        vertex: usize,
+        forward: (&[u32; crate::cuts::shared::state::FULL_WORDS], f64),
+        backward: (&[u32; crate::cuts::shared::state::FULL_WORDS], f64),
+    ) -> FrontierOutcome<Self> {
+        if !self.compatible {
+            return FrontierOutcome::Complete(self);
+        }
+        if vertex >= info.vertex_cut_potential.len()
+            || preparation.fields.iter().any(|field| {
+                field.denominator == i32::MIN || usize::try_from(field.word)
+                    .map_or(true, |word| word >= crate::cuts::shared::state::FULL_WORDS)
+            })
+        {
+            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("full-memory cut join layout"));
+        }
+        self.reduced_cost = crate::cuts::shared::state::full_memory_concatenation_cost(
+            info, preparation, vertex, (forward.0, forward.1), (backward.0, backward.1),
+            self.reduced_cost,
+        );
+        FrontierOutcome::Complete(self)
+    }
+}
+
 impl MachineConcatenation {
+    /// Apply the paired resource wrapper to an existing raw accumulator.
+    /// Feasibility mode leaves its bits untouched; cost modes add in this
+    /// order, matching the machine wrapper's binary64 operation.
+    pub fn accumulate(&self, previous: f64) -> f64 {
+        match self.dependent {
+            Some(value) => previous + value,
+            None => previous,
+        }
+    }
+
     /// Combine a selected paired join with physical label costs and NG memory.
     /// The paired contribution and additional cost are added before the two
     /// physical label costs are combined with them. This order is observable
@@ -41,25 +111,16 @@ impl MachineConcatenation {
         forward_memory: u64,
         backward_memory: u64,
     ) -> FrontierOutcome<MachineLabelConcatenation> {
-        let compute = || -> Result<MachineLabelConcatenation, FrontierUnknown> {
-            // The label wrapper initializes its output to +0 and the paired
-            // cost wrapper adds the scan result to it in cost modes.
-            let dependent_cost = match self.dependent {
-                Some(value) => finite(0.0 + finite(value)?)?,
-                None => 0.0,
-            };
-            let additional = finite(dependent_cost + finite(additional_cost)?)?;
-            let physical = finite(finite(forward_cost)? + finite(backward_cost)?)?;
-            Ok(MachineLabelConcatenation {
-                compatible: forward_memory & backward_memory == 0,
-                reduced_cost: finite(physical + additional)?,
-                dependent_cost,
-            })
-        };
-        match compute() {
-            Ok(value) => FrontierOutcome::Complete(value),
-            Err(reason) => FrontierOutcome::Unknown(reason),
-        }
+        // These are raw machine outputs, including IEEE infinities and NaNs.
+        // Source-model pruning must independently validate its own bounds.
+        let dependent_cost = self.accumulate(0.0);
+        let additional = dependent_cost + additional_cost;
+        let physical = forward_cost + backward_cost;
+        FrontierOutcome::Complete(MachineLabelConcatenation {
+            compatible: forward_memory & backward_memory == 0,
+            reduced_cost: physical + additional,
+            dependent_cost,
+        })
     }
 }
 
@@ -186,16 +247,10 @@ impl PreparedSlopeRelationArc {
         backward_elements: &[u64; 16],
         budget: FrontierBudget,
     ) -> FrontierOutcome<MachineLabelConcatenation> {
-        let physical = match finite(forward_cost)
-            .and_then(|left| finite(backward_cost).and_then(|right| finite(left + right)))
-            .and_then(|sum| finite(initial_cost).and_then(|initial| finite(sum + initial)))
-        {
-            Ok(value) => value,
-            Err(reason) => return FrontierOutcome::Unknown(reason),
-        };
-        if !initial_dependent.is_finite() {
-            return FrontierOutcome::Unknown(FrontierUnknown::Unsupported("machine enumeration label dependent output"));
-        }
+        let physical = (forward_cost + backward_cost) + initial_cost;
+        // The native wrapper does not read this output before the overlap
+        // check. An overlap preserves it verbatim; otherwise the resource
+        // wrapper first resets it to positive zero.
         if forward_elements.iter().zip(backward_elements).any(|(left, right)| left & right != 0) {
             return FrontierOutcome::Complete(MachineLabelConcatenation {
                 compatible: false,
@@ -205,21 +260,12 @@ impl PreparedSlopeRelationArc {
         }
         match Self::machine_concatenation(forward, backward, ceiling, mode, budget) {
             FrontierOutcome::Complete(selection) => {
-                let dependent_cost = match selection.dependent {
-                    Some(value) => match finite(0.0 + value) {
-                        Ok(value) => value,
-                        Err(reason) => return FrontierOutcome::Unknown(reason),
-                    },
-                    None => 0.0,
-                };
-                match finite(physical + dependent_cost) {
-                    Ok(reduced_cost) => FrontierOutcome::Complete(MachineLabelConcatenation {
-                        compatible: true,
-                        reduced_cost,
-                        dependent_cost,
-                    }),
-                    Err(reason) => FrontierOutcome::Unknown(reason),
-                }
+                let dependent_cost = selection.accumulate(0.0);
+                FrontierOutcome::Complete(MachineLabelConcatenation {
+                    compatible: true,
+                    reduced_cost: physical + dependent_cost,
+                    dependent_cost,
+                })
             }
             FrontierOutcome::Empty => FrontierOutcome::Complete(MachineLabelConcatenation {
                 compatible: false,

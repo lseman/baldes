@@ -1,5 +1,4 @@
 //! Paired raw slope relations: physical dependent state and objective stay separate.
-use super::bounds::Range;
 use super::*;
 use descriptor::{
     FrontierBudget, FrontierOutcome, FrontierUnknown, MachinePathHistory, MachineRootState,
@@ -161,16 +160,11 @@ pub(super) struct PreparedSlopePaired {
     exact_cost: bool,
     integral_costs: bool,
     monotone_constant_transfers: bool,
-    constant_mapping_transfers: bool,
-    constant_backward_mapping: bool,
     cost_lattice: Option<Arc<PreparedCostLattice>>,
     ceiling: f64,
     mode: PairedResourceMode,
     normalization: PairedCostNormalization,
     policy: FrontOperationPolicy,
-    /// Cost-unbounded native mode without a reachable upper bound (the
-    /// reference's 1e12 infinity): a higher front may pay its excess.
-    shifts: bool,
 }
 impl PartialEq for PreparedSlopePaired {
     fn eq(&self, b: &Self) -> bool {
@@ -209,8 +203,6 @@ impl PartialEq for PreparedSlopePaired {
             && self.mode == b.mode
             && self.integral_costs == b.integral_costs
             && self.monotone_constant_transfers == b.monotone_constant_transfers
-            && self.constant_mapping_transfers == b.constant_mapping_transfers
-            && self.constant_backward_mapping == b.constant_backward_mapping
             && self.cost_lattice == b.cost_lattice
             && self.normalization == b.normalization
             && self.policy == b.policy
@@ -759,7 +751,6 @@ impl PreparedSlopePaired {
             .collect::<Result<Vec<_>>>()
             .ok()
             .map(std::sync::Arc::from);
-        let mut shifts = false;
         if mode != PairedResourceMode::Feasibility {
             let first = arcs
                 .first()
@@ -779,9 +770,6 @@ impl PreparedSlopePaired {
                     "raw paired cost requires shared ordered constant dependent bounds",
                 ));
             }
-            shifts = mode == PairedResourceMode::CostUnbounded
-                && policy == FrontOperationPolicy::FrontAlgebra
-                && upper >= 1e12;
             if mode == PairedResourceMode::CostBounded {
                 if witness.value < lower || arcs.iter().any(|arc| arc.waiting < 0) {
                     return Err(invalid("bounded raw paired cost requires nonnegative waiting and initial minimum above the lower bound"));
@@ -866,26 +854,6 @@ impl PreparedSlopePaired {
         // same domains and identity arrivals. T(y)=max(y+c, lower), c>=0,
         // is monotone and T(y)>=y under binary64 arithmetic; any upper bound
         // satisfied by the longer suffix also holds for the shorter one.
-        let constant_mapping_transfers = mode != PairedResourceMode::Feasibility
-            && constant(initial).is_some()
-            && {
-                let domain = initial.domain();
-                domain.0 == 0.
-                    && domain.1 > 0.
-                    && !arcs.is_empty()
-                    && arcs.iter().all(|arc| {
-                        arc.waiting == 0
-                            && arc.arrival.pairs() == [(0., 0.), (1., domain.1)]
-                            && [&arc.increment, &arc.lower, &arc.upper].iter().all(|f| {
-                                f.domain() == domain && f.pairs().len() == 2 && constant(f).is_some()
-                            })
-                            && constant(&arc.increment).is_some_and(|value| value >= 0.)
-                    })
-            };
-        let constant_backward_mapping = constant_mapping_transfers
-            && arcs.iter().all(|arc| {
-                constant(&arc.upper).is_some_and(|upper| upper.to_bits() == ceiling.to_bits())
-            });
         let monotone_constant_transfers = mode != PairedResourceMode::Feasibility
             && constant(initial).is_some()
             && arcs.first().is_some_and(|first| {
@@ -933,14 +901,11 @@ impl PreparedSlopePaired {
             exact_cost,
             integral_costs,
             monotone_constant_transfers,
-            constant_mapping_transfers,
-            constant_backward_mapping,
             cost_lattice,
             ceiling,
             mode,
             normalization,
             policy,
-            shifts,
         })
     }
     /// Forward fronts cover and stay below under this resource's policy.
@@ -1005,7 +970,7 @@ impl PreparedSlopePaired {
             };
         }
         if scale < 0. {
-            if self.shifts || self.policy != FrontOperationPolicy::StrictDomain {
+            if self.policy != FrontOperationPolicy::StrictDomain {
                 return None;
             }
             let (Some(front_a), Some(front_b)) = (&a.upper_negative, &b.upper_negative) else {
@@ -1021,16 +986,10 @@ impl PreparedSlopePaired {
         let (Some(front_a), Some(front_b)) = (&a.front, &b.front) else {
             return None;
         };
-        if !(self.shifts && scale != 0.) {
-            return front_a.covers_below(front_b, self.policy).then_some(0.);
-        }
-        let excess = front_a.excess(front_b, self.policy)?;
-        let gap = Range::point(excess)
-            .multiply(Range::point(scale))
-            .add(Range::point(b.minimum))
-            .subtract(Range::point(a.minimum))
-            .hi;
-        gap.is_finite().then_some(gap.max(0.))
+        // A finite source-domain ceiling remains a feasibility constraint,
+        // even when its value is the machine's conventional infinity. Paying
+        // for a higher front cannot preserve completions that reach it.
+        front_a.covers_below(front_b, self.policy).then_some(0.)
     }
     pub(super) fn has_costs(&self) -> bool {
         self.mode != PairedResourceMode::Feasibility
@@ -1258,19 +1217,9 @@ impl PreparedSlopePaired {
             };
             let mut source = None;
             if self.mode != PairedResourceMode::Feasibility && scale != 0. {
-                let unavailable = || {
-                    crate::incomplete(
-                        "paired machine backward objective normalization is unavailable",
-                    )
-                };
-                if scale < 0.
-                    || !self.constant_backward_mapping
-                    || self.waiting_windows.is_some()
-                    || ceiling.to_bits() != self.ceiling.to_bits()
-                    || history.len().saturating_mul(128) > budget.max_operations
-                {
-                    return Err(unavailable());
-                }
+                // This carries a source suffix program, not a machine-to-source
+                // objective conversion. Its provisional cost stays zero; a
+                // join replays the suffix from the forward source state.
                 let mut previous = old.clone();
                 previous.machine_history = None;
                 let next = self
@@ -1282,18 +1231,7 @@ impl PreparedSlopePaired {
                         source_scale,
                         false,
                     )?
-                    .ok_or_else(unavailable)?;
-                let descriptor::FrontierOutcome::Complete(expected) =
-                    next.raw_upper.as_deref().ok_or_else(unavailable)?.outcome()
-                else {
-                    return Err(unavailable());
-                };
-                if !Self::same_machine_constant_front(
-                    expected,
-                    &SlopeFront::from_prepared(front.clone()),
-                ) {
-                    return Err(unavailable());
-                }
+                    .ok_or_else(|| crate::incomplete("paired source suffix unavailable"))?;
                 source = Some(next);
             }
             let next_history = outcome(history.append_backward(arc, front, bits, key, budget))?
@@ -1347,26 +1285,23 @@ impl PreparedSlopePaired {
         }))
     }
 
-    fn same_machine_constant_front(source: &SlopeFront, machine: &SlopeFront) -> bool {
-        let (Some(source_value), Some(machine_value)) = (
-            Self::machine_constant_value(source),
-            Self::machine_constant_value(machine),
-        ) else {
-            return false;
-        };
-        let [source] = source.components() else { return false; };
-        let [machine] = machine.components() else { return false; };
-        let (source_lower, source_upper) = source.domain();
-        let (machine_lower, machine_upper) = machine.domain();
-        source_value.to_bits() == machine_value.to_bits()
-            && source_lower.to_bits() == machine_lower.to_bits()
-            && source_upper.to_bits() == machine_upper.to_bits()
-            && (source_upper - source_lower).is_finite()
+    fn same_machine_front(source: &SlopeFront, machine: &SlopeFront) -> bool {
+        let source = source.components();
+        let machine = machine.components();
+        source.len() == machine.len()
+            && source.iter().zip(machine).all(|(a, b)| {
+                !a.is_machine_zero_length()
+                    && !b.is_machine_zero_length()
+                    && a.pairs().len() == b.pairs().len()
+                    && a.pairs().iter().zip(b.pairs()).all(|(a, b)| {
+                        a.0.to_bits() == b.0.to_bits() && a.1.to_bits() == b.1.to_bits()
+                    })
+            })
     }
 
     /// Establish compatibility rather than interpreting a raw key as an
     /// objective. Replay the declared source program and require identical
-    /// constant fronts at every retained machine state, including the root.
+    /// prepared fronts at every retained machine state, including the root.
     fn mapped_machine_objective(
         &self,
         history: &MachinePathHistory,
@@ -1376,10 +1311,7 @@ impl PreparedSlopePaired {
     ) -> Result<f64> {
         let unavailable =
             || crate::incomplete("paired machine objective normalization is unavailable");
-        if weighted_scale < 0.
-            || !self.constant_mapping_transfers
-            || self.waiting_windows.is_some()
-        {
+        if weighted_scale < 0. {
             return Err(unavailable());
         }
         let started = std::time::Instant::now();
@@ -1393,7 +1325,7 @@ impl PreparedSlopePaired {
             let Some(source) = &source.front else {
                 return false;
             };
-            Self::same_machine_constant_front(source, machine)
+            Self::same_machine_front(source, machine)
         };
         let mut source = self.root(true, false);
         for (index, snapshot) in snapshots.into_iter().enumerate() {
