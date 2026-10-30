@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "baldes"
-version = "2.0.2"
+version = "2.0.3"
 edition = "2021"
 rust-version = "1.70"
 description = "BALDES 2.0: bucket-graph labeling RCSP solver and branch-cut-and-price root, written in Rust"
