@@ -89,16 +89,11 @@ and binary/source hashes, solver versions, commands, build description, bounds,
 gaps, statuses and both <strong>process wall time</strong> and <strong>internal solve time</strong>.</p>
 <p>Gurobi's TimeLimit covers optimization after model construction; BALDES's limit
 also includes node master construction. Read build/process times alongside
-internal solve times. Neither algorithm receives an external warm start; BALDES
-internally seeds singleton columns and a greedy feasible route packing. BALDES's default runner work budget
-is 1,000,000 labels per pricing call (<code>--max-labels</code> changes it). Work limits and
-incomplete pricing remain visible and do not certify optimality. Completed
-pricing columns/statistics, incumbents and relaxation bounds are retained.
-Column generation defaults to NG prepricing with eight-customer memories;
-<code>--ng-size 0</code> on the runner disables this stage. Every emitted column is replayed
-with true stochastic recourse; cyclic walks are excluded from incumbents.
-The reverse Bellman-vector fallback can be compared with the original
-adapter using <code>stochastic_instance ... --bidirectional</code>.
+internal solve times. BALDES uses conventional routing pricing and Theta recourse
+cuts, with rank-one and capacity cuts enabled. Initial NG neighborhoods have
+size eight by default; <code>--ng-size</code> changes that size. Dynamic NG mode defaults
+to -1 (pause strengthening while rank-one rows are active). The routing pool
+heuristic supplies incumbents; no previous run is loaded automatically.
 Pass <code>--hgs-seconds 3 --hgs-seed 0</code> to the paired runner to enable the
 mean-demand HGS warm start for BALDES. Its budget is included in BALDES's
 solve limit and the report records the option and route-validation counts.</p>
