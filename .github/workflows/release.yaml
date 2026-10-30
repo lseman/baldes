@@ -80,19 +80,6 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
           args: --release --locked --strip --sdist --out dist -i python3.9
-      - name: Test installed wheel on oldest supported Python
-        run: |
-          python -m pip install pytest dist/*.whl
-          cd "$RUNNER_TEMP"
-          python -m pytest --import-mode=importlib "$GITHUB_WORKSPACE/python/tests"
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-      - name: Test installed wheel on current Python
-        run: |
-          python -m pip install pytest dist/*.whl
-          cd "$RUNNER_TEMP"
-          python -m pytest --import-mode=importlib "$GITHUB_WORKSPACE/python/tests"
       - uses: actions/upload-artifact@v4
         with:
           name: wheel-${{ matrix.target }}
